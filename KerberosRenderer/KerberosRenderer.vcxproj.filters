@@ -122,5 +122,11 @@
     <ClInclude Include="vendor\glfw-3.4\include\GLFW\glfw3native.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="src\io.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="src\shaders\simple.slang" />
   </ItemGroup>
 </Project>
