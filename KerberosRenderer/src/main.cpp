@@ -5,12 +5,18 @@
 import vulkan_hpp;
 #endif
 
+#define VK_USE_PLATFORM_WIN32_KHR
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
+#define GLFW_EXPOSE_NATIVE_WIN32
+#include <GLFW/glfw3native.h>
 
 #include <iostream>
 #include <stdexcept>
 #include <cstdlib>
+#include <cstdint>
+#include <limits>
+#include <algorithm>
 #include <vector>
 #include <map>
 
@@ -48,15 +54,25 @@ static VKAPI_ATTR vk::Bool32 VKAPI_CALL DebugCallback(
 class HelloTriangleApplication
 {
 private:
-	GLFWwindow* m_Window = nullptr;
+	GLFWwindow* window = nullptr;
 
-	vk::raii::Context m_Context;
-	vk::raii::Instance m_Instance = nullptr;
-	vk::raii::DebugUtilsMessengerEXT m_DebugMessenger = nullptr;
+	vk::raii::Context context;
+	vk::raii::Instance instance = nullptr;
+	vk::raii::DebugUtilsMessengerEXT debugMessenger = nullptr;
 
-	vk::raii::PhysicalDevice m_PhysicalDevice = nullptr;
-	vk::raii::Device m_Device = nullptr;
-	vk::raii::Queue m_GraphicsQueue = nullptr;
+	vk::raii::PhysicalDevice physicalDevice = nullptr;
+	vk::raii::Device device = nullptr;
+	vk::raii::Queue graphicsQueue = nullptr;
+	vk::raii::Queue presentQueue = nullptr;
+
+	vk::raii::SurfaceKHR surface = nullptr;
+
+	vk::raii::SwapchainKHR swapChain = nullptr;
+	vk::Format swapChainImageFormat = vk::Format::eUndefined;
+	vk::Extent2D swapChainExtent;
+
+	std::vector<vk::Image> swapChainImages;
+	std::vector<vk::ImageView> swapChainImageViews;
 
 public:
 	void run()
@@ -75,27 +91,30 @@ private:
 		glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
 		glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
 
-		m_Window = glfwCreateWindow(width, height, "Vulkan", nullptr, nullptr);
+		window = glfwCreateWindow(width, height, "Vulkan", nullptr, nullptr);
 	}
 
 	void InitVulkan()
 	{
 		CreateInstance();
 		SetupDebugMessenger();
+		CreateSurface();
 		PickPhysicalDevice();
 		CreateLogicalDevice();
+		CreateSwapChain();
+		CreateSwapChainImageViews();
 	}
 
 	void MainLoop() const
 	{
-		while (!glfwWindowShouldClose(m_Window)) {
+		while (!glfwWindowShouldClose(window)) {
 			glfwPollEvents();
 		}
 	}
 
 	void Cleanup() const
 	{
-		glfwDestroyWindow(m_Window);
+		glfwDestroyWindow(window);
 
 		glfwTerminate();
 	}
@@ -116,7 +135,7 @@ private:
 		}
 
 		// Check if the required layers are supported by the Vulkan implementation.
-		auto layerProperties = m_Context.enumerateInstanceLayerProperties();
+		auto layerProperties = context.enumerateInstanceLayerProperties();
 		if (std::ranges::any_of(requiredLayers, [&layerProperties](auto const& requiredLayer) {
 			return std::ranges::none_of(layerProperties,
 										[requiredLayer](auto const& layerProperty)
@@ -129,7 +148,7 @@ private:
 		const auto requiredExtensions = GetRequiredExtensions();
 
 		// Check if the required extensions are supported by the Vulkan implementation.
-		auto extensionProperties = m_Context.enumerateInstanceExtensionProperties();
+		auto extensionProperties = context.enumerateInstanceExtensionProperties();
 		for (auto const& requiredExtension : requiredExtensions)
 		{
 			if (std::ranges::none_of(extensionProperties,
@@ -148,7 +167,7 @@ private:
 			.ppEnabledExtensionNames = requiredExtensions.data()
 		};
 
-		m_Instance = vk::raii::Instance{m_Context, createInfo};
+		instance = vk::raii::Instance{context, createInfo};
 	}
 
 	void SetupDebugMessenger() {
@@ -162,7 +181,7 @@ private:
 			.pfnUserCallback = &DebugCallback
 		};
 
-		m_DebugMessenger = m_Instance.createDebugUtilsMessengerEXT(debugUtilsMessengerCreateInfoEXT);
+		debugMessenger = instance.createDebugUtilsMessengerEXT(debugUtilsMessengerCreateInfoEXT);
 	}
 
 	static std::vector<const char*> GetRequiredExtensions() 
@@ -179,9 +198,18 @@ private:
 		return extensions;
 	}
 
+	void CreateSurface()
+	{
+		VkSurfaceKHR _surface;
+		if (glfwCreateWindowSurface(static_cast<VkInstance>(*instance), window, nullptr, &_surface) != VK_SUCCESS) {
+			throw std::runtime_error("failed to create window surface!");
+		}
+		surface = vk::raii::SurfaceKHR{ instance, _surface };
+	}
+
 	void PickPhysicalDevice()
 	{
-		const auto devices = m_Instance.enumeratePhysicalDevices();
+		const auto devices = instance.enumeratePhysicalDevices();
 		if (devices.empty()) {
 			throw std::runtime_error("Failed to find GPUs with Vulkan support!");
 		}
@@ -204,7 +232,7 @@ private:
 			}
 			isSuitable = isSuitable && found;
 			if (isSuitable) {
-				m_PhysicalDevice = device;
+				physicalDevice = device;
 			}
 			return isSuitable;
 		});
@@ -240,10 +268,49 @@ private:
 
 	void CreateLogicalDevice()
 	{
-		std::vector<vk::QueueFamilyProperties> queueFamilyProperties = m_PhysicalDevice.getQueueFamilyProperties();
-		const uint32_t graphicsIndex = FindQueueFamilies(m_PhysicalDevice);
+		std::vector<vk::QueueFamilyProperties> queueFamilyProperties = physicalDevice.getQueueFamilyProperties();
+		uint32_t graphicsIndex = FindQueueFamilies(physicalDevice);
+
+		// determine a queueFamilyIndex that supports present
+	    // first check if the graphicsIndex is good enough
+		uint32_t presentIndex = physicalDevice.getSurfaceSupportKHR(graphicsIndex, *surface)
+			? graphicsIndex
+			: static_cast<uint32_t>(queueFamilyProperties.size());
+
+		if (presentIndex == queueFamilyProperties.size())
+		{
+			// the graphicsIndex doesn't support present -> look for another family index that supports both
+			// graphics and present
+			for (size_t i = 0; i < queueFamilyProperties.size(); i++)
+			{
+				if ((queueFamilyProperties[i].queueFlags & vk::QueueFlagBits::eGraphics) &&
+					physicalDevice.getSurfaceSupportKHR(static_cast<uint32_t>(i), *surface))
+				{
+					graphicsIndex = static_cast<uint32_t>(i);
+					presentIndex = graphicsIndex;
+					break;
+				}
+			}
+			if (presentIndex == queueFamilyProperties.size())
+			{
+				// there's nothing like a single family index that supports both graphics and present -> look for another
+				// family index that supports present
+				for (size_t i = 0; i < queueFamilyProperties.size(); i++)
+				{
+					if (physicalDevice.getSurfaceSupportKHR(static_cast<uint32_t>(i), *surface))
+					{
+						presentIndex = static_cast<uint32_t>(i);
+						break;
+					}
+				}
+			}
+		}
+		if ((graphicsIndex == queueFamilyProperties.size()) || (presentIndex == queueFamilyProperties.size()))
+		{
+			throw std::runtime_error("Could not find a queue for graphics or present -> terminating");
+		}
 		
-		constexpr float queuePriority = 1.0f;
+		constexpr float queuePriority = 0.5f;
 		vk::DeviceQueueCreateInfo deviceQueueCreateInfo { 
 			.queueFamilyIndex = graphicsIndex,
 			.queueCount = 1,
@@ -265,9 +332,112 @@ private:
 			.ppEnabledExtensionNames = deviceExtensions.data()
 		};
 
-		m_Device = vk::raii::Device{ m_PhysicalDevice, deviceCreateInfo };
+		device = vk::raii::Device{ physicalDevice, deviceCreateInfo };
 
-		m_GraphicsQueue = m_Device.getQueue(graphicsIndex, 0);
+		graphicsQueue = device.getQueue(graphicsIndex, 0);
+		presentQueue = device.getQueue(presentIndex, 0);
+	}
+
+	static vk::SurfaceFormatKHR ChooseSwapSurfaceFormat(const std::vector<vk::SurfaceFormatKHR>& availableFormats) 
+	{
+		for (const auto& availableFormat : availableFormats) {
+			if (availableFormat.format == vk::Format::eB8G8R8A8Srgb && availableFormat.colorSpace == vk::ColorSpaceKHR::eSrgbNonlinear) {
+				return availableFormat;
+			}
+		}
+
+		return availableFormats[0];
+	}
+
+	static vk::PresentModeKHR ChooseSwapPresentMode(const std::vector<vk::PresentModeKHR>& availablePresentModes) 
+	{
+		for (const auto& availablePresentMode : availablePresentModes) {
+			if (availablePresentMode == vk::PresentModeKHR::eMailbox) {
+				return availablePresentMode;
+			}
+		}
+
+		// FIFO is guaranteed to be available
+		return vk::PresentModeKHR::eFifo;
+	}
+
+	vk::Extent2D ChooseSwapExtent(const vk::SurfaceCapabilitiesKHR& capabilities) 
+	{
+		if (capabilities.currentExtent.width != std::numeric_limits<uint32_t>::max()) {
+			return capabilities.currentExtent;
+		}
+		
+		int width, height;
+		glfwGetFramebufferSize(window, &width, &height);
+
+		return {
+			std::clamp(static_cast<uint32_t>(width), capabilities.minImageExtent.width, capabilities.maxImageExtent.width),
+			std::clamp(static_cast<uint32_t>(height), capabilities.minImageExtent.height, capabilities.maxImageExtent.height)
+		};
+	}
+
+	void CreateSwapChain()
+	{
+		const auto surfaceCapabilities = physicalDevice.getSurfaceCapabilitiesKHR(surface);
+		const auto swapChainSurfaceFormat = ChooseSwapSurfaceFormat(physicalDevice.getSurfaceFormatsKHR(surface));
+		const auto extent = ChooseSwapExtent(surfaceCapabilities);
+
+		auto minImageCount = std::max(3u, surfaceCapabilities.minImageCount);
+		minImageCount = (surfaceCapabilities.maxImageCount > 0 && minImageCount > surfaceCapabilities.maxImageCount) 
+			? surfaceCapabilities.maxImageCount 
+			: minImageCount;
+
+		uint32_t imageCount = surfaceCapabilities.minImageCount + 1;
+		if (surfaceCapabilities.maxImageCount > 0 && imageCount > surfaceCapabilities.maxImageCount) {
+			imageCount = surfaceCapabilities.maxImageCount;
+		}
+
+		const vk::PresentModeKHR presentMode = ChooseSwapPresentMode(physicalDevice.getSurfacePresentModesKHR(surface));
+
+		const vk::SwapchainCreateInfoKHR swapChainCreateInfo{
+			.flags = vk::SwapchainCreateFlagsKHR(), 
+			.surface = surface, 
+			.minImageCount = minImageCount,
+			.imageFormat = swapChainSurfaceFormat.format, 
+			.imageColorSpace = swapChainSurfaceFormat.colorSpace,
+			.imageExtent = extent, 
+			.imageArrayLayers = 1,
+			.imageUsage = vk::ImageUsageFlagBits::eColorAttachment, 
+			.imageSharingMode = vk::SharingMode::eExclusive,
+			.preTransform = surfaceCapabilities.currentTransform, 
+			.compositeAlpha = vk::CompositeAlphaFlagBitsKHR::eOpaque,
+			.presentMode = presentMode,
+			.clipped = true, 
+			.oldSwapchain = nullptr };
+
+		swapChain = vk::raii::SwapchainKHR(device, swapChainCreateInfo);
+		swapChainImageFormat = swapChainSurfaceFormat.format;
+		swapChainExtent = extent;
+
+		swapChainImages = swapChain.getImages();
+	}
+
+	void CreateSwapChainImageViews()
+	{
+		swapChainImageViews.clear();
+
+		vk::ImageViewCreateInfo imageViewCreateInfo{ 
+			.viewType = vk::ImageViewType::e2D, 
+			.format = swapChainImageFormat,
+			.subresourceRange = {
+				.aspectMask = vk::ImageAspectFlagBits::eColor, 
+				.baseMipLevel = 0, 
+				.levelCount = 1,
+				.baseArrayLayer = 0, 
+				.layerCount = 1 
+		    }
+		};
+
+		for (const auto image : swapChainImages) {
+			imageViewCreateInfo.image = image;
+			vk::raii::ImageView imageView{ device, imageViewCreateInfo };
+			swapChainImageViews.emplace_back(imageView);
+		}
 	}
 };
 
