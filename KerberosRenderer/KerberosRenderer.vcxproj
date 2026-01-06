@@ -130,6 +130,7 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="src\Buffer.cpp" />
     <ClCompile Include="src\main.cpp" />
     <ClCompile Include="vendor\glfw-3.4\src\context.c" />
     <ClCompile Include="vendor\glfw-3.4\src\egl_context.c" />
@@ -161,7 +162,10 @@
     <ClCompile Include="vendor\imgui\imgui_widgets.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="src\Buffer.hpp" />
     <ClInclude Include="src\io.hpp" />
+    <ClInclude Include="src\Utils.hpp" />
+    <ClInclude Include="src\Vulkan.hpp" />
     <ClInclude Include="vendor\glfw-3.4\include\GLFW\glfw3.h" />
     <ClInclude Include="vendor\glfw-3.4\include\GLFW\glfw3native.h" />
     <ClInclude Include="vendor\imgui\backends\imgui_impl_glfw.h" />

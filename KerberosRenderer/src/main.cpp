@@ -1,15 +1,12 @@
-#if defined(__INTELLISENSE__) || !defined(USE_CPP20_MODULES)
-#define VULKAN_HPP_NO_STRUCT_CONSTRUCTORS
-#include <vulkan/vulkan_raii.hpp>
-#else
-import vulkan_hpp;
-#endif
+#include "Vulkan.hpp"
 
 #define VK_USE_PLATFORM_WIN32_KHR
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
 #define GLFW_EXPOSE_NATIVE_WIN32
 #include <GLFW/glfw3native.h>
+
+#include <glm/glm.hpp>
 
 #include <iostream>
 #include <stdexcept>
@@ -19,8 +16,11 @@ import vulkan_hpp;
 #include <algorithm>
 #include <vector>
 #include <map>
+#include <array>
 
+#include "Buffer.hpp"
 #include "io.hpp"
+#include "Utils.hpp"
 
 constexpr uint32_t width = 800;
 constexpr uint32_t height = 600;
@@ -52,6 +52,34 @@ static VKAPI_ATTR vk::Bool32 VKAPI_CALL DebugCallback(
 
 	return vk::False;
 }
+
+struct Vertex
+{
+	glm::vec2 pos;
+	glm::vec3 color;
+
+	static vk::VertexInputBindingDescription GetBindingDescription() {
+		return { 0, sizeof(Vertex), vk::VertexInputRate::eVertex };
+	}
+
+	static std::array<vk::VertexInputAttributeDescription, 2> GetAttributeDescriptions() {
+		return {
+			vk::VertexInputAttributeDescription(0, 0, vk::Format::eR32G32Sfloat, offsetof(Vertex, pos)),
+			vk::VertexInputAttributeDescription(1, 0, vk::Format::eR32G32B32Sfloat, offsetof(Vertex, color))
+		};
+	}
+};
+
+const std::vector<Vertex> vertices = {
+	{{-0.5f, -0.5f}, {1.0f, 0.0f, 0.0f}},
+	{{0.5f, -0.5f}, {0.0f, 1.0f, 0.0f}},
+	{{0.5f, 0.5f}, {0.0f, 0.0f, 1.0f}},
+	{{-0.5f, 0.5f}, {1.0f, 1.0f, 1.0f}}
+};
+
+const std::vector<uint16_t> indices = {
+	0, 1, 2, 2, 3, 0
+};
 
 constexpr int MAX_FRAMES_IN_FLIGHT = 2;
 
@@ -94,6 +122,11 @@ private:
 
 	uint32_t frameIndex = 0;
 
+	vk::raii::Buffer vertexBuffer = nullptr;
+	vk::raii::DeviceMemory vertexBufferMemory = nullptr;
+	vk::raii::Buffer indexBuffer = nullptr;
+	vk::raii::DeviceMemory indexBufferMemory = nullptr;
+
 public:
 	void run()
 	{
@@ -133,6 +166,8 @@ private:
 		CreateSwapChainImageViews();
 		CreateGraphicsPipeline();
 		CreateCommandPool();
+		CreateVertexBuffer();
+		CreateIndexBuffer();
 		CreateCommandBuffers();
 		CreateSyncObjects();
 	}
@@ -211,6 +246,65 @@ private:
 		frameIndex = (frameIndex + 1) % MAX_FRAMES_IN_FLIGHT;
 
 		frameIndex = (frameIndex + 1) % MAX_FRAMES_IN_FLIGHT;
+	}
+
+	void RecordCommandBuffer(const uint32_t imageIndex) const
+	{
+		commandBuffers[frameIndex].begin({});
+
+		TransitionImageLayout(
+			commandBuffers[frameIndex],
+			imageIndex,
+			vk::ImageLayout::eUndefined,
+			vk::ImageLayout::eColorAttachmentOptimal,
+			{},
+			vk::AccessFlagBits2::eColorAttachmentWrite,
+			vk::PipelineStageFlagBits2::eColorAttachmentOutput,
+			vk::PipelineStageFlagBits2::eColorAttachmentOutput
+		);
+
+		constexpr vk::ClearValue clearColor = vk::ClearColorValue(0.0f, 0.0f, 0.0f, 1.0f);
+		vk::RenderingAttachmentInfo attachmentInfo = {
+			.imageView = swapChainImageViews[imageIndex],
+			.imageLayout = vk::ImageLayout::eColorAttachmentOptimal,
+			.loadOp = vk::AttachmentLoadOp::eClear,
+			.storeOp = vk::AttachmentStoreOp::eStore,
+			.clearValue = clearColor
+		};
+
+		const vk::RenderingInfo renderingInfo = {
+			.renderArea = {.offset = {.x = 0, .y = 0 }, .extent = swapChainExtent },
+			.layerCount = 1,
+			.colorAttachmentCount = 1,
+			.pColorAttachments = &attachmentInfo
+		};
+
+		commandBuffers[frameIndex].beginRendering(renderingInfo);
+
+		commandBuffers[frameIndex].bindPipeline(vk::PipelineBindPoint::eGraphics, graphicsPipeline);
+		commandBuffers[frameIndex].bindVertexBuffers(0, *vertexBuffer, {0});
+		commandBuffers[frameIndex].bindIndexBuffer(*indexBuffer, 0, vk::IndexType::eUint16);
+
+		commandBuffers[frameIndex].setViewport(0, vk::Viewport{ 0.0f, 0.0f, static_cast<float>(swapChainExtent.width), static_cast<float>(swapChainExtent.height), 0.0f, 1.0f });
+		commandBuffers[frameIndex].setScissor(0, vk::Rect2D{ vk::Offset2D(0, 0), swapChainExtent });
+
+		commandBuffers[frameIndex].drawIndexed(indices.size(), 1, 0, 0, 0);
+
+		commandBuffers[frameIndex].endRendering();
+
+		// After rendering, transition the swapchain image to PRESENT_SRC
+		TransitionImageLayout(
+			commandBuffers[frameIndex],
+			imageIndex,
+			vk::ImageLayout::eColorAttachmentOptimal,
+			vk::ImageLayout::ePresentSrcKHR,
+			vk::AccessFlagBits2::eColorAttachmentWrite,
+			{},
+			vk::PipelineStageFlagBits2::eColorAttachmentOutput,
+			vk::PipelineStageFlagBits2::eBottomOfPipe
+		);
+
+		commandBuffers[frameIndex].end();
 	}
 
 	void CreateInstance()
@@ -564,7 +658,14 @@ private:
 			.pDynamicStates = dynamicStates.data()
 		};
 
-		vk::PipelineVertexInputStateCreateInfo vertexInputInfo;
+		auto bindingDescription = Vertex::GetBindingDescription();
+		auto attributeDescriptions = Vertex::GetAttributeDescriptions();
+		vk::PipelineVertexInputStateCreateInfo vertexInputInfo{
+			.vertexBindingDescriptionCount = 1,
+			.pVertexBindingDescriptions = &bindingDescription,
+			.vertexAttributeDescriptionCount = static_cast<uint32_t>(attributeDescriptions.size()),
+			.pVertexAttributeDescriptions = attributeDescriptions.data(),
+		};
 
 		vk::PipelineInputAssemblyStateCreateInfo inputAssembly{ .topology = vk::PrimitiveTopology::eTriangleList };
 
@@ -631,6 +732,65 @@ private:
 		commandPool = vk::raii::CommandPool(device, poolInfo);
 	}
 
+	
+
+	void CreateVertexBuffer() 
+	{
+		const vk::DeviceSize bufferSize = sizeof(vertices[0]) * vertices.size();
+		vk::BufferCreateInfo stagingInfo{ .size = bufferSize, .usage = vk::BufferUsageFlagBits::eTransferSrc, .sharingMode = vk::SharingMode::eExclusive };
+		vk::raii::Buffer stagingBuffer(device, stagingInfo);
+		vk::MemoryRequirements memRequirementsStaging = stagingBuffer.getMemoryRequirements();
+		const vk::MemoryAllocateInfo memoryAllocateInfoStaging{
+			.allocationSize = memRequirementsStaging.size,
+			.memoryTypeIndex = FindMemoryType(physicalDevice, memRequirementsStaging.memoryTypeBits,
+			                                  vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent)
+		};
+		const vk::raii::DeviceMemory stagingBufferMemory(device, memoryAllocateInfoStaging);
+
+		stagingBuffer.bindMemory(stagingBufferMemory, 0);
+		void* dataStaging = stagingBufferMemory.mapMemory(0, stagingInfo.size);
+		memcpy(dataStaging, vertices.data(), stagingInfo.size);
+		stagingBufferMemory.unmapMemory();
+
+		const vk::BufferCreateInfo bufferInfo{ .size = bufferSize,  .usage = vk::BufferUsageFlagBits::eVertexBuffer | vk::BufferUsageFlagBits::eTransferDst, .sharingMode = vk::SharingMode::eExclusive };
+		vertexBuffer = vk::raii::Buffer(device, bufferInfo);
+
+		const vk::MemoryRequirements memRequirements = vertexBuffer.getMemoryRequirements();
+		const vk::MemoryAllocateInfo memoryAllocateInfo{
+			.allocationSize = memRequirements.size,
+			.memoryTypeIndex = FindMemoryType(physicalDevice, memRequirements.memoryTypeBits,
+			                                  vk::MemoryPropertyFlagBits::eDeviceLocal)
+		};
+		vertexBufferMemory = vk::raii::DeviceMemory(device, memoryAllocateInfo);
+
+		vertexBuffer.bindMemory(*vertexBufferMemory, 0);
+
+		CopyBuffer(device, commandPool, graphicsQueue, stagingBuffer, vertexBuffer, stagingInfo.size);
+	}
+
+	void CreateIndexBuffer()
+	{
+		const vk::DeviceSize bufferSize = sizeof(indices[0]) * indices.size();
+
+		vk::raii::Buffer stagingBuffer({});
+		vk::raii::DeviceMemory stagingBufferMemory({});
+		CreateBuffer(device, physicalDevice, bufferSize,
+					 vk::BufferUsageFlagBits::eTransferSrc,
+					 vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent,
+					 stagingBuffer, stagingBufferMemory);
+
+		void* data = stagingBufferMemory.mapMemory(0, bufferSize);
+		memcpy(data, indices.data(), bufferSize);
+		stagingBufferMemory.unmapMemory();
+
+		CreateBuffer(device, physicalDevice, bufferSize, 
+					 vk::BufferUsageFlagBits::eTransferDst | vk::BufferUsageFlagBits::eIndexBuffer, 
+					 vk::MemoryPropertyFlagBits::eDeviceLocal, 
+					 indexBuffer, indexBufferMemory);
+
+		CopyBuffer(device, commandPool, graphicsQueue, stagingBuffer, indexBuffer, bufferSize);
+	}
+
 	void CreateCommandBuffers()
 	{
 		const vk::CommandBufferAllocateInfo allocInfo{ 
@@ -656,63 +816,6 @@ private:
 			presentCompleteSemaphores.emplace_back(device, vk::SemaphoreCreateInfo());
 			inFlightFences.emplace_back(device, vk::FenceCreateInfo{ .flags = vk::FenceCreateFlagBits::eSignaled });
 		}
-	}
-
-	void RecordCommandBuffer(const uint32_t imageIndex) const
-	{
-		commandBuffers[frameIndex].begin({});
-
-		TransitionImageLayout(
-			commandBuffers[frameIndex],
-			imageIndex,
-			vk::ImageLayout::eUndefined,
-			vk::ImageLayout::eColorAttachmentOptimal,
-			{},
-			vk::AccessFlagBits2::eColorAttachmentWrite,
-			vk::PipelineStageFlagBits2::eColorAttachmentOutput,
-			vk::PipelineStageFlagBits2::eColorAttachmentOutput
-		);
-
-		constexpr vk::ClearValue clearColor = vk::ClearColorValue(0.0f, 0.0f, 0.0f, 1.0f);
-		vk::RenderingAttachmentInfo attachmentInfo = {
-			.imageView = swapChainImageViews[imageIndex],
-			.imageLayout = vk::ImageLayout::eColorAttachmentOptimal,
-			.loadOp = vk::AttachmentLoadOp::eClear,
-			.storeOp = vk::AttachmentStoreOp::eStore,
-			.clearValue = clearColor
-		};
-
-		const vk::RenderingInfo renderingInfo = {
-			.renderArea = { .offset = { .x = 0, .y = 0 }, .extent = swapChainExtent },
-			.layerCount = 1,
-			.colorAttachmentCount = 1,
-			.pColorAttachments = &attachmentInfo
-		};
-
-		commandBuffers[frameIndex].beginRendering(renderingInfo);
-
-		commandBuffers[frameIndex].bindPipeline(vk::PipelineBindPoint::eGraphics, graphicsPipeline);
-
-		commandBuffers[frameIndex].setViewport(0, vk::Viewport(0.0f, 0.0f, static_cast<float>(swapChainExtent.width), static_cast<float>(swapChainExtent.height), 0.0f, 1.0f));
-		commandBuffers[frameIndex].setScissor(0, vk::Rect2D(vk::Offset2D(0, 0), swapChainExtent));
-
-		commandBuffers[frameIndex].draw(3, 1, 0, 0);
-
-		commandBuffers[frameIndex].endRendering();
-
-		// After rendering, transition the swapchain image to PRESENT_SRC
-		TransitionImageLayout(
-			commandBuffers[frameIndex],
-			imageIndex,
-			vk::ImageLayout::eColorAttachmentOptimal,
-			vk::ImageLayout::ePresentSrcKHR,
-			vk::AccessFlagBits2::eColorAttachmentWrite,
-			{},
-			vk::PipelineStageFlagBits2::eColorAttachmentOutput,
-			vk::PipelineStageFlagBits2::eBottomOfPipe
-		);
-
-		commandBuffers[frameIndex].end();
 	}
 
 	void TransitionImageLayout(
