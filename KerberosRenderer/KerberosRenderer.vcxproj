@@ -132,6 +132,7 @@
   <ItemGroup>
     <ClCompile Include="src\Buffer.cpp" />
     <ClCompile Include="src\main.cpp" />
+    <ClCompile Include="src\Texture.cpp" />
     <ClCompile Include="vendor\glfw-3.4\src\context.c" />
     <ClCompile Include="vendor\glfw-3.4\src\egl_context.c" />
     <ClCompile Include="vendor\glfw-3.4\src\init.c" />
@@ -164,6 +165,7 @@
   <ItemGroup>
     <ClInclude Include="src\Buffer.hpp" />
     <ClInclude Include="src\io.hpp" />
+    <ClInclude Include="src\Texture.hpp" />
     <ClInclude Include="src\Utils.hpp" />
     <ClInclude Include="src\Vulkan.hpp" />
     <ClInclude Include="vendor\glfw-3.4\include\GLFW\glfw3.h" />
