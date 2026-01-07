@@ -15,4 +15,9 @@ void CreateImage(
 	vk::raii::DeviceMemory& imageMemory
 );
 
-vk::raii::ImageView CreateImageView(const vk::raii::Device& device, const vk::raii::Image& image, vk::Format format);
+vk::raii::ImageView CreateImageView(
+	const vk::raii::Device& device, 
+	const vk::raii::Image& image, 
+	vk::Format format, 
+	vk::ImageAspectFlagBits aspectFlags
+);

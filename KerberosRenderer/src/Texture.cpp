@@ -42,14 +42,19 @@ void CreateImage(
 	image.bindMemory(imageMemory, 0);
 }
 
-vk::raii::ImageView CreateImageView(const vk::raii::Device& device, const vk::raii::Image& image, const vk::Format format) 
+vk::raii::ImageView CreateImageView(
+	const vk::raii::Device& device, 
+	const vk::raii::Image& image, 
+	const vk::Format format,
+	const vk::ImageAspectFlagBits aspectFlags
+) 
 {
 	const vk::ImageViewCreateInfo viewInfo{ 
 		.image = image, 
 		.viewType = vk::ImageViewType::e2D,
 		.format = format, 
 		.subresourceRange = { 
-			vk::ImageAspectFlagBits::eColor, 
+			aspectFlags, 
 			0, 
 			1, 
 			0, 

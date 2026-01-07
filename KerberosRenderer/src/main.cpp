@@ -6,6 +6,7 @@
 #define GLFW_EXPOSE_NATIVE_WIN32
 #include <GLFW/glfw3native.h>
 
+#define GLM_FORCE_DEPTH_ZERO_TO_ONE
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 
@@ -61,7 +62,7 @@ static VKAPI_ATTR vk::Bool32 VKAPI_CALL DebugCallback(
 
 struct Vertex
 {
-	glm::vec2 pos;
+	glm::vec3 pos;
 	glm::vec3 color;
 	glm::vec2 texCoord;
 
@@ -71,7 +72,7 @@ struct Vertex
 
 	static std::array<vk::VertexInputAttributeDescription, 3> GetAttributeDescriptions() {
 		return {
-			vk::VertexInputAttributeDescription(0, 0, vk::Format::eR32G32Sfloat, offsetof(Vertex, pos)),
+			vk::VertexInputAttributeDescription(0, 0, vk::Format::eR32G32B32Sfloat, offsetof(Vertex, pos)),
 			vk::VertexInputAttributeDescription(1, 0, vk::Format::eR32G32B32Sfloat, offsetof(Vertex, color)),
 			vk::VertexInputAttributeDescription(2, 0, vk::Format::eR32G32Sfloat, offsetof(Vertex, texCoord)),
 		};
@@ -79,14 +80,20 @@ struct Vertex
 };
 
 const std::vector<Vertex> vertices = {
-	{{-0.5f, -0.5f}, {1.0f, 0.0f, 0.0f}, {1.0f, 0.0f}},
-	{{0.5f, -0.5f}, {0.0f, 1.0f, 0.0f}, {0.0f, 0.0f}},
-	{{0.5f, 0.5f}, {0.0f, 0.0f, 1.0f}, {0.0f, 1.0f}},
-	{{-0.5f, 0.5f}, {1.0f, 1.0f, 1.0f}, {1.0f, 1.0f}}
+	{{-0.5f, -0.5f, 0.0f}, {1.0f, 0.0f, 0.0f}, {0.0f, 0.0f}},
+	{{0.5f, -0.5f, 0.0f}, {0.0f, 1.0f, 0.0f}, {1.0f, 0.0f}},
+	{{0.5f, 0.5f, 0.0f}, {0.0f, 0.0f, 1.0f}, {1.0f, 1.0f}},
+	{{-0.5f, 0.5f, 0.0f}, {1.0f, 1.0f, 1.0f}, {0.0f, 1.0f}},
+
+	{{-0.5f, -0.5f, -0.5f}, {1.0f, 0.0f, 0.0f}, {0.0f, 0.0f}},
+	{{0.5f, -0.5f, -0.5f}, {0.0f, 1.0f, 0.0f}, {1.0f, 0.0f}},
+	{{0.5f, 0.5f, -0.5f}, {0.0f, 0.0f, 1.0f}, {1.0f, 1.0f}},
+	{{-0.5f, 0.5f, -0.5f}, {1.0f, 1.0f, 1.0f}, {0.0f, 1.0f}}
 };
 
 const std::vector<uint16_t> indices = {
-	0, 1, 2, 2, 3, 0
+	0, 1, 2, 2, 3, 0,
+	4, 5, 6, 6, 7, 4
 };
 
 struct UniformBufferObject
@@ -122,6 +129,11 @@ private:
 
 	std::vector<vk::Image> swapChainImages;
 	std::vector<vk::raii::ImageView> swapChainImageViews;
+
+	vk::raii::Image depthImage = nullptr;
+	vk::raii::DeviceMemory depthImageMemory = nullptr;
+	vk::raii::ImageView depthImageView = nullptr;
+	vk::Format depthFormat = vk::Format::eUndefined;
 
 	vk::raii::DescriptorPool descriptorPool = nullptr;
 	std::vector<vk::raii::DescriptorSet> descriptorSets;
@@ -193,6 +205,7 @@ private:
 		CreateLogicalDevice();
 		CreateSwapChain();
 		CreateSwapChainImageViews();
+		CreateDepthResources();
 		CreateDescriptorSetLayout();
 		CreateGraphicsPipeline();
 		CreateCommandPool();
@@ -290,17 +303,29 @@ private:
 		commandBuffers[frameIndex].begin({});
 
 		TransitionImageLayout(
-			commandBuffers[frameIndex],
-			imageIndex,
+			swapChainImages[imageIndex],
 			vk::ImageLayout::eUndefined,
 			vk::ImageLayout::eColorAttachmentOptimal,
 			{},
 			vk::AccessFlagBits2::eColorAttachmentWrite,
 			vk::PipelineStageFlagBits2::eColorAttachmentOutput,
-			vk::PipelineStageFlagBits2::eColorAttachmentOutput
+			vk::PipelineStageFlagBits2::eColorAttachmentOutput,
+			vk::ImageAspectFlagBits::eColor
 		);
 
+		TransitionImageLayout(
+			depthImage,
+			vk::ImageLayout::eUndefined,
+			vk::ImageLayout::eDepthAttachmentOptimal,
+			vk::AccessFlagBits2::eDepthStencilAttachmentWrite,
+			vk::AccessFlagBits2::eDepthStencilAttachmentWrite,
+			vk::PipelineStageFlagBits2::eEarlyFragmentTests | vk::PipelineStageFlagBits2::eLateFragmentTests,
+			vk::PipelineStageFlagBits2::eEarlyFragmentTests | vk::PipelineStageFlagBits2::eLateFragmentTests,
+			vk::ImageAspectFlagBits::eDepth);
+
 		constexpr vk::ClearValue clearColor = vk::ClearColorValue(0.0f, 0.0f, 0.0f, 1.0f);
+		constexpr vk::ClearValue clearDepth = vk::ClearDepthStencilValue{.depth = 1.0f, .stencil = 0 };
+
 		vk::RenderingAttachmentInfo attachmentInfo = {
 			.imageView = swapChainImageViews[imageIndex],
 			.imageLayout = vk::ImageLayout::eColorAttachmentOptimal,
@@ -309,11 +334,20 @@ private:
 			.clearValue = clearColor
 		};
 
+		vk::RenderingAttachmentInfo depthAttachmentInfo = {
+			.imageView = depthImageView,
+			.imageLayout = vk::ImageLayout::eDepthStencilAttachmentOptimal,
+			.loadOp = vk::AttachmentLoadOp::eClear,
+			.storeOp = vk::AttachmentStoreOp::eDontCare,
+			.clearValue = clearDepth
+		};
+
 		const vk::RenderingInfo renderingInfo = {
 			.renderArea = {.offset = {.x = 0, .y = 0 }, .extent = swapChainExtent },
 			.layerCount = 1,
 			.colorAttachmentCount = 1,
-			.pColorAttachments = &attachmentInfo
+			.pColorAttachments = &attachmentInfo,
+			.pDepthAttachment = &depthAttachmentInfo
 		};
 
 		commandBuffers[frameIndex].beginRendering(renderingInfo);
@@ -337,14 +371,14 @@ private:
 
 		// After rendering, transition the swapchain image to PRESENT_SRC
 		TransitionImageLayout(
-			commandBuffers[frameIndex],
-			imageIndex,
+			swapChainImages[imageIndex],
 			vk::ImageLayout::eColorAttachmentOptimal,
 			vk::ImageLayout::ePresentSrcKHR,
 			vk::AccessFlagBits2::eColorAttachmentWrite,
 			{},
 			vk::PipelineStageFlagBits2::eColorAttachmentOutput,
-			vk::PipelineStageFlagBits2::eBottomOfPipe
+			vk::PipelineStageFlagBits2::eBottomOfPipe,
+			vk::ImageAspectFlagBits::eColor
 		);
 
 		commandBuffers[frameIndex].end();
@@ -751,6 +785,16 @@ private:
 
 		vk::PipelineMultisampleStateCreateInfo multisampling{ .rasterizationSamples = vk::SampleCountFlagBits::e1, .sampleShadingEnable = vk::False };
 
+		vk::PipelineDepthStencilStateCreateInfo depthStencil{ 
+			.depthTestEnable = vk::True, 
+			.depthWriteEnable = vk::True,
+			.depthCompareOp = vk::CompareOp::eLess, 
+			.depthBoundsTestEnable = vk::False,
+			.stencilTestEnable = vk::False,
+			.minDepthBounds = 0.0f, 
+			.maxDepthBounds = 1.0f,
+		};
+
 		vk::PipelineColorBlendAttachmentState colorBlendAttachment{
 			.blendEnable = vk::False,
 			.colorWriteMask = vk::ColorComponentFlagBits::eR | vk::ColorComponentFlagBits::eG | vk::ColorComponentFlagBits::eB | vk::ColorComponentFlagBits::eA 
@@ -771,7 +815,11 @@ private:
 
 		pipelineLayout = vk::raii::PipelineLayout{ device, pipelineLayoutInfo };
 
-		vk::PipelineRenderingCreateInfo pipelineRenderingCreateInfo{ .colorAttachmentCount = 1, .pColorAttachmentFormats = &swapChainImageFormat };
+		vk::PipelineRenderingCreateInfo pipelineRenderingCreateInfo{ 
+			.colorAttachmentCount = 1, 
+			.pColorAttachmentFormats = &swapChainImageFormat,
+			.depthAttachmentFormat = depthFormat
+		};
 
 		vk::GraphicsPipelineCreateInfo pipelineInfo{ 
 			.pNext = &pipelineRenderingCreateInfo,
@@ -782,6 +830,7 @@ private:
 			.pViewportState = &viewportState, 
 			.pRasterizationState = &rasterizer,
 			.pMultisampleState = &multisampling, 
+			.pDepthStencilState = &depthStencil,
 			.pColorBlendState = &colorBlending,
 			.pDynamicState = &dynamicStateInfo, 
 			.layout = pipelineLayout, 
@@ -799,6 +848,38 @@ private:
 		};
 
 		commandPool = vk::raii::CommandPool(device, poolInfo);
+	}
+
+	vk::Format FindDepthFormat() const
+	{
+		return FindSupportedFormat(
+			physicalDevice,
+			{ vk::Format::eD32Sfloat, vk::Format::eD32SfloatS8Uint, vk::Format::eD24UnormS8Uint },
+			vk::ImageTiling::eOptimal,
+			vk::FormatFeatureFlagBits::eDepthStencilAttachment
+		);
+	}
+
+	static bool HasStencilComponent(const vk::Format format) 
+	{
+		return format == vk::Format::eD32SfloatS8Uint || format == vk::Format::eD24UnormS8Uint;
+	}
+
+	void CreateDepthResources()
+	{
+		depthFormat = FindDepthFormat();
+
+		CreateImage(device, physicalDevice,
+					swapChainExtent.width,
+					swapChainExtent.height,
+					depthFormat,
+					vk::ImageTiling::eOptimal,
+					vk::ImageUsageFlagBits::eDepthStencilAttachment,
+					vk::MemoryPropertyFlagBits::eDeviceLocal,
+					depthImage,
+					depthImageMemory);
+
+		depthImageView = CreateImageView(device, depthImage, depthFormat, vk::ImageAspectFlagBits::eDepth);
 	}
 
 	void CreateTextureImage() 
@@ -843,7 +924,7 @@ private:
 
 	void CreateTextureImageView()
 	{
-		textureImageView = CreateImageView(device, textureImage, vk::Format::eR8G8B8A8Srgb);
+		textureImageView = CreateImageView(device, textureImage, vk::Format::eR8G8B8A8Srgb, vk::ImageAspectFlagBits::eColor);
 	}
 
 	void CreateTextureSampler()
@@ -1064,14 +1145,14 @@ private:
 	}
 
 	void TransitionImageLayout(
-		const vk::raii::CommandBuffer& cmd,
-		const uint32_t imageIndex,
+		const vk::Image image,
 		const vk::ImageLayout oldLayout,
 		const vk::ImageLayout newLayout,
 		const vk::AccessFlags2 srcAccessMask,
 		const vk::AccessFlags2 dstAccessMask,
 		const vk::PipelineStageFlags2 srcStageMask,
-		const vk::PipelineStageFlags2 dstStageMask
+		const vk::PipelineStageFlags2 dstStageMask,
+		const vk::ImageAspectFlagBits aspectFlags
 	) const {
 		vk::ImageMemoryBarrier2 barrier = {
 			.srcStageMask = srcStageMask,
@@ -1082,9 +1163,9 @@ private:
 			.newLayout = newLayout,
 			.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
 			.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-			.image = swapChainImages[imageIndex],
+			.image = image,
 			.subresourceRange = {
-				.aspectMask = vk::ImageAspectFlagBits::eColor,
+				.aspectMask = aspectFlags,
 				.baseMipLevel = 0,
 				.levelCount = 1,
 				.baseArrayLayer = 0,
@@ -1098,15 +1179,12 @@ private:
 			.pImageMemoryBarriers = &barrier
 		};
 
-		cmd.pipelineBarrier2(dependencyInfo);
+		commandBuffers[frameIndex].pipelineBarrier2(dependencyInfo);
 	}
 
 	void TransitionImageLayout(const vk::raii::Image& image, const vk::ImageLayout oldLayout, const vk::ImageLayout newLayout) const 
 	{
 		const auto commandBuffer = BeginSingleTimeCommands();
-
-		vk::PipelineStageFlags2 sourceStage;
-		vk::PipelineStageFlags2 destinationStage;
 
 		vk::ImageMemoryBarrier2 barrier = {
 			.oldLayout = oldLayout,
@@ -1229,6 +1307,7 @@ private:
 
 		CreateSwapChain();
 		CreateSwapChainImageViews();
+		CreateDepthResources();
 	}
 };
 
