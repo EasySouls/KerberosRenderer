@@ -7,6 +7,7 @@ void CreateImage(
 	const vk::PhysicalDevice& physicalDevice,
 	uint32_t width, 
 	uint32_t height, 
+	uint32_t mipLevels,
 	vk::Format format, 
 	vk::ImageTiling tiling, 
 	vk::ImageUsageFlags usage, 
@@ -19,5 +20,6 @@ vk::raii::ImageView CreateImageView(
 	const vk::raii::Device& device, 
 	const vk::raii::Image& image, 
 	vk::Format format, 
-	vk::ImageAspectFlagBits aspectFlags
+	vk::ImageAspectFlagBits aspectFlags,
+	uint32_t mipLevels
 );

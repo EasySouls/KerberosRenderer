@@ -7,6 +7,7 @@ void CreateImage(
 	const vk::PhysicalDevice& physicalDevice,
 	const uint32_t width, 
 	const uint32_t height,
+	const uint32_t mipLevels,
 	const vk::Format format,
 	const vk::ImageTiling tiling,
 	const vk::ImageUsageFlags usage,
@@ -22,7 +23,7 @@ void CreateImage(
 			.height = height,
 			.depth = 1
 	    }, 
-		.mipLevels = 1, 
+		.mipLevels = mipLevels, 
 		.arrayLayers = 1,
 		.samples = vk::SampleCountFlagBits::e1, 
 		.tiling = tiling,
@@ -46,19 +47,20 @@ vk::raii::ImageView CreateImageView(
 	const vk::raii::Device& device, 
 	const vk::raii::Image& image, 
 	const vk::Format format,
-	const vk::ImageAspectFlagBits aspectFlags
+	const vk::ImageAspectFlagBits aspectFlags,
+	const uint32_t mipLevels
 ) 
 {
 	const vk::ImageViewCreateInfo viewInfo{ 
 		.image = image, 
 		.viewType = vk::ImageViewType::e2D,
 		.format = format, 
-		.subresourceRange = { 
-			aspectFlags, 
-			0, 
-			1, 
-			0, 
-			1 
+		.subresourceRange = {
+			.aspectMask = aspectFlags,
+			.baseMipLevel = 0,
+			.levelCount = mipLevels,
+			.baseArrayLayer = 0,
+			.layerCount = 1 
 	    }
 	};
 
