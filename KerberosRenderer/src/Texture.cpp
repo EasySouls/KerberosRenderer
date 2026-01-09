@@ -8,6 +8,7 @@ void CreateImage(
 	const uint32_t width, 
 	const uint32_t height,
 	const uint32_t mipLevels,
+	const vk::SampleCountFlagBits numSamples,
 	const vk::Format format,
 	const vk::ImageTiling tiling,
 	const vk::ImageUsageFlags usage,
@@ -25,7 +26,7 @@ void CreateImage(
 	    }, 
 		.mipLevels = mipLevels, 
 		.arrayLayers = 1,
-		.samples = vk::SampleCountFlagBits::e1, 
+		.samples = numSamples, 
 		.tiling = tiling,
 		.usage = usage, 
 		.sharingMode = vk::SharingMode::eExclusive 
