@@ -18,6 +18,10 @@
 #define TINYOBJLOADER_IMPLEMENTATION
 #include "tiny_obj_loader.h"
 
+#include "imgui.h"
+#include "backends/imgui_impl_glfw.h"
+#include "backends/imgui_impl_vulkan.h"
+
 #include <iostream>
 #include <stdexcept>
 #include <cstdlib>
@@ -67,6 +71,15 @@ static VKAPI_ATTR vk::Bool32 VKAPI_CALL DebugCallback(
 	std::cerr << "validation layer: type " << to_string(type) << " msg: " << pCallbackData->pMessage << '\n';
 
 	return vk::False;
+}
+
+static void CheckVkResult(const VkResult err)
+{
+	if (err == VK_SUCCESS)
+		return;
+	std::ignore = fprintf(stderr, "[vulkan] Error: VkResult = %d\n", err);
+	if (err < 0)
+		abort();
 }
 
 struct Vertex
@@ -150,6 +163,7 @@ private:
 
 	vk::raii::DescriptorPool descriptorPool = nullptr;
 	std::vector<vk::raii::DescriptorSet> descriptorSets;
+	vk::raii::DescriptorPool imGuiDescriptorPool = nullptr;
 
 	vk::raii::DescriptorSetLayout descriptorSetLayout = nullptr;
 	vk::raii::PipelineLayout pipelineLayout = nullptr;
@@ -247,12 +261,24 @@ private:
 
 		CreateCommandBuffers();
 		CreateSyncObjects();
+
+		CreateImGuiDescriptorPool();
+		SetupImGui();
 	}
 
 	void MainLoop()
 	{
 		while (!glfwWindowShouldClose(window)) {
 			glfwPollEvents();
+
+			ImGui_ImplVulkan_NewFrame();
+			ImGui_ImplGlfw_NewFrame();
+			ImGui::NewFrame();
+
+			bool showDemoWindow = true;
+			ImGui::ShowDemoWindow(&showDemoWindow);
+
+			ImGui::Render();
 
 			DrawFrame();
 		}
@@ -262,6 +288,10 @@ private:
 
 	void Cleanup() const
 	{
+		ImGui_ImplVulkan_Shutdown();
+		ImGui_ImplGlfw_Shutdown();
+		ImGui::DestroyContext();
+
 		glfwDestroyWindow(window);
 
 		glfwTerminate();
@@ -303,6 +333,13 @@ private:
 			.pSignalSemaphores = &*renderFinishedSemaphores[imageIndex]};
 
 		graphicsQueue.submit(submitInfo, *inFlightFences[frameIndex]);
+
+		const ImGuiIO& io = ImGui::GetIO();
+		if (io.ConfigFlags & ImGuiConfigFlags_ViewportsEnable)
+		{
+			ImGui::UpdatePlatformWindows();
+			ImGui::RenderPlatformWindowsDefault();
+		}
 
 		const vk::PresentInfoKHR presentInfoKHR{
 			.waitSemaphoreCount = 1,
@@ -418,6 +455,8 @@ private:
 			// Draw the object
 			commandBuffers[frameIndex].drawIndexed(static_cast<uint32_t>(indices.size()), 1, 0, 0, 0);
 		}
+
+		ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), *commandBuffers[frameIndex]);
 
 		commandBuffers[frameIndex].endRendering();
 
@@ -1372,6 +1411,116 @@ private:
 			presentCompleteSemaphores.emplace_back(device, vk::SemaphoreCreateInfo());
 			inFlightFences.emplace_back(device, vk::FenceCreateInfo{ .flags = vk::FenceCreateFlagBits::eSignaled });
 		}
+	}
+
+	void CreateImGuiDescriptorPool()
+	{
+		const std::array poolSizes = {
+			vk::DescriptorPoolSize{
+				.type = vk::DescriptorType::eSampler,
+				.descriptorCount = 1000
+			},
+			vk::DescriptorPoolSize{
+				.type = vk::DescriptorType::eCombinedImageSampler,
+				.descriptorCount = 1000
+			},
+			vk::DescriptorPoolSize{
+				.type = vk::DescriptorType::eSampledImage,
+				.descriptorCount = 1000
+			},
+			vk::DescriptorPoolSize{
+				.type = vk::DescriptorType::eStorageImage,
+				.descriptorCount = 1000
+			},
+			vk::DescriptorPoolSize{
+				.type = vk::DescriptorType::eUniformTexelBuffer,
+				.descriptorCount = 1000
+			},
+			vk::DescriptorPoolSize{
+				.type = vk::DescriptorType::eStorageTexelBuffer,
+				.descriptorCount = 1000
+			},
+			vk::DescriptorPoolSize{
+				.type = vk::DescriptorType::eUniformBuffer,
+				.descriptorCount = 1000
+			},
+			vk::DescriptorPoolSize{
+				.type = vk::DescriptorType::eStorageBuffer,
+				.descriptorCount = 1000
+			},
+			vk::DescriptorPoolSize{
+				.type = vk::DescriptorType::eUniformBufferDynamic,
+				.descriptorCount = 1000
+			},
+			vk::DescriptorPoolSize{
+				.type = vk::DescriptorType::eStorageBufferDynamic,
+				.descriptorCount = 1000
+			},
+			vk::DescriptorPoolSize{
+				.type = vk::DescriptorType::eInputAttachment,
+				.descriptorCount = 1000
+			}
+		};
+		const vk::DescriptorPoolCreateInfo poolInfo{
+			.flags = vk::DescriptorPoolCreateFlagBits::eFreeDescriptorSet,
+			.maxSets = 1000 * static_cast<uint32_t>(poolSizes.size()),
+			.poolSizeCount = static_cast<uint32_t>(poolSizes.size()),
+			.pPoolSizes = poolSizes.data()
+		};
+		imGuiDescriptorPool = vk::raii::DescriptorPool{ device, poolInfo };
+	}
+
+	void SetupImGui()
+	{
+		IMGUI_CHECKVERSION();
+		ImGui::CreateContext();
+		ImGuiIO& io = ImGui::GetIO(); (void)io;
+		io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;     // Enable Keyboard Controls
+		io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;      // Enable Gamepad Controls
+		io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;         // Enable Docking
+		io.ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;       // Enable Multi-Viewport / Platform Windows
+
+		ImGui::StyleColorsDark();
+
+		const float mainScale = ImGui_ImplGlfw_GetContentScaleForMonitor(glfwGetPrimaryMonitor());
+
+		ImGuiStyle& style = ImGui::GetStyle();
+		style.ScaleAllSizes(mainScale);        // Bake a fixed style scale. (until we have a solution for dynamic style scaling, changing this requires resetting Style + calling this again)
+		style.FontScaleDpi = mainScale;        // Set initial font scale. (using io.ConfigDpiScaleFonts=true makes this unnecessary. We leave both here for documentation purpose)
+		io.ConfigDpiScaleFonts = true;          // [Experimental] Automatically overwrite style.FontScaleDpi in Begin() when Monitor DPI changes. This will scale fonts but _NOT_ scale sizes/padding for now.
+		io.ConfigDpiScaleViewports = true;      // [Experimental] Scale Dear ImGui and Platform Windows when Monitor DPI changes.
+
+
+		if (io.ConfigFlags & ImGuiConfigFlags_ViewportsEnable)
+		{
+			style.WindowRounding = 0.0f;
+			style.Colors[ImGuiCol_WindowBg].w = 1.0f;
+		}
+
+		ImGui_ImplGlfw_InitForVulkan(window, true);
+
+		const VkFormat colorFormatVk = static_cast<VkFormat>(swapChainImageFormat);
+		const VkFormat depthFormatVk = static_cast<VkFormat>(depthFormat);
+
+		ImGui_ImplVulkan_InitInfo initInfo = {};
+		initInfo.Instance = *instance;
+		initInfo.PhysicalDevice = *physicalDevice;
+		initInfo.Device = *device;
+		initInfo.QueueFamily = graphicsQueueFamilyIndex;
+		initInfo.Queue = *graphicsQueue;
+		initInfo.PipelineCache = nullptr;
+		initInfo.DescriptorPool = *imGuiDescriptorPool;
+		initInfo.MinImageCount = static_cast<uint32_t>(swapChainImages.size());
+		initInfo.ImageCount = static_cast<uint32_t>(swapChainImages.size());
+		initInfo.Allocator = nullptr;
+		initInfo.UseDynamicRendering = true;
+		initInfo.PipelineInfoMain.PipelineRenderingCreateInfo = {
+			.colorAttachmentCount = 1,
+			.pColorAttachmentFormats = &colorFormatVk,
+			.depthAttachmentFormat = depthFormatVk
+		};
+		initInfo.CheckVkResultFn = CheckVkResult;
+		ImGui_ImplVulkan_Init(&initInfo);
 	}
 
 	void UpdateUniformBuffers(const uint32_t currentImage) 
