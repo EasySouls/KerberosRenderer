@@ -268,15 +268,54 @@ private:
 
 	void MainLoop()
 	{
-		while (!glfwWindowShouldClose(window)) {
+		bool showDemoWindow = true;
+		bool showAnotherWindow = false;
+		ImVec4 clearColor = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
+
+		while (!glfwWindowShouldClose(window)) 
+		{
 			glfwPollEvents();
 
 			ImGui_ImplVulkan_NewFrame();
 			ImGui_ImplGlfw_NewFrame();
 			ImGui::NewFrame();
 
-			bool showDemoWindow = true;
-			ImGui::ShowDemoWindow(&showDemoWindow);
+			ImGui::DockSpaceOverViewport(0, nullptr, ImGuiDockNodeFlags_PassthruCentralNode);
+
+			if (showDemoWindow)
+				ImGui::ShowDemoWindow(&showDemoWindow);
+
+			{
+				const auto& io = ImGui::GetIO();
+				static float f = 0.0f;
+				static int counter = 0;
+
+				ImGui::Begin("Hello, world!");                          // Create a window called "Hello, world!" and append into it.
+
+				ImGui::Text("This is some useful text.");               // Display some text (you can use a format strings too)
+				ImGui::Checkbox("Demo Window", &showDemoWindow);      // Edit bools storing our window open/close state
+				ImGui::Checkbox("Another Window", &showAnotherWindow);
+
+				ImGui::SliderFloat("float", &f, 0.0f, 1.0f);            // Edit 1 float using a slider from 0.0f to 1.0f
+				ImGui::ColorEdit3("clear color", reinterpret_cast<float*>(&clearColor)); // Edit 3 floats representing a color
+
+				if (ImGui::Button("Button"))                            // Buttons return true when clicked (most widgets return true when edited/activated)
+					counter++;
+				ImGui::SameLine();
+				ImGui::Text("counter = %d", counter);
+
+				ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / io.Framerate, io.Framerate);
+				ImGui::End();
+			}
+
+			if (showAnotherWindow)
+			{
+				ImGui::Begin("Another Window", &showAnotherWindow);
+				ImGui::Text("Hello from another window!");
+				if (ImGui::Button("Close Me"))
+					showAnotherWindow = false;
+				ImGui::End();
+			}
 
 			ImGui::Render();
 
@@ -702,7 +741,12 @@ private:
 	static vk::SurfaceFormatKHR ChooseSwapSurfaceFormat(const std::vector<vk::SurfaceFormatKHR>& availableFormats) 
 	{
 		for (const auto& availableFormat : availableFormats) {
-			if (availableFormat.format == vk::Format::eB8G8R8A8Srgb && availableFormat.colorSpace == vk::ColorSpaceKHR::eSrgbNonlinear) {
+			// This way the GPU applies gamma correction to ImGui windows, which makes them look greyish.
+			// Figure out a way to have correct colors in ImGui windows as well.
+			/*if (availableFormat.format == vk::Format::eB8G8R8A8Srgb && availableFormat.colorSpace == vk::ColorSpaceKHR::eSrgbNonlinear) {
+				return availableFormat;
+			}*/
+			if (availableFormat.format == vk::Format::eB8G8R8A8Unorm && availableFormat.colorSpace == vk::ColorSpaceKHR::eSrgbNonlinear) {
 				return availableFormat;
 			}
 		}
@@ -1502,7 +1546,20 @@ private:
 		const VkFormat colorFormatVk = static_cast<VkFormat>(swapChainImageFormat);
 		const VkFormat depthFormatVk = static_cast<VkFormat>(depthFormat);
 
+		const VkPipelineRenderingCreateInfoKHR pipelineRenderingCreateInfo = {
+			.sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO_KHR,
+			.pNext = nullptr,
+			.colorAttachmentCount = 1,
+			.pColorAttachmentFormats = &colorFormatVk,
+			.depthAttachmentFormat = depthFormatVk,
+			.stencilAttachmentFormat = VK_FORMAT_UNDEFINED
+		};
+
+		const VkSampleCountFlagBits msaaSamplesVk = static_cast<VkSampleCountFlagBits>(msaaSamples);
+		constexpr VkSampleCountFlagBits msaaSamplesViewportVk = VK_SAMPLE_COUNT_1_BIT;
+
 		ImGui_ImplVulkan_InitInfo initInfo = {};
+		ZeroMemory(&initInfo, sizeof(initInfo));
 		initInfo.Instance = *instance;
 		initInfo.PhysicalDevice = *physicalDevice;
 		initInfo.Device = *device;
@@ -1514,11 +1571,10 @@ private:
 		initInfo.ImageCount = static_cast<uint32_t>(swapChainImages.size());
 		initInfo.Allocator = nullptr;
 		initInfo.UseDynamicRendering = true;
-		initInfo.PipelineInfoMain.PipelineRenderingCreateInfo = {
-			.colorAttachmentCount = 1,
-			.pColorAttachmentFormats = &colorFormatVk,
-			.depthAttachmentFormat = depthFormatVk
-		};
+		initInfo.PipelineInfoMain.PipelineRenderingCreateInfo = pipelineRenderingCreateInfo;
+		initInfo.PipelineInfoMain.MSAASamples = msaaSamplesVk;
+		initInfo.PipelineInfoForViewports.PipelineRenderingCreateInfo = pipelineRenderingCreateInfo;
+		initInfo.PipelineInfoForViewports.MSAASamples = msaaSamplesViewportVk;
 		initInfo.CheckVkResultFn = CheckVkResult;
 		ImGui_ImplVulkan_Init(&initInfo);
 	}
