@@ -58,6 +58,7 @@ namespace kbr
 			vk::ImageAspectFlagBits aspectFlags
 		) const;
 
+		void Cleanup() const;
 
 		vk::Format FindDepthFormat() const;
 		vk::Extent2D ChooseSwapExtent(const vk::SurfaceCapabilitiesKHR& capabilities) const;

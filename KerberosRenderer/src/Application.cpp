@@ -65,7 +65,7 @@ namespace kbr
 		}
 	}
 
-	void Application::FramebufferResized(uint32_t width, uint32_t height) 
+	void Application::FramebufferResized(const uint32_t width, const uint32_t height) const 
 	{
 		vulkanContext->FramebufferResized(width, height);
 	}

@@ -40,6 +40,7 @@
 #include "GameObject.hpp"
 
 #include "Application.hpp"
+#include "GameLayer.hpp"
 
 constexpr uint32_t width = 800;
 constexpr uint32_t height = 600;
@@ -1799,7 +1800,9 @@ int main() {
 		/*HelloTriangleApplication app;
 		app.run();*/
 
-		const kbr::Application app;
+		kbr::Application app;
+		app.PushLayer<Game::GameLayer>();
+
 		app.Run();
 	}
 	catch (const std::exception& e) {

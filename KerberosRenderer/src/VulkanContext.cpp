@@ -69,7 +69,10 @@ namespace kbr
 		SetupImGui();
 	}
 
-	VulkanContext::~VulkanContext() = default;
+	VulkanContext::~VulkanContext()
+	{
+		Cleanup();
+	};
 
 	void VulkanContext::PrepareImGuiFrame() 
 	{
@@ -783,6 +786,15 @@ namespace kbr
 		};
 
 		commandBuffers[frameIndex].pipelineBarrier2(dependencyInfo);
+	}
+
+	void VulkanContext::Cleanup() const 
+	{
+		device.waitIdle();
+
+		ImGui_ImplVulkan_Shutdown();
+		ImGui_ImplGlfw_Shutdown();
+		ImGui::DestroyContext();
 	}
 
 	void VulkanContext::CreateImGuiDescriptorPool()

@@ -14,11 +14,14 @@ namespace kbr
 
 		virtual ~Layer() = default;
 
-		std::string GetName() const { return name; }
+		virtual void OnAttach() = 0;
+		virtual void OnDetach() = 0;
 
 		virtual void OnUpdate(float deltaTime) = 0;
 		virtual void OnEvent() = 0;
 		virtual void OnImGuiRender() = 0;
+
+		std::string GetName() const { return name; }
 
 	private:
 		std::string name;

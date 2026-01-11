@@ -17,8 +17,11 @@ namespace kbr
 
 		void Run() const;
 
-	protected:
-		void FramebufferResized(uint32_t width, uint32_t height);
+		template<typename T> 
+			requires std::is_base_of_v<Layer, T>
+		void PushLayer();
+
+		void FramebufferResized(uint32_t width, uint32_t height) const;
 
 	private:
 		GLFWwindow* window;
@@ -26,4 +29,11 @@ namespace kbr
 
 		std::vector<std::unique_ptr<Layer>> layers;
 	};
+
+	template <typename T> 
+		requires std::is_base_of_v<Layer, T>
+	void Application::PushLayer() 
+	{
+		layers.emplace_back(std::make_unique<T>());
+	}
 }
