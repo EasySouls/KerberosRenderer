@@ -39,6 +39,8 @@
 #include "Utils.hpp"
 #include "GameObject.hpp"
 
+#include "Application.hpp"
+
 constexpr uint32_t width = 800;
 constexpr uint32_t height = 600;
 
@@ -396,8 +398,6 @@ private:
 		else if (result != vk::Result::eSuccess) {
 			throw std::runtime_error("failed to present swap chain image!");
 		}
-
-		frameIndex = (frameIndex + 1) % MAX_FRAMES_IN_FLIGHT;
 
 		frameIndex = (frameIndex + 1) % MAX_FRAMES_IN_FLIGHT;
 	}
@@ -1796,8 +1796,11 @@ private:
 
 int main() {
 	try {
-		HelloTriangleApplication app;
-		app.run();
+		/*HelloTriangleApplication app;
+		app.run();*/
+
+		const kbr::Application app;
+		app.Run();
 	}
 	catch (const std::exception& e) {
 		std::cerr << e.what() << '\n';

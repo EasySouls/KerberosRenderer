@@ -71,6 +71,88 @@ namespace kbr
 
 	VulkanContext::~VulkanContext() = default;
 
+	void VulkanContext::PrepareImGuiFrame() 
+	{
+		ImGui_ImplVulkan_NewFrame();
+		ImGui_ImplGlfw_NewFrame();
+		ImGui::NewFrame();
+
+		ImGui::DockSpaceOverViewport(0, nullptr, ImGuiDockNodeFlags_PassthruCentralNode);
+	}
+
+	void VulkanContext::RenderImGui() 
+	{
+		ImGui::Render();
+	}
+
+	void VulkanContext::Draw() 
+	{
+		const vk::Result fenceResult = device.waitForFences(*inFlightFences[frameIndex], vk::True, UINT64_MAX);
+		if (fenceResult != vk::Result::eSuccess)
+		{
+			throw std::runtime_error("failed to wait for fence!");
+		}
+
+		auto [result, imageIndex] = swapChain.acquireNextImage(UINT64_MAX, *presentCompleteSemaphores[frameIndex], nullptr);
+		if (result == vk::Result::eErrorOutOfDateKHR) {
+			RecreateSwapchain();
+			return;
+		}
+		if (result != vk::Result::eSuccess && result != vk::Result::eSuboptimalKHR) {
+			throw std::runtime_error("failed to acquire swap chain image!");
+		}
+		currentImageIndex = imageIndex;
+
+		device.resetFences(*inFlightFences[frameIndex]);
+
+		commandBuffers[frameIndex].reset();
+		RecordCommandBuffer(currentImageIndex);
+
+		//UpdateUniformBuffers(frameIndex);
+
+		//vk::PipelineStageFlags waitDestinationStageMask(vk::PipelineStageFlagBits::eTopOfPipe);
+		vk::PipelineStageFlags waitDestinationStageMask(vk::PipelineStageFlagBits::eColorAttachmentOutput);
+		const vk::SubmitInfo submitInfo{
+			.waitSemaphoreCount = 1,
+			.pWaitSemaphores = &*presentCompleteSemaphores[frameIndex],
+			.pWaitDstStageMask = &waitDestinationStageMask,
+			.commandBufferCount = 1,
+			.pCommandBuffers = &*commandBuffers[frameIndex],
+			.signalSemaphoreCount = 1,
+			.pSignalSemaphores = &*renderFinishedSemaphores[imageIndex] };
+
+		graphicsQueue.submit(submitInfo, *inFlightFences[frameIndex]);
+	}
+
+	void VulkanContext::Present() 
+	{
+		const ImGuiIO& io = ImGui::GetIO();
+		if (io.ConfigFlags & ImGuiConfigFlags_ViewportsEnable)
+		{
+			ImGui::UpdatePlatformWindows();
+			ImGui::RenderPlatformWindowsDefault();
+		}
+
+		const vk::PresentInfoKHR presentInfoKHR{
+			.waitSemaphoreCount = 1,
+			.pWaitSemaphores = &*renderFinishedSemaphores[currentImageIndex],
+			.swapchainCount = 1,
+			.pSwapchains = &*swapChain,
+			.pImageIndices = &currentImageIndex
+		};
+
+		const auto result = presentQueue.presentKHR(presentInfoKHR);
+		if (result == vk::Result::eErrorOutOfDateKHR || result == vk::Result::eSuboptimalKHR || framebufferResized) {
+			framebufferResized = false;
+			RecreateSwapchain();
+		}
+		else if (result != vk::Result::eSuccess) {
+			throw std::runtime_error("failed to present swap chain image!");
+		}
+
+		frameIndex = (frameIndex + 1) % maxFramesInFlight;
+	}
+
 	vk::raii::CommandBuffer VulkanContext::BeginSingleTimeCommands() const
 	{
 		const vk::CommandBufferAllocateInfo allocInfo{
@@ -101,6 +183,123 @@ namespace kbr
 	uint32_t VulkanContext::GetMaxFramesInFlight() const 
 	{
 		return maxFramesInFlight;
+	}
+
+	void VulkanContext::FramebufferResized(uint32_t width, uint32_t height) 
+	{
+		framebufferResized = true;
+	}
+
+	void VulkanContext::RecordCommandBuffer(const uint32_t imageIndex) const 
+	{
+		commandBuffers[frameIndex].begin({});
+
+		// Transition the swapchain image to COLOR_ATTACHMENT_OPTIMAL
+		TransitionImageLayout(
+			swapChainImages[imageIndex],
+			vk::ImageLayout::eUndefined,
+			vk::ImageLayout::eColorAttachmentOptimal,
+			{},
+			vk::AccessFlagBits2::eColorAttachmentWrite,
+			vk::PipelineStageFlagBits2::eColorAttachmentOutput,
+			vk::PipelineStageFlagBits2::eColorAttachmentOutput,
+			vk::ImageAspectFlagBits::eColor
+		);
+
+		// Transition the multisampled color image to COLOR_ATTACHMENT_OPTIMAL
+		TransitionImageLayout(
+			colorImage,
+			vk::ImageLayout::eUndefined,
+			vk::ImageLayout::eColorAttachmentOptimal,
+			vk::AccessFlagBits2::eColorAttachmentWrite,
+			vk::AccessFlagBits2::eColorAttachmentWrite,
+			vk::PipelineStageFlagBits2::eColorAttachmentOutput,
+			vk::PipelineStageFlagBits2::eColorAttachmentOutput,
+			vk::ImageAspectFlagBits::eColor);
+
+		// Transition the depth image to DEPTH_STENCIL_ATTACHMENT_OPTIMAL
+		TransitionImageLayout(
+			depthImage,
+			vk::ImageLayout::eUndefined,
+			vk::ImageLayout::eDepthAttachmentOptimal,
+			vk::AccessFlagBits2::eDepthStencilAttachmentWrite,
+			vk::AccessFlagBits2::eDepthStencilAttachmentWrite,
+			vk::PipelineStageFlagBits2::eEarlyFragmentTests | vk::PipelineStageFlagBits2::eLateFragmentTests,
+			vk::PipelineStageFlagBits2::eEarlyFragmentTests | vk::PipelineStageFlagBits2::eLateFragmentTests,
+			vk::ImageAspectFlagBits::eDepth);
+
+		constexpr vk::ClearValue clearColor = vk::ClearColorValue(0.0f, 0.0f, 0.0f, 1.0f);
+		constexpr vk::ClearValue clearDepth = vk::ClearDepthStencilValue{ .depth = 1.0f, .stencil = 0 };
+
+		// Multisampled color attachment with resolve attachment
+		vk::RenderingAttachmentInfo attachmentInfo = {
+			.imageView = colorImageView,
+			.imageLayout = vk::ImageLayout::eColorAttachmentOptimal,
+			.resolveMode = vk::ResolveModeFlagBits::eAverage,
+			.resolveImageView = swapChainImageViews[imageIndex],
+			.resolveImageLayout = vk::ImageLayout::eColorAttachmentOptimal,
+			.loadOp = vk::AttachmentLoadOp::eClear,
+			.storeOp = vk::AttachmentStoreOp::eStore,
+			.clearValue = clearColor
+		};
+
+		vk::RenderingAttachmentInfo depthAttachmentInfo = {
+			.imageView = depthImageView,
+			.imageLayout = vk::ImageLayout::eDepthStencilAttachmentOptimal,
+			.loadOp = vk::AttachmentLoadOp::eClear,
+			.storeOp = vk::AttachmentStoreOp::eDontCare,
+			.clearValue = clearDepth
+		};
+
+		const vk::RenderingInfo renderingInfo = {
+			.renderArea = {.offset = {.x = 0, .y = 0 }, .extent = swapChainExtent },
+			.layerCount = 1,
+			.colorAttachmentCount = 1,
+			.pColorAttachments = &attachmentInfo,
+			.pDepthAttachment = &depthAttachmentInfo
+		};
+
+		commandBuffers[frameIndex].beginRendering(renderingInfo);
+
+		//commandBuffers[frameIndex].bindPipeline(vk::PipelineBindPoint::eGraphics, graphicsPipeline);
+		//commandBuffers[frameIndex].bindVertexBuffers(0, *vertexBuffer, { 0 });
+		//commandBuffers[frameIndex].bindIndexBuffer(*indexBuffer, 0, vk::IndexType::eUint32);
+
+		//commandBuffers[frameIndex].setViewport(0, vk::Viewport{ 0.0f, 0.0f, static_cast<float>(swapChainExtent.width), static_cast<float>(swapChainExtent.height), 0.0f, 1.0f });
+		//commandBuffers[frameIndex].setScissor(0, vk::Rect2D{ vk::Offset2D(0, 0), swapChainExtent });
+
+		//// Draw each object with its own descriptor set
+		//for (const auto& gameObject : gameObjects) {
+		//	// Bind the descriptor set for this object
+		//	commandBuffers[frameIndex].bindDescriptorSets(
+		//		vk::PipelineBindPoint::eGraphics,
+		//		*pipelineLayout,
+		//		0,
+		//		*gameObject.descriptorSets[frameIndex],
+		//		nullptr
+		//	);
+
+		//	// Draw the object
+		//	commandBuffers[frameIndex].drawIndexed(static_cast<uint32_t>(indices.size()), 1, 0, 0, 0);
+		//}
+
+		ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), *commandBuffers[frameIndex]);
+
+		commandBuffers[frameIndex].endRendering();
+
+		// After rendering, transition the swapchain image to PRESENT_SRC
+		TransitionImageLayout(
+			swapChainImages[imageIndex],
+			vk::ImageLayout::eColorAttachmentOptimal,
+			vk::ImageLayout::ePresentSrcKHR,
+			vk::AccessFlagBits2::eColorAttachmentWrite,
+			{},
+			vk::PipelineStageFlagBits2::eColorAttachmentOutput,
+			vk::PipelineStageFlagBits2::eBottomOfPipe,
+			vk::ImageAspectFlagBits::eColor
+		);
+
+		commandBuffers[frameIndex].end();
 	}
 
 	void VulkanContext::CreateInstance()
@@ -548,6 +747,44 @@ namespace kbr
 		CreateDepthResources();
 	}
 
+	void VulkanContext::TransitionImageLayout(
+		const vk::Image image,
+		const vk::ImageLayout oldLayout,
+		const vk::ImageLayout newLayout,
+		const vk::AccessFlags2 srcAccessMask,
+		const vk::AccessFlags2 dstAccessMask,
+		const vk::PipelineStageFlags2 srcStageMask,
+		const vk::PipelineStageFlags2 dstStageMask,
+		const vk::ImageAspectFlagBits aspectFlags
+	) const {
+		vk::ImageMemoryBarrier2 barrier = {
+			.srcStageMask = srcStageMask,
+			.srcAccessMask = srcAccessMask,
+			.dstStageMask = dstStageMask,
+			.dstAccessMask = dstAccessMask,
+			.oldLayout = oldLayout,
+			.newLayout = newLayout,
+			.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+			.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+			.image = image,
+			.subresourceRange = {
+				.aspectMask = aspectFlags,
+				.baseMipLevel = 0,
+				.levelCount = 1,
+				.baseArrayLayer = 0,
+				.layerCount = 1
+			}
+		};
+
+		const vk::DependencyInfo dependencyInfo = {
+			.dependencyFlags = {},
+			.imageMemoryBarrierCount = 1,
+			.pImageMemoryBarriers = &barrier
+		};
+
+		commandBuffers[frameIndex].pipelineBarrier2(dependencyInfo);
+	}
+
 	void VulkanContext::CreateImGuiDescriptorPool()
 	{
 		constexpr std::array poolSizes = {
@@ -596,7 +833,7 @@ namespace kbr
 				.descriptorCount = 1000
 			}
 		};
-		constexpr vk::DescriptorPoolCreateInfo poolInfo{
+		const vk::DescriptorPoolCreateInfo poolInfo{
 			.flags = vk::DescriptorPoolCreateFlagBits::eFreeDescriptorSet,
 			.maxSets = 1000 * static_cast<uint32_t>(poolSizes.size()),
 			.poolSizeCount = static_cast<uint32_t>(poolSizes.size()),
@@ -649,11 +886,11 @@ namespace kbr
 		const VkPipelineRenderingCreateInfoKHR pipelineRenderingCreateInfo = {
 			.sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO_KHR,
 			.pNext = nullptr,
+			.viewMask = 0,
 			.colorAttachmentCount = 1,
 			.pColorAttachmentFormats = &colorFormatVk,
 			.depthAttachmentFormat = depthFormatVk,
 			.stencilAttachmentFormat = VK_FORMAT_UNDEFINED,
-			.viewMask = 0
 		};
 
 		const VkSampleCountFlagBits msaaSamplesVk = static_cast<VkSampleCountFlagBits>(msaaSamples);

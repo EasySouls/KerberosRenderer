@@ -4,7 +4,7 @@
 
 #include <vector>
 
-class GLFWwindow;
+struct GLFWwindow;
 
 namespace kbr
 {
@@ -14,12 +14,21 @@ namespace kbr
 		explicit VulkanContext(GLFWwindow* window);
 		virtual ~VulkanContext();
 
+		void PrepareImGuiFrame();
+		void RenderImGui();
+		void Draw();
+		void Present();
+
 		vk::raii::CommandBuffer BeginSingleTimeCommands() const;
 		void EndSingleTimeCommands(const vk::raii::CommandBuffer& commandBuffer) const;
 
 		uint32_t GetMaxFramesInFlight() const;
 
+		void FramebufferResized(uint32_t width, uint32_t height);
+
 	private:
+		void RecordCommandBuffer(uint32_t imageIndex) const;
+
 		void CreateInstance();
 		void SetupDebugMessenger();
 		void CreateSurface();
@@ -37,6 +46,17 @@ namespace kbr
 
 		void CleanupSwapChain();
 		void RecreateSwapchain();
+
+		void TransitionImageLayout(
+			vk::Image image,
+			vk::ImageLayout oldLayout,
+			vk::ImageLayout newLayout,
+			vk::AccessFlags2 srcAccessMask,
+			vk::AccessFlags2 dstAccessMask,
+			vk::PipelineStageFlags2 srcStageMask,
+			vk::PipelineStageFlags2 dstStageMask,
+			vk::ImageAspectFlagBits aspectFlags
+		) const;
 
 
 		vk::Format FindDepthFormat() const;
@@ -97,5 +117,6 @@ namespace kbr
 		bool framebufferResized = false;
 
 		uint32_t frameIndex = 0;
+		uint32_t currentImageIndex = 0;
 	};
 } 

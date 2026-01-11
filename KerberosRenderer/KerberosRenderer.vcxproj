@@ -130,6 +130,7 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="src\Application.cpp" />
     <ClCompile Include="src\Buffer.cpp" />
     <ClCompile Include="src\main.cpp" />
     <ClCompile Include="src\Texture.cpp" />
@@ -164,9 +165,11 @@
     <ClCompile Include="vendor\imgui\imgui_widgets.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="src\Application.hpp" />
     <ClInclude Include="src\Buffer.hpp" />
     <ClInclude Include="src\GameObject.hpp" />
     <ClInclude Include="src\io.hpp" />
+    <ClInclude Include="src\Layer.hpp" />
     <ClInclude Include="src\Texture.hpp" />
     <ClInclude Include="src\Utils.hpp" />
     <ClInclude Include="src\Vertex.hpp" />
