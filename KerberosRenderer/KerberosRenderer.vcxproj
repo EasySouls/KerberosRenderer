@@ -133,6 +133,7 @@
     <ClCompile Include="src\Buffer.cpp" />
     <ClCompile Include="src\main.cpp" />
     <ClCompile Include="src\Texture.cpp" />
+    <ClCompile Include="src\VulkanContext.cpp" />
     <ClCompile Include="vendor\glfw-3.4\src\context.c" />
     <ClCompile Include="vendor\glfw-3.4\src\egl_context.c" />
     <ClCompile Include="vendor\glfw-3.4\src\init.c" />
@@ -168,7 +169,9 @@
     <ClInclude Include="src\io.hpp" />
     <ClInclude Include="src\Texture.hpp" />
     <ClInclude Include="src\Utils.hpp" />
+    <ClInclude Include="src\Vertex.hpp" />
     <ClInclude Include="src\Vulkan.hpp" />
+    <ClInclude Include="src\VulkanContext.hpp" />
     <ClInclude Include="vendor\glfw-3.4\include\GLFW\glfw3.h" />
     <ClInclude Include="vendor\glfw-3.4\include\GLFW\glfw3native.h" />
     <ClInclude Include="vendor\imgui\backends\imgui_impl_glfw.h" />
