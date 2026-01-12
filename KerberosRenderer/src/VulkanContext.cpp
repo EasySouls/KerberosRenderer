@@ -47,9 +47,17 @@ static VKAPI_ATTR vk::Bool32 VKAPI_CALL DebugCallback(
 
 namespace kbr
 {
+	VulkanContext* VulkanContext::s_Instance = nullptr;
+
 	VulkanContext::VulkanContext(GLFWwindow* window)
 		: window(window)
 	{
+		if (s_Instance != nullptr)
+		{
+			throw std::runtime_error("VulkanContext instance already exists!");
+		}
+		s_Instance = this;
+
 		CreateInstance();
 		SetupDebugMessenger();
 		CreateSurface();
@@ -183,9 +191,58 @@ namespace kbr
 		graphicsQueue.waitIdle();
 	}
 
+	void VulkanContext::CopyBuffer(
+		const vk::raii::Buffer& srcBuffer,
+		const vk::raii::Buffer& dstBuffer,
+		const vk::DeviceSize size,
+		const vk::raii::Semaphore* waitSemaphore,
+		const vk::raii::Semaphore* signalSemaphore
+	)
+	{
+		const vk::CommandBufferAllocateInfo allocInfo{
+			.commandPool = *commandPool,
+			.level = vk::CommandBufferLevel::ePrimary,
+			.commandBufferCount = 1
+		};
+		const vk::raii::CommandBuffer copyCmdBuffer = std::move(device.allocateCommandBuffers(allocInfo).front());
+
+		constexpr vk::CommandBufferBeginInfo beginInfo{
+			.flags = vk::CommandBufferUsageFlagBits::eOneTimeSubmit
+		};
+		copyCmdBuffer.begin(beginInfo);
+		copyCmdBuffer.copyBuffer(*srcBuffer, *dstBuffer, vk::BufferCopy{ .size = size });
+		copyCmdBuffer.end();
+
+		const vk::SubmitInfo submitInfo{
+			.waitSemaphoreCount = waitSemaphore ? 1u : 0u,
+			.pWaitSemaphores = waitSemaphore ? reinterpret_cast<const vk::Semaphore*>(waitSemaphore) : nullptr,
+			.commandBufferCount = 1u,
+			.pCommandBuffers = &*copyCmdBuffer,
+			.signalSemaphoreCount = signalSemaphore ? 1u : 0u,
+			.pSignalSemaphores = signalSemaphore ? reinterpret_cast<const vk::Semaphore*>(signalSemaphore) : nullptr,
+		};
+		graphicsQueue.submit(submitInfo, nullptr);
+		graphicsQueue.waitIdle();
+	}
+
 	uint32_t VulkanContext::GetMaxFramesInFlight() const 
 	{
 		return maxFramesInFlight;
+	}
+
+	vk::raii::Device& VulkanContext::GetDevice() 
+	{
+		return device;
+	}
+
+	vk::PhysicalDeviceMemoryProperties VulkanContext::GetMemoryProperties() const 
+	{
+		return physicalDevice.getMemoryProperties();
+	}
+
+	vk::FormatProperties VulkanContext::GetFormatProperties(const vk::Format format) const 
+	{
+		return physicalDevice.getFormatProperties(format);
 	}
 
 	void VulkanContext::FramebufferResized(uint32_t width, uint32_t height) 
@@ -675,7 +732,6 @@ namespace kbr
 	vk::Format VulkanContext::FindDepthFormat() const
 	{
 		return FindSupportedFormat(
-			physicalDevice,
 			{ vk::Format::eD32Sfloat, vk::Format::eD32SfloatS8Uint, vk::Format::eD24UnormS8Uint },
 			vk::ImageTiling::eOptimal,
 			vk::FormatFeatureFlagBits::eDepthStencilAttachment
@@ -691,7 +747,7 @@ namespace kbr
 	{
 		const vk::Format colorFormat = swapChainImageFormat;
 
-		CreateImage(device, physicalDevice,
+		CreateImage(device,
 					swapChainExtent.width,
 					swapChainExtent.height,
 					1,
@@ -710,7 +766,7 @@ namespace kbr
 	{
 		depthFormat = FindDepthFormat();
 
-		CreateImage(device, physicalDevice,
+		CreateImage(device,
 					swapChainExtent.width,
 					swapChainExtent.height,
 					1,

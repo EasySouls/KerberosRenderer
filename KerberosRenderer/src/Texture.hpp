@@ -4,7 +4,6 @@
 
 void CreateImage(
 	const vk::raii::Device& device,
-	const vk::PhysicalDevice& physicalDevice,
 	uint32_t width, 
 	uint32_t height, 
 	uint32_t mipLevels,

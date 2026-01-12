@@ -1,10 +1,10 @@
 #pragma once
 
 #include "Vulkan.hpp"
+#include "Vertex.hpp"
 
 void CreateBuffer(
 	const vk::raii::Device& device,
-	const vk::PhysicalDevice& physicalDevice,
 	vk::DeviceSize size,
 	vk::BufferUsageFlags usage,
 	vk::MemoryPropertyFlags properties,
@@ -12,13 +12,31 @@ void CreateBuffer(
 	vk::raii::DeviceMemory& bufferMemory
 );
 
-void CopyBuffer(
-	const vk::raii::Device& device,
-	const vk::raii::CommandPool& commandPool,
-	const vk::raii::Queue& graphicsQueue,
-	const vk::raii::Buffer& srcBuffer,
-	const vk::raii::Buffer& dstBuffer,
-	vk::DeviceSize size,
-	const vk::raii::Semaphore* waitSemaphore = nullptr,
-	const vk::raii::Semaphore* signalSemaphore = nullptr
-);
+namespace kbr
+{
+	class VertexBuffer
+	{
+	public:
+		explicit VertexBuffer(const std::vector<Vertex>& vertices);
+
+		const vk::raii::Buffer& GetBuffer() const { return m_Buffer; }
+		const vk::raii::DeviceMemory& GetBufferMemory() const { return m_BufferMemory; }
+
+	private:
+		vk::raii::Buffer m_Buffer = nullptr;
+		vk::raii::DeviceMemory m_BufferMemory = nullptr;
+	};
+
+	class IndexBuffer
+	{
+	public:
+		explicit IndexBuffer(const std::vector<uint32_t>& indices);
+
+		const vk::raii::Buffer& GetBuffer() const { return m_Buffer; }
+		const vk::raii::DeviceMemory& GetBufferMemory() const { return m_BufferMemory; }
+
+	private:
+		vk::raii::Buffer m_Buffer = nullptr;
+		vk::raii::DeviceMemory m_BufferMemory = nullptr;
+	};
+}

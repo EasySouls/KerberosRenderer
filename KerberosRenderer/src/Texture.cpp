@@ -4,7 +4,6 @@
 
 void CreateImage(
 	const vk::raii::Device& device,
-	const vk::PhysicalDevice& physicalDevice,
 	const uint32_t width, 
 	const uint32_t height,
 	const uint32_t mipLevels,
@@ -37,7 +36,7 @@ void CreateImage(
 	const vk::MemoryRequirements memRequirements = image.getMemoryRequirements();
 	const vk::MemoryAllocateInfo allocInfo{ 
 		.allocationSize = memRequirements.size,
-		.memoryTypeIndex = FindMemoryType(physicalDevice, memRequirements.memoryTypeBits, properties) 
+		.memoryTypeIndex = FindMemoryType(memRequirements.memoryTypeBits, properties) 
 	};
 
 	imageMemory = vk::raii::DeviceMemory(device, allocInfo);

@@ -9,7 +9,7 @@
 
 #include <array>
 
-namespace krb
+namespace kbr
 {
 	struct Vertex
 	{
@@ -37,9 +37,9 @@ namespace krb
 	
 }
 
-template<> struct std::hash<krb::Vertex>
+template<> struct std::hash<kbr::Vertex>
 {
-	size_t operator()(krb::Vertex const& vertex) const noexcept {
+	size_t operator()(kbr::Vertex const& vertex) const noexcept {
 		return ((hash<glm::vec3>()(vertex.pos) ^
 				 (hash<glm::vec3>()(vertex.color) << 1)) >> 1) ^
 			(hash<glm::vec2>()(vertex.texCoord) << 1);

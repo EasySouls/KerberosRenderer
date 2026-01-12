@@ -22,9 +22,23 @@ namespace kbr
 		vk::raii::CommandBuffer BeginSingleTimeCommands() const;
 		void EndSingleTimeCommands(const vk::raii::CommandBuffer& commandBuffer) const;
 
+		void CopyBuffer(
+			const vk::raii::Buffer& srcBuffer,
+			const vk::raii::Buffer& dstBuffer,
+			vk::DeviceSize size,
+			const vk::raii::Semaphore* waitSemaphore = nullptr,
+			const vk::raii::Semaphore* signalSemaphore = nullptr
+		);
+
 		uint32_t GetMaxFramesInFlight() const;
 
+		vk::raii::Device& GetDevice();
+		vk::PhysicalDeviceMemoryProperties GetMemoryProperties() const;
+		vk::FormatProperties GetFormatProperties(vk::Format format) const;
+
 		void FramebufferResized(uint32_t width, uint32_t height);
+
+		static VulkanContext& Get() { return *s_Instance; }
 
 	private:
 		void RecordCommandBuffer(uint32_t imageIndex) const;
@@ -119,5 +133,8 @@ namespace kbr
 
 		uint32_t frameIndex = 0;
 		uint32_t currentImageIndex = 0;
+
+		// Singleton instance
+		static VulkanContext* s_Instance;
 	};
 } 

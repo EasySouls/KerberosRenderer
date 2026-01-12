@@ -1,10 +1,10 @@
 #include "Buffer.hpp"
 
 #include "Utils.hpp"
+#include "VulkanContext.hpp"
 
 void CreateBuffer(
 	const vk::raii::Device& device,
-	const vk::PhysicalDevice& physicalDevice,
 	const vk::DeviceSize size,
 	const vk::BufferUsageFlags usage,
 	const vk::MemoryPropertyFlags properties,
@@ -22,45 +22,78 @@ void CreateBuffer(
 	const vk::MemoryRequirements memRequirements = buffer.getMemoryRequirements();
 	const vk::MemoryAllocateInfo allocInfo{
 		.allocationSize = memRequirements.size,
-		.memoryTypeIndex = FindMemoryType(physicalDevice, memRequirements.memoryTypeBits, properties)
+		.memoryTypeIndex = FindMemoryType(memRequirements.memoryTypeBits, properties)
 	};
 	bufferMemory = vk::raii::DeviceMemory(device, allocInfo);
 	buffer.bindMemory(*bufferMemory, 0);
 }
 
-void CopyBuffer(
-	const vk::raii::Device& device, 
-	const vk::raii::CommandPool& commandPool,
-	const vk::raii::Queue& graphicsQueue, 
-	const vk::raii::Buffer& srcBuffer, 
-	const vk::raii::Buffer& dstBuffer,
-	const vk::DeviceSize size,
-	const vk::raii::Semaphore* waitSemaphore,
-	const vk::raii::Semaphore* signalSemaphore
-) 
+namespace kbr {
+
+VertexBuffer::VertexBuffer(const std::vector<Vertex>& vertices) 
 {
-	const vk::CommandBufferAllocateInfo allocInfo{
-		.commandPool = *commandPool,
-		.level = vk::CommandBufferLevel::ePrimary,
-		.commandBufferCount = 1
-	};
-	const vk::raii::CommandBuffer copyCmdBuffer = std::move(device.allocateCommandBuffers(allocInfo).front());
+	const vk::raii::Device& device = VulkanContext::Get().GetDevice();
 
-	constexpr vk::CommandBufferBeginInfo beginInfo{
-		.flags = vk::CommandBufferUsageFlagBits::eOneTimeSubmit
+	const vk::DeviceSize bufferSize = sizeof(vertices[0]) * vertices.size();
+	const vk::BufferCreateInfo stagingInfo{ .size = bufferSize, .usage = vk::BufferUsageFlagBits::eTransferSrc, .sharingMode = vk::SharingMode::eExclusive };
+	const vk::raii::Buffer stagingBuffer(device, stagingInfo);
+	const vk::MemoryRequirements memRequirementsStaging = stagingBuffer.getMemoryRequirements();
+	const vk::MemoryAllocateInfo memoryAllocateInfoStaging{
+		.allocationSize = memRequirementsStaging.size,
+		.memoryTypeIndex = FindMemoryType(memRequirementsStaging.memoryTypeBits,
+										  vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent)
 	};
-	copyCmdBuffer.begin(beginInfo);
-	copyCmdBuffer.copyBuffer(*srcBuffer, *dstBuffer, vk::BufferCopy{ .size = size });
-	copyCmdBuffer.end();
+	const vk::raii::DeviceMemory stagingBufferMemory(device, memoryAllocateInfoStaging);
 
-	const vk::SubmitInfo submitInfo{
-		.waitSemaphoreCount = waitSemaphore ? 1u : 0u,
-		.pWaitSemaphores = waitSemaphore ? reinterpret_cast<const vk::Semaphore*>(waitSemaphore) : nullptr,
-		.commandBufferCount = 1u,
-		.pCommandBuffers = &*copyCmdBuffer,
-		.signalSemaphoreCount = signalSemaphore ? 1u : 0u,
-		.pSignalSemaphores = signalSemaphore ? reinterpret_cast<const vk::Semaphore*>(signalSemaphore) : nullptr,
+	stagingBuffer.bindMemory(stagingBufferMemory, 0);
+	void* dataStaging = stagingBufferMemory.mapMemory(0, stagingInfo.size);
+	memcpy(dataStaging, vertices.data(), stagingInfo.size);
+	stagingBufferMemory.unmapMemory();
+
+	const vk::BufferCreateInfo bufferInfo{
+		.size = bufferSize,
+		.usage = vk::BufferUsageFlagBits::eVertexBuffer | vk::BufferUsageFlagBits::eTransferDst,
+		.sharingMode = vk::SharingMode::eExclusive
 	};
-	graphicsQueue.submit(submitInfo, nullptr);
-	graphicsQueue.waitIdle();
+	m_Buffer = vk::raii::Buffer(device, bufferInfo);
+
+	const vk::MemoryRequirements memRequirements = m_Buffer.getMemoryRequirements();
+	const vk::MemoryAllocateInfo memoryAllocateInfo{
+		.allocationSize = memRequirements.size,
+		.memoryTypeIndex = FindMemoryType(memRequirements.memoryTypeBits,
+										  vk::MemoryPropertyFlagBits::eDeviceLocal)
+	};
+	m_BufferMemory = vk::raii::DeviceMemory(device, memoryAllocateInfo);
+
+	m_Buffer.bindMemory(*m_BufferMemory, 0);
+
+	VulkanContext::Get().CopyBuffer(stagingBuffer, m_Buffer, stagingInfo.size);
+}
+
+IndexBuffer::IndexBuffer(const std::vector<uint32_t>& indices) 
+{
+	const vk::raii::Device& device = VulkanContext::Get().GetDevice();
+
+	const vk::DeviceSize bufferSize = sizeof(indices[0]) * indices.size();
+
+	vk::raii::Buffer stagingBuffer({});
+	vk::raii::DeviceMemory stagingBufferMemory({});
+	CreateBuffer(device,
+				 bufferSize,
+				 vk::BufferUsageFlagBits::eTransferSrc,
+				 vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent,
+				 stagingBuffer, stagingBufferMemory);
+
+	void* data = stagingBufferMemory.mapMemory(0, bufferSize);
+	memcpy(data, indices.data(), bufferSize);
+	stagingBufferMemory.unmapMemory();
+
+	CreateBuffer(device, bufferSize,
+				 vk::BufferUsageFlagBits::eTransferDst | vk::BufferUsageFlagBits::eIndexBuffer,
+				 vk::MemoryPropertyFlagBits::eDeviceLocal,
+				 m_Buffer, m_BufferMemory);
+
+	VulkanContext::Get().CopyBuffer(stagingBuffer, m_Buffer, bufferSize);
+}
+
 }

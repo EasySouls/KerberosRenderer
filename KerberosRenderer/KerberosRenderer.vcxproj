@@ -134,6 +134,7 @@
     <ClCompile Include="src\Buffer.cpp" />
     <ClCompile Include="src\GameLayer.cpp" />
     <ClCompile Include="src\main.cpp" />
+    <ClCompile Include="src\Mesh.cpp" />
     <ClCompile Include="src\Texture.cpp" />
     <ClCompile Include="src\VulkanContext.cpp" />
     <ClCompile Include="vendor\glfw-3.4\src\context.c" />
@@ -172,6 +173,7 @@
     <ClInclude Include="src\GameObject.hpp" />
     <ClInclude Include="src\io.hpp" />
     <ClInclude Include="src\Layer.hpp" />
+    <ClInclude Include="src\Mesh.hpp" />
     <ClInclude Include="src\Texture.hpp" />
     <ClInclude Include="src\Utils.hpp" />
     <ClInclude Include="src\Vertex.hpp" />

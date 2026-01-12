@@ -994,7 +994,6 @@ private:
 	vk::Format FindDepthFormat() const
 	{
 		return FindSupportedFormat(
-			physicalDevice,
 			{ vk::Format::eD32Sfloat, vk::Format::eD32SfloatS8Uint, vk::Format::eD24UnormS8Uint },
 			vk::ImageTiling::eOptimal,
 			vk::FormatFeatureFlagBits::eDepthStencilAttachment
@@ -1010,7 +1009,7 @@ private:
 	{
 		const vk::Format colorFormat = swapChainImageFormat;
 
-		CreateImage(device, physicalDevice,
+		CreateImage(device,
 					swapChainExtent.width,
 					swapChainExtent.height,
 					1,
@@ -1029,7 +1028,7 @@ private:
 	{
 		depthFormat = FindDepthFormat();
 
-		CreateImage(device, physicalDevice,
+		CreateImage(device,
 					swapChainExtent.width,
 					swapChainExtent.height,
 					1,
@@ -1060,7 +1059,7 @@ private:
 		vk::raii::Buffer stagingBuffer({});
 		vk::raii::DeviceMemory stagingBufferMemory({});
 
-		CreateBuffer(device, physicalDevice,
+		CreateBuffer(device,
 					 imageSize, 
 					 vk::BufferUsageFlagBits::eTransferSrc, 
 					 vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent, 
@@ -1074,7 +1073,7 @@ private:
 
 		vk::raii::Image textureImageTemp({});
 		vk::raii::DeviceMemory textureImageMemoryTemp({});
-		CreateImage(device, physicalDevice, 
+		CreateImage(device, 
 					texWidth, texHeight,
 					mipLevels,
 					vk::SampleCountFlagBits::e1,
@@ -1263,7 +1262,7 @@ private:
 		const vk::MemoryRequirements memRequirementsStaging = stagingBuffer.getMemoryRequirements();
 		const vk::MemoryAllocateInfo memoryAllocateInfoStaging{
 			.allocationSize = memRequirementsStaging.size,
-			.memoryTypeIndex = FindMemoryType(physicalDevice, memRequirementsStaging.memoryTypeBits,
+			.memoryTypeIndex = FindMemoryType(memRequirementsStaging.memoryTypeBits,
 			                                  vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent)
 		};
 		const vk::raii::DeviceMemory stagingBufferMemory(device, memoryAllocateInfoStaging);
@@ -1283,14 +1282,14 @@ private:
 		const vk::MemoryRequirements memRequirements = vertexBuffer.getMemoryRequirements();
 		const vk::MemoryAllocateInfo memoryAllocateInfo{
 			.allocationSize = memRequirements.size,
-			.memoryTypeIndex = FindMemoryType(physicalDevice, memRequirements.memoryTypeBits,
+			.memoryTypeIndex = FindMemoryType(memRequirements.memoryTypeBits,
 			                                  vk::MemoryPropertyFlagBits::eDeviceLocal)
 		};
 		vertexBufferMemory = vk::raii::DeviceMemory(device, memoryAllocateInfo);
 
 		vertexBuffer.bindMemory(*vertexBufferMemory, 0);
 
-		CopyBuffer(device, commandPool, graphicsQueue, stagingBuffer, vertexBuffer, stagingInfo.size);
+		kbr::VulkanContext::Get().CopyBuffer(stagingBuffer, vertexBuffer, stagingInfo.size);
 	}
 
 	void CreateIndexBuffer()
@@ -1299,7 +1298,7 @@ private:
 
 		vk::raii::Buffer stagingBuffer({});
 		vk::raii::DeviceMemory stagingBufferMemory({});
-		CreateBuffer(device, physicalDevice, bufferSize,
+		CreateBuffer(device, bufferSize,
 					 vk::BufferUsageFlagBits::eTransferSrc,
 					 vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent,
 					 stagingBuffer, stagingBufferMemory);
@@ -1308,12 +1307,12 @@ private:
 		memcpy(data, indices.data(), bufferSize);
 		stagingBufferMemory.unmapMemory();
 
-		CreateBuffer(device, physicalDevice, bufferSize, 
+		CreateBuffer(device, bufferSize, 
 					 vk::BufferUsageFlagBits::eTransferDst | vk::BufferUsageFlagBits::eIndexBuffer, 
 					 vk::MemoryPropertyFlagBits::eDeviceLocal, 
 					 indexBuffer, indexBufferMemory);
 
-		CopyBuffer(device, commandPool, graphicsQueue, stagingBuffer, indexBuffer, bufferSize);
+		kbr::VulkanContext::Get().CopyBuffer(stagingBuffer, indexBuffer, bufferSize);
 	}
 
 	void CreateUniformBuffers()
@@ -1327,7 +1326,7 @@ private:
 			constexpr vk::DeviceSize bufferSize = sizeof(UniformBufferObject);
 			vk::raii::Buffer uniformBuffer({});
 			vk::raii::DeviceMemory uniformBufferMemory({});
-			CreateBuffer(device, physicalDevice, bufferSize,
+			CreateBuffer(device, bufferSize,
 			             vk::BufferUsageFlagBits::eUniformBuffer,
 			             vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent,
 			             uniformBuffer, uniformBufferMemory);
@@ -1348,7 +1347,7 @@ private:
 				constexpr vk::DeviceSize bufferSize = sizeof(UniformBufferObject);
 				vk::raii::Buffer buffer({});
 				vk::raii::DeviceMemory bufferMem({});
-				CreateBuffer(device, physicalDevice, bufferSize, 
+				CreateBuffer(device, bufferSize, 
 							 vk::BufferUsageFlagBits::eUniformBuffer,
 							 vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent,
 							 buffer, bufferMem);
