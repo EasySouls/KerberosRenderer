@@ -6,7 +6,7 @@
 
 namespace kbr
 {
-	static void FramebufferResizeCallback(GLFWwindow* window, int width, int height)
+	static void FramebufferResizeCallback(GLFWwindow* window, const int width, const int height)
 	{
 		const auto app = static_cast<Application*>(glfwGetWindowUserPointer(window));
 		app->FramebufferResized(static_cast<uint32_t>(width), static_cast<uint32_t>(height));
@@ -21,52 +21,61 @@ namespace kbr
 		}
 		// Create a GLFW window
 		glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
-		window = glfwCreateWindow(800, 600, "Kerberos Renderer", nullptr, nullptr);
-		if (!window)
+		m_Window = glfwCreateWindow(800, 600, "Kerberos Renderer", nullptr, nullptr);
+		if (!m_Window)
 		{
 			glfwTerminate();
 			throw std::runtime_error("Failed to create GLFW window");
 		}
 
-		glfwSetWindowUserPointer(window, this);
-		glfwSetFramebufferSizeCallback(window, FramebufferResizeCallback);
+		glfwSetWindowUserPointer(m_Window, this);
+		glfwSetFramebufferSizeCallback(m_Window, FramebufferResizeCallback);
 
-		vulkanContext = std::make_unique<VulkanContext>(window);
+		m_VulkanContext = std::make_unique<VulkanContext>(m_Window);
 	}
 
 	Application::~Application()
 	{
-		glfwDestroyWindow(window);
+		for (const auto& layer : m_Layers)
+		{
+			layer->OnDetach();
+		}
+
+		glfwDestroyWindow(m_Window);
 		glfwTerminate();
 	}
 
-	void Application::Run() const 
+	void Application::Run() 
 	{
-		while (!glfwWindowShouldClose(window))
+		while (!glfwWindowShouldClose(m_Window))
 		{
 			glfwPollEvents();
 
-			for (const auto& layer : layers)
+			const float time = static_cast<float>(glfwGetTime());
+			const float deltaTime = time - m_LastFrameTime;
+			m_LastFrameTime = time;
+
+			for (const auto& layer : m_Layers)
 			{
-				layer->OnUpdate(0.0f); // TODO: Replace 0.0f with actual delta time
+				layer->OnUpdate(deltaTime);
 			}
 
-			vulkanContext->PrepareImGuiFrame();
+			m_VulkanContext->PrepareImGuiFrame();
 
-			for (const auto& layer : layers)
+			for (const auto& layer : m_Layers)
 			{
 				layer->OnImGuiRender();
 			}
 
-			vulkanContext->RenderImGui();
+			m_VulkanContext->RenderImGui();
 
-			vulkanContext->Draw();
-			vulkanContext->Present();
+			m_VulkanContext->Draw();
+			m_VulkanContext->Present();
 		}
 	}
 
 	void Application::FramebufferResized(const uint32_t width, const uint32_t height) const 
 	{
-		vulkanContext->FramebufferResized(width, height);
+		m_VulkanContext->FramebufferResized(width, height);
 	}
 }

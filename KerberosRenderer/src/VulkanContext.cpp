@@ -197,7 +197,7 @@ namespace kbr
 		const vk::DeviceSize size,
 		const vk::raii::Semaphore* waitSemaphore,
 		const vk::raii::Semaphore* signalSemaphore
-	)
+	) const 
 	{
 		const vk::CommandBufferAllocateInfo allocInfo{
 			.commandPool = *commandPool,
@@ -223,6 +223,76 @@ namespace kbr
 		};
 		graphicsQueue.submit(submitInfo, nullptr);
 		graphicsQueue.waitIdle();
+	}
+
+	void VulkanContext::TransitionImageLayout(const vk::raii::Image& image, const vk::ImageLayout oldLayout, const vk::ImageLayout newLayout, const uint32_t mipLevels) const
+	{
+		const auto commandBuffer = BeginSingleTimeCommands();
+
+		vk::ImageMemoryBarrier2 barrier = {
+			.oldLayout = oldLayout,
+			.newLayout = newLayout,
+			.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+			.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+			.image = image,
+			.subresourceRange = {
+				.aspectMask = vk::ImageAspectFlagBits::eColor,
+				.baseMipLevel = 0,
+				.levelCount = mipLevels,
+				.baseArrayLayer = 0,
+				.layerCount = 1
+			}
+		};
+
+		if (oldLayout == vk::ImageLayout::eUndefined && newLayout == vk::ImageLayout::eTransferDstOptimal) {
+			barrier.srcAccessMask = {};
+			barrier.dstAccessMask = vk::AccessFlagBits2::eTransferWrite;
+
+			barrier.srcStageMask = vk::PipelineStageFlagBits2::eTopOfPipe;
+			barrier.dstStageMask = vk::PipelineStageFlagBits2::eTransfer;
+		}
+		else if (oldLayout == vk::ImageLayout::eTransferDstOptimal && newLayout == vk::ImageLayout::eShaderReadOnlyOptimal) {
+			barrier.srcAccessMask = vk::AccessFlagBits2::eTransferWrite;
+			barrier.dstAccessMask = vk::AccessFlagBits2::eShaderRead;
+
+			barrier.srcStageMask = vk::PipelineStageFlagBits2::eTransfer;
+			barrier.dstStageMask = vk::PipelineStageFlagBits2::eFragmentShader;
+		}
+		else {
+			throw std::invalid_argument("unsupported layout transition!");
+		}
+
+		const vk::DependencyInfo dependencyInfo = {
+			.dependencyFlags = {},
+			.imageMemoryBarrierCount = 1,
+			.pImageMemoryBarriers = &barrier
+		};
+
+		commandBuffer.pipelineBarrier2(dependencyInfo);
+
+		EndSingleTimeCommands(commandBuffer);
+	}
+
+	vk::Format VulkanContext::FindSupportedFormat(
+		const std::vector<vk::Format>& candidates, 
+		const vk::ImageTiling tiling,
+		const vk::FormatFeatureFlags features) const 
+	{
+		for (const vk::Format format : candidates)
+		{
+			const vk::FormatProperties props = GetFormatProperties(format);
+
+			if (tiling == vk::ImageTiling::eLinear && (props.linearTilingFeatures & features) == features)
+			{
+				return format;
+			}
+			if (tiling == vk::ImageTiling::eOptimal && (props.optimalTilingFeatures & features) == features)
+			{
+				return format;
+			}
+		}
+
+		throw std::runtime_error("Failed to find supported format!");
 	}
 
 	uint32_t VulkanContext::GetMaxFramesInFlight() const 
@@ -563,7 +633,7 @@ namespace kbr
 
 		// Create a chain of feature structures
 		vk::StructureChain<vk::PhysicalDeviceFeatures2, vk::PhysicalDeviceVulkan11Features, vk::PhysicalDeviceVulkan13Features, vk::PhysicalDeviceExtendedDynamicStateFeaturesEXT> featureChain = {
-			{.features = {.samplerAnisotropy = true } },
+			{.features = {.depthClamp = true, .samplerAnisotropy = true } },
 			{.shaderDrawParameters = true },
 			{.synchronization2 = true, .dynamicRendering = true },
 			{.extendedDynamicState = true }

@@ -28,7 +28,16 @@ namespace kbr
 			vk::DeviceSize size,
 			const vk::raii::Semaphore* waitSemaphore = nullptr,
 			const vk::raii::Semaphore* signalSemaphore = nullptr
-		);
+		) const;
+
+		void TransitionImageLayout(const vk::raii::Image& image, 
+								   vk::ImageLayout oldLayout,
+								   vk::ImageLayout newLayout, 
+								   uint32_t mipLevels) const;
+
+		vk::Format FindSupportedFormat(const std::vector<vk::Format>& candidates,
+									   vk::ImageTiling tiling,
+									   vk::FormatFeatureFlags features) const;
 
 		uint32_t GetMaxFramesInFlight() const;
 
