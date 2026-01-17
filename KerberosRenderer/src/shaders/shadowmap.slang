@@ -1,5 +1,6 @@
 struct VSInput {
     float3 inPosition;
+    float3 inNormal;
 };
 
 struct UniformBuffer {
@@ -24,8 +25,8 @@ VSOutput vertMain(VSInput input) {
 }
 
 [shader("fragment")]
-float fragMain(VSOutput inVert) : SV_TARGET
+void fragMain(VSOutput inVert) : SV_TARGET
 {
-    // Depth value is automatically written to the depth buffer
-    return 0.0;
+    //// Depth value is automatically written to the depth buffer
+    //return 0.0;
 }

@@ -105,7 +105,7 @@
       <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions);_CRT_SECURE_NO_WARNINGS;_GLFW_WIN32;NOMINMAX</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp20</LanguageStandard>
-      <AdditionalIncludeDirectories>C:\Development\KerberosRenderer\KerberosRenderer\vendor\glfw-3.4\include;C:\Development\KerberosRenderer\KerberosRenderer\vendor\glm;C:\Development\KerberosRenderer\KerberosRenderer\vendor\imgui;C:\Development\KerberosRenderer\KerberosRenderer\vendor\stb;C:\VulkanSDK\1.4.335.0\Include;C:\Development\KerberosRenderer\KerberosRenderer\vendor\tinyobjloader;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>C:\Development\KerberosRenderer\KerberosRenderer\vendor\glfw-3.4\include;C:\Development\KerberosRenderer\KerberosRenderer\vendor\glm;C:\Development\KerberosRenderer\KerberosRenderer\vendor\imgui;C:\Development\KerberosRenderer\KerberosRenderer\vendor\stb;C:\VulkanSDK\1.4.335.0\Include;C:\Development\KerberosRenderer\KerberosRenderer\vendor\tinyobjloader;C:\Development\KerberosRenderer\KerberosRenderer\vendor\tinygltf;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -132,9 +132,11 @@
   <ItemGroup>
     <ClCompile Include="src\Application.cpp" />
     <ClCompile Include="src\Buffer.cpp" />
+    <ClCompile Include="src\Camera.cpp" />
     <ClCompile Include="src\GameLayer.cpp" />
     <ClCompile Include="src\main.cpp" />
     <ClCompile Include="src\Mesh.cpp" />
+    <ClCompile Include="src\ModelLoader.cpp" />
     <ClCompile Include="src\Texture.cpp" />
     <ClCompile Include="src\VulkanContext.cpp" />
     <ClCompile Include="vendor\glfw-3.4\src\context.c" />
@@ -169,11 +171,13 @@
   <ItemGroup>
     <ClInclude Include="src\Application.hpp" />
     <ClInclude Include="src\Buffer.hpp" />
+    <ClInclude Include="src\Camera.hpp" />
     <ClInclude Include="src\GameLayer.hpp" />
     <ClInclude Include="src\GameObject.hpp" />
     <ClInclude Include="src\io.hpp" />
     <ClInclude Include="src\Layer.hpp" />
     <ClInclude Include="src\Mesh.hpp" />
+    <ClInclude Include="src\ModelLoader.hpp" />
     <ClInclude Include="src\Texture.hpp" />
     <ClInclude Include="src\Utils.hpp" />
     <ClInclude Include="src\Vertex.hpp" />

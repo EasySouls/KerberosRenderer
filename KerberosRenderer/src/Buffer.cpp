@@ -96,4 +96,17 @@ IndexBuffer::IndexBuffer(const std::vector<uint32_t>& indices)
 	VulkanContext::Get().CopyBuffer(stagingBuffer, m_Buffer, bufferSize);
 }
 
+UniformBuffer::UniformBuffer(const vk::DeviceSize bufferSize) 
+{
+	const vk::raii::Device& device = VulkanContext::Get().GetDevice();
+
+	CreateBuffer(device,
+				 bufferSize,
+				 vk::BufferUsageFlagBits::eUniformBuffer,
+				 vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent,
+				 m_Buffer, m_BufferMemory);
+
+	m_MappedData = m_BufferMemory.mapMemory(0, bufferSize);
+}
+
 }

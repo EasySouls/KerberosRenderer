@@ -40,7 +40,7 @@ static VKAPI_ATTR vk::Bool32 VKAPI_CALL DebugCallback(
 	const vk::DebugUtilsMessengerCallbackDataEXT* pCallbackData,
 	void*)
 {
-	std::cerr << "validation layer: type " << to_string(type) << " msg: " << pCallbackData->pMessage << '\n';
+	std::cerr << "validation layer: type " << to_string(type) << " msg: " << pCallbackData->pMessage << "\n\n";
 
 	return vk::False;
 }
@@ -298,6 +298,18 @@ namespace kbr
 	uint32_t VulkanContext::GetMaxFramesInFlight() const 
 	{
 		return maxFramesInFlight;
+	}
+
+	void VulkanContext::SetObjectDebugName(const uint64_t objectHandle, const vk::ObjectType objectType,
+		const std::string& name) const 
+	{
+		const vk::DebugUtilsObjectNameInfoEXT nameInfo{
+			.objectType = objectType,
+			.objectHandle = objectHandle,
+			.pObjectName = name.c_str()
+		};
+
+		device.setDebugUtilsObjectNameEXT(nameInfo);
 	}
 
 	vk::raii::Device& VulkanContext::GetDevice() 

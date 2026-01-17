@@ -41,6 +41,8 @@ namespace kbr
 
 		uint32_t GetMaxFramesInFlight() const;
 
+		void SetObjectDebugName(uint64_t objectHandle, vk::ObjectType objectType, const std::string& name) const;
+
 		vk::raii::Device& GetDevice();
 		vk::PhysicalDeviceMemoryProperties GetMemoryProperties() const;
 		vk::FormatProperties GetFormatProperties(vk::Format format) const;

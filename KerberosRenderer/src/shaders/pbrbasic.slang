@@ -20,7 +20,6 @@ struct VSOutput
 struct UBO
 {
     float4x4 projection;
-    float4x4 model;
     float4x4 view;
     float3 camPos;
 };
@@ -38,7 +37,16 @@ struct Material {
 	[[vk::offset(24)]] float g;
 	[[vk::offset(28)]] float b;
 };
-[[vk::push_constant]] Material material;
+
+struct PerObject {
+    float3 objPos;
+    float4x4 model;
+    float4x4 worldNormal;
+    Material material;
+};
+ConstantBuffer<PerObject> perObject;
+
+Sampler2D shadowMap;
 
 static const float PI = 3.14159265359;
 
@@ -104,12 +112,12 @@ float3 BRDF(float3 L, float3 V, float3 N, Material material)
 }
 
 [shader("vertex")]
-VSOutput vertMain(VSInput input, uniform float3 objPos)
+VSOutput vertMain(VSInput input)
 {
     VSOutput output;
-    float3 locPos = mul(ubo.model, float4(input.Pos, 1.0)).xyz;
-    output.WorldPos = locPos + objPos;
-    output.Normal = mul((float3x3)ubo.model, input.Normal);
+    float3 locPos = mul(perObject.model, float4(input.Pos, 1.0)).xyz;
+    output.WorldPos = locPos + perObject.objPos;
+    output.Normal = mul((float3x3)perObject.worldNormal, input.Normal);
     output.Pos = mul(ubo.projection, mul(ubo.view, float4(output.WorldPos, 1.0)));
     return output;
 }
@@ -124,11 +132,11 @@ float4 fragMain(VSOutput input)
 	float3 Lo = float3(0.0, 0.0, 0.0);
 	for (int i = 0; i < 4; i++) {
 		float3 L = normalize(uboParams.lights[i].xyz - input.WorldPos);
-		Lo += BRDF(L, V, N, material);
+		Lo += BRDF(L, V, N, perObject.material);
 	};
 
 	// Combine with ambient
-	float3 color = float3(material.r, material.g, material.b) * 0.02;
+	float3 color = float3(perObject.material.r, perObject.material.g, perObject.material.b) * 0.02;
 	color += Lo;
 
 	// Gamma correct

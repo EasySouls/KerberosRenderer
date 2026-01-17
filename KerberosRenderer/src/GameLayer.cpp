@@ -3,20 +3,23 @@
 #include "VulkanContext.hpp"
 #include "io.hpp"
 #include "Texture.hpp"
+#include "Vertex.hpp"
+#include "ModelLoader.hpp"
 
 #include "glm/glm.hpp"
 #include "imgui.h"
 
 #include <iostream>
 
-#include "Vertex.hpp"
+#include "backends/imgui_impl_vulkan.h"
 
 
 namespace Game
 {
 	GameLayer::GameLayer() 
-		: Layer("GameLayer")
+		: Layer("GameLayer"), m_Camera(45.0f, 800.0f / 600.0f, 0.1f, 1000.0f)
 	{
+		m_Camera.SetPosition(glm::vec3(0.0f, 1.0f, 5.0f));
 	}
 
 	void GameLayer::OnAttach() 
@@ -35,8 +38,36 @@ namespace Game
 		m_Materials.emplace_back("Blue", glm::vec3(0.0f, 0.0f, 1.0f), 0.1f, 1.0f);
 		m_Materials.emplace_back("Black", glm::vec3(0.0f), 0.1f, 1.0f);
 
+		PrepareUniformBuffers();
+
 		auto& context = kbr::VulkanContext::Get();
 		auto& device = context.GetDevice();
+
+		// Create samplers
+		{
+			vk::SamplerCreateInfo samplerInfo{
+				.magFilter = vk::Filter::eLinear,
+				.minFilter = vk::Filter::eLinear,
+				.mipmapMode = vk::SamplerMipmapMode::eLinear,
+				.addressModeU = vk::SamplerAddressMode::eRepeat,
+				.addressModeV = vk::SamplerAddressMode::eRepeat,
+				.addressModeW = vk::SamplerAddressMode::eRepeat,
+				.mipLodBias = 0.0f,
+				.anisotropyEnable = vk::True,
+				.maxAnisotropy = 16.0f,
+				.compareEnable = vk::False,
+				.compareOp = vk::CompareOp::eAlways,
+				.minLod = 0.0f,
+				.maxLod = VK_LOD_CLAMP_NONE,
+				.borderColor = vk::BorderColor::eIntOpaqueBlack,
+				.unnormalizedCoordinates = vk::False
+			};
+			m_ColorSampler = vk::raii::Sampler{ device, samplerInfo };
+
+			context.SetObjectDebugName(reinterpret_cast<uint64_t>(static_cast<VkSampler>(*m_ColorSampler)),
+									   vk::ObjectType::eSampler,
+									   "Color Texture Sampler");
+		}
 
 		// Create shared pipeline states
 		std::vector dynamicStates = {
@@ -56,7 +87,12 @@ namespace Game
 		// Create the shadow map resources
 		{
 			// Create shadow map image
-			const vk::Format shadowMapFormat = context.FindSupportedFormat({ vk::Format::eD32Sfloat }, vk::ImageTiling::eOptimal, vk::FormatFeatureFlagBits::eDepthStencilAttachment);
+			const vk::Format shadowMapFormat = context.FindSupportedFormat(
+				{ vk::Format::eD32Sfloat }, 
+				vk::ImageTiling::eOptimal, 
+				vk::FormatFeatureFlagBits::eDepthStencilAttachment | vk::FormatFeatureFlagBits::eSampledImage
+			);
+
 			constexpr uint32_t shadowMapSize = 2048;
 			constexpr uint32_t shadowMapMipLevels = 1;
 
@@ -67,12 +103,27 @@ namespace Game
 						vk::SampleCountFlagBits::e1,
 						shadowMapFormat,
 						vk::ImageTiling::eOptimal,
-						vk::ImageUsageFlagBits::eDepthStencilAttachment,
+						vk::ImageUsageFlagBits::eDepthStencilAttachment | vk::ImageUsageFlagBits::eSampled,
 						vk::MemoryPropertyFlagBits::eDeviceLocal,
 						m_ShadowMapImage,
 						m_ShadowMapImageMemory);
 
-			m_ShadowMapImageView = CreateImageView(device, m_ShadowMapImage, shadowMapFormat, vk::ImageAspectFlagBits::eDepth, shadowMapMipLevels);
+			context.SetObjectDebugName(reinterpret_cast<uint64_t>(static_cast<VkImage>(*m_ShadowMapImage)),
+									 vk::ObjectType::eImage,
+									  "Shadow Map Image");
+			context.SetObjectDebugName(reinterpret_cast<uint64_t>(static_cast<VkDeviceMemory>(*m_ShadowMapImageMemory)),
+									 vk::ObjectType::eDeviceMemory,
+									   "Shadow Map Image Memory");
+
+			m_ShadowMapImageView = CreateImageView(device, 
+												   m_ShadowMapImage, 
+												   shadowMapFormat, 
+												   vk::ImageAspectFlagBits::eDepth, 
+												   shadowMapMipLevels);
+
+			context.SetObjectDebugName(reinterpret_cast<uint64_t>(static_cast<VkImageView>(*m_ShadowMapImageView)),
+									 vk::ObjectType::eImageView,
+									   "Shadow Map Image View");
 
 			// Create shadow map image layout transition
 			/*context.TransitionImageLayout(shadowMapImage,
@@ -90,7 +141,7 @@ namespace Game
 
 			const vk::DescriptorSetLayoutCreateInfo shadowMapLayoutInfo{
 				.bindingCount = 1,
-				.pBindings = &shadowMapLayoutBinding
+				.pBindings = &shadowMapLayoutBinding,
 			};
 
 			auto shadowMapDescriptorSetLayout = vk::raii::DescriptorSetLayout{ device, shadowMapLayoutInfo };
@@ -98,10 +149,14 @@ namespace Game
 			vk::PipelineLayoutCreateInfo pipelineLayoutInfo{
 				.setLayoutCount = 1,
 				.pSetLayouts = &*shadowMapDescriptorSetLayout,
-				.pushConstantRangeCount = 0
+				.pushConstantRangeCount = 0,
+				.pPushConstantRanges = nullptr
 			};
 
 			m_ShadowMapPipelineLayout = vk::raii::PipelineLayout{ device, pipelineLayoutInfo };
+			context.SetObjectDebugName(reinterpret_cast<uint64_t>(static_cast<VkPipelineLayout>(*m_ShadowMapPipelineLayout)),
+									 vk::ObjectType::ePipelineLayout,
+									   "Shadow Map Pipeline Layout");
 
 			// Create shader for shadow mapping
 			const auto shaderCode = IO::ReadFile("src/shaders/shadowmap.spv");
@@ -110,6 +165,10 @@ namespace Game
 				.pCode = reinterpret_cast<const uint32_t*>(shaderCode.data()) 
 			};
 			vk::raii::ShaderModule shaderModule{ device, shaderInfo };
+
+			context.SetObjectDebugName(reinterpret_cast<uint64_t>(static_cast<VkShaderModule>(*shaderModule)),
+									 vk::ObjectType::eShaderModule,
+									   "Shadow Map Shader Module");
 
 			const vk::PipelineShaderStageCreateInfo vertShaderStageInfo{ .stage = vk::ShaderStageFlagBits::eVertex, .module = shaderModule,  .pName = "vertMain" };
 			const vk::PipelineShaderStageCreateInfo fragShaderStageInfo{ .stage = vk::ShaderStageFlagBits::eFragment, .module = shaderModule, .pName = "fragMain" };
@@ -192,14 +251,20 @@ namespace Game
 			};
 
 			m_ShadowMapPipeline = vk::raii::Pipeline(device, nullptr, pipelineInfo);
+
+			context.SetObjectDebugName(reinterpret_cast<uint64_t>(static_cast<VkPipeline>(*m_ShadowMapPipeline)),
+									 vk::ObjectType::ePipeline,
+									   "Shadow Map Pipeline");
 		}
+
+		SetupDescriptors();
 
 		// Create the opaque and transparent pipeline resources
 		{
 			const vk::Format colorFormat = context.FindSupportedFormat(
-				{ vk::Format::eR32G32B32A32Uint }, 
+				{ vk::Format::eR32G32B32A32Sfloat, vk::Format::eR32G32B32A32Uint }, 
 				vk::ImageTiling::eOptimal, 
-				vk::FormatFeatureFlagBits::eColorAttachment
+				vk::FormatFeatureFlagBits::eColorAttachment | vk::FormatFeatureFlagBits::eColorAttachmentBlend | vk::FormatFeatureFlagBits::eSampledImage
 			);
 			constexpr uint32_t imageSize = 2048;
 			constexpr uint32_t mipLevels = 1;
@@ -211,12 +276,24 @@ namespace Game
 						vk::SampleCountFlagBits::e1,
 						colorFormat,
 						vk::ImageTiling::eOptimal,
-						vk::ImageUsageFlagBits::eColorAttachment,
+						vk::ImageUsageFlagBits::eColorAttachment | vk::ImageUsageFlagBits::eSampled,
 						vk::MemoryPropertyFlagBits::eDeviceLocal,
 						m_ColorImage,
 						m_ColorImageMemory);
 
+			context.SetObjectDebugName(reinterpret_cast<uint64_t>(static_cast<VkImage>(*m_ColorImage)),
+									 vk::ObjectType::eImage,
+									   "Color Attachment Image");
+
+			context.SetObjectDebugName(reinterpret_cast<uint64_t>(static_cast<VkDeviceMemory>(*m_ColorImageMemory)),
+									   vk::ObjectType::eDeviceMemory,
+									   "Color Attachment Image Memory");
+
 			m_ColorImageView = CreateImageView(device, m_ColorImage, colorFormat, vk::ImageAspectFlagBits::eColor, mipLevels);
+
+			context.SetObjectDebugName(reinterpret_cast<uint64_t>(static_cast<VkImageView>(*m_ColorImageView)),
+									 vk::ObjectType::eImageView,
+									   "Color Attachment Image View");
 
 			const vk::Format depthFormat = context.FindSupportedFormat(
 				{ vk::Format::eD32Sfloat }, 
@@ -237,39 +314,32 @@ namespace Game
 				m_DepthImage,
 				m_DepthImageMemory);
 
+			context.SetObjectDebugName(reinterpret_cast<uint64_t>(static_cast<VkImage>(*m_DepthImage)),
+									 vk::ObjectType::eImage,
+									   "Depth Attachment Image");
+
+			context.SetObjectDebugName(reinterpret_cast<uint64_t>(static_cast<VkDeviceMemory>(*m_DepthImageMemory)),
+									   vk::ObjectType::eDeviceMemory,
+									   "Depth Attachment Image Memory");
+
 			m_DepthImageView = CreateImageView(device, m_DepthImage, depthFormat, vk::ImageAspectFlagBits::eDepth, mipLevels);
 
-			constexpr std::array bindings = {
-				vk::DescriptorSetLayoutBinding{
-					.binding = 0,
-					.descriptorType = vk::DescriptorType::eUniformBuffer,
-					.descriptorCount = 1,
-					.stageFlags = vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment,
-					.pImmutableSamplers = nullptr
-				},
-				vk::DescriptorSetLayoutBinding{
-					.binding = 1,
-					.descriptorType = vk::DescriptorType::eCombinedImageSampler,
-					.descriptorCount = 1,
-					.stageFlags = vk::ShaderStageFlagBits::eFragment,
-					.pImmutableSamplers = nullptr
-				}
-			};
-
-			const vk::DescriptorSetLayoutCreateInfo layoutInfo{
-				.bindingCount = static_cast<uint32_t>(bindings.size()),
-				.pBindings = bindings.data()
-			};
-
-			auto descriptorSetLayout = vk::raii::DescriptorSetLayout{ device, layoutInfo };
+			context.SetObjectDebugName(reinterpret_cast<uint64_t>(static_cast<VkImageView>(*m_DepthImageView)),
+									 vk::ObjectType::eImageView,
+									   "Depth Attachment Image View");
 
 			vk::PipelineLayoutCreateInfo pipelineLayoutInfo{
 				.setLayoutCount = 1,
-				.pSetLayouts = &*descriptorSetLayout,
-				.pushConstantRangeCount = 0
+				.pSetLayouts = &*m_PBRDescriptorSetLayout,
+				.pushConstantRangeCount = 0,
+				.pPushConstantRanges = nullptr
 			};
 
 			m_PBRPipelineLayout = vk::raii::PipelineLayout{ device, pipelineLayoutInfo };
+
+			context.SetObjectDebugName(reinterpret_cast<uint64_t>(static_cast<VkPipelineLayout>(*m_PBRPipelineLayout)),
+									 vk::ObjectType::ePipelineLayout,
+									   "PBR Pipeline Layout");
 
 			const auto shaderCode = IO::ReadFile("src/shaders/pbrbasic.spv");
 			const vk::ShaderModuleCreateInfo shaderInfo{
@@ -277,6 +347,10 @@ namespace Game
 				.pCode = reinterpret_cast<const uint32_t*>(shaderCode.data())
 			};
 			vk::raii::ShaderModule shaderModule{ device, shaderInfo };
+
+			context.SetObjectDebugName(reinterpret_cast<uint64_t>(static_cast<VkShaderModule>(*shaderModule)),
+									 vk::ObjectType::eShaderModule,
+									   "PBR Shader Module");
 
 			const vk::PipelineShaderStageCreateInfo vertShaderStageInfo{ .stage = vk::ShaderStageFlagBits::eVertex, .module = shaderModule,  .pName = "vertMain" };
 			const vk::PipelineShaderStageCreateInfo fragShaderStageInfo{ .stage = vk::ShaderStageFlagBits::eFragment, .module = shaderModule, .pName = "fragMain" };
@@ -395,6 +469,10 @@ namespace Game
 
 			m_PBROpaquePipeline = vk::raii::Pipeline(device, nullptr, opaquePipelineInfo);
 
+			context.SetObjectDebugName(reinterpret_cast<uint64_t>(static_cast<VkPipeline>(*m_PBROpaquePipeline)),
+									 vk::ObjectType::ePipeline,
+									   "PBR Opaque Pipeline");
+
 			vk::GraphicsPipelineCreateInfo transparentPipelineInfo{
 				.pNext = &pipelineRenderingCreateInfo,
 				.stageCount = 2,
@@ -412,8 +490,59 @@ namespace Game
 			};
 
 			m_PBRTransparentPipeline = vk::raii::Pipeline(device, nullptr, transparentPipelineInfo);
+
+			context.SetObjectDebugName(reinterpret_cast<uint64_t>(static_cast<VkPipeline>(*m_PBRTransparentPipeline)),
+									 vk::ObjectType::ePipeline,
+									   "PBR Transparent Pipeline");
 		}
 
+		// Transition color image to shader read layout
+		{
+			vk::ImageMemoryBarrier2 barrier = {
+				.srcStageMask = vk::PipelineStageFlagBits2::eTopOfPipe,
+				.srcAccessMask = {},
+				.dstStageMask = vk::PipelineStageFlagBits2::eFragmentShader,
+				.dstAccessMask = vk::AccessFlagBits2::eShaderRead,
+				.oldLayout = vk::ImageLayout::eUndefined,
+				.newLayout = vk::ImageLayout::eShaderReadOnlyOptimal,
+				.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+				.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+				.image = m_ColorImage,
+				.subresourceRange = {
+					.aspectMask = vk::ImageAspectFlagBits::eColor,
+					.baseMipLevel = 0,
+					.levelCount = 1,
+					.baseArrayLayer = 0,
+					.layerCount = 1
+				}
+			};
+			const vk::DependencyInfo dependencyInfo = {
+				.dependencyFlags = {},
+				.imageMemoryBarrierCount = 1,
+				.pImageMemoryBarriers = &barrier
+			};
+
+			const auto cmd = context.BeginSingleTimeCommands();
+			context.SetObjectDebugName(reinterpret_cast<uint64_t>(static_cast<VkCommandBuffer>(*cmd)),
+									 vk::ObjectType::eCommandBuffer,
+									   "GameLayer Single Time Command Buffer for Color Image Layout Transition");
+			cmd.pipelineBarrier2(dependencyInfo);
+			context.EndSingleTimeCommands(cmd);
+		}
+
+		// Load models
+		{
+			m_Meshes.push_back(kbr::ModelLoader::LoadModel("src/models/avocado/Avocado.gltf"));
+		}
+
+		// Create descriptor set for the output image for ImGui rendering
+		{
+			m_ColorOutputDescriptorSet = ImGui_ImplVulkan_AddTexture(*m_ColorSampler, *m_ColorImageView, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+
+			context.SetObjectDebugName(reinterpret_cast<uint64_t>(m_ColorOutputDescriptorSet),
+									 vk::ObjectType::eDescriptorSet,
+									   "Color Output Descriptor Set for ImGui");
+		}
 	}
 	
 	void GameLayer::OnDetach() 
@@ -429,6 +558,16 @@ namespace Game
 		const auto& context = kbr::VulkanContext::Get();
 
 		const auto cmd = context.BeginSingleTimeCommands();
+
+		context.SetObjectDebugName(reinterpret_cast<uint64_t>(static_cast<VkCommandBuffer>(*cmd)),
+								 vk::ObjectType::eCommandBuffer,
+								   "GameLayer Single Time Command Buffer");
+
+		// TODO: Get current image index from VulkanContext
+		constexpr uint32_t currentImage = 0;
+
+		UpdateLights(m_Time, currentImage);
+		UpdateUniformBuffers(currentImage);
 
 		// Render shadow map
 		{
@@ -475,6 +614,8 @@ namespace Game
 			const vk::RenderingInfo shadowMapRenderingInfo{
 				.renderArea = renderArea,
 				.layerCount = 1,
+				.colorAttachmentCount = 0,
+				.pColorAttachments = nullptr,
 				.pDepthAttachment = &shadowMapDepthAttachmentInfo
 			};
 
@@ -484,8 +625,98 @@ namespace Game
 			cmd.setScissor(0, renderArea);
 
 			cmd.bindPipeline(vk::PipelineBindPoint::eGraphics, *m_ShadowMapPipeline);
+			cmd.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, *m_PBRPipelineLayout, 0, *m_DescriptorSets[currentImage], {});
+
+			for (const auto& mesh : m_Meshes)
+			{
+				mesh.Draw(cmd);
+			}
 
 			cmd.endRendering();
+		}
+
+		// Transition shadow map image layout for shader read
+		{
+			vk::ImageMemoryBarrier2 barrier = {
+			.srcStageMask = vk::PipelineStageFlagBits2::eEarlyFragmentTests | vk::PipelineStageFlagBits2::eLateFragmentTests,
+			.srcAccessMask = vk::AccessFlagBits2::eDepthStencilAttachmentWrite,
+			.dstStageMask = vk::PipelineStageFlagBits2::eFragmentShader,
+			.dstAccessMask = vk::AccessFlagBits2::eShaderRead,
+			.oldLayout = vk::ImageLayout::eDepthAttachmentOptimal,
+			.newLayout = vk::ImageLayout::eShaderReadOnlyOptimal,
+			.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+			.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+			.image = m_ShadowMapImage,
+			.subresourceRange = {
+				.aspectMask = vk::ImageAspectFlagBits::eDepth,
+				.baseMipLevel = 0,
+				.levelCount = 1,
+				.baseArrayLayer = 0,
+				.layerCount = 1
+			}
+			};
+			const vk::DependencyInfo dependencyInfo = {
+				.dependencyFlags = {},
+				.imageMemoryBarrierCount = 1,
+				.pImageMemoryBarriers = &barrier
+			};
+			cmd.pipelineBarrier2(dependencyInfo);
+		}
+
+		// Transition color image layout for color attachment
+		{
+			vk::ImageMemoryBarrier2 barrier = {
+			.srcStageMask = vk::PipelineStageFlagBits2::eFragmentShader,
+			.srcAccessMask = vk::AccessFlagBits2::eShaderRead,
+			.dstStageMask = vk::PipelineStageFlagBits2::eColorAttachmentOutput,
+			.dstAccessMask = vk::AccessFlagBits2::eColorAttachmentWrite,
+			.oldLayout = vk::ImageLayout::eShaderReadOnlyOptimal,
+			.newLayout = vk::ImageLayout::eColorAttachmentOptimal,
+			.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+			.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+			.image = m_ColorImage,
+			.subresourceRange = {
+				.aspectMask = vk::ImageAspectFlagBits::eColor,
+				.baseMipLevel = 0,
+				.levelCount = 1,
+				.baseArrayLayer = 0,
+				.layerCount = 1
+			}
+			};
+			const vk::DependencyInfo dependencyInfo = {
+				.dependencyFlags = {},
+				.imageMemoryBarrierCount = 1,
+				.pImageMemoryBarriers = &barrier
+			};
+			cmd.pipelineBarrier2(dependencyInfo);
+		}
+
+		// Transition depth image to depth attachment optimal
+		{
+			vk::ImageMemoryBarrier2 barrier = {
+			.srcStageMask = vk::PipelineStageFlagBits2::eFragmentShader,
+			.srcAccessMask = vk::AccessFlagBits2::eShaderRead,
+			.dstStageMask = vk::PipelineStageFlagBits2::eEarlyFragmentTests | vk::PipelineStageFlagBits2::eLateFragmentTests,
+			.dstAccessMask = vk::AccessFlagBits2::eDepthStencilAttachmentWrite,
+			.oldLayout = vk::ImageLayout::eUndefined,
+			.newLayout = vk::ImageLayout::eDepthAttachmentOptimal,
+			.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+			.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+			.image = m_DepthImage,
+			.subresourceRange = {
+				.aspectMask = vk::ImageAspectFlagBits::eDepth,
+				.baseMipLevel = 0,
+				.levelCount = 1,
+				.baseArrayLayer = 0,
+				.layerCount = 1
+			}
+			};
+			const vk::DependencyInfo dependencyInfo = {
+				.dependencyFlags = {},
+				.imageMemoryBarrierCount = 1,
+				.pImageMemoryBarriers = &barrier
+			};
+			cmd.pipelineBarrier2(dependencyInfo);
 		}
 
 		// Render opaque objects
@@ -514,6 +745,7 @@ namespace Game
 			const vk::RenderingInfo renderingInfo{
 				.renderArea = renderArea,
 				.layerCount = 1,
+				.colorAttachmentCount = 1,
 				.pColorAttachments = &colorAttachmentInfo,
 				.pDepthAttachment = &depthAttachmentInfo
 			};
@@ -526,6 +758,12 @@ namespace Game
 			cmd.setScissor(0, renderArea);
 
 			cmd.bindPipeline(vk::PipelineBindPoint::eGraphics, *m_PBROpaquePipeline);
+			cmd.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, *m_PBRPipelineLayout, 0, *m_DescriptorSets[currentImage], {});
+
+			for (const auto& mesh : m_Meshes)
+			{
+				mesh.Draw(cmd);
+			}
 
 			cmd.endRendering();
 		}
@@ -554,6 +792,7 @@ namespace Game
 			const vk::RenderingInfo renderingInfo{
 				.renderArea = renderArea,
 				.layerCount = 1,
+				.colorAttachmentCount = 1,
 				.pColorAttachments = &colorAttachmentInfo,
 				.pDepthAttachment = &depthAttachmentInfo
 			};
@@ -566,8 +805,42 @@ namespace Game
 			cmd.setScissor(0, renderArea);
 
 			cmd.bindPipeline(vk::PipelineBindPoint::eGraphics, *m_PBRTransparentPipeline);
+			cmd.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, *m_PBRPipelineLayout, 0, *m_DescriptorSets[currentImage], {});
+
+			/*for (const auto& mesh : m_Meshes)
+			{
+				mesh.Draw(cmd);
+			}*/
 
 			cmd.endRendering();
+		}
+
+		// Transition color image layout for shader read in ImGui
+		{
+			vk::ImageMemoryBarrier2 barrier = {
+			.srcStageMask = vk::PipelineStageFlagBits2::eColorAttachmentOutput,
+			.srcAccessMask = vk::AccessFlagBits2::eColorAttachmentWrite,
+			.dstStageMask = vk::PipelineStageFlagBits2::eFragmentShader,
+			.dstAccessMask = vk::AccessFlagBits2::eShaderRead,
+			.oldLayout = vk::ImageLayout::eColorAttachmentOptimal,
+			.newLayout = vk::ImageLayout::eShaderReadOnlyOptimal,
+			.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+			.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+			.image = m_ColorImage,
+			.subresourceRange = {
+				.aspectMask = vk::ImageAspectFlagBits::eColor,
+				.baseMipLevel = 0,
+				.levelCount = 1,
+				.baseArrayLayer = 0,
+				.layerCount = 1
+			}
+			};
+			const vk::DependencyInfo dependencyInfo = {
+				.dependencyFlags = {},
+				.imageMemoryBarrierCount = 1,
+				.pImageMemoryBarriers = &barrier
+			};
+			cmd.pipelineBarrier2(dependencyInfo);
 		}
 
 		context.EndSingleTimeCommands(cmd);
@@ -580,8 +853,217 @@ namespace Game
 	void GameLayer::OnImGuiRender()
 	{
 		ImGui::Begin("Game Layer");
+
 		ImGui::Text("Time: %.2f seconds", m_Time);
 		ImGui::Text("FPS: %.2f", m_Fps);
+
+		ImGui::Separator();
+		ImGui::Text("pointer = %p", m_ColorOutputDescriptorSet);
+		ImGui::Text("size = %d x %d", 400, 400);
+		ImGui::Image((ImTextureID)m_ColorOutputDescriptorSet, ImVec2(400, 400));
+
 		ImGui::End();
 	}
+
+	void GameLayer::UpdateUniformBuffers(const uint32_t currentImage) 
+	{
+		const auto& [projection, view] = m_Camera.GetMatrices();
+
+		m_UniformDataMatrices.projection = projection;
+		m_UniformDataMatrices.view = view;
+		m_UniformDataMatrices.camPos = m_Camera.GetPosition() * -1.0f;
+
+		memcpy(m_UniformBuffers[currentImage].scene->GetMappedData(), &m_UniformDataMatrices, sizeof(UniformDataMatrices));
+
+		// TODO: Get the current object's position
+		constexpr glm::vec3 objectPosition = glm::vec3(-1.2f, 1.0f, 0.0f);
+		constexpr glm::mat4 translation = glm::translate(glm::mat4(1.0f), objectPosition);
+		const glm::mat4 model = glm::rotate(translation, glm::radians(m_Time * 10.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+
+		// TODO: For now we use the first material only
+		const Material selectedMaterial = m_Materials[0];
+		m_PerObjectUniformData = {
+			.position = objectPosition,
+			.model = model,
+			.worldNormal = glm::transpose(glm::inverse(glm::mat3(model))),
+			.material = selectedMaterial.params
+		};
+		memcpy(m_UniformBuffers[currentImage].perObject->GetMappedData(), &m_PerObjectUniformData, sizeof(PerObjectData));
+	}
+
+	void GameLayer::UpdateLights(const float time, const uint32_t currentImage) 
+	{
+		constexpr float p = 15.0f;
+		m_UniformDataParams.lights[0] = glm::vec4(-p, -p * 0.5f, -p, 1.0f);
+		m_UniformDataParams.lights[1] = glm::vec4(-p, -p * 0.5f, p, 1.0f);
+		m_UniformDataParams.lights[2] = glm::vec4(p, -p * 0.5f, p, 1.0f);
+		m_UniformDataParams.lights[3] = glm::vec4(p, -p * 0.5f, -p, 1.0f);
+
+		m_UniformDataParams.lights[0].x = sin(glm::radians(time * 360.0f)) * 20.0f;
+		m_UniformDataParams.lights[0].z = cos(glm::radians(time * 360.0f)) * 20.0f;
+		m_UniformDataParams.lights[1].x = cos(glm::radians(time * 360.0f)) * 20.0f;
+		m_UniformDataParams.lights[1].y = sin(glm::radians(time * 360.0f)) * 20.0f;
+
+		memcpy(m_UniformBuffers[currentImage].params->GetMappedData(), &m_UniformDataParams, sizeof(UniformDataParams));
+	}
+
+	void GameLayer::PrepareUniformBuffers()
+	{
+		for (auto& [scene, params, material] : m_UniformBuffers)
+		{
+			scene = std::make_shared<kbr::UniformBuffer>(sizeof(UniformDataMatrices));
+
+			params = std::make_shared<kbr::UniformBuffer>(sizeof(UniformDataParams));
+
+			material = std::make_shared<kbr::UniformBuffer>(sizeof(PerObjectData));
+		}
+	}
+
+	void GameLayer::SetupDescriptors() 
+	{
+		auto& context = kbr::VulkanContext::Get();
+		const auto& device = context.GetDevice();
+
+		std::vector<vk::DescriptorPoolSize> poolSizes = {
+			vk::DescriptorPoolSize{
+				.type = vk::DescriptorType::eUniformBuffer,
+				.descriptorCount = 20
+			},
+			vk::DescriptorPoolSize{
+				.type = vk::DescriptorType::eCombinedImageSampler,
+				.descriptorCount = 10
+			}
+		};
+
+		vk::DescriptorPoolCreateInfo poolInfo{
+			.flags = vk::DescriptorPoolCreateFlagBits::eFreeDescriptorSet,
+			.maxSets = 10,
+			.poolSizeCount = static_cast<uint32_t>(poolSizes.size()),
+			.pPoolSizes = poolSizes.data()
+		};
+
+		m_DescriptorPool = vk::raii::DescriptorPool{ device, poolInfo };
+		context.SetObjectDebugName(reinterpret_cast<uint64_t>(static_cast<VkDescriptorPool>(*m_DescriptorPool)),
+								   vk::ObjectType::eDescriptorPool,
+								   "PBR Descriptor Pool");
+
+		std::vector<vk::DescriptorSetLayoutBinding> bindings = {
+			vk::DescriptorSetLayoutBinding{
+				.binding = 0,
+				.descriptorType = vk::DescriptorType::eUniformBuffer,
+				.descriptorCount = 1,
+				.stageFlags = vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment,
+				.pImmutableSamplers = nullptr
+			},
+			vk::DescriptorSetLayoutBinding{
+				.binding = 1,
+				.descriptorType = vk::DescriptorType::eUniformBuffer,
+				.descriptorCount = 1,
+				.stageFlags = vk::ShaderStageFlagBits::eFragment,
+				.pImmutableSamplers = nullptr
+			},
+			vk::DescriptorSetLayoutBinding{
+				.binding = 2,
+				.descriptorType = vk::DescriptorType::eUniformBuffer,
+				.descriptorCount = 1,
+				.stageFlags = vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment,
+				.pImmutableSamplers = nullptr
+			},
+			vk::DescriptorSetLayoutBinding{
+				.binding = 3,
+				.descriptorType = vk::DescriptorType::eCombinedImageSampler,
+				.descriptorCount = 1,
+				.stageFlags = vk::ShaderStageFlagBits::eFragment,
+				.pImmutableSamplers = nullptr
+			}
+		};
+
+		const vk::DescriptorSetLayoutCreateInfo layoutInfo{
+			.bindingCount = static_cast<uint32_t>(bindings.size()),
+			.pBindings = bindings.data()
+		};
+
+		m_PBRDescriptorSetLayout = vk::raii::DescriptorSetLayout{ device, layoutInfo };
+		context.SetObjectDebugName(reinterpret_cast<uint64_t>(static_cast<VkDescriptorSetLayout>(*m_PBRDescriptorSetLayout)),
+								   vk::ObjectType::eDescriptorSetLayout,
+								   "PBR Descriptor Set Layout");
+
+		vk::DescriptorSetAllocateInfo allocInfo{
+			.descriptorPool = m_DescriptorPool,
+			.descriptorSetCount = static_cast<uint32_t>(m_DescriptorSets.size()),
+			.pSetLayouts = &*m_PBRDescriptorSetLayout
+		};
+		std::vector<vk::raii::DescriptorSet> descriptorSets = device.allocateDescriptorSets(allocInfo);
+
+		for (uint32_t i = 0; i < m_UniformBuffers.size(); i++)
+		{
+			m_DescriptorSets[i] = std::move(descriptorSets[i]);
+
+			context.SetObjectDebugName(reinterpret_cast<uint64_t>(static_cast<VkDescriptorSet>(*m_DescriptorSets[i])),
+									   vk::ObjectType::eDescriptorSet,
+									   "PBR Descriptor Set[" + std::to_string(i) + "]");
+
+			const vk::DescriptorBufferInfo sceneBufferInfo{
+				.buffer = *m_UniformBuffers[i].scene->GetBuffer(),
+				.offset = 0,
+				.range = sizeof(UniformDataMatrices)
+			};
+
+			const vk::DescriptorBufferInfo paramsBufferInfo{
+				.buffer = *m_UniformBuffers[i].params->GetBuffer(),
+				.offset = 0,
+				.range = sizeof(UniformDataParams)
+			};
+
+			const vk::DescriptorBufferInfo perObjectBufferInfo{
+				.buffer = *m_UniformBuffers[i].perObject->GetBuffer(),
+				.offset = 0,
+				.range = sizeof(PerObjectData)
+			};
+
+			const vk::DescriptorImageInfo shadowMapImageInfo{
+				.sampler = *m_ColorSampler,
+				.imageView = *m_ShadowMapImageView,
+				.imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal
+			};
+
+			const std::vector descriptorWrites = {
+				vk::WriteDescriptorSet{
+					.dstSet = *m_DescriptorSets[i],
+					.dstBinding = 0,
+					.dstArrayElement = 0,
+					.descriptorCount = 1,
+					.descriptorType = vk::DescriptorType::eUniformBuffer,
+					.pBufferInfo = &sceneBufferInfo
+				},
+				vk::WriteDescriptorSet{
+					.dstSet = *m_DescriptorSets[i],
+					.dstBinding = 1,
+					.dstArrayElement = 0,
+					.descriptorCount = 1,
+					.descriptorType = vk::DescriptorType::eUniformBuffer,
+					.pBufferInfo = &paramsBufferInfo
+				},
+				vk::WriteDescriptorSet{
+					.dstSet = *m_DescriptorSets[i],
+					.dstBinding = 2,
+					.dstArrayElement = 0,
+					.descriptorCount = 1,
+					.descriptorType = vk::DescriptorType::eUniformBuffer,
+					.pBufferInfo = &perObjectBufferInfo
+				},
+				vk::WriteDescriptorSet{
+					.dstSet = *m_DescriptorSets[i],
+					.dstBinding = 3,
+					.dstArrayElement = 0,
+					.descriptorCount = 1,
+					.descriptorType = vk::DescriptorType::eCombinedImageSampler,
+					.pImageInfo = &shadowMapImageInfo
+				},
+			};
+
+			device.updateDescriptorSets(descriptorWrites, {});
+		}
+	}
+
 }

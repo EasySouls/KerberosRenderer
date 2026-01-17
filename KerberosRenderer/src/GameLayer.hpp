@@ -1,13 +1,18 @@
 #pragma once
 
 #include "Layer.hpp"
-
 #include "Vulkan.hpp"
+
+#include "Mesh.hpp"
+#include "Camera.hpp"
+#include "Buffer.hpp"
 
 #include <glm/vec3.hpp>
 
 #include <string>
 #include <vector>
+#include <array>
+#include <memory>
 
 namespace Game
 {
@@ -49,10 +54,20 @@ namespace Game
 		void OnImGuiRender() override;
 
 	private:
+		void UpdateLights(float time, uint32_t currentImage);
+		void UpdateUniformBuffers(uint32_t currentImage);
+
+		void PrepareUniformBuffers();
+		void SetupDescriptors();
+
+	private:
 		float m_Time = 0.0f;
 		float m_Fps = 0.0f;
 
+		kbr::Camera m_Camera;
+
 		std::vector<Material> m_Materials;
+		std::vector<kbr::Mesh> m_Meshes;
 
 		// Vulkan resources
 		vk::raii::Image m_ShadowMapImage = nullptr;
@@ -69,9 +84,51 @@ namespace Game
 		vk::raii::DeviceMemory m_DepthImageMemory = nullptr;
 		vk::raii::ImageView m_DepthImageView = nullptr;
 
+		vk::raii::DescriptorPool m_DescriptorPool = nullptr;
+		vk::raii::DescriptorSetLayout m_PBRDescriptorSetLayout = nullptr;
+
 		vk::raii::PipelineLayout m_PBRPipelineLayout = nullptr;
 		vk::raii::Pipeline m_PBROpaquePipeline = nullptr;
 		vk::raii::Pipeline m_PBRTransparentPipeline = nullptr;
+
+		vk::raii::Sampler m_ColorSampler = nullptr;
+
+		struct UniformDataMatrices
+		{
+			glm::mat4 projection;
+			glm::mat4 view;
+			glm::vec3 camPos;
+		};
+		UniformDataMatrices m_UniformDataMatrices;
+
+		struct UniformDataParams
+		{
+			glm::vec4 lights[4];
+		};
+		UniformDataParams m_UniformDataParams;
+
+		struct PerObjectData
+		{
+			glm::vec3 position;
+			glm::mat4 model;
+			glm::mat4 worldNormal;
+			Material::PushBlock material;
+		};
+		PerObjectData m_PerObjectUniformData;
+
+		struct UniformBufferObject
+		{
+			std::shared_ptr<kbr::UniformBuffer> scene;
+			std::shared_ptr<kbr::UniformBuffer> params;
+			std::shared_ptr<kbr::UniformBuffer> perObject;
+		};
+		// TODO: This should hold multiple UBOs for multiple frames in flight
+		std::array<UniformBufferObject, 1> m_UniformBuffers;
+
+		// TODO: This should hold multiple descriptor sets for multiple frames in flight
+		std::array<vk::raii::DescriptorSet, 1> m_DescriptorSets{nullptr};
+
+		VkDescriptorSet m_ColorOutputDescriptorSet = VK_NULL_HANDLE;
 	};
 
 }

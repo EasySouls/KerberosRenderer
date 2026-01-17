@@ -51,7 +51,8 @@ vk::raii::ImageView CreateImageView(
 	const uint32_t mipLevels
 ) 
 {
-	const vk::ImageViewCreateInfo viewInfo{ 
+	const vk::ImageViewCreateInfo viewInfo{
+		.flags = {},
 		.image = image, 
 		.viewType = vk::ImageViewType::e2D,
 		.format = format, 
