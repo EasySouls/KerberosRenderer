@@ -183,5 +183,6 @@
   <ItemGroup>
     <None Include="src\shaders\simple.slang" />
     <None Include="src\shaders\shadowmap.slang" />
+    <None Include="src\shaders\pbrbasic.slang" />
   </ItemGroup>
 </Project>

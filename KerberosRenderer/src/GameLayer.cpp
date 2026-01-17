@@ -9,6 +9,8 @@
 
 #include <iostream>
 
+#include "Vertex.hpp"
+
 
 namespace Game
 {
@@ -20,6 +22,18 @@ namespace Game
 	void GameLayer::OnAttach() 
 	{
 		std::cout << "GameLayer attached!\n";
+
+		m_Materials.emplace_back("Gold", glm::vec3(1.0f, 0.765557f, 0.336057f), 0.1f, 1.0f);
+		m_Materials.emplace_back("Copper", glm::vec3(0.955008f, 0.637427f, 0.538163f), 0.1f, 1.0f);
+		m_Materials.emplace_back("Chromium", glm::vec3(0.549585f, 0.556114f, 0.554256f), 0.1f, 1.0f);
+		m_Materials.emplace_back("Nickel", glm::vec3(0.659777f, 0.608679f, 0.525649f), 0.1f, 1.0f);
+		m_Materials.emplace_back("Titanium", glm::vec3(0.541931f, 0.496791f, 0.449419f), 0.1f, 1.0f);
+		m_Materials.emplace_back("Cobalt", glm::vec3(0.662124f, 0.654864f, 0.633732f), 0.1f, 1.0f);
+		m_Materials.emplace_back("Platinum", glm::vec3(0.672411f, 0.637331f, 0.585456f), 0.1f, 1.0f);
+		m_Materials.emplace_back("White", glm::vec3(1.0f), 0.1f, 1.0f);
+		m_Materials.emplace_back("Red", glm::vec3(1.0f, 0.0f, 0.0f), 0.1f, 1.0f);
+		m_Materials.emplace_back("Blue", glm::vec3(0.0f, 0.0f, 1.0f), 0.1f, 1.0f);
+		m_Materials.emplace_back("Black", glm::vec3(0.0f), 0.1f, 1.0f);
 
 		auto& context = kbr::VulkanContext::Get();
 		auto& device = context.GetDevice();
@@ -55,10 +69,10 @@ namespace Game
 						vk::ImageTiling::eOptimal,
 						vk::ImageUsageFlagBits::eDepthStencilAttachment,
 						vk::MemoryPropertyFlagBits::eDeviceLocal,
-						shadowMapImage,
-						shadowMapImageMemory);
+						m_ShadowMapImage,
+						m_ShadowMapImageMemory);
 
-			shadowMapImageView = CreateImageView(device, shadowMapImage, shadowMapFormat, vk::ImageAspectFlagBits::eDepth, shadowMapMipLevels);
+			m_ShadowMapImageView = CreateImageView(device, m_ShadowMapImage, shadowMapFormat, vk::ImageAspectFlagBits::eDepth, shadowMapMipLevels);
 
 			// Create shadow map image layout transition
 			/*context.TransitionImageLayout(shadowMapImage,
@@ -87,7 +101,7 @@ namespace Game
 				.pushConstantRangeCount = 0
 			};
 
-			shadowMapPipelineLayout = vk::raii::PipelineLayout{ device, pipelineLayoutInfo };
+			m_ShadowMapPipelineLayout = vk::raii::PipelineLayout{ device, pipelineLayoutInfo };
 
 			// Create shader for shadow mapping
 			const auto shaderCode = IO::ReadFile("src/shaders/shadowmap.spv");
@@ -111,10 +125,6 @@ namespace Game
 				.vertexAttributeDescriptionCount = static_cast<uint32_t>(attributeDescriptions.size()),
 				.pVertexAttributeDescriptions = attributeDescriptions.data(),
 			};
-
-			vk::PipelineInputAssemblyStateCreateInfo inputAssembly{ .topology = vk::PrimitiveTopology::eTriangleList };
-
-			vk::PipelineViewportStateCreateInfo viewportState{ .viewportCount = 1, .scissorCount = 1 };
 
 			vk::PipelineRasterizationStateCreateInfo rasterizer{
 				.depthClampEnable = vk::True,
@@ -177,13 +187,232 @@ namespace Game
 				.pDepthStencilState = &depthStencil,
 				.pColorBlendState = &colorBlending,
 				.pDynamicState = &dynamicStateInfo,
-				.layout = shadowMapPipelineLayout,
+				.layout = m_ShadowMapPipelineLayout,
 				.renderPass = nullptr
 			};
 
-			shadowMapPipeline = vk::raii::Pipeline(device, nullptr, pipelineInfo);
+			m_ShadowMapPipeline = vk::raii::Pipeline(device, nullptr, pipelineInfo);
 		}
 
+		// Create the opaque and transparent pipeline resources
+		{
+			const vk::Format colorFormat = context.FindSupportedFormat(
+				{ vk::Format::eR32G32B32A32Uint }, 
+				vk::ImageTiling::eOptimal, 
+				vk::FormatFeatureFlagBits::eColorAttachment
+			);
+			constexpr uint32_t imageSize = 2048;
+			constexpr uint32_t mipLevels = 1;
+
+			CreateImage(device,
+						imageSize,
+						imageSize,
+						mipLevels,
+						vk::SampleCountFlagBits::e1,
+						colorFormat,
+						vk::ImageTiling::eOptimal,
+						vk::ImageUsageFlagBits::eColorAttachment,
+						vk::MemoryPropertyFlagBits::eDeviceLocal,
+						m_ColorImage,
+						m_ColorImageMemory);
+
+			m_ColorImageView = CreateImageView(device, m_ColorImage, colorFormat, vk::ImageAspectFlagBits::eColor, mipLevels);
+
+			const vk::Format depthFormat = context.FindSupportedFormat(
+				{ vk::Format::eD32Sfloat }, 
+				vk::ImageTiling::eOptimal, 
+				vk::FormatFeatureFlagBits::eDepthStencilAttachment
+			);
+
+			CreateImage(
+				device,
+				imageSize,
+				imageSize,
+				mipLevels,
+				vk::SampleCountFlagBits::e1,
+				depthFormat,
+				vk::ImageTiling::eOptimal,
+				vk::ImageUsageFlagBits::eDepthStencilAttachment,
+				vk::MemoryPropertyFlagBits::eDeviceLocal,
+				m_DepthImage,
+				m_DepthImageMemory);
+
+			m_DepthImageView = CreateImageView(device, m_DepthImage, depthFormat, vk::ImageAspectFlagBits::eDepth, mipLevels);
+
+			constexpr std::array bindings = {
+				vk::DescriptorSetLayoutBinding{
+					.binding = 0,
+					.descriptorType = vk::DescriptorType::eUniformBuffer,
+					.descriptorCount = 1,
+					.stageFlags = vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment,
+					.pImmutableSamplers = nullptr
+				},
+				vk::DescriptorSetLayoutBinding{
+					.binding = 1,
+					.descriptorType = vk::DescriptorType::eCombinedImageSampler,
+					.descriptorCount = 1,
+					.stageFlags = vk::ShaderStageFlagBits::eFragment,
+					.pImmutableSamplers = nullptr
+				}
+			};
+
+			const vk::DescriptorSetLayoutCreateInfo layoutInfo{
+				.bindingCount = static_cast<uint32_t>(bindings.size()),
+				.pBindings = bindings.data()
+			};
+
+			auto descriptorSetLayout = vk::raii::DescriptorSetLayout{ device, layoutInfo };
+
+			vk::PipelineLayoutCreateInfo pipelineLayoutInfo{
+				.setLayoutCount = 1,
+				.pSetLayouts = &*descriptorSetLayout,
+				.pushConstantRangeCount = 0
+			};
+
+			m_PBRPipelineLayout = vk::raii::PipelineLayout{ device, pipelineLayoutInfo };
+
+			const auto shaderCode = IO::ReadFile("src/shaders/pbrbasic.spv");
+			const vk::ShaderModuleCreateInfo shaderInfo{
+				.codeSize = shaderCode.size() * sizeof(char),
+				.pCode = reinterpret_cast<const uint32_t*>(shaderCode.data())
+			};
+			vk::raii::ShaderModule shaderModule{ device, shaderInfo };
+
+			const vk::PipelineShaderStageCreateInfo vertShaderStageInfo{ .stage = vk::ShaderStageFlagBits::eVertex, .module = shaderModule,  .pName = "vertMain" };
+			const vk::PipelineShaderStageCreateInfo fragShaderStageInfo{ .stage = vk::ShaderStageFlagBits::eFragment, .module = shaderModule, .pName = "fragMain" };
+			vk::PipelineShaderStageCreateInfo shaderStages[] = { vertShaderStageInfo, fragShaderStageInfo };
+
+			const auto bindingDesc = kbr::Vertex::GetBindingDescription();
+			const auto attributeDescs = kbr::Vertex::GetAttributeDescriptions();
+
+			vk::PipelineVertexInputStateCreateInfo vertexInputInfo{
+				.vertexBindingDescriptionCount = 1,
+				.pVertexBindingDescriptions = &bindingDesc,
+				.vertexAttributeDescriptionCount = static_cast<uint32_t>(attributeDescs.size()),
+				.pVertexAttributeDescriptions = attributeDescs.data(),
+			};
+
+			vk::PipelineMultisampleStateCreateInfo multisampling{
+				.rasterizationSamples = vk::SampleCountFlagBits::e1,
+				.sampleShadingEnable = vk::False,
+				.minSampleShading = 1.0f,
+				.pSampleMask = nullptr,
+				.alphaToCoverageEnable = vk::False,
+				.alphaToOneEnable = vk::False
+			};
+
+			vk::PipelineRasterizationStateCreateInfo opaqueRasterizer{
+				.depthClampEnable = vk::False,
+				.rasterizerDiscardEnable = vk::False,
+				.polygonMode = vk::PolygonMode::eFill,
+				.cullMode = vk::CullModeFlagBits::eBack,
+				.frontFace = vk::FrontFace::eCounterClockwise,
+				.depthBiasEnable = vk::False,
+				.lineWidth = 1.0f
+			};
+
+			vk::PipelineRasterizationStateCreateInfo transparentRasterizer{
+				.depthClampEnable = vk::False,
+				.rasterizerDiscardEnable = vk::False,
+				.polygonMode = vk::PolygonMode::eFill,
+				.cullMode = vk::CullModeFlagBits::eNone,
+				.frontFace = vk::FrontFace::eCounterClockwise,
+				.depthBiasEnable = vk::False,
+				.lineWidth = 1.0f
+			};
+
+			vk::PipelineDepthStencilStateCreateInfo opaqueDepthStencil{
+				.depthTestEnable = vk::True,
+				.depthWriteEnable = vk::True,
+				.depthCompareOp = vk::CompareOp::eLess,
+				.depthBoundsTestEnable = vk::False,
+				.stencilTestEnable = vk::False,
+				.minDepthBounds = 0.0f,
+				.maxDepthBounds = 1.0f,
+			};
+
+			vk::PipelineDepthStencilStateCreateInfo transparentDepthStencil{
+				.depthTestEnable = vk::True,
+				.depthWriteEnable = vk::False,
+				.depthCompareOp = vk::CompareOp::eLess,
+				.depthBoundsTestEnable = vk::False,
+				.stencilTestEnable = vk::False,
+				.minDepthBounds = 0.0f,
+				.maxDepthBounds = 1.0f,
+			};
+
+			vk::PipelineColorBlendAttachmentState opaqueColorBlendAttachment{
+				.blendEnable = vk::False,
+				.colorWriteMask = vk::ColorComponentFlagBits::eR | vk::ColorComponentFlagBits::eG | vk::ColorComponentFlagBits::eB | vk::ColorComponentFlagBits::eA
+			};
+
+			vk::PipelineColorBlendStateCreateInfo colorBlending{
+				.logicOpEnable = vk::False,
+				.logicOp = vk::LogicOp::eCopy,
+				.attachmentCount = 1,
+				.pAttachments = &opaqueColorBlendAttachment
+			};
+
+			vk::PipelineColorBlendAttachmentState transparentColorBlendAttachment{
+				.blendEnable = vk::True,
+				.srcColorBlendFactor = vk::BlendFactor::eSrcAlpha,
+				.dstColorBlendFactor = vk::BlendFactor::eOneMinusSrcAlpha,
+				.colorBlendOp = vk::BlendOp::eAdd,
+				.srcAlphaBlendFactor = vk::BlendFactor::eOne,
+				.dstAlphaBlendFactor = vk::BlendFactor::eZero,
+				.alphaBlendOp = vk::BlendOp::eAdd,
+				.colorWriteMask = vk::ColorComponentFlagBits::eR | vk::ColorComponentFlagBits::eG | vk::ColorComponentFlagBits::eB | vk::ColorComponentFlagBits::eA
+			};
+
+			vk::PipelineColorBlendStateCreateInfo transparentColorBlending{
+				.logicOpEnable = vk::False,
+				.logicOp = vk::LogicOp::eCopy,
+				.attachmentCount = 1,
+				.pAttachments = &transparentColorBlendAttachment
+			};
+
+			vk::PipelineRenderingCreateInfo pipelineRenderingCreateInfo{
+				.colorAttachmentCount = 1,
+				.pColorAttachmentFormats = &colorFormat,
+				.depthAttachmentFormat = depthFormat
+			};
+
+			vk::GraphicsPipelineCreateInfo opaquePipelineInfo{
+				.pNext = &pipelineRenderingCreateInfo,
+				.stageCount = 2,
+				.pStages = shaderStages,
+				.pVertexInputState = &vertexInputInfo,
+				.pInputAssemblyState = &inputAssembly,
+				.pViewportState = &viewportState,
+				.pRasterizationState = &opaqueRasterizer,
+				.pMultisampleState = &multisampling,
+				.pDepthStencilState = &opaqueDepthStencil,
+				.pColorBlendState = &colorBlending,
+				.pDynamicState = &dynamicStateInfo,
+				.layout = m_PBRPipelineLayout,
+				.renderPass = nullptr
+			};
+
+			m_PBROpaquePipeline = vk::raii::Pipeline(device, nullptr, opaquePipelineInfo);
+
+			vk::GraphicsPipelineCreateInfo transparentPipelineInfo{
+				.pNext = &pipelineRenderingCreateInfo,
+				.stageCount = 2,
+				.pStages = shaderStages,
+				.pVertexInputState = &vertexInputInfo,
+				.pInputAssemblyState = &inputAssembly,
+				.pViewportState = &viewportState,
+				.pRasterizationState = &transparentRasterizer,
+				.pMultisampleState = &multisampling,
+				.pDepthStencilState = &transparentDepthStencil,
+				.pColorBlendState = &transparentColorBlending,
+				.pDynamicState = &dynamicStateInfo,
+				.layout = m_PBRPipelineLayout,
+				.renderPass = nullptr
+			};
+
+			m_PBRTransparentPipeline = vk::raii::Pipeline(device, nullptr, transparentPipelineInfo);
+		}
 
 	}
 	
@@ -212,7 +441,7 @@ namespace Game
 			.newLayout = vk::ImageLayout::eDepthAttachmentOptimal,
 			.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
 			.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-			.image = shadowMapImage,
+			.image = m_ShadowMapImage,
 			.subresourceRange = {
 				.aspectMask = vk::ImageAspectFlagBits::eDepth,
 				.baseMipLevel = 0,
@@ -231,24 +460,112 @@ namespace Game
 			cmd.pipelineBarrier2(dependencyInfo);
 
 			vk::RenderingAttachmentInfo shadowMapDepthAttachmentInfo{
-				.imageView = shadowMapImageView,
+				.imageView = m_ShadowMapImageView,
 				.imageLayout = vk::ImageLayout::eDepthAttachmentOptimal,
 				.loadOp = vk::AttachmentLoadOp::eClear,
 				.storeOp = vk::AttachmentStoreOp::eStore,
-				.clearValue = vk::ClearDepthStencilValue{ 1.0f, 0 }
+				.clearValue = vk::ClearDepthStencilValue{.depth = 1.0f, .stencil = 0 }
+			};
+
+			constexpr vk::Rect2D renderArea{
+				.offset = vk::Offset2D{ .x = 0, .y = 0 },
+				.extent = vk::Extent2D{ .width = 2048, .height = 2048 }
 			};
 
 			const vk::RenderingInfo shadowMapRenderingInfo{
-				.renderArea = vk::Rect2D{ vk::Offset2D{ 0, 0 }, vk::Extent2D{ 2048, 2048 } },
+				.renderArea = renderArea,
 				.layerCount = 1,
 				.pDepthAttachment = &shadowMapDepthAttachmentInfo
 			};
 
 			cmd.beginRendering(shadowMapRenderingInfo);
-			cmd.setViewport(0, vk::Viewport{ 0.0f, 0.0f, 2048.0f, 2048.0f, 0.0f, 1.0f });
-			cmd.setScissor(0, vk::Rect2D{ vk::Offset2D{ 0, 0 }, vk::Extent2D{ 2048, 2048 } });
+			cmd.setViewport(0, vk::Viewport{.x = 0.0f, .y = 0.0f, .width = 2048.0f, .height = 2048.0f, .minDepth = 0.0f,
+				                .maxDepth = 1.0f });
+			cmd.setScissor(0, renderArea);
 
-			cmd.bindPipeline(vk::PipelineBindPoint::eGraphics, *shadowMapPipeline);
+			cmd.bindPipeline(vk::PipelineBindPoint::eGraphics, *m_ShadowMapPipeline);
+
+			cmd.endRendering();
+		}
+
+		// Render opaque objects
+		{
+			vk::RenderingAttachmentInfo colorAttachmentInfo{
+				.imageView = m_ColorImageView,
+				.imageLayout = vk::ImageLayout::eColorAttachmentOptimal,
+				.loadOp = vk::AttachmentLoadOp::eClear,
+				.storeOp = vk::AttachmentStoreOp::eStore,
+				.clearValue = vk::ClearColorValue{ std::array{1.0f, 0.0f, 0.0f, 1.0f} }
+			};
+
+			vk::RenderingAttachmentInfo depthAttachmentInfo{
+				.imageView = m_DepthImageView,
+				.imageLayout = vk::ImageLayout::eDepthAttachmentOptimal,
+				.loadOp = vk::AttachmentLoadOp::eClear,
+				.storeOp = vk::AttachmentStoreOp::eDontCare,
+				.clearValue = vk::ClearDepthStencilValue{ .depth = 1.0f, .stencil = 0 }
+			};
+
+			constexpr vk::Rect2D renderArea{
+				.offset = vk::Offset2D{ .x = 0, .y = 0 },
+				.extent = vk::Extent2D{ .width = 2048, .height = 2048 }
+			};
+
+			const vk::RenderingInfo renderingInfo{
+				.renderArea = renderArea,
+				.layerCount = 1,
+				.pColorAttachments = &colorAttachmentInfo,
+				.pDepthAttachment = &depthAttachmentInfo
+			};
+
+			cmd.beginRendering(renderingInfo);
+
+			cmd.setViewport(0, vk::Viewport{.x = 0.0f, .y = 0.0f, .width = 2048.0f, .height = 2048.0f, .minDepth = 0.0f,
+								.maxDepth = 1.0f });
+
+			cmd.setScissor(0, renderArea);
+
+			cmd.bindPipeline(vk::PipelineBindPoint::eGraphics, *m_PBROpaquePipeline);
+
+			cmd.endRendering();
+		}
+
+		// Render transparent objects
+		{
+			vk::RenderingAttachmentInfo colorAttachmentInfo{
+				.imageView = m_ColorImageView,
+				.imageLayout = vk::ImageLayout::eColorAttachmentOptimal,
+				.loadOp = vk::AttachmentLoadOp::eLoad,
+				.storeOp = vk::AttachmentStoreOp::eStore,
+			};
+
+			vk::RenderingAttachmentInfo depthAttachmentInfo{
+				.imageView = m_DepthImageView,
+				.imageLayout = vk::ImageLayout::eDepthAttachmentOptimal,
+				.loadOp = vk::AttachmentLoadOp::eLoad,
+				.storeOp = vk::AttachmentStoreOp::eDontCare,
+			};
+
+			constexpr vk::Rect2D renderArea{
+				.offset = vk::Offset2D{ .x = 0, .y = 0 },
+				.extent = vk::Extent2D{ .width = 2048, .height = 2048 }
+			};
+
+			const vk::RenderingInfo renderingInfo{
+				.renderArea = renderArea,
+				.layerCount = 1,
+				.pColorAttachments = &colorAttachmentInfo,
+				.pDepthAttachment = &depthAttachmentInfo
+			};
+
+			cmd.beginRendering(renderingInfo);
+
+			cmd.setViewport(0, vk::Viewport{.x = 0.0f, .y = 0.0f, .width = 2048.0f, .height = 2048.0f, .minDepth = 0.0f,
+								.maxDepth = 1.0f });
+
+			cmd.setScissor(0, renderArea);
+
+			cmd.bindPipeline(vk::PipelineBindPoint::eGraphics, *m_PBRTransparentPipeline);
 
 			cmd.endRendering();
 		}
