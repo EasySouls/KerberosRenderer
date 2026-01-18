@@ -55,10 +55,13 @@ namespace Game
 
 	private:
 		void UpdateLights(float time, uint32_t currentImage);
-		void UpdateUniformBuffers(uint32_t currentImage);
+		void UpdateSceneUniformBuffers(uint32_t currentImage);
+		void UpdatePerObjectUniformBuffer(uint32_t currentImage, const glm::vec3& objectPosition, const glm::mat4& model, const Material& material);
 
 		void PrepareUniformBuffers();
 		void SetupDescriptors();
+
+		glm::mat4 CalculateLightSpaceMatrix() const;
 
 	private:
 		float m_Time = 0.0f;
@@ -93,13 +96,14 @@ namespace Game
 
 		vk::raii::Sampler m_ColorSampler = nullptr;
 
-		struct UniformDataMatrices
+		struct SceneUniformData
 		{
 			glm::mat4 projection;
 			glm::mat4 view;
+			glm::mat4 lightSpaceMatrix;
 			glm::vec3 camPos;
 		};
-		UniformDataMatrices m_UniformDataMatrices;
+		SceneUniformData m_SceneUniformData;
 
 		struct UniformDataParams
 		{

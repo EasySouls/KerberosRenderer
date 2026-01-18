@@ -17,17 +17,20 @@ struct VSOutput
     float3 Normal;
 };
 
-struct UBO
+struct SceneData
 {
     float4x4 projection;
     float4x4 view;
+    float4x4 lightSpaceMatrix;
     float3 camPos;
 };
-ConstantBuffer<UBO> ubo;
+[[vk::binding(0)]]
+ConstantBuffer<SceneData> scene;
 
 struct UBOParams {
 	float4 lights[4];
 };
+[[vk::binding(1)]]
 ConstantBuffer<UBOParams> uboParams;
 
 struct Material {
@@ -44,8 +47,10 @@ struct PerObject {
     float4x4 worldNormal;
     Material material;
 };
+[[vk::binding(2)]]
 ConstantBuffer<PerObject> perObject;
 
+[[vk::binding(3)]]
 Sampler2D shadowMap;
 
 static const float PI = 3.14159265359;
@@ -118,7 +123,7 @@ VSOutput vertMain(VSInput input)
     float3 locPos = mul(perObject.model, float4(input.Pos, 1.0)).xyz;
     output.WorldPos = locPos + perObject.objPos;
     output.Normal = mul((float3x3)perObject.worldNormal, input.Normal);
-    output.Pos = mul(ubo.projection, mul(ubo.view, float4(output.WorldPos, 1.0)));
+    output.Pos = mul(scene.projection, mul(scene.view, float4(output.WorldPos, 1.0)));
     return output;
 }
 
@@ -126,7 +131,7 @@ VSOutput vertMain(VSInput input)
 float4 fragMain(VSOutput input)
 {
 	float3 N = normalize(input.Normal);
-	float3 V = normalize(ubo.camPos - input.WorldPos);
+	float3 V = normalize(scene.camPos - input.WorldPos);
 
 	// Specular contribution
 	float3 Lo = float3(0.0, 0.0, 0.0);

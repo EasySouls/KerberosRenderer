@@ -125,30 +125,19 @@ namespace Game
 									 vk::ObjectType::eImageView,
 									   "Shadow Map Image View");
 
+			// We do this here, because the descriptors will use the shadow map image view,
+			// but has to happen before we create the pipeline
+			SetupDescriptors();
+
 			// Create shadow map image layout transition
 			/*context.TransitionImageLayout(shadowMapImage,
 										  vk::ImageLayout::eUndefined,
 										  vk::ImageLayout::eDepthStencilAttachmentOptimal,
 										  shadowMapMipLevels);*/
 
-			// Create descriptor set layout for shadow map shader
-			constexpr vk::DescriptorSetLayoutBinding shadowMapLayoutBinding(
-				0,
-				vk::DescriptorType::eUniformBuffer,
-				1,
-				vk::ShaderStageFlagBits::eVertex,
-				nullptr);
-
-			const vk::DescriptorSetLayoutCreateInfo shadowMapLayoutInfo{
-				.bindingCount = 1,
-				.pBindings = &shadowMapLayoutBinding,
-			};
-
-			auto shadowMapDescriptorSetLayout = vk::raii::DescriptorSetLayout{ device, shadowMapLayoutInfo };
-
 			vk::PipelineLayoutCreateInfo pipelineLayoutInfo{
 				.setLayoutCount = 1,
-				.pSetLayouts = &*shadowMapDescriptorSetLayout,
+				.pSetLayouts = &*m_PBRDescriptorSetLayout,
 				.pushConstantRangeCount = 0,
 				.pPushConstantRanges = nullptr
 			};
@@ -256,8 +245,6 @@ namespace Game
 									 vk::ObjectType::ePipeline,
 									   "Shadow Map Pipeline");
 		}
-
-		SetupDescriptors();
 
 		// Create the opaque and transparent pipeline resources
 		{
@@ -567,7 +554,15 @@ namespace Game
 		constexpr uint32_t currentImage = 0;
 
 		UpdateLights(m_Time, currentImage);
-		UpdateUniformBuffers(currentImage);
+		UpdateSceneUniformBuffers(currentImage);
+
+		// TODO: Get the current object's position
+		constexpr glm::vec3 objectPosition = glm::vec3(-1.2f, 1.0f, 0.0f);
+		constexpr glm::mat4 translation = glm::translate(glm::mat4(1.0f), objectPosition);
+		const glm::mat4 model = glm::rotate(translation, glm::radians(m_Time * 10.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+
+		// TODO: For now we use the first material only
+		const Material selectedMaterial = m_Materials[0];
 
 		// Render shadow map
 		{
@@ -629,6 +624,8 @@ namespace Game
 
 			for (const auto& mesh : m_Meshes)
 			{
+				UpdatePerObjectUniformBuffer(currentImage, objectPosition, model, selectedMaterial);
+
 				mesh.Draw(cmd);
 			}
 
@@ -726,7 +723,7 @@ namespace Game
 				.imageLayout = vk::ImageLayout::eColorAttachmentOptimal,
 				.loadOp = vk::AttachmentLoadOp::eClear,
 				.storeOp = vk::AttachmentStoreOp::eStore,
-				.clearValue = vk::ClearColorValue{ std::array{1.0f, 0.0f, 0.0f, 1.0f} }
+				.clearValue = vk::ClearColorValue{ std::array{0.0f, 0.0f, 0.0f, 1.0f} }
 			};
 
 			vk::RenderingAttachmentInfo depthAttachmentInfo{
@@ -762,6 +759,8 @@ namespace Game
 
 			for (const auto& mesh : m_Meshes)
 			{
+				UpdatePerObjectUniformBuffer(currentImage, objectPosition, model, selectedMaterial);
+
 				mesh.Draw(cmd);
 			}
 
@@ -809,6 +808,8 @@ namespace Game
 
 			/*for (const auto& mesh : m_Meshes)
 			{
+				UpdatePerObjectUniformBuffer(currentImage, objectPosition, model, material);
+
 				mesh.Draw(cmd);
 			}*/
 
@@ -865,28 +866,26 @@ namespace Game
 		ImGui::End();
 	}
 
-	void GameLayer::UpdateUniformBuffers(const uint32_t currentImage) 
+	void GameLayer::UpdateSceneUniformBuffers(const uint32_t currentImage) 
 	{
 		const auto& [projection, view] = m_Camera.GetMatrices();
 
-		m_UniformDataMatrices.projection = projection;
-		m_UniformDataMatrices.view = view;
-		m_UniformDataMatrices.camPos = m_Camera.GetPosition() * -1.0f;
+		m_SceneUniformData.projection = projection;
+		m_SceneUniformData.view = view;
+		m_SceneUniformData.lightSpaceMatrix = CalculateLightSpaceMatrix();
+		m_SceneUniformData.camPos = m_Camera.GetPosition() * -1.0f;
 
-		memcpy(m_UniformBuffers[currentImage].scene->GetMappedData(), &m_UniformDataMatrices, sizeof(UniformDataMatrices));
+		memcpy(m_UniformBuffers[currentImage].scene->GetMappedData(), &m_SceneUniformData, sizeof(SceneUniformData));
+	}
 
-		// TODO: Get the current object's position
-		constexpr glm::vec3 objectPosition = glm::vec3(-1.2f, 1.0f, 0.0f);
-		constexpr glm::mat4 translation = glm::translate(glm::mat4(1.0f), objectPosition);
-		const glm::mat4 model = glm::rotate(translation, glm::radians(m_Time * 10.0f), glm::vec3(0.0f, 1.0f, 0.0f));
-
-		// TODO: For now we use the first material only
-		const Material selectedMaterial = m_Materials[0];
+	void GameLayer::UpdatePerObjectUniformBuffer(const uint32_t currentImage, const glm::vec3& objectPosition,
+		const glm::mat4& model, const Material& material) 
+	{
 		m_PerObjectUniformData = {
 			.position = objectPosition,
 			.model = model,
 			.worldNormal = glm::transpose(glm::inverse(glm::mat3(model))),
-			.material = selectedMaterial.params
+			.material = material.params
 		};
 		memcpy(m_UniformBuffers[currentImage].perObject->GetMappedData(), &m_PerObjectUniformData, sizeof(PerObjectData));
 	}
@@ -909,13 +908,13 @@ namespace Game
 
 	void GameLayer::PrepareUniformBuffers()
 	{
-		for (auto& [scene, params, material] : m_UniformBuffers)
+		for (auto& [scene, params, perObject] : m_UniformBuffers)
 		{
-			scene = std::make_shared<kbr::UniformBuffer>(sizeof(UniformDataMatrices));
+			scene = std::make_shared<kbr::UniformBuffer>(sizeof(SceneUniformData));
 
 			params = std::make_shared<kbr::UniformBuffer>(sizeof(UniformDataParams));
 
-			material = std::make_shared<kbr::UniformBuffer>(sizeof(PerObjectData));
+			perObject = std::make_shared<kbr::UniformBuffer>(sizeof(PerObjectData));
 		}
 	}
 
@@ -1006,7 +1005,7 @@ namespace Game
 			const vk::DescriptorBufferInfo sceneBufferInfo{
 				.buffer = *m_UniformBuffers[i].scene->GetBuffer(),
 				.offset = 0,
-				.range = sizeof(UniformDataMatrices)
+				.range = sizeof(SceneUniformData)
 			};
 
 			const vk::DescriptorBufferInfo paramsBufferInfo{
@@ -1066,4 +1065,15 @@ namespace Game
 		}
 	}
 
+	glm::mat4 GameLayer::CalculateLightSpaceMatrix() const 
+	{
+		constexpr float nearPlane = 1.0f;
+		constexpr float farPlane = 50.0f;
+		const glm::vec4 lightPos = m_UniformDataParams.lights[0];
+
+		const glm::mat4 lightProjection = glm::ortho(-20.0f, 20.0f, -20.0f, 20.0f, nearPlane, farPlane);
+		const glm::mat4 lightView = glm::lookAt(glm::vec3(lightPos), glm::vec3(0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+
+		return lightProjection * lightView;
+	}
 }

@@ -3,13 +3,32 @@ struct VSInput {
     float3 inNormal;
 };
 
-struct UniformBuffer {
+struct SceneData
+{
+    float4x4 projection;
+    float4x4 view;
     float4x4 lightSpaceMatrix;
-    float4x4 model;
+    float3 camPos;
+};
+[[vk::binding(0)]]
+ConstantBuffer<SceneData> scene;
+
+struct Material {
+    [[vk::offset(12)]] float roughness;
+    [[vk::offset(16)]] float metallic;
+    [[vk::offset(20)]] float r;
+    [[vk::offset(24)]] float g;
+    [[vk::offset(28)]] float b;
 };
 
-[[vk::binding(0)]]
-ConstantBuffer<UniformBuffer> ubo;
+struct PerObject {
+    float3 objPos;
+    float4x4 model;
+    float4x4 worldNormal;
+    Material material;
+};
+[[vk::binding(2)]]
+ConstantBuffer<PerObject> perObject;
 
 struct VSOutput
 {
@@ -19,8 +38,8 @@ struct VSOutput
 [shader("vertex")]
 VSOutput vertMain(VSInput input) {
     VSOutput output;
-    float4 worldPosition = mul(ubo.model, float4(input.inPosition, 1.0));
-    output.pos = mul(ubo.lightSpaceMatrix, worldPosition);
+    float4 worldPosition = mul(perObject.model, float4(input.inPosition, 1.0));
+    output.pos = mul(scene.lightSpaceMatrix, worldPosition);
     return output;
 }
 
