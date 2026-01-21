@@ -4,6 +4,12 @@
 #include "Layer.hpp"
 
 #include <memory>
+#include <mutex>
+#include <vector>
+#include <queue>
+#include <functional>
+
+#include "events/Event.hpp"
 
 struct GLFWwindow;
 
@@ -16,9 +22,9 @@ namespace kbr
 		~Application();
 
 		Application(const Application& other) = delete;
-		Application(Application&& other) noexcept = default;
+		Application(Application&& other) noexcept = delete;
 		Application& operator=(const Application& other) = delete;
-		Application& operator=(Application&& other) noexcept = default;
+		Application& operator=(Application&& other) noexcept = delete;
 
 		void Run();
 
@@ -26,7 +32,14 @@ namespace kbr
 			requires std::is_base_of_v<Layer, T>
 		void PushLayer();
 
-		void FramebufferResized(uint32_t width, uint32_t height) const;
+		void PushEvent(const std::shared_ptr<Event>& event)
+		{
+			//std::lock_guard<std::mutex> lock(m_QueueMutex);
+			m_EventQueue.push(event);
+		}
+
+		static Application& Get() { return *s_Instance; }
+		GLFWwindow* GetWindow() const { return m_Window; }
 
 	private:
 		GLFWwindow* m_Window;
@@ -34,6 +47,13 @@ namespace kbr
 
 		std::vector<std::unique_ptr<Layer>> m_Layers;
 		float m_LastFrameTime = 0.0f;
+
+		std::queue<std::function<void()>> m_MainThreadQueue;
+		std::mutex m_QueueMutex;
+
+		std::queue<std::shared_ptr<Event>> m_EventQueue;
+
+		static Application* s_Instance;
 	};
 
 	template <typename T> 

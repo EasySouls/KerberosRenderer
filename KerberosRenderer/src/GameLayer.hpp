@@ -50,7 +50,7 @@ namespace Game
 		void OnDetach() override;
 
 		void OnUpdate(float deltaTime) override;
-		void OnEvent() override;
+		void OnEvent(std::shared_ptr<kbr::Event> event) override;
 		void OnImGuiRender() override;
 
 	private:
@@ -63,16 +63,21 @@ namespace Game
 
 		glm::mat4 CalculateLightSpaceMatrix() const;
 
+		void CreateVulkanResources();
+		void ResizeResources();
+
 	private:
 		float m_Time = 0.0f;
 		float m_Fps = 0.0f;
 
 		kbr::Camera m_Camera;
+		glm::vec2 m_ViewportSize{ 0.f };
 
 		std::vector<Material> m_Materials;
 		std::vector<kbr::Mesh> m_Meshes;
 
 		// Vulkan resources
+		uint32_t m_ShadowMapSize = 2048;
 		vk::raii::Image m_ShadowMapImage = nullptr;
 		vk::raii::DeviceMemory m_ShadowMapImageMemory = nullptr;
 		vk::raii::ImageView m_ShadowMapImageView = nullptr;
@@ -95,6 +100,8 @@ namespace Game
 		vk::raii::Pipeline m_PBRTransparentPipeline = nullptr;
 
 		vk::raii::Sampler m_ColorSampler = nullptr;
+
+		glm::vec2 m_OutputSize{ 0.f };
 
 		struct SceneUniformData
 		{

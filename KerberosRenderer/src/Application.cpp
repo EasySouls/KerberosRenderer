@@ -1,19 +1,35 @@
 #include "Application.hpp"
 
+#include "events/KeyPressedEvent.hpp"
+#include "events/KeyReleasedEvent.hpp"
+#include "events/KeyTypedEvent.hpp"
+#include "events/MouseButtonPressedEvent.hpp"
+#include "events/MouseButtonReleasedEvent.hpp"
+#include "events/MouseMovedEvent.hpp"
+#include "events/MouseScrolledEvent.hpp"
+#include "events/WindowDropEvent.hpp"
+#include "events/WindowResizedEvent.hpp"
+
 #include <GLFW/glfw3.h>
 
 #include <stdexcept>
+#include <iostream>
+#include <filesystem>
+
 
 namespace kbr
 {
-	static void FramebufferResizeCallback(GLFWwindow* window, const int width, const int height)
-	{
-		const auto app = static_cast<Application*>(glfwGetWindowUserPointer(window));
-		app->FramebufferResized(static_cast<uint32_t>(width), static_cast<uint32_t>(height));
-	}
+	Application* Application::s_Instance = nullptr;
 
 	Application::Application()
 	{
+		if (s_Instance)
+		{
+			throw std::runtime_error("Application already exists!");
+		}
+
+		s_Instance = this;
+
 		// Initialize GLFW
 		if (!glfwInit())
 		{
@@ -29,7 +45,123 @@ namespace kbr
 		}
 
 		glfwSetWindowUserPointer(m_Window, this);
-		glfwSetFramebufferSizeCallback(m_Window, FramebufferResizeCallback);
+
+		glfwSetFramebufferSizeCallback(m_Window, [](GLFWwindow* window, const int width, const int height)
+		{
+			const auto app = static_cast<Application*>(glfwGetWindowUserPointer(window));
+
+			std::cout << "Framebuffer resized: (" << width << ", " << height << ")\n";
+			app->m_VulkanContext->FramebufferResized(static_cast<uint32_t>(width), static_cast<uint32_t>(height));
+		});
+
+		// Setup GLFW event handlers
+		glfwSetWindowSizeCallback(m_Window, [](GLFWwindow* window, const int width, const int height)
+		{
+			const auto app = static_cast<Application*>(glfwGetWindowUserPointer(window));
+
+			const auto event = std::make_shared<WindowResizedEvent>(width, height);
+			app->PushEvent(event);
+		});
+
+		/*glfwSetWindowCloseCallback(m_Window, [](GLFWwindow* window)
+		{
+			const auto app = static_cast<Application*>(glfwGetWindowUserPointer(window));
+
+			const auto event = std::make_shared<WindowClosedEvent>();
+			app->PushEvent(event);
+		});*/
+
+		glfwSetKeyCallback(m_Window, [](GLFWwindow* window, const int key, const int scancode, const int action, const int mods)
+		{
+			const auto app = static_cast<Application*>(glfwGetWindowUserPointer(window));
+
+			switch (action)
+			{
+				case GLFW_PRESS:
+				{
+					const auto event = std::make_shared<KeyPressedEvent>(key, 0);
+					app->PushEvent(event);
+					break;
+				}
+
+				case GLFW_RELEASE:
+				{
+					const auto event = std::make_shared<KeyReleasedEvent>(key);
+					app->PushEvent(event);
+					break;
+				}
+
+				case GLFW_REPEAT:
+				{
+					const auto event = std::make_shared<KeyPressedEvent>(key, 1);
+					app->PushEvent(event);
+					break;
+				}
+
+				default:
+					break;
+			}
+		});
+
+		glfwSetCharCallback(m_Window, [](GLFWwindow* window, const unsigned int keycode)
+		{
+			const auto app = static_cast<Application*>(glfwGetWindowUserPointer(window));
+
+			const auto event = std::make_shared<KeyTypedEvent>(keycode);
+			app->PushEvent(event);
+		});
+
+		glfwSetMouseButtonCallback(m_Window, [](GLFWwindow* window, const int button, const int action, const int mods)
+		{
+			const auto app = static_cast<Application*>(glfwGetWindowUserPointer(window));
+			switch (action)
+			{
+				case GLFW_PRESS:
+				{
+					const auto event = std::make_shared<MouseButtonPressedEvent>(button);
+					app->PushEvent(event);
+					break;
+				}
+				case GLFW_RELEASE:
+				{
+					const auto event = std::make_shared<MouseButtonReleasedEvent>(button);
+					app->PushEvent(event);
+					break;
+				}
+				default:
+					break;
+			}
+		});
+
+		glfwSetScrollCallback(m_Window, [](GLFWwindow* window, const double xOffset, const double yOffset)
+		{
+			const auto app = static_cast<Application*>(glfwGetWindowUserPointer(window));
+
+			const auto event = std::make_shared<MouseScrolledEvent>(static_cast<float>(xOffset), static_cast<float>(yOffset));
+			app->PushEvent(event);
+		});
+
+		glfwSetCursorPosCallback(m_Window, [](GLFWwindow* window, const double xPos, const double yPos)
+		{
+			const auto app = static_cast<Application*>(glfwGetWindowUserPointer(window));
+
+			const auto event = std::make_shared<MouseMovedEvent>(static_cast<float>(xPos), static_cast<float>(yPos));
+			app->PushEvent(event);
+		});
+
+		glfwSetDropCallback(m_Window, [](GLFWwindow* window, const int pathCount, const char* paths[])
+		{
+			const auto app = static_cast<Application*>(glfwGetWindowUserPointer(window));
+
+			std::vector<std::filesystem::path> filepaths(pathCount);
+			for (int i = 0; i < pathCount; ++i)
+			{
+				filepaths[i] = paths[i];
+			}
+
+			const auto event = std::make_shared<WindowDropEvent>(filepaths);
+			app->PushEvent(event);
+		});
 
 		m_VulkanContext = std::make_unique<VulkanContext>(m_Window);
 	}
@@ -55,6 +187,17 @@ namespace kbr
 			const float deltaTime = time - m_LastFrameTime;
 			m_LastFrameTime = time;
 
+			// Process events
+			while (!m_EventQueue.empty())
+			{
+				const auto event = m_EventQueue.front();
+				for (const auto& layer : m_Layers)
+				{
+					layer->OnEvent(event);
+				}
+				m_EventQueue.pop();
+			}
+
 			for (const auto& layer : m_Layers)
 			{
 				layer->OnUpdate(deltaTime);
@@ -72,10 +215,5 @@ namespace kbr
 			m_VulkanContext->Draw();
 			m_VulkanContext->Present();
 		}
-	}
-
-	void Application::FramebufferResized(const uint32_t width, const uint32_t height) const 
-	{
-		m_VulkanContext->FramebufferResized(width, height);
 	}
 }

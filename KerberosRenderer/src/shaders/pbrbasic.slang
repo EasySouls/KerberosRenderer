@@ -141,7 +141,8 @@ float4 fragMain(VSOutput input)
 	};
 
 	// Combine with ambient
-	float3 color = float3(perObject.material.r, perObject.material.g, perObject.material.b) * 0.02;
+    float3 color = float3(perObject.material.r, perObject.material.g, perObject.material.b) * 0.02;
+    return float4(color, 1.0);
 	color += Lo;
 
 	// Gamma correct
