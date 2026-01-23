@@ -10,6 +10,8 @@
 #include "events/WindowDropEvent.hpp"
 #include "events/WindowResizedEvent.hpp"
 
+#include "logging/Log.hpp"
+
 #include <GLFW/glfw3.h>
 
 #include <stdexcept>
@@ -30,6 +32,8 @@ namespace kbr
 
 		s_Instance = this;
 
+		Log::Init();
+
 		// Initialize GLFW
 		if (!glfwInit())
 		{
@@ -37,7 +41,7 @@ namespace kbr
 		}
 		// Create a GLFW window
 		glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
-		m_Window = glfwCreateWindow(800, 600, "Kerberos Renderer", nullptr, nullptr);
+		m_Window = glfwCreateWindow(1200, 800, "Kerberos Renderer", nullptr, nullptr);
 		if (!m_Window)
 		{
 			glfwTerminate();
@@ -202,18 +206,24 @@ namespace kbr
 			{
 				layer->OnUpdate(deltaTime);
 			}
+			std::cout << "Layers OnUpdate complete.\n";
 
 			m_VulkanContext->PrepareImGuiFrame();
+			std::cout << "ImGui frame prepared.\n";
 
 			for (const auto& layer : m_Layers)
 			{
 				layer->OnImGuiRender();
 			}
+			std::cout << "Layers ImGui render complete.\n";
 
 			m_VulkanContext->RenderImGui();
+			std::cout << "ImGui rendered.\n";
 
 			m_VulkanContext->Draw();
+			std::cout << "Frame drawn.\n";
 			m_VulkanContext->Present();
+			std::cout << "Frame presented.\n";
 		}
 	}
 }

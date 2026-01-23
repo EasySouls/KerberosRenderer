@@ -105,27 +105,27 @@ namespace Game
 
 		struct SceneUniformData
 		{
-			glm::mat4 projection;
-			glm::mat4 view;
-			glm::mat4 lightSpaceMatrix;
-			glm::vec3 camPos;
+			glm::mat4 projection{ 0.f };
+			glm::mat4 view{ 0.f };
+			glm::mat4 lightSpaceMatrix{ 0.f };
+			glm::vec3 camPos{ 0.f };
 		};
-		SceneUniformData m_SceneUniformData;
+		SceneUniformData m_SceneUniformData{};
 
 		struct UniformDataParams
 		{
 			glm::vec4 lights[4];
 		};
-		UniformDataParams m_UniformDataParams;
+		UniformDataParams m_UniformDataParams{};
 
 		struct PerObjectData
 		{
-			glm::vec3 position;
-			glm::mat4 model;
-			glm::mat4 worldNormal;
+			glm::vec3 position{0.f};
+			glm::mat4 model{ 0.f };
+			glm::mat4 worldNormal{ 0.f };
 			Material::PushBlock material;
 		};
-		PerObjectData m_PerObjectUniformData;
+		PerObjectData m_PerObjectUniformData{};
 
 		struct UniformBufferObject
 		{

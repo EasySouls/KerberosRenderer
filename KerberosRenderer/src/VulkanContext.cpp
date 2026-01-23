@@ -8,6 +8,7 @@
 
 #include "Texture.hpp"
 #include "Utils.hpp"
+#include "logging/Log.hpp"
 
 #define VK_USE_PLATFORM_WIN32_KHR
 #define GLFW_INCLUDE_VULKAN
@@ -28,19 +29,75 @@ const std::vector<const char*> deviceExtensions = {
 	vk::KHRCreateRenderpass2ExtensionName
 };
 
-#ifdef NDEBUG
-constexpr bool enableValidationLayers = false;
-#else
+#ifdef KBR_DEBUG
 constexpr bool enableValidationLayers = true;
+#else
+constexpr bool enableValidationLayers = false;
 #endif
 
 static VKAPI_ATTR vk::Bool32 VKAPI_CALL DebugCallback(
-	vk::DebugUtilsMessageSeverityFlagBitsEXT severity,
+	const vk::DebugUtilsMessageSeverityFlagBitsEXT severity,
 	const vk::DebugUtilsMessageTypeFlagsEXT type,
 	const vk::DebugUtilsMessengerCallbackDataEXT* pCallbackData,
 	void*)
 {
-	std::cerr << "validation layer: type " << to_string(type) << " msg: " << pCallbackData->pMessage << "\n\n";
+	if (type & vk::DebugUtilsMessageTypeFlagBitsEXT::eGeneral) {
+		if (severity & vk::DebugUtilsMessageSeverityFlagBitsEXT::eVerbose) {
+			KBR_CORE_TRACE("General|Verbose: {}|{}: {}", pCallbackData->messageIdNumber, pCallbackData->pMessageIdName, pCallbackData->pMessage);
+		}
+		else if (severity & vk::DebugUtilsMessageSeverityFlagBitsEXT::eInfo) {
+			KBR_CORE_INFO("General|Info: {}|{}: {}", pCallbackData->messageIdNumber, pCallbackData->pMessageIdName, pCallbackData->pMessage);
+		}
+		else if (severity & vk::DebugUtilsMessageSeverityFlagBitsEXT::eWarning) {
+			KBR_CORE_WARN("General|Warning: {}|{}: {}", pCallbackData->messageIdNumber, pCallbackData->pMessageIdName, pCallbackData->pMessage);
+		}
+		else if (severity & vk::DebugUtilsMessageSeverityFlagBitsEXT::eError) {
+			KBR_CORE_ERROR("General|Error: {}|{}: {}", pCallbackData->messageIdNumber, pCallbackData->pMessageIdName, pCallbackData->pMessage);
+		}
+	}
+	else if (type & vk::DebugUtilsMessageTypeFlagBitsEXT::eValidation) {
+		if (severity & vk::DebugUtilsMessageSeverityFlagBitsEXT::eVerbose) {
+			KBR_CORE_TRACE("Validation|Verbose: {}|{}: {}", pCallbackData->messageIdNumber, pCallbackData->pMessageIdName, pCallbackData->pMessage);
+		}
+		else if (severity & vk::DebugUtilsMessageSeverityFlagBitsEXT::eInfo) {
+			KBR_CORE_INFO("Validation|Info: {}|{}: {}", pCallbackData->messageIdNumber, pCallbackData->pMessageIdName, pCallbackData->pMessage);
+		}
+		else if (severity & vk::DebugUtilsMessageSeverityFlagBitsEXT::eWarning) {
+			KBR_CORE_WARN("Validation|Warning: {}|{}: {}", pCallbackData->messageIdNumber, pCallbackData->pMessageIdName, pCallbackData->pMessage);
+		}
+		else if (severity & vk::DebugUtilsMessageSeverityFlagBitsEXT::eError) {
+			KBR_CORE_ERROR("Validation|Error: {}|{}: {}", pCallbackData->messageIdNumber, pCallbackData->pMessageIdName, pCallbackData->pMessage);
+		}
+	}
+	else if (type & vk::DebugUtilsMessageTypeFlagBitsEXT::ePerformance) {
+		if (severity & vk::DebugUtilsMessageSeverityFlagBitsEXT::eVerbose) {
+			KBR_CORE_TRACE("Performance|Verbose: {}|{}: {}", pCallbackData->messageIdNumber, pCallbackData->pMessageIdName, pCallbackData->pMessage);
+		}
+		else if (severity & vk::DebugUtilsMessageSeverityFlagBitsEXT::eInfo) {
+			KBR_CORE_INFO("Performance|Info: {}|{}: {}", pCallbackData->messageIdNumber, pCallbackData->pMessageIdName, pCallbackData->pMessage);
+		}
+		else if (severity & vk::DebugUtilsMessageSeverityFlagBitsEXT::eWarning) {
+			KBR_CORE_WARN("Performance|Warning: {}|{}: {}", pCallbackData->messageIdNumber, pCallbackData->pMessageIdName, pCallbackData->pMessage);
+		}
+		else if (severity & vk::DebugUtilsMessageSeverityFlagBitsEXT::eError) {
+			KBR_CORE_ERROR("Performance|Error: {}|{}: {}", pCallbackData->messageIdNumber, pCallbackData->pMessageIdName, pCallbackData->pMessage);
+		}
+	}
+	else if (type & vk::DebugUtilsMessageTypeFlagBitsEXT::eDeviceAddressBinding) {
+		if (severity & vk::DebugUtilsMessageSeverityFlagBitsEXT::eVerbose) {
+			KBR_CORE_TRACE("DeviceAddressBinding|Verbose: {}|{}: {}", pCallbackData->messageIdNumber, pCallbackData->pMessageIdName, pCallbackData->pMessage);
+		}
+		else if (severity & vk::DebugUtilsMessageSeverityFlagBitsEXT::eInfo) {
+			KBR_CORE_INFO("DeviceAddressBinding|Info: {}|{}: {}", pCallbackData->messageIdNumber, pCallbackData->pMessageIdName, pCallbackData->pMessage);
+		}
+		else if (severity & vk::DebugUtilsMessageSeverityFlagBitsEXT::eWarning) {
+			KBR_CORE_WARN("DeviceAddressBinding|Warning: {}|{}: {}", pCallbackData->messageIdNumber, pCallbackData->pMessageIdName, pCallbackData->pMessage);
+		}
+		else if (severity & vk::DebugUtilsMessageSeverityFlagBitsEXT::eError) {
+			KBR_CORE_ERROR("DeviceAddressBinding|Error: {}|{}: {}", pCallbackData->messageIdNumber, pCallbackData->pMessageIdName, pCallbackData->pMessage);
+		}
+	}
+	//std::cerr << "validation layer: type " << to_string(type) << " msg: " << pCallbackData->pMessage << "\n\n";
 
 	return vk::False;
 }
@@ -303,6 +360,7 @@ namespace kbr
 	void VulkanContext::SetObjectDebugName(const uint64_t objectHandle, const vk::ObjectType objectType,
 		const std::string& name) const 
 	{
+#ifdef KBR_DEBUG
 		const vk::DebugUtilsObjectNameInfoEXT nameInfo{
 			.objectType = objectType,
 			.objectHandle = objectHandle,
@@ -310,6 +368,7 @@ namespace kbr
 		};
 
 		device.setDebugUtilsObjectNameEXT(nameInfo);
+#endif
 	}
 
 	vk::raii::Device& VulkanContext::GetDevice() 

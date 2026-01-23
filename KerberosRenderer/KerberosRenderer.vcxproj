@@ -102,10 +102,10 @@
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions);_CRT_SECURE_NO_WARNINGS;_GLFW_WIN32;NOMINMAX</PreprocessorDefinitions>
+      <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions);_CRT_SECURE_NO_WARNINGS;_GLFW_WIN32;NOMINMAX;KBR_DEBUG</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp20</LanguageStandard>
-      <AdditionalIncludeDirectories>C:\Development\KerberosRenderer\KerberosRenderer\vendor\glfw-3.4\include;C:\Development\KerberosRenderer\KerberosRenderer\vendor\glm;C:\Development\KerberosRenderer\KerberosRenderer\vendor\imgui;C:\Development\KerberosRenderer\KerberosRenderer\vendor\stb;C:\VulkanSDK\1.4.335.0\Include;C:\Development\KerberosRenderer\KerberosRenderer\vendor\tinyobjloader;C:\Development\KerberosRenderer\KerberosRenderer\vendor\tinygltf;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>C:\Development\KerberosRenderer\KerberosRenderer\vendor\glfw-3.4\include;C:\Development\KerberosRenderer\KerberosRenderer\vendor\glm;C:\Development\KerberosRenderer\KerberosRenderer\vendor\imgui;C:\Development\KerberosRenderer\KerberosRenderer\vendor\stb;C:\VulkanSDK\1.4.335.0\Include;C:\Development\KerberosRenderer\KerberosRenderer\vendor\tinyobjloader;C:\Development\KerberosRenderer\KerberosRenderer\vendor\tinygltf;C:\Development\KerberosRenderer\KerberosRenderer\vendor;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -120,13 +120,16 @@
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>NDEBUG;_CONSOLE;%(PreprocessorDefinitions);_CRT_SECURE_NO_WARNINGS;_GLFW_WIN32;NOMINMAX</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp20</LanguageStandard>
+      <AdditionalIncludeDirectories>C:\Development\KerberosRenderer\KerberosRenderer\vendor\glfw-3.4\include;C:\Development\KerberosRenderer\KerberosRenderer\vendor\glm;C:\Development\KerberosRenderer\KerberosRenderer\vendor\imgui;C:\Development\KerberosRenderer\KerberosRenderer\vendor\stb;C:\VulkanSDK\1.4.335.0\Include;C:\Development\KerberosRenderer\KerberosRenderer\vendor\tinyobjloader;C:\Development\KerberosRenderer\KerberosRenderer\vendor\tinygltf;C:\Development\KerberosRenderer\KerberosRenderer\vendor;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
+      <AdditionalLibraryDirectories>C:\VulkanSDK\1.4.335.0\Lib;</AdditionalLibraryDirectories>
+      <AdditionalDependencies>vulkan-1.lib;$(CoreLibraryDependencies);%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
@@ -135,6 +138,7 @@
     <ClCompile Include="src\Camera.cpp" />
     <ClCompile Include="src\GameLayer.cpp" />
     <ClCompile Include="src\input\InputSystem.cpp" />
+    <ClCompile Include="src\logging\Log.cpp" />
     <ClCompile Include="src\main.cpp" />
     <ClCompile Include="src\Mesh.cpp" />
     <ClCompile Include="src\ModelLoader.cpp" />
@@ -190,6 +194,7 @@
     <ClInclude Include="src\input\MouseButtonCodes.hpp" />
     <ClInclude Include="src\io.hpp" />
     <ClInclude Include="src\Layer.hpp" />
+    <ClInclude Include="src\logging\Log.hpp" />
     <ClInclude Include="src\Mesh.hpp" />
     <ClInclude Include="src\ModelLoader.hpp" />
     <ClInclude Include="src\Texture.hpp" />

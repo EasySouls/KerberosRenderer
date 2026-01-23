@@ -1805,7 +1805,7 @@ int main() {
 		app.Run();
 	}
 	catch (const std::exception& e) {
-		std::cerr << e.what() << '\n';
+		std::cerr << "Exception: " << e.what() << '\n';
 		return EXIT_FAILURE;
 	}
 

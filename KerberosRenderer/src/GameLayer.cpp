@@ -47,8 +47,12 @@ namespace Game
 
 		CreateVulkanResources();
 
+		std::cout << "Prepared Vulkan resources!\n";
+
 		// Load models
 		m_Meshes.push_back(kbr::ModelLoader::LoadModel("src/models/avocado/Avocado.gltf"));
+
+		std::cout << "Loaded " << m_Meshes.size() << " mesh(es)!\n";
 	}
 	
 	void GameLayer::OnDetach() 
@@ -165,6 +169,8 @@ namespace Game
 			}
 
 			cmd.endRendering();
+
+			std::cout << "Shadow pass done!\n";
 		}
 
 		// Transition shadow map image layout for shader read
@@ -308,6 +314,8 @@ namespace Game
 			}
 
 			cmd.endRendering();
+
+			std::cout << "Opaque pass done!\n";
 		}
 
 		// Render transparent objects
@@ -351,6 +359,8 @@ namespace Game
 			}*/
 
 			cmd.endRendering();
+
+			std::cout << "Transparent pass done!\n";
 		}
 
 		// Transition color image layout for shader read in ImGui
@@ -379,9 +389,13 @@ namespace Game
 				.pImageMemoryBarriers = &barrier
 			};
 			cmd.pipelineBarrier2(dependencyInfo);
+
+			std::cout << "Color image transitioned for ImGui!\n";
 		}
 
 		context.EndSingleTimeCommands(cmd);
+
+		std::cout << "Frame rendered!\n";
 	}
 
 	void GameLayer::OnEvent(const std::shared_ptr<kbr::Event> event)
@@ -415,11 +429,11 @@ namespace Game
 		ImGui::Separator();
 
 		ImGui::Text("Color Output Image");
-		ImGui::Text("pointer = %p", m_ColorOutputDescriptorSet);
 		ImGui::Text("Size: %.2f x %.2f", m_ViewportSize.x, m_ViewportSize.y);
 
 		ImGui::End();
 
+		std::cout << "ImGui rendered!\n";
 	}
 
 	void GameLayer::UpdateSceneUniformBuffers(const uint32_t currentImage) 
