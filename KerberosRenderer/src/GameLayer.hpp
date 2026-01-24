@@ -13,6 +13,7 @@
 #include <vector>
 #include <array>
 #include <memory>
+#include <optional>
 
 namespace Game
 {
@@ -76,7 +77,7 @@ namespace Game
 
 		std::vector<Material> m_Materials;
 		std::vector<kbr::Mesh> m_Meshes;
-		kbr::Mesh m_SkyboxMesh;
+		std::optional<kbr::Mesh> m_SkyboxMesh;
 		int m_SelectedMaterialIndex = 0;
 
 		// Vulkan resources

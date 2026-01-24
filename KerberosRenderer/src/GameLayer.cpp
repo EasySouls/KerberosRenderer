@@ -18,7 +18,7 @@
 namespace Game
 {
 	GameLayer::GameLayer() 
-		: Layer("GameLayer"), m_SkyboxMesh("Skybox", {}, {})
+		: Layer("GameLayer"), m_SkyboxMesh(std::nullopt)
 	{
 		//m_Camera.SetPosition(glm::vec3(0.0f, 1.0f, 5.0f));
 	}
@@ -51,11 +51,11 @@ namespace Game
 		KBR_CORE_INFO("Prepared Vulkan resources!");
 
 		// Load models
-		m_Meshes.push_back(kbr::ModelLoader::LoadModel("src/models/avocado/Avocado.gltf"));
+		m_Meshes.push_back(kbr::ModelLoader::LoadModel("assets/models/avocado/Avocado.gltf"));
 
 		KBR_CORE_INFO("Loaded {} mesh(es)!", m_Meshes.size());
 
-		m_SkyboxMesh = kbr::ModelLoader::LoadModel("src/models/skybox/skybox.obj");
+		m_SkyboxMesh = kbr::ModelLoader::LoadModel("assets/models/cube.gltf");
 	}
 	
 	void GameLayer::OnDetach() 
@@ -802,7 +802,7 @@ namespace Game
 									   "Shadow Map Pipeline Layout");
 
 			// Create shader for shadow mapping
-			kbr::Shader shadowMapShader("src/shaders/shadowmap.spv", "ShadowMap");
+			kbr::Shader shadowMapShader("assets/shaders/shadowmap.spv", "ShadowMap");
 
 			constexpr vk::VertexInputBindingDescription bindingDescription = { 0, sizeof(glm::vec3), vk::VertexInputRate::eVertex };
 			constexpr std::array attributeDescriptions = {
@@ -972,7 +972,7 @@ namespace Game
 									   vk::ObjectType::ePipelineLayout,
 									   "PBR Pipeline Layout");
 
-			kbr::Shader pbrShader("src/shaders/pbrbasic.spv", "PBR");
+			kbr::Shader pbrShader("assets/shaders/pbrbasic.spv", "PBR");
 
 			const auto bindingDesc = kbr::Vertex::GetBindingDescription();
 			const auto attributeDescs = kbr::Vertex::GetAttributeDescriptions();
