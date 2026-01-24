@@ -18,7 +18,7 @@
 namespace Game
 {
 	GameLayer::GameLayer() 
-		: Layer("GameLayer")
+		: Layer("GameLayer"), m_SkyboxMesh("Skybox", {}, {})
 	{
 		//m_Camera.SetPosition(glm::vec3(0.0f, 1.0f, 5.0f));
 	}
@@ -54,6 +54,8 @@ namespace Game
 		m_Meshes.push_back(kbr::ModelLoader::LoadModel("src/models/avocado/Avocado.gltf"));
 
 		KBR_CORE_INFO("Loaded {} mesh(es)!", m_Meshes.size());
+
+		m_SkyboxMesh = kbr::ModelLoader::LoadModel("src/models/skybox/skybox.obj");
 	}
 	
 	void GameLayer::OnDetach() 
@@ -99,8 +101,7 @@ namespace Game
 			glm::rotate(glm::mat4(1.0f), m_ObjectRotation.z, glm::vec3(0.0f, 0.0f, 1.0f)) *
 			glm::scale(glm::mat4(1.0f), m_ObjectScale);
 
-		// TODO: For now we use the first material only
-		const Material selectedMaterial = m_Materials[9];
+		const Material selectedMaterial = m_Materials[m_SelectedMaterialIndex];
 
 		// Render shadow map
 		{
@@ -443,6 +444,29 @@ namespace Game
 		ImGui::DragFloat3("Rotation", glm::value_ptr(m_ObjectRotation), 0.01f);
 		ImGui::DragFloat3("Scale", glm::value_ptr(m_ObjectScale), 0.1f, 0.1f, 100.0f);
 
+		ImGui::Separator();
+
+		// Light controls
+		ImGui::Text("Light Positions");
+		ImGui::Text("Light 1: (%.2f, %.2f, %.2f)", m_UniformDataParams.lights[0].x, m_UniformDataParams.lights[0].y, m_UniformDataParams.lights[0].z);
+		ImGui::Text("Light 2: (%.2f, %.2f, %.2f)", m_UniformDataParams.lights[1].x, m_UniformDataParams.lights[1].y, m_UniformDataParams.lights[1].z);
+		ImGui::DragFloat3("Light 3 Position", glm::value_ptr(m_UniformDataParams.lights[2]), 0.1f);
+		ImGui::DragFloat3("Light 4 Position", glm::value_ptr(m_UniformDataParams.lights[3]), 0.1f);
+		ImGui::DragFloat("Exposure", &m_UniformDataParams.exposure, 0.1f, 0.1f, 10.0f);
+		ImGui::DragFloat("Gamma", &m_UniformDataParams.gamma, 0.1f, 0.1f, 10.0f);
+		ImGui::DragFloat3("Ambient Light Color", glm::value_ptr(m_SceneUniformData.ambientLightColor), 0.01f, 0.0f, 1.0f);
+
+		ImGui::Separator();
+
+		// Material selection
+		ImGui::Text("Material");
+		const char* materialNames[11];
+		for (size_t i = 0; i < m_Materials.size(); ++i)
+		{
+			materialNames[i] = m_Materials[i].name.c_str();
+		}
+		ImGui::Combo("Select Material", &m_SelectedMaterialIndex, materialNames, static_cast<int>(m_Materials.size()));
+
 		ImGui::End();
 
 		KBR_CORE_TRACE("ImGui rendered!");
@@ -455,8 +479,9 @@ namespace Game
 
 		m_SceneUniformData.projection = projection;
 		m_SceneUniformData.view = view;
+		m_SceneUniformData.viewProjection = view * projection;
 		m_SceneUniformData.lightSpaceMatrix = CalculateLightSpaceMatrix();
-		m_SceneUniformData.camPos = m_Camera.GetPosition() * -1.0f;
+		m_SceneUniformData.camPos = m_Camera.GetPosition();
 
 		std::memcpy(m_UniformBuffers[currentImage].scene->GetMappedData(), &m_SceneUniformData, sizeof(SceneUniformData));
 	}
@@ -478,13 +503,12 @@ namespace Game
 		constexpr float p = 5.0f;
 		m_UniformDataParams.lights[0] = glm::vec4(-p, -p * 0.5f, -p, 1.0f);
 		m_UniformDataParams.lights[1] = glm::vec4(-p, -p * 0.5f, p, 1.0f);
-		m_UniformDataParams.lights[2] = glm::vec4(p, -p * 0.5f, p, 1.0f);
-		m_UniformDataParams.lights[3] = glm::vec4(p, -p * 0.5f, -p, 1.0f);
+		// The third and fourth are controlled via ImGui
 
-		m_UniformDataParams.lights[0].x = sin(glm::radians(time * 360.0f)) * 20.0f;
-		m_UniformDataParams.lights[0].z = cos(glm::radians(time * 360.0f)) * 20.0f;
-		m_UniformDataParams.lights[1].x = cos(glm::radians(time * 360.0f)) * 20.0f;
-		m_UniformDataParams.lights[1].y = sin(glm::radians(time * 360.0f)) * 20.0f;
+		m_UniformDataParams.lights[0].x = sin(glm::radians(time * 80.0f)) * 20.0f;
+		m_UniformDataParams.lights[0].z = cos(glm::radians(time * 80.0f)) * 20.0f;
+		m_UniformDataParams.lights[1].x = cos(glm::radians(time * 80.0f)) * 20.0f;
+		m_UniformDataParams.lights[1].y = sin(glm::radians(time * 80.0f)) * 20.0f;
 
 		std::memcpy(m_UniformBuffers[currentImage].params->GetMappedData(), &m_UniformDataParams, sizeof(UniformDataParams));
 	}
@@ -652,10 +676,17 @@ namespace Game
 	{
 		constexpr float nearPlane = 1.0f;
 		constexpr float farPlane = 50.0f;
-		const glm::vec4 lightPos = m_UniformDataParams.lights[0];
+		constexpr float orthoSize = 20.0f;
+		const glm::mat4 lightProjection = glm::ortho(-orthoSize, orthoSize, -orthoSize, orthoSize, nearPlane, farPlane);
 
-		const glm::mat4 lightProjection = glm::ortho(-20.0f, 20.0f, -20.0f, 20.0f, nearPlane, farPlane);
-		const glm::mat4 lightView = glm::lookAt(glm::vec3(lightPos), glm::vec3(0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+		constexpr glm::vec3 sceneCenter = glm::vec3(0.0f, 0.0f, 0.0f);
+		constexpr float lightDistance = 20.0f;
+
+		const glm::vec3 lightPos = sceneCenter - glm::normalize(glm::vec3(m_UniformDataParams.lights[3])) * lightDistance;
+		constexpr glm::vec3 lightTarget = sceneCenter; /// Look at origin
+		constexpr glm::vec3 lightUp = glm::vec3(0.0f, 1.0f, 0.0f);
+
+		const glm::mat4 lightView = glm::lookAt(glm::vec3(lightPos), lightTarget, lightUp);
 
 		return lightProjection * lightView;
 	}

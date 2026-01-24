@@ -21,11 +21,9 @@ namespace Game
 		// Parameter block used as push constant block
 		struct PushBlock
 		{
-			alignas(4) float roughness;
-			alignas(4) float metallic;
-			alignas(4) float r;
-			alignas(4) float g;
-			alignas(4) float b;
+			glm::vec3 albedo;
+			float roughness;
+			float metallic;
 		} params{};
 
 		std::string name;
@@ -37,9 +35,7 @@ namespace Game
 		{
 			params.roughness = r;
 			params.metallic = m;
-			params.r = c.r;
-			params.g = c.g;
-			params.b = c.b;
+			params.albedo = c;
 		}
 	};
 
@@ -80,6 +76,8 @@ namespace Game
 
 		std::vector<Material> m_Materials;
 		std::vector<kbr::Mesh> m_Meshes;
+		kbr::Mesh m_SkyboxMesh;
+		int m_SelectedMaterialIndex = 0;
 
 		// Vulkan resources
 		uint32_t m_ShadowMapSize = 2048;
@@ -88,6 +86,8 @@ namespace Game
 		vk::raii::ImageView m_ShadowMapImageView = nullptr;
 		vk::raii::PipelineLayout m_ShadowMapPipelineLayout = nullptr;
 		vk::raii::Pipeline m_ShadowMapPipeline = nullptr;
+
+		//vk::raii
 
 		vk::raii::Image m_ColorImage = nullptr;
 		vk::raii::DeviceMemory m_ColorImageMemory = nullptr;
@@ -111,14 +111,18 @@ namespace Game
 		{
 			glm::mat4 projection{ 0.f };
 			glm::mat4 view{ 0.f };
+			glm::mat4 viewProjection{ 0.f };
 			glm::mat4 lightSpaceMatrix{ 0.f };
+			glm::vec3 ambientLightColor{ 0.1f, 0.1f, 0.1f };
 			glm::vec3 camPos{ 0.f };
 		};
 		SceneUniformData m_SceneUniformData{};
 
 		struct UniformDataParams
 		{
-			alignas(16) glm::vec4 lights[4];
+			alignas(16) std::array<glm::vec4, 4> lights{};
+			float exposure = 4.5f;
+			float gamma = 2.2f;
 		};
 		UniformDataParams m_UniformDataParams{};
 
@@ -147,7 +151,7 @@ namespace Game
 
 		glm::vec3 m_ObjectPosition{ 0.f };
 		glm::vec3 m_ObjectRotation{ 0.f };
-		glm::vec3 m_ObjectScale{ 10.f };
+		glm::vec3 m_ObjectScale{ 5.f };
 	};
 
 }

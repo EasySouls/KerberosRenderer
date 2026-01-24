@@ -7,18 +7,18 @@ struct SceneData
 {
     float4x4 projection;
     float4x4 view;
+    float4x4 viewProjection;
     float4x4 lightSpaceMatrix;
+    float3 ambientLightColor;
     float3 camPos;
 };
 [[vk::binding(0)]]
 ConstantBuffer<SceneData> scene;
 
 struct Material {
-    [[vk::offset(4)]] float roughness;
-    [[vk::offset(8)]] float metallic;
-    [[vk::offset(12)]] float r;
-    [[vk::offset(16)]] float g;
-    [[vk::offset(20)]] float b;
+    float3 albedo;
+    float roughness;
+    float metallic;
 };
 
 struct PerObject {

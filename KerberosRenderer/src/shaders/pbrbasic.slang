@@ -8,20 +8,25 @@ struct VSInput
 {
     float3 Pos;
     float3 Normal;
+    float2 TexCoord;
 };
 
 struct VSOutput
 {
-    float4 Pos : SV_POSITION;
-    float3 WorldPos;
-    float3 Normal;
+    float4 Position : SV_POSITION;
+    float3 FragPos_WorldSpace;
+    float3 Normal_WorldSpace;
+    float2 TexCoord : TEXCOORD0;
+    float4 FragPos_LightSpace;
 };
 
 struct SceneData
 {
     float4x4 projection;
     float4x4 view;
+    float4x4 viewProjection;
     float4x4 lightSpaceMatrix;
+    float3 ambientLightColor;
     float3 camPos;
 };
 [[vk::binding(0)]]
@@ -29,16 +34,16 @@ ConstantBuffer<SceneData> scene;
 
 struct UBOParams {
 	float4 lights[4];
+    float exposure;
+    float gamma;
 };
 [[vk::binding(1)]]
 ConstantBuffer<UBOParams> uboParams;
 
 struct Material {
-	[[vk::offset(0)]] float roughness;
-	[[vk::offset(4)]] float metallic;
-	[[vk::offset(8)]] float r;
-	[[vk::offset(12)]] float g;
-	[[vk::offset(16)]] float b;
+    float3 albedo;
+	float roughness;
+	float metallic;
 };
 
 struct PerObject {
@@ -77,7 +82,7 @@ float G_SchlicksmithGGX(float dotNL, float dotNV, float roughness)
 // Fresnel function ----------------------------------------------------
 float3 F_Schlick(float cosTheta, Material material)
 {
-    float3 F0 = lerp(float3(0.04, 0.04, 0.04), float3(material.r, material.g, material.b), material.metallic); // * material.specular
+    float3 F0 = lerp(float3(0.04, 0.04, 0.04), material.albedo, material.metallic); // * material.specular
 	float3 F = F0 + (1.0 - F0) * pow(1.0 - cosTheta, 5.0);
 	return F;
 }
@@ -120,37 +125,44 @@ float3 BRDF(float3 L, float3 V, float3 N, Material material)
 VSOutput vertMain(VSInput input)
 {
     VSOutput output;
-    float3 locPos = mul(perObject.model, float4(input.Pos, 1.0)).xyz;
-    output.WorldPos = locPos + perObject.objPos;
-    output.Normal = mul((float3x3)perObject.worldNormal, input.Normal);
-    output.Pos = mul(scene.projection, mul(scene.view, float4(output.WorldPos, 1.0)));
+
+    float4 worldPos = mul(perObject.model, float4(input.Pos, 1.0));
+    output.FragPos_WorldSpace = worldPos.xyz;
+
+    float3x3 normalMatrix = (float3x3)perObject.worldNormal;
+    output.Normal_WorldSpace = mul(normalMatrix, input.Normal);
+
+    output.TexCoord = input.TexCoord;
+
+    output.FragPos_LightSpace = mul(scene.lightSpaceMatrix, float4(output.FragPos_WorldSpace, 1.0));
+
+    output.Position = mul(scene.viewProjection, worldPos);
     return output;
 }
 
 [shader("fragment")]
 float4 fragMain(VSOutput input)
 {
-	float3 N = normalize(input.Normal);
-	float3 V = normalize(scene.camPos - input.WorldPos);
+	float3 N = normalize(input.Normal_WorldSpace);
+	float3 V = normalize(scene.camPos - input.FragPos_WorldSpace);
 
 	// Specular contribution
 	float3 Lo = float3(0.0, 0.0, 0.0);
 	for (int i = 0; i < 4; i++) {
-		float3 L = normalize(uboParams.lights[i].xyz - input.WorldPos);
+		float3 L = normalize(normalize(uboParams.lights[i].xyz) - input.FragPos_WorldSpace);
 		Lo += BRDF(L, V, N, perObject.material);
 	};
 
     // Ambient background lighting
-    float3 ambientColor = float3(0.1, 0.1, 0.1);
-    float3 albedo = float3(perObject.material.r, perObject.material.g, perObject.material.b);
-    float3 ambient = ambientColor * albedo;
+    float3 ambient = scene.ambientLightColor * perObject.material.albedo;
 
     // Combine with ambient
-    float3 color = ambient + Lo;
-    //float3 color = albedo;
+    //float3 color = ambient + Lo;
+    //float3 color = perObject.material.albedo;
+    float3 color = float3(0.5, 0.2, 0.8);
 
-	// Gamma correct
-	color = pow(color, float3(0.4545, 0.4545, 0.4545));
+    // Gamma correct
+    color = pow(color, (1.0f / uboParams.gamma).xxx);
 
     return float4(color, 1.0);
 }
