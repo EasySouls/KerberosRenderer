@@ -330,6 +330,116 @@ namespace kbr
 		EndSingleTimeCommands(commandBuffer);
 	}
 
+	void VulkanContext::TransitionImageLayout(const vk::raii::CommandBuffer& copyCmd, const vk::raii::Image& image,
+		vk::ImageLayout oldLayout, vk::ImageLayout newLayout, const vk::ImageSubresourceRange& subresourceRange,
+		vk::PipelineStageFlags2 srcStageMask, vk::PipelineStageFlags2 dstStageMask) const 
+	{
+		vk::ImageMemoryBarrier2 barrier = {
+			.oldLayout = oldLayout,
+			.newLayout = newLayout,
+			.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+			.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+			.image = image,
+			.subresourceRange = subresourceRange
+		};
+
+		switch (oldLayout)
+		{
+			case VK_IMAGE_LAYOUT_UNDEFINED:
+				// Image layout is undefined (or does not matter)
+				// Only valid as initial layout
+				// No flags required, listed only for completeness
+				barrier.srcAccessMask = {};
+				break;
+
+			case VK_IMAGE_LAYOUT_PREINITIALIZED:
+				// Image is preinitialized
+				// Only valid as initial layout for linear images, preserves memory contents
+				// Make sure host writes have been finished
+				barrier.srcAccessMask = vk::AccessFlagBits2::eHostWrite;
+				break;
+
+			case VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL:
+				// Image is a color attachment
+				// Make sure any writes to the color buffer have been finished
+				barrier.srcAccessMask = vk::AccessFlagBits2::eColorAttachmentWrite;
+				break;
+
+			case VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL:
+				// Image is a depth/stencil attachment
+				// Make sure any writes to the depth/stencil buffer have been finished
+				barrier.srcAccessMask = vk::AccessFlagBits2::eDepthStencilAttachmentWrite;
+				break;
+
+			case VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL:
+				// Image is a transfer source
+				// Make sure any reads from the image have been finished
+				barrier.srcAccessMask = vk::AccessFlagBits2::eTransferRead;
+				break;
+
+			case VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL:
+				// Image is a transfer destination
+				// Make sure any writes to the image have been finished
+				barrier.srcAccessMask = vk::AccessFlagBits2::eTransferWrite;
+				break;
+
+			case VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL:
+				// Image is read by a shader
+				// Make sure any shader reads from the image have been finished
+				barrier.srcAccessMask = vk::AccessFlagBits2::eShaderRead;
+				break;
+			default:
+				throw std::invalid_argument("unsupported layout transition!");
+		}
+
+		switch (newLayout)
+		{
+			case VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL:
+				// Image will be used as a transfer destination
+				// Make sure any writes to the image have been finished
+				barrier.dstAccessMask = vk::AccessFlagBits2::eTransferWrite;
+				break;
+
+			case VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL:
+				// Image will be used as a transfer source
+				// Make sure any reads from the image have been finished
+				barrier.dstAccessMask = vk::AccessFlagBits2::eTransferRead;
+				break;
+
+			case VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL:
+				// Image will be used as a color attachment
+				// Make sure any writes to the color buffer have been finished
+				barrier.dstAccessMask = vk::AccessFlagBits2::eColorAttachmentWrite;
+				break;
+
+			case VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL:
+				// Image layout will be used as a depth/stencil attachment
+				// Make sure any writes to depth/stencil buffer have been finished
+				barrier.dstAccessMask = barrier.dstAccessMask | vk::AccessFlagBits2::eDepthStencilAttachmentWrite;
+				break;
+
+			case VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL:
+				// Image will be read in a shader (sampler, input attachment)
+				// Make sure any writes to the image have been finished
+				if (barrier.srcAccessMask == vk::AccessFlagBits2{})
+				{
+					barrier.srcAccessMask = vk::AccessFlagBits2::eHostWrite | vk::AccessFlagBits2::eTransferWrite;
+				}
+				barrier.dstAccessMask = vk::AccessFlagBits2::eShaderRead;
+				break;
+			default:
+				throw std::invalid_argument("unsupported layout transition!");
+		}
+
+		copyCmd.pipelineBarrier2(
+			vk::DependencyInfo{
+				.dependencyFlags = {},
+				.imageMemoryBarrierCount = 1,
+				.pImageMemoryBarriers = &barrier
+			}
+		);
+	}
+
 	vk::Format VulkanContext::FindSupportedFormat(
 		const std::vector<vk::Format>& candidates, 
 		const vk::ImageTiling tiling,
@@ -374,6 +484,11 @@ namespace kbr
 	vk::raii::Device& VulkanContext::GetDevice() 
 	{
 		return device;
+	}
+
+	vk::raii::PhysicalDevice& VulkanContext::GetPhysicalDevice() 
+	{
+		return physicalDevice;
 	}
 
 	vk::PhysicalDeviceMemoryProperties VulkanContext::GetMemoryProperties() const 

@@ -2,6 +2,11 @@
 
 #include "Vulkan.hpp"
 
+#include <ktx.h>
+#include <ktxvulkan.h>
+
+#include <filesystem>
+
 void CreateImage(
 	const vk::raii::Device& device,
 	uint32_t width, 
@@ -23,3 +28,63 @@ vk::raii::ImageView CreateImageView(
 	vk::ImageAspectFlagBits aspectFlags,
 	uint32_t mipLevels
 );
+
+namespace kbr
+{
+	class Texture
+	{
+	public:
+		vk::raii::Image         image;
+		vk::ImageLayout         imageLayout;
+		vk::raii::DeviceMemory  deviceMemory;
+		vk::raii::ImageView     view;
+		uint32_t              width, height;
+		uint32_t              mipLevels;
+		uint32_t              layerCount;
+		vk::DescriptorImageInfo descriptor;
+		vk::raii::Sampler             sampler;
+
+		void      UpdateDescriptor();
+		static ktxResult LoadKTXFile(const std::filesystem::path& filepath, ktxTexture** target);
+	};
+
+	class Texture2D : public Texture
+	{
+	public:
+		void LoadFromFile(
+			const std::filesystem::path& filepath,
+			vk::Format           format,
+			vk::ImageUsageFlags  imageUsageFlags = vk::ImageUsageFlagBits::eSampled,
+			vk::ImageLayout      imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal);
+
+		void FromBuffer(
+			void* buffer,
+			vk::DeviceSize       bufferSize,
+			vk::Format           format,
+			uint32_t           texWidth,
+			uint32_t           texHeight,
+			vk::Filter           filter = vk::Filter::eLinear,
+			vk::ImageUsageFlags  imageUsageFlags = vk::ImageUsageFlagBits::eSampled,
+			vk::ImageLayout      imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal);
+	};
+
+	class Texture2DArray : public Texture
+	{
+	public:
+		void LoadFromFile(
+			const std::filesystem::path& filepath,
+			vk::Format           format,
+			vk::ImageUsageFlags  imageUsageFlags = vk::ImageUsageFlagBits::eSampled,
+			vk::ImageLayout      imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal);
+	};
+
+	class TextureCubeMap : public Texture
+	{
+	public:
+		void LoadFromFile(
+			const std::filesystem::path& filepath,
+			vk::Format           format,
+			vk::ImageUsageFlags  imageUsageFlags = vk::ImageUsageFlagBits::eSampled,
+			vk::ImageLayout      imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal);
+	};
+}

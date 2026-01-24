@@ -88,7 +88,7 @@ namespace Game
 		vk::raii::PipelineLayout m_ShadowMapPipelineLayout = nullptr;
 		vk::raii::Pipeline m_ShadowMapPipeline = nullptr;
 
-		//vk::raii
+		kbr::TextureCube m_SkyboxTexture;
 
 		vk::raii::Image m_ColorImage = nullptr;
 		vk::raii::DeviceMemory m_ColorImageMemory = nullptr;

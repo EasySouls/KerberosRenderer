@@ -105,7 +105,7 @@
       <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions);_CRT_SECURE_NO_WARNINGS;_GLFW_WIN32;NOMINMAX;KBR_DEBUG</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp20</LanguageStandard>
-      <AdditionalIncludeDirectories>C:\Development\KerberosRenderer\KerberosRenderer\vendor\glfw-3.4\include;C:\Development\KerberosRenderer\KerberosRenderer\vendor\glm;C:\Development\KerberosRenderer\KerberosRenderer\vendor\imgui;C:\Development\KerberosRenderer\KerberosRenderer\vendor\stb;C:\VulkanSDK\1.4.335.0\Include;C:\Development\KerberosRenderer\KerberosRenderer\vendor\tinyobjloader;C:\Development\KerberosRenderer\KerberosRenderer\vendor\tinygltf;C:\Development\KerberosRenderer\KerberosRenderer\vendor;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>C:\Development\KerberosRenderer\KerberosRenderer\vendor\glfw-3.4\include;C:\Development\KerberosRenderer\KerberosRenderer\vendor\glm;C:\Development\KerberosRenderer\KerberosRenderer\vendor\imgui;C:\Development\KerberosRenderer\KerberosRenderer\vendor\stb;C:\VulkanSDK\1.4.335.0\Include;C:\Development\KerberosRenderer\KerberosRenderer\vendor\tinyobjloader;C:\Development\KerberosRenderer\KerberosRenderer\vendor\tinygltf;C:\Development\KerberosRenderer\KerberosRenderer\vendor;C:\Development\KerberosRenderer\KerberosRenderer\vendor\ktx\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -123,7 +123,7 @@
       <PreprocessorDefinitions>NDEBUG;_CONSOLE;%(PreprocessorDefinitions);_CRT_SECURE_NO_WARNINGS;_GLFW_WIN32;NOMINMAX</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp20</LanguageStandard>
-      <AdditionalIncludeDirectories>C:\Development\KerberosRenderer\KerberosRenderer\vendor\glfw-3.4\include;C:\Development\KerberosRenderer\KerberosRenderer\vendor\glm;C:\Development\KerberosRenderer\KerberosRenderer\vendor\imgui;C:\Development\KerberosRenderer\KerberosRenderer\vendor\stb;C:\VulkanSDK\1.4.335.0\Include;C:\Development\KerberosRenderer\KerberosRenderer\vendor\tinyobjloader;C:\Development\KerberosRenderer\KerberosRenderer\vendor\tinygltf;C:\Development\KerberosRenderer\KerberosRenderer\vendor;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>C:\Development\KerberosRenderer\KerberosRenderer\vendor\glfw-3.4\include;C:\Development\KerberosRenderer\KerberosRenderer\vendor\glm;C:\Development\KerberosRenderer\KerberosRenderer\vendor\imgui;C:\Development\KerberosRenderer\KerberosRenderer\vendor\stb;C:\VulkanSDK\1.4.335.0\Include;C:\Development\KerberosRenderer\KerberosRenderer\vendor\tinyobjloader;C:\Development\KerberosRenderer\KerberosRenderer\vendor\tinygltf;C:\Development\KerberosRenderer\KerberosRenderer\vendor;C:\Development\KerberosRenderer\KerberosRenderer\vendor\ktx\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>

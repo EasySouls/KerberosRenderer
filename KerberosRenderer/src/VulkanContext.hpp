@@ -35,6 +35,14 @@ namespace kbr
 								   vk::ImageLayout newLayout, 
 								   uint32_t mipLevels) const;
 
+		void TransitionImageLayout(const vk::raii::CommandBuffer& copyCmd,
+								   const vk::raii::Image& image,
+								   vk::ImageLayout oldLayout,
+								   vk::ImageLayout newLayout,
+								   const vk::ImageSubresourceRange& subresourceRange, 
+								   vk::PipelineStageFlags2 srcStageMask = vk::PipelineStageFlagBits2::eAllCommands, 
+								   vk::PipelineStageFlags2 dstStageMask = vk::PipelineStageFlagBits2::eAllCommands) const;
+
 		vk::Format FindSupportedFormat(const std::vector<vk::Format>& candidates,
 									   vk::ImageTiling tiling,
 									   vk::FormatFeatureFlags features) const;
@@ -44,6 +52,7 @@ namespace kbr
 		void SetObjectDebugName(uint64_t objectHandle, vk::ObjectType objectType, const std::string& name) const;
 
 		vk::raii::Device& GetDevice();
+		vk::raii::PhysicalDevice& GetPhysicalDevice();
 		vk::PhysicalDeviceMemoryProperties GetMemoryProperties() const;
 		vk::FormatProperties GetFormatProperties(vk::Format format) const;
 
