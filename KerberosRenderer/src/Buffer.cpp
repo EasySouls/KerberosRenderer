@@ -47,7 +47,7 @@ VertexBuffer::VertexBuffer(const std::vector<Vertex>& vertices)
 
 	stagingBuffer.bindMemory(stagingBufferMemory, 0);
 	void* dataStaging = stagingBufferMemory.mapMemory(0, stagingInfo.size);
-	memcpy(dataStaging, vertices.data(), stagingInfo.size);
+	std::memcpy(dataStaging, vertices.data(), stagingInfo.size);
 	stagingBufferMemory.unmapMemory();
 
 	const vk::BufferCreateInfo bufferInfo{
@@ -85,7 +85,7 @@ IndexBuffer::IndexBuffer(const std::vector<uint32_t>& indices)
 				 stagingBuffer, stagingBufferMemory);
 
 	void* data = stagingBufferMemory.mapMemory(0, bufferSize);
-	memcpy(data, indices.data(), bufferSize);
+	std::memcpy(data, indices.data(), bufferSize);
 	stagingBufferMemory.unmapMemory();
 
 	CreateBuffer(device, bufferSize,

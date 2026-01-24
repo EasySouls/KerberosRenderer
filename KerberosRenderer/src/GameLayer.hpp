@@ -21,9 +21,11 @@ namespace Game
 		// Parameter block used as push constant block
 		struct PushBlock
 		{
-			float roughness;
-			float metallic;
-			float r, g, b;
+			alignas(4) float roughness;
+			alignas(4) float metallic;
+			alignas(4) float r;
+			alignas(4) float g;
+			alignas(4) float b;
 		} params{};
 
 		std::string name;
@@ -71,7 +73,10 @@ namespace Game
 		float m_Fps = 0.0f;
 
 		kbr::Camera m_Camera;
+		// Size of the ImGui viewport.
 		glm::vec2 m_ViewportSize{ 0.f };
+		// Size of the output images.
+		glm::vec2 m_OutputSize{ 0.f };
 
 		std::vector<Material> m_Materials;
 		std::vector<kbr::Mesh> m_Meshes;
@@ -101,7 +106,6 @@ namespace Game
 
 		vk::raii::Sampler m_ColorSampler = nullptr;
 
-		glm::vec2 m_OutputSize{ 0.f };
 
 		struct SceneUniformData
 		{
@@ -114,16 +118,16 @@ namespace Game
 
 		struct UniformDataParams
 		{
-			glm::vec4 lights[4];
+			alignas(16) glm::vec4 lights[4];
 		};
 		UniformDataParams m_UniformDataParams{};
 
 		struct PerObjectData
 		{
-			glm::vec3 position{0.f};
-			glm::mat4 model{ 0.f };
-			glm::mat4 worldNormal{ 0.f };
-			Material::PushBlock material;
+			alignas(16) glm::vec3 position{0.f};
+			alignas(16) glm::mat4 model{ 0.f };
+			alignas(16) glm::mat4 worldNormal{ 0.f };
+			alignas(16) Material::PushBlock material;
 		};
 		PerObjectData m_PerObjectUniformData{};
 
@@ -140,6 +144,10 @@ namespace Game
 		std::array<vk::raii::DescriptorSet, 1> m_DescriptorSets{nullptr};
 
 		VkDescriptorSet m_ColorOutputDescriptorSet = VK_NULL_HANDLE;
+
+		glm::vec3 m_ObjectPosition{ 0.f };
+		glm::vec3 m_ObjectRotation{ 0.f };
+		glm::vec3 m_ObjectScale{ 10.f };
 	};
 
 }

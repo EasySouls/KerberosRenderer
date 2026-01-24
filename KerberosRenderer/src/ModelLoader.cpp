@@ -24,11 +24,11 @@ namespace kbr
 		}
 		if (!warn.empty())
 		{
-			std::cout << "GLTF Warning: " << warn << std::endl;
+			std::cout << "GLTF Warning: " << warn << '\n';
 		}
 		if (!err.empty())
 		{
-			std::cerr << "GLTF Error: " << err << std::endl;
+			std::cerr << "GLTF Error: " << err << '\n';
 		}
 		if (!ret)
 		{
@@ -120,6 +120,7 @@ namespace kbr
             }
         }
 
-        return { vertices, indices };
+		const std::string name = path.stem().string();
+        return { name, vertices, indices };
 	}
 }

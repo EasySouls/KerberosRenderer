@@ -14,11 +14,11 @@ struct SceneData
 ConstantBuffer<SceneData> scene;
 
 struct Material {
-    [[vk::offset(12)]] float roughness;
-    [[vk::offset(16)]] float metallic;
-    [[vk::offset(20)]] float r;
-    [[vk::offset(24)]] float g;
-    [[vk::offset(28)]] float b;
+    [[vk::offset(4)]] float roughness;
+    [[vk::offset(8)]] float metallic;
+    [[vk::offset(12)]] float r;
+    [[vk::offset(16)]] float g;
+    [[vk::offset(20)]] float b;
 };
 
 struct PerObject {

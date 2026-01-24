@@ -34,11 +34,11 @@ struct UBOParams {
 ConstantBuffer<UBOParams> uboParams;
 
 struct Material {
-	[[vk::offset(12)]] float roughness;
-	[[vk::offset(16)]] float metallic;
-	[[vk::offset(20)]] float r;
-	[[vk::offset(24)]] float g;
-	[[vk::offset(28)]] float b;
+	[[vk::offset(0)]] float roughness;
+	[[vk::offset(4)]] float metallic;
+	[[vk::offset(8)]] float r;
+	[[vk::offset(12)]] float g;
+	[[vk::offset(16)]] float b;
 };
 
 struct PerObject {
@@ -140,13 +140,17 @@ float4 fragMain(VSOutput input)
 		Lo += BRDF(L, V, N, perObject.material);
 	};
 
-	// Combine with ambient
-    float3 color = float3(perObject.material.r, perObject.material.g, perObject.material.b) * 0.02;
-    return float4(color, 1.0);
-	color += Lo;
+    // Ambient background lighting
+    float3 ambientColor = float3(0.1, 0.1, 0.1);
+    float3 albedo = float3(perObject.material.r, perObject.material.g, perObject.material.b);
+    float3 ambient = ambientColor * albedo;
+
+    // Combine with ambient
+    float3 color = ambient + Lo;
+    //float3 color = albedo;
 
 	// Gamma correct
 	color = pow(color, float3(0.4545, 0.4545, 0.4545));
 
-	return float4(color, 1.0);
+    return float4(color, 1.0);
 }

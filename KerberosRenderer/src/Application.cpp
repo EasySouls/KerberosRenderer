@@ -54,7 +54,7 @@ namespace kbr
 		{
 			const auto app = static_cast<Application*>(glfwGetWindowUserPointer(window));
 
-			std::cout << "Framebuffer resized: (" << width << ", " << height << ")\n";
+			KBR_CORE_INFO("Framebuffer resized: ({}, {})", width, height);
 			app->m_VulkanContext->FramebufferResized(static_cast<uint32_t>(width), static_cast<uint32_t>(height));
 		});
 
@@ -206,24 +206,24 @@ namespace kbr
 			{
 				layer->OnUpdate(deltaTime);
 			}
-			std::cout << "Layers OnUpdate complete.\n";
+			KBR_CORE_TRACE("Layers OnUpdate complete.");
 
 			m_VulkanContext->PrepareImGuiFrame();
-			std::cout << "ImGui frame prepared.\n";
+			KBR_CORE_TRACE("ImGui frame prepared.");
 
 			for (const auto& layer : m_Layers)
 			{
 				layer->OnImGuiRender();
 			}
-			std::cout << "Layers ImGui render complete.\n";
+			KBR_CORE_TRACE("Layers ImGui render complete.");
 
 			m_VulkanContext->RenderImGui();
-			std::cout << "ImGui rendered.\n";
+			KBR_CORE_TRACE("ImGui rendered.");
 
 			m_VulkanContext->Draw();
-			std::cout << "Frame drawn.\n";
+			KBR_CORE_TRACE("Frame drawn.");
 			m_VulkanContext->Present();
-			std::cout << "Frame presented.\n";
+			KBR_CORE_TRACE("Frame presented.");
 		}
 	}
 }

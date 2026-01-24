@@ -5,16 +5,13 @@
 #include "Texture.hpp"
 #include "Vertex.hpp"
 #include "ModelLoader.hpp"
+#include "Shader.hpp"
+#include "events/WindowResizedEvent.hpp"
+#include "logging/Log.hpp"
 
 #include "glm/glm.hpp"
+#include <glm/gtc/type_ptr.hpp>
 #include "imgui.h"
-
-#include <iostream>
-
-#include "events/KeyPressedEvent.hpp"
-#include "events/MouseMovedEvent.hpp"
-#include "events/MouseScrolledEvent.hpp"
-#include "events/WindowResizedEvent.hpp"
 
 #include "backends/imgui_impl_vulkan.h"
 
@@ -28,7 +25,7 @@ namespace Game
 
 	void GameLayer::OnAttach() 
 	{
-		std::cout << "GameLayer attached!\n";
+		KBR_CORE_INFO("GameLayer attached!");
 
 		m_Camera = kbr::Camera(45.0f, 16.0f / 9.0f, 0.1f, 1000.0f);
 		m_ViewportSize = { 1280.0f, 720.0f };
@@ -45,19 +42,23 @@ namespace Game
 		m_Materials.emplace_back("Blue", glm::vec3(0.0f, 0.0f, 1.0f), 0.1f, 1.0f);
 		m_Materials.emplace_back("Black", glm::vec3(0.0f), 0.1f, 1.0f);
 
+		KBR_CORE_INFO("Size of SceneUniformData: {} bytes", sizeof(SceneUniformData));
+		KBR_CORE_INFO("Size of UniformDataParams: {} bytes", sizeof(UniformDataParams));
+		KBR_CORE_INFO("Size of PerObjectData: {} bytes", sizeof(PerObjectData));
+
 		CreateVulkanResources();
 
-		std::cout << "Prepared Vulkan resources!\n";
+		KBR_CORE_INFO("Prepared Vulkan resources!");
 
 		// Load models
 		m_Meshes.push_back(kbr::ModelLoader::LoadModel("src/models/avocado/Avocado.gltf"));
 
-		std::cout << "Loaded " << m_Meshes.size() << " mesh(es)!\n";
+		KBR_CORE_INFO("Loaded {} mesh(es)!", m_Meshes.size());
 	}
 	
 	void GameLayer::OnDetach() 
 	{
-		std::cout << "GameLayer detached!\n";
+		KBR_CORE_INFO("GameLayer detached!");
 	}
 
 	void GameLayer::OnUpdate(const float deltaTime)
@@ -91,12 +92,15 @@ namespace Game
 		UpdateSceneUniformBuffers(currentImage);
 
 		// TODO: Get the current object's position
-		constexpr glm::vec3 objectPosition = glm::vec3(-1.2f, 1.0f, 0.0f);
-		constexpr glm::mat4 translation = glm::translate(glm::mat4(1.0f), objectPosition);
-		const glm::mat4 model = glm::rotate(translation, glm::radians(m_Time * 10.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+		const glm::mat4 translation = glm::translate(glm::mat4(1.0f), m_ObjectPosition);
+		const glm::mat4 model = translation *
+			glm::rotate(glm::mat4(1.0f), m_ObjectRotation.x, glm::vec3(1.0f, 0.0f, 0.0f)) *
+			glm::rotate(glm::mat4(1.0f), m_ObjectRotation.y, glm::vec3(0.0f, 1.0f, 0.0f)) *
+			glm::rotate(glm::mat4(1.0f), m_ObjectRotation.z, glm::vec3(0.0f, 0.0f, 1.0f)) *
+			glm::scale(glm::mat4(1.0f), m_ObjectScale);
 
 		// TODO: For now we use the first material only
-		const Material selectedMaterial = m_Materials[0];
+		const Material selectedMaterial = m_Materials[9];
 
 		// Render shadow map
 		{
@@ -163,14 +167,14 @@ namespace Game
 
 			for (const auto& mesh : m_Meshes)
 			{
-				UpdatePerObjectUniformBuffer(currentImage, objectPosition, model, selectedMaterial);
+				UpdatePerObjectUniformBuffer(currentImage, m_ObjectPosition, model, selectedMaterial);
 
 				mesh.Draw(cmd);
 			}
 
 			cmd.endRendering();
 
-			std::cout << "Shadow pass done!\n";
+			KBR_CORE_TRACE("Shadow pass done!");
 		}
 
 		// Transition shadow map image layout for shader read
@@ -266,9 +270,9 @@ namespace Game
 			.maxDepth = 1.0f
 		};
 
-		constexpr vk::Rect2D renderArea{
-				.offset = vk::Offset2D{.x = 0, .y = 0 },
-				.extent = vk::Extent2D{.width = 2048, .height = 2048 }
+		const vk::Rect2D renderArea{
+				.offset = vk::Offset2D{ .x = 0, .y = 0 },
+				.extent = vk::Extent2D{ .width = static_cast<uint32_t>(m_OutputSize.x), .height = static_cast<uint32_t>(m_OutputSize.y) }
 		};
 
 		// Render opaque objects
@@ -308,14 +312,14 @@ namespace Game
 
 			for (const auto& mesh : m_Meshes)
 			{
-				UpdatePerObjectUniformBuffer(currentImage, objectPosition, model, selectedMaterial);
+				UpdatePerObjectUniformBuffer(currentImage, m_ObjectPosition, model, selectedMaterial);
 
 				mesh.Draw(cmd);
 			}
 
 			cmd.endRendering();
 
-			std::cout << "Opaque pass done!\n";
+			KBR_CORE_TRACE("Opaque pass done!");
 		}
 
 		// Render transparent objects
@@ -360,7 +364,7 @@ namespace Game
 
 			cmd.endRendering();
 
-			std::cout << "Transparent pass done!\n";
+			KBR_CORE_TRACE("Transparent pass done!");
 		}
 
 		// Transition color image layout for shader read in ImGui
@@ -390,12 +394,12 @@ namespace Game
 			};
 			cmd.pipelineBarrier2(dependencyInfo);
 
-			std::cout << "Color image transitioned for ImGui!\n";
+			KBR_CORE_TRACE("Color image transitioned for ImGui!");
 		}
 
 		context.EndSingleTimeCommands(cmd);
 
-		std::cout << "Frame rendered!\n";
+		KBR_CORE_TRACE("Frame rendered!");
 	}
 
 	void GameLayer::OnEvent(const std::shared_ptr<kbr::Event> event)
@@ -431,9 +435,17 @@ namespace Game
 		ImGui::Text("Color Output Image");
 		ImGui::Text("Size: %.2f x %.2f", m_ViewportSize.x, m_ViewportSize.y);
 
+		ImGui::Separator();
+
+		// Object transform controls
+		ImGui::Text("Object Transform");
+		ImGui::DragFloat3("Position", glm::value_ptr(m_ObjectPosition), 0.1f);
+		ImGui::DragFloat3("Rotation", glm::value_ptr(m_ObjectRotation), 0.01f);
+		ImGui::DragFloat3("Scale", glm::value_ptr(m_ObjectScale), 0.1f, 0.1f, 100.0f);
+
 		ImGui::End();
 
-		std::cout << "ImGui rendered!\n";
+		KBR_CORE_TRACE("ImGui rendered!");
 	}
 
 	void GameLayer::UpdateSceneUniformBuffers(const uint32_t currentImage) 
@@ -446,7 +458,7 @@ namespace Game
 		m_SceneUniformData.lightSpaceMatrix = CalculateLightSpaceMatrix();
 		m_SceneUniformData.camPos = m_Camera.GetPosition() * -1.0f;
 
-		memcpy(m_UniformBuffers[currentImage].scene->GetMappedData(), &m_SceneUniformData, sizeof(SceneUniformData));
+		std::memcpy(m_UniformBuffers[currentImage].scene->GetMappedData(), &m_SceneUniformData, sizeof(SceneUniformData));
 	}
 
 	void GameLayer::UpdatePerObjectUniformBuffer(const uint32_t currentImage, const glm::vec3& objectPosition,
@@ -458,12 +470,12 @@ namespace Game
 			.worldNormal = glm::transpose(glm::inverse(glm::mat3(model))),
 			.material = material.params
 		};
-		memcpy(m_UniformBuffers[currentImage].perObject->GetMappedData(), &m_PerObjectUniformData, sizeof(PerObjectData));
+		std::memcpy(m_UniformBuffers[currentImage].perObject->GetMappedData(), &m_PerObjectUniformData, sizeof(PerObjectData));
 	}
 
 	void GameLayer::UpdateLights(const float time, const uint32_t currentImage) 
 	{
-		constexpr float p = 15.0f;
+		constexpr float p = 5.0f;
 		m_UniformDataParams.lights[0] = glm::vec4(-p, -p * 0.5f, -p, 1.0f);
 		m_UniformDataParams.lights[1] = glm::vec4(-p, -p * 0.5f, p, 1.0f);
 		m_UniformDataParams.lights[2] = glm::vec4(p, -p * 0.5f, p, 1.0f);
@@ -474,7 +486,7 @@ namespace Game
 		m_UniformDataParams.lights[1].x = cos(glm::radians(time * 360.0f)) * 20.0f;
 		m_UniformDataParams.lights[1].y = sin(glm::radians(time * 360.0f)) * 20.0f;
 
-		memcpy(m_UniformBuffers[currentImage].params->GetMappedData(), &m_UniformDataParams, sizeof(UniformDataParams));
+		std::memcpy(m_UniformBuffers[currentImage].params->GetMappedData(), &m_UniformDataParams, sizeof(UniformDataParams));
 	}
 
 	void GameLayer::PrepareUniformBuffers()
@@ -759,20 +771,7 @@ namespace Game
 									   "Shadow Map Pipeline Layout");
 
 			// Create shader for shadow mapping
-			const auto shaderCode = IO::ReadFile("src/shaders/shadowmap.spv");
-			const vk::ShaderModuleCreateInfo shaderInfo{
-				.codeSize = shaderCode.size() * sizeof(char),
-				.pCode = reinterpret_cast<const uint32_t*>(shaderCode.data())
-			};
-			vk::raii::ShaderModule shaderModule{ device, shaderInfo };
-
-			context.SetObjectDebugName(reinterpret_cast<uint64_t>(static_cast<VkShaderModule>(*shaderModule)),
-									   vk::ObjectType::eShaderModule,
-									   "Shadow Map Shader Module");
-
-			const vk::PipelineShaderStageCreateInfo vertShaderStageInfo{ .stage = vk::ShaderStageFlagBits::eVertex, .module = shaderModule,  .pName = "vertMain" };
-			const vk::PipelineShaderStageCreateInfo fragShaderStageInfo{ .stage = vk::ShaderStageFlagBits::eFragment, .module = shaderModule, .pName = "fragMain" };
-			vk::PipelineShaderStageCreateInfo shaderStages[] = { vertShaderStageInfo, fragShaderStageInfo };
+			kbr::Shader shadowMapShader("src/shaders/shadowmap.spv", "ShadowMap");
 
 			constexpr vk::VertexInputBindingDescription bindingDescription = { 0, sizeof(glm::vec3), vk::VertexInputRate::eVertex };
 			constexpr std::array attributeDescriptions = {
@@ -834,10 +833,12 @@ namespace Game
 				.depthAttachmentFormat = shadowMapFormat
 			};
 
+			const auto shaderStages = shadowMapShader.GetPipelineShaderStageCreateInfo();
+
 			vk::GraphicsPipelineCreateInfo pipelineInfo{
 				.pNext = &pipelineRenderingCreateInfo,
 				.stageCount = 2,
-				.pStages = shaderStages,
+				.pStages = shaderStages.data(),
 				.pVertexInputState = &vertexInputInfo,
 				.pInputAssemblyState = &inputAssembly,
 				.pViewportState = &viewportState,
@@ -940,20 +941,7 @@ namespace Game
 									   vk::ObjectType::ePipelineLayout,
 									   "PBR Pipeline Layout");
 
-			const auto shaderCode = IO::ReadFile("src/shaders/pbrbasic.spv");
-			const vk::ShaderModuleCreateInfo shaderInfo{
-				.codeSize = shaderCode.size() * sizeof(char),
-				.pCode = reinterpret_cast<const uint32_t*>(shaderCode.data())
-			};
-			vk::raii::ShaderModule shaderModule{ device, shaderInfo };
-
-			context.SetObjectDebugName(reinterpret_cast<uint64_t>(static_cast<VkShaderModule>(*shaderModule)),
-									   vk::ObjectType::eShaderModule,
-									   "PBR Shader Module");
-
-			const vk::PipelineShaderStageCreateInfo vertShaderStageInfo{ .stage = vk::ShaderStageFlagBits::eVertex, .module = shaderModule,  .pName = "vertMain" };
-			const vk::PipelineShaderStageCreateInfo fragShaderStageInfo{ .stage = vk::ShaderStageFlagBits::eFragment, .module = shaderModule, .pName = "fragMain" };
-			vk::PipelineShaderStageCreateInfo shaderStages[] = { vertShaderStageInfo, fragShaderStageInfo };
+			kbr::Shader pbrShader("src/shaders/pbrbasic.spv", "PBR");
 
 			const auto bindingDesc = kbr::Vertex::GetBindingDescription();
 			const auto attributeDescs = kbr::Vertex::GetAttributeDescriptions();
@@ -1050,10 +1038,12 @@ namespace Game
 				.depthAttachmentFormat = depthFormat
 			};
 
+			const auto shaderStages = pbrShader.GetPipelineShaderStageCreateInfo();
+
 			vk::GraphicsPipelineCreateInfo opaquePipelineInfo{
 				.pNext = &pipelineRenderingCreateInfo,
 				.stageCount = 2,
-				.pStages = shaderStages,
+				.pStages = shaderStages.data(),
 				.pVertexInputState = &vertexInputInfo,
 				.pInputAssemblyState = &inputAssembly,
 				.pViewportState = &viewportState,
@@ -1075,7 +1065,7 @@ namespace Game
 			vk::GraphicsPipelineCreateInfo transparentPipelineInfo{
 				.pNext = &pipelineRenderingCreateInfo,
 				.stageCount = 2,
-				.pStages = shaderStages,
+				.pStages = shaderStages.data(),
 				.pVertexInputState = &vertexInputInfo,
 				.pInputAssemblyState = &inputAssembly,
 				.pViewportState = &viewportState,
@@ -1153,6 +1143,8 @@ namespace Game
 			vk::ImageTiling::eOptimal,
 			vk::FormatFeatureFlagBits::eColorAttachment | vk::FormatFeatureFlagBits::eColorAttachmentBlend | vk::FormatFeatureFlagBits::eSampledImage
 		);
+
+		device.waitIdle();
 
 		// Destroy old resources
 		ImGui_ImplVulkan_RemoveTexture(m_ColorOutputDescriptorSet);
