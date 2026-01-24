@@ -35,7 +35,7 @@
 
 #include "Buffer.hpp"
 #include "io.hpp"
-#include "Texture.hpp"
+#include "Textures.hpp"
 #include "Utils.hpp"
 #include "GameObject.hpp"
 
@@ -1009,7 +1009,7 @@ private:
 	{
 		const vk::Format colorFormat = swapChainImageFormat;
 
-		CreateImage(device,
+		kbr::CreateImage(device,
 					swapChainExtent.width,
 					swapChainExtent.height,
 					1,
@@ -1021,26 +1021,26 @@ private:
 					colorImage,
 					colorImageMemory);
 
-		colorImageView = CreateImageView(device, colorImage, colorFormat, vk::ImageAspectFlagBits::eColor, 1);
+		colorImageView = kbr::CreateImageView(device, colorImage, colorFormat, vk::ImageAspectFlagBits::eColor, 1);
 	}
 
 	void CreateDepthResources()
 	{
 		depthFormat = FindDepthFormat();
 
-		CreateImage(device,
-					swapChainExtent.width,
-					swapChainExtent.height,
-					1,
-					msaaSamples,
-					depthFormat,
-					vk::ImageTiling::eOptimal,
-					vk::ImageUsageFlagBits::eDepthStencilAttachment,
-					vk::MemoryPropertyFlagBits::eDeviceLocal,
-					depthImage,
-					depthImageMemory);
+		kbr::CreateImage(device,
+		                 swapChainExtent.width,
+		                 swapChainExtent.height,
+		                 1,
+		                 msaaSamples,
+		                 depthFormat,
+		                 vk::ImageTiling::eOptimal,
+		                 vk::ImageUsageFlagBits::eDepthStencilAttachment,
+		                 vk::MemoryPropertyFlagBits::eDeviceLocal,
+		                 depthImage,
+		                 depthImageMemory);
 
-		depthImageView = CreateImageView(device, depthImage, depthFormat, vk::ImageAspectFlagBits::eDepth, 1);
+		depthImageView = kbr::CreateImageView(device, depthImage, depthFormat, vk::ImageAspectFlagBits::eDepth, 1);
 	}
 
 	void CreateTextureImage() 
@@ -1073,15 +1073,15 @@ private:
 
 		vk::raii::Image textureImageTemp({});
 		vk::raii::DeviceMemory textureImageMemoryTemp({});
-		CreateImage(device, 
-					texWidth, texHeight,
-					mipLevels,
-					vk::SampleCountFlagBits::e1,
-					vk::Format::eR8G8B8A8Srgb, 
-					vk::ImageTiling::eOptimal, 
-					vk::ImageUsageFlagBits::eTransferSrc | vk::ImageUsageFlagBits::eTransferDst | vk::ImageUsageFlagBits::eSampled, 
-					vk::MemoryPropertyFlagBits::eDeviceLocal, 
-					textureImage, textureImageMemory);
+		kbr::CreateImage(device, 
+		                 texWidth, texHeight,
+		                 mipLevels,
+		                 vk::SampleCountFlagBits::e1,
+		                 vk::Format::eR8G8B8A8Srgb, 
+		                 vk::ImageTiling::eOptimal, 
+		                 vk::ImageUsageFlagBits::eTransferSrc | vk::ImageUsageFlagBits::eTransferDst | vk::ImageUsageFlagBits::eSampled, 
+		                 vk::MemoryPropertyFlagBits::eDeviceLocal, 
+		                 textureImage, textureImageMemory);
 
 		TransitionImageLayout(textureImage, vk::ImageLayout::eUndefined, vk::ImageLayout::eTransferDstOptimal, mipLevels);
 		CopyBufferToImage(stagingBuffer, textureImage, static_cast<uint32_t>(texWidth), static_cast<uint32_t>(texHeight));
@@ -1168,7 +1168,7 @@ private:
 
 	void CreateTextureImageView()
 	{
-		textureImageView = CreateImageView(device, textureImage, vk::Format::eR8G8B8A8Srgb, vk::ImageAspectFlagBits::eColor, mipLevels);
+		textureImageView = kbr::CreateImageView(device, textureImage, vk::Format::eR8G8B8A8Srgb, vk::ImageAspectFlagBits::eColor, mipLevels);
 	}
 
 	void CreateTextureSampler()

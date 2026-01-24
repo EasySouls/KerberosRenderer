@@ -105,7 +105,7 @@
       <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions);_CRT_SECURE_NO_WARNINGS;_GLFW_WIN32;NOMINMAX;KBR_DEBUG</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp20</LanguageStandard>
-      <AdditionalIncludeDirectories>C:\Development\KerberosRenderer\KerberosRenderer\vendor\glfw-3.4\include;C:\Development\KerberosRenderer\KerberosRenderer\vendor\glm;C:\Development\KerberosRenderer\KerberosRenderer\vendor\imgui;C:\Development\KerberosRenderer\KerberosRenderer\vendor\stb;C:\VulkanSDK\1.4.335.0\Include;C:\Development\KerberosRenderer\KerberosRenderer\vendor\tinyobjloader;C:\Development\KerberosRenderer\KerberosRenderer\vendor\tinygltf;C:\Development\KerberosRenderer\KerberosRenderer\vendor;C:\Development\KerberosRenderer\KerberosRenderer\vendor\ktx\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>C:\Development\KerberosRenderer\KerberosRenderer\vendor\glfw-3.4\include;C:\Development\KerberosRenderer\KerberosRenderer\vendor\glm;C:\Development\KerberosRenderer\KerberosRenderer\vendor\imgui;C:\Development\KerberosRenderer\KerberosRenderer\vendor\stb;C:\VulkanSDK\1.4.335.0\Include;C:\Development\KerberosRenderer\KerberosRenderer\vendor\tinyobjloader;C:\Development\KerberosRenderer\KerberosRenderer\vendor\tinygltf;C:\Development\KerberosRenderer\KerberosRenderer\vendor;C:\Development\KerberosRenderer\KerberosRenderer\vendor\ktx\include;C:\Development\KerberosRenderer\KerberosRenderer\vendor\ktx\other_include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -123,7 +123,7 @@
       <PreprocessorDefinitions>NDEBUG;_CONSOLE;%(PreprocessorDefinitions);_CRT_SECURE_NO_WARNINGS;_GLFW_WIN32;NOMINMAX</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp20</LanguageStandard>
-      <AdditionalIncludeDirectories>C:\Development\KerberosRenderer\KerberosRenderer\vendor\glfw-3.4\include;C:\Development\KerberosRenderer\KerberosRenderer\vendor\glm;C:\Development\KerberosRenderer\KerberosRenderer\vendor\imgui;C:\Development\KerberosRenderer\KerberosRenderer\vendor\stb;C:\VulkanSDK\1.4.335.0\Include;C:\Development\KerberosRenderer\KerberosRenderer\vendor\tinyobjloader;C:\Development\KerberosRenderer\KerberosRenderer\vendor\tinygltf;C:\Development\KerberosRenderer\KerberosRenderer\vendor;C:\Development\KerberosRenderer\KerberosRenderer\vendor\ktx\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>C:\Development\KerberosRenderer\KerberosRenderer\vendor\glfw-3.4\include;C:\Development\KerberosRenderer\KerberosRenderer\vendor\glm;C:\Development\KerberosRenderer\KerberosRenderer\vendor\imgui;C:\Development\KerberosRenderer\KerberosRenderer\vendor\stb;C:\VulkanSDK\1.4.335.0\Include;C:\Development\KerberosRenderer\KerberosRenderer\vendor\tinyobjloader;C:\Development\KerberosRenderer\KerberosRenderer\vendor\tinygltf;C:\Development\KerberosRenderer\KerberosRenderer\vendor;C:\Development\KerberosRenderer\KerberosRenderer\vendor\ktx\include;C:\Development\KerberosRenderer\KerberosRenderer\vendor\ktx\other_include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -143,7 +143,7 @@
     <ClCompile Include="src\Mesh.cpp" />
     <ClCompile Include="src\ModelLoader.cpp" />
     <ClCompile Include="src\Shader.cpp" />
-    <ClCompile Include="src\Texture.cpp" />
+    <ClCompile Include="src\Textures.cpp" />
     <ClCompile Include="src\VulkanContext.cpp" />
     <ClCompile Include="vendor\glfw-3.4\src\context.c" />
     <ClCompile Include="vendor\glfw-3.4\src\egl_context.c" />
@@ -173,6 +173,14 @@
     <ClCompile Include="vendor\imgui\imgui_draw.cpp" />
     <ClCompile Include="vendor\imgui\imgui_tables.cpp" />
     <ClCompile Include="vendor\imgui\imgui_widgets.cpp" />
+    <ClCompile Include="vendor\ktx\lib\checkheader.c" />
+    <ClCompile Include="vendor\ktx\lib\errstr.c" />
+    <ClCompile Include="vendor\ktx\lib\filestream.c" />
+    <ClCompile Include="vendor\ktx\lib\hashlist.c" />
+    <ClCompile Include="vendor\ktx\lib\hashtable.c" />
+    <ClCompile Include="vendor\ktx\lib\memstream.c" />
+    <ClCompile Include="vendor\ktx\lib\swap.c" />
+    <ClCompile Include="vendor\ktx\lib\texture.c" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\Application.hpp" />
@@ -199,7 +207,7 @@
     <ClInclude Include="src\Mesh.hpp" />
     <ClInclude Include="src\ModelLoader.hpp" />
     <ClInclude Include="src\Shader.hpp" />
-    <ClInclude Include="src\Texture.hpp" />
+    <ClInclude Include="src\Textures.hpp" />
     <ClInclude Include="src\Utils.hpp" />
     <ClInclude Include="src\Vertex.hpp" />
     <ClInclude Include="src\Vulkan.hpp" />
@@ -210,6 +218,13 @@
     <ClInclude Include="vendor\imgui\backends\imgui_impl_vulkan.h" />
     <ClInclude Include="vendor\imgui\imgui.h" />
     <ClInclude Include="vendor\imgui\imgui_internal.h" />
+    <ClInclude Include="vendor\ktx\include\ktx.h" />
+    <ClInclude Include="vendor\ktx\lib\filestream.h" />
+    <ClInclude Include="vendor\ktx\lib\ktxint.h" />
+    <ClInclude Include="vendor\ktx\lib\memstream.h" />
+    <ClInclude Include="vendor\ktx\lib\stream.h" />
+    <ClInclude Include="vendor\ktx\lib\uthash.h" />
+    <ClInclude Include="vendor\ktx\other_include\KHR\khrplatform.h" />
     <ClInclude Include="vendor\tinyobjloader\tiny_obj_loader.h" />
   </ItemGroup>
   <ItemGroup>

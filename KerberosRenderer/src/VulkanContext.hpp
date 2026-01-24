@@ -51,6 +51,17 @@ namespace kbr
 
 		void SetObjectDebugName(uint64_t objectHandle, vk::ObjectType objectType, const std::string& name) const;
 
+		template<typename T>
+		void SetObjectDebugName(const T& object, const std::string& name) const
+			requires requires { T::objectType; }
+		{
+			SetObjectDebugName(
+				reinterpret_cast<uint64_t>(static_cast<T::CType>(*object)),
+				T::objectType,
+				name
+			);
+		}
+
 		vk::raii::Device& GetDevice();
 		vk::raii::PhysicalDevice& GetPhysicalDevice();
 		vk::PhysicalDeviceMemoryProperties GetMemoryProperties() const;

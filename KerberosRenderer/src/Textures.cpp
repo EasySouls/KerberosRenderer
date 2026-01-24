@@ -1,75 +1,84 @@
-#include "Texture.hpp"
+#include "Textures.hpp"
 
 #include "Utils.hpp"
 
-void CreateImage(
-	const vk::raii::Device& device,
-	const uint32_t width, 
-	const uint32_t height,
-	const uint32_t mipLevels,
-	const vk::SampleCountFlagBits numSamples,
-	const vk::Format format,
-	const vk::ImageTiling tiling,
-	const vk::ImageUsageFlags usage,
-	const vk::MemoryPropertyFlags properties, 
-	vk::raii::Image& image, 
-	vk::raii::DeviceMemory& imageMemory) 
-{
-	const vk::ImageCreateInfo imageInfo{ 
-		.imageType = vk::ImageType::e2D, 
-		.format = format,
-		.extent = {
-			.width = width, 
-			.height = height,
-			.depth = 1
-	    }, 
-		.mipLevels = mipLevels, 
-		.arrayLayers = 1,
-		.samples = numSamples, 
-		.tiling = tiling,
-		.usage = usage, 
-		.sharingMode = vk::SharingMode::eExclusive 
-	};
-
-	image = vk::raii::Image(device, imageInfo);
-
-	const vk::MemoryRequirements memRequirements = image.getMemoryRequirements();
-	const vk::MemoryAllocateInfo allocInfo{ 
-		.allocationSize = memRequirements.size,
-		.memoryTypeIndex = FindMemoryType(memRequirements.memoryTypeBits, properties) 
-	};
-
-	imageMemory = vk::raii::DeviceMemory(device, allocInfo);
-	image.bindMemory(imageMemory, 0);
-}
-
-vk::raii::ImageView CreateImageView(
-	const vk::raii::Device& device, 
-	const vk::raii::Image& image, 
-	const vk::Format format,
-	const vk::ImageAspectFlagBits aspectFlags,
-	const uint32_t mipLevels
-) 
-{
-	const vk::ImageViewCreateInfo viewInfo{
-		.flags = {},
-		.image = image, 
-		.viewType = vk::ImageViewType::e2D,
-		.format = format, 
-		.subresourceRange = {
-			.aspectMask = aspectFlags,
-			.baseMipLevel = 0,
-			.levelCount = mipLevels,
-			.baseArrayLayer = 0,
-			.layerCount = 1 
-	    }
-	};
-
-	return { device, viewInfo };
-}
+#include <ktx.h>
 
 namespace kbr
 {
+	void CreateImage(
+		const vk::raii::Device& device,
+		const uint32_t width, 
+		const uint32_t height,
+		const uint32_t mipLevels,
+		const vk::SampleCountFlagBits numSamples,
+		const vk::Format format,
+		const vk::ImageTiling tiling,
+		const vk::ImageUsageFlags usage,
+		const vk::MemoryPropertyFlags properties, 
+		vk::raii::Image& image, 
+		vk::raii::DeviceMemory& imageMemory) 
+	{
+		const vk::ImageCreateInfo imageInfo{ 
+			.imageType = vk::ImageType::e2D, 
+			.format = format,
+			.extent = {
+				.width = width, 
+				.height = height,
+				.depth = 1
+		    }, 
+			.mipLevels = mipLevels, 
+			.arrayLayers = 1,
+			.samples = numSamples, 
+			.tiling = tiling,
+			.usage = usage, 
+			.sharingMode = vk::SharingMode::eExclusive 
+		};
+	
+		image = vk::raii::Image(device, imageInfo);
+	
+		const vk::MemoryRequirements memRequirements = image.getMemoryRequirements();
+		const vk::MemoryAllocateInfo allocInfo{ 
+			.allocationSize = memRequirements.size,
+			.memoryTypeIndex = FindMemoryType(memRequirements.memoryTypeBits, properties) 
+		};
+	
+		imageMemory = vk::raii::DeviceMemory(device, allocInfo);
+		image.bindMemory(imageMemory, 0);
+	}
+	
+	vk::raii::ImageView CreateImageView(
+		const vk::raii::Device& device, 
+		const vk::raii::Image& image, 
+		const vk::Format format,
+		const vk::ImageAspectFlagBits aspectFlags,
+		const uint32_t mipLevels
+	) 
+	{
+		const vk::ImageViewCreateInfo viewInfo{
+			.flags = {},
+			.image = image, 
+			.viewType = vk::ImageViewType::e2D,
+			.format = format, 
+			.subresourceRange = {
+				.aspectMask = aspectFlags,
+				.baseMipLevel = 0,
+				.levelCount = mipLevels,
+				.baseArrayLayer = 0,
+				.layerCount = 1 
+		    }
+		};
+	
+		return { device, viewInfo };
+	}
+
+	ktxResult LoadKTXFile(const std::filesystem::path& filepath, ktxTexture** target)
+	{
+		ktxResult result = KTX_SUCCESS;
+		result = ktxTexture_CreateFromNamedFile(filepath.string().c_str(), KTX_TEXTURE_CREATE_LOAD_IMAGE_DATA_BIT, target);
+		return result;
+	}
+
 	void Texture::UpdateDescriptor() 
 	{
 		descriptor.sampler = sampler;
@@ -77,15 +86,37 @@ namespace kbr
 		descriptor.imageLayout = imageLayout;
 	}
 
-	ktxResult Texture::LoadKTXFile(const std::filesystem::path& filepath, ktxTexture** target) 
+	void Texture::CreateSampler(const vk::raii::Device& device, const vk::Filter filter) 
 	{
-		ktxResult result = KTX_SUCCESS;
-		result = ktxTexture_CreateFromNamedFile(filepath.string().c_str(), KTX_TEXTURE_CREATE_LOAD_IMAGE_DATA_BIT, target);
-		return result;
+		const vk::SamplerCreateInfo samplerCreateInfo{
+			.magFilter = filter,
+			.minFilter = filter,
+			.mipmapMode = vk::SamplerMipmapMode::eLinear,
+			.addressModeU = vk::SamplerAddressMode::eRepeat,
+			.addressModeV = vk::SamplerAddressMode::eRepeat,
+			.addressModeW = vk::SamplerAddressMode::eRepeat,
+			.mipLodBias = 0.0f,
+			.anisotropyEnable = vk::True,
+			.maxAnisotropy = 16.0f,
+			.compareOp = vk::CompareOp::eNever,
+			.minLod = 0.0f,
+			.maxLod = static_cast<float>(mipLevels),
+			.borderColor = vk::BorderColor::eFloatOpaqueWhite
+		};
+		sampler = device.createSampler(samplerCreateInfo);
+	}
+
+	void Texture::SetDebugName(const std::string& debugName) const 
+	{
+		const auto& context = VulkanContext::Get();
+		context.SetObjectDebugName(image, debugName + "_Image");
+		context.SetObjectDebugName(view, debugName + "_ImageView");
+		context.SetObjectDebugName(sampler, debugName + "_Sampler");
+		context.SetObjectDebugName(deviceMemory, debugName + "_ImageMemory");
 	}
 
 	void Texture2D::LoadFromFile(const std::filesystem::path& filepath, vk::Format format,
-		vk::ImageUsageFlags imageUsageFlags, vk::ImageLayout imageLayout) 
+	                             vk::ImageUsageFlags imageUsageFlags, vk::ImageLayout imageLayout) 
 	{
 		ktxTexture* ktxTexture;
 		ktxResult result = LoadKTXFile(filepath, &ktxTexture);
@@ -216,22 +247,7 @@ namespace kbr
 		ktxTexture_Destroy(ktxTexture);
 
 		// Create a default sampler
-		vk::SamplerCreateInfo samplerCreateInfo{
-			.magFilter = vk::Filter::eLinear,
-			.minFilter = vk::Filter::eLinear,
-			.mipmapMode = vk::SamplerMipmapMode::eLinear,
-			.addressModeU = vk::SamplerAddressMode::eRepeat,
-			.addressModeV = vk::SamplerAddressMode::eRepeat,
-			.addressModeW = vk::SamplerAddressMode::eRepeat,
-			.mipLodBias = 0.0f,
-			.anisotropyEnable = vk::True,
-			.maxAnisotropy = 16.0f,
-			.compareOp = vk::CompareOp::eNever,
-			.minLod = 0.0f,
-			.maxLod = static_cast<float>(mipLevels),
-			.borderColor = vk::BorderColor::eFloatOpaqueWhite
-		};
-		sampler = device.createSampler(samplerCreateInfo);
+		CreateSampler(device);
 
 		// Create image view
 		// Textures are not directly accessed by the shaders and
@@ -247,6 +263,9 @@ namespace kbr
 
 		// Update descriptor image info member that can be used for setting up descriptor sets
 		UpdateDescriptor();
+
+		const std::string debugName = filepath.stem().string();
+		SetDebugName(debugName);
 	}
 
 	void Texture2D::FromBuffer(void* buffer, vk::DeviceSize bufferSize, vk::Format format, uint32_t texWidth,
@@ -261,7 +280,7 @@ namespace kbr
 		throw std::runtime_error("Texture2DArray::LoadFromFile not implemented yet");
 	}
 
-	void TextureCubeMap::LoadFromFile(const std::filesystem::path& filepath, vk::Format format,
+	void TextureCube::LoadFromFile(const std::filesystem::path& filepath, vk::Format format,
 		vk::ImageUsageFlags imageUsageFlags, vk::ImageLayout imageLayout) 
 	{
 		ktxTexture* ktxTexture;
@@ -401,22 +420,7 @@ namespace kbr
 		ktxTexture_Destroy(ktxTexture);
 
 		// Create a default sampler
-		vk::SamplerCreateInfo samplerCreateInfo{
-			.magFilter = vk::Filter::eLinear,
-			.minFilter = vk::Filter::eLinear,
-			.mipmapMode = vk::SamplerMipmapMode::eLinear,
-			.addressModeU = vk::SamplerAddressMode::eClampToEdge,
-			.addressModeV = vk::SamplerAddressMode::eClampToEdge,
-			.addressModeW = vk::SamplerAddressMode::eClampToEdge,
-			.mipLodBias = 0.0f,
-			.anisotropyEnable = vk::True,
-			.maxAnisotropy = 16.0f,
-			.compareOp = vk::CompareOp::eNever,
-			.minLod = 0.0f,
-			.maxLod = static_cast<float>(mipLevels),
-			.borderColor = vk::BorderColor::eFloatOpaqueWhite
-		};
-		sampler = device.createSampler(samplerCreateInfo);
+		CreateSampler(device);
 
 		// Create image view
 		// Textures are not directly accessed by the shaders and
@@ -432,5 +436,8 @@ namespace kbr
 
 		// Update descriptor image info member that can be used for setting up descriptor sets
 		UpdateDescriptor();
+
+		const std::string debugName = filepath.stem().string();
+		SetDebugName(debugName);
 	}
 }

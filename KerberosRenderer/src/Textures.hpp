@@ -2,50 +2,51 @@
 
 #include "Vulkan.hpp"
 
-#include <ktx.h>
-#include <ktxvulkan.h>
-
 #include <filesystem>
-
-void CreateImage(
-	const vk::raii::Device& device,
-	uint32_t width, 
-	uint32_t height, 
-	uint32_t mipLevels,
-	vk::SampleCountFlagBits numSamples,
-	vk::Format format, 
-	vk::ImageTiling tiling, 
-	vk::ImageUsageFlags usage, 
-	vk::MemoryPropertyFlags properties, 
-	vk::raii::Image& image, 
-	vk::raii::DeviceMemory& imageMemory
-);
-
-vk::raii::ImageView CreateImageView(
-	const vk::raii::Device& device, 
-	const vk::raii::Image& image, 
-	vk::Format format, 
-	vk::ImageAspectFlagBits aspectFlags,
-	uint32_t mipLevels
-);
 
 namespace kbr
 {
+	void CreateImage(
+		const vk::raii::Device& device,
+		uint32_t width, 
+		uint32_t height, 
+		uint32_t mipLevels,
+		vk::SampleCountFlagBits numSamples,
+		vk::Format format, 
+		vk::ImageTiling tiling, 
+		vk::ImageUsageFlags usage, 
+		vk::MemoryPropertyFlags properties, 
+		vk::raii::Image& image, 
+		vk::raii::DeviceMemory& imageMemory
+	);
+	
+	vk::raii::ImageView CreateImageView(
+		const vk::raii::Device& device, 
+		const vk::raii::Image& image, 
+		vk::Format format, 
+		vk::ImageAspectFlagBits aspectFlags,
+		uint32_t mipLevels
+	);
+
 	class Texture
 	{
 	public:
-		vk::raii::Image         image;
-		vk::ImageLayout         imageLayout;
-		vk::raii::DeviceMemory  deviceMemory;
-		vk::raii::ImageView     view;
-		uint32_t              width, height;
-		uint32_t              mipLevels;
-		uint32_t              layerCount;
-		vk::DescriptorImageInfo descriptor;
-		vk::raii::Sampler             sampler;
+		vk::raii::Image         image = nullptr;
+		vk::ImageLayout         imageLayout{};
+		vk::raii::DeviceMemory  deviceMemory = nullptr;
+		vk::raii::ImageView     view = nullptr;
+		uint32_t                width = 0;
+		uint32_t                height = 0;
+		uint32_t                mipLevels = 0;
+		uint32_t                layerCount = 0;
+		vk::DescriptorImageInfo descriptor{};
+		vk::raii::Sampler       sampler = nullptr;
 
 		void      UpdateDescriptor();
-		static ktxResult LoadKTXFile(const std::filesystem::path& filepath, ktxTexture** target);
+
+	protected:
+		void CreateSampler(const vk::raii::Device& device, vk::Filter filter = vk::Filter::eLinear);
+		void SetDebugName(const std::string& debugName) const;
 	};
 
 	class Texture2D : public Texture
@@ -78,7 +79,7 @@ namespace kbr
 			vk::ImageLayout      imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal);
 	};
 
-	class TextureCubeMap : public Texture
+	class TextureCube : public Texture
 	{
 	public:
 		void LoadFromFile(

@@ -2,7 +2,6 @@
 
 #include "VulkanContext.hpp"
 #include "io.hpp"
-#include "Texture.hpp"
 #include "Vertex.hpp"
 #include "ModelLoader.hpp"
 #include "Shader.hpp"
@@ -56,6 +55,7 @@ namespace Game
 		KBR_CORE_INFO("Loaded {} mesh(es)!", m_Meshes.size());
 
 		m_SkyboxMesh = kbr::ModelLoader::LoadModel("assets/models/cube.gltf");
+		m_SkyboxTexture.LoadFromFile("assets/textures/hdr/pisa_cube.ktx", vk::Format::eR16G16B16A16Sfloat);
 	}
 	
 	void GameLayer::OnDetach() 
@@ -750,17 +750,17 @@ namespace Game
 
 			constexpr uint32_t shadowMapMipLevels = 1;
 
-			CreateImage(device,
-						m_ShadowMapSize,
-						m_ShadowMapSize,
-						shadowMapMipLevels,
-						vk::SampleCountFlagBits::e1,
-						shadowMapFormat,
-						vk::ImageTiling::eOptimal,
-						vk::ImageUsageFlagBits::eDepthStencilAttachment | vk::ImageUsageFlagBits::eSampled,
-						vk::MemoryPropertyFlagBits::eDeviceLocal,
-						m_ShadowMapImage,
-						m_ShadowMapImageMemory);
+			kbr::CreateImage(device,
+			                 m_ShadowMapSize,
+			                 m_ShadowMapSize,
+			                 shadowMapMipLevels,
+			                 vk::SampleCountFlagBits::e1,
+			                 shadowMapFormat,
+			                 vk::ImageTiling::eOptimal,
+			                 vk::ImageUsageFlagBits::eDepthStencilAttachment | vk::ImageUsageFlagBits::eSampled,
+			                 vk::MemoryPropertyFlagBits::eDeviceLocal,
+			                 m_ShadowMapImage,
+			                 m_ShadowMapImageMemory);
 
 			context.SetObjectDebugName(reinterpret_cast<uint64_t>(static_cast<VkImage>(*m_ShadowMapImage)),
 									   vk::ObjectType::eImage,
@@ -769,11 +769,11 @@ namespace Game
 									   vk::ObjectType::eDeviceMemory,
 									   "Shadow Map Image Memory");
 
-			m_ShadowMapImageView = CreateImageView(device,
-												   m_ShadowMapImage,
-												   shadowMapFormat,
-												   vk::ImageAspectFlagBits::eDepth,
-												   shadowMapMipLevels);
+			m_ShadowMapImageView = kbr::CreateImageView(device,
+			                                            m_ShadowMapImage,
+			                                            shadowMapFormat,
+			                                            vk::ImageAspectFlagBits::eDepth,
+			                                            shadowMapMipLevels);
 
 			context.SetObjectDebugName(reinterpret_cast<uint64_t>(static_cast<VkImageView>(*m_ShadowMapImageView)),
 									   vk::ObjectType::eImageView,
@@ -900,17 +900,17 @@ namespace Game
 			const uint32_t imageHeight = static_cast<uint32_t>(m_ViewportSize.y);
 			constexpr uint32_t mipLevels = 1;
 
-			CreateImage(device,
-						imageWidth,
-						imageHeight,
-						mipLevels,
-						vk::SampleCountFlagBits::e1,
-						colorFormat,
-						vk::ImageTiling::eOptimal,
-						vk::ImageUsageFlagBits::eColorAttachment | vk::ImageUsageFlagBits::eSampled,
-						vk::MemoryPropertyFlagBits::eDeviceLocal,
-						m_ColorImage,
-						m_ColorImageMemory);
+			kbr::CreateImage(device,
+			                 imageWidth,
+			                 imageHeight,
+			                 mipLevels,
+			                 vk::SampleCountFlagBits::e1,
+			                 colorFormat,
+			                 vk::ImageTiling::eOptimal,
+			                 vk::ImageUsageFlagBits::eColorAttachment | vk::ImageUsageFlagBits::eSampled,
+			                 vk::MemoryPropertyFlagBits::eDeviceLocal,
+			                 m_ColorImage,
+			                 m_ColorImageMemory);
 
 			context.SetObjectDebugName(reinterpret_cast<uint64_t>(static_cast<VkImage>(*m_ColorImage)),
 									   vk::ObjectType::eImage,
@@ -920,7 +920,7 @@ namespace Game
 									   vk::ObjectType::eDeviceMemory,
 									   "Color Attachment Image Memory");
 
-			m_ColorImageView = CreateImageView(device, m_ColorImage, colorFormat, vk::ImageAspectFlagBits::eColor, mipLevels);
+			m_ColorImageView = kbr::CreateImageView(device, m_ColorImage, colorFormat, vk::ImageAspectFlagBits::eColor, mipLevels);
 
 			context.SetObjectDebugName(reinterpret_cast<uint64_t>(static_cast<VkImageView>(*m_ColorImageView)),
 									   vk::ObjectType::eImageView,
@@ -932,7 +932,7 @@ namespace Game
 				vk::FormatFeatureFlagBits::eDepthStencilAttachment
 			);
 
-			CreateImage(
+			kbr::CreateImage(
 				device,
 				imageWidth,
 				imageHeight,
@@ -953,7 +953,7 @@ namespace Game
 									   vk::ObjectType::eDeviceMemory,
 									   "Depth Attachment Image Memory");
 
-			m_DepthImageView = CreateImageView(device, m_DepthImage, depthFormat, vk::ImageAspectFlagBits::eDepth, mipLevels);
+			m_DepthImageView = kbr::CreateImageView(device, m_DepthImage, depthFormat, vk::ImageAspectFlagBits::eDepth, mipLevels);
 
 			context.SetObjectDebugName(reinterpret_cast<uint64_t>(static_cast<VkImageView>(*m_DepthImageView)),
 									   vk::ObjectType::eImageView,
@@ -1190,17 +1190,17 @@ namespace Game
 		// Recreate resources with new size
 		const uint32_t imageWidth = static_cast<uint32_t>(m_ViewportSize.x);
 		const uint32_t imageHeight = static_cast<uint32_t>(m_ViewportSize.y);
-		CreateImage(device,
-					imageWidth,
-					imageHeight,
-					mipLevels,
-					vk::SampleCountFlagBits::e1,
-					colorFormat,
-					vk::ImageTiling::eOptimal,
-					vk::ImageUsageFlagBits::eColorAttachment | vk::ImageUsageFlagBits::eSampled,
-					vk::MemoryPropertyFlagBits::eDeviceLocal,
-					m_ColorImage,
-					m_ColorImageMemory);
+		kbr::CreateImage(device,
+		                 imageWidth,
+		                 imageHeight,
+		                 mipLevels,
+		                 vk::SampleCountFlagBits::e1,
+		                 colorFormat,
+		                 vk::ImageTiling::eOptimal,
+		                 vk::ImageUsageFlagBits::eColorAttachment | vk::ImageUsageFlagBits::eSampled,
+		                 vk::MemoryPropertyFlagBits::eDeviceLocal,
+		                 m_ColorImage,
+		                 m_ColorImageMemory);
 
 		context.SetObjectDebugName(reinterpret_cast<uint64_t>(static_cast<VkImage>(*m_ColorImage)),
 								   vk::ObjectType::eImage,
@@ -1210,7 +1210,7 @@ namespace Game
 								   vk::ObjectType::eDeviceMemory,
 								   "Color Attachment Image Memory");
 
-		m_ColorImageView = CreateImageView(device, m_ColorImage, colorFormat, vk::ImageAspectFlagBits::eColor, mipLevels);
+		m_ColorImageView = kbr::CreateImageView(device, m_ColorImage, colorFormat, vk::ImageAspectFlagBits::eColor, mipLevels);
 
 		context.SetObjectDebugName(reinterpret_cast<uint64_t>(static_cast<VkImageView>(*m_ColorImageView)),
 								   vk::ObjectType::eImageView,
@@ -1222,7 +1222,7 @@ namespace Game
 			vk::FormatFeatureFlagBits::eDepthStencilAttachment
 		);
 
-		CreateImage(
+		kbr::CreateImage(
 			device,
 			imageWidth,
 			imageHeight,
@@ -1243,7 +1243,7 @@ namespace Game
 								   vk::ObjectType::eDeviceMemory,
 								   "Depth Attachment Image Memory");
 
-		m_DepthImageView = CreateImageView(device, m_DepthImage, depthFormat, vk::ImageAspectFlagBits::eDepth, mipLevels);
+		m_DepthImageView = kbr::CreateImageView(device, m_DepthImage, depthFormat, vk::ImageAspectFlagBits::eDepth, mipLevels);
 
 		context.SetObjectDebugName(reinterpret_cast<uint64_t>(static_cast<VkImageView>(*m_DepthImageView)),
 								   vk::ObjectType::eImageView,

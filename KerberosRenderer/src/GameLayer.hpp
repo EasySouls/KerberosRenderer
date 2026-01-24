@@ -6,6 +6,7 @@
 #include "Mesh.hpp"
 #include "Camera.hpp"
 #include "Buffer.hpp"
+#include "Textures.hpp"
 
 #include <glm/vec3.hpp>
 

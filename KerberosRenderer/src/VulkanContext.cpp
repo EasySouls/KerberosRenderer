@@ -6,7 +6,7 @@
 #include "backends/imgui_impl_glfw.h"
 #include "backends/imgui_impl_vulkan.h"
 
-#include "Texture.hpp"
+#include "Textures.hpp"
 #include "Utils.hpp"
 #include "logging/Log.hpp"
 
@@ -345,45 +345,45 @@ namespace kbr
 
 		switch (oldLayout)
 		{
-			case VK_IMAGE_LAYOUT_UNDEFINED:
+			case vk::ImageLayout::eUndefined:
 				// Image layout is undefined (or does not matter)
 				// Only valid as initial layout
 				// No flags required, listed only for completeness
 				barrier.srcAccessMask = {};
 				break;
 
-			case VK_IMAGE_LAYOUT_PREINITIALIZED:
+			case vk::ImageLayout::ePreinitialized:
 				// Image is preinitialized
 				// Only valid as initial layout for linear images, preserves memory contents
 				// Make sure host writes have been finished
 				barrier.srcAccessMask = vk::AccessFlagBits2::eHostWrite;
 				break;
 
-			case VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL:
+			case vk::ImageLayout::eColorAttachmentOptimal:
 				// Image is a color attachment
 				// Make sure any writes to the color buffer have been finished
 				barrier.srcAccessMask = vk::AccessFlagBits2::eColorAttachmentWrite;
 				break;
 
-			case VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL:
+			case vk::ImageLayout::eDepthStencilAttachmentOptimal:
 				// Image is a depth/stencil attachment
 				// Make sure any writes to the depth/stencil buffer have been finished
 				barrier.srcAccessMask = vk::AccessFlagBits2::eDepthStencilAttachmentWrite;
 				break;
 
-			case VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL:
+			case vk::ImageLayout::eTransferSrcOptimal:
 				// Image is a transfer source
 				// Make sure any reads from the image have been finished
 				barrier.srcAccessMask = vk::AccessFlagBits2::eTransferRead;
 				break;
 
-			case VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL:
+			case vk::ImageLayout::eTransferDstOptimal:
 				// Image is a transfer destination
 				// Make sure any writes to the image have been finished
 				barrier.srcAccessMask = vk::AccessFlagBits2::eTransferWrite;
 				break;
 
-			case VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL:
+			case vk::ImageLayout::eShaderReadOnlyOptimal:
 				// Image is read by a shader
 				// Make sure any shader reads from the image have been finished
 				barrier.srcAccessMask = vk::AccessFlagBits2::eShaderRead;
@@ -394,34 +394,34 @@ namespace kbr
 
 		switch (newLayout)
 		{
-			case VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL:
+			case vk::ImageLayout::eTransferDstOptimal:
 				// Image will be used as a transfer destination
 				// Make sure any writes to the image have been finished
 				barrier.dstAccessMask = vk::AccessFlagBits2::eTransferWrite;
 				break;
 
-			case VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL:
+			case vk::ImageLayout::eTransferSrcOptimal:
 				// Image will be used as a transfer source
 				// Make sure any reads from the image have been finished
 				barrier.dstAccessMask = vk::AccessFlagBits2::eTransferRead;
 				break;
 
-			case VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL:
+			case vk::ImageLayout::eColorAttachmentOptimal:
 				// Image will be used as a color attachment
 				// Make sure any writes to the color buffer have been finished
 				barrier.dstAccessMask = vk::AccessFlagBits2::eColorAttachmentWrite;
 				break;
 
-			case VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL:
+			case vk::ImageLayout::eDepthStencilAttachmentOptimal:
 				// Image layout will be used as a depth/stencil attachment
 				// Make sure any writes to depth/stencil buffer have been finished
 				barrier.dstAccessMask = barrier.dstAccessMask | vk::AccessFlagBits2::eDepthStencilAttachmentWrite;
 				break;
 
-			case VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL:
+			case vk::ImageLayout::eShaderReadOnlyOptimal:
 				// Image will be read in a shader (sampler, input attachment)
 				// Make sure any writes to the image have been finished
-				if (barrier.srcAccessMask == vk::AccessFlagBits2{})
+				if (barrier.srcAccessMask == vk::AccessFlagBits2::eNone)
 				{
 					barrier.srcAccessMask = vk::AccessFlagBits2::eHostWrite | vk::AccessFlagBits2::eTransferWrite;
 				}
