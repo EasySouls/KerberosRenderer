@@ -1,9 +1,3 @@
-/* Copyright (c) 2025, Sascha Willems
- *
- * SPDX-License-Identifier: MIT
- *
- */
-
 struct VSInput
 {
     float3 Position;
@@ -17,40 +11,22 @@ struct VSOutput
     float3 UVW;
 };
 
-struct SceneData
+struct SkyboxData
 {
-    float4x4 projection;
-    float4x4 view;
-    float4x4 viewProjection;
-    float4x4 lightSpaceMatrix;
-    float3 ambientLightColor;
-    float3 camPos;
+	float4x4 projection;
+	float4x4 model;
 };
+
 [[vk::binding(0)]]
-ConstantBuffer<SceneData> scene;
+ConstantBuffer<SkyboxData> skyboxData;
 
 struct UBOParams {
     float4 lights[4];
-    float exposure;
-    float gamma;
+	float exposure;
+	float gamma;
 };
 [[vk::binding(1)]]
 ConstantBuffer<UBOParams> uboParams;
-
-struct Material {
-    float3 albedo;
-    float roughness;
-    float metallic;
-};
-
-struct PerObject {
-    float3 objPos;
-    float4x4 model;
-    float4x4 worldNormal;
-    Material material;
-};
-[[vk::binding(2)]]
-ConstantBuffer<PerObject> perObject;
 
 [[vk::binding(4)]]
 SamplerCube samplerEnv;
@@ -73,7 +49,7 @@ VSOutput vertMain(VSInput input)
 {
     VSOutput output;
     output.UVW = input.Position;
-    output.Pos = mul(scene.projection, mul(perObject.model, float4(input.Position.xyz, 1.0)));
+    output.Pos = mul(skyboxData.projection, mul(skyboxData.model, float4(input.Position.xyz, 1.0)));
     return output;
 }
 

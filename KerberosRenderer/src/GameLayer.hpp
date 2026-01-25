@@ -56,7 +56,7 @@ namespace Game
 	private:
 		void UpdateLights(float time, uint32_t currentImage);
 		void UpdateSceneUniformBuffers(uint32_t currentImage);
-		void UpdatePerObjectUniformBuffer(uint32_t currentImage, const glm::vec3& objectPosition, const glm::mat4& model, const Material& material);
+		void UpdatePerObjectUniformBuffer(uint32_t currentImage, const glm::mat4& model, const Material& material);
 
 		void PrepareUniformBuffers();
 		void SetupDescriptors();
@@ -130,18 +130,25 @@ namespace Game
 
 		struct PerObjectData
 		{
-			alignas(16) glm::vec3 position{0.f};
 			alignas(16) glm::mat4 model{ 0.f };
 			alignas(16) glm::mat4 worldNormal{ 0.f };
 			alignas(16) Material::PushBlock material;
 		};
 		PerObjectData m_PerObjectUniformData{};
 
+		struct SkyboxData
+		{
+			glm::mat4 projection{ 0.f };
+			glm::mat4 model{ 0.f };
+		};
+		SkyboxData m_SkyboxData{};
+
 		struct UniformBufferObject
 		{
 			std::shared_ptr<kbr::UniformBuffer> scene;
 			std::shared_ptr<kbr::UniformBuffer> params;
 			std::shared_ptr<kbr::UniformBuffer> perObject;
+			std::shared_ptr<kbr::UniformBuffer> skybox;
 		};
 		// TODO: This should hold multiple UBOs for multiple frames in flight
 		std::array<UniformBufferObject, 1> m_UniformBuffers;

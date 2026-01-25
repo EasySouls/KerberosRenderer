@@ -10,6 +10,10 @@
 
 #include "glm/glm.hpp"
 #include <glm/gtc/type_ptr.hpp>
+
+#include "Buffer.hpp"
+#include "Buffer.hpp"
+#include "Buffer.hpp"
 #include "imgui.h"
 
 #include "backends/imgui_impl_vulkan.h"
@@ -168,7 +172,7 @@ namespace Game
 
 			for (const auto& mesh : m_Meshes)
 			{
-				UpdatePerObjectUniformBuffer(currentImage, m_ObjectPosition, model, selectedMaterial);
+				UpdatePerObjectUniformBuffer(currentImage, model, selectedMaterial);
 
 				mesh.Draw(cmd);
 			}
@@ -311,13 +315,7 @@ namespace Game
 			if (m_DisplaySkybox && m_SkyboxMesh.has_value())
 			{
 				cmd.bindPipeline(vk::PipelineBindPoint::eGraphics, *m_SkyboxPipeline);
-				// TODO: Use separate descriptor set for skybox
-				cmd.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, *m_PBRPipelineLayout, 0, *m_DescriptorSets[currentImage].scene, {});
-
-				const glm::mat4 skyboxModel = glm::mat4(glm::mat3(m_Camera.GetViewMatrix()));
-				m_PerObjectUniformData.model = skyboxModel;
-				m_PerObjectUniformData.position = glm::vec3(0.0f);
-				std::memcpy(m_UniformBuffers[currentImage].perObject->GetMappedData(), &m_PerObjectUniformData, sizeof(PerObjectData));
+				cmd.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, *m_PBRPipelineLayout, 0, *m_DescriptorSets[currentImage].skybox, {});
 
 				m_SkyboxMesh->Draw(cmd);
 			}
@@ -327,7 +325,7 @@ namespace Game
 
 			for (const auto& mesh : m_Meshes)
 			{
-				UpdatePerObjectUniformBuffer(currentImage, m_ObjectPosition, model, selectedMaterial);
+				UpdatePerObjectUniformBuffer(currentImage, model, selectedMaterial);
 
 				mesh.Draw(cmd);
 			}
@@ -504,13 +502,17 @@ namespace Game
 		m_SceneUniformData.camPos = m_Camera.GetPosition();
 
 		std::memcpy(m_UniformBuffers[currentImage].scene->GetMappedData(), &m_SceneUniformData, sizeof(SceneUniformData));
+
+		const glm::mat4 skyboxModel = glm::mat4(glm::mat3(view));
+		m_SkyboxData.model = skyboxModel;
+		m_SkyboxData.projection = projection;
+		std::memcpy(m_UniformBuffers[currentImage].skybox->GetMappedData(), &m_SkyboxData, sizeof(SkyboxData));
 	}
 
-	void GameLayer::UpdatePerObjectUniformBuffer(const uint32_t currentImage, const glm::vec3& objectPosition,
-		const glm::mat4& model, const Material& material) 
+	void GameLayer::UpdatePerObjectUniformBuffer(const unsigned currentImage,
+	                                             const glm::mat4& model, const Material& material) 
 	{
 		m_PerObjectUniformData = {
-			.position = objectPosition,
 			.model = model,
 			.worldNormal = glm::transpose(glm::inverse(glm::mat3(model))),
 			.material = material.params
@@ -535,13 +537,15 @@ namespace Game
 
 	void GameLayer::PrepareUniformBuffers()
 	{
-		for (auto& [scene, params, perObject] : m_UniformBuffers)
+		for (auto& [scene, params, perObject, skybox] : m_UniformBuffers)
 		{
 			scene = std::make_shared<kbr::UniformBuffer>(sizeof(SceneUniformData));
 
 			params = std::make_shared<kbr::UniformBuffer>(sizeof(UniformDataParams));
 
 			perObject = std::make_shared<kbr::UniformBuffer>(sizeof(PerObjectData));
+
+			skybox = std::make_shared<kbr::UniformBuffer>(sizeof(SkyboxData));
 		}
 	}
 
@@ -626,12 +630,12 @@ namespace Game
 			.descriptorSetCount = static_cast<uint32_t>(m_DescriptorSets.size()),
 			.pSetLayouts = &*m_PBRDescriptorSetLayout
 		};
-		std::vector<vk::raii::DescriptorSet> descriptorSets = device.allocateDescriptorSets(allocInfo);
 
+		std::vector<vk::raii::DescriptorSet> sceneDescriptorSets = device.allocateDescriptorSets(allocInfo);
+		std::vector<vk::raii::DescriptorSet> skyboxDescriptorSets = device.allocateDescriptorSets(allocInfo);
 		for (uint32_t i = 0; i < m_UniformBuffers.size(); i++)
 		{
-			m_DescriptorSets[i].scene = std::move(descriptorSets[i]);
-
+			m_DescriptorSets[i].scene = std::move(sceneDescriptorSets[i]);
 			context.SetObjectDebugName(m_DescriptorSets[i].scene,"PBR Descriptor Set[" + std::to_string(i) + "]");
 
 			const vk::DescriptorBufferInfo sceneBufferInfo{
@@ -662,6 +666,12 @@ namespace Game
 				.sampler = *m_SkyboxTexture.GetSampler(),
 				.imageView = *m_SkyboxTexture.GetImageView(),
 				.imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal
+			};
+
+			const vk::DescriptorBufferInfo skyboxBufferInfo{
+				.buffer = *m_UniformBuffers[i].skybox->GetBuffer(),
+				.offset = 0,
+				.range = sizeof(SkyboxData)
 			};
 
 			const std::vector descriptorWrites = {
@@ -708,6 +718,38 @@ namespace Game
 			};
 
 			device.updateDescriptorSets(descriptorWrites, {});
+
+			m_DescriptorSets[i].skybox = std::move(skyboxDescriptorSets[i]);
+			context.SetObjectDebugName(m_DescriptorSets[i].skybox, "Skybox Descriptor Set[" + std::to_string(i) + "]");
+
+			const std::vector skyboxDescriptorWrites = {
+				vk::WriteDescriptorSet{
+					.dstSet = *m_DescriptorSets[i].skybox,
+					.dstBinding = 0,
+					.dstArrayElement = 0,
+					.descriptorCount = 1,
+					.descriptorType = vk::DescriptorType::eUniformBuffer,
+					.pBufferInfo = &skyboxBufferInfo
+				},
+				vk::WriteDescriptorSet{
+					.dstSet = *m_DescriptorSets[i].skybox,
+					.dstBinding = 1,
+					.dstArrayElement = 0,
+					.descriptorCount = 1,
+					.descriptorType = vk::DescriptorType::eUniformBuffer,
+					.pBufferInfo = &paramsBufferInfo
+				},
+				vk::WriteDescriptorSet{
+					.dstSet = *m_DescriptorSets[i].skybox,
+					.dstBinding = 4,
+					.dstArrayElement = 0,
+					.descriptorCount = 1,
+					.descriptorType = vk::DescriptorType::eCombinedImageSampler,
+					.pImageInfo = &skyboxImageInfo
+				}
+			};
+
+			device.updateDescriptorSets(skyboxDescriptorWrites, {});
 		}
 	}
 

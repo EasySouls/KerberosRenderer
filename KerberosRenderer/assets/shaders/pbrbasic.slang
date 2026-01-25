@@ -47,7 +47,6 @@ struct Material {
 };
 
 struct PerObject {
-    float3 objPos;
     float4x4 model;
     float4x4 worldNormal;
     Material material;
