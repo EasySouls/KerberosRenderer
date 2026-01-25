@@ -45,6 +45,9 @@ namespace Game
 		KBR_CORE_INFO("Size of UniformDataParams: {} bytes", sizeof(UniformDataParams));
 		KBR_CORE_INFO("Size of PerObjectData: {} bytes", sizeof(PerObjectData));
 
+		m_SkyboxMesh = kbr::ModelLoader::LoadModel("assets/models/cube.gltf");
+		m_SkyboxTexture.LoadFromFile("assets/textures/hdr/pisa_cube.ktx", vk::Format::eR16G16B16A16Sfloat);
+
 		CreateVulkanResources();
 
 		KBR_CORE_INFO("Prepared Vulkan resources!");
@@ -53,9 +56,6 @@ namespace Game
 		m_Meshes.push_back(kbr::ModelLoader::LoadModel("assets/models/avocado/Avocado.gltf"));
 
 		KBR_CORE_INFO("Loaded {} mesh(es)!", m_Meshes.size());
-
-		m_SkyboxMesh = kbr::ModelLoader::LoadModel("assets/models/cube.gltf");
-		m_SkyboxTexture.LoadFromFile("assets/textures/hdr/pisa_cube.ktx", vk::Format::eR16G16B16A16Sfloat);
 	}
 	
 	void GameLayer::OnDetach() 
@@ -164,7 +164,7 @@ namespace Game
 			cmd.setScissor(0, renderArea);
 
 			cmd.bindPipeline(vk::PipelineBindPoint::eGraphics, *m_ShadowMapPipeline);
-			cmd.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, *m_PBRPipelineLayout, 0, *m_DescriptorSets[currentImage], {});
+			cmd.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, *m_PBRPipelineLayout, 0, *m_DescriptorSets[currentImage].scene, {});
 
 			for (const auto& mesh : m_Meshes)
 			{
@@ -308,8 +308,22 @@ namespace Game
 
 			cmd.setScissor(0, renderArea);
 
+			if (m_DisplaySkybox && m_SkyboxMesh.has_value())
+			{
+				cmd.bindPipeline(vk::PipelineBindPoint::eGraphics, *m_SkyboxPipeline);
+				// TODO: Use separate descriptor set for skybox
+				cmd.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, *m_PBRPipelineLayout, 0, *m_DescriptorSets[currentImage].scene, {});
+
+				const glm::mat4 skyboxModel = glm::mat4(glm::mat3(m_Camera.GetViewMatrix()));
+				m_PerObjectUniformData.model = skyboxModel;
+				m_PerObjectUniformData.position = glm::vec3(0.0f);
+				std::memcpy(m_UniformBuffers[currentImage].perObject->GetMappedData(), &m_PerObjectUniformData, sizeof(PerObjectData));
+
+				m_SkyboxMesh->Draw(cmd);
+			}
+
 			cmd.bindPipeline(vk::PipelineBindPoint::eGraphics, *m_PBROpaquePipeline);
-			cmd.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, *m_PBRPipelineLayout, 0, *m_DescriptorSets[currentImage], {});
+			cmd.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, *m_PBRPipelineLayout, 0, *m_DescriptorSets[currentImage].scene, {});
 
 			for (const auto& mesh : m_Meshes)
 			{
@@ -354,7 +368,7 @@ namespace Game
 			cmd.setScissor(0, renderArea);
 
 			cmd.bindPipeline(vk::PipelineBindPoint::eGraphics, *m_PBRTransparentPipeline);
-			cmd.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, *m_PBRPipelineLayout, 0, *m_DescriptorSets[currentImage], {});
+			cmd.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, *m_PBRPipelineLayout, 0, *m_DescriptorSets[currentImage].scene, {});
 
 			/*for (const auto& mesh : m_Meshes)
 			{
@@ -467,6 +481,12 @@ namespace Game
 		}
 		ImGui::Combo("Select Material", &m_SelectedMaterialIndex, materialNames, static_cast<int>(m_Materials.size()));
 
+		ImGui::Separator();
+
+		// Skybox settings
+		ImGui::Text("Skybox");
+		ImGui::Checkbox("Display Skybox", &m_DisplaySkybox);
+
 		ImGui::End();
 
 		KBR_CORE_TRACE("ImGui rendered!");
@@ -533,11 +553,11 @@ namespace Game
 		std::vector<vk::DescriptorPoolSize> poolSizes = {
 			vk::DescriptorPoolSize{
 				.type = vk::DescriptorType::eUniformBuffer,
-				.descriptorCount = 20
+				.descriptorCount = 10
 			},
 			vk::DescriptorPoolSize{
 				.type = vk::DescriptorType::eCombinedImageSampler,
-				.descriptorCount = 10
+				.descriptorCount = 20
 			}
 		};
 
@@ -581,6 +601,13 @@ namespace Game
 				.descriptorCount = 1,
 				.stageFlags = vk::ShaderStageFlagBits::eFragment,
 				.pImmutableSamplers = nullptr
+			},
+			vk::DescriptorSetLayoutBinding{
+				.binding = 4,
+				.descriptorType = vk::DescriptorType::eCombinedImageSampler,
+				.descriptorCount = 1,
+				.stageFlags = vk::ShaderStageFlagBits::eFragment,
+				.pImmutableSamplers = nullptr
 			}
 		};
 
@@ -603,11 +630,9 @@ namespace Game
 
 		for (uint32_t i = 0; i < m_UniformBuffers.size(); i++)
 		{
-			m_DescriptorSets[i] = std::move(descriptorSets[i]);
+			m_DescriptorSets[i].scene = std::move(descriptorSets[i]);
 
-			context.SetObjectDebugName(reinterpret_cast<uint64_t>(static_cast<VkDescriptorSet>(*m_DescriptorSets[i])),
-									   vk::ObjectType::eDescriptorSet,
-									   "PBR Descriptor Set[" + std::to_string(i) + "]");
+			context.SetObjectDebugName(m_DescriptorSets[i].scene,"PBR Descriptor Set[" + std::to_string(i) + "]");
 
 			const vk::DescriptorBufferInfo sceneBufferInfo{
 				.buffer = *m_UniformBuffers[i].scene->GetBuffer(),
@@ -633,9 +658,15 @@ namespace Game
 				.imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal
 			};
 
+			const vk::DescriptorImageInfo skyboxImageInfo{
+				.sampler = *m_SkyboxTexture.GetSampler(),
+				.imageView = *m_SkyboxTexture.GetImageView(),
+				.imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal
+			};
+
 			const std::vector descriptorWrites = {
 				vk::WriteDescriptorSet{
-					.dstSet = *m_DescriptorSets[i],
+					.dstSet = *m_DescriptorSets[i].scene,
 					.dstBinding = 0,
 					.dstArrayElement = 0,
 					.descriptorCount = 1,
@@ -643,7 +674,7 @@ namespace Game
 					.pBufferInfo = &sceneBufferInfo
 				},
 				vk::WriteDescriptorSet{
-					.dstSet = *m_DescriptorSets[i],
+					.dstSet = *m_DescriptorSets[i].scene,
 					.dstBinding = 1,
 					.dstArrayElement = 0,
 					.descriptorCount = 1,
@@ -651,7 +682,7 @@ namespace Game
 					.pBufferInfo = &paramsBufferInfo
 				},
 				vk::WriteDescriptorSet{
-					.dstSet = *m_DescriptorSets[i],
+					.dstSet = *m_DescriptorSets[i].scene,
 					.dstBinding = 2,
 					.dstArrayElement = 0,
 					.descriptorCount = 1,
@@ -659,13 +690,21 @@ namespace Game
 					.pBufferInfo = &perObjectBufferInfo
 				},
 				vk::WriteDescriptorSet{
-					.dstSet = *m_DescriptorSets[i],
+					.dstSet = *m_DescriptorSets[i].scene,
 					.dstBinding = 3,
 					.dstArrayElement = 0,
 					.descriptorCount = 1,
 					.descriptorType = vk::DescriptorType::eCombinedImageSampler,
 					.pImageInfo = &shadowMapImageInfo
 				},
+				vk::WriteDescriptorSet{
+					.dstSet = *m_DescriptorSets[i].scene,
+					.dstBinding = 4,
+					.dstArrayElement = 0,
+					.descriptorCount = 1,
+					.descriptorType = vk::DescriptorType::eCombinedImageSampler,
+					.pImageInfo = &skyboxImageInfo
+				}
 			};
 
 			device.updateDescriptorSets(descriptorWrites, {});
@@ -997,6 +1036,8 @@ namespace Game
 				.depthClampEnable = vk::False,
 				.rasterizerDiscardEnable = vk::False,
 				.polygonMode = vk::PolygonMode::eFill,
+				//.cullMode = vk::CullModeFlagBits::eNone, // TODO: vk::CullModeFlagBits::eBack,
+				//.frontFace = vk::FrontFace::eClockwise, // TODO: Verify winding order
 				.cullMode = vk::CullModeFlagBits::eBack,
 				.frontFace = vk::FrontFace::eCounterClockwise,
 				.depthBiasEnable = vk::False,
@@ -1016,7 +1057,7 @@ namespace Game
 			vk::PipelineDepthStencilStateCreateInfo opaqueDepthStencil{
 				.depthTestEnable = vk::True,
 				.depthWriteEnable = vk::True,
-				.depthCompareOp = vk::CompareOp::eLess,
+				.depthCompareOp = vk::CompareOp::eLessOrEqual,
 				.depthBoundsTestEnable = vk::False,
 				.stencilTestEnable = vk::False,
 				.minDepthBounds = 0.0f,
@@ -1089,9 +1130,7 @@ namespace Game
 
 			m_PBROpaquePipeline = vk::raii::Pipeline(device, nullptr, opaquePipelineInfo);
 
-			context.SetObjectDebugName(reinterpret_cast<uint64_t>(static_cast<VkPipeline>(*m_PBROpaquePipeline)),
-									   vk::ObjectType::ePipeline,
-									   "PBR Opaque Pipeline");
+			context.SetObjectDebugName(m_PBROpaquePipeline,"PBR Opaque Pipeline");
 
 			vk::GraphicsPipelineCreateInfo transparentPipelineInfo{
 				.pNext = &pipelineRenderingCreateInfo,
@@ -1111,9 +1150,33 @@ namespace Game
 
 			m_PBRTransparentPipeline = vk::raii::Pipeline(device, nullptr, transparentPipelineInfo);
 
-			context.SetObjectDebugName(reinterpret_cast<uint64_t>(static_cast<VkPipeline>(*m_PBRTransparentPipeline)),
-									   vk::ObjectType::ePipeline,
-									   "PBR Transparent Pipeline");
+			context.SetObjectDebugName(m_PBRTransparentPipeline,"PBR Transparent Pipeline");
+
+			kbr::Shader skyboxShader("assets/shaders/skybox.spv", "Skybox");
+			const auto skyboxShaderStages = skyboxShader.GetPipelineShaderStageCreateInfo();
+
+			opaqueDepthStencil.depthWriteEnable = vk::False;
+			opaqueDepthStencil.depthTestEnable = vk::False;
+
+			opaqueRasterizer.cullMode = vk::CullModeFlagBits::eFront;
+
+			vk::GraphicsPipelineCreateInfo skyboxPipelineInfo{
+				.pNext = &pipelineRenderingCreateInfo,
+				.stageCount = 2,
+				.pStages = skyboxShaderStages.data(),
+				.pVertexInputState = &vertexInputInfo,
+				.pInputAssemblyState = &inputAssembly,
+				.pViewportState = &viewportState,
+				.pRasterizationState = &opaqueRasterizer,
+				.pMultisampleState = &multisampling,
+				.pDepthStencilState = &opaqueDepthStencil,
+				.pColorBlendState = &colorBlending,
+				.pDynamicState = &dynamicStateInfo,
+				.layout = m_PBRPipelineLayout,
+				.renderPass = nullptr
+			};
+			m_SkyboxPipeline = vk::raii::Pipeline(device, nullptr, skyboxPipelineInfo);
+			context.SetObjectDebugName(m_SkyboxPipeline, "Skybox Pipeline");
 		}
 
 		// Transition color image to shader read layout

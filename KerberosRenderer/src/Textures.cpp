@@ -86,6 +86,16 @@ namespace kbr
 		descriptor.imageLayout = imageLayout;
 	}
 
+	vk::raii::Sampler& Texture::GetSampler() 
+	{
+		return sampler;
+	}
+
+	vk::raii::ImageView& Texture::GetImageView() 
+	{
+		return view;
+	}
+
 	void Texture::CreateSampler(const vk::raii::Device& device, const vk::Filter filter) 
 	{
 		const vk::SamplerCreateInfo samplerCreateInfo{

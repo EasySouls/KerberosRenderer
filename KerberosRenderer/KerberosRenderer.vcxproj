@@ -228,6 +228,7 @@
     <ClInclude Include="vendor\tinyobjloader\tiny_obj_loader.h" />
   </ItemGroup>
   <ItemGroup>
+    <None Include="assets\shaders\skybox.slang" />
     <None Include="src\shaders\pbrbasic.slang" />
     <None Include="src\shaders\shadowmap.slang" />
     <None Include="src\shaders\simple.slang" />

@@ -431,6 +431,9 @@ namespace kbr
 				throw std::invalid_argument("unsupported layout transition!");
 		}
 
+		barrier.srcStageMask = srcStageMask;
+		barrier.dstStageMask = dstStageMask;
+
 		copyCmd.pipelineBarrier2(
 			vk::DependencyInfo{
 				.dependencyFlags = {},

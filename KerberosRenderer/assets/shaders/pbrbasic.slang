@@ -157,9 +157,9 @@ float4 fragMain(VSOutput input)
     float3 ambient = scene.ambientLightColor * perObject.material.albedo;
 
     // Combine with ambient
-    //float3 color = ambient + Lo;
+    float3 color = (ambient + Lo) * uboParams.exposure;
     //float3 color = perObject.material.albedo;
-    float3 color = float3(0.5, 0.2, 0.8);
+    //float3 color = float3(0.5, 0.2, 0.8);
 
     // Gamma correct
     color = pow(color, (1.0f / uboParams.gamma).xxx);

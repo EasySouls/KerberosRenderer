@@ -105,9 +105,9 @@ namespace Game
 		vk::raii::PipelineLayout m_PBRPipelineLayout = nullptr;
 		vk::raii::Pipeline m_PBROpaquePipeline = nullptr;
 		vk::raii::Pipeline m_PBRTransparentPipeline = nullptr;
+		vk::raii::Pipeline m_SkyboxPipeline = nullptr;
 
 		vk::raii::Sampler m_ColorSampler = nullptr;
-
 
 		struct SceneUniformData
 		{
@@ -146,14 +146,22 @@ namespace Game
 		// TODO: This should hold multiple UBOs for multiple frames in flight
 		std::array<UniformBufferObject, 1> m_UniformBuffers;
 
+		struct DescriptorSets
+		{
+			vk::raii::DescriptorSet scene = nullptr;
+			vk::raii::DescriptorSet skybox = nullptr;
+		};
+
 		// TODO: This should hold multiple descriptor sets for multiple frames in flight
-		std::array<vk::raii::DescriptorSet, 1> m_DescriptorSets{nullptr};
+		std::array<DescriptorSets, 1> m_DescriptorSets{};
 
 		VkDescriptorSet m_ColorOutputDescriptorSet = VK_NULL_HANDLE;
 
 		glm::vec3 m_ObjectPosition{ 0.f };
 		glm::vec3 m_ObjectRotation{ 0.f };
 		glm::vec3 m_ObjectScale{ 5.f };
+
+		bool m_DisplaySkybox = true;
 	};
 
 }

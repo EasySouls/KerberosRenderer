@@ -44,6 +44,9 @@ namespace kbr
 
 		void      UpdateDescriptor();
 
+		vk::raii::Sampler& GetSampler();
+		vk::raii::ImageView& GetImageView();
+
 	protected:
 		void CreateSampler(const vk::raii::Device& device, vk::Filter filter = vk::Filter::eLinear);
 		void SetDebugName(const std::string& debugName) const;
