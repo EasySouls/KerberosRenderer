@@ -126,10 +126,10 @@
     <ClCompile Include="src\Camera.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="src\input\InputSystem.cpp">
+    <ClCompile Include="src\Input\InputSystem.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="src\logging\Log.cpp">
+    <ClCompile Include="src\Logging\Log.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="src\Shader.cpp">
@@ -224,46 +224,46 @@
     <ClInclude Include="src\Camera.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="src\events\Event.hpp">
+    <ClInclude Include="src\Events\Event.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="src\events\MouseButtonPressedEvent.hpp">
+    <ClInclude Include="src\Events\MouseButtonPressedEvent.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="src\events\KeyPressedEvent.hpp">
+    <ClInclude Include="src\Events\KeyPressedEvent.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="src\events\WindowResizedEvent.hpp">
+    <ClInclude Include="src\Events\WindowResizedEvent.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="src\events\KeyTypedEvent.hpp">
+    <ClInclude Include="src\Events\KeyTypedEvent.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="src\events\KeyReleasedEvent.hpp">
+    <ClInclude Include="src\Events\KeyReleasedEvent.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="src\events\MouseScrolledEvent.hpp">
+    <ClInclude Include="src\Events\MouseScrolledEvent.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="src\events\MouseMovedEvent.hpp">
+    <ClInclude Include="src\Events\MouseMovedEvent.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="src\events\MouseButtonReleasedEvent.hpp">
+    <ClInclude Include="src\Events\MouseButtonReleasedEvent.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="src\events\WindowDropEvent.hpp">
+    <ClInclude Include="src\Events\WindowDropEvent.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="src\input\InputSystem.hpp">
+    <ClInclude Include="src\Input\InputSystem.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="src\input\KeyCodes.hpp">
+    <ClInclude Include="src\Input\KeyCodes.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="src\input\MouseButtonCodes.hpp">
+    <ClInclude Include="src\Input\MouseButtonCodes.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="src\logging\Log.hpp">
+    <ClInclude Include="src\Logging\Log.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="src\Shader.hpp">
@@ -290,11 +290,19 @@
     <ClInclude Include="vendor\ktx\other_include\KHR\khrplatform.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="src\Scene\Node.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Renderer\Material.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="src\shaders\simple.slang" />
     <None Include="src\shaders\shadowmap.slang" />
     <None Include="src\shaders\pbrbasic.slang" />
     <None Include="assets\shaders\skybox.slang" />
+    <None Include="assets\shaders\shadowmap.slang" />
+    <None Include="assets\shaders\pbrbasic.slang" />
   </ItemGroup>
 </Project>

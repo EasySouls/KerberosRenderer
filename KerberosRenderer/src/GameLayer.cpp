@@ -12,8 +12,6 @@
 #include <glm/gtc/type_ptr.hpp>
 
 #include "Buffer.hpp"
-#include "Buffer.hpp"
-#include "Buffer.hpp"
 #include "imgui.h"
 
 #include "backends/imgui_impl_vulkan.h"
@@ -26,6 +24,16 @@ namespace Game
 		//m_Camera.SetPosition(glm::vec3(0.0f, 1.0f, 5.0f));
 	}
 
+	GameLayer::~GameLayer() 
+	{
+		for (const auto& node : m_SceneNodes)
+		{
+			delete node;
+		}
+
+		m_SceneNodes.clear();
+	}
+
 	void GameLayer::OnAttach() 
 	{
 		KBR_CORE_INFO("GameLayer attached!");
@@ -33,17 +41,17 @@ namespace Game
 		m_Camera = kbr::Camera(45.0f, 16.0f / 9.0f, 0.1f, 1000.0f);
 		m_ViewportSize = { 1280.0f, 720.0f };
 
-		m_Materials.emplace_back("Gold", glm::vec3(1.0f, 0.765557f, 0.336057f), 0.1f, 1.0f);
-		m_Materials.emplace_back("Copper", glm::vec3(0.955008f, 0.637427f, 0.538163f), 0.1f, 1.0f);
-		m_Materials.emplace_back("Chromium", glm::vec3(0.549585f, 0.556114f, 0.554256f), 0.1f, 1.0f);
-		m_Materials.emplace_back("Nickel", glm::vec3(0.659777f, 0.608679f, 0.525649f), 0.1f, 1.0f);
-		m_Materials.emplace_back("Titanium", glm::vec3(0.541931f, 0.496791f, 0.449419f), 0.1f, 1.0f);
-		m_Materials.emplace_back("Cobalt", glm::vec3(0.662124f, 0.654864f, 0.633732f), 0.1f, 1.0f);
-		m_Materials.emplace_back("Platinum", glm::vec3(0.672411f, 0.637331f, 0.585456f), 0.1f, 1.0f);
-		m_Materials.emplace_back("White", glm::vec3(1.0f), 0.1f, 1.0f);
-		m_Materials.emplace_back("Red", glm::vec3(1.0f, 0.0f, 0.0f), 0.1f, 1.0f);
-		m_Materials.emplace_back("Blue", glm::vec3(0.0f, 0.0f, 1.0f), 0.1f, 1.0f);
-		m_Materials.emplace_back("Black", glm::vec3(0.0f), 0.1f, 1.0f);
+		m_Materials.emplace_back(std::make_shared<kbr::Material>("Gold", glm::vec3(1.0f, 0.765557f, 0.336057f), 0.1f, 1.0f));
+		m_Materials.emplace_back(std::make_shared<kbr::Material>("Copper", glm::vec3(0.955008f, 0.637427f, 0.538163f), 0.1f, 1.0f));
+		m_Materials.emplace_back(std::make_shared<kbr::Material>("Chromium", glm::vec3(0.549585f, 0.556114f, 0.554256f), 0.1f, 1.0f));
+		m_Materials.emplace_back(std::make_shared<kbr::Material>("Nickel", glm::vec3(0.659777f, 0.608679f, 0.525649f), 0.1f, 1.0f));
+		m_Materials.emplace_back(std::make_shared<kbr::Material>("Titanium", glm::vec3(0.541931f, 0.496791f, 0.449419f), 0.1f, 1.0f));
+		m_Materials.emplace_back(std::make_shared<kbr::Material>("Cobalt", glm::vec3(0.662124f, 0.654864f, 0.633732f), 0.1f, 1.0f));
+		m_Materials.emplace_back(std::make_shared<kbr::Material>("Platinum", glm::vec3(0.672411f, 0.637331f, 0.585456f), 0.1f, 1.0f));
+		m_Materials.emplace_back(std::make_shared<kbr::Material>("White", glm::vec3(1.0f), 0.1f, 1.0f));
+		m_Materials.emplace_back(std::make_shared<kbr::Material>("Red", glm::vec3(1.0f, 0.0f, 0.0f), 0.1f, 1.0f));
+		m_Materials.emplace_back(std::make_shared<kbr::Material>("Blue", glm::vec3(0.0f, 0.0f, 1.0f), 0.1f, 1.0f));
+		m_Materials.emplace_back(std::make_shared<kbr::Material>("Black", glm::vec3(0.0f), 0.1f, 1.0f));
 
 		KBR_CORE_INFO("Size of SceneUniformData: {} bytes", sizeof(SceneUniformData));
 		KBR_CORE_INFO("Size of UniformDataParams: {} bytes", sizeof(UniformDataParams));
@@ -57,9 +65,45 @@ namespace Game
 		KBR_CORE_INFO("Prepared Vulkan resources!");
 
 		// Load models
-		m_Meshes.push_back(kbr::ModelLoader::LoadModel("assets/models/avocado/Avocado.gltf"));
+		m_Meshes["avocado"] = std::make_shared<kbr::Mesh>(kbr::ModelLoader::LoadModel("assets/models/avocado/Avocado.gltf"));
+		m_Meshes["cube"] = std::make_shared<kbr::Mesh>(kbr::ModelLoader::LoadModel("assets/models/cube.gltf"));
 
 		KBR_CORE_INFO("Loaded {} mesh(es)!", m_Meshes.size());
+
+
+		const auto& avocadoTexture = m_Textures.emplace_back();
+		avocadoTexture->LoadFromFile("assets/models/avocado/Avocado_baseColor.ktx", vk::Format::eR8G8B8A8Srgb);
+		const auto& avocadoNormalTexture = m_Textures.emplace_back();
+		avocadoNormalTexture->LoadFromFile("assets/models/avocado/Avocado_normal.ktx", vk::Format::eR8G8B8A8Unorm);
+
+		const auto& stoneFloorAlbedoTexture = m_Textures.emplace_back();
+		stoneFloorAlbedoTexture->LoadFromFile("assets/textures/stonefloor01_color_rgba.ktx", vk::Format::eR8G8B8A8Srgb);
+		const auto& stoneFloorNormalTexture = m_Textures.emplace_back();
+		stoneFloorNormalTexture->LoadFromFile("assets/textures/stonefloor01_normal_rgba.ktx", vk::Format::eR8G8B8A8Unorm);
+
+
+		KBR_CORE_INFO("Loaded {} texture(s)!", m_Textures.size());
+
+		const auto& avocadoMaterial = m_Materials.emplace_back(std::make_shared<kbr::Material>("Avocado", glm::vec3(1.0f), 0.1f, 1.0f, avocadoTexture, avocadoNormalTexture));
+		const auto& cubeMaterial = m_Materials.emplace_back(std::make_shared<kbr::Material>("Stone Floor", glm::vec3(1.0f), 0.5f, 0.0f, stoneFloorAlbedoTexture, stoneFloorNormalTexture));
+
+		m_SceneNodes.push_back(new kbr::Node{
+			.Position = glm::vec3(0.0f, -1.5f, 0.0f),
+			.Rotation = glm::vec3(0.0f),
+			.Scale = glm::vec3(1.0f),
+			.Mesh = m_Meshes["avocado"],
+			.Material = avocadoMaterial,
+			.Name = "Avocado"
+		});
+
+		m_SceneNodes.push_back(new kbr::Node{
+			.Position = glm::vec3(2.0f, 0.0f, 0.0f),
+			.Rotation = glm::vec3(0.0f),
+			.Scale = glm::vec3(1.0f),
+			.Mesh = m_Meshes["cube"],
+			.Material = cubeMaterial,
+			.Name = "Cube"
+		});
 	}
 	
 	void GameLayer::OnDetach() 
@@ -97,15 +141,14 @@ namespace Game
 		UpdateLights(m_Time, currentImage);
 		UpdateSceneUniformBuffers(currentImage);
 
-		// TODO: Get the current object's position
-		const glm::mat4 translation = glm::translate(glm::mat4(1.0f), m_ObjectPosition);
+		/*const glm::mat4 translation = glm::translate(glm::mat4(1.0f), m_ObjectPosition);
 		const glm::mat4 model = translation *
 			glm::rotate(glm::mat4(1.0f), m_ObjectRotation.x, glm::vec3(1.0f, 0.0f, 0.0f)) *
 			glm::rotate(glm::mat4(1.0f), m_ObjectRotation.y, glm::vec3(0.0f, 1.0f, 0.0f)) *
 			glm::rotate(glm::mat4(1.0f), m_ObjectRotation.z, glm::vec3(0.0f, 0.0f, 1.0f)) *
-			glm::scale(glm::mat4(1.0f), m_ObjectScale);
+			glm::scale(glm::mat4(1.0f), m_ObjectScale);*/
 
-		const Material selectedMaterial = m_Materials[m_SelectedMaterialIndex];
+		const kbr::Material& selectedMaterial = *m_Materials[m_SelectedMaterialIndex];
 
 		// Render shadow map
 		{
@@ -170,11 +213,11 @@ namespace Game
 			cmd.bindPipeline(vk::PipelineBindPoint::eGraphics, *m_ShadowMapPipeline);
 			cmd.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, *m_PBRPipelineLayout, 0, *m_DescriptorSets[currentImage].scene, {});
 
-			for (const auto& mesh : m_Meshes)
+			for (const auto& node : m_SceneNodes)
 			{
-				UpdatePerObjectUniformBuffer(currentImage, model, selectedMaterial);
+				UpdatePerObjectUniformBuffer(currentImage, node->GetTransform(), selectedMaterial);
 
-				mesh.Draw(cmd);
+				node->Mesh->Draw(cmd);
 			}
 
 			cmd.endRendering();
@@ -323,11 +366,11 @@ namespace Game
 			cmd.bindPipeline(vk::PipelineBindPoint::eGraphics, *m_PBROpaquePipeline);
 			cmd.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, *m_PBRPipelineLayout, 0, *m_DescriptorSets[currentImage].scene, {});
 
-			for (const auto& mesh : m_Meshes)
+			for (const auto& node : m_SceneNodes)
 			{
-				UpdatePerObjectUniformBuffer(currentImage, model, selectedMaterial);
+				UpdatePerObjectUniformBuffer(currentImage, node->GetTransform(), selectedMaterial);
 
-				mesh.Draw(cmd);
+				node->Mesh->Draw(cmd);
 			}
 
 			cmd.endRendering();
@@ -451,10 +494,17 @@ namespace Game
 		ImGui::Separator();
 
 		// Object transform controls
-		ImGui::Text("Object Transform");
-		ImGui::DragFloat3("Position", glm::value_ptr(m_ObjectPosition), 0.1f);
-		ImGui::DragFloat3("Rotation", glm::value_ptr(m_ObjectRotation), 0.01f);
-		ImGui::DragFloat3("Scale", glm::value_ptr(m_ObjectScale), 0.1f, 0.1f, 100.0f);
+		ImGui::Text("Nodes");
+		for (size_t i = 0; i < m_SceneNodes.size(); ++i)
+		{
+			if (ImGui::TreeNode(m_SceneNodes[i]->Name.c_str()))
+			{
+				ImGui::DragFloat3(("Position##" + std::to_string(i)).c_str(), glm::value_ptr(m_SceneNodes[i]->Position), 0.1f);
+				ImGui::DragFloat3(("Rotation##" + std::to_string(i)).c_str(), glm::value_ptr(m_SceneNodes[i]->Rotation), 0.01f);
+				ImGui::DragFloat3(("Scale##" + std::to_string(i)).c_str(), glm::value_ptr(m_SceneNodes[i]->Scale), 0.1f, 0.1f, 100.0f);
+				ImGui::TreePop();
+			}
+		}
 
 		ImGui::Separator();
 
@@ -475,7 +525,7 @@ namespace Game
 		const char* materialNames[11];
 		for (size_t i = 0; i < m_Materials.size(); ++i)
 		{
-			materialNames[i] = m_Materials[i].name.c_str();
+			materialNames[i] = m_Materials[i]->name.c_str();
 		}
 		ImGui::Combo("Select Material", &m_SelectedMaterialIndex, materialNames, static_cast<int>(m_Materials.size()));
 
@@ -509,13 +559,13 @@ namespace Game
 		std::memcpy(m_UniformBuffers[currentImage].skybox->GetMappedData(), &m_SkyboxData, sizeof(SkyboxData));
 	}
 
-	void GameLayer::UpdatePerObjectUniformBuffer(const unsigned currentImage,
-	                                             const glm::mat4& model, const Material& material) 
+	void GameLayer::UpdatePerObjectUniformBuffer(const uint32_t currentImage,
+	                                             const glm::mat4& model, const kbr::Material& material) 
 	{
 		m_PerObjectUniformData = {
 			.model = model,
 			.worldNormal = glm::transpose(glm::inverse(glm::mat3(model))),
-			.material = material.params
+			.material = material.Params
 		};
 		std::memcpy(m_UniformBuffers[currentImage].perObject->GetMappedData(), &m_PerObjectUniformData, sizeof(PerObjectData));
 	}
@@ -620,15 +670,21 @@ namespace Game
 			.pBindings = bindings.data()
 		};
 
-		m_PBRDescriptorSetLayout = vk::raii::DescriptorSetLayout{ device, layoutInfo };
-		context.SetObjectDebugName(reinterpret_cast<uint64_t>(static_cast<VkDescriptorSetLayout>(*m_PBRDescriptorSetLayout)),
-								   vk::ObjectType::eDescriptorSetLayout,
-								   "PBR Descriptor Set Layout");
+		m_DescriptorSetLayouts.scene = vk::raii::DescriptorSetLayout{ device, layoutInfo };
+		context.SetObjectDebugName(m_DescriptorSetLayouts.scene,"PBR Descriptor Set Layout");
+
+		m_DescriptorSetLayouts.textures = vk::raii::DescriptorSetLayout{ device, layoutInfo };
+		context.SetObjectDebugName(m_DescriptorSetLayouts.textures, "Texture Descriptor Set Layout");
+
+		const std::array<vk::DescriptorSetLayout, 2> setLayouts = {
+			*m_DescriptorSetLayouts.scene,
+			* m_DescriptorSetLayouts.textures
+		};
 
 		vk::DescriptorSetAllocateInfo allocInfo{
 			.descriptorPool = m_DescriptorPool,
-			.descriptorSetCount = static_cast<uint32_t>(m_DescriptorSets.size()),
-			.pSetLayouts = &*m_PBRDescriptorSetLayout
+			.descriptorSetCount = static_cast<uint32_t>(m_DescriptorSets.size()), // TODO: Check if this is correct
+			.pSetLayouts = setLayouts.data()
 		};
 
 		std::vector<vk::raii::DescriptorSet> sceneDescriptorSets = device.allocateDescriptorSets(allocInfo);
@@ -870,9 +926,10 @@ namespace Game
 										  vk::ImageLayout::eDepthStencilAttachmentOptimal,
 										  shadowMapMipLevels);*/
 
+
 			vk::PipelineLayoutCreateInfo pipelineLayoutInfo{
 				.setLayoutCount = 1,
-				.pSetLayouts = &*m_PBRDescriptorSetLayout,
+				.pSetLayouts = &*m_DescriptorSetLayouts.scene,
 				.pushConstantRangeCount = 0,
 				.pPushConstantRanges = nullptr
 			};
@@ -1040,9 +1097,14 @@ namespace Game
 									   vk::ObjectType::eImageView,
 									   "Depth Attachment Image View");
 
+			const std::array<vk::DescriptorSetLayout, 2> setLayouts = {
+				m_DescriptorSetLayouts.scene,
+				m_DescriptorSetLayouts.textures
+			};
+
 			vk::PipelineLayoutCreateInfo pipelineLayoutInfo{
-				.setLayoutCount = 1,
-				.pSetLayouts = &*m_PBRDescriptorSetLayout,
+				.setLayoutCount = static_cast<uint32_t>(setLayouts.size()),
+				.pSetLayouts = setLayouts.data(),
 				.pushConstantRangeCount = 0,
 				.pPushConstantRanges = nullptr
 			};

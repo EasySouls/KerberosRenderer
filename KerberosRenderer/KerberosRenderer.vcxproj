@@ -105,7 +105,7 @@
       <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions);_CRT_SECURE_NO_WARNINGS;_GLFW_WIN32;NOMINMAX;KBR_DEBUG</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp20</LanguageStandard>
-      <AdditionalIncludeDirectories>C:\Development\KerberosRenderer\KerberosRenderer\vendor\glfw-3.4\include;C:\Development\KerberosRenderer\KerberosRenderer\vendor\glm;C:\Development\KerberosRenderer\KerberosRenderer\vendor\imgui;C:\Development\KerberosRenderer\KerberosRenderer\vendor\stb;C:\VulkanSDK\1.4.335.0\Include;C:\Development\KerberosRenderer\KerberosRenderer\vendor\tinyobjloader;C:\Development\KerberosRenderer\KerberosRenderer\vendor\tinygltf;C:\Development\KerberosRenderer\KerberosRenderer\vendor;C:\Development\KerberosRenderer\KerberosRenderer\vendor\ktx\include;C:\Development\KerberosRenderer\KerberosRenderer\vendor\ktx\other_include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>C:\Development\KerberosRenderer\KerberosRenderer\vendor\glfw-3.4\include;C:\Development\KerberosRenderer\KerberosRenderer\vendor\glm;C:\Development\KerberosRenderer\KerberosRenderer\vendor\imgui;C:\Development\KerberosRenderer\KerberosRenderer\vendor\stb;C:\VulkanSDK\1.4.335.0\Include;C:\Development\KerberosRenderer\KerberosRenderer\vendor\tinyobjloader;C:\Development\KerberosRenderer\KerberosRenderer\vendor\tinygltf;C:\Development\KerberosRenderer\KerberosRenderer\vendor;C:\Development\KerberosRenderer\KerberosRenderer\vendor\ktx\include;C:\Development\KerberosRenderer\KerberosRenderer\vendor\ktx\other_include;C:\Development\KerberosRenderer\KerberosRenderer\src;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -123,7 +123,7 @@
       <PreprocessorDefinitions>NDEBUG;_CONSOLE;%(PreprocessorDefinitions);_CRT_SECURE_NO_WARNINGS;_GLFW_WIN32;NOMINMAX</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp20</LanguageStandard>
-      <AdditionalIncludeDirectories>C:\Development\KerberosRenderer\KerberosRenderer\vendor\glfw-3.4\include;C:\Development\KerberosRenderer\KerberosRenderer\vendor\glm;C:\Development\KerberosRenderer\KerberosRenderer\vendor\imgui;C:\Development\KerberosRenderer\KerberosRenderer\vendor\stb;C:\VulkanSDK\1.4.335.0\Include;C:\Development\KerberosRenderer\KerberosRenderer\vendor\tinyobjloader;C:\Development\KerberosRenderer\KerberosRenderer\vendor\tinygltf;C:\Development\KerberosRenderer\KerberosRenderer\vendor;C:\Development\KerberosRenderer\KerberosRenderer\vendor\ktx\include;C:\Development\KerberosRenderer\KerberosRenderer\vendor\ktx\other_include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>C:\Development\KerberosRenderer\KerberosRenderer\vendor\glfw-3.4\include;C:\Development\KerberosRenderer\KerberosRenderer\vendor\glm;C:\Development\KerberosRenderer\KerberosRenderer\vendor\imgui;C:\Development\KerberosRenderer\KerberosRenderer\vendor\stb;C:\VulkanSDK\1.4.335.0\Include;C:\Development\KerberosRenderer\KerberosRenderer\vendor\tinyobjloader;C:\Development\KerberosRenderer\KerberosRenderer\vendor\tinygltf;C:\Development\KerberosRenderer\KerberosRenderer\vendor;C:\Development\KerberosRenderer\KerberosRenderer\vendor\ktx\include;C:\Development\KerberosRenderer\KerberosRenderer\vendor\ktx\other_include;C:\Development\KerberosRenderer\KerberosRenderer\src;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -137,8 +137,8 @@
     <ClCompile Include="src\Buffer.cpp" />
     <ClCompile Include="src\Camera.cpp" />
     <ClCompile Include="src\GameLayer.cpp" />
-    <ClCompile Include="src\input\InputSystem.cpp" />
-    <ClCompile Include="src\logging\Log.cpp" />
+    <ClCompile Include="src\Input\InputSystem.cpp" />
+    <ClCompile Include="src\Logging\Log.cpp" />
     <ClCompile Include="src\main.cpp" />
     <ClCompile Include="src\Mesh.cpp" />
     <ClCompile Include="src\ModelLoader.cpp" />
@@ -186,26 +186,28 @@
     <ClInclude Include="src\Application.hpp" />
     <ClInclude Include="src\Buffer.hpp" />
     <ClInclude Include="src\Camera.hpp" />
-    <ClInclude Include="src\events\Event.hpp" />
-    <ClInclude Include="src\events\KeyPressedEvent.hpp" />
-    <ClInclude Include="src\events\KeyReleasedEvent.hpp" />
-    <ClInclude Include="src\events\KeyTypedEvent.hpp" />
-    <ClInclude Include="src\events\MouseButtonReleasedEvent.hpp" />
-    <ClInclude Include="src\events\MouseMovedEvent.hpp" />
-    <ClInclude Include="src\events\MouseButtonPressedEvent.hpp" />
-    <ClInclude Include="src\events\MouseScrolledEvent.hpp" />
-    <ClInclude Include="src\events\WindowDropEvent.hpp" />
-    <ClInclude Include="src\events\WindowResizedEvent.hpp" />
+    <ClInclude Include="src\Events\Event.hpp" />
+    <ClInclude Include="src\Events\KeyPressedEvent.hpp" />
+    <ClInclude Include="src\Events\KeyReleasedEvent.hpp" />
+    <ClInclude Include="src\Events\KeyTypedEvent.hpp" />
+    <ClInclude Include="src\Events\MouseButtonReleasedEvent.hpp" />
+    <ClInclude Include="src\Events\MouseMovedEvent.hpp" />
+    <ClInclude Include="src\Events\MouseButtonPressedEvent.hpp" />
+    <ClInclude Include="src\Events\MouseScrolledEvent.hpp" />
+    <ClInclude Include="src\Events\WindowDropEvent.hpp" />
+    <ClInclude Include="src\Events\WindowResizedEvent.hpp" />
     <ClInclude Include="src\GameLayer.hpp" />
     <ClInclude Include="src\GameObject.hpp" />
-    <ClInclude Include="src\input\InputSystem.hpp" />
-    <ClInclude Include="src\input\KeyCodes.hpp" />
-    <ClInclude Include="src\input\MouseButtonCodes.hpp" />
+    <ClInclude Include="src\Input\InputSystem.hpp" />
+    <ClInclude Include="src\Input\KeyCodes.hpp" />
+    <ClInclude Include="src\Input\MouseButtonCodes.hpp" />
     <ClInclude Include="src\io.hpp" />
     <ClInclude Include="src\Layer.hpp" />
-    <ClInclude Include="src\logging\Log.hpp" />
+    <ClInclude Include="src\Logging\Log.hpp" />
     <ClInclude Include="src\Mesh.hpp" />
     <ClInclude Include="src\ModelLoader.hpp" />
+    <ClInclude Include="src\Renderer\Material.hpp" />
+    <ClInclude Include="src\Scene\Node.hpp" />
     <ClInclude Include="src\Shader.hpp" />
     <ClInclude Include="src\Textures.hpp" />
     <ClInclude Include="src\Utils.hpp" />
@@ -228,6 +230,8 @@
     <ClInclude Include="vendor\tinyobjloader\tiny_obj_loader.h" />
   </ItemGroup>
   <ItemGroup>
+    <None Include="assets\shaders\pbrbasic.slang" />
+    <None Include="assets\shaders\shadowmap.slang" />
     <None Include="assets\shaders\skybox.slang" />
     <None Include="src\shaders\pbrbasic.slang" />
     <None Include="src\shaders\shadowmap.slang" />

@@ -7,6 +7,8 @@
 #include "Camera.hpp"
 #include "Buffer.hpp"
 #include "Textures.hpp"
+#include "Renderer/Material.hpp"
+#include "Scene/Node.hpp"
 
 #include <glm/vec3.hpp>
 
@@ -15,36 +17,15 @@
 #include <array>
 #include <memory>
 #include <optional>
+#include <unordered_map>
 
 namespace Game
 {
-	struct Material
-	{
-		// Parameter block used as push constant block
-		struct PushBlock
-		{
-			glm::vec3 albedo;
-			float roughness;
-			float metallic;
-		} params{};
-
-		std::string name;
-
-		Material() = default;
-
-		Material(std::string n, const glm::vec3 c, const float r, const float m)
-			: name(std::move(n))
-		{
-			params.roughness = r;
-			params.metallic = m;
-			params.albedo = c;
-		}
-	};
-
 	class GameLayer : public kbr::Layer
 	{
 	public:
 		GameLayer();
+		~GameLayer() override;
 
 		void OnAttach() override;
 		void OnDetach() override;
@@ -56,7 +37,7 @@ namespace Game
 	private:
 		void UpdateLights(float time, uint32_t currentImage);
 		void UpdateSceneUniformBuffers(uint32_t currentImage);
-		void UpdatePerObjectUniformBuffer(uint32_t currentImage, const glm::mat4& model, const Material& material);
+		void UpdatePerObjectUniformBuffer(uint32_t currentImage, const glm::mat4& model, const kbr::Material& material);
 
 		void PrepareUniformBuffers();
 		void SetupDescriptors();
@@ -70,16 +51,21 @@ namespace Game
 		float m_Time = 0.0f;
 		float m_Fps = 0.0f;
 
+		bool m_DisplaySkybox = true;
+
 		kbr::Camera m_Camera;
 		// Size of the ImGui viewport.
 		glm::vec2 m_ViewportSize{ 0.f };
 		// Size of the output images.
 		glm::vec2 m_OutputSize{ 0.f };
 
-		std::vector<Material> m_Materials;
-		std::vector<kbr::Mesh> m_Meshes;
+		std::vector<std::shared_ptr<kbr::Material>> m_Materials;
+		std::unordered_map<std::string, std::shared_ptr<kbr::Mesh>> m_Meshes;
 		std::optional<kbr::Mesh> m_SkyboxMesh;
+		std::vector<std::shared_ptr<kbr::Texture2D>> m_Textures;
 		int m_SelectedMaterialIndex = 0;
+
+		std::vector<kbr::Node*> m_SceneNodes;
 
 		// Vulkan resources
 		uint32_t m_ShadowMapSize = 2048;
@@ -100,7 +86,11 @@ namespace Game
 		vk::raii::ImageView m_DepthImageView = nullptr;
 
 		vk::raii::DescriptorPool m_DescriptorPool = nullptr;
-		vk::raii::DescriptorSetLayout m_PBRDescriptorSetLayout = nullptr;
+		struct DescriptorSetLayouts
+		{
+			vk::raii::DescriptorSetLayout scene = nullptr;
+			vk::raii::DescriptorSetLayout textures = nullptr;
+		} m_DescriptorSetLayouts;
 
 		vk::raii::PipelineLayout m_PBRPipelineLayout = nullptr;
 		vk::raii::Pipeline m_PBROpaquePipeline = nullptr;
@@ -115,8 +105,8 @@ namespace Game
 			glm::mat4 view{ 0.f };
 			glm::mat4 viewProjection{ 0.f };
 			glm::mat4 lightSpaceMatrix{ 0.f };
-			glm::vec3 ambientLightColor{ 0.1f, 0.1f, 0.1f };
-			glm::vec3 camPos{ 0.f };
+			alignas(16) glm::vec3 ambientLightColor{ 0.1f, 0.1f, 0.1f };
+			alignas(16) glm::vec3 camPos{ 0.f };
 		};
 		SceneUniformData m_SceneUniformData{};
 
@@ -132,7 +122,7 @@ namespace Game
 		{
 			alignas(16) glm::mat4 model{ 0.f };
 			alignas(16) glm::mat4 worldNormal{ 0.f };
-			alignas(16) Material::PushBlock material;
+			alignas(16) kbr::Material::UniformBlock material;
 		};
 		PerObjectData m_PerObjectUniformData{};
 
@@ -163,12 +153,6 @@ namespace Game
 		std::array<DescriptorSets, 1> m_DescriptorSets{};
 
 		VkDescriptorSet m_ColorOutputDescriptorSet = VK_NULL_HANDLE;
-
-		glm::vec3 m_ObjectPosition{ 0.f };
-		glm::vec3 m_ObjectRotation{ 0.f };
-		glm::vec3 m_ObjectScale{ 5.f };
-
-		bool m_DisplaySkybox = true;
 	};
 
 }
