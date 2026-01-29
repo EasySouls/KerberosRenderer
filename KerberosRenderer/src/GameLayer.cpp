@@ -70,22 +70,25 @@ namespace Game
 
 		KBR_CORE_INFO("Loaded {} mesh(es)!", m_Meshes.size());
 
+		const std::vector<std::pair<std::string, vk::Format>> textureFiles = {
+			{ "assets/models/avocado/Avocado_baseColor.ktx2", vk::Format::eR8G8B8A8Srgb },
+			{ "assets/models/avocado/Avocado_normal.ktx2", vk::Format::eR8G8B8A8Unorm },
+			{ "assets/textures/stonefloor01_color_rgba.ktx", vk::Format::eR8G8B8A8Srgb },
+			{ "assets/textures/stonefloor01_normal_rgba.ktx", vk::Format::eR8G8B8A8Unorm }
+		};
 
-		const auto& avocadoTexture = m_Textures.emplace_back();
-		avocadoTexture->LoadFromFile("assets/models/avocado/Avocado_baseColor.ktx", vk::Format::eR8G8B8A8Srgb);
-		const auto& avocadoNormalTexture = m_Textures.emplace_back();
-		avocadoNormalTexture->LoadFromFile("assets/models/avocado/Avocado_normal.ktx", vk::Format::eR8G8B8A8Unorm);
-
-		const auto& stoneFloorAlbedoTexture = m_Textures.emplace_back();
-		stoneFloorAlbedoTexture->LoadFromFile("assets/textures/stonefloor01_color_rgba.ktx", vk::Format::eR8G8B8A8Srgb);
-		const auto& stoneFloorNormalTexture = m_Textures.emplace_back();
-		stoneFloorNormalTexture->LoadFromFile("assets/textures/stonefloor01_normal_rgba.ktx", vk::Format::eR8G8B8A8Unorm);
-
+		m_Textures.reserve(textureFiles.size());
+		for (const auto& [filepath, format] : textureFiles)
+		{
+			auto texture = std::make_shared<kbr::Texture2D>();
+			texture->LoadFromFile(filepath, format);
+			m_Textures.push_back(texture);
+		}
 
 		KBR_CORE_INFO("Loaded {} texture(s)!", m_Textures.size());
 
-		const auto& avocadoMaterial = m_Materials.emplace_back(std::make_shared<kbr::Material>("Avocado", glm::vec3(1.0f), 0.1f, 1.0f, avocadoTexture, avocadoNormalTexture));
-		const auto& cubeMaterial = m_Materials.emplace_back(std::make_shared<kbr::Material>("Stone Floor", glm::vec3(1.0f), 0.5f, 0.0f, stoneFloorAlbedoTexture, stoneFloorNormalTexture));
+		const auto& avocadoMaterial = m_Materials.emplace_back(std::make_shared<kbr::Material>("Avocado", glm::vec3(1.0f), 0.1f, 1.0f, m_Textures[0], m_Textures[1]));
+		const auto& cubeMaterial = m_Materials.emplace_back(std::make_shared<kbr::Material>("Stone Floor", glm::vec3(1.0f), 0.5f, 0.0f, m_Textures[2], m_Textures[3]));
 
 		m_SceneNodes.push_back(new kbr::Node{
 			.Position = glm::vec3(0.0f, -1.5f, 0.0f),
@@ -522,12 +525,14 @@ namespace Game
 
 		// Material selection
 		ImGui::Text("Material");
-		const char* materialNames[11];
-		for (size_t i = 0; i < m_Materials.size(); ++i)
+		
+		std::vector<const char*> materialNames;
+		materialNames.reserve(m_Materials.size());
+		for (const auto& mat : m_Materials)
 		{
-			materialNames[i] = m_Materials[i]->name.c_str();
+			materialNames.push_back(mat->name.c_str());
 		}
-		ImGui::Combo("Select Material", &m_SelectedMaterialIndex, materialNames, static_cast<int>(m_Materials.size()));
+		ImGui::Combo("Select Material", &m_SelectedMaterialIndex, materialNames.data(), static_cast<int>(m_Materials.size()));
 
 		ImGui::Separator();
 

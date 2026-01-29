@@ -140,7 +140,7 @@ namespace kbr
 		mipLevels = ktxTexture->numLevels;
 
 		ktx_uint8_t* ktxTextureData = ktxTexture_GetData(ktxTexture);
-		ktx_size_t ktxTextureSize = ktxTexture_GetSize(ktxTexture);
+		ktx_size_t ktxTextureSize = ktxTexture_GetDataSize(ktxTexture);
 
 		// Get device properties for the requested texture format
 		vk::FormatProperties formatProperties = context.GetFormatProperties(format);
@@ -305,7 +305,7 @@ namespace kbr
 		mipLevels = ktxTexture->numLevels;
 
 		ktx_uint8_t* ktxTextureData = ktxTexture_GetData(ktxTexture);
-		ktx_size_t ktxTextureSize = ktxTexture_GetSize(ktxTexture);
+		ktx_size_t ktxTextureSize = ktxTexture_GetDataSize(ktxTexture);
 
 		// Get device properties for the requested texture format
 		vk::FormatProperties formatProperties = context.GetFormatProperties(format);
