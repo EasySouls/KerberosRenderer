@@ -7,7 +7,6 @@ struct SceneData
 {
     float4x4 projection;
     float4x4 view;
-    float4x4 viewProjection;
     float4x4 lightSpaceMatrix;
     float3 ambientLightColor;
     float3 camPos;

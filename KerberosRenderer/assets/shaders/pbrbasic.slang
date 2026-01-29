@@ -1,9 +1,3 @@
-/* Copyright (c) 2025, Sascha Willems
- *
- * SPDX-License-Identifier: MIT
- *
- */
-
 struct VSInput
 {
     float3 Pos;
@@ -24,7 +18,6 @@ struct SceneData
 {
     float4x4 projection;
     float4x4 view;
-    float4x4 viewProjection;
     float4x4 lightSpaceMatrix;
     float3 ambientLightColor;
     float3 camPos;
@@ -135,7 +128,7 @@ VSOutput vertMain(VSInput input)
 
     output.FragPos_LightSpace = mul(scene.lightSpaceMatrix, float4(output.FragPos_WorldSpace, 1.0));
 
-    output.Position = mul(scene.viewProjection, worldPos);
+    output.Position = mul(scene.projection, mul(scene.view, worldPos));
     return output;
 }
 

@@ -6,6 +6,9 @@
 #include "ModelLoader.hpp"
 #include "Shader.hpp"
 #include "events/WindowResizedEvent.hpp"
+#include "Scene/Camera/EditorCamera.hpp"
+#include "Scene/Camera/FirstPersonCamera.hpp"
+#include "Input/KeyCodes.hpp"
 #include "logging/Log.hpp"
 
 #include "glm/glm.hpp"
@@ -21,7 +24,6 @@ namespace Game
 	GameLayer::GameLayer() 
 		: Layer("GameLayer"), m_SkyboxMesh(std::nullopt)
 	{
-		//m_Camera.SetPosition(glm::vec3(0.0f, 1.0f, 5.0f));
 	}
 
 	GameLayer::~GameLayer() 
@@ -38,7 +40,8 @@ namespace Game
 	{
 		KBR_CORE_INFO("GameLayer attached!");
 
-		m_Camera = kbr::Camera(45.0f, 16.0f / 9.0f, 0.1f, 1000.0f);
+		m_Camera = std::make_unique<kbr::EditorCamera>(45.0f, 16.0f / 9.0f, 0.1f, 1000.0f);
+		m_Camera->SetPosition(glm::vec3(0.0f, 5.0f, 10.0f));
 		m_ViewportSize = { 1280.0f, 720.0f };
 
 		m_Materials.emplace_back(std::make_shared<kbr::Material>("Gold", glm::vec3(1.0f, 0.765557f, 0.336057f), 0.1f, 1.0f));
@@ -56,6 +59,7 @@ namespace Game
 		KBR_CORE_INFO("Size of SceneUniformData: {} bytes", sizeof(SceneUniformData));
 		KBR_CORE_INFO("Size of UniformDataParams: {} bytes", sizeof(UniformDataParams));
 		KBR_CORE_INFO("Size of PerObjectData: {} bytes", sizeof(PerObjectData));
+		KBR_CORE_INFO("Size of material UniformBlock: {} bytes", sizeof(kbr::Material::UniformBlock));
 
 		m_SkyboxMesh = kbr::ModelLoader::LoadModel("assets/models/cube.gltf");
 		m_SkyboxTexture.LoadFromFile("assets/textures/hdr/pisa_cube.ktx", vk::Format::eR16G16B16A16Sfloat);
@@ -123,12 +127,12 @@ namespace Game
 		if (m_ViewportSize.x > 0.0f && m_ViewportSize.y > 0.0f && 
 			(static_cast<int>(m_OutputSize.x) != static_cast<int>(m_ViewportSize.x) || static_cast<int>(m_OutputSize.y) != static_cast<int>(m_ViewportSize.y)))
 		{
-			m_Camera.SetViewportSize(m_OutputSize.x, m_OutputSize.y);
+			m_Camera->SetViewportSize(m_OutputSize.x, m_OutputSize.y);
 
 			ResizeResources();
 		}
 
-		m_Camera.OnUpdate(deltaTime);
+		m_Camera->OnUpdate(deltaTime);
 
 		const auto& context = kbr::VulkanContext::Get();
 
@@ -463,7 +467,9 @@ namespace Game
 
 	void GameLayer::OnEvent(const std::shared_ptr<kbr::Event> event)
 	{
-		m_Camera.OnEvent(event);
+		m_Camera->OnEvent(event);
+
+		OnKeyPressed(event);
 	}
 
 	void GameLayer::OnImGuiRender()
@@ -483,11 +489,14 @@ namespace Game
 
 		ImGui::Separator();
 
-		ImGui::Text("Camera");
-		const auto& camPos = m_Camera.GetPosition();
+		ImGui::Text("EditorCamera");
+		const auto& camPos = m_Camera->GetPosition();
 		ImGui::Text("Position: (%.2f, %.2f, %.2f)", camPos.x, camPos.y, camPos.z);
-		ImGui::Text("Rotation: (Pitch: %.2f, Yaw: %.2f)", m_Camera.GetPitch(), m_Camera.GetYaw());
-		ImGui::Text("Distance: %.2f", m_Camera.GetDistance());
+		ImGui::Text("Rotation: (Pitch: %.2f, Yaw: %.2f)", m_Camera->GetPitch(), m_Camera->GetYaw());
+		ImGui::Text("Distance: %.2f", m_Camera->GetDistance());
+
+		glm::vec3 focalPoint = m_Camera->GetFocalPoint();
+		ImGui::DragFloat3("Focal point", glm::value_ptr(focalPoint), 0.1f, 0.0f, 0.0f, "%.3f", ImGuiSliderFlags_NoInput);
 
 		ImGui::Separator();
 
@@ -547,14 +556,13 @@ namespace Game
 
 	void GameLayer::UpdateSceneUniformBuffers(const uint32_t currentImage) 
 	{
-		const glm::mat4& projection = m_Camera.GetProjectionMatrix();
-		const glm::mat4& view = m_Camera.GetViewMatrix();
+		const glm::mat4& projection = m_Camera->GetProjectionMatrix();
+		const glm::mat4& view = m_Camera->GetViewMatrix();
 
 		m_SceneUniformData.projection = projection;
 		m_SceneUniformData.view = view;
-		m_SceneUniformData.viewProjection = view * projection;
 		m_SceneUniformData.lightSpaceMatrix = CalculateLightSpaceMatrix();
-		m_SceneUniformData.camPos = m_Camera.GetPosition();
+		m_SceneUniformData.camPos = m_Camera->GetPosition() * -1.0f;
 
 		std::memcpy(m_UniformBuffers[currentImage].scene->GetMappedData(), &m_SceneUniformData, sizeof(SceneUniformData));
 
@@ -1145,9 +1153,8 @@ namespace Game
 				.depthClampEnable = vk::False,
 				.rasterizerDiscardEnable = vk::False,
 				.polygonMode = vk::PolygonMode::eFill,
-				//.cullMode = vk::CullModeFlagBits::eNone, // TODO: vk::CullModeFlagBits::eBack,
-				//.frontFace = vk::FrontFace::eClockwise, // TODO: Verify winding order
-				.cullMode = vk::CullModeFlagBits::eBack,
+				.cullMode = vk::CullModeFlagBits::eNone, // TODO: vk::CullModeFlagBits::eBack,
+				//.cullMode = vk::CullModeFlagBits::eBack,
 				.frontFace = vk::FrontFace::eCounterClockwise,
 				.depthBiasEnable = vk::False,
 				.lineWidth = 1.0f
@@ -1267,6 +1274,26 @@ namespace Game
 			opaqueDepthStencil.depthWriteEnable = vk::False;
 			opaqueDepthStencil.depthTestEnable = vk::False;
 
+			vk::PipelineDepthStencilStateCreateInfo skyboxDepthStencil{
+				.depthTestEnable = vk::True,
+				.depthWriteEnable = vk::False,
+				.depthCompareOp = vk::CompareOp::eLessOrEqual,
+				.depthBoundsTestEnable = vk::False,
+				.stencilTestEnable = vk::False,
+				.minDepthBounds = 0.0f,
+				.maxDepthBounds = 1.0f,
+			};
+
+			vk::PipelineRasterizationStateCreateInfo skyboxRasterizer{
+				.depthClampEnable = vk::False,
+				.rasterizerDiscardEnable = vk::False,
+				.polygonMode = vk::PolygonMode::eFill,
+				.cullMode = vk::CullModeFlagBits::eFront,
+				.frontFace = vk::FrontFace::eCounterClockwise,
+				.depthBiasEnable = vk::False,
+				.lineWidth = 1.0f
+			};
+
 			opaqueRasterizer.cullMode = vk::CullModeFlagBits::eFront;
 
 			vk::GraphicsPipelineCreateInfo skyboxPipelineInfo{
@@ -1276,9 +1303,9 @@ namespace Game
 				.pVertexInputState = &vertexInputInfo,
 				.pInputAssemblyState = &inputAssembly,
 				.pViewportState = &viewportState,
-				.pRasterizationState = &opaqueRasterizer,
+				.pRasterizationState = &skyboxRasterizer,
 				.pMultisampleState = &multisampling,
-				.pDepthStencilState = &opaqueDepthStencil,
+				.pDepthStencilState = &skyboxDepthStencil,
 				.pColorBlendState = &colorBlending,
 				.pDynamicState = &dynamicStateInfo,
 				.layout = m_PBRPipelineLayout,
@@ -1463,5 +1490,18 @@ namespace Game
 		}
 
 		m_OutputSize = m_ViewportSize;
+	}
+
+	void GameLayer::OnKeyPressed(const std::shared_ptr<kbr::Event>& event) const 
+	{
+		if (const auto keyPressedEvent = std::dynamic_pointer_cast<kbr::KeyPressedEvent>(event))
+		{
+			const int key = keyPressedEvent->GetKeyCode();
+			if (key == kbr::Key::F)
+			{
+				const glm::vec3 avocadoPosition = m_SceneNodes[0]->Position;
+				m_Camera->Focus(avocadoPosition);
+			}
+		}
 	}
 }

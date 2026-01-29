@@ -4,13 +4,11 @@
 #include "Vulkan.hpp"
 
 #include "Mesh.hpp"
-#include "Camera.hpp"
 #include "Buffer.hpp"
 #include "Textures.hpp"
 #include "Renderer/Material.hpp"
 #include "Scene/Node.hpp"
-
-#include <glm/vec3.hpp>
+#include "Scene/Camera/Camera.hpp"
 
 #include <string>
 #include <vector>
@@ -47,13 +45,15 @@ namespace Game
 		void CreateVulkanResources();
 		void ResizeResources();
 
+		void OnKeyPressed(const std::shared_ptr<kbr::Event>& event) const;
+
 	private:
 		float m_Time = 0.0f;
 		float m_Fps = 0.0f;
 
 		bool m_DisplaySkybox = true;
 
-		kbr::Camera m_Camera;
+		std::unique_ptr<kbr::Camera> m_Camera = nullptr;
 		// Size of the ImGui viewport.
 		glm::vec2 m_ViewportSize{ 0.f };
 		// Size of the output images.
@@ -103,7 +103,6 @@ namespace Game
 		{
 			glm::mat4 projection{ 0.f };
 			glm::mat4 view{ 0.f };
-			glm::mat4 viewProjection{ 0.f };
 			glm::mat4 lightSpaceMatrix{ 0.f };
 			alignas(16) glm::vec3 ambientLightColor{ 0.1f, 0.1f, 0.1f };
 			alignas(16) glm::vec3 camPos{ 0.f };
