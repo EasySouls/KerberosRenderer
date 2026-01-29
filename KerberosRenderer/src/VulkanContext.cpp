@@ -494,6 +494,11 @@ namespace kbr
 		return physicalDevice;
 	}
 
+	vk::PhysicalDeviceProperties VulkanContext::GetProperties() const 
+	{
+		return physicalDevice.getProperties();
+	}
+
 	vk::PhysicalDeviceMemoryProperties VulkanContext::GetMemoryProperties() const 
 	{
 		return physicalDevice.getMemoryProperties();

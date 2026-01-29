@@ -218,12 +218,22 @@ namespace Game
 			cmd.setScissor(0, renderArea);
 
 			cmd.bindPipeline(vk::PipelineBindPoint::eGraphics, *m_ShadowMapPipeline);
-			cmd.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, *m_PBRPipelineLayout, 0, *m_DescriptorSets[currentImage].scene, {});
 
-			for (const auto& node : m_SceneNodes)
+			for (size_t i = 0; i < m_SceneNodes.size(); ++i)
 			{
-				UpdatePerObjectUniformBuffer(currentImage, node->GetTransform(), selectedMaterial);
+				auto& node = m_SceneNodes[i];
 
+				UpdatePerObjectUniformBuffer(currentImage, i, node->GetTransform(), selectedMaterial);
+
+				uint32_t dynamicOffset = static_cast<uint32_t>(i * m_DynamicAlignment);
+
+				cmd.bindDescriptorSets(
+					vk::PipelineBindPoint::eGraphics, 
+					*m_PBRPipelineLayout, 
+					0, 
+					*m_DescriptorSets[currentImage].scene, 
+					{ dynamicOffset });
+				
 				node->Mesh->Draw(cmd);
 			}
 
@@ -365,17 +375,41 @@ namespace Game
 			if (m_DisplaySkybox && m_SkyboxMesh.has_value())
 			{
 				cmd.bindPipeline(vk::PipelineBindPoint::eGraphics, *m_SkyboxPipeline);
-				cmd.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, *m_PBRPipelineLayout, 0, *m_DescriptorSets[currentImage].skybox, {});
+				cmd.bindDescriptorSets(
+					vk::PipelineBindPoint::eGraphics, 
+					*m_PBRPipelineLayout, 
+					0, 
+					*m_DescriptorSets[currentImage].skybox, 
+					{ 0 });
 
 				m_SkyboxMesh->Draw(cmd);
 			}
 
 			cmd.bindPipeline(vk::PipelineBindPoint::eGraphics, *m_PBROpaquePipeline);
-			cmd.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, *m_PBRPipelineLayout, 0, *m_DescriptorSets[currentImage].scene, {});
+
+			/*cmd.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, *m_PBRPipelineLayout, 0, *m_DescriptorSets[currentImage].scene, {});
 
 			for (const auto& node : m_SceneNodes)
 			{
 				UpdatePerObjectUniformBuffer(currentImage, node->GetTransform(), selectedMaterial);
+
+				node->Mesh->Draw(cmd);
+			}*/
+
+			for (size_t i = 0; i < m_SceneNodes.size(); ++i)
+			{
+				auto& node = m_SceneNodes[i];
+
+				UpdatePerObjectUniformBuffer(currentImage, i, node->GetTransform(), selectedMaterial);
+
+				uint32_t dynamicOffset = static_cast<uint32_t>(i * m_DynamicAlignment);
+
+				cmd.bindDescriptorSets(
+					vk::PipelineBindPoint::eGraphics,
+					*m_PBRPipelineLayout,
+					0,
+					*m_DescriptorSets[currentImage].scene,
+					{ dynamicOffset });
 
 				node->Mesh->Draw(cmd);
 			}
@@ -416,13 +450,23 @@ namespace Game
 			cmd.setScissor(0, renderArea);
 
 			cmd.bindPipeline(vk::PipelineBindPoint::eGraphics, *m_PBRTransparentPipeline);
-			cmd.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, *m_PBRPipelineLayout, 0, *m_DescriptorSets[currentImage].scene, {});
 
-			/*for (const auto& mesh : m_Meshes)
+			/*for (size_t i = 0; i < m_SceneNodes.size(); ++i)
 			{
-				UpdatePerObjectUniformBuffer(currentImage, objectPosition, model, material);
+				auto& node = m_SceneNodes[i];
 
-				mesh.Draw(cmd);
+				UpdatePerObjectUniformBuffer(currentImage, i, node->GetTransform(), selectedMaterial);
+
+				uint32_t dynamicOffset = static_cast<uint32_t>(i * m_DynamicAlignment);
+
+				cmd.bindDescriptorSets(
+					vk::PipelineBindPoint::eGraphics,
+					*m_PBRPipelineLayout,
+					0,
+					*m_DescriptorSets[currentImage].scene,
+					{ dynamicOffset });
+
+				node->Mesh->Draw(cmd);
 			}*/
 
 			cmd.endRendering();
@@ -572,7 +616,7 @@ namespace Game
 		std::memcpy(m_UniformBuffers[currentImage].skybox->GetMappedData(), &m_SkyboxData, sizeof(SkyboxData));
 	}
 
-	void GameLayer::UpdatePerObjectUniformBuffer(const uint32_t currentImage,
+	void GameLayer::UpdatePerObjectUniformBuffer(const uint32_t currentImage, const uint32_t objectIndex,
 	                                             const glm::mat4& model, const kbr::Material& material) 
 	{
 		m_PerObjectUniformData = {
@@ -580,7 +624,11 @@ namespace Game
 			.worldNormal = glm::transpose(glm::inverse(glm::mat3(model))),
 			.material = material.Params
 		};
-		std::memcpy(m_UniformBuffers[currentImage].perObject->GetMappedData(), &m_PerObjectUniformData, sizeof(PerObjectData));
+
+		char* data = static_cast<char*>(m_UniformBuffers[currentImage].perObject->GetMappedData());
+		data += objectIndex * m_DynamicAlignment;
+
+		std::memcpy(data, &m_PerObjectUniformData, sizeof(PerObjectData));
 	}
 
 	void GameLayer::UpdateLights(const float time, const uint32_t currentImage) 
@@ -600,13 +648,24 @@ namespace Game
 
 	void GameLayer::PrepareUniformBuffers()
 	{
+		auto& context = kbr::VulkanContext::Get();
+		const auto properties = context.GetProperties();
+
+		m_MinUniformBufferOffsetAlignment = properties.limits.minUniformBufferOffsetAlignment;
+
+		m_DynamicAlignment = sizeof(PerObjectData);
+		if (m_MinUniformBufferOffsetAlignment > 0)
+		{
+			m_DynamicAlignment = (m_DynamicAlignment + m_MinUniformBufferOffsetAlignment - 1) & ~(m_MinUniformBufferOffsetAlignment - 1);
+		}
+
 		for (auto& [scene, params, perObject, skybox] : m_UniformBuffers)
 		{
 			scene = std::make_shared<kbr::UniformBuffer>(sizeof(SceneUniformData));
 
 			params = std::make_shared<kbr::UniformBuffer>(sizeof(UniformDataParams));
 
-			perObject = std::make_shared<kbr::UniformBuffer>(sizeof(PerObjectData));
+			perObject = std::make_shared<kbr::UniformBuffer>(m_DynamicAlignment * MaxObjects);
 
 			skybox = std::make_shared<kbr::UniformBuffer>(sizeof(SkyboxData));
 		}
@@ -620,6 +679,10 @@ namespace Game
 		std::vector<vk::DescriptorPoolSize> poolSizes = {
 			vk::DescriptorPoolSize{
 				.type = vk::DescriptorType::eUniformBuffer,
+				.descriptorCount = 10
+			},
+			vk::DescriptorPoolSize{
+				.type = vk::DescriptorType::eUniformBufferDynamic,
 				.descriptorCount = 10
 			},
 			vk::DescriptorPoolSize{
@@ -657,7 +720,7 @@ namespace Game
 			},
 			vk::DescriptorSetLayoutBinding{
 				.binding = 2,
-				.descriptorType = vk::DescriptorType::eUniformBuffer,
+				.descriptorType = vk::DescriptorType::eUniformBufferDynamic,
 				.descriptorCount = 1,
 				.stageFlags = vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment,
 				.pImmutableSamplers = nullptr
@@ -765,7 +828,7 @@ namespace Game
 					.dstBinding = 2,
 					.dstArrayElement = 0,
 					.descriptorCount = 1,
-					.descriptorType = vk::DescriptorType::eUniformBuffer,
+					.descriptorType = vk::DescriptorType::eUniformBufferDynamic,
 					.pBufferInfo = &perObjectBufferInfo
 				},
 				vk::WriteDescriptorSet{

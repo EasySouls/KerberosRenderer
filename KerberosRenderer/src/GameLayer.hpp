@@ -35,7 +35,7 @@ namespace Game
 	private:
 		void UpdateLights(float time, uint32_t currentImage);
 		void UpdateSceneUniformBuffers(uint32_t currentImage);
-		void UpdatePerObjectUniformBuffer(uint32_t currentImage, const glm::mat4& model, const kbr::Material& material);
+		void UpdatePerObjectUniformBuffer(uint32_t currentImage, uint32_t objectIndex, const glm::mat4& model, const kbr::Material& material);
 
 		void PrepareUniformBuffers();
 		void SetupDescriptors();
@@ -152,6 +152,11 @@ namespace Game
 		std::array<DescriptorSets, 1> m_DescriptorSets{};
 
 		VkDescriptorSet m_ColorOutputDescriptorSet = VK_NULL_HANDLE;
+
+		// Dynamic uniform buffer related members
+		VkDeviceSize m_MinUniformBufferOffsetAlignment = 0;
+		uint32_t m_DynamicAlignment = 0;
+		constexpr static size_t MaxObjects = 1000;
 	};
 
 }

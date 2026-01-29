@@ -64,6 +64,7 @@ namespace kbr
 
 		vk::raii::Device& GetDevice();
 		vk::raii::PhysicalDevice& GetPhysicalDevice();
+		vk::PhysicalDeviceProperties GetProperties() const;
 		vk::PhysicalDeviceMemoryProperties GetMemoryProperties() const;
 		vk::FormatProperties GetFormatProperties(vk::Format format) const;
 
