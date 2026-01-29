@@ -1,0 +1,3 @@
+[submodule "KerberosRenderer/vendor/ktx"]
+	path = KerberosRenderer/vendor/ktx
+	url = https://github.com/KhronosGroup/KTX-Software
