@@ -32,6 +32,8 @@ namespace kbr
 
 		virtual void SetViewportSize(float width, float height) = 0;
 
+		virtual void SetFlipY(bool flip) = 0;
+
 		virtual const glm::mat4& GetViewMatrix() const = 0;
 		virtual const glm::mat4& GetProjectionMatrix() const = 0;
 		virtual glm::mat4 GetViewProjectionMatrix() const = 0;

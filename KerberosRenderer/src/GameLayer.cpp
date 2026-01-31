@@ -43,7 +43,8 @@ namespace Game
 		KBR_CORE_INFO("GameLayer attached!");
 
 		m_Camera = std::make_unique<kbr::EditorCamera>(45.0f, 16.0f / 9.0f, 0.1f, 1000.0f);
-		m_Camera->SetPosition(glm::vec3(0.0f, 5.0f, 10.0f));
+		m_Camera->SetFlipY(false);
+		m_Camera->SetPosition(glm::vec3(0.0f, 5.0f, -10.0f));
 		m_ViewportSize = { 1280.0f, 720.0f };
 
 		m_Materials.emplace_back(std::make_shared<kbr::Material>("Gold", glm::vec3(1.0f, 0.765557f, 0.336057f), 0.1f, 1.0f));
@@ -63,7 +64,9 @@ namespace Game
 		KBR_CORE_INFO("Size of PerObjectData: {} bytes", sizeof(PerObjectData));
 		KBR_CORE_INFO("Size of material UniformBlock: {} bytes", sizeof(kbr::Material::UniformBlock));
 
-		m_SkyboxMesh = kbr::ModelLoader::LoadModel("assets/models/cube.gltf");
+		const kbr::GLTFLoadingFlags loadingFlags = kbr::GLTFLoadingFlags::FlipY;
+
+		m_SkyboxMesh = kbr::ModelLoader::LoadModel("assets/models/cube.gltf", loadingFlags);
 		m_SkyboxTexture.LoadFromFile(
 			"assets/textures/hdr/pisa_cube.ktx",
 			vk::Format::eR16G16B16A16Sfloat,
@@ -71,8 +74,8 @@ namespace Game
 		);
 
 		// Load models
-		m_Meshes["avocado"] = std::make_shared<kbr::Mesh>(kbr::ModelLoader::LoadModel("assets/models/avocado/Avocado.gltf"));
-		m_Meshes["cube"] = std::make_shared<kbr::Mesh>(kbr::ModelLoader::LoadModel("assets/models/cube.gltf"));
+		m_Meshes["avocado"] = std::make_shared<kbr::Mesh>(kbr::ModelLoader::LoadModel("assets/models/avocado/Avocado.gltf", loadingFlags));
+		m_Meshes["cube"] = std::make_shared<kbr::Mesh>(kbr::ModelLoader::LoadModel("assets/models/cube.gltf", loadingFlags));
 
 		KBR_CORE_INFO("Loaded {} mesh(es)!", m_Meshes.size());
 

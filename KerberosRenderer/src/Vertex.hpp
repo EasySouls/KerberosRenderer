@@ -14,7 +14,7 @@ namespace kbr
 	struct Vertex
 	{
 		glm::vec3 pos;
-		glm::vec3 color;
+		glm::vec3 normal;
 		glm::vec2 texCoord;
 
 		static vk::VertexInputBindingDescription GetBindingDescription() {
@@ -24,13 +24,13 @@ namespace kbr
 		static std::array<vk::VertexInputAttributeDescription, 3> GetAttributeDescriptions() {
 			return {
 				vk::VertexInputAttributeDescription(0, 0, vk::Format::eR32G32B32Sfloat, offsetof(Vertex, pos)),
-				vk::VertexInputAttributeDescription(1, 0, vk::Format::eR32G32B32Sfloat, offsetof(Vertex, color)),
+				vk::VertexInputAttributeDescription(1, 0, vk::Format::eR32G32B32Sfloat, offsetof(Vertex, normal)),
 				vk::VertexInputAttributeDescription(2, 0, vk::Format::eR32G32Sfloat, offsetof(Vertex, texCoord)),
 			};
 		}
 
 		bool operator==(const Vertex& other) const {
-			return pos == other.pos && color == other.color && texCoord == other.texCoord;
+			return pos == other.pos && normal == other.normal && texCoord == other.texCoord;
 		}
 	};
 
@@ -41,7 +41,7 @@ template<> struct std::hash<kbr::Vertex>
 {
 	size_t operator()(kbr::Vertex const& vertex) const noexcept {
 		return ((hash<glm::vec3>()(vertex.pos) ^
-				 (hash<glm::vec3>()(vertex.color) << 1)) >> 1) ^
+				 (hash<glm::vec3>()(vertex.normal) << 1)) >> 1) ^
 			(hash<glm::vec2>()(vertex.texCoord) << 1);
 	}
 };

@@ -7,7 +7,7 @@
 
 namespace kbr
 {
-	Mesh ModelLoader::LoadModel(const std::filesystem::path& path)
+	Mesh ModelLoader::LoadModel(const std::filesystem::path& path, GLTFLoadingFlags flags)
 	{
 		tinygltf::Model model;
 		tinygltf::TinyGLTF loader;
@@ -65,6 +65,17 @@ namespace kbr
                 const tinygltf::BufferView& posBufferView = model.bufferViews[posAccessor.bufferView];
                 const tinygltf::Buffer& posBuffer = model.buffers[posBufferView.buffer];
 
+				// Get vertex normals
+				const tinygltf::Accessor* normalAccessor = nullptr;
+				const tinygltf::BufferView* normalBufferView = nullptr;
+				const tinygltf::Buffer* normalBuffer = nullptr;
+				bool hasNormals = primitive.attributes.contains("NORMAL");
+				if (hasNormals) {
+					normalAccessor = &model.accessors[primitive.attributes.at("NORMAL")];
+					normalBufferView = &model.bufferViews[normalAccessor->bufferView];
+					normalBuffer = &model.buffers[normalBufferView->buffer];
+				}
+
                 // Get texture coordinates if available
                 bool hasTexCoords = primitive.attributes.contains("TEXCOORD_0");
                 const tinygltf::Accessor* texCoordAccessor = nullptr;
@@ -91,6 +102,17 @@ namespace kbr
 					const float* pos = reinterpret_cast<const float*>(posBytes);
 					vertex.pos = { pos[0], pos[1], pos[2] };
 
+					if (hasNormals)
+					{
+						const uint8_t* normalBytes = normalBuffer->data.data() + normalBufferView->byteOffset + normalAccessor->byteOffset + i * sizeof(float) * 3;
+						const float* normal = reinterpret_cast<const float*>(normalBytes);
+						vertex.normal = { normal[0], normal[1], normal[2] };
+					}
+					else
+					{
+						vertex.normal = { 0.0f, 0.0f, 0.0f };
+					}
+
 					if (hasTexCoords)
 					{
 						const uint8_t* uvBytes = texCoordBuffer->data.data() + texCoordBufferView->byteOffset + texCoordAccessor->byteOffset + i * uvStride;
@@ -101,8 +123,6 @@ namespace kbr
 					{
 						vertex.texCoord = { 0.0f, 0.0f };
 					}
-
-					vertex.color = { 1.0f, 1.0f, 1.0f };
 
 					auto it = uniqueVertices.find(vertex);
 					if (it == uniqueVertices.end())
@@ -154,6 +174,15 @@ namespace kbr
 				}
             }
         }
+
+		if ((flags & GLTFLoadingFlags::FlipY) == GLTFLoadingFlags::FlipY)
+		{
+			for (auto& vertex : vertices)
+			{
+				vertex.pos.y *= -1.0f;
+				vertex.normal.y *= -1.0f;
+			}
+		}
 
 		const std::string name = path.stem().string();
         return { name, vertices, indices };

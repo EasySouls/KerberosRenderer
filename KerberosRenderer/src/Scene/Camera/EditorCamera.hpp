@@ -33,6 +33,8 @@ namespace kbr
 
 		void SetViewportSize(float width, float height) override;
 
+		void SetFlipY(bool flip) override;
+
 		const glm::mat4& GetViewMatrix() const override { return m_View; }
 		const glm::mat4& GetProjectionMatrix() const override { return m_Projection; }
 		glm::mat4 GetViewProjectionMatrix() const override { return m_Projection * m_View; }
@@ -82,5 +84,7 @@ namespace kbr
 
 		float m_ViewportWidth = 1280.0f;
 		float m_ViewportHeight = 720.0f;
+
+		bool m_FlipY = true;
 	};
 }

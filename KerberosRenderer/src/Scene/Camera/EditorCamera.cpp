@@ -50,6 +50,13 @@ namespace kbr
 		UpdateProjection();
 	}
 
+	void EditorCamera::SetFlipY(const bool flip)
+	{
+		m_FlipY = flip; 
+		
+		UpdateProjection();
+	}
+
 	glm::vec3 EditorCamera::GetUp() const
 	{
 		return glm::rotate(GetOrientation(), glm::vec3(0.0f, 1.0f, 0.0f));
@@ -74,7 +81,9 @@ namespace kbr
 	{
 		m_AspectRatio = m_ViewportWidth / m_ViewportHeight;
 		m_Projection = glm::perspective(glm::radians(m_Fov), m_AspectRatio, m_NearClip, m_FarClip);
-		m_Projection[1][1] *= -1; // Invert Y coordinate for Vulkan
+		if (m_FlipY) {
+			m_Projection[1][1] *= -1; // Invert Y coordinate for Vulkan
+		}
 	}
 
 	void EditorCamera::UpdateView()
@@ -84,9 +93,13 @@ namespace kbr
 		// m_Yaw = 0.0f;
 
 		m_Position = CalculatePosition();
+		glm::vec3 translation = m_Position;
+		if (m_FlipY) {
+			translation.y *= -1; // Invert Y coordinate for Vulkan
+		}
 
 		const glm::quat orientation = GetOrientation();
-		m_View = glm::translate(glm::mat4(1.0f), m_Position) * glm::toMat4(orientation);
+		m_View = glm::translate(glm::mat4(1.0f), translation) * glm::toMat4(orientation);
 		m_View = glm::inverse(m_View);
 	}
 
