@@ -3,7 +3,7 @@
 namespace kbr
 {
 	FirstPersonCamera::FirstPersonCamera(const float fov, const float aspectRatio, const float nearClip, const float farClip)
-		: m_FOV(fov), m_AspectRatio(aspectRatio), m_NearClip(nearClip), m_FarClip(farClip)
+		: m_Fov(fov), m_AspectRatio(aspectRatio), m_NearClip(nearClip), m_FarClip(farClip)
 	{
 		UpdateProjection();
 		UpdateView();
@@ -124,7 +124,7 @@ namespace kbr
 
 	void FirstPersonCamera::UpdateProjection()
 	{
-		m_ProjectionMatrix = glm::perspective(glm::radians(m_FOV), m_AspectRatio, m_NearClip, m_FarClip);
+		m_ProjectionMatrix = glm::perspective(glm::radians(m_Fov), m_AspectRatio, m_NearClip, m_FarClip);
 		m_ProjectionMatrix[1][1] *= -1; // Invert Y for Vulkan
 		m_ProjectionDirty = false;
 	}

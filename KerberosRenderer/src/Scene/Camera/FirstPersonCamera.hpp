@@ -45,7 +45,7 @@ namespace kbr
 		float m_Distance = 10.0f;
 		float m_Pitch = 0.0f;
 		float m_Yaw = -90.0f; // Facing towards negative Z by default
-		float m_FOV;
+		float m_Fov;
 		float m_AspectRatio;
 		float m_NearClip;
 		float m_FarClip;

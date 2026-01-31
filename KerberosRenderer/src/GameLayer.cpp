@@ -64,7 +64,7 @@ namespace Game
 		KBR_CORE_INFO("Size of PerObjectData: {} bytes", sizeof(PerObjectData));
 		KBR_CORE_INFO("Size of material UniformBlock: {} bytes", sizeof(kbr::Material::UniformBlock));
 
-		const kbr::GLTFLoadingFlags loadingFlags = kbr::GLTFLoadingFlags::FlipY;
+		constexpr kbr::GLTFLoadingFlags loadingFlags = kbr::GLTFLoadingFlags::FlipY;
 
 		m_SkyboxMesh = kbr::ModelLoader::LoadModel("assets/models/cube.gltf", loadingFlags);
 		m_SkyboxTexture.LoadFromFile(
@@ -164,8 +164,6 @@ namespace Game
 			glm::rotate(glm::mat4(1.0f), m_ObjectRotation.z, glm::vec3(0.0f, 0.0f, 1.0f)) *
 			glm::scale(glm::mat4(1.0f), m_ObjectScale);*/
 
-		const kbr::Material& selectedMaterial = *m_Materials[m_SelectedMaterialIndex];
-
 		// Render shadow map
 		{
 			vk::ImageMemoryBarrier2 barrier = {
@@ -232,7 +230,7 @@ namespace Game
 			{
 				auto& node = m_SceneNodes[i];
 
-				UpdatePerObjectUniformBuffer(currentImage, static_cast<uint32_t>(i), node->GetTransform(), selectedMaterial);
+				UpdatePerObjectUniformBuffer(currentImage, static_cast<uint32_t>(i), node->GetTransform(), *node->Material);
 
 				uint32_t dynamicOffset = static_cast<uint32_t>(i * m_DynamicAlignment);
 
@@ -409,7 +407,7 @@ namespace Game
 			{
 				auto& node = m_SceneNodes[i];
 
-				UpdatePerObjectUniformBuffer(currentImage, static_cast<uint32_t>(i), node->GetTransform(), selectedMaterial);
+				UpdatePerObjectUniformBuffer(currentImage, static_cast<uint32_t>(i), node->GetTransform(), *node->Material);
 
 				uint32_t dynamicOffset = static_cast<uint32_t>(i * m_DynamicAlignment);
 
@@ -567,6 +565,14 @@ namespace Game
 				ImGui::DragFloat3(("Position##" + std::to_string(i)).c_str(), glm::value_ptr(m_SceneNodes[i]->Position), 0.1f);
 				ImGui::DragFloat3(("Rotation##" + std::to_string(i)).c_str(), glm::value_ptr(m_SceneNodes[i]->Rotation), 0.01f);
 				ImGui::DragFloat3(("Scale##" + std::to_string(i)).c_str(), glm::value_ptr(m_SceneNodes[i]->Scale), 0.1f, 0.1f, 100.0f);
+
+				ImGui::Separator();
+
+				ImGui::Text("Material");
+				ImGui::Text("Name: %s", m_SceneNodes[i]->Material->name.c_str());
+				ImGui::ColorEdit3(("Albedo Color##" + std::to_string(i)).c_str(), glm::value_ptr(m_SceneNodes[i]->Material->Params.albedo));
+				ImGui::DragFloat(("Metallic##" + std::to_string(i)).c_str(), &m_SceneNodes[i]->Material->Params.metallic, 0.01f, 0.0f, 1.0f);
+				ImGui::DragFloat(("Roughness##" + std::to_string(i)).c_str(), &m_SceneNodes[i]->Material->Params.roughness, 0.01f, 0.0f, 1.0f);
 				ImGui::TreePop();
 			}
 		}
@@ -577,7 +583,7 @@ namespace Game
 		ImGui::Text("Light Positions");
 		ImGui::Text("Light 1: (%.2f, %.2f, %.2f)", m_UniformDataParams.lights[0].x, m_UniformDataParams.lights[0].y, m_UniformDataParams.lights[0].z);
 		ImGui::Text("Light 2: (%.2f, %.2f, %.2f)", m_UniformDataParams.lights[1].x, m_UniformDataParams.lights[1].y, m_UniformDataParams.lights[1].z);
-		ImGui::DragFloat3("Light 3 Position", glm::value_ptr(m_UniformDataParams.lights[2]), 0.1f);
+		ImGui::Text("Light 2: (%.2f, %.2f, %.2f)", m_UniformDataParams.lights[2].x, m_UniformDataParams.lights[2].y, m_UniformDataParams.lights[2].z);
 		ImGui::DragFloat3("Light 4 Position", glm::value_ptr(m_UniformDataParams.lights[3]), 0.1f);
 		ImGui::DragFloat("Exposure", &m_UniformDataParams.exposure, 0.1f, 0.1f, 10.0f);
 		ImGui::DragFloat("Gamma", &m_UniformDataParams.gamma, 0.1f, 0.1f, 10.0f);
@@ -615,7 +621,7 @@ namespace Game
 		m_SceneUniformData.projection = projection;
 		m_SceneUniformData.view = view;
 		m_SceneUniformData.lightSpaceMatrix = CalculateLightSpaceMatrix();
-		m_SceneUniformData.camPos = m_Camera->GetPosition() * -1.0f;
+		m_SceneUniformData.camPos = m_Camera->GetPosition();
 
 		std::memcpy(m_UniformBuffers[currentImage].scene->GetMappedData(), &m_SceneUniformData, sizeof(SceneUniformData));
 
@@ -642,15 +648,16 @@ namespace Game
 
 	void GameLayer::UpdateLights(const float time, const uint32_t currentImage) 
 	{
-		constexpr float p = 5.0f;
-		m_UniformDataParams.lights[0] = glm::vec4(-p, -p * 0.5f, -p, 1.0f);
-		m_UniformDataParams.lights[1] = glm::vec4(-p, -p * 0.5f, p, 1.0f);
-		// The third and fourth are controlled via ImGui
+		m_UniformDataParams.lights[0] = glm::vec4(5.0f, 10.0f, 5.0f, 1.0f);
 
-		m_UniformDataParams.lights[0].x = sin(glm::radians(time * 80.0f)) * 20.0f;
-		m_UniformDataParams.lights[0].z = cos(glm::radians(time * 80.0f)) * 20.0f;
-		m_UniformDataParams.lights[1].x = cos(glm::radians(time * 80.0f)) * 20.0f;
-		m_UniformDataParams.lights[1].y = sin(glm::radians(time * 80.0f)) * 20.0f;
+		constexpr float p = 3.0f;
+		m_UniformDataParams.lights[1] = glm::vec4(-p, -p * 0.5f, -p, 1.0f);
+		m_UniformDataParams.lights[2] = glm::vec4(-p, -p * 0.5f, p, 1.0f);
+
+		m_UniformDataParams.lights[1].x = sin(glm::radians(time * 80.0f)) * 20.0f;
+		m_UniformDataParams.lights[1].z = cos(glm::radians(time * 80.0f)) * 20.0f;
+		m_UniformDataParams.lights[2].x = cos(glm::radians(time * 80.0f)) * 20.0f;
+		m_UniformDataParams.lights[2].y = sin(glm::radians(time * 80.0f)) * 20.0f;
 
 		std::memcpy(m_UniformBuffers[currentImage].params->GetMappedData(), &m_UniformDataParams, sizeof(UniformDataParams));
 	}
@@ -934,7 +941,11 @@ namespace Game
 		constexpr glm::vec3 sceneCenter = glm::vec3(0.0f, 0.0f, 0.0f);
 		constexpr float lightDistance = 20.0f;
 
-		const glm::vec3 lightPos = sceneCenter - glm::normalize(glm::vec3(m_UniformDataParams.lights[3])) * lightDistance;
+		const glm::vec3 lightDirRaw = glm::vec3(m_UniformDataParams.lights[0]);
+		const glm::vec3 lightDir = glm::length2(lightDirRaw) > 0.0f 
+			? glm::normalize(lightDirRaw) 
+			: glm::vec3(0.5f, 1.0f, 0.2f);
+		const glm::vec3 lightPos = sceneCenter - lightDir * lightDistance;
 		constexpr glm::vec3 lightTarget = sceneCenter; /// Look at origin
 		constexpr glm::vec3 lightUp = glm::vec3(0.0f, 1.0f, 0.0f);
 
