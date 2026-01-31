@@ -744,7 +744,21 @@ namespace Game
 				.descriptorCount = 1,
 				.stageFlags = vk::ShaderStageFlagBits::eFragment,
 				.pImmutableSamplers = nullptr
-			}
+			},
+			vk::DescriptorSetLayoutBinding{
+				.binding = 5,
+				.descriptorType = vk::DescriptorType::eCombinedImageSampler,
+				.descriptorCount = 1,
+				.stageFlags = vk::ShaderStageFlagBits::eFragment,
+				.pImmutableSamplers = nullptr
+			},
+			vk::DescriptorSetLayoutBinding{
+				.binding = 6,
+				.descriptorType = vk::DescriptorType::eCombinedImageSampler,
+				.descriptorCount = 1,
+				.stageFlags = vk::ShaderStageFlagBits::eFragment,
+				.pImmutableSamplers = nullptr
+			},
 		};
 
 		const vk::DescriptorSetLayoutCreateInfo layoutInfo{
@@ -851,7 +865,23 @@ namespace Game
 					.dstArrayElement = 0,
 					.descriptorCount = 1,
 					.descriptorType = vk::DescriptorType::eCombinedImageSampler,
-					.pImageInfo = &skyboxImageInfo
+					.pImageInfo = &m_IrradianceCubeTexture.descriptor
+				},
+				vk::WriteDescriptorSet{
+					.dstSet = *m_DescriptorSets[i].scene,
+					.dstBinding = 5,
+					.dstArrayElement = 0,
+					.descriptorCount = 1,
+					.descriptorType = vk::DescriptorType::eCombinedImageSampler,
+					.pImageInfo = &m_LutBrdfTexture.descriptor
+				},
+				vk::WriteDescriptorSet{
+					.dstSet = *m_DescriptorSets[i].scene,
+					.dstBinding = 6,
+					.dstArrayElement = 0,
+					.descriptorCount = 1,
+					.descriptorType = vk::DescriptorType::eCombinedImageSampler,
+					.pImageInfo = &m_PrefilteredCubeTexture.descriptor
 				}
 			};
 

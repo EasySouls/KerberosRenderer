@@ -43,6 +43,7 @@ namespace kbr::SkyboxUtils
 		};
 
 		texture.image = device.createImage(imageInfo);
+		context.SetObjectDebugName(texture.image, "BRDFLUT_Image");
 
 		vk::MemoryRequirements memReqs = texture.image.getMemoryRequirements();
 		vk::MemoryAllocateInfo memAlloc{
@@ -52,6 +53,7 @@ namespace kbr::SkyboxUtils
 
 		texture.deviceMemory = device.allocateMemory(memAlloc);
 		texture.image.bindMemory(texture.deviceMemory, 0);
+		context.SetObjectDebugName(texture.deviceMemory, "BRDFLUT_ImageMemory");
 
 		// Image view
 		vk::ImageViewCreateInfo viewInfo{
@@ -68,6 +70,8 @@ namespace kbr::SkyboxUtils
 		};
 
 		texture.view = device.createImageView(viewInfo);
+		context.SetObjectDebugName(texture.view, "BRDFLUT_ImageView");
+
 
 		// Sampler
 		vk::SamplerCreateInfo samplerInfo{
@@ -89,6 +93,8 @@ namespace kbr::SkyboxUtils
 		texture.layerCount = 1;
 		texture.imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal;
 		texture.UpdateDescriptor();
+
+		context.SetObjectDebugName(texture.sampler, "BRDFLUT_Sampler");
 
 		vk::AttachmentDescription attrDesc{
 			.format = format,
@@ -141,6 +147,7 @@ namespace kbr::SkyboxUtils
 		};
 
 		vk::raii::RenderPass renderpass = device.createRenderPass(renderPassInfo);
+		context.SetObjectDebugName(renderpass, "BRDFLUT_Renderpass");
 
 		vk::FramebufferCreateInfo framebufferInfo{
 			.renderPass = *renderpass,
@@ -152,6 +159,7 @@ namespace kbr::SkyboxUtils
 		};
 
 		vk::raii::Framebuffer framebuffer = device.createFramebuffer(framebufferInfo);
+		context.SetObjectDebugName(framebuffer, "BRDFLUT_Framebuffer");
 
 		// Descriptors
 		std::vector<vk::DescriptorSetLayoutBinding> setLayoutBindings = {};
@@ -161,6 +169,8 @@ namespace kbr::SkyboxUtils
 			.pBindings = setLayoutBindings.data()
 		};
 		vk::raii::DescriptorSetLayout descriptorSetLayout = device.createDescriptorSetLayout(descriptorsetlayoutInfo);
+		context.SetObjectDebugName(descriptorSetLayout, "BRDFLUT_DescriptorSetLayout");
+
 
 		// Descriptor Pool
 		std::vector<vk::DescriptorPoolSize> poolSizes = {
@@ -188,6 +198,7 @@ namespace kbr::SkyboxUtils
 		{
 			std::vector<vk::raii::DescriptorSet> descriptorSets = device.allocateDescriptorSets(allocInfo);
 			descriptorSet = std::move(descriptorSets[0]);
+			context.SetObjectDebugName(descriptorSet, "BRDFLUT_DescriptorSet");
 		}
 
 		// Pipeline layout
@@ -196,6 +207,7 @@ namespace kbr::SkyboxUtils
 			.pSetLayouts = &*descriptorSetLayout
 		};
 		vk::raii::PipelineLayout pipelinelayout = device.createPipelineLayout(pipelineLayoutInfo);
+		context.SetObjectDebugName(pipelinelayout, "BRDFLUT_PipelineLayout");
 
 		// Pipeline
 		vk::PipelineInputAssemblyStateCreateInfo inputAssemblyState{
@@ -274,6 +286,7 @@ namespace kbr::SkyboxUtils
 		pipelineInfo.renderPass = renderpass;
 
 		vk::raii::Pipeline pipeline = device.createGraphicsPipeline(nullptr, pipelineInfo);
+		context.SetObjectDebugName(pipeline, "BRDFLUT_Pipeline");
 
 		// Render
 		vk::ClearValue clearValues[1];
@@ -297,6 +310,7 @@ namespace kbr::SkyboxUtils
 		renderPassBeginInfo.framebuffer = *framebuffer;
 
 		const auto cmd = context.BeginSingleTimeCommands();
+		context.SetObjectDebugName(cmd, "BRDFLUT_CommandBuffer");
 
 		cmd.beginRenderPass(renderPassBeginInfo, vk::SubpassContents::eInline);
 
@@ -359,6 +373,7 @@ namespace kbr::SkyboxUtils
 		};
 
 		irradianceTexture.image = device.createImage(imageInfo);
+		context.SetObjectDebugName(irradianceTexture.image, "IrradianceCube_Image");
 
 		const vk::MemoryRequirements memReqs = irradianceTexture.image.getMemoryRequirements();
 		const vk::MemoryAllocateInfo memAlloc{
@@ -368,6 +383,7 @@ namespace kbr::SkyboxUtils
 
 		irradianceTexture.deviceMemory = device.allocateMemory(memAlloc);
 		irradianceTexture.image.bindMemory(irradianceTexture.deviceMemory, 0);
+		context.SetObjectDebugName(irradianceTexture.deviceMemory, "IrradianceCube_ImageMemory");
 
 		// Image view
 		const vk::ImageViewCreateInfo viewInfo{
@@ -384,6 +400,7 @@ namespace kbr::SkyboxUtils
 		};
 
 		irradianceTexture.view = device.createImageView(viewInfo);
+		context.SetObjectDebugName(irradianceTexture.view, "IrradianceCube_ImageView");
 
 		// Sampler
 		const vk::SamplerCreateInfo samplerInfo{
@@ -404,6 +421,7 @@ namespace kbr::SkyboxUtils
 		irradianceTexture.layerCount = 6;
 		irradianceTexture.imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal;
 		irradianceTexture.UpdateDescriptor();
+		context.SetObjectDebugName(irradianceTexture.sampler, "IrradianceCube_Sampler");
 
 		vk::AttachmentDescription attrDesc{
 			.format = format,
@@ -456,6 +474,7 @@ namespace kbr::SkyboxUtils
 		};
 
 		vk::raii::RenderPass renderpass = device.createRenderPass(renderPassInfo);
+		context.SetObjectDebugName(renderpass, "IrradianceCube_Renderpass");
 
 		struct OffscreenResources
 		{
@@ -484,6 +503,7 @@ namespace kbr::SkyboxUtils
 				.usage = vk::ImageUsageFlagBits::eColorAttachment | vk::ImageUsageFlagBits::eTransferSrc,
 			};
 			offscreen.image = device.createImage(offscreenImageInfo);
+			context.SetObjectDebugName(offscreen.image, "IrradianceCube_OffscreenImage");
 
 			vk::MemoryRequirements offscreenMemReqs = offscreen.image.getMemoryRequirements();
 			vk::MemoryAllocateInfo offscreenMemAlloc{
@@ -492,6 +512,7 @@ namespace kbr::SkyboxUtils
 			};
 			offscreen.memory = device.allocateMemory(offscreenMemAlloc);
 			offscreen.image.bindMemory(*offscreen.memory, 0);
+			context.SetObjectDebugName(offscreen.memory, "IrradianceCube_OffscreenImageMemory");
 
 			const vk::ImageViewCreateInfo offscreenViewInfo{
 				.image = *offscreen.image,
@@ -506,6 +527,7 @@ namespace kbr::SkyboxUtils
 				}
 			};
 			offscreen.view = device.createImageView(offscreenViewInfo);
+			context.SetObjectDebugName(offscreen.view, "IrradianceCube_OffscreenImageView");
 
 			vk::FramebufferCreateInfo offscreenFramebufferInfo{
 				.renderPass = *renderpass,
@@ -516,8 +538,11 @@ namespace kbr::SkyboxUtils
 				.layers = 1
 			};
 			offscreen.framebuffer = device.createFramebuffer(offscreenFramebufferInfo);
+			context.SetObjectDebugName(offscreen.framebuffer, "IrradianceCube_OffscreenFramebuffer");
 
 			const auto cmd = context.BeginSingleTimeCommands();
+			context.SetObjectDebugName(cmd, "IrradianceCube_OffscreenImageLayoutCmd");
+
 			context.TransitionImageLayout(
 				cmd,
 				offscreen.image,
@@ -550,6 +575,7 @@ namespace kbr::SkyboxUtils
 				.pBindings = setLayoutBindings.data()
 			};
 			descriptorSetLayout = device.createDescriptorSetLayout(descriptorsetlayoutInfo);
+			context.SetObjectDebugName(descriptorSetLayout, "IrradianceCube_DescriptorSetLayout");
 		}
 
 		// Descriptor Pool
@@ -568,6 +594,7 @@ namespace kbr::SkyboxUtils
 				.pPoolSizes = poolSizes.data()
 			};
 			descriptorPool = device.createDescriptorPool(descriptorPoolInfo);
+			context.SetObjectDebugName(descriptorPool, "IrradianceCube_DescriptorPool");
 		}
 
 		// Descriptor sets
@@ -580,6 +607,8 @@ namespace kbr::SkyboxUtils
 			};
 			std::vector<vk::raii::DescriptorSet> descriptorSets = device.allocateDescriptorSets(allocInfo);
 			descriptorSet = std::move(descriptorSets[0]);
+			context.SetObjectDebugName(descriptorSet, "IrradianceCube_DescriptorSet");
+
 			vk::WriteDescriptorSet writeDescriptorSet{
 				.dstSet = *descriptorSet,
 				.dstBinding = 0,
@@ -614,6 +643,7 @@ namespace kbr::SkyboxUtils
 				.pPushConstantRanges = &pushConstantRange
 			};
 			pipelinelayout = device.createPipelineLayout(pipelineLayoutInfo);
+			context.SetObjectDebugName(pipelinelayout, "IrradianceCube_PipelineLayout");
 		}
 
 		// Pipeline
@@ -703,6 +733,7 @@ namespace kbr::SkyboxUtils
 			pipelineInfo.renderPass = renderpass;
 
 			pipeline = device.createGraphicsPipeline(nullptr, pipelineInfo);
+			context.SetObjectDebugName(pipeline, "IrradianceCube_Pipeline");
 		}
 
 		vk::ClearValue clearValues[1];
@@ -735,6 +766,7 @@ namespace kbr::SkyboxUtils
 		};
 
 		const auto cmd = context.BeginSingleTimeCommands();
+		context.SetObjectDebugName(cmd, "IrradianceCube_RenderCommandBuffer");
 
 		vk::Viewport viewport{
 			.x = 0.0f,
@@ -790,7 +822,7 @@ namespace kbr::SkyboxUtils
 
 				cmd.endRenderPass();
 
-				const vk::ImageSubresourceRange offscreenSubresourceRange{
+				constexpr vk::ImageSubresourceRange offscreenSubresourceRange{
 					.aspectMask = vk::ImageAspectFlagBits::eColor,
 					.baseMipLevel = 0,
 					.levelCount = 1,
@@ -892,6 +924,7 @@ namespace kbr::SkyboxUtils
 		};
 
 		prefilteredEnvMap.image = device.createImage(imageInfo);
+		context.SetObjectDebugName(prefilteredEnvMap.image, "PrefilteredEnvMap_Image");
 
 		const vk::MemoryRequirements memReqs = prefilteredEnvMap.image.getMemoryRequirements();
 		const vk::MemoryAllocateInfo memAlloc{
@@ -901,6 +934,7 @@ namespace kbr::SkyboxUtils
 
 		prefilteredEnvMap.deviceMemory = device.allocateMemory(memAlloc);
 		prefilteredEnvMap.image.bindMemory(prefilteredEnvMap.deviceMemory, 0);
+		context.SetObjectDebugName(prefilteredEnvMap.deviceMemory, "PrefilteredEnvMap_ImageMemory");
 
 		// Image view
 		const vk::ImageViewCreateInfo viewInfo{
@@ -917,6 +951,7 @@ namespace kbr::SkyboxUtils
 		};
 
 		prefilteredEnvMap.view = device.createImageView(viewInfo);
+		context.SetObjectDebugName(prefilteredEnvMap.view, "PrefilteredEnvMap_ImageView");
 
 		// Sampler
 		const vk::SamplerCreateInfo samplerInfo{
@@ -935,6 +970,7 @@ namespace kbr::SkyboxUtils
 		prefilteredEnvMap.layerCount = 6;
 		prefilteredEnvMap.imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal;
 		prefilteredEnvMap.UpdateDescriptor();
+		context.SetObjectDebugName(prefilteredEnvMap.sampler, "PrefilteredEnvMap_Sampler");
 
 		vk::AttachmentDescription attrDesc{
 			.format = format,
@@ -987,6 +1023,7 @@ namespace kbr::SkyboxUtils
 		};
 
 		vk::raii::RenderPass renderpass = device.createRenderPass(renderPassInfo);
+		context.SetObjectDebugName(renderpass, "PrefilteredEnvMap_Renderpass");
 
 		struct OffscreenResources
 		{
@@ -1015,6 +1052,7 @@ namespace kbr::SkyboxUtils
 				.usage = vk::ImageUsageFlagBits::eColorAttachment | vk::ImageUsageFlagBits::eTransferSrc,
 			};
 			offscreen.image = device.createImage(offscreenImageInfo);
+			context.SetObjectDebugName(offscreen.image, "PrefilteredEnvMap_OffscreenImage");
 
 			vk::MemoryRequirements offscreenMemReqs = offscreen.image.getMemoryRequirements();
 			vk::MemoryAllocateInfo offscreenMemAlloc{
@@ -1023,6 +1061,7 @@ namespace kbr::SkyboxUtils
 			};
 			offscreen.memory = device.allocateMemory(offscreenMemAlloc);
 			offscreen.image.bindMemory(*offscreen.memory, 0);
+			context.SetObjectDebugName(offscreen.memory, "PrefilteredEnvMap_OffscreenImageMemory");
 
 			const vk::ImageViewCreateInfo offscreenViewInfo{
 				.image = *offscreen.image,
@@ -1037,6 +1076,7 @@ namespace kbr::SkyboxUtils
 				}
 			};
 			offscreen.view = device.createImageView(offscreenViewInfo);
+			context.SetObjectDebugName(offscreen.view, "PrefilteredEnvMap_OffscreenImageView");
 
 			vk::FramebufferCreateInfo offscreenFramebufferInfo{
 				.renderPass = *renderpass,
@@ -1047,8 +1087,11 @@ namespace kbr::SkyboxUtils
 				.layers = 1
 			};
 			offscreen.framebuffer = device.createFramebuffer(offscreenFramebufferInfo);
+			context.SetObjectDebugName(offscreen.framebuffer, "PrefilteredEnvMap_OffscreenFramebuffer");
 
 			const auto cmd = context.BeginSingleTimeCommands();
+			context.SetObjectDebugName(cmd, "PrefilteredEnvMap_OffscreenCommandBuffer");
+
 			context.TransitionImageLayout(
 				cmd,
 				offscreen.image,
@@ -1081,6 +1124,7 @@ namespace kbr::SkyboxUtils
 				.pBindings = setLayoutBindings.data()
 			};
 			descriptorSetLayout = device.createDescriptorSetLayout(descriptorsetlayoutInfo);
+			context.SetObjectDebugName(descriptorSetLayout, "PrefilteredEnvMap_DescriptorSetLayout");
 		}
 
 		// Descriptor Pool
@@ -1099,6 +1143,7 @@ namespace kbr::SkyboxUtils
 				.pPoolSizes = poolSizes.data()
 			};
 			descriptorPool = device.createDescriptorPool(descriptorPoolInfo);
+			context.SetObjectDebugName(descriptorPool, "PrefilteredEnvMap_DescriptorPool");
 		}
 
 		// Descriptor sets
@@ -1111,6 +1156,8 @@ namespace kbr::SkyboxUtils
 			};
 			std::vector<vk::raii::DescriptorSet> descriptorSets = device.allocateDescriptorSets(allocInfo);
 			descriptorSet = std::move(descriptorSets[0]);
+			context.SetObjectDebugName(descriptorSet, "PrefilteredEnvMap_DescriptorSet");
+
 			vk::WriteDescriptorSet writeDescriptorSet{
 				.dstSet = *descriptorSet,
 				.dstBinding = 0,
@@ -1144,6 +1191,7 @@ namespace kbr::SkyboxUtils
 				.pPushConstantRanges = &pushConstantRange
 			};
 			pipelinelayout = device.createPipelineLayout(pipelineLayoutInfo);
+			context.SetObjectDebugName(pipelinelayout, "PrefilteredEnvMap_PipelineLayout");
 		}
 
 		// Pipeline
@@ -1233,6 +1281,7 @@ namespace kbr::SkyboxUtils
 			pipelineInfo.renderPass = renderpass;
 
 			pipeline = device.createGraphicsPipeline(nullptr, pipelineInfo);
+			context.SetObjectDebugName(pipeline, "PrefilteredEnvMap_Pipeline");
 		}
 
 		vk::ClearValue clearValues[1];
@@ -1265,6 +1314,7 @@ namespace kbr::SkyboxUtils
 		};
 
 		const auto cmd = context.BeginSingleTimeCommands();
+		context.SetObjectDebugName(cmd, "PrefilteredEnvMap_RenderCommandBuffer");
 
 		vk::Viewport viewport{
 			.x = 0.0f,

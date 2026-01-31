@@ -50,8 +50,11 @@ ConstantBuffer<PerObject> perObject;
 [[vk::binding(3)]]
 Sampler2D shadowMap;
 
+[[vk::binding(4)]]
 SamplerCube samplerIrradiance;
+[[vk::binding(5)]]
 Sampler2D samplerBRDFLUT;
+[[vk::binding(6)]]
 SamplerCube prefilteredMapSampler;
 
 static const float PI = 3.14159265359;
