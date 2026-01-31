@@ -67,6 +67,7 @@ namespace kbr
 		vk::PhysicalDeviceProperties GetProperties() const;
 		vk::PhysicalDeviceMemoryProperties GetMemoryProperties() const;
 		vk::FormatProperties GetFormatProperties(vk::Format format) const;
+		vk::SampleCountFlagBits GetMSAASamples() const;
 
 		void FramebufferResized(uint32_t width, uint32_t height);
 

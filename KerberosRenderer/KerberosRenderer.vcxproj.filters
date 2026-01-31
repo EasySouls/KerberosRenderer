@@ -123,9 +123,6 @@
     <ClCompile Include="src\ModelLoader.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="src\Camera.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="src\Input\InputSystem.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -135,28 +132,16 @@
     <ClCompile Include="src\Shader.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="vendor\ktx\lib\errstr.c">
+    <ClCompile Include="src\Renderer\SkyboxUtils.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="vendor\ktx\lib\filestream.c">
+    <ClCompile Include="src\Scene\Camera\Camera.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="vendor\ktx\lib\hashlist.c">
+    <ClCompile Include="src\Scene\Camera\EditorCamera.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="vendor\ktx\lib\hashtable.c">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="vendor\ktx\lib\memstream.c">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="vendor\ktx\lib\swap.c">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="vendor\ktx\lib\texture.c">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="vendor\ktx\lib\checkheader.c">
+    <ClCompile Include="src\Scene\Camera\FirstPersonCamera.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
@@ -221,9 +206,6 @@
     <ClInclude Include="src\ModelLoader.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="src\Camera.hpp">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="src\Events\Event.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -269,31 +251,22 @@
     <ClInclude Include="src\Shader.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="vendor\ktx\lib\filestream.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="vendor\ktx\lib\ktxint.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="vendor\ktx\lib\memstream.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="vendor\ktx\lib\stream.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="vendor\ktx\lib\uthash.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="vendor\ktx\include\ktx.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="vendor\ktx\other_include\KHR\khrplatform.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="src\Scene\Node.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="src\Renderer\Material.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Renderer\SkyboxUtils.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Scene\Camera\Camera.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Scene\Camera\EditorCamera.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Scene\Camera\FirstPersonCamera.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
@@ -304,5 +277,7 @@
     <None Include="assets\shaders\skybox.slang" />
     <None Include="assets\shaders\shadowmap.slang" />
     <None Include="assets\shaders\pbrbasic.slang" />
+    <None Include="assets\shaders\irradiancecube.slang" />
+    <None Include="assets\shaders\prefilterenvmap.slang" />
   </ItemGroup>
 </Project>

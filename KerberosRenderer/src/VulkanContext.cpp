@@ -509,6 +509,11 @@ namespace kbr
 		return physicalDevice.getFormatProperties(format);
 	}
 
+	vk::SampleCountFlagBits VulkanContext::GetMSAASamples() const 
+	{
+		return msaaSamples;
+	}
+
 	void VulkanContext::FramebufferResized(uint32_t width, uint32_t height) 
 	{
 		framebufferResized = true;

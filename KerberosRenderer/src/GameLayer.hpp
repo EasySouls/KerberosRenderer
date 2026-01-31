@@ -76,6 +76,10 @@ namespace Game
 		vk::raii::Pipeline m_ShadowMapPipeline = nullptr;
 
 		kbr::TextureCube m_SkyboxTexture;
+		// Generated at runtime
+		kbr::Texture2D m_LutBrdfTexture;
+		kbr::TextureCube m_IrradianceCubeTexture;
+		kbr::TextureCube m_PrefilteredCubeTexture;
 
 		vk::raii::Image m_ColorImage = nullptr;
 		vk::raii::DeviceMemory m_ColorImageMemory = nullptr;

@@ -5,14 +5,16 @@
 #include "Vertex.hpp"
 #include "ModelLoader.hpp"
 #include "Shader.hpp"
-#include "events/WindowResizedEvent.hpp"
+#include "Events/WindowResizedEvent.hpp"
+#include "Renderer/SkyboxUtils.hpp"
 #include "Scene/Camera/EditorCamera.hpp"
 #include "Scene/Camera/FirstPersonCamera.hpp"
 #include "Input/KeyCodes.hpp"
-#include "logging/Log.hpp"
+#include "Logging/Log.hpp"
 
 #include "glm/glm.hpp"
 #include <glm/gtc/type_ptr.hpp>
+#include <glm/gtc/matrix_inverse.hpp>
 
 #include "Buffer.hpp"
 #include "imgui.h"
@@ -62,11 +64,11 @@ namespace Game
 		KBR_CORE_INFO("Size of material UniformBlock: {} bytes", sizeof(kbr::Material::UniformBlock));
 
 		m_SkyboxMesh = kbr::ModelLoader::LoadModel("assets/models/cube.gltf");
-		m_SkyboxTexture.LoadFromFile("assets/textures/hdr/pisa_cube.ktx", vk::Format::eR16G16B16A16Sfloat);
-
-		CreateVulkanResources();
-
-		KBR_CORE_INFO("Prepared Vulkan resources!");
+		m_SkyboxTexture.LoadFromFile(
+			"assets/textures/hdr/pisa_cube.ktx",
+			vk::Format::eR16G16B16A16Sfloat,
+			vk::ImageUsageFlagBits::eSampled
+		);
 
 		// Load models
 		m_Meshes["avocado"] = std::make_shared<kbr::Mesh>(kbr::ModelLoader::LoadModel("assets/models/avocado/Avocado.gltf"));
@@ -111,6 +113,10 @@ namespace Game
 			.Material = cubeMaterial,
 			.Name = "Cube"
 		});
+
+		CreateVulkanResources();
+
+		KBR_CORE_INFO("Prepared Vulkan resources!");
 	}
 	
 	void GameLayer::OnDetach() 
@@ -223,7 +229,7 @@ namespace Game
 			{
 				auto& node = m_SceneNodes[i];
 
-				UpdatePerObjectUniformBuffer(currentImage, i, node->GetTransform(), selectedMaterial);
+				UpdatePerObjectUniformBuffer(currentImage, static_cast<uint32_t>(i), node->GetTransform(), selectedMaterial);
 
 				uint32_t dynamicOffset = static_cast<uint32_t>(i * m_DynamicAlignment);
 
@@ -400,7 +406,7 @@ namespace Game
 			{
 				auto& node = m_SceneNodes[i];
 
-				UpdatePerObjectUniformBuffer(currentImage, i, node->GetTransform(), selectedMaterial);
+				UpdatePerObjectUniformBuffer(currentImage, static_cast<uint32_t>(i), node->GetTransform(), selectedMaterial);
 
 				uint32_t dynamicOffset = static_cast<uint32_t>(i * m_DynamicAlignment);
 
@@ -621,12 +627,12 @@ namespace Game
 	{
 		m_PerObjectUniformData = {
 			.model = model,
-			.worldNormal = glm::transpose(glm::inverse(glm::mat3(model))),
+			.worldNormal = glm::inverseTranspose(model),
 			.material = material.Params
 		};
 
 		char* data = static_cast<char*>(m_UniformBuffers[currentImage].perObject->GetMappedData());
-		data += objectIndex * m_DynamicAlignment;
+		data += static_cast<size_t>(objectIndex) * m_DynamicAlignment;
 
 		std::memcpy(data, &m_PerObjectUniformData, sizeof(PerObjectData));
 	}
@@ -648,7 +654,7 @@ namespace Game
 
 	void GameLayer::PrepareUniformBuffers()
 	{
-		auto& context = kbr::VulkanContext::Get();
+		const auto& context = kbr::VulkanContext::Get();
 		const auto properties = context.GetProperties();
 
 		m_MinUniformBufferOffsetAlignment = properties.limits.minUniformBufferOffsetAlignment;
@@ -906,6 +912,10 @@ namespace Game
 
 	void GameLayer::CreateVulkanResources()
 	{
+		kbr::SkyboxUtils::GenerateBRDFLUT(m_LutBrdfTexture);
+		kbr::SkyboxUtils::GenerateIrradianceCube(m_IrradianceCubeTexture, m_SkyboxTexture.descriptor, *m_SkyboxMesh);
+		kbr::SkyboxUtils::GeneratePrefilteredEnvMap(m_PrefilteredCubeTexture, m_SkyboxTexture.descriptor, *m_SkyboxMesh);
+
 		PrepareUniformBuffers();
 
 		auto& context = kbr::VulkanContext::Get();
