@@ -788,7 +788,7 @@ namespace kbr::SkyboxUtils
 		vk::ImageSubresourceRange irradianceSubresourceRange{
 			.aspectMask = vk::ImageAspectFlagBits::eColor,
 			.baseMipLevel = 0,
-			.levelCount = 1,
+			.levelCount = irradianceTexture.mipLevels,
 			.baseArrayLayer = 0,
 			.layerCount = 6
 		};
@@ -1335,7 +1335,7 @@ namespace kbr::SkyboxUtils
 		vk::ImageSubresourceRange prefilterSubresourceRange{
 			.aspectMask = vk::ImageAspectFlagBits::eColor,
 			.baseMipLevel = 0,
-			.levelCount = numMips,
+			.levelCount = prefilteredEnvMap.mipLevels,
 			.baseArrayLayer = 0,
 			.layerCount = 6
 		};

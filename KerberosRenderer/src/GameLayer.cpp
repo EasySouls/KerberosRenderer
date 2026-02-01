@@ -552,7 +552,8 @@ namespace Game
 		ImGui::Separator();
 
 		ImGui::Text("Color Output Image");
-		ImGui::Text("Size: %.2f x %.2f", m_ViewportSize.x, m_ViewportSize.y);
+		ImGui::Text("Viewport size: %.2f x %.2f", m_ViewportSize.x, m_ViewportSize.y);
+		ImGui::Text("Output size: %.2f x %.2f", m_OutputSize.x, m_OutputSize.y);
 
 		ImGui::Separator();
 
