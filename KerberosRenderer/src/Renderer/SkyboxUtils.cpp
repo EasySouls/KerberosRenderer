@@ -431,7 +431,7 @@ namespace kbr::SkyboxUtils
 			.stencilLoadOp = vk::AttachmentLoadOp::eDontCare,
 			.stencilStoreOp = vk::AttachmentStoreOp::eDontCare,
 			.initialLayout = vk::ImageLayout::eUndefined,
-			.finalLayout = vk::ImageLayout::eShaderReadOnlyOptimal
+			.finalLayout = vk::ImageLayout::eColorAttachmentOptimal
 		};
 
 		// Color attachment
@@ -980,7 +980,7 @@ namespace kbr::SkyboxUtils
 			.stencilLoadOp = vk::AttachmentLoadOp::eDontCare,
 			.stencilStoreOp = vk::AttachmentStoreOp::eDontCare,
 			.initialLayout = vk::ImageLayout::eUndefined,
-			.finalLayout = vk::ImageLayout::eShaderReadOnlyOptimal
+			.finalLayout = vk::ImageLayout::eColorAttachmentOptimal
 		};
 
 		// Color attachment
@@ -1397,13 +1397,13 @@ namespace kbr::SkyboxUtils
 				copyRegion.srcSubresource.baseArrayLayer = 0;
 				copyRegion.srcSubresource.mipLevel = 0;
 				copyRegion.srcSubresource.layerCount = 1;
-				copyRegion.srcOffset = { 0, 0, 0 };
+				copyRegion.srcOffset = { .x = 0, .y = 0, .z = 0 };
 
 				copyRegion.dstSubresource.aspectMask = vk::ImageAspectFlagBits::eColor;
 				copyRegion.dstSubresource.baseArrayLayer = f;
 				copyRegion.dstSubresource.mipLevel = m;
 				copyRegion.dstSubresource.layerCount = 1;
-				copyRegion.dstOffset = { 0, 0, 0 };
+				copyRegion.dstOffset = { .x = 0, .y = 0, .z = 0 };
 
 				copyRegion.extent.width = static_cast<uint32_t>(viewport.width);
 				copyRegion.extent.height = static_cast<uint32_t>(viewport.height);
