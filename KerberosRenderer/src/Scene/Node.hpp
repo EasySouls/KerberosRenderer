@@ -24,6 +24,8 @@ namespace kbr
 
 		std::string Name;
 
+		bool Visible = true;
+
 		glm::mat4 GetTransform() const 
 		{
 			const glm::mat4 translation = glm::translate(glm::mat4(1.0f), Position);

@@ -27,6 +27,12 @@ namespace kbr
 
 		vk::DescriptorSet DescriptorSet = nullptr;
 
+		bool IsTransparent() const 
+		{
+			//return Params.albedo.a < 1.0f;
+			return false;
+		}
+
 		Material() = default;
 
 		Material(std::string n, const glm::vec3 c, const float r, const float m)

@@ -44,7 +44,7 @@ namespace Game
 
 		m_Camera = std::make_unique<kbr::EditorCamera>(45.0f, 16.0f / 9.0f, 0.1f, 1000.0f);
 		m_Camera->SetFlipY(false);
-		m_Camera->SetPosition(glm::vec3(0.0f, 5.0f, -10.0f));
+		m_Camera->SetPosition(glm::vec3(0.0f, -15.0f, -10.0f));
 		m_ViewportSize = { 1280.0f, 720.0f };
 
 		m_Materials.emplace_back(std::make_shared<kbr::Material>("Gold", glm::vec3(1.0f, 0.765557f, 0.336057f), 0.1f, 1.0f));
@@ -76,6 +76,7 @@ namespace Game
 		// Load models
 		m_Meshes["avocado"] = std::make_shared<kbr::Mesh>(kbr::ModelLoader::LoadModel("assets/models/avocado/Avocado.gltf", loadingFlags));
 		m_Meshes["cube"] = std::make_shared<kbr::Mesh>(kbr::ModelLoader::LoadModel("assets/models/cube.gltf", loadingFlags));
+		m_Meshes["sphere"] = std::make_shared<kbr::Mesh>(kbr::ModelLoader::LoadModel("assets/models/sphere.gltf", loadingFlags));
 
 		KBR_CORE_INFO("Loaded {} mesh(es)!", m_Meshes.size());
 
@@ -96,13 +97,13 @@ namespace Game
 
 		KBR_CORE_INFO("Loaded {} texture(s)!", m_Textures.size());
 
-		const auto& avocadoMaterial = m_Materials.emplace_back(std::make_shared<kbr::Material>("Avocado", glm::vec3(1.0f), 0.1f, 1.0f, m_Textures[0], m_Textures[1]));
-		const auto& cubeMaterial = m_Materials.emplace_back(std::make_shared<kbr::Material>("Stone Floor", glm::vec3(1.0f), 0.5f, 0.0f, m_Textures[2], m_Textures[3]));
+		const auto& avocadoMaterial = m_Materials.emplace_back(std::make_shared<kbr::Material>("Avocado", glm::vec3(1.0f), 0.9f, 0.03f, m_Textures[0], m_Textures[1]));
+		const auto& stoneFloorMaterial = m_Materials.emplace_back(std::make_shared<kbr::Material>("Stone Floor", glm::vec3(1.0f), 0.8f, 0.05f, m_Textures[2], m_Textures[3]));
 
 		m_SceneNodes.push_back(new kbr::Node{
 			.Position = glm::vec3(0.0f, -1.5f, 0.0f),
 			.Rotation = glm::vec3(0.0f),
-			.Scale = glm::vec3(1.0f),
+			.Scale = glm::vec3(50.0f),
 			.Mesh = m_Meshes["avocado"],
 			.Material = avocadoMaterial,
 			.Name = "Avocado"
@@ -113,8 +114,17 @@ namespace Game
 			.Rotation = glm::vec3(0.0f),
 			.Scale = glm::vec3(1.0f),
 			.Mesh = m_Meshes["cube"],
-			.Material = cubeMaterial,
+			.Material = stoneFloorMaterial,
 			.Name = "Cube"
+		});
+
+		m_SceneNodes.push_back(new kbr::Node{
+			.Position = glm::vec3(2.0f, -10.0f, 3.0f),
+			.Rotation = glm::vec3(0.0f),
+			.Scale = glm::vec3(1.0f),
+			.Mesh = m_Meshes["sphere"],
+			.Material = stoneFloorMaterial,
+			.Name = "Sphere"
 		});
 
 		CreateVulkanResources();
@@ -136,7 +146,7 @@ namespace Game
 		if (m_ViewportSize.x > 0.0f && m_ViewportSize.y > 0.0f && 
 			(static_cast<int>(m_OutputSize.x) != static_cast<int>(m_ViewportSize.x) || static_cast<int>(m_OutputSize.y) != static_cast<int>(m_ViewportSize.y)))
 		{
-			m_Camera->SetViewportSize(m_OutputSize.x, m_OutputSize.y);
+			m_Camera->SetViewportSize(m_ViewportSize.x, m_ViewportSize.y);
 
 			ResizeResources();
 		}
@@ -229,6 +239,8 @@ namespace Game
 			for (size_t i = 0; i < m_SceneNodes.size(); ++i)
 			{
 				auto& node = m_SceneNodes[i];
+				if (!node->Visible || !node->Mesh || !node->Material)
+					continue;
 
 				UpdatePerObjectUniformBuffer(currentImage, static_cast<uint32_t>(i), node->GetTransform(), *node->Material);
 
@@ -407,6 +419,9 @@ namespace Game
 			{
 				auto& node = m_SceneNodes[i];
 
+				if (!node->Visible || !node->Mesh || !node->Material || node->Material->IsTransparent())
+					continue;
+
 				UpdatePerObjectUniformBuffer(currentImage, static_cast<uint32_t>(i), node->GetTransform(), *node->Material);
 
 				uint32_t dynamicOffset = static_cast<uint32_t>(i * m_DynamicAlignment);
@@ -461,6 +476,9 @@ namespace Game
 			/*for (size_t i = 0; i < m_SceneNodes.size(); ++i)
 			{
 				auto& node = m_SceneNodes[i];
+
+				if (!node->Visible || !node->Mesh || !node->Material || !node->Material->IsTransparent())
+					continue;
 
 				UpdatePerObjectUniformBuffer(currentImage, i, node->GetTransform(), selectedMaterial);
 
@@ -563,6 +581,10 @@ namespace Game
 		{
 			if (ImGui::TreeNode(m_SceneNodes[i]->Name.c_str()))
 			{
+				ImGui::Checkbox(("Visible##" + std::to_string(i)).c_str(), &m_SceneNodes[i]->Visible);
+
+				ImGui::Separator();
+
 				ImGui::DragFloat3(("Position##" + std::to_string(i)).c_str(), glm::value_ptr(m_SceneNodes[i]->Position), 0.1f);
 				ImGui::DragFloat3(("Rotation##" + std::to_string(i)).c_str(), glm::value_ptr(m_SceneNodes[i]->Rotation), 0.01f);
 				ImGui::DragFloat3(("Scale##" + std::to_string(i)).c_str(), glm::value_ptr(m_SceneNodes[i]->Scale), 0.1f, 0.1f, 100.0f);
