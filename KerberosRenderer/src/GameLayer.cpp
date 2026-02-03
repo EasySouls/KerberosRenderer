@@ -35,6 +35,8 @@ namespace Game
 			delete node;
 		}
 
+		kbr::VulkanContext::Get().WaitIdle();
+
 		m_SceneNodes.clear();
 	}
 
@@ -42,7 +44,7 @@ namespace Game
 	{
 		KBR_CORE_INFO("GameLayer attached!");
 
-		m_Camera = std::make_unique<kbr::EditorCamera>(45.0f, 16.0f / 9.0f, 0.1f, 1000.0f);
+		m_Camera = std::make_unique<kbr::FirstPersonCamera>(45.0f, 16.0f / 9.0f, 0.1f, 1000.0f);
 		m_Camera->SetFlipY(false);
 		m_Camera->SetPosition(glm::vec3(0.0f, -15.0f, -10.0f));
 		m_ViewportSize = { 1280.0f, 720.0f };

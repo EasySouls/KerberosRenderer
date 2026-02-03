@@ -470,8 +470,13 @@ namespace kbr
 		return maxFramesInFlight;
 	}
 
+	void VulkanContext::WaitIdle() const 
+	{
+		device.waitIdle();
+	}
+
 	void VulkanContext::SetObjectDebugName(const uint64_t objectHandle, const vk::ObjectType objectType,
-		const std::string& name) const 
+	                                       const std::string& name) const 
 	{
 #ifdef KBR_DEBUG
 		const vk::DebugUtilsObjectNameInfoEXT nameInfo{

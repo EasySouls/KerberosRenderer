@@ -49,6 +49,8 @@ namespace kbr
 
 		uint32_t GetMaxFramesInFlight() const;
 
+		void WaitIdle() const;
+
 		void SetObjectDebugName(uint64_t objectHandle, vk::ObjectType objectType, const std::string& name) const;
 
 		template<typename T>

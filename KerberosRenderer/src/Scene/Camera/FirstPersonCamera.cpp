@@ -1,5 +1,11 @@
 #include "FirstPersonCamera.hpp"
 
+#include <algorithm>
+
+#include "events/MouseButtonPressedEvent.hpp"
+#include "events/MouseButtonReleasedEvent.hpp"
+#include "Input/InputSystem.hpp"
+
 namespace kbr
 {
 	FirstPersonCamera::FirstPersonCamera(const float fov, const float aspectRatio, const float nearClip, const float farClip)
@@ -11,6 +17,34 @@ namespace kbr
 
 	void FirstPersonCamera::OnUpdate(const float deltaTime)
 	{
+		const bool forward = Input::IsKeyPressed(Key::W);
+		const bool backward = Input::IsKeyPressed(Key::S);
+		const bool left = Input::IsKeyPressed(Key::A);
+		const bool right = Input::IsKeyPressed(Key::D);
+
+		if (forward || backward || left || right)
+		{
+			const glm::vec3 forwardDir = GetForward();
+			const glm::vec3 rightDir = GetRight();
+
+			glm::vec3 movement(0.0f);
+			if (forward)
+				movement += forwardDir;
+			if (backward)
+				movement -= forwardDir;
+			if (left)
+				movement -= rightDir;
+			if (right)
+				movement += rightDir;
+
+			if (glm::length(movement) > 0.0f)
+			{
+				movement = glm::normalize(movement);
+				m_Position += movement * m_MoveSpeed * deltaTime;
+				m_ViewDirty = true;
+			}
+		}
+
 		if (m_ViewDirty)
 		{
 			UpdateView();
@@ -23,7 +57,43 @@ namespace kbr
 
 	void FirstPersonCamera::OnEvent(const std::shared_ptr<Event>& event)
 	{
-		// Handle events if necessary
+		if (const auto mouseButtonPressedEvent = std::dynamic_pointer_cast<MouseButtonPressedEvent>(event))
+		{
+			if (mouseButtonPressedEvent->GetButton() == Mouse::Button1)
+			{
+				//Input::SetCursorMode(CursorMode::Locked);
+				m_CanLookAround = true;
+			}
+		}
+		else if (const auto mouseButtonReleasedEvent = std::dynamic_pointer_cast<MouseButtonReleasedEvent>(event))
+		{
+			if (mouseButtonReleasedEvent->GetButton() == Mouse::Button1)
+			{
+				//Input::SetCursorMode(CursorMode::Normal);
+				m_CanLookAround = false;
+			}
+		}
+		else if (const auto mouseMovedEvent = std::dynamic_pointer_cast<MouseMovedEvent>(event))
+		{
+			const int32_t x = static_cast<int32_t>(mouseMovedEvent->GetX());
+			const int32_t y = static_cast<int32_t>(mouseMovedEvent->GetY());
+
+			const int32_t dx = static_cast<int32_t>(m_MousePosition.x) - x;
+			const int32_t dy = static_cast<int32_t>(m_MousePosition.y) - y;
+
+			m_MousePosition.x = static_cast<float>(x);
+			m_MousePosition.y = static_cast<float>(y);
+
+			if (!m_CanLookAround)
+				return;
+
+			constexpr float rotationSpeed = 0.1f;
+			m_Yaw -= static_cast<float>(dx) * rotationSpeed;
+			m_Pitch -= static_cast<float>(dy) * rotationSpeed;
+			m_Pitch = std::min(m_Pitch, 89.0f);
+			m_Pitch = std::max(m_Pitch, -89.0f);
+			m_ViewDirty = true;
+		}
 	}
 
 	void FirstPersonCamera::SetPosition(const glm::vec3& position)
@@ -34,19 +104,15 @@ namespace kbr
 
 	float FirstPersonCamera::GetDistance() const 
 	{
-		return m_Distance;
+		return 0.0f;
 	}
 
 	void FirstPersonCamera::SetDistance(const float distance)
 	{
-		m_Distance = distance;
-		m_ViewDirty = true;
 	}
 
 	void FirstPersonCamera::Focus(const glm::vec3& focusPoint)
 	{
-		m_FocalPoint = focusPoint;
-		m_ViewDirty = true;
 	}
 
 	void FirstPersonCamera::SetViewportSize(const float width, const float height)
@@ -54,6 +120,13 @@ namespace kbr
 		m_AspectRatio = width / height;
 		m_ProjectionDirty = true;
 		UpdateProjection();
+	}
+
+	void FirstPersonCamera::SetFlipY(const bool flip) 
+	{
+		m_FlipY = flip;
+
+		m_ProjectionDirty = true;
 	}
 
 	const glm::mat4& FirstPersonCamera::GetViewMatrix() const
@@ -73,7 +146,7 @@ namespace kbr
 
 	glm::vec3 FirstPersonCamera::GetUp() const
 	{
-		return glm::vec3(0.0f, 1.0f, 0.0f);
+		return {0.0f, 1.0f, 0.0f};
 	}
 
 	glm::vec3 FirstPersonCamera::GetRight() const
@@ -112,12 +185,13 @@ namespace kbr
 
 	const glm::vec3& FirstPersonCamera::GetFocalPoint() const
 	{
-		return m_FocalPoint;
+		constexpr static glm::vec3 zeroPoint{ 0.0f, 0.0f, 0.0f };
+		return zeroPoint;
 	}
 
 	void FirstPersonCamera::UpdateView()
 	{
-		glm::vec3 direction = GetForward();
+		const glm::vec3 direction = GetForward();
 		m_ViewMatrix = glm::lookAt(m_Position, m_Position + direction, GetUp());
 		m_ViewDirty = false;
 	}
@@ -125,7 +199,9 @@ namespace kbr
 	void FirstPersonCamera::UpdateProjection()
 	{
 		m_ProjectionMatrix = glm::perspective(glm::radians(m_Fov), m_AspectRatio, m_NearClip, m_FarClip);
-		m_ProjectionMatrix[1][1] *= -1; // Invert Y for Vulkan
+		if (m_FlipY) {
+			m_ProjectionMatrix[1][1] *= -1; // Invert Y for Vulkan
+		}
 		m_ProjectionDirty = false;
 	}
 

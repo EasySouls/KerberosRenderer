@@ -21,6 +21,8 @@ namespace kbr
 
 		void SetViewportSize(float width, float height) override;
 
+		void SetFlipY(bool flip) override;
+
 		const glm::mat4& GetViewMatrix() const override;
 		const glm::mat4& GetProjectionMatrix() const override;
 		glm::mat4 GetViewProjectionMatrix() const override;
@@ -41,8 +43,13 @@ namespace kbr
 
 	private:
 		glm::vec3 m_Position{ 0.0f, 0.0f, 0.0f };
-		glm::vec3 m_FocalPoint{ 0.0f, 0.0f, -1.0f };
-		float m_Distance = 10.0f;
+		float m_MoveSpeed = 5.0f;
+		bool m_CanLookAround = false;
+
+		bool m_FlipY = false;
+
+		glm::vec2 m_MousePosition{ 0.0f, 0.0f };
+
 		float m_Pitch = 0.0f;
 		float m_Yaw = -90.0f; // Facing towards negative Z by default
 		float m_Fov;
