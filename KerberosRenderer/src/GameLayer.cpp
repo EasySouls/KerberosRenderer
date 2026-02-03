@@ -5,6 +5,7 @@
 #include "Vertex.hpp"
 #include "ModelLoader.hpp"
 #include "Shader.hpp"
+#include "Buffer.hpp"
 #include "Events/WindowResizedEvent.hpp"
 #include "Renderer/SkyboxUtils.hpp"
 #include "Scene/Camera/EditorCamera.hpp"
@@ -12,11 +13,11 @@
 #include "Input/KeyCodes.hpp"
 #include "Logging/Log.hpp"
 
+#define GLM_FORCE_DEPTH_ZERO_TO_ONE
 #include "glm/glm.hpp"
 #include <glm/gtc/type_ptr.hpp>
 #include <glm/gtc/matrix_inverse.hpp>
 
-#include "Buffer.hpp"
 #include "imgui.h"
 
 #include "backends/imgui_impl_vulkan.h"
@@ -35,9 +36,12 @@ namespace Game
 			delete node;
 		}
 
+		m_SceneNodes.clear();
+		
 		kbr::VulkanContext::Get().WaitIdle();
 
-		m_SceneNodes.clear();
+		ImGui_ImplVulkan_RemoveTexture(m_ColorOutputDescriptorSet);
+		ImGui_ImplVulkan_RemoveTexture(m_ShadowMapDescriptorSet);
 	}
 
 	void GameLayer::OnAttach() 
@@ -129,6 +133,9 @@ namespace Game
 			.Name = "Sphere"
 		});
 
+		// Setup initial directional light which we will use to generate the shadow map
+		m_UniformDataParams.lights[0] = glm::vec4(0.0f, 1.0f, 0.0f, 0.0f);
+
 		CreateVulkanResources();
 
 		KBR_CORE_INFO("Prepared Vulkan resources!");
@@ -210,12 +217,12 @@ namespace Game
 				.imageLayout = vk::ImageLayout::eDepthAttachmentOptimal,
 				.loadOp = vk::AttachmentLoadOp::eClear,
 				.storeOp = vk::AttachmentStoreOp::eStore,
-				.clearValue = vk::ClearDepthStencilValue{.depth = 1.0f, .stencil = 0 }
+				.clearValue = vk::ClearDepthStencilValue{ .depth = 1.0f, .stencil = 0 }
 			};
 
 			const vk::Rect2D renderArea{
 				.offset = vk::Offset2D{ .x = 0, .y = 0 },
-				.extent = vk::Extent2D{.width = m_ShadowMapSize, .height = m_ShadowMapSize }
+				.extent = vk::Extent2D{ .width = m_ShadowMapSize, .height = m_ShadowMapSize }
 			};
 
 			const vk::RenderingInfo shadowMapRenderingInfo{
@@ -605,11 +612,11 @@ namespace Game
 		ImGui::Separator();
 
 		// Light controls
-		ImGui::Text("Light Positions");
-		ImGui::Text("Light 1: (%.2f, %.2f, %.2f)", m_UniformDataParams.lights[0].x, m_UniformDataParams.lights[0].y, m_UniformDataParams.lights[0].z);
+		ImGui::Text("Light directions");
+		ImGui::DragFloat3("Light 1 Direction", glm::value_ptr(m_UniformDataParams.lights[0]), 0.1f);
 		ImGui::Text("Light 2: (%.2f, %.2f, %.2f)", m_UniformDataParams.lights[1].x, m_UniformDataParams.lights[1].y, m_UniformDataParams.lights[1].z);
 		ImGui::Text("Light 2: (%.2f, %.2f, %.2f)", m_UniformDataParams.lights[2].x, m_UniformDataParams.lights[2].y, m_UniformDataParams.lights[2].z);
-		ImGui::DragFloat3("Light 4 Position", glm::value_ptr(m_UniformDataParams.lights[3]), 0.1f);
+		ImGui::DragFloat3("Light 4 Direction", glm::value_ptr(m_UniformDataParams.lights[3]), 0.1f);
 		ImGui::DragFloat("Exposure", &m_UniformDataParams.exposure, 0.1f, 0.1f, 10.0f);
 		ImGui::DragFloat("Gamma", &m_UniformDataParams.gamma, 0.1f, 0.1f, 10.0f);
 		ImGui::DragFloat3("Ambient Light Color", glm::value_ptr(m_SceneUniformData.ambientLightColor), 0.01f, 0.0f, 1.0f);
@@ -626,6 +633,18 @@ namespace Game
 			materialNames.push_back(mat->name.c_str());
 		}
 		ImGui::Combo("Select Material", &m_SelectedMaterialIndex, materialNames.data(), static_cast<int>(m_Materials.size()));
+
+		ImGui::Separator();
+
+		// Display shadow map
+		ImGui::Text("Shadow Map");
+		ImGui::Image((ImTextureID)m_ShadowMapDescriptorSet, ImVec2(256.0f, 256.0f));
+
+		ImGui::Text("Light position for shadow map calculation:");
+		ImGui::Text("(%.2f, %.2f, %.2f)",
+					m_LightPosForShadowMapCalculation.x,
+					m_LightPosForShadowMapCalculation.y,
+					m_LightPosForShadowMapCalculation.z);
 
 		ImGui::Separator();
 
@@ -673,8 +692,6 @@ namespace Game
 
 	void GameLayer::UpdateLights(const float time, const uint32_t currentImage) 
 	{
-		m_UniformDataParams.lights[0] = glm::vec4(5.0f, 10.0f, 5.0f, 1.0f);
-
 		constexpr float p = 3.0f;
 		m_UniformDataParams.lights[1] = glm::vec4(-p, -p * 0.5f, -p, 1.0f);
 		m_UniformDataParams.lights[2] = glm::vec4(-p, -p * 0.5f, p, 1.0f);
@@ -956,27 +973,44 @@ namespace Game
 		}
 	}
 
-	glm::mat4 GameLayer::CalculateLightSpaceMatrix() const 
+	glm::mat4 GameLayer::CalculateLightSpaceMatrix() 
 	{
-		constexpr float nearPlane = 1.0f;
-		constexpr float farPlane = 50.0f;
+		constexpr float nearPlane = 0.1f;
+		constexpr float farPlane = 100.0f;
 		constexpr float orthoSize = 20.0f;
 		const glm::mat4 lightProjection = glm::ortho(-orthoSize, orthoSize, -orthoSize, orthoSize, nearPlane, farPlane);
 
 		constexpr glm::vec3 sceneCenter = glm::vec3(0.0f, 0.0f, 0.0f);
 		constexpr float lightDistance = 20.0f;
 
-		const glm::vec3 lightDirRaw = glm::vec3(m_UniformDataParams.lights[0]);
-		const glm::vec3 lightDir = glm::length2(lightDirRaw) > 0.0f 
+		/*const glm::vec3 lightDirRaw = glm::vec3(m_UniformDataParams.lights[0]);
+		const glm::vec3 lightDir = glm::length2(lightDirRaw) > std::numeric_limits<float>::epsilon()
 			? glm::normalize(lightDirRaw) 
-			: glm::vec3(0.5f, 1.0f, 0.2f);
+			: glm::vec3(0.0f, 1.0f, 0.0f);*/
+
+		const glm::vec3 lightDir = glm::normalize(glm::vec3(m_UniformDataParams.lights[0]));
+
 		const glm::vec3 lightPos = sceneCenter - lightDir * lightDistance;
+		m_LightPosForShadowMapCalculation = lightPos;
 		constexpr glm::vec3 lightTarget = sceneCenter; /// Look at origin
-		constexpr glm::vec3 lightUp = glm::vec3(0.0f, 1.0f, 0.0f);
 
-		const glm::mat4 lightView = glm::lookAt(glm::vec3(lightPos), lightTarget, lightUp);
+		glm::vec3 lightUp = glm::vec3(0.0f, 1.0f, 0.0f);
+		/*if (glm::abs(glm::dot(lightDir, lightUp)) > 0.99f)
+		{
+			lightUp = glm::vec3(1.0f, 0.0f, 0.0f);
+		}*/
 
-		return lightProjection * lightView;
+		const glm::mat4 lightView = glm::lookAt(lightPos, lightTarget, lightUp);
+
+		// Correction matrix for Vulkan Clip Space
+		// Y: -1 (flip logic), Z: 0.5 scale + 0.5 offset ([-1,1] -> [0,1])
+		constexpr glm::mat4 correction = glm::mat4(
+			1.0f, 0.0f, 0.0f, 0.0f,
+			0.0f, -1.0f, 0.0f, 0.0f,
+			0.0f, 0.0f, 0.5f, 0.0f,
+			0.0f, 0.0f, 0.5f, 1.0f);
+
+		return correction * lightProjection * lightView;
 	}
 
 	void GameLayer::CreateVulkanResources()
@@ -1097,7 +1131,7 @@ namespace Game
 			// Create shader for shadow mapping
 			kbr::Shader shadowMapShader("assets/shaders/shadowmap.spv", "ShadowMap");
 
-			constexpr vk::VertexInputBindingDescription bindingDescription = { 0, sizeof(glm::vec3), vk::VertexInputRate::eVertex };
+			/*constexpr vk::VertexInputBindingDescription bindingDescription = { 0, sizeof(glm::vec3), vk::VertexInputRate::eVertex };
 			constexpr std::array attributeDescriptions = {
 				vk::VertexInputAttributeDescription{.location = 0, .binding = 0, .format = vk::Format::eR32G32B32Sfloat, .offset = 0 }
 			};
@@ -1106,6 +1140,16 @@ namespace Game
 				.pVertexBindingDescriptions = &bindingDescription,
 				.vertexAttributeDescriptionCount = static_cast<uint32_t>(attributeDescriptions.size()),
 				.pVertexAttributeDescriptions = attributeDescriptions.data(),
+			};*/
+
+			const auto bindingDesc = kbr::Vertex::GetBindingDescription();
+			const auto attributeDescs = kbr::Vertex::GetAttributeDescriptions();
+
+			vk::PipelineVertexInputStateCreateInfo vertexInputInfo{
+				.vertexBindingDescriptionCount = 1,
+				.pVertexBindingDescriptions = &bindingDesc,
+				.vertexAttributeDescriptionCount = static_cast<uint32_t>(attributeDescs.size()),
+				.pVertexAttributeDescriptions = attributeDescs.data(),
 			};
 
 			vk::PipelineRasterizationStateCreateInfo rasterizer{
@@ -1498,6 +1542,11 @@ namespace Game
 			context.SetObjectDebugName(reinterpret_cast<uint64_t>(m_ColorOutputDescriptorSet),
 									   vk::ObjectType::eDescriptorSet,
 									   "Color Output Descriptor Set for ImGui");
+
+			m_ShadowMapDescriptorSet = ImGui_ImplVulkan_AddTexture(*m_ColorSampler, *m_ShadowMapImageView, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+			context.SetObjectDebugName(reinterpret_cast<uint64_t>(m_ShadowMapDescriptorSet),
+									   vk::ObjectType::eDescriptorSet,
+									   "Shadow Map Descriptor Set for ImGui");
 		}
 
 		m_OutputSize = m_ViewportSize;

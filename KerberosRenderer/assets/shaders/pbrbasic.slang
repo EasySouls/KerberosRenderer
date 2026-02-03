@@ -57,6 +57,9 @@ Sampler2D samplerBRDFLUT;
 [[vk::binding(6)]]
 SamplerCube prefilteredMapSampler;
 
+[SpecializationConstant] const int enablePCF = 0;
+[SpecializationConstant] const int enableLighting = 1;
+
 static const float PI = 3.14159265359;
 
 // From http://filmicgames.com/archives/75
@@ -141,6 +144,40 @@ float3 specularContribution(float3 L, float3 V, float3 N, float3 F0, Material ma
     return color;
 }
 
+float ShadowCalculation(float3 lightDir, float3 normal, float4 fragPosLightSpace)
+{
+    // Perform perspective divide
+    float3 projCoords = fragPosLightSpace.xyz / fragPosLightSpace.w;
+    // Transform to [0,1] range
+    projCoords = projCoords * 0.5 + 0.5;
+    // Get closest depth value from light's perspective (using [0,1] range fragPosLight as coords)
+    float closestDepth = shadowMap.Sample(projCoords.xy).r;
+    // Get depth of current fragment from light's perspective
+    float currentDepth = projCoords.z;
+    // Check whether current frag pos is in shadow
+    float bias = max(0.05 * (1.0 - dot(normal, lightDir)), 0.005);
+    float shadow = 0.0;
+    if (enablePCF == 1) {
+        // Percentage-closer filtering (PCF)
+        float2 texelSize = 1.0 / float2(1024.0, 1024.0); // todo: param/const
+        for(int x = -1; x <= 1; ++x)
+        {
+            for(int y = -1; y <= 1; ++y)
+            {
+                float pcfDepth = shadowMap.Sample(projCoords.xy + float2(x, y) * texelSize).r;
+                shadow += currentDepth - bias > pcfDepth ? 1.0 : 0.0;
+            }
+        }
+        shadow /= 9.0;
+    } else {
+        shadow = currentDepth - bias > closestDepth ? 1.0 : 0.0;
+    }
+    // Keep the shadow at 0.0 when outside the far plane of the light's orthographic frustum.
+    if(projCoords.z > 1.0)
+        shadow = 0.0;
+    return shadow;
+}
+
 [shader("vertex")]
 VSOutput vertMain(VSInput input)
 {
@@ -167,15 +204,30 @@ float4 fragMain(VSOutput input)
     float3 V = normalize(scene.camPos - input.FragPos_WorldSpace);
     float3 R = reflect(-V, N);
 
+    // For point lights in the future
+    //float3 lightDir = normalize(uboParams.lights[0].xyz - input.FragPos_WorldSpace);
+
+    // Currently we are using light 0 only for generating the shadow map
+    float3 lightDir = normalize(uboParams.lights[0].xyz);
+    float shadow = ShadowCalculation(lightDir, N, input.FragPos_LightSpace);
+
     float3 F0 = float3(0.04, 0.04, 0.04);
     F0 = lerp(F0, perObject.material.albedo, perObject.material.metallic);
 
 	// Specular contribution
 	float3 Lo = float3(0.0, 0.0, 0.0);
-	for (int i = 0; i < 4; i++) {
-        float3 L = normalize(normalize(uboParams.lights[i].xyz) - input.FragPos_WorldSpace);
-        Lo += specularContribution(L, V, N, F0, perObject.material);
-	};
+    if (enableLighting == 1) {
+	    for (int i = 0; i < 4; i++) {
+            // For point lights in the future
+            // float3 L = normalize(normalize(uboParams.lights[i].xyz) - input.FragPos_WorldSpace);
+            float3 L = normalize(uboParams.lights[i].xyz);
+
+            float3 contribution = specularContribution(L, V, N, F0, perObject.material);
+            contribution *= (1.0 - shadow);
+
+            Lo += contribution;
+	    };
+    }
 
     float2 brdf = samplerBRDFLUT.Sample(float2(max(dot(N, V), 0.0), perObject.material.roughness)).rg;
     float3 reflection = prefilteredReflection(R, perObject.material.roughness).rgb;

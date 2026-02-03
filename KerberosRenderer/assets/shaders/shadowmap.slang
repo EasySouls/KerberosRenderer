@@ -1,6 +1,7 @@
-struct VSInput {
-    float3 inPosition;
-    float3 inNormal;
+struct VSInput 
+{
+    float3 Pos;
+    float3 Normal;
 };
 
 struct SceneData
@@ -30,14 +31,14 @@ ConstantBuffer<PerObject> perObject;
 
 struct VSOutput
 {
-    float4 pos : SV_Position;
+    float4 Pos : SV_Position;
 };
 
 [shader("vertex")]
 VSOutput vertMain(VSInput input) {
     VSOutput output;
-    float4 worldPosition = mul(perObject.model, float4(input.inPosition, 1.0));
-    output.pos = mul(scene.lightSpaceMatrix, worldPosition);
+    float4 worldPosition = mul(perObject.model, float4(input.Pos, 1.0));
+    output.Pos = mul(scene.lightSpaceMatrix, worldPosition);
     return output;
 }
 

@@ -43,7 +43,7 @@ namespace kbr
 
 	private:
 		glm::vec3 m_Position{ 0.0f, 0.0f, 0.0f };
-		float m_MoveSpeed = 5.0f;
+		float m_MoveSpeed = 20.0f;
 		bool m_CanLookAround = false;
 
 		bool m_FlipY = false;

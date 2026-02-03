@@ -40,7 +40,7 @@ namespace Game
 		void PrepareUniformBuffers();
 		void SetupDescriptors();
 
-		glm::mat4 CalculateLightSpaceMatrix() const;
+		glm::mat4 CalculateLightSpaceMatrix();
 
 		void CreateVulkanResources();
 		void ResizeResources();
@@ -52,6 +52,8 @@ namespace Game
 		float m_Fps = 0.0f;
 
 		bool m_DisplaySkybox = true;
+
+		glm::vec3 m_LightPosForShadowMapCalculation{ 0.0f };
 
 		std::unique_ptr<kbr::Camera> m_Camera = nullptr;
 		// Size of the ImGui viewport.
@@ -115,6 +117,7 @@ namespace Game
 
 		struct UniformDataParams
 		{
+			// Direction of the lights
 			alignas(16) std::array<glm::vec4, 4> lights{};
 			float exposure = 4.5f;
 			float gamma = 2.2f;
@@ -156,6 +159,7 @@ namespace Game
 		std::array<DescriptorSets, 1> m_DescriptorSets{};
 
 		VkDescriptorSet m_ColorOutputDescriptorSet = VK_NULL_HANDLE;
+		VkDescriptorSet m_ShadowMapDescriptorSet = VK_NULL_HANDLE;
 
 		// Dynamic uniform buffer related members
 		VkDeviceSize m_MinUniformBufferOffsetAlignment = 0;
