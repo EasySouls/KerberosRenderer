@@ -1,3 +1,4 @@
+#include "pch.hpp"
 #include "InputSystem.hpp"
 
 #include "../Application.hpp"

@@ -1,3 +1,4 @@
+#include "pch.hpp"
 #include "FirstPersonCamera.hpp"
 
 #include <algorithm>

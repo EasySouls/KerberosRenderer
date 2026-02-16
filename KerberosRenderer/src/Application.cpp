@@ -1,3 +1,4 @@
+#include "pch.hpp"
 #include "Application.hpp"
 
 #include "events/KeyPressedEvent.hpp"

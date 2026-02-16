@@ -1,3 +1,4 @@
+#include "pch.hpp"
 #include "Vulkan.hpp"
 
 #define VK_USE_PLATFORM_WIN32_KHR
@@ -39,6 +40,7 @@
 #include "Utils.hpp"
 #include "GameObject.hpp"
 
+#include "pch.hpp"
 #include "Application.hpp"
 #include "GameLayer.hpp"
 

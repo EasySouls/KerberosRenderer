@@ -1,3 +1,4 @@
+#include "pch.hpp"
 #include "ModelLoader.hpp"
 
 #define TINYGLTF_IMPLEMENTATION

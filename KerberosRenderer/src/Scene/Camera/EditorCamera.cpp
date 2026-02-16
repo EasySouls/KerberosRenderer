@@ -1,3 +1,4 @@
+#include "pch.hpp"
 #include "EditorCamera.hpp"
 
 #include "events/WindowResizedEvent.hpp"

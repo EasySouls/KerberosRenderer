@@ -135,13 +135,13 @@
     <ClCompile Include="src\Renderer\SkyboxUtils.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="src\Scene\Camera\Camera.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="src\Scene\Camera\EditorCamera.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="src\Scene\Camera\FirstPersonCamera.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="src\pch.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
@@ -269,6 +269,9 @@
     <ClInclude Include="src\Scene\Camera\FirstPersonCamera.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="src\pch.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="src\shaders\simple.slang" />
@@ -279,5 +282,6 @@
     <None Include="assets\shaders\pbrbasic.slang" />
     <None Include="assets\shaders\irradiancecube.slang" />
     <None Include="assets\shaders\prefilterenvmap.slang" />
+    <None Include="update_proj.ps1" />
   </ItemGroup>
 </Project>
