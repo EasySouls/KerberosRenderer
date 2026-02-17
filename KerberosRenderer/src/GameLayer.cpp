@@ -862,7 +862,7 @@ namespace Game
 			};
 
 			const vk::DescriptorImageInfo shadowMapImageInfo{
-				.sampler = *m_ColorSampler,
+				.sampler = *m_ShadowMapSampler,
 				.imageView = *m_ShadowMapImageView,
 				.imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal
 			};
@@ -996,22 +996,22 @@ namespace Game
 		constexpr glm::vec3 lightTarget = sceneCenter; /// Look at origin
 
 		glm::vec3 lightUp = glm::vec3(0.0f, 1.0f, 0.0f);
-		/*if (glm::abs(glm::dot(lightDir, lightUp)) > 0.99f)
+		if (glm::abs(glm::dot(lightDir, lightUp)) > 0.99f)
 		{
 			lightUp = glm::vec3(1.0f, 0.0f, 0.0f);
-		}*/
+		}
 
 		const glm::mat4 lightView = glm::lookAt(lightPos, lightTarget, lightUp);
 
 		// Correction matrix for Vulkan Clip Space
 		// Y: -1 (flip logic), Z: 0.5 scale + 0.5 offset ([-1,1] -> [0,1])
-		constexpr glm::mat4 correction = glm::mat4(
-			1.0f, 0.0f, 0.0f, 0.0f,
-			0.0f, -1.0f, 0.0f, 0.0f,
-			0.0f, 0.0f, 0.5f, 0.0f,
-			0.0f, 0.0f, 0.5f, 1.0f);
+		//constexpr glm::mat4 correction = glm::mat4(
+		//	1.0f, 0.0f, 0.0f, 0.0f,
+		//	0.0f, -1.0f, 0.0f, 0.0f,
+		//	0.0f, 0.0f, 0.5f, 0.0f,
+		//	0.0f, 0.0f, 0.5f, 1.0f);
 
-		return correction * lightProjection * lightView;
+		return lightProjection * lightView;
 	}
 
 	void GameLayer::CreateVulkanResources()
@@ -1046,9 +1046,27 @@ namespace Game
 			};
 			m_ColorSampler = vk::raii::Sampler{ device, samplerInfo };
 
-			context.SetObjectDebugName(reinterpret_cast<uint64_t>(static_cast<VkSampler>(*m_ColorSampler)),
-									   vk::ObjectType::eSampler,
-									   "Color Texture Sampler");
+			context.SetObjectDebugName(m_ColorSampler,"Color Texture Sampler");
+
+			vk::SamplerCreateInfo shadowSamplerInfo{
+				.magFilter = vk::Filter::eLinear,
+				.minFilter = vk::Filter::eLinear,
+				.mipmapMode = vk::SamplerMipmapMode::eLinear,
+				.addressModeU = vk::SamplerAddressMode::eClampToBorder,
+				.addressModeV = vk::SamplerAddressMode::eClampToBorder,
+				.addressModeW = vk::SamplerAddressMode::eClampToBorder,
+				.mipLodBias = 0.0f,
+				.anisotropyEnable = vk::False,
+				.compareEnable = vk::False,
+				.compareOp = vk::CompareOp::eAlways,
+				.minLod = 0.0f,
+				.maxLod = 1.0f,
+				.borderColor = vk::BorderColor::eFloatOpaqueWhite,
+				.unnormalizedCoordinates = vk::False
+			};
+			m_ShadowMapSampler = vk::raii::Sampler{ device, shadowSamplerInfo };
+
+			context.SetObjectDebugName(m_ShadowMapSampler, "Shadow Map Sampler");
 		}
 
 		// Create shared pipeline states
@@ -1157,7 +1175,7 @@ namespace Game
 				.depthClampEnable = vk::True,
 				.rasterizerDiscardEnable = vk::False,
 				.polygonMode = vk::PolygonMode::eFill,
-				.cullMode = vk::CullModeFlagBits::eBack,
+				.cullMode = vk::CullModeFlagBits::eFront,
 				.frontFace = vk::FrontFace::eCounterClockwise,
 				.depthBiasEnable = vk::True,
 				.depthBiasConstantFactor = 1.25f,

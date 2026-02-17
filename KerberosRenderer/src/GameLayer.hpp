@@ -104,6 +104,7 @@ namespace Game
 		vk::raii::Pipeline m_SkyboxPipeline = nullptr;
 
 		vk::raii::Sampler m_ColorSampler = nullptr;
+		vk::raii::Sampler m_ShadowMapSampler = nullptr;
 
 		struct SceneUniformData
 		{

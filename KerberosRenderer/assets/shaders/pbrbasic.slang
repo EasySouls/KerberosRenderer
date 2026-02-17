@@ -116,7 +116,7 @@ float3 prefilteredReflection(float3 R, float roughness)
     return lerp(a, b, lod - lodf);
 }
 
-float3 specularContribution(float3 L, float3 V, float3 N, float3 F0, Material material)
+float3 SpecularContribution(float3 L, float3 V, float3 N, float3 F0, Material material)
 {
     // Precalculate vectors and dot products
     float3 H = normalize(V + L);
@@ -149,9 +149,11 @@ float ShadowCalculation(float3 lightDir, float3 normal, float4 fragPosLightSpace
     // Perform perspective divide
     float3 projCoords = fragPosLightSpace.xyz / fragPosLightSpace.w;
     // Transform to [0,1] range
-    projCoords = projCoords * 0.5 + 0.5;
+    float2 shadowUV = projCoords.xy * 0.5 + 0.5;
+    // Flip Y for Vulkan
+    shadowUV.y = 1.0 - shadowUV.y;
     // Get closest depth value from light's perspective (using [0,1] range fragPosLight as coords)
-    float closestDepth = shadowMap.Sample(projCoords.xy).r;
+    float closestDepth = shadowMap.Sample(shadowUV).r;
     // Get depth of current fragment from light's perspective
     float currentDepth = projCoords.z;
     // Check whether current frag pos is in shadow
@@ -159,12 +161,15 @@ float ShadowCalculation(float3 lightDir, float3 normal, float4 fragPosLightSpace
     float shadow = 0.0;
     if (enablePCF == 1) {
         // Percentage-closer filtering (PCF)
-        float2 texelSize = 1.0 / float2(1024.0, 1024.0); // todo: param/const
-        for(int x = -1; x <= 1; ++x)
+        uint width, height;
+        shadowMap.GetDimensions(width, height);
+        float2 texelSize = 1.0 / float2(width, height);
+
+        for (int x = -1; x <= 1; ++x)
         {
             for(int y = -1; y <= 1; ++y)
             {
-                float pcfDepth = shadowMap.Sample(projCoords.xy + float2(x, y) * texelSize).r;
+                float pcfDepth = shadowMap.Sample(shadowUV + float2(x, y) * texelSize).r;
                 shadow += currentDepth - bias > pcfDepth ? 1.0 : 0.0;
             }
         }
@@ -172,9 +177,11 @@ float ShadowCalculation(float3 lightDir, float3 normal, float4 fragPosLightSpace
     } else {
         shadow = currentDepth - bias > closestDepth ? 1.0 : 0.0;
     }
+
     // Keep the shadow at 0.0 when outside the far plane of the light's orthographic frustum.
-    if(projCoords.z > 1.0)
+    if (currentDepth > 1.0 || shadowUV.x < 0.0 || shadowUV.x > 1.0 || shadowUV.y < 0.0 || shadowUV.y > 1.0)
         shadow = 0.0;
+
     return shadow;
 }
 
@@ -222,8 +229,9 @@ float4 fragMain(VSOutput input)
             // float3 L = normalize(normalize(uboParams.lights[i].xyz) - input.FragPos_WorldSpace);
             float3 L = normalize(uboParams.lights[i].xyz);
 
-            float3 contribution = specularContribution(L, V, N, F0, perObject.material);
-            contribution *= (1.0 - shadow);
+            float3 contribution = SpecularContribution(L, V, N, F0, perObject.material);
+            if (i == 0) // Only apply shadow to the first light for now
+                contribution *= (1.0 - shadow);
 
             Lo += contribution;
 	    };
