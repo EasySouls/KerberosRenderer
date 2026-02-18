@@ -52,6 +52,7 @@ namespace Game
 		float m_Fps = 0.0f;
 
 		bool m_DisplaySkybox = true;
+		bool m_DisplayDebugNormals = false;
 
 		glm::vec3 m_LightPosForShadowMapCalculation{ 0.0f };
 
@@ -102,6 +103,7 @@ namespace Game
 		vk::raii::Pipeline m_PBROpaquePipeline = nullptr;
 		vk::raii::Pipeline m_PBRTransparentPipeline = nullptr;
 		vk::raii::Pipeline m_SkyboxPipeline = nullptr;
+		vk::raii::Pipeline m_NormalDebugPipeline = nullptr;
 
 		vk::raii::Sampler m_ColorSampler = nullptr;
 		vk::raii::Sampler m_ShadowMapSampler = nullptr;

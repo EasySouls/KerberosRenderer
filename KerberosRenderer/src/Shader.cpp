@@ -10,6 +10,22 @@
 
 namespace kbr
 {
+	static vk::ShaderStageFlagBits ExecutionModelToShaderStage(const spv::ExecutionModel model)
+	{
+		switch (model)
+		{
+			case spv::ExecutionModelVertex:                 return vk::ShaderStageFlagBits::eVertex;
+			case spv::ExecutionModelTessellationControl:    return vk::ShaderStageFlagBits::eTessellationControl;
+			case spv::ExecutionModelTessellationEvaluation: return vk::ShaderStageFlagBits::eTessellationEvaluation;
+			case spv::ExecutionModelGeometry:               return vk::ShaderStageFlagBits::eGeometry;
+			case spv::ExecutionModelFragment:               return vk::ShaderStageFlagBits::eFragment;
+			case spv::ExecutionModelGLCompute:              return vk::ShaderStageFlagBits::eCompute;
+			default:
+				KBR_CORE_ERROR("Unsupported SPIR-V execution model: {}", static_cast<int>(model));
+				return vk::ShaderStageFlagBits::eVertex;
+		}
+	}
+
 	Shader::Shader(const std::filesystem::path& filepath, std::string name)
 		: m_Name(std::move(name))
 	{
@@ -36,9 +52,18 @@ namespace kbr
 
 	std::vector<vk::PipelineShaderStageCreateInfo> Shader::GetPipelineShaderStageCreateInfo() const 
 	{
-		const vk::PipelineShaderStageCreateInfo vertShaderStageInfo{ .stage = vk::ShaderStageFlagBits::eVertex, .module = m_ShaderModule,  .pName = "vertMain" };
-		const vk::PipelineShaderStageCreateInfo fragShaderStageInfo{ .stage = vk::ShaderStageFlagBits::eFragment, .module = m_ShaderModule, .pName = "fragMain" };
-		return { vertShaderStageInfo, fragShaderStageInfo };
+		std::vector<vk::PipelineShaderStageCreateInfo> stages;
+		stages.reserve(m_StageEntries.size());
+
+		for (const auto& [stage, entryPoint] : m_StageEntries) {
+			stages.push_back(vk::PipelineShaderStageCreateInfo{
+				.stage = stage,
+				.module = m_ShaderModule,
+				.pName = entryPoint.c_str()
+			});
+		}
+
+		return stages;
 	}
 
 	void Shader::Reflect() 
@@ -47,6 +72,16 @@ namespace kbr
 		spirv_cross::ShaderResources resources = compiler.get_shader_resources();
 
 		KBR_CORE_INFO("Reflecting shader {}", m_Name);
+
+		auto entryPoints = compiler.get_entry_points_and_stages();
+		m_StageEntries.clear();
+		m_StageEntries.reserve(entryPoints.size());
+
+		for (const auto& [name, execution_model] : entryPoints) {
+			const vk::ShaderStageFlagBits stage = ExecutionModelToShaderStage(execution_model);
+			m_StageEntries.push_back({ .stage = stage, .entryPoint = name });
+			KBR_CORE_INFO("  Entry point: {0}, Stage: {1}", name, vk::to_string(stage));
+		}
 
 		KBR_CORE_INFO("    Uniform Buffers: {0}", resources.uniform_buffers.size());
 		for (const auto& resource : resources.uniform_buffers) {

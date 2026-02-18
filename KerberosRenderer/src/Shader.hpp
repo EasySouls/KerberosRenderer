@@ -8,6 +8,12 @@
 
 namespace kbr
 {
+	struct ShaderStageEntry
+	{
+		vk::ShaderStageFlagBits stage;
+		std::string entryPoint;
+	};
+
 	class Shader
 	{
 	public:
@@ -28,5 +34,6 @@ namespace kbr
 		std::string m_Name;
 		vk::raii::ShaderModule m_ShaderModule = nullptr;
 		std::vector<uint32_t> m_SpirvCode;
+		std::vector<ShaderStageEntry> m_StageEntries;
 	};
 }

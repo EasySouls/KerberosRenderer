@@ -283,5 +283,6 @@
     <None Include="assets\shaders\irradiancecube.slang" />
     <None Include="assets\shaders\prefilterenvmap.slang" />
     <None Include="update_proj.ps1" />
+    <None Include="assets\shaders\normaldebug.slang" />
   </ItemGroup>
 </Project>

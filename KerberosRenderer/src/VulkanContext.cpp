@@ -838,7 +838,7 @@ namespace kbr
 
 		// Create a chain of feature structures
 		vk::StructureChain<vk::PhysicalDeviceFeatures2, vk::PhysicalDeviceVulkan11Features, vk::PhysicalDeviceVulkan13Features, vk::PhysicalDeviceExtendedDynamicStateFeaturesEXT> featureChain = {
-			{.features = {.depthClamp = true, .samplerAnisotropy = true } },
+			{.features = {.geometryShader = true, .depthClamp = true, .samplerAnisotropy = true } },
 			{.shaderDrawParameters = true },
 			{.synchronization2 = true, .dynamicRendering = true },
 			{.extendedDynamicState = true }

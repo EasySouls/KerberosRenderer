@@ -446,6 +446,26 @@ namespace Game
 				node->Mesh->Draw(cmd);
 			}
 
+			if (m_DisplayDebugNormals)
+			{
+				cmd.bindPipeline(vk::PipelineBindPoint::eGraphics, *m_NormalDebugPipeline);
+				for (size_t i = 0; i < m_SceneNodes.size(); ++i)
+				{
+					auto& node = m_SceneNodes[i];
+					if (!node->Visible || !node->Mesh || !node->Material || node->Material->IsTransparent())
+						continue;
+					UpdatePerObjectUniformBuffer(currentImage, static_cast<uint32_t>(i), node->GetTransform(), *node->Material);
+					uint32_t dynamicOffset = static_cast<uint32_t>(i * m_DynamicAlignment);
+					cmd.bindDescriptorSets(
+						vk::PipelineBindPoint::eGraphics,
+						*m_PBRPipelineLayout,
+						0,
+						*m_DescriptorSets[currentImage].scene,
+						{ dynamicOffset });
+					node->Mesh->Draw(cmd);
+				}
+			}
+
 			cmd.endRendering();
 
 			KBR_CORE_TRACE("Opaque pass done!");
@@ -649,9 +669,10 @@ namespace Game
 
 		ImGui::Separator();
 
-		// Skybox settings
-		ImGui::Text("Skybox");
+		// Scene settings
+		ImGui::Text("Settings");
 		ImGui::Checkbox("Display Skybox", &m_DisplaySkybox);
+		ImGui::Checkbox("Display normals", &m_DisplayDebugNormals);
 
 		ImGui::End();
 
@@ -1333,8 +1354,6 @@ namespace Game
 									   vk::ObjectType::ePipelineLayout,
 									   "PBR Pipeline Layout");
 
-			kbr::Shader pbrShader("assets/shaders/pbrbasic.spv", "PBR");
-
 			const auto bindingDesc = kbr::Vertex::GetBindingDescription();
 			const auto attributeDescs = kbr::Vertex::GetAttributeDescriptions();
 
@@ -1431,11 +1450,12 @@ namespace Game
 				.depthAttachmentFormat = depthFormat
 			};
 
+			kbr::Shader pbrShader("assets/shaders/pbrbasic.spv", "PBR");
 			const auto shaderStages = pbrShader.GetPipelineShaderStageCreateInfo();
 
 			vk::GraphicsPipelineCreateInfo opaquePipelineInfo{
 				.pNext = &pipelineRenderingCreateInfo,
-				.stageCount = 2,
+				.stageCount = static_cast<uint32_t>(shaderStages.size()),
 				.pStages = shaderStages.data(),
 				.pVertexInputState = &vertexInputInfo,
 				.pInputAssemblyState = &inputAssembly,
@@ -1452,6 +1472,16 @@ namespace Game
 			m_PBROpaquePipeline = vk::raii::Pipeline(device, nullptr, opaquePipelineInfo);
 
 			context.SetObjectDebugName(m_PBROpaquePipeline,"PBR Opaque Pipeline");
+
+			kbr::Shader normalDebugShader("assets/shaders/normaldebug.spv", "NormalDebug");
+			const auto normalDebugShaderStages = normalDebugShader.GetPipelineShaderStageCreateInfo();
+
+			opaquePipelineInfo.stageCount = static_cast<uint32_t>(normalDebugShaderStages.size());
+			opaquePipelineInfo.pStages = normalDebugShaderStages.data();
+
+			m_NormalDebugPipeline = vk::raii::Pipeline(device, nullptr, opaquePipelineInfo);
+
+			context.SetObjectDebugName(m_NormalDebugPipeline, "Normal Debug Pipeline");
 
 			vk::GraphicsPipelineCreateInfo transparentPipelineInfo{
 				.pNext = &pipelineRenderingCreateInfo,
