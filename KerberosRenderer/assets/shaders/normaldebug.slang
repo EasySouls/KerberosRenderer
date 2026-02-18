@@ -22,12 +22,30 @@ struct GSOutput
 	float3 Color;
 };
 
-struct UBO
+struct SceneData
 {
     float4x4 projection;
-    float4x4 model;
+    float4x4 view;
+    float4x4 lightSpaceMatrix;
+    float3 ambientLightColor;
+    float3 camPos;
 };
-ConstantBuffer<UBO> ubo;
+[[vk::binding(0)]]
+ConstantBuffer<SceneData> scene;
+
+struct Material {
+    float3 albedo;
+    float roughness;
+    float metallic;
+};
+
+struct PerObject {
+    float4x4 model;
+    float4x4 worldNormal;
+    Material material;
+};
+[[vk::binding(2)]]
+ConstantBuffer<PerObject> perObject;
 
 [shader("vertex")]
 VSOutput vertMain(VSInput input)
@@ -42,18 +60,20 @@ VSOutput vertMain(VSInput input)
 [maxvertexcount(6)]
 void geometryMain(triangle VSOutput input[3], inout LineStream<GSOutput> outStream)
 {
-	float normalLength = 0.02;
-	for(int i=0; i<3; i++)
+    float normalLength = 0.02;
+    float4x4 viewProj = mul(scene.projection, scene.view);
+
+	for (int i = 0; i < 3; i++)
 	{
 		float3 pos = input[i].Pos.xyz;
 		float3 normal = input[i].Normal.xyz;
 
 		GSOutput output = (GSOutput)0;
-		output.Pos = mul(ubo.projection, mul(ubo.model, float4(pos, 1.0)));
+		output.Pos = mul(viewProj, mul(perObject.model, float4(pos, 1.0)));
 		output.Color = float3(1.0, 0.0, 0.0);
 		outStream.Append( output );
 
-		output.Pos = mul(ubo.projection, mul(ubo.model, float4(pos + normal * normalLength, 1.0)));
+		output.Pos = mul(viewProj, mul(perObject.model, float4(pos + normal * normalLength, 1.0)));
 		output.Color = float3(0.0, 0.0, 1.0);
 		outStream.Append( output );
 

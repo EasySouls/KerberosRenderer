@@ -454,14 +454,18 @@ namespace Game
 					auto& node = m_SceneNodes[i];
 					if (!node->Visible || !node->Mesh || !node->Material || node->Material->IsTransparent())
 						continue;
+
 					UpdatePerObjectUniformBuffer(currentImage, static_cast<uint32_t>(i), node->GetTransform(), *node->Material);
+					
 					uint32_t dynamicOffset = static_cast<uint32_t>(i * m_DynamicAlignment);
+					
 					cmd.bindDescriptorSets(
 						vk::PipelineBindPoint::eGraphics,
 						*m_PBRPipelineLayout,
 						0,
 						*m_DescriptorSets[currentImage].scene,
 						{ dynamicOffset });
+
 					node->Mesh->Draw(cmd);
 				}
 			}
@@ -784,49 +788,49 @@ namespace Game
 								   "PBR Descriptor Pool");
 
 		std::vector<vk::DescriptorSetLayoutBinding> bindings = {
-			vk::DescriptorSetLayoutBinding{
+			vk::DescriptorSetLayoutBinding{ // Scene data
 				.binding = 0,
 				.descriptorType = vk::DescriptorType::eUniformBuffer,
 				.descriptorCount = 1,
-				.stageFlags = vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment,
+				.stageFlags = vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment | vk::ShaderStageFlagBits::eGeometry,
 				.pImmutableSamplers = nullptr
 			},
-			vk::DescriptorSetLayoutBinding{
+			vk::DescriptorSetLayoutBinding{ // Light data and other params
 				.binding = 1,
 				.descriptorType = vk::DescriptorType::eUniformBuffer,
 				.descriptorCount = 1,
 				.stageFlags = vk::ShaderStageFlagBits::eFragment,
 				.pImmutableSamplers = nullptr
 			},
-			vk::DescriptorSetLayoutBinding{
+			vk::DescriptorSetLayoutBinding{ // Per-object data
 				.binding = 2,
 				.descriptorType = vk::DescriptorType::eUniformBufferDynamic,
 				.descriptorCount = 1,
-				.stageFlags = vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment,
+				.stageFlags = vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment | vk::ShaderStageFlagBits::eGeometry,
 				.pImmutableSamplers = nullptr
 			},
-			vk::DescriptorSetLayoutBinding{
+			vk::DescriptorSetLayoutBinding{ // Shadow map
 				.binding = 3,
 				.descriptorType = vk::DescriptorType::eCombinedImageSampler,
 				.descriptorCount = 1,
 				.stageFlags = vk::ShaderStageFlagBits::eFragment,
 				.pImmutableSamplers = nullptr
 			},
-			vk::DescriptorSetLayoutBinding{
+			vk::DescriptorSetLayoutBinding{ // Irradiance map
 				.binding = 4,
 				.descriptorType = vk::DescriptorType::eCombinedImageSampler,
 				.descriptorCount = 1,
 				.stageFlags = vk::ShaderStageFlagBits::eFragment,
 				.pImmutableSamplers = nullptr
 			},
-			vk::DescriptorSetLayoutBinding{
+			vk::DescriptorSetLayoutBinding{ // BRDF LUT
 				.binding = 5,
 				.descriptorType = vk::DescriptorType::eCombinedImageSampler,
 				.descriptorCount = 1,
 				.stageFlags = vk::ShaderStageFlagBits::eFragment,
 				.pImmutableSamplers = nullptr
 			},
-			vk::DescriptorSetLayoutBinding{
+			vk::DescriptorSetLayoutBinding{ // Prefiltered environment map
 				.binding = 6,
 				.descriptorType = vk::DescriptorType::eCombinedImageSampler,
 				.descriptorCount = 1,

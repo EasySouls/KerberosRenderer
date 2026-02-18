@@ -90,6 +90,7 @@ namespace kbr
                 }
 
 				const size_t posStride = posBufferView.byteStride ? posBufferView.byteStride : sizeof(float) * 3;
+				const size_t normalStride = hasNormals && normalBufferView->byteStride ? normalBufferView->byteStride : sizeof(float) * 3;
 				const size_t uvStride = hasTexCoords && texCoordBufferView->byteStride ? texCoordBufferView->byteStride : sizeof(float) * 2;
 
                 std::vector<uint32_t> remap(posAccessor.count);
@@ -105,7 +106,7 @@ namespace kbr
 
 					if (hasNormals)
 					{
-						const uint8_t* normalBytes = normalBuffer->data.data() + normalBufferView->byteOffset + normalAccessor->byteOffset + i * sizeof(float) * 3;
+						const uint8_t* normalBytes = normalBuffer->data.data() + normalBufferView->byteOffset + normalAccessor->byteOffset + i * normalStride;
 						const float* normal = reinterpret_cast<const float*>(normalBytes);
 						vertex.normal = { normal[0], normal[1], normal[2] };
 					}
@@ -183,6 +184,17 @@ namespace kbr
 				vertex.pos.y *= -1.0f;
 				vertex.normal.y *= -1.0f;
 			}
+		}
+
+		constexpr float epsilon = 1e-4f;
+		for (auto& vertex : vertices)
+		{
+			for (int i = 0; i < 3; i++)
+			{
+				if (std::abs(vertex.normal[i]) < epsilon)
+					vertex.normal[i] = 0.0f;
+			}
+			vertex.normal = glm::normalize(vertex.normal);
 		}
 
 		const std::string name = path.stem().string();
