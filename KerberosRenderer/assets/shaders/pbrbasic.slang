@@ -58,7 +58,6 @@ Sampler2D samplerBRDFLUT;
 SamplerCube prefilteredMapSampler;
 
 [SpecializationConstant] const int enablePCF = 0;
-[SpecializationConstant] const int enableLighting = 1;
 
 static const float PI = 3.14159265359;
 
@@ -148,15 +147,13 @@ float ShadowCalculation(float3 lightDir, float3 normal, float4 fragPosLightSpace
 {
     // Perform perspective divide
     float3 projCoords = fragPosLightSpace.xyz / fragPosLightSpace.w;
+
     // Transform to [0,1] range
     float2 shadowUV = projCoords.xy * 0.5 + 0.5;
-    // Flip Y for Vulkan
-    shadowUV.y = 1.0 - shadowUV.y;
-    // Get closest depth value from light's perspective (using [0,1] range fragPosLight as coords)
+
     float closestDepth = shadowMap.Sample(shadowUV).r;
-    // Get depth of current fragment from light's perspective
     float currentDepth = projCoords.z;
-    // Check whether current frag pos is in shadow
+
     float bias = max(0.05 * (1.0 - dot(normal, lightDir)), 0.005);
     float shadow = 0.0;
     if (enablePCF == 1) {
@@ -212,7 +209,7 @@ float4 fragMain(VSOutput input)
     float3 R = reflect(-V, N);
 
     // For point lights in the future
-    //float3 lightDir = normalize(uboParams.lights[0].xyz - input.FragPos_WorldSpace);
+    // float3 lightDir = normalize(uboParams.lights[0].xyz - input.FragPos_WorldSpace);
 
     // Currently we are using light 0 only for generating the shadow map
     float3 lightDir = normalize(uboParams.lights[0].xyz);
@@ -223,23 +220,24 @@ float4 fragMain(VSOutput input)
 
 	// Specular contribution
 	float3 Lo = float3(0.0, 0.0, 0.0);
-    if (enableLighting == 1) {
-	    for (int i = 0; i < 4; i++) {
-            // For point lights in the future
-            // float3 L = normalize(normalize(uboParams.lights[i].xyz) - input.FragPos_WorldSpace);
-            float3 L = normalize(uboParams.lights[i].xyz);
+	for (int i = 0; i < 4; i++) {
+        // For point lights in the future
+        // float3 L = normalize(normalize(uboParams.lights[i].xyz) - input.FragPos_WorldSpace);
+        float3 L = normalize(uboParams.lights[i].xyz);
 
-            float3 contribution = SpecularContribution(L, V, N, F0, perObject.material);
-            if (i == 0) // Only apply shadow to the first light for now
-                contribution *= (1.0 - shadow);
+        float3 contribution = SpecularContribution(L, V, N, F0, perObject.material);
+        if (i == 0) // Only apply shadow to the first light for now
+            contribution *= (1.0 - shadow);
 
-            Lo += contribution;
-	    };
-    }
+        Lo += contribution;
+	};
+
+    float3 sampleN = float3(N.x, -N.y, N.z);
+    float3 sampleR = float3(R.x, -R.y, R.z);
 
     float2 brdf = samplerBRDFLUT.Sample(float2(max(dot(N, V), 0.0), perObject.material.roughness)).rg;
-    float3 reflection = prefilteredReflection(R, perObject.material.roughness).rgb;
-    float3 irradiance = samplerIrradiance.Sample(N).rgb;
+    float3 reflection = prefilteredReflection(sampleR, perObject.material.roughness).rgb;
+    float3 irradiance = samplerIrradiance.Sample(sampleN).rgb;
 
     // Diffuse based on irradiance
     float3 diffuse = irradiance * perObject.material.albedo;

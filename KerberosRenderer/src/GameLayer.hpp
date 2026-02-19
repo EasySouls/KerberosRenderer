@@ -53,6 +53,7 @@ namespace Game
 
 		bool m_DisplaySkybox = true;
 		bool m_DisplayDebugNormals = false;
+		bool m_EnablePCF = true;
 
 		glm::vec3 m_LightPosForShadowMapCalculation{ 0.0f };
 
@@ -101,6 +102,7 @@ namespace Game
 
 		vk::raii::PipelineLayout m_PBRPipelineLayout = nullptr;
 		vk::raii::Pipeline m_PBROpaquePipeline = nullptr;
+		vk::raii::Pipeline m_PBROpaquePipelinePCF = nullptr;
 		vk::raii::Pipeline m_PBRTransparentPipeline = nullptr;
 		vk::raii::Pipeline m_SkyboxPipeline = nullptr;
 		vk::raii::Pipeline m_NormalDebugPipeline = nullptr;

@@ -14,9 +14,6 @@
 #include "Input/KeyCodes.hpp"
 #include "Logging/Log.hpp"
 
-#define GLM_FORCE_DEPTH_ZERO_TO_ONE
-#include "glm/glm.hpp"
-#include <glm/gtc/type_ptr.hpp>
 #include <glm/gtc/matrix_inverse.hpp>
 
 #include "imgui.h"
@@ -50,8 +47,8 @@ namespace Game
 		KBR_CORE_INFO("GameLayer attached!");
 
 		m_Camera = std::make_unique<kbr::FirstPersonCamera>(45.0f, 16.0f / 9.0f, 0.1f, 1000.0f);
-		m_Camera->SetFlipY(false);
-		m_Camera->SetPosition(glm::vec3(0.0f, -15.0f, -10.0f));
+		m_Camera->SetFlipY(true);
+		m_Camera->SetPosition(glm::vec3(0.0f, 15.0f, 45.0f));
 		m_ViewportSize = { 1280.0f, 720.0f };
 
 		m_Materials.emplace_back(std::make_shared<kbr::Material>("Gold", glm::vec3(1.0f, 0.765557f, 0.336057f), 0.1f, 1.0f));
@@ -71,7 +68,7 @@ namespace Game
 		KBR_CORE_INFO("Size of PerObjectData: {} bytes", sizeof(PerObjectData));
 		KBR_CORE_INFO("Size of material UniformBlock: {} bytes", sizeof(kbr::Material::UniformBlock));
 
-		constexpr kbr::GLTFLoadingFlags loadingFlags = kbr::GLTFLoadingFlags::FlipY;
+		constexpr kbr::GLTFLoadingFlags loadingFlags = kbr::GLTFLoadingFlags::None;
 
 		m_SkyboxMesh = kbr::ModelLoader::LoadModel("assets/models/cube.gltf", loadingFlags);
 		m_SkyboxTexture.LoadFromFile(
@@ -108,7 +105,7 @@ namespace Game
 		const auto& stoneFloorMaterial = m_Materials.emplace_back(std::make_shared<kbr::Material>("Stone Floor", glm::vec3(1.0f), 0.8f, 0.05f, m_Textures[2], m_Textures[3]));
 
 		m_SceneNodes.push_back(new kbr::Node{
-			.Position = glm::vec3(0.0f, -1.5f, 0.0f),
+			.Position = glm::vec3(6.0f, 9.5f, 0.0f),
 			.Rotation = glm::vec3(0.0f),
 			.Scale = glm::vec3(50.0f),
 			.Mesh = m_Meshes["avocado"],
@@ -126,7 +123,7 @@ namespace Game
 		});
 
 		m_SceneNodes.push_back(new kbr::Node{
-			.Position = glm::vec3(2.0f, -10.0f, 3.0f),
+			.Position = glm::vec3(2.0f, 10.0f, 3.0f),
 			.Rotation = glm::vec3(0.0f),
 			.Scale = glm::vec3(1.0f),
 			.Mesh = m_Meshes["sphere"],
@@ -414,16 +411,8 @@ namespace Game
 				m_SkyboxMesh->Draw(cmd);
 			}
 
-			cmd.bindPipeline(vk::PipelineBindPoint::eGraphics, *m_PBROpaquePipeline);
-
-			/*cmd.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, *m_PBRPipelineLayout, 0, *m_DescriptorSets[currentImage].scene, {});
-
-			for (const auto& node : m_SceneNodes)
-			{
-				UpdatePerObjectUniformBuffer(currentImage, node->GetTransform(), selectedMaterial);
-
-				node->Mesh->Draw(cmd);
-			}*/
+			const auto& opaquePipeline = m_EnablePCF ? m_PBROpaquePipelinePCF : m_PBROpaquePipeline;
+			cmd.bindPipeline(vk::PipelineBindPoint::eGraphics, *opaquePipeline);
 
 			for (size_t i = 0; i < m_SceneNodes.size(); ++i)
 			{
@@ -677,6 +666,7 @@ namespace Game
 		ImGui::Text("Settings");
 		ImGui::Checkbox("Display Skybox", &m_DisplaySkybox);
 		ImGui::Checkbox("Display normals", &m_DisplayDebugNormals);
+		ImGui::Checkbox("Enable PCF", &m_EnablePCF);
 
 		ImGui::End();
 
@@ -718,14 +708,17 @@ namespace Game
 
 	void GameLayer::UpdateLights(const float time, const uint32_t currentImage) 
 	{
-		constexpr float p = 3.0f;
+		/*constexpr float p = 3.0f;
 		m_UniformDataParams.lights[1] = glm::vec4(-p, -p * 0.5f, -p, 1.0f);
 		m_UniformDataParams.lights[2] = glm::vec4(-p, -p * 0.5f, p, 1.0f);
 
 		m_UniformDataParams.lights[1].x = sin(glm::radians(time * 80.0f)) * 20.0f;
 		m_UniformDataParams.lights[1].z = cos(glm::radians(time * 80.0f)) * 20.0f;
 		m_UniformDataParams.lights[2].x = cos(glm::radians(time * 80.0f)) * 20.0f;
-		m_UniformDataParams.lights[2].y = sin(glm::radians(time * 80.0f)) * 20.0f;
+		m_UniformDataParams.lights[2].y = sin(glm::radians(time * 80.0f)) * 20.0f;*/
+
+		m_UniformDataParams.lights[1] = glm::vec4{ 0.0f };
+		m_UniformDataParams.lights[2] = glm::vec4{ 0.0f };
 
 		std::memcpy(m_UniformBuffers[currentImage].params->GetMappedData(), &m_UniformDataParams, sizeof(UniformDataParams));
 	}
@@ -852,7 +845,7 @@ namespace Game
 
 		const std::array<vk::DescriptorSetLayout, 2> setLayouts = {
 			*m_DescriptorSetLayouts.scene,
-			* m_DescriptorSetLayouts.textures
+			*m_DescriptorSetLayouts.textures
 		};
 
 		vk::DescriptorSetAllocateInfo allocInfo{
@@ -1004,7 +997,8 @@ namespace Game
 		constexpr float nearPlane = 0.1f;
 		constexpr float farPlane = 100.0f;
 		constexpr float orthoSize = 20.0f;
-		const glm::mat4 lightProjection = glm::ortho(-orthoSize, orthoSize, -orthoSize, orthoSize, nearPlane, farPlane);
+		glm::mat4 lightProjection = glm::ortho(-orthoSize, orthoSize, -orthoSize, orthoSize, nearPlane, farPlane);
+		lightProjection[1][1] *= -1.0f;
 
 		constexpr glm::vec3 sceneCenter = glm::vec3(0.0f, 0.0f, 0.0f);
 		constexpr float lightDistance = 20.0f;
@@ -1016,7 +1010,7 @@ namespace Game
 
 		const glm::vec3 lightDir = glm::normalize(glm::vec3(m_UniformDataParams.lights[0]));
 
-		const glm::vec3 lightPos = sceneCenter - lightDir * lightDistance;
+		const glm::vec3 lightPos = sceneCenter + lightDir * lightDistance;
 		m_LightPosForShadowMapCalculation = lightPos;
 		constexpr glm::vec3 lightTarget = sceneCenter; /// Look at origin
 
@@ -1220,7 +1214,7 @@ namespace Game
 			vk::PipelineDepthStencilStateCreateInfo depthStencil{
 				.depthTestEnable = vk::True,
 				.depthWriteEnable = vk::True,
-				.depthCompareOp = vk::CompareOp::eLess,
+				.depthCompareOp = vk::CompareOp::eLessOrEqual,
 				.depthBoundsTestEnable = vk::False,
 				.stencilTestEnable = vk::False,
 				.minDepthBounds = 0.0f,
@@ -1381,8 +1375,7 @@ namespace Game
 				.depthClampEnable = vk::False,
 				.rasterizerDiscardEnable = vk::False,
 				.polygonMode = vk::PolygonMode::eFill,
-				.cullMode = vk::CullModeFlagBits::eNone, // TODO: vk::CullModeFlagBits::eBack,
-				//.cullMode = vk::CullModeFlagBits::eBack,
+				.cullMode = vk::CullModeFlagBits::eBack,
 				.frontFace = vk::FrontFace::eCounterClockwise,
 				.depthBiasEnable = vk::False,
 				.lineWidth = 1.0f
@@ -1455,7 +1448,7 @@ namespace Game
 			};
 
 			kbr::Shader pbrShader("assets/shaders/pbrbasic.spv", "PBR");
-			const auto shaderStages = pbrShader.GetPipelineShaderStageCreateInfo();
+			auto shaderStages = pbrShader.GetPipelineShaderStageCreateInfo();
 
 			vk::GraphicsPipelineCreateInfo opaquePipelineInfo{
 				.pNext = &pipelineRenderingCreateInfo,
@@ -1473,9 +1466,28 @@ namespace Game
 				.renderPass = nullptr
 			};
 
+			uint32_t enablePCF = 0;
+			vk::SpecializationMapEntry specializationMapEntry{
+				.constantID = 0,
+				.offset = 0,
+				.size = sizeof(uint32_t)
+			};
+			vk::SpecializationInfo specializationInfo{
+				.mapEntryCount = 1,
+				.pMapEntries = &specializationMapEntry,
+				.dataSize = sizeof(uint32_t),
+				.pData = &enablePCF
+			};
+			shaderStages[1].pSpecializationInfo = &specializationInfo;
+
 			m_PBROpaquePipeline = vk::raii::Pipeline(device, nullptr, opaquePipelineInfo);
 
 			context.SetObjectDebugName(m_PBROpaquePipeline,"PBR Opaque Pipeline");
+
+			enablePCF = 1;
+			m_PBROpaquePipelinePCF = vk::raii::Pipeline(device, nullptr, opaquePipelineInfo);
+
+			context.SetObjectDebugName(m_PBROpaquePipelinePCF, "PBR Opaque Pipeline PCF");
 
 			kbr::Shader normalDebugShader("assets/shaders/normaldebug.spv", "NormalDebug");
 			const auto normalDebugShaderStages = normalDebugShader.GetPipelineShaderStageCreateInfo();

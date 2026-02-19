@@ -119,7 +119,8 @@ namespace kbr
 					{
 						const uint8_t* uvBytes = texCoordBuffer->data.data() + texCoordBufferView->byteOffset + texCoordAccessor->byteOffset + i * uvStride;
 						const float* texCoord = reinterpret_cast<const float*>(uvBytes);
-						vertex.texCoord = { texCoord[0], 1.0f - texCoord[1] };
+						//vertex.texCoord = { texCoord[0], 1.0f - texCoord[1] };
+						vertex.texCoord = { texCoord[0], texCoord[1] };
 					}
 					else
 					{
@@ -184,6 +185,11 @@ namespace kbr
 				vertex.pos.y *= -1.0f;
 				vertex.normal.y *= -1.0f;
 			}
+
+			for (size_t i = 0; i < indices.size(); i += 3)
+			{
+				std::swap(indices[i + 1], indices[i + 2]);
+			}
 		}
 
 		constexpr float epsilon = 1e-4f;
@@ -194,7 +200,11 @@ namespace kbr
 				if (std::abs(vertex.normal[i]) < epsilon)
 					vertex.normal[i] = 0.0f;
 			}
-			vertex.normal = glm::normalize(vertex.normal);
+
+			if (glm::length(vertex.normal) > 0.0f) 
+			{
+				vertex.normal = glm::normalize(vertex.normal);
+			}
 		}
 
 		const std::string name = path.stem().string();

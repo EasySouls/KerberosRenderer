@@ -837,14 +837,19 @@ namespace kbr
 		};
 
 		// Create a chain of feature structures
-		vk::StructureChain<vk::PhysicalDeviceFeatures2, vk::PhysicalDeviceVulkan11Features, vk::PhysicalDeviceVulkan13Features, vk::PhysicalDeviceExtendedDynamicStateFeaturesEXT> featureChain = {
-			{.features = {.geometryShader = true, .depthClamp = true, .samplerAnisotropy = true } },
-			{.shaderDrawParameters = true },
-			{.synchronization2 = true, .dynamicRendering = true },
-			{.extendedDynamicState = true }
+		vk::StructureChain<vk::PhysicalDeviceFeatures2, vk::PhysicalDeviceVulkan11Features, vk::PhysicalDeviceVulkan12Features, vk::PhysicalDeviceVulkan13Features, vk::PhysicalDeviceExtendedDynamicStateFeaturesEXT> featureChain = {
+			{ .features = {
+				.geometryShader = true, .depthClamp = true, .samplerAnisotropy = true,
+				.shaderInt64 = true
+		       },
+			},
+			{ .shaderDrawParameters = true },
+			{ .descriptorIndexing = true, .bufferDeviceAddress = true },
+			{ .synchronization2 = true, .dynamicRendering = true },
+			{ .extendedDynamicState = true }
 		};
 
-		vk::DeviceCreateInfo deviceCreateInfo{
+		const vk::DeviceCreateInfo deviceCreateInfo{
 			.pNext = &featureChain.get<vk::PhysicalDeviceFeatures2>(),
 			.queueCreateInfoCount = 1,
 			.pQueueCreateInfos = &deviceQueueCreateInfo,

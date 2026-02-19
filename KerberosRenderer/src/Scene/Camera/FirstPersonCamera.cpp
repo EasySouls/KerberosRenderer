@@ -88,9 +88,9 @@ namespace kbr
 			if (!m_CanLookAround)
 				return;
 
-			constexpr float rotationSpeed = 0.1f;
+			constexpr float rotationSpeed = 0.3f;
 			m_Yaw -= static_cast<float>(dx) * rotationSpeed;
-			m_Pitch -= static_cast<float>(dy) * rotationSpeed;
+			m_Pitch += static_cast<float>(dy) * rotationSpeed;
 			m_Pitch = std::min(m_Pitch, 89.0f);
 			m_Pitch = std::max(m_Pitch, -89.0f);
 			m_ViewDirty = true;

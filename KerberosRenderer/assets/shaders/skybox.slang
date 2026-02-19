@@ -56,7 +56,8 @@ VSOutput vertMain(VSInput input)
 [shader("fragment")]
 float4 fragMain(VSOutput input)
 {
-    float3 color = samplerEnv.Sample(input.UVW).rgb;
+    float3 sampleUV = float3(input.UVW.x, -input.UVW.y, input.UVW.z);
+    float3 color = samplerEnv.Sample(sampleUV).rgb;
 
 	// Tone mapping
 	color = Uncharted2Tonemap(color * uboParams.exposure);
