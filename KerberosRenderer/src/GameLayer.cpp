@@ -107,7 +107,7 @@ namespace Game
 
 		const auto& avocadoMaterial = m_MaterialRegistry.AddAndRetrieve("Avocado", std::make_shared<kbr::Material>("Avocado", glm::vec3(1.0f), 0.9f, 0.03f, m_Textures[0], m_Textures[1]));
 		const auto& stoneFloorMaterial = m_MaterialRegistry.AddAndRetrieve("Stone Floor", std::make_shared<kbr::Material>("Stone Floor", glm::vec3(1.0f), 0.8f, 0.05f, m_Textures[2], m_Textures[3]));
-		const auto& stoneFloor2Material = m_MaterialRegistry.AddAndRetrieve("Stone Floor 2", std::make_shared<kbr::Material>("Stone Floor 2", glm::vec3(1.0f), 0.9f, 0.0f, m_Textures[4], m_Textures[5]));
+		const auto& stoneFloor2Material = m_MaterialRegistry.AddAndRetrieve("Stone Floor 2", std::make_shared<kbr::Material>("Stone Floor 2", glm::vec3(0.4, 0.15f, 0.0f), 1.0f, 0.0f, m_Textures[4], m_Textures[5]));
 
 		m_SceneNodes.push_back(new kbr::Node{
 			.Position = glm::vec3(6.0f, 9.5f, 0.0f),
@@ -256,6 +256,8 @@ namespace Game
 			cmd.setScissor(0, renderArea);
 
 			cmd.bindPipeline(vk::PipelineBindPoint::eGraphics, *m_ShadowMapPipeline);
+
+			cmd.setDepthBias(m_DepthBias.constantFactor, m_DepthBias.clamp, m_DepthBias.slopeFactor);
 
 			for (size_t i = 0; i < m_SceneNodes.size(); ++i)
 			{
@@ -674,6 +676,11 @@ namespace Game
 					m_LightPosForShadowMapCalculation.x,
 					m_LightPosForShadowMapCalculation.y,
 					m_LightPosForShadowMapCalculation.z);
+
+		ImGui::Text("Depth Bias");
+		ImGui::DragFloat("Constant Factor", &m_DepthBias.constantFactor, 0.001f, 0.0f, 5.0f);
+		ImGui::DragFloat("Clamp", &m_DepthBias.clamp, 0.001f, 0.0f, 1.0f);
+		ImGui::DragFloat("Slope Factor", &m_DepthBias.slopeFactor, 0.01f, 0.0f, 10.0f);
 
 		ImGui::Separator();
 
@@ -1104,15 +1111,6 @@ namespace Game
 		}
 
 		// Create shared pipeline states
-		std::vector dynamicStates = {
-			vk::DynamicState::eViewport,
-			vk::DynamicState::eScissor
-		};
-
-		const vk::PipelineDynamicStateCreateInfo dynamicStateInfo{
-			.dynamicStateCount = static_cast<uint32_t>(dynamicStates.size()),
-			.pDynamicStates = dynamicStates.data()
-		};
 
 		vk::PipelineInputAssemblyStateCreateInfo inputAssembly{ .topology = vk::PrimitiveTopology::eTriangleList };
 
@@ -1212,8 +1210,6 @@ namespace Game
 				.cullMode = vk::CullModeFlagBits::eFront,
 				.frontFace = vk::FrontFace::eCounterClockwise,
 				.depthBiasEnable = vk::True,
-				.depthBiasConstantFactor = 1.25f,
-				.depthBiasSlopeFactor = 1.75f,
 				.lineWidth = 1.0f
 			};
 
@@ -1256,6 +1252,17 @@ namespace Game
 
 			const auto shaderStages = shadowMapShader.GetPipelineShaderStageCreateInfo();
 
+			std::vector shadowMapDynamicState = {
+				vk::DynamicState::eViewport,
+				vk::DynamicState::eScissor,
+				vk::DynamicState::eDepthBias,
+			};
+
+			const vk::PipelineDynamicStateCreateInfo shadowMapDynamicStateInfo{
+				.dynamicStateCount = static_cast<uint32_t>(shadowMapDynamicState.size()),
+				.pDynamicStates = shadowMapDynamicState.data()
+			};
+
 			vk::GraphicsPipelineCreateInfo pipelineInfo{
 				.pNext = &pipelineRenderingCreateInfo,
 				.stageCount = 2,
@@ -1267,7 +1274,7 @@ namespace Game
 				.pMultisampleState = &multisampling,
 				.pDepthStencilState = &depthStencil,
 				.pColorBlendState = &colorBlending,
-				.pDynamicState = &dynamicStateInfo,
+				.pDynamicState = &shadowMapDynamicStateInfo,
 				.layout = m_ShadowMapPipelineLayout,
 				.renderPass = nullptr
 			};
@@ -1281,6 +1288,16 @@ namespace Game
 
 		// Create the opaque and transparent pipeline resources
 		{
+			std::vector dynamicStates = {
+				vk::DynamicState::eViewport,
+				vk::DynamicState::eScissor
+			};
+
+			const vk::PipelineDynamicStateCreateInfo dynamicStateInfo{
+				.dynamicStateCount = static_cast<uint32_t>(dynamicStates.size()),
+				.pDynamicStates = dynamicStates.data()
+			};
+
 			const vk::Format colorFormat = context.FindSupportedFormat(
 				{ vk::Format::eR32G32B32A32Sfloat, vk::Format::eR32G32B32A32Uint },
 				vk::ImageTiling::eOptimal,

@@ -73,6 +73,14 @@ namespace Game
 
 		kbr::MaterialRegistry m_MaterialRegistry;
 
+		struct DepthBias
+		{
+			float constantFactor = 1.25f;
+			float slopeFactor = 1.75f;
+			float clamp = 0.0f;
+		};
+		DepthBias m_DepthBias;
+
 		// Vulkan resources
 		uint32_t m_ShadowMapSize = 2048;
 		vk::raii::Image m_ShadowMapImage = nullptr;

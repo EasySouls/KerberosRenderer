@@ -154,7 +154,8 @@ float ShadowCalculation(float3 lightDir, float3 normal, float4 fragPosLightSpace
     float closestDepth = shadowMap.Sample(shadowUV).r;
     float currentDepth = projCoords.z;
 
-    float bias = max(0.005 * (1.0 - dot(normal, lightDir)), 0.0005);
+    // Hardware-based depth bias is enabled
+    //float bias = max(0.005 * (1.0 - dot(normal, lightDir)), 0.0005);
     float shadow = 0.0;
     if (enablePCF == 1) {
         // Percentage-closer filtering (PCF)
@@ -167,12 +168,14 @@ float ShadowCalculation(float3 lightDir, float3 normal, float4 fragPosLightSpace
             for(int y = -1; y <= 1; ++y)
             {
                 float pcfDepth = shadowMap.Sample(shadowUV + float2(x, y) * texelSize).r;
-                shadow += currentDepth - bias > pcfDepth ? 1.0 : 0.0;
+                //shadow += currentDepth - bias > pcfDepth ? 1.0 : 0.0;
+                shadow += currentDepth > pcfDepth ? 1.0 : 0.0;
             }
         }
         shadow /= 9.0;
     } else {
-        shadow = currentDepth - bias > closestDepth ? 1.0 : 0.0;
+        //shadow = currentDepth - bias > closestDepth ? 1.0 : 0.0;
+        shadow = currentDepth > closestDepth ? 1.0 : 0.0;
     }
 
     // Keep the shadow at 0.0 when outside the far plane of the light's orthographic frustum.
