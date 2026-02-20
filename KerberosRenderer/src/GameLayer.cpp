@@ -1,6 +1,8 @@
 #include "pch.hpp"
 #include "GameLayer.hpp"
 
+#include <ranges>
+
 #include "VulkanContext.hpp"
 #include "io.hpp"
 #include "Vertex.hpp"
@@ -51,17 +53,17 @@ namespace Game
 		m_Camera->SetPosition(glm::vec3(0.0f, 15.0f, 45.0f));
 		m_ViewportSize = { 1280.0f, 720.0f };
 
-		m_Materials.emplace_back(std::make_shared<kbr::Material>("Gold", glm::vec3(1.0f, 0.765557f, 0.336057f), 0.1f, 1.0f));
-		m_Materials.emplace_back(std::make_shared<kbr::Material>("Copper", glm::vec3(0.955008f, 0.637427f, 0.538163f), 0.1f, 1.0f));
-		m_Materials.emplace_back(std::make_shared<kbr::Material>("Chromium", glm::vec3(0.549585f, 0.556114f, 0.554256f), 0.1f, 1.0f));
-		m_Materials.emplace_back(std::make_shared<kbr::Material>("Nickel", glm::vec3(0.659777f, 0.608679f, 0.525649f), 0.1f, 1.0f));
-		m_Materials.emplace_back(std::make_shared<kbr::Material>("Titanium", glm::vec3(0.541931f, 0.496791f, 0.449419f), 0.1f, 1.0f));
-		m_Materials.emplace_back(std::make_shared<kbr::Material>("Cobalt", glm::vec3(0.662124f, 0.654864f, 0.633732f), 0.1f, 1.0f));
-		m_Materials.emplace_back(std::make_shared<kbr::Material>("Platinum", glm::vec3(0.672411f, 0.637331f, 0.585456f), 0.1f, 1.0f));
-		m_Materials.emplace_back(std::make_shared<kbr::Material>("White", glm::vec3(1.0f), 0.1f, 1.0f));
-		m_Materials.emplace_back(std::make_shared<kbr::Material>("Red", glm::vec3(1.0f, 0.0f, 0.0f), 0.1f, 1.0f));
-		m_Materials.emplace_back(std::make_shared<kbr::Material>("Blue", glm::vec3(0.0f, 0.0f, 1.0f), 0.1f, 1.0f));
-		m_Materials.emplace_back(std::make_shared<kbr::Material>("Black", glm::vec3(0.0f), 0.1f, 1.0f));
+		m_MaterialRegistry.Add("Gold", std::make_shared<kbr::Material>("Gold", glm::vec3(1.0f, 0.765557f, 0.336057f), 0.1f, 1.0f));
+		m_MaterialRegistry.Add("Copper", std::make_shared<kbr::Material>("Copper", glm::vec3(0.955008f, 0.637427f, 0.538163f), 0.1f, 1.0f));
+		m_MaterialRegistry.Add("Chromium", std::make_shared<kbr::Material>("Chromium", glm::vec3(0.549585f, 0.556114f, 0.554256f), 0.1f, 1.0f));
+		m_MaterialRegistry.Add("Nickel", std::make_shared<kbr::Material>("Nickel", glm::vec3(0.659777f, 0.608679f, 0.525649f), 0.1f, 1.0f));
+		m_MaterialRegistry.Add("Titanium", std::make_shared<kbr::Material>("Titanium", glm::vec3(0.541931f, 0.496791f, 0.449419f), 0.1f, 1.0f));
+		m_MaterialRegistry.Add("Cobalt", std::make_shared<kbr::Material>("Cobalt", glm::vec3(0.662124f, 0.654864f, 0.633732f), 0.1f, 1.0f));
+		m_MaterialRegistry.Add("Platinum", std::make_shared<kbr::Material>("Platinum", glm::vec3(0.672411f, 0.637331f, 0.585456f), 0.1f, 1.0f));
+		m_MaterialRegistry.Add("White", std::make_shared<kbr::Material>("White", glm::vec3(1.0f), 0.1f, 1.0f));
+		m_MaterialRegistry.Add("Red", std::make_shared<kbr::Material>("Red", glm::vec3(1.0f, 0.0f, 0.0f), 0.1f, 1.0f));
+		m_MaterialRegistry.Add("Blue", std::make_shared<kbr::Material>("Blue", glm::vec3(0.0f, 0.0f, 1.0f), 0.1f, 1.0f));
+		m_MaterialRegistry.Add("Black", std::make_shared<kbr::Material>("Black", glm::vec3(0.0f), 0.1f, 1.0f));
 
 		KBR_CORE_INFO("Size of SceneUniformData: {} bytes", sizeof(SceneUniformData));
 		KBR_CORE_INFO("Size of UniformDataParams: {} bytes", sizeof(UniformDataParams));
@@ -88,7 +90,9 @@ namespace Game
 			{ "assets/models/avocado/Avocado_baseColor.ktx2", vk::Format::eR8G8B8A8Srgb },
 			{ "assets/models/avocado/Avocado_normal.ktx2", vk::Format::eR8G8B8A8Unorm },
 			{ "assets/textures/stonefloor01_color_rgba.ktx", vk::Format::eR8G8B8A8Srgb },
-			{ "assets/textures/stonefloor01_normal_rgba.ktx", vk::Format::eR8G8B8A8Unorm }
+			{ "assets/textures/stonefloor01_normal_rgba.ktx", vk::Format::eR8G8B8A8Unorm },
+			{ "assets/textures/stonefloor02_color_rgba.ktx", vk::Format::eR8G8B8A8Srgb },
+			{ "assets/textures/stonefloor02_normal_rgba.ktx", vk::Format::eR8G8B8A8Unorm },
 		};
 
 		m_Textures.reserve(textureFiles.size());
@@ -101,8 +105,9 @@ namespace Game
 
 		KBR_CORE_INFO("Loaded {} texture(s)!", m_Textures.size());
 
-		const auto& avocadoMaterial = m_Materials.emplace_back(std::make_shared<kbr::Material>("Avocado", glm::vec3(1.0f), 0.9f, 0.03f, m_Textures[0], m_Textures[1]));
-		const auto& stoneFloorMaterial = m_Materials.emplace_back(std::make_shared<kbr::Material>("Stone Floor", glm::vec3(1.0f), 0.8f, 0.05f, m_Textures[2], m_Textures[3]));
+		const auto& avocadoMaterial = m_MaterialRegistry.AddAndRetrieve("Avocado", std::make_shared<kbr::Material>("Avocado", glm::vec3(1.0f), 0.9f, 0.03f, m_Textures[0], m_Textures[1]));
+		const auto& stoneFloorMaterial = m_MaterialRegistry.AddAndRetrieve("Stone Floor", std::make_shared<kbr::Material>("Stone Floor", glm::vec3(1.0f), 0.8f, 0.05f, m_Textures[2], m_Textures[3]));
+		const auto& stoneFloor2Material = m_MaterialRegistry.AddAndRetrieve("Stone Floor 2", std::make_shared<kbr::Material>("Stone Floor 2", glm::vec3(1.0f), 0.9f, 0.0f, m_Textures[4], m_Textures[5]));
 
 		m_SceneNodes.push_back(new kbr::Node{
 			.Position = glm::vec3(6.0f, 9.5f, 0.0f),
@@ -123,12 +128,21 @@ namespace Game
 		});
 
 		m_SceneNodes.push_back(new kbr::Node{
-			.Position = glm::vec3(2.0f, 10.0f, 3.0f),
+			.Position = glm::vec3(2.0f, 6.0f, 3.0f),
 			.Rotation = glm::vec3(0.0f),
 			.Scale = glm::vec3(1.0f),
 			.Mesh = m_Meshes["sphere"],
 			.Material = stoneFloorMaterial,
 			.Name = "Sphere"
+		});
+
+		m_SceneNodes.push_back(new kbr::Node{
+			.Position = glm::vec3(2.0f, -10.0f, 3.0f),
+			.Rotation = glm::vec3(0.0f),
+			.Scale = glm::vec3(20.0f, 0.1f, 20.0f),
+			.Mesh = m_Meshes["cube"],
+			.Material = stoneFloor2Material,
+			.Name = "Floor"
 		});
 
 		// Setup initial directional light which we will use to generate the shadow map
@@ -641,12 +655,13 @@ namespace Game
 		ImGui::Text("Material");
 		
 		std::vector<const char*> materialNames;
-		materialNames.reserve(m_Materials.size());
-		for (const auto& mat : m_Materials)
+		const uint32_t materialCount = m_MaterialRegistry.Size();
+		materialNames.reserve(materialCount);
+		for (const auto& mat : m_MaterialRegistry | std::views::values)
 		{
 			materialNames.push_back(mat->name.c_str());
 		}
-		ImGui::Combo("Select Material", &m_SelectedMaterialIndex, materialNames.data(), static_cast<int>(m_Materials.size()));
+		ImGui::Combo("Select Material", &m_SelectedMaterialIndex, materialNames.data(), static_cast<int>(materialCount));
 
 		ImGui::Separator();
 

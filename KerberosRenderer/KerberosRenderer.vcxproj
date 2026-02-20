@@ -149,6 +149,7 @@
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Create</PrecompiledHeader>
       <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Release|x64'">pch.hpp</PrecompiledHeaderFile>
     </ClCompile>
+    <ClCompile Include="src\Renderer\MaterialRegistry.cpp" />
     <ClCompile Include="src\Renderer\SkyboxUtils.cpp" />
     <ClCompile Include="src\GameLayer.cpp" />
     <ClCompile Include="src\Input\InputSystem.cpp" />
@@ -249,7 +250,9 @@
   <ItemGroup>
     <ClInclude Include="src\Application.hpp" />
     <ClInclude Include="src\Buffer.hpp" />
+    <ClInclude Include="src\Core\Core.hpp" />
     <ClInclude Include="src\pch.hpp" />
+    <ClInclude Include="src\Renderer\MaterialRegistry.hpp" />
     <ClInclude Include="src\Renderer\SkyboxUtils.hpp" />
     <ClInclude Include="src\Scene\Camera\Camera.hpp" />
     <ClInclude Include="src\Events\Event.hpp" />

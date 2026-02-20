@@ -9,6 +9,7 @@
 #include "Renderer/Material.hpp"
 #include "Scene/Node.hpp"
 #include "Scene/Camera/Camera.hpp"
+#include "Renderer/MaterialRegistry.hpp"
 
 #include <string>
 #include <vector>
@@ -63,13 +64,14 @@ namespace Game
 		// Size of the output images.
 		glm::vec2 m_OutputSize{ 0.f };
 
-		std::vector<std::shared_ptr<kbr::Material>> m_Materials;
 		std::unordered_map<std::string, std::shared_ptr<kbr::Mesh>> m_Meshes;
 		std::optional<kbr::Mesh> m_SkyboxMesh;
 		std::vector<std::shared_ptr<kbr::Texture2D>> m_Textures;
 		int m_SelectedMaterialIndex = 0;
 
 		std::vector<kbr::Node*> m_SceneNodes;
+
+		kbr::MaterialRegistry m_MaterialRegistry;
 
 		// Vulkan resources
 		uint32_t m_ShadowMapSize = 2048;

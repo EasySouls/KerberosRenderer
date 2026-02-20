@@ -154,7 +154,7 @@ float ShadowCalculation(float3 lightDir, float3 normal, float4 fragPosLightSpace
     float closestDepth = shadowMap.Sample(shadowUV).r;
     float currentDepth = projCoords.z;
 
-    float bias = max(0.05 * (1.0 - dot(normal, lightDir)), 0.005);
+    float bias = max(0.005 * (1.0 - dot(normal, lightDir)), 0.0005);
     float shadow = 0.0;
     if (enablePCF == 1) {
         // Percentage-closer filtering (PCF)
