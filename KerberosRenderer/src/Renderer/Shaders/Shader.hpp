@@ -35,5 +35,6 @@ namespace kbr
 		vk::raii::ShaderModule m_ShaderModule = nullptr;
 		std::vector<uint32_t> m_SpirvCode;
 		std::vector<ShaderStageEntry> m_StageEntries;
+		std::filesystem::path m_Filepath;
 	};
 }

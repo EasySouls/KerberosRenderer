@@ -117,7 +117,7 @@
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <AdditionalLibraryDirectories>C:\VulkanSDK\1.4.335.0\Lib;C:\Development\KerberosRenderer\KerberosRenderer\vendor\ktx\lib\build\Debug;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
-      <AdditionalDependencies>vulkan-1.lib;ktx.lib;spirv-cross-cored.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>vulkan-1.lib;ktx.lib;spirv-cross-cored.lib;slangd.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
@@ -137,7 +137,7 @@
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <AdditionalLibraryDirectories>C:\VulkanSDK\1.4.335.0\Lib;C:\Development\KerberosRenderer\KerberosRenderer\vendor\ktx\lib\build\Release</AdditionalLibraryDirectories>
-      <AdditionalDependencies>vulkan-1.lib;ktx.lib;spirv-cross-core.lib;$(CoreLibraryDependencies);%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>vulkan-1.lib;ktx.lib;spirv-cross-core.lib;slang.lib;$(CoreLibraryDependencies);%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
@@ -150,6 +150,7 @@
       <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Release|x64'">pch.hpp</PrecompiledHeaderFile>
     </ClCompile>
     <ClCompile Include="src\Renderer\MaterialRegistry.cpp" />
+    <ClCompile Include="src\Renderer\Shaders\SlangCompiler.cpp" />
     <ClCompile Include="src\Renderer\SkyboxUtils.cpp" />
     <ClCompile Include="src\GameLayer.cpp" />
     <ClCompile Include="src\Input\InputSystem.cpp" />
@@ -159,7 +160,7 @@
     <ClCompile Include="src\ModelLoader.cpp" />
     <ClCompile Include="src\Scene\Camera\EditorCamera.cpp" />
     <ClCompile Include="src\Scene\Camera\FirstPersonCamera.cpp" />
-    <ClCompile Include="src\Shader.cpp" />
+    <ClCompile Include="src\Renderer\Shaders\Shader.cpp" />
     <ClCompile Include="src\Textures.cpp" />
     <ClCompile Include="src\VulkanContext.cpp" />
     <ClCompile Include="vendor\glfw-3.4\src\context.c">
@@ -253,6 +254,8 @@
     <ClInclude Include="src\Core\Core.hpp" />
     <ClInclude Include="src\pch.hpp" />
     <ClInclude Include="src\Renderer\MaterialRegistry.hpp" />
+    <ClInclude Include="src\Renderer\Shaders\ShaderEntryPoints.hpp" />
+    <ClInclude Include="src\Renderer\Shaders\SlangCompiler.hpp" />
     <ClInclude Include="src\Renderer\SkyboxUtils.hpp" />
     <ClInclude Include="src\Scene\Camera\Camera.hpp" />
     <ClInclude Include="src\Events\Event.hpp" />
@@ -270,7 +273,7 @@
     <ClInclude Include="src\Input\InputSystem.hpp" />
     <ClInclude Include="src\Input\KeyCodes.hpp" />
     <ClInclude Include="src\Input\MouseButtonCodes.hpp" />
-    <ClInclude Include="src\io.hpp" />
+    <ClInclude Include="src\IO.hpp" />
     <ClInclude Include="src\Layer.hpp" />
     <ClInclude Include="src\Logging\Log.hpp" />
     <ClInclude Include="src\Mesh.hpp" />
@@ -279,7 +282,7 @@
     <ClInclude Include="src\Scene\Camera\EditorCamera.hpp" />
     <ClInclude Include="src\Scene\Camera\FirstPersonCamera.hpp" />
     <ClInclude Include="src\Scene\Node.hpp" />
-    <ClInclude Include="src\Shader.hpp" />
+    <ClInclude Include="src\Renderer\Shaders\Shader.hpp" />
     <ClInclude Include="src\Textures.hpp" />
     <ClInclude Include="src\Utils.hpp" />
     <ClInclude Include="src\Vertex.hpp" />
@@ -303,7 +306,6 @@
     <None Include="src\shaders\pbrbasic.slang" />
     <None Include="src\shaders\shadowmap.slang" />
     <None Include="src\shaders\simple.slang" />
-    <None Include="update_proj.ps1" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

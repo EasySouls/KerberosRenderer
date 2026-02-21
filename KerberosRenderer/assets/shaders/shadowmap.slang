@@ -35,7 +35,7 @@ struct VSOutput
 };
 
 [shader("vertex")]
-VSOutput vertMain(VSInput input) {
+VSOutput vertexMain(VSInput input) {
     VSOutput output;
     float4 worldPosition = mul(perObject.model, float4(input.Pos, 1.0));
     output.Pos = mul(scene.lightSpaceMatrix, worldPosition);
@@ -43,7 +43,7 @@ VSOutput vertMain(VSInput input) {
 }
 
 [shader("fragment")]
-void fragMain(VSOutput inVert) : SV_TARGET
+void fragmentMain(VSOutput inVert) : SV_TARGET
 {
     //// Depth value is automatically written to the depth buffer
     //return 0.0;

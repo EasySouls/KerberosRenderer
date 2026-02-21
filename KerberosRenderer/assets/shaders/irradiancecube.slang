@@ -26,7 +26,7 @@ struct PushConsts {
 #define PI 3.1415926535897932384626433832795
 
 [shader("vertex")]
-VSOutput vertMain(VSInput input, uniform float4x4 mvp)
+VSOutput vertexMain(VSInput input, uniform float4x4 mvp)
 {
     VSOutput output;
     output.UVW = input.Pos;
@@ -35,7 +35,7 @@ VSOutput vertMain(VSInput input, uniform float4x4 mvp)
 }
 
 [shader("fragment")]
-float4 fragMain(float3 inPos)
+float4 fragmentMain(float3 inPos)
 {
     float3 N = normalize(inPos.xyz);
 	float3 up = float3(0.0, 1.0, 0.0);

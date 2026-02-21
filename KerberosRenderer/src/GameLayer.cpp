@@ -7,7 +7,7 @@
 #include "io.hpp"
 #include "Vertex.hpp"
 #include "ModelLoader.hpp"
-#include "Shader.hpp"
+#include "Renderer/Shaders/Shader.hpp"
 #include "Buffer.hpp"
 #include "Events/WindowResizedEvent.hpp"
 #include "Renderer/SkyboxUtils.hpp"
@@ -1180,7 +1180,7 @@ namespace Game
 									   "Shadow Map Pipeline Layout");
 
 			// Create shader for shadow mapping
-			kbr::Shader shadowMapShader("assets/shaders/shadowmap.spv", "ShadowMap");
+			kbr::Shader shadowMapShader("shadowmap", "ShadowMap");
 
 			/*constexpr vk::VertexInputBindingDescription bindingDescription = { 0, sizeof(glm::vec3), vk::VertexInputRate::eVertex };
 			constexpr std::array attributeDescriptions = {
@@ -1479,7 +1479,7 @@ namespace Game
 				.depthAttachmentFormat = depthFormat
 			};
 
-			kbr::Shader pbrShader("assets/shaders/pbrbasic.spv", "PBR");
+			kbr::Shader pbrShader("pbrbasic", "PBR");
 			auto shaderStages = pbrShader.GetPipelineShaderStageCreateInfo();
 
 			vk::GraphicsPipelineCreateInfo opaquePipelineInfo{
@@ -1521,7 +1521,7 @@ namespace Game
 
 			context.SetObjectDebugName(m_PBROpaquePipelinePCF, "PBR Opaque Pipeline PCF");
 
-			kbr::Shader normalDebugShader("assets/shaders/normaldebug.spv", "NormalDebug");
+			kbr::Shader normalDebugShader("normaldebug", "NormalDebug");
 			const auto normalDebugShaderStages = normalDebugShader.GetPipelineShaderStageCreateInfo();
 
 			opaquePipelineInfo.stageCount = static_cast<uint32_t>(normalDebugShaderStages.size());
@@ -1551,7 +1551,7 @@ namespace Game
 
 			context.SetObjectDebugName(m_PBRTransparentPipeline,"PBR Transparent Pipeline");
 
-			kbr::Shader skyboxShader("assets/shaders/skybox.spv", "Skybox");
+			kbr::Shader skyboxShader("skybox", "Skybox");
 			const auto skyboxShaderStages = skyboxShader.GetPipelineShaderStageCreateInfo();
 
 			opaqueDepthStencil.depthWriteEnable = vk::False;

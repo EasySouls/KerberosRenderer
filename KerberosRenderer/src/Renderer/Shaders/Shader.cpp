@@ -6,10 +6,28 @@
 
 #include <spirv_cross/spirv_cross.hpp>
 
+#include "SlangCompiler.hpp"
 #include "logging/Log.hpp"
 
 namespace kbr
 {
+	namespace Utils 
+	{
+
+		static const char* GetCacheDirectory()
+		{
+			return "assets/cache/shaders";
+		}
+
+		static void CreateCacheDirectoryIfNeeded()
+		{
+			const std::string cacheDirectory = GetCacheDirectory();
+			if (!std::filesystem::exists(cacheDirectory))
+				std::filesystem::create_directories(cacheDirectory);
+		}
+
+	}
+
 	static vk::ShaderStageFlagBits ExecutionModelToShaderStage(const spv::ExecutionModel model)
 	{
 		switch (model)
@@ -29,12 +47,74 @@ namespace kbr
 	Shader::Shader(const std::filesystem::path& filepath, std::string name)
 		: m_Name(std::move(name))
 	{
-		const auto shaderCode = IO::ReadFile(filepath);
-		m_SpirvCode.resize(shaderCode.size() / sizeof(uint32_t));
-		std::memcpy(m_SpirvCode.data(), shaderCode.data(), shaderCode.size());
+		Utils::CreateCacheDirectoryIfNeeded();
+
+		std::filesystem::path shadersPath = std::filesystem::path("assets") / "shaders";
+		std::filesystem::path cacheDirectory = Utils::GetCacheDirectory();
+		m_Filepath = shadersPath / (filepath.string() + std::string(".slang"));
+
+		/// Get source file modification time
+		std::filesystem::file_time_type sourceModTime{};
+		if (!filepath.empty() && std::filesystem::exists(m_Filepath))
+		{
+			sourceModTime = std::filesystem::last_write_time(m_Filepath);
+		}
+
+		bool needsCompilation = true;
+		const std::filesystem::path cachedSpirvPath = cacheDirectory / (filepath.stem().string() + ".spv");
+		if (std::filesystem::exists(cachedSpirvPath)) 
+		{
+			const std::filesystem::file_time_type cachedModTime = std::filesystem::last_write_time(cachedSpirvPath);
+			if (cachedModTime >= sourceModTime) 
+			{
+				KBR_CORE_INFO("Loading cached SPIR-V for shader: {}", filepath.filename().string());
+				needsCompilation = false;
+			} 
+			else 
+			{
+				KBR_CORE_INFO("Cached SPIR-V is outdated. Recompiling shader: {}", filepath.filename().string());
+				needsCompilation = true;
+			}
+		} 
+		else 
+		{
+			KBR_CORE_INFO("No cached SPIR-V found. Compiling shader: {}", filepath.filename().string());
+			needsCompilation = true;
+			
+		}
+
+		if (needsCompilation) 
+		{
+			throw std::runtime_error("Shader compilation is currently under development, please use compile_shaders.bat to compile shaders manually.");
+
+			try
+			{
+				m_SpirvCode = SlangCompiler::CompileToSpirv(m_Filepath, {});
+
+				std::ofstream outFile(cachedSpirvPath, std::ios::binary);
+				outFile.write(reinterpret_cast<const char*>(m_SpirvCode.data()), static_cast<std::streamsize>(m_SpirvCode.size() * sizeof(uint32_t)));
+			}
+			catch (const CompilationFailedException& e)
+			{
+				KBR_CORE_ERROR("Shader compilation failed for '{}': {}", filepath.filename().string(), e.what());
+				throw;
+			}
+			catch (const std::exception& e)
+			{
+				KBR_CORE_ERROR("Failed to compile shader '{}': {}", filepath.filename().string(), e.what());
+				throw;
+			}
+		}
+		else
+		{
+			const auto shaderCode = IO::ReadFile(cachedSpirvPath);
+			m_SpirvCode.resize(shaderCode.size() / sizeof(uint32_t));
+			std::memcpy(m_SpirvCode.data(), shaderCode.data(), shaderCode.size());
+		}
+		
 
 		const vk::ShaderModuleCreateInfo shaderInfo{
-			.codeSize = shaderCode.size() * sizeof(char),
+			.codeSize = m_SpirvCode.size() * sizeof(uint32_t),
 			.pCode = m_SpirvCode.data()
 		};
 

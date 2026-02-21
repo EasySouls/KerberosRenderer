@@ -186,7 +186,7 @@ float ShadowCalculation(float3 lightDir, float3 normal, float4 fragPosLightSpace
 }
 
 [shader("vertex")]
-VSOutput vertMain(VSInput input)
+VSOutput vertexMain(VSInput input)
 {
     VSOutput output;
 
@@ -205,7 +205,7 @@ VSOutput vertMain(VSInput input)
 }
 
 [shader("fragment")]
-float4 fragMain(VSOutput input)
+float4 fragmentMain(VSOutput input)
 {
 	float3 N = normalize(input.Normal_WorldSpace);
     float3 V = normalize(scene.camPos - input.FragPos_WorldSpace);

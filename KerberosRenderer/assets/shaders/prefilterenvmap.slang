@@ -16,7 +16,7 @@ struct VSOutput
 };
 
 [shader("vertex")]
-VSOutput vertMain(VSInput input, uniform float4x4 mvp)
+VSOutput vertexMain(VSInput input, uniform float4x4 mvp)
 {
 	VSOutput output;
 	output.UVW = input.Pos;
@@ -121,7 +121,7 @@ float3 prefilterEnvMap(float3 R, float roughness)
 }
 
 [shader("fragment")]
-float4 fragMain(float3 inPos)
+float4 fragmentMain(float3 inPos)
 {
     float3 N = normalize(inPos.xyz);
     return float4(prefilterEnvMap(N, consts.roughness), 1.0);

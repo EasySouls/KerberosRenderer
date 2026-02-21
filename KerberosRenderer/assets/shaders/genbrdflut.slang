@@ -93,7 +93,7 @@ float2 BRDF(float NoV, float roughness)
 }
 
 [shader("vertex")]
-VSOutput vertMain(uint VertexIndex: SV_VertexID)
+VSOutput vertexMain(uint VertexIndex: SV_VertexID)
 {
     VSOutput output;
     output.UV = float2((VertexIndex << 1) & 2, VertexIndex & 2);
@@ -102,7 +102,7 @@ VSOutput vertMain(uint VertexIndex: SV_VertexID)
 }
 
 [shader("fragment")]
-float4 fragMain(VSOutput input)
+float4 fragmentMain(VSOutput input)
 {
 	return float4(BRDF(input.UV.x, input.UV.y), 0.0, 1.0);
 }

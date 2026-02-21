@@ -48,7 +48,7 @@ struct PerObject {
 ConstantBuffer<PerObject> perObject;
 
 [shader("vertex")]
-VSOutput vertMain(VSInput input)
+VSOutput vertexMain(VSInput input)
 {
     VSOutput output;
     output.Normal = input.Normal;
@@ -82,7 +82,7 @@ void geometryMain(triangle VSOutput input[3], inout LineStream<GSOutput> outStre
 }
 
 [shader("fragment")]
-float4 fragMain(GSOutput input)
+float4 fragmentMain(GSOutput input)
 {
     return float4(input.Color, 1.0);
 }

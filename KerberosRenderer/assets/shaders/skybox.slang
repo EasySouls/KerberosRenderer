@@ -45,7 +45,7 @@ float3 Uncharted2Tonemap(float3 color)
 }
 
 [shader("vertex")]
-VSOutput vertMain(VSInput input)
+VSOutput vertexMain(VSInput input)
 {
     VSOutput output;
     output.UVW = input.Position;
@@ -54,7 +54,7 @@ VSOutput vertMain(VSInput input)
 }
 
 [shader("fragment")]
-float4 fragMain(VSOutput input)
+float4 fragmentMain(VSOutput input)
 {
     float3 sampleUV = float3(input.UVW.x, -input.UVW.y, input.UVW.z);
     float3 color = samplerEnv.Sample(sampleUV).rgb;

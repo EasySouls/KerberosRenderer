@@ -1,10 +1,22 @@
-C:/VulkanSDK/1.4.335.0/bin/slangc.exe simple.slang -target spirv -profile spirv_1_4 -emit-spirv-directly -fvk-use-entrypoint-name -entry vertMain -entry fragMain -o simple.spv
-C:/VulkanSDK/1.4.335.0/bin/slangc.exe shadowmap.slang -target spirv -profile spirv_1_4 -emit-spirv-directly -fvk-use-entrypoint-name -entry vertMain -entry fragMain -o shadowmap.spv
-C:/VulkanSDK/1.4.335.0/bin/slangc.exe pbrbasic.slang -target spirv -profile spirv_1_4 -emit-spirv-directly -fvk-use-entrypoint-name -entry vertMain -entry fragMain -o pbrbasic.spv
-C:/VulkanSDK/1.4.335.0/bin/slangc.exe skybox.slang -target spirv -profile spirv_1_4 -emit-spirv-directly -fvk-use-entrypoint-name -entry vertMain -entry fragMain -o skybox.spv
-C:/VulkanSDK/1.4.335.0/bin/slangc.exe genbrdflut.slang -target spirv -profile spirv_1_4 -emit-spirv-directly -fvk-use-entrypoint-name -entry vertMain -entry fragMain -o genbrdflut.spv
-C:/VulkanSDK/1.4.335.0/bin/slangc.exe irradiancecube.slang -target spirv -profile spirv_1_4 -emit-spirv-directly -fvk-use-entrypoint-name -entry vertMain -entry fragMain -o irradiancecube.spv
-C:/VulkanSDK/1.4.335.0/bin/slangc.exe prefilterenvmap.slang -target spirv -profile spirv_1_4 -emit-spirv-directly -fvk-use-entrypoint-name -entry vertMain -entry fragMain -o prefilterenvmap.spv
-C:/VulkanSDK/1.4.335.0/bin/slangc.exe normaldebug.slang -target spirv -profile spirv_1_4 -emit-spirv-directly -fvk-use-entrypoint-name -entry vertMain -entry geometryMain -entry fragMain -o normaldebug.spv
+@echo off
+
+set SLANGC=%VULKAN_SDK%\bin\slangc.exe
+
+echo Using Slang compiler: %SLANGC%
+
+if not exist "%SLANGC%" (
+    echo ERROR: slangc.exe not found at "%SLANGC%". Is VULKAN_SDK set correctly?
+    pause
+    exit /b 1
+)
+
+"%SLANGC%" simple.slang -target spirv -profile spirv_1_4 -emit-spirv-directly -fvk-use-entrypoint-name -entry vertexMain -entry fragmentMain -o ../cache/shaders/simple.spv
+"%SLANGC%" shadowmap.slang -target spirv -profile spirv_1_4 -emit-spirv-directly -fvk-use-entrypoint-name -entry vertexMain -entry fragmentMain -o ../cache/shaders/shadowmap.spv
+"%SLANGC%" pbrbasic.slang -target spirv -profile spirv_1_4 -emit-spirv-directly -fvk-use-entrypoint-name -entry vertexMain -entry fragmentMain -o ../cache/shaders/pbrbasic.spv
+"%SLANGC%" skybox.slang -target spirv -profile spirv_1_4 -emit-spirv-directly -fvk-use-entrypoint-name -entry vertexMain -entry fragmentMain -o ../cache/shaders/skybox.spv
+"%SLANGC%" genbrdflut.slang -target spirv -profile spirv_1_4 -emit-spirv-directly -fvk-use-entrypoint-name -entry vertexMain -entry fragmentMain -o ../cache/shaders/genbrdflut.spv
+"%SLANGC%" irradiancecube.slang -target spirv -profile spirv_1_4 -emit-spirv-directly -fvk-use-entrypoint-name -entry vertexMain -entry fragmentMain -o ../cache/shaders/irradiancecube.spv
+"%SLANGC%" prefilterenvmap.slang -target spirv -profile spirv_1_4 -emit-spirv-directly -fvk-use-entrypoint-name -entry vertexMain -entry fragmentMain -o ../cache/shaders/prefilterenvmap.spv
+"%SLANGC%" normaldebug.slang -target spirv -profile spirv_1_4 -emit-spirv-directly -fvk-use-entrypoint-name -entry vertexMain -entry geometryMain -entry fragmentMain -o ../cache/shaders/normaldebug.spv
 
 PAUSE

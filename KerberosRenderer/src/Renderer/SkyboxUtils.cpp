@@ -3,7 +3,7 @@
 
 #include "Vulkan.hpp"
 #include "VulkanContext.hpp"
-#include "Shader.hpp"
+#include "Shaders/Shader.hpp"
 #include "Utils.hpp"
 #include "Logging/Log.hpp"
 
@@ -269,7 +269,7 @@ namespace kbr::SkyboxUtils
 
 		vk::PipelineVertexInputStateCreateInfo emptyInputState{};
 
-		Shader genbrdflutShader("assets/shaders/genbrdflut.spv", "GenBRDFLUT");
+		Shader genbrdflutShader("genbrdflut", "GenBRDFLUT");
 		const auto shaderStages = genbrdflutShader.GetPipelineShaderStageCreateInfo();
 
 		vk::GraphicsPipelineCreateInfo pipelineInfo{};
@@ -716,7 +716,7 @@ namespace kbr::SkyboxUtils
 				.pVertexAttributeDescriptions = attributeDescs.data()
 			};
 
-			Shader irradianceCubeShader("assets/shaders/irradiancecube.spv", "IrradianceCube");
+			Shader irradianceCubeShader("irradiancecube", "IrradianceCube");
 			const auto shaderStages = irradianceCubeShader.GetPipelineShaderStageCreateInfo();
 
 			vk::GraphicsPipelineCreateInfo pipelineInfo{};
@@ -1264,7 +1264,7 @@ namespace kbr::SkyboxUtils
 				.pVertexAttributeDescriptions = attributeDescs.data()
 			};
 
-			Shader prefilterEnvMapShader("assets/shaders/prefilterenvmap.spv", "PrefilterEnvMap");
+			Shader prefilterEnvMapShader("prefilterenvmap", "PrefilterEnvMap");
 			const auto shaderStages = prefilterEnvMapShader.GetPipelineShaderStageCreateInfo();
 
 			vk::GraphicsPipelineCreateInfo pipelineInfo{};
