@@ -16,7 +16,11 @@ namespace kbr
 
 		static const char* GetCacheDirectory()
 		{
+#ifdef KBR_DEBUG
+			return "assets/cache/shaders/debug";
+#else
 			return "assets/cache/shaders";
+#endif
 		}
 
 		static void CreateCacheDirectoryIfNeeded()
@@ -85,11 +89,9 @@ namespace kbr
 
 		if (needsCompilation) 
 		{
-			throw std::runtime_error("Shader compilation is currently under development, please use compile_shaders.bat to compile shaders manually.");
-
 			try
 			{
-				m_SpirvCode = SlangCompiler::CompileToSpirv(m_Filepath, {});
+				m_SpirvCode = SlangCompiler::CompileToSpirv(m_Filepath);
 
 				std::ofstream outFile(cachedSpirvPath, std::ios::binary);
 				outFile.write(reinterpret_cast<const char*>(m_SpirvCode.data()), static_cast<std::streamsize>(m_SpirvCode.size() * sizeof(uint32_t)));
@@ -112,6 +114,11 @@ namespace kbr
 			std::memcpy(m_SpirvCode.data(), shaderCode.data(), shaderCode.size());
 		}
 		
+		if (m_SpirvCode.empty()) 
+		{
+			KBR_CORE_ERROR("Failed to load SPIR-V code for shader: {}", filepath.filename().string());
+			throw std::runtime_error("Failed to load SPIR-V code");
+		}
 
 		const vk::ShaderModuleCreateInfo shaderInfo{
 			.codeSize = m_SpirvCode.size() * sizeof(uint32_t),

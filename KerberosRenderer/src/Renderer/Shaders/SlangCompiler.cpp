@@ -28,10 +28,10 @@ namespace kbr
 
 		SessionDesc sessionDesc = {};
 
-		SlangProfileID profile = globalSession->findProfile("spirv_1_4");
+		const SlangProfileID profile = globalSession->findProfile("spirv_1_6");
 		if (profile == SLANG_PROFILE_UNKNOWN)
 		{
-			KBR_CORE_ERROR("Failed to find Slang profile 'spirv_1_4'");
+			KBR_CORE_ERROR("Failed to find Slang profile 'spirv_1_6'");
 			throw CompilationFailedException("Unknown Slang profile");
 		}
 
@@ -49,14 +49,18 @@ namespace kbr
 		std::vector<CompilerOptionEntry> compilerOptions;
 		compilerOptions.push_back({ .name = CompilerOptionName::EmitSpirvDirectly, .value = { .intValue0 = 1 } });
 		compilerOptions.push_back({ .name = CompilerOptionName::VulkanUseEntryPointName, .value = { .intValue0 = 1 } });
-		//compilerOptions.push_back({ .name = CompilerOptionName::VulkanEmitReflection, .value = { .intValue0 = 1 } });
+#ifdef KBR_DEBUG
+		compilerOptions.push_back({ .name = CompilerOptionName::VulkanEmitReflection, .value = { .intValue0 = 1 } });
 		//compilerOptions.push_back({ .name = CompilerOptionName::DebugInformation, .value = { .intValue0 = SLANG_DEBUG_INFO_LEVEL_MAXIMAL } });
+#endif
 		/*compilerOptions.push_back({ .name = CompilerOptionName::Capability, .value = {
 			.kind = CompilerOptionValueKind::String,
 			.stringValue0 = "vk_mem_model"
 		} });*/
 		sessionDesc.compilerOptionEntryCount = static_cast<uint32_t>(compilerOptions.size());
 		sessionDesc.compilerOptionEntries = compilerOptions.data();
+
+		sessionDesc.defaultMatrixLayoutMode = SLANG_MATRIX_LAYOUT_COLUMN_MAJOR;
 
 		Slang::ComPtr<ISession> session;
 		if (SLANG_FAILED(globalSession->createSession(sessionDesc, session.writeRef())))
@@ -73,7 +77,7 @@ namespace kbr
 			IO::ReadFileBlob(filepath),
 			diagnostics.writeRef());*/
 		const Slang::ComPtr<IModule> module(session->loadModule(moduleName.c_str(), moduleDiagnostics.writeRef()));
-		if (moduleDiagnostics)
+		if (moduleDiagnostics || !module)
 		{
 			KBR_CORE_ERROR("Shader compilation error: {}", static_cast<const char*>(moduleDiagnostics->getBufferPointer()));
 			throw CompilationFailedException("Shader compilation error: " + std::string(static_cast<const char*>(moduleDiagnostics->getBufferPointer())));
@@ -145,7 +149,7 @@ namespace kbr
 
 		Slang::ComPtr<IComponentType> linkedProgram;
 		Slang::ComPtr<ISlangBlob> linkDiagnostics;
-		program->link(linkedProgram.writeRef(), linkDiagnostics.writeRef());
+		program->linkWithOptions(linkedProgram.writeRef(), static_cast<uint32_t>(compilerOptions.size()), compilerOptions.data(), linkDiagnostics.writeRef());
 		if (linkDiagnostics)
 		{
 			KBR_CORE_ERROR("Shader linking error: {}", static_cast<const char*>(linkDiagnostics->getBufferPointer()));
@@ -172,7 +176,7 @@ namespace kbr
 		{
 			constexpr SlangInt targetIndex = 0;
 			Slang::ComPtr<IBlob> diagnosticsBlob;
-			SlangResult result = linkedProgram->getTargetCode(
+			const SlangResult result = linkedProgram->getTargetCode(
 				targetIndex,
 				spirvBlob.writeRef(),
 				diagnosticsBlob.writeRef());

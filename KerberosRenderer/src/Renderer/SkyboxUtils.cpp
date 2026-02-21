@@ -280,11 +280,11 @@ namespace kbr::SkyboxUtils
 		pipelineInfo.pViewportState = &viewportState;
 		pipelineInfo.pDepthStencilState = &depthStencilState;
 		pipelineInfo.pDynamicState = &dynamicStateInfo;
-		pipelineInfo.stageCount = 2;
+		pipelineInfo.stageCount = static_cast<uint32_t>(shaderStages.size());
 		pipelineInfo.pStages = shaderStages.data();
 		pipelineInfo.pVertexInputState = &emptyInputState;
 		pipelineInfo.layout = *pipelinelayout;
-		pipelineInfo.renderPass = renderpass;
+		pipelineInfo.renderPass = *renderpass;
 
 		vk::raii::Pipeline pipeline = device.createGraphicsPipeline(nullptr, pipelineInfo);
 		context.SetObjectDebugName(pipeline, "BRDFLUT_Pipeline");

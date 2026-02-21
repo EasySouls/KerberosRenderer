@@ -27,7 +27,12 @@ const std::vector<const char*> deviceExtensions = {
 	vk::KHRSwapchainExtensionName,
 	vk::KHRSpirv14ExtensionName,
 	vk::KHRSynchronization2ExtensionName,
-	vk::KHRCreateRenderpass2ExtensionName
+	vk::KHRCreateRenderpass2ExtensionName,
+#ifdef KBR_DEBUG
+	vk::KHRShaderNonSemanticInfoExtensionName,
+	vk::GOOGLEHlslFunctionality1ExtensionName,
+	vk::GOOGLEUserTypeExtensionName,
+#endif
 };
 
 #ifdef KBR_DEBUG
