@@ -15,7 +15,6 @@
 #include <optional>
 
 // Windows
-#define NOMINMAX
 #include <Windows.h>
 
 // Third-party

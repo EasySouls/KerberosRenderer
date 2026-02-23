@@ -181,6 +181,24 @@ namespace kbr
 		UpdateView();
 	}
 
+	void EditorCamera::SetRotation(const glm::vec3& rotation) 
+	{
+		m_Pitch = rotation.x;
+		m_Yaw = rotation.y;
+	}
+
+	void EditorCamera::Rotate(const float pitch, const float yaw) 
+	{
+		m_Pitch += pitch;
+		m_Yaw += yaw;
+	}
+
+	void EditorCamera::Rotate(const glm::vec3& axis, const float angle) 
+	{
+		m_Pitch += axis.x * angle;
+		m_Yaw += axis.y * angle;
+	}
+
 	void EditorCamera::OnMouseScrolled(const MouseScrolledEvent& mouseScrolled)
 	{
 		constexpr float sensitivity = 0.1f;

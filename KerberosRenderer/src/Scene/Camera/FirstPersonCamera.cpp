@@ -103,6 +103,30 @@ namespace kbr
 		m_ViewDirty = true;
 	}
 
+	void FirstPersonCamera::SetRotation(const glm::vec3& rotation) 
+	{
+		m_Pitch = rotation.x;
+		m_Yaw = rotation.y;
+
+		m_ViewDirty = true;
+	}
+
+	void FirstPersonCamera::Rotate(const float pitch, const float yaw) 
+	{
+		m_Pitch += pitch;
+		m_Yaw += yaw;
+
+		m_ViewDirty = true;
+	}
+
+	void FirstPersonCamera::Rotate(const glm::vec3& axis, const float angle) 
+	{
+		m_Pitch += axis.x * angle;
+		m_Yaw += axis.y * angle;
+
+		m_ViewDirty = true;
+	}
+
 	float FirstPersonCamera::GetDistance() const 
 	{
 		return 0.0f;

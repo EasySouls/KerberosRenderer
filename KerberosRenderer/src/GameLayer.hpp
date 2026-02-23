@@ -104,11 +104,13 @@ namespace Game
 		vk::raii::ImageView m_DepthImageView = nullptr;
 
 		vk::raii::DescriptorPool m_DescriptorPool = nullptr;
+
 		struct DescriptorSetLayouts
 		{
 			vk::raii::DescriptorSetLayout scene = nullptr;
 			vk::raii::DescriptorSetLayout textures = nullptr;
-		} m_DescriptorSetLayouts;
+		};
+		DescriptorSetLayouts m_DescriptorSetLayouts;
 
 		vk::raii::PipelineLayout m_PBRPipelineLayout = nullptr;
 		vk::raii::Pipeline m_PBROpaquePipeline = nullptr;
@@ -178,7 +180,7 @@ namespace Game
 
 		// Dynamic uniform buffer related members
 		VkDeviceSize m_MinUniformBufferOffsetAlignment = 0;
-		uint32_t m_DynamicAlignment = 0;
+		uint64_t m_DynamicAlignment = 0;
 		constexpr static size_t MaxObjects = 1000;
 	};
 

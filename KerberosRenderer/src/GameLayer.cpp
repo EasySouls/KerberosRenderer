@@ -50,7 +50,9 @@ namespace Game
 
 		m_Camera = std::make_unique<kbr::FirstPersonCamera>(45.0f, 16.0f / 9.0f, 0.1f, 1000.0f);
 		m_Camera->SetFlipY(true);
-		m_Camera->SetPosition(glm::vec3(0.0f, 15.0f, 45.0f));
+		m_Camera->SetPosition(glm::vec3(0.0f, 15.0f, -45.0f));
+		m_Camera->SetRotation(glm::vec3(0.0f, 90.0f, 0.0f));
+
 		m_ViewportSize = { 1280.0f, 720.0f };
 
 		m_MaterialRegistry.Add("Gold", std::make_shared<kbr::Material>("Gold", glm::vec3(1.0f, 0.765557f, 0.336057f), 0.1f, 1.0f));
@@ -132,7 +134,7 @@ namespace Game
 			.Rotation = glm::vec3(0.0f),
 			.Scale = glm::vec3(1.0f),
 			.Mesh = m_Meshes["sphere"],
-			.Material = stoneFloorMaterial,
+			.Material = m_MaterialRegistry.Get("Blue"),
 			.Name = "Sphere"
 		});
 
@@ -1064,7 +1066,7 @@ namespace Game
 		PrepareUniformBuffers();
 
 		auto& context = kbr::VulkanContext::Get();
-		auto& device = context.GetDevice();
+		const auto& device = context.GetDevice();
 
 		// Create samplers
 		{

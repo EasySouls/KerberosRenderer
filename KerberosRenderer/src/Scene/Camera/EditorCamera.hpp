@@ -19,6 +19,9 @@ namespace kbr
 		void OnEvent(const std::shared_ptr<Event>& event) override;
 
 		void SetPosition(const glm::vec3& position) override;
+		void SetRotation(const glm::vec3& rotation) override;
+		void Rotate(float pitch, float yaw) override;
+		void Rotate(const glm::vec3& axis, float angle) override;
 
 		float GetDistance() const override { return m_Distance; }
 		void SetDistance(const float distance) override { m_Distance = distance; }

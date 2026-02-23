@@ -22,7 +22,7 @@ struct SceneData
     float3 ambientLightColor;
     float3 camPos;
 };
-[[vk::binding(0)]]
+[[vk::binding(0, 0)]]
 ConstantBuffer<SceneData> scene;
 
 struct UBOParams {
@@ -30,7 +30,7 @@ struct UBOParams {
     float exposure;
     float gamma;
 };
-[[vk::binding(1)]]
+[[vk::binding(1, 0)]]
 ConstantBuffer<UBOParams> uboParams;
 
 struct Material {
@@ -44,17 +44,17 @@ struct PerObject {
     float4x4 worldNormal;
     Material material;
 };
-[[vk::binding(2)]]
+[[vk::binding(2, 0)]]
 ConstantBuffer<PerObject> perObject;
 
-[[vk::binding(3)]]
+[[vk::binding(3, 0)]]
 Sampler2D shadowMap;
 
-[[vk::binding(4)]]
+[[vk::binding(4, 0)]]
 SamplerCube samplerIrradiance;
-[[vk::binding(5)]]
+[[vk::binding(5, 0)]]
 Sampler2D samplerBRDFLUT;
-[[vk::binding(6)]]
+[[vk::binding(6, 0)]]
 SamplerCube prefilteredMapSampler;
 
 [SpecializationConstant] const int enablePCF = 0;

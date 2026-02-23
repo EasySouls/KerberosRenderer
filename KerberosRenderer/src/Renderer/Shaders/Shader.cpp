@@ -1,13 +1,13 @@
 #include "pch.hpp"
 #include "Shader.hpp"
 
-#include "io.hpp"
+#include "IO.hpp"
 #include "VulkanContext.hpp"
 
 #include <spirv_cross/spirv_cross.hpp>
 
 #include "SlangCompiler.hpp"
-#include "logging/Log.hpp"
+#include "Logging/Log.hpp"
 
 namespace kbr
 {

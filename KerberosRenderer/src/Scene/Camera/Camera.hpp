@@ -24,6 +24,9 @@ namespace kbr
 		virtual void OnEvent(const std::shared_ptr<Event>& event) = 0;
 
 		virtual void SetPosition(const glm::vec3& position) = 0;
+		virtual void SetRotation(const glm::vec3& rotation) = 0;
+		virtual void Rotate(float pitch, float yaw) = 0;
+		virtual void Rotate(const glm::vec3& axis, float angle) = 0;
 
 		virtual float GetDistance() const = 0;
 		virtual void SetDistance(float distance) = 0;
