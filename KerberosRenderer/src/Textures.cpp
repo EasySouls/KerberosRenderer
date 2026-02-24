@@ -282,7 +282,140 @@ namespace kbr
 	void Texture2D::FromBuffer(void* buffer, vk::DeviceSize bufferSize, vk::Format format, uint32_t texWidth,
 		uint32_t texHeight, vk::Filter filter, vk::ImageUsageFlags imageUsageFlags, vk::ImageLayout imageLayout) 
 	{
-		throw std::runtime_error("Texture2D::FromBuffer not implemented yet");
+		auto& context = VulkanContext::Get();
+		const auto& device = context.GetDevice();
+
+		width = texWidth;
+		height = texHeight;
+		mipLevels = 1; // TODO: Parameterize
+
+		// Use a separate command buffer for texture loading
+		vk::raii::CommandBuffer copyCmd = context.BeginSingleTimeCommands();
+
+		// Create a host-visible staging buffer that contains the raw image data
+		vk::BufferCreateInfo bufferCreateInfo{
+			.size = bufferSize,
+			.usage = vk::BufferUsageFlagBits::eTransferSrc,
+			.sharingMode = vk::SharingMode::eExclusive
+		};
+		vk::raii::Buffer stagingBuffer = device.createBuffer(bufferCreateInfo, nullptr);
+
+		// Get memory requirements for the staging buffer (alignment, memory type bits)
+		vk::MemoryRequirements memReqs = stagingBuffer.getMemoryRequirements();
+		vk::MemoryAllocateInfo memAllocInfo{
+			.allocationSize = memReqs.size,
+			// Get memory type index for a host visible buffer
+			.memoryTypeIndex = FindMemoryType(memReqs.memoryTypeBits, vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent)
+		};
+		vk::raii::DeviceMemory stagingMemory = device.allocateMemory(memAllocInfo, nullptr);
+		stagingBuffer.bindMemory(stagingMemory, 0);
+
+		// Copy texture data into staging buffer
+		uint8_t* data{ nullptr };
+		data = static_cast<uint8_t*>(stagingMemory.mapMemory(0, memReqs.size));
+		std::memcpy(data, buffer, bufferSize);
+		stagingMemory.unmapMemory();
+
+		// Setup buffer copy regions for each mip level
+		std::vector<vk::BufferImageCopy> bufferCopyRegions;
+
+		for (uint32_t i = 0; i < mipLevels; i++) {
+			VkDeviceSize offset = 0; // TODO: Calculate offset when mipmapping is enabled
+			vk::BufferImageCopy bufferCopyRegion{
+				.bufferOffset = offset,
+				.imageSubresource = {
+					.aspectMask = vk::ImageAspectFlagBits::eColor,
+					.mipLevel = i,
+					.baseArrayLayer = 0,
+					.layerCount = 1,
+				},
+				.imageExtent = {
+					.width = std::max(1u, texWidth >> i),
+					.height = std::max(1u, texHeight >> i),
+					.depth = 1
+				}
+			};
+			bufferCopyRegions.push_back(bufferCopyRegion);
+		}
+
+		// Create optimal tiled target image
+		vk::ImageCreateInfo imageCreateInfo{
+			.imageType = vk::ImageType::e2D,
+			.format = format,
+			.extent = {.width = width, .height = height, .depth = 1 },
+			.mipLevels = mipLevels,
+			.arrayLayers = 1,
+			.samples = vk::SampleCountFlagBits::e1,
+			.tiling = vk::ImageTiling::eOptimal,
+			.usage = imageUsageFlags,
+			.sharingMode = vk::SharingMode::eExclusive,
+			.initialLayout = vk::ImageLayout::eUndefined,
+		};
+		// Ensure that the TRANSFER_DST bit is set for staging
+		if (!(imageCreateInfo.usage & vk::ImageUsageFlagBits::eTransferDst)) {
+			imageCreateInfo.usage |= vk::ImageUsageFlagBits::eTransferDst;
+		}
+		image = device.createImage(imageCreateInfo, nullptr);
+		memReqs = image.getMemoryRequirements();
+		memAllocInfo.allocationSize = memReqs.size;
+		memAllocInfo.memoryTypeIndex = FindMemoryType(memReqs.memoryTypeBits, vk::MemoryPropertyFlagBits::eDeviceLocal);
+		deviceMemory = device.allocateMemory(memAllocInfo, nullptr);
+		image.bindMemory(deviceMemory, 0);
+
+		vk::ImageSubresourceRange subresourceRange{
+			.aspectMask = vk::ImageAspectFlagBits::eColor,
+			.baseMipLevel = 0,
+			.levelCount = mipLevels,
+			.layerCount = 1,
+		};
+
+		// Image barrier for optimal image (target)
+		// Optimal image will be used as destination for the copy
+		context.TransitionImageLayout(
+			copyCmd,
+			image,
+			vk::ImageLayout::eUndefined,
+			vk::ImageLayout::eTransferDstOptimal,
+			subresourceRange);
+
+		// Copy mip levels from staging buffer
+		copyCmd.copyBufferToImage(
+			stagingBuffer,
+			image,
+			vk::ImageLayout::eTransferDstOptimal,
+			bufferCopyRegions);
+
+		// Change texture image layout to shader read after all mip levels have been copied
+		this->imageLayout = imageLayout;
+		context.TransitionImageLayout(
+			copyCmd,
+			image,
+			vk::ImageLayout::eTransferDstOptimal,
+			imageLayout,
+			subresourceRange);
+
+		context.EndSingleTimeCommands(copyCmd);
+
+		// Create a default sampler
+		CreateSampler(device);
+
+		// Create image view
+		// Textures are not directly accessed by the shaders and
+		// are abstracted by image views containing additional
+		// information and sub resource ranges
+		vk::ImageViewCreateInfo viewCreateInfo{
+			.image = image,
+			.viewType = vk::ImageViewType::e2D,
+			.format = format,
+			.subresourceRange = {.aspectMask = vk::ImageAspectFlagBits::eColor, .baseMipLevel = 0, .levelCount = mipLevels, .baseArrayLayer = 0, .layerCount = 1 },
+		};
+		view = device.createImageView(viewCreateInfo);
+
+		// Update descriptor image info member that can be used for setting up descriptor sets
+		UpdateDescriptor();
+
+		const std::string debugName = "Texture from buffer"; // TODO: Have an option to set debug names for textures from a buffer
+		SetDebugName(debugName);
 	}
 
 	void Texture2DArray::LoadFromFile(const std::filesystem::path& filepath, vk::Format format,

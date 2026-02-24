@@ -85,6 +85,8 @@ namespace Game
 		m_Meshes["avocado"] = std::make_shared<kbr::Mesh>(kbr::ModelLoader::LoadModel("assets/models/avocado/Avocado.gltf", loadingFlags));
 		m_Meshes["cube"] = std::make_shared<kbr::Mesh>(kbr::ModelLoader::LoadModel("assets/models/cube.gltf", loadingFlags));
 		m_Meshes["sphere"] = std::make_shared<kbr::Mesh>(kbr::ModelLoader::LoadModel("assets/models/sphere.gltf", loadingFlags));
+		m_Meshes["cerberus"] = std::make_shared<kbr::Mesh>(kbr::ModelLoader::LoadModel("assets/models/cerberus/cerberus.gltf", loadingFlags));
+
 
 		KBR_CORE_INFO("Loaded {} mesh(es)!", m_Meshes.size());
 
@@ -95,6 +97,12 @@ namespace Game
 			{ "assets/textures/stonefloor01_normal_rgba.ktx", vk::Format::eR8G8B8A8Unorm },
 			{ "assets/textures/stonefloor02_color_rgba.ktx", vk::Format::eR8G8B8A8Srgb },
 			{ "assets/textures/stonefloor02_normal_rgba.ktx", vk::Format::eR8G8B8A8Unorm },
+
+			{ "assets/models/cerberus/albedo.ktx", vk::Format::eR8G8B8A8Unorm },
+			{ "assets/models/cerberus/normal.ktx", vk::Format::eR8G8B8A8Unorm },
+			{ "assets/models/cerberus/ao.ktx", vk::Format::eR8Unorm },
+			{ "assets/models/cerberus/metallic.ktx", vk::Format::eR8Unorm },
+			{ "assets/models/cerberus/roughness.ktx", vk::Format::eR8Unorm },
 		};
 
 		m_Textures.reserve(textureFiles.size());
@@ -147,10 +155,21 @@ namespace Game
 			.Name = "Floor"
 		});
 
+		m_SceneNodes.push_back(new kbr::Node{
+			.Position = glm::vec3(-8.0f, 10.0f, 8.0f),
+			.Rotation = glm::vec3(-1.6f, 1.4, 0.0),
+			.Scale = glm::vec3(8.0f),
+			.Mesh = m_Meshes["cerberus"],
+			.Material = stoneFloor2Material,
+			.Name = "Revolver"
+		});
+
 		// Setup initial directional light which we will use to generate the shadow map
 		m_UniformDataParams.lights[0] = glm::vec4(0.0f, 1.0f, 0.0f, 0.0f);
 
 		CreateVulkanResources();
+
+		m_MaterialRegistry.SetupDescriptorSets(m_DescriptorSetLayouts.textures);
 
 		KBR_CORE_INFO("Prepared Vulkan resources!");
 	}
@@ -447,7 +466,7 @@ namespace Game
 					vk::PipelineBindPoint::eGraphics,
 					*m_PBRPipelineLayout,
 					0,
-					*m_DescriptorSets[currentImage].scene,
+					{ m_DescriptorSets[currentImage].scene, node->Material->DescriptorSet },
 					{ dynamicOffset });
 
 				node->Mesh->Draw(cmd);
@@ -861,10 +880,49 @@ namespace Game
 			.pBindings = bindings.data()
 		};
 
+
 		m_DescriptorSetLayouts.scene = vk::raii::DescriptorSetLayout{ device, layoutInfo };
 		context.SetObjectDebugName(m_DescriptorSetLayouts.scene,"PBR Descriptor Set Layout");
 
-		m_DescriptorSetLayouts.textures = vk::raii::DescriptorSetLayout{ device, layoutInfo };
+		std::vector<vk::DescriptorSetLayoutBinding> textureBindings = {
+			vk::DescriptorSetLayoutBinding{ // Albedo map
+				.binding = 0,
+				.descriptorType = vk::DescriptorType::eCombinedImageSampler,
+				.descriptorCount = 1,
+				.stageFlags = vk::ShaderStageFlagBits::eFragment,
+			},
+			vk::DescriptorSetLayoutBinding{ // Normal map
+				.binding = 1,
+				.descriptorType = vk::DescriptorType::eCombinedImageSampler,
+				.descriptorCount = 1,
+				.stageFlags = vk::ShaderStageFlagBits::eFragment,
+			},
+			//vk::DescriptorSetLayoutBinding{ // Ambient occlusion map
+			//	.binding = 2,
+			//	.descriptorType = vk::DescriptorType::eCombinedImageSampler,
+			//	.descriptorCount = 1,
+			//	.stageFlags = vk::ShaderStageFlagBits::eFragment,
+			//},
+			//vk::DescriptorSetLayoutBinding{ // Metallic map
+			//	.binding = 3,
+			//	.descriptorType = vk::DescriptorType::eCombinedImageSampler,
+			//	.descriptorCount = 1,
+			//	.stageFlags = vk::ShaderStageFlagBits::eFragment,
+			//},
+			//vk::DescriptorSetLayoutBinding{ // Roughness map
+			//	.binding = 4,
+			//	.descriptorType = vk::DescriptorType::eCombinedImageSampler,
+			//	.descriptorCount = 1,
+			//	.stageFlags = vk::ShaderStageFlagBits::eFragment,
+			//},
+		};
+
+		const vk::DescriptorSetLayoutCreateInfo textureLayoutInfo{
+			.bindingCount = static_cast<uint32_t>(textureBindings.size()),
+			.pBindings = textureBindings.data()
+		};
+
+		m_DescriptorSetLayouts.textures = vk::raii::DescriptorSetLayout{ device, textureLayoutInfo };
 		context.SetObjectDebugName(m_DescriptorSetLayouts.textures, "Texture Descriptor Set Layout");
 
 		const std::array<vk::DescriptorSetLayout, 2> setLayouts = {
@@ -1481,7 +1539,7 @@ namespace Game
 				.depthAttachmentFormat = depthFormat
 			};
 
-			kbr::Shader pbrShader("pbrbasic", "PBR");
+			kbr::Shader pbrShader("pbrtextured", "PBR");
 			auto shaderStages = pbrShader.GetPipelineShaderStageCreateInfo();
 
 			vk::GraphicsPipelineCreateInfo opaquePipelineInfo{

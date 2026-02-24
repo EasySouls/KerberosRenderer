@@ -18,9 +18,9 @@ namespace kbr
 		glm::vec3 Rotation{ 0.0f, 0.0f, 0.0f };
 		glm::vec3 Scale{1.0f};
 
-		std::shared_ptr<Mesh> Mesh = nullptr;
+		Ref<Mesh> Mesh = nullptr;
 		// TODO: store this on the mesh, or if it has submeshes, store per-submesh materials
-		std::shared_ptr<Material> Material = nullptr; 
+		Ref<Material> Material = nullptr; 
 
 		std::string Name;
 

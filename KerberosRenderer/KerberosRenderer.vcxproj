@@ -312,6 +312,7 @@ _DISABLE_VECTOR_ANNOTATION=1</PreprocessorDefinitions>
     <None Include="assets\shaders\irradiancecube.slang" />
     <None Include="assets\shaders\normaldebug.slang" />
     <None Include="assets\shaders\pbrbasic.slang" />
+    <None Include="assets\shaders\pbrtextured.slang" />
     <None Include="assets\shaders\prefilterenvmap.slang" />
     <None Include="assets\shaders\shadowmap.slang" />
     <None Include="assets\shaders\skybox.slang" />

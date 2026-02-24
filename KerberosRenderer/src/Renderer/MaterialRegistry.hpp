@@ -18,6 +18,8 @@ namespace kbr
 		const Ref<Material>& AddAndRetrieve(const std::string& name, const Material& mat);
 		const Ref<Material>& AddAndRetrieve(const std::string& name, const Ref<Material>& mat);
 
+		void SetupDescriptorSets(const vk::raii::DescriptorSetLayout& setLayout);
+
 		const Ref<Material>& Get(const std::string& name) const;
 		Ref<Material>& Get(const std::string& name);
 
@@ -27,6 +29,18 @@ namespace kbr
 		std::unordered_map<std::string, Ref<Material>>::iterator end() { return m_Materials.end(); }
 
 	private:
+		void RecreateDescriptorPoolIfNeeded();
+
+	private:
 		std::unordered_map<std::string, Ref<Material>> m_Materials;
+
+		vk::raii::DescriptorPool m_TextureDescriptorPool = nullptr;
+		uint32_t m_PoolSize = 0;
+
+		uint32_t m_TexturePerMaterial = 5;
+
+		// TODO: Move from here
+		Texture2D m_AlbedoPlaceholder;
+		Texture2D m_NormalPlaceholder;
 	};
 }

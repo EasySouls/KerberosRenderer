@@ -11,7 +11,7 @@ namespace kbr
 	void Log::Init()
 	{
 		// [Timestamp] [name of logger]: [message]
-		spdlog::set_pattern("%^[%T] %n: %v%$");
+		spdlog::set_pattern("%^[%T] %n: %v%$\n");
 
 		auto coreConsoleSink = std::make_shared<spdlog::sinks::stdout_color_sink_mt>();
 		coreConsoleSink->set_level(spdlog::level::trace);

@@ -115,6 +115,7 @@ namespace Game
 		vk::raii::PipelineLayout m_PBRPipelineLayout = nullptr;
 		vk::raii::Pipeline m_PBROpaquePipeline = nullptr;
 		vk::raii::Pipeline m_PBROpaquePipelinePCF = nullptr;
+		//vk::raii::Pipeline m_PBROpaqueTexturedPipeline = nullptr;
 		vk::raii::Pipeline m_PBRTransparentPipeline = nullptr;
 		vk::raii::Pipeline m_SkyboxPipeline = nullptr;
 		vk::raii::Pipeline m_NormalDebugPipeline = nullptr;

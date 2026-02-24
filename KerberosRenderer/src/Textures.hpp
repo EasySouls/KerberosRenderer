@@ -65,8 +65,8 @@ namespace kbr
 			void* buffer,
 			vk::DeviceSize       bufferSize,
 			vk::Format           format,
-			uint32_t           texWidth,
-			uint32_t           texHeight,
+			uint32_t             texWidth,
+			uint32_t             texHeight,
 			vk::Filter           filter = vk::Filter::eLinear,
 			vk::ImageUsageFlags  imageUsageFlags = vk::ImageUsageFlagBits::eSampled,
 			vk::ImageLayout      imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal);

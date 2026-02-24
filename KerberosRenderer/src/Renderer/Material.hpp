@@ -1,7 +1,7 @@
 #pragma once
 
-#include "Textures.hpp"
 #include "Vulkan.hpp"
+#include "Textures.hpp"
 
 #include <glm/vec3.hpp>
 
@@ -25,7 +25,7 @@ namespace kbr
 		std::shared_ptr<Texture2D> AlbedoTexture = nullptr;
 		std::shared_ptr<Texture2D> NormalTexture = nullptr;
 
-		vk::DescriptorSet DescriptorSet = nullptr;
+		vk::raii::DescriptorSet DescriptorSet{ nullptr };
 
 		bool IsTransparent() const 
 		{
@@ -50,6 +50,27 @@ namespace kbr
 			Params.roughness = r;
 			Params.metallic = m;
 			Params.albedo = c;
+		}
+
+		Material(const Material& other)
+			: Params(other.Params)
+			, name(other.name)
+			, AlbedoTexture(other.AlbedoTexture)
+			, NormalTexture(other.NormalTexture) 
+		{
+		}
+
+		Material& operator=(const Material& other)
+		{
+			if (this != &other)
+			{
+				Params = other.Params;
+				name = other.name;
+				AlbedoTexture = other.AlbedoTexture;
+				NormalTexture = other.NormalTexture;
+				// DescriptorSet intentionally not copied
+			}
+			return *this;
 		}
 	};
 }

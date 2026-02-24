@@ -301,5 +301,6 @@
     <None Include="assets\shaders\irradiancecube.slang" />
     <None Include="assets\shaders\prefilterenvmap.slang" />
     <None Include="assets\shaders\normaldebug.slang" />
+    <None Include="assets\shaders\pbrtextured.slang" />
   </ItemGroup>
 </Project>
