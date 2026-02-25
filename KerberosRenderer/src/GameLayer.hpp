@@ -7,6 +7,7 @@
 #include "Buffer.hpp"
 #include "Textures.hpp"
 #include "Renderer/Material.hpp"
+#include "Core/Core.hpp"
 #include "Scene/Node.hpp"
 #include "Scene/Camera/Camera.hpp"
 #include "Renderer/MaterialRegistry.hpp"
@@ -69,7 +70,7 @@ namespace Game
 		std::vector<std::shared_ptr<kbr::Texture2D>> m_Textures;
 		int m_SelectedMaterialIndex = 0;
 
-		std::vector<kbr::Node*> m_SceneNodes;
+		std::vector<kbr::Owner<kbr::Node>> m_SceneNodes;
 
 		kbr::MaterialRegistry m_MaterialRegistry;
 

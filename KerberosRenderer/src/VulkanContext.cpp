@@ -196,6 +196,11 @@ namespace kbr
 			.pSignalSemaphores = &*renderFinishedSemaphores[imageIndex] };
 
 		graphicsQueue.submit(submitInfo, *inFlightFences[frameIndex]);
+
+		// Refrech the memory budget info
+		// In the future it might be enough to call this from the client, since we do not need to update the memory budget info every frame,
+		// only when we create or destroy resources, or the memory usage window is opened
+		m_MemoryBudget.UpdateMemoryBudgetInfo();
 	}
 
 	void VulkanContext::Present() 
@@ -493,6 +498,11 @@ namespace kbr
 
 		device.setDebugUtilsObjectNameEXT(nameInfo);
 #endif
+	}
+
+	MemoryBudgetInfo VulkanContext::GetMemoryBudgetInfo() const 
+	{
+		return m_MemoryBudget.GetMemoryBudgetInfo();
 	}
 
 	vk::raii::Device& VulkanContext::GetDevice() 

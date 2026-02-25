@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Vulkan.hpp"
+#include "Utils/MemoryBudget.hpp"
 
 #include <vector>
 
@@ -63,6 +64,8 @@ namespace kbr
 				name
 			);
 		}
+
+		MemoryBudgetInfo GetMemoryBudgetInfo() const;
 
 		vk::raii::Device& GetDevice();
 		vk::raii::PhysicalDevice& GetPhysicalDevice();
@@ -168,6 +171,8 @@ namespace kbr
 
 		uint32_t frameIndex = 0;
 		uint32_t currentImageIndex = 0;
+
+		MemoryBudget m_MemoryBudget;
 
 		// Singleton instance
 		static VulkanContext* s_Instance;

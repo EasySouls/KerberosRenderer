@@ -31,11 +31,6 @@ namespace Game
 
 	GameLayer::~GameLayer() 
 	{
-		for (const auto& node : m_SceneNodes)
-		{
-			delete node;
-		}
-
 		m_SceneNodes.clear();
 		
 		kbr::VulkanContext::Get().WaitIdle();
@@ -119,50 +114,50 @@ namespace Game
 		const auto& stoneFloorMaterial = m_MaterialRegistry.AddAndRetrieve("Stone Floor", std::make_shared<kbr::Material>("Stone Floor", glm::vec3(1.0f), 0.8f, 0.05f, m_Textures[2], m_Textures[3]));
 		const auto& stoneFloor2Material = m_MaterialRegistry.AddAndRetrieve("Stone Floor 2", std::make_shared<kbr::Material>("Stone Floor 2", glm::vec3(0.4, 0.15f, 0.0f), 1.0f, 0.0f, m_Textures[4], m_Textures[5]));
 
-		m_SceneNodes.push_back(new kbr::Node{
+		m_SceneNodes.push_back(kbr::CreateOwner<kbr::Node>(kbr::Node{
 			.Position = glm::vec3(6.0f, 9.5f, 0.0f),
 			.Rotation = glm::vec3(0.0f),
 			.Scale = glm::vec3(50.0f),
 			.Mesh = m_Meshes["avocado"],
 			.Material = avocadoMaterial,
 			.Name = "Avocado"
-		});
+		}));
 
-		m_SceneNodes.push_back(new kbr::Node{
+		m_SceneNodes.push_back(kbr::CreateOwner<kbr::Node>(kbr::Node{
 			.Position = glm::vec3(2.0f, 0.0f, 0.0f),
 			.Rotation = glm::vec3(0.0f),
 			.Scale = glm::vec3(1.0f),
 			.Mesh = m_Meshes["cube"],
 			.Material = stoneFloorMaterial,
 			.Name = "Cube"
-		});
+		}));
 
-		m_SceneNodes.push_back(new kbr::Node{
+		m_SceneNodes.push_back(kbr::CreateOwner<kbr::Node>(kbr::Node{
 			.Position = glm::vec3(2.0f, 6.0f, 3.0f),
 			.Rotation = glm::vec3(0.0f),
 			.Scale = glm::vec3(1.0f),
 			.Mesh = m_Meshes["sphere"],
 			.Material = m_MaterialRegistry.Get("Blue"),
 			.Name = "Sphere"
-		});
+		}));
 
-		m_SceneNodes.push_back(new kbr::Node{
+		m_SceneNodes.push_back(kbr::CreateOwner<kbr::Node>(kbr::Node{
 			.Position = glm::vec3(2.0f, -10.0f, 3.0f),
 			.Rotation = glm::vec3(0.0f),
 			.Scale = glm::vec3(20.0f, 0.1f, 20.0f),
 			.Mesh = m_Meshes["cube"],
 			.Material = stoneFloor2Material,
 			.Name = "Floor"
-		});
+		}));
 
-		m_SceneNodes.push_back(new kbr::Node{
+		m_SceneNodes.push_back( kbr::CreateOwner<kbr::Node>(kbr::Node{
 			.Position = glm::vec3(-8.0f, 10.0f, 8.0f),
 			.Rotation = glm::vec3(-1.6f, 1.4, 0.0),
 			.Scale = glm::vec3(8.0f),
 			.Mesh = m_Meshes["cerberus"],
 			.Material = stoneFloor2Material,
 			.Name = "Revolver"
-		});
+		}));
 
 		// Setup initial directional light which we will use to generate the shadow map
 		m_UniformDataParams.lights[0] = glm::vec4(0.0f, 1.0f, 0.0f, 0.0f);
@@ -710,6 +705,32 @@ namespace Game
 		ImGui::Checkbox("Display Skybox", &m_DisplaySkybox);
 		ImGui::Checkbox("Display normals", &m_DisplayDebugNormals);
 		ImGui::Checkbox("Enable PCF", &m_EnablePCF);
+
+		ImGui::Separator();
+
+		const auto memoryBudgetInfo = kbr::VulkanContext::Get().GetMemoryBudgetInfo();
+
+		auto convertedMemory = kbr::MemoryBudget::ConvertBytes(memoryBudgetInfo.DeviceMemoryTotalUsage);
+		ImGui::Text("Total memory usage: %.2f %s", convertedMemory.data, convertedMemory.units.c_str());
+
+		convertedMemory = kbr::MemoryBudget::ConvertBytes(memoryBudgetInfo.DeviceMemoryTotalBudget);
+		ImGui::Text("Total memory budget: %.2f %s", convertedMemory.data, convertedMemory.units.c_str());
+		if (ImGui::CollapsingHeader("Detailed Memory Usage"))
+		{
+			for (int i = 0; i < static_cast<int>(memoryBudgetInfo.DeviceMemoryHeapCount); i++)
+			{
+				std::string header = "Memory Heap Index: " + std::to_string(i);
+				if (ImGui::CollapsingHeader(header.c_str()))
+				{
+					convertedMemory = kbr::MemoryBudget::ConvertBytes(memoryBudgetInfo.MemoryBudgetProps.heapUsage[i]);
+					ImGui::Text("Usage: %.2f %s", convertedMemory.data, convertedMemory.units.c_str());
+
+					convertedMemory = kbr::MemoryBudget::ConvertBytes(memoryBudgetInfo.MemoryBudgetProps.heapBudget[i]);
+					ImGui::Text("Budget: %.2f %s", convertedMemory.data, convertedMemory.units.c_str());
+					ImGui::Text("Heap Flag: %s", kbr::MemoryBudget::ReadMemoryHeapFlags(memoryBudgetInfo.DeviceMemoryProps.memoryHeaps[i].flags).c_str());
+				}
+			}
+		}
 
 		ImGui::End();
 
