@@ -1,7 +1,0 @@
-<Solution>
-  <Configurations>
-    <Platform Name="x64" />
-    <Platform Name="x86" />
-  </Configurations>
-  <Project Path="KerberosRenderer/KerberosRenderer.vcxproj" Id="a95a77f6-b2dc-4620-89d2-fe685b0995d6" />
-</Solution>

@@ -361,3 +361,12 @@ MigrationBackup/
 
 # Fody - auto-generated XML schema
 FodyWeavers.xsd
+
+# Ignore compiled shaders
+*.spv
+
+# CMake build directories
+build/
+
+# Editor cache
+KerberosEditor/Assets/Cache
