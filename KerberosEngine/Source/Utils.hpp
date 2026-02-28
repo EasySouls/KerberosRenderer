@@ -1,0 +1,46 @@
+#pragma once
+
+#include "Vulkan.hpp"
+#include "VulkanContext.hpp"
+
+namespace Kerberos {
+
+inline uint32_t FindMemoryType(const uint32_t typeFilter, const vk::MemoryPropertyFlags properties)
+{
+	const VulkanContext& context = VulkanContext::Get();
+	const vk::PhysicalDeviceMemoryProperties memProperties = context.GetMemoryProperties();
+
+	for (uint32_t i = 0; i < memProperties.memoryTypeCount; ++i)
+	{
+		if ((typeFilter & (1 << i)) && (memProperties.memoryTypes[i].propertyFlags & properties) == properties)
+		{
+			return i;
+		}
+	}
+
+	throw std::runtime_error("Failed to find suitable memory type!");
+}
+
+inline vk::Format FindSupportedFormat(
+	const std::vector<vk::Format>& candidates,
+	const vk::ImageTiling tiling,
+	const vk::FormatFeatureFlags features)
+{
+	for (const vk::Format format : candidates)
+	{
+		const VulkanContext& context = VulkanContext::Get();
+		const vk::FormatProperties props = context.GetFormatProperties(format);
+
+		if (tiling == vk::ImageTiling::eLinear && (props.linearTilingFeatures & features) == features)
+		{
+			return format;
+		}
+		if (tiling == vk::ImageTiling::eOptimal && (props.optimalTilingFeatures & features) == features)
+		{
+			return format;
+		}
+	}
+	throw std::runtime_error("Failed to find supported format!");
+}
+
+}

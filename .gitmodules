@@ -1,3 +1,28 @@
-[submodule "KerberosRenderer/vendor/ktx"]
-	path = KerberosRenderer/vendor/ktx
+[submodule "KerberosEngine/ThirdParty/ktx"]
+	path = KerberosEngine/ThirdParty/ktx
 	url = https://github.com/KhronosGroup/KTX-Software
+[submodule "KerberosEngine/ThirdParty/imgui"]
+	path = KerberosEngine/ThirdParty/imgui
+	url = https://github.com/ocornut/imgui
+	branch = docking
+[submodule "KerberosEngine/ThirdParty/JoltPhysics"]
+	path = KerberosEngine/ThirdParty/JoltPhysics
+	url = https://github.com/jrouwe/JoltPhysics
+[submodule "KerberosEngine/ThirdParty/yaml-cpp"]
+	path = KerberosEngine/ThirdParty/yaml-cpp
+	url = https://github.com/jbeder/yaml-cpp.git
+[submodule "KerberosEngine/ThirdParty/ImGuizmo"]
+	path = KerberosEngine/ThirdParty/ImGuizmo
+	url = https://github.com/CedricGuillemet/ImGuizmo.git
+[submodule "KerberosEngine/ThirdParty/Assimp"]
+	path = KerberosEngine/ThirdParty/Assimp
+	url = https://github.com/assimp/assimp.git
+[submodule "KerberosEngine/ThirdParty/msdf-atlas-gen"]
+	path = KerberosEngine/ThirdParty/msdf-atlas-gen
+	url = https://github.com/Chlumsky/msdf-atlas-gen
+[submodule "KerberosEngine/ThirdParty/freetype"]
+	path = KerberosEngine/ThirdParty/freetype
+	url = https://github.com/freetype/freetype.git
+[submodule "KerberosEngine/ThirdParty/entt"]
+	path = KerberosEngine/ThirdParty/entt
+	url = https://github.com/skypjack/entt.git
