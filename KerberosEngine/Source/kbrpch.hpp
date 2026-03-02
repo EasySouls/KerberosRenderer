@@ -31,3 +31,4 @@
 #include <glm/gtc/type_ptr.hpp>
 
 #include "Core/Core.hpp"
+#include "Debug/Instrumentor.hpp"

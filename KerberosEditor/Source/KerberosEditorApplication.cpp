@@ -30,7 +30,9 @@ namespace Kerberos
 
 		// Workaround for the fact that the editor is launched inside CMake's build	directory.
 		// We have to go back to the project root directory so the editor can find the assets and other files it needs.
-		const std::filesystem::path projectRoot = std::filesystem::current_path()
+		const std::filesystem::path exeDir = std::filesystem::current_path();
+		const std::filesystem::path projectRoot = exeDir
+			.parent_path()
 			.parent_path()
 			.parent_path()
 			.parent_path()

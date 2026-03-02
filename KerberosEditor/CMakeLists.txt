@@ -2,9 +2,9 @@ project(KerberosEditor)
 
 add_executable(KerberosEditor)
 
-file(GLOB_RECURSE EDITOR_SRC
+file(GLOB_RECURSE EDITOR_SRC CMAKE_CONFIGURE_DEPENDS
     Source/*.cpp
-    Source/*.h
+    Source/*.hpp
 )
 
 source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}/Source" PREFIX "Source" FILES ${EDITOR_SRC})
@@ -12,7 +12,8 @@ source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}/Source" PREFIX "Source" FILES ${E
 target_sources(KerberosEditor PRIVATE ${EDITOR_SRC})
 
 target_include_directories(KerberosEditor PRIVATE
-    ${CMAKE_SOURCE_DIR}/KerberosEngine/Source
+    ${CMAKE_CURRENT_SOURCE_DIR}/Source
+    # ${CMAKE_SOURCE_DIR}/KerberosEngine/Source
 )
 
 target_link_libraries(KerberosEditor PRIVATE

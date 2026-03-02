@@ -43,6 +43,9 @@ namespace Kerberos
 			KBR_CORE_WARN("No working directory specified, using current path: {0}", std::filesystem::current_path().string());
 		}
 
+		m_AudioManager = CreateOwner<AudioManager>(AudioManager::Create());
+		m_AudioManager->Init();
+
 		// Initialize GLFW
 		if (!glfwInit())
 		{

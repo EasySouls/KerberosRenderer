@@ -6,16 +6,16 @@ add_subdirectory(ThirdParty)
 add_library(KerberosEngine STATIC)
 
 # Collect only Source files
-file(GLOB_RECURSE ENGINE_SRC
-    Source/*.cpp
-    Source/*.h
-    Source/*.hpp
-    Source/*.ixx
+file(GLOB_RECURSE ENGINE_SRC CMAKE_CONFIGURE_DEPENDS
+    Source/**.cpp
+    Source/**.hpp
+    Source/**.ixx
+    Source/**.h
 )
 
 source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}/Source" PREFIX "Source" FILES ${ENGINE_SRC})
 
-target_sources(KerberosEngine PRIVATE ${ENGINE_SRC})
+target_sources(KerberosEngine PRIVATE ${ENGINE_SRC} "Source/Assets/AssetRegistry.cpp" "Source/Assets/EditorAssetManager.cpp" "Source/Assets/RuntimeAssetManager.cpp" "Source/Assets/Importers/AssetImporter.cpp" "Source/Audio/Sound.cpp" "Source/Audio/AudioManager.cpp" "Source/Audio/Windows/XAudio2AudioManager.cpp" "Source/Assets/Importers/SoundImporter.cpp" "Source/Assets/Importers/TextureImporter.cpp" "Source/Utils/Windows/WindowsSystemOperations.cpp" "Source/Assets/Importers/CubemapImporter.cpp" "Source/Assets/Importers/MeshImporter.cpp")
 
 # Precompiled header
 target_precompile_headers(KerberosEngine PRIVATE Source/kbrpch.hpp)
@@ -24,7 +24,7 @@ target_precompile_headers(KerberosEngine PRIVATE Source/kbrpch.hpp)
 target_include_directories(KerberosEngine
     PUBLIC
         ${CMAKE_CURRENT_SOURCE_DIR}/Source
-        ${CMAKE_CURRENT_SOURCE_DIR}/ThirdParty/
+        ${CMAKE_CURRENT_SOURCE_DIR}/ThirdParty
         ${KBR_VULKAN_DIR}/Include # This shouldn't be public in the future
     PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/ThirdParty/imgui
@@ -35,7 +35,7 @@ target_include_directories(KerberosEngine
 )
 
 # Definitions
-target_compile_definitions(KerberosEngine PRIVATE
+target_compile_definitions(KerberosEngine PUBLIC
     _CRT_SECURE_NO_WARNINGS
     GLFW_INCLUDE_NONE
     IMGUI_DOCKING_BRANCH

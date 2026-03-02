@@ -2,6 +2,7 @@
 
 #include "VulkanContext.hpp"
 #include "Events/Event.hpp"
+#include "Audio/AudioManager.hpp"
 #include "Logging/Log.hpp"
 #include "Layer.hpp"
 
@@ -59,13 +60,16 @@ namespace Kerberos
 		}
 
 		static Application& Get() { return *s_Instance; }
+
 		GLFWwindow* GetWindow() const { return m_Window; }
+		AudioManager* GetAudioManager() const { return m_AudioManager.get(); }
 
 	private:
 		ApplicationSpecification m_Specification;
 
 		GLFWwindow* m_Window;
-		std::unique_ptr<VulkanContext> m_VulkanContext;
+		Owner<VulkanContext> m_VulkanContext;
+		Owner<AudioManager> m_AudioManager;
 
 		std::vector<std::unique_ptr<Layer>> m_Layers;
 		float m_LastFrameTime = 0.0f;

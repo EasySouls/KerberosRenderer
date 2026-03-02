@@ -9,11 +9,16 @@ struct GLFWwindow;
 
 namespace Kerberos
 {
-	class VulkanContext
+	class VulkanContext final
 	{
 	public:
 		explicit VulkanContext(GLFWwindow* window);
-		virtual ~VulkanContext();
+		~VulkanContext();
+
+		VulkanContext(const VulkanContext& other) = delete;
+		VulkanContext(VulkanContext&& other) noexcept = delete;
+		VulkanContext& operator=(const VulkanContext& other) = delete;
+		VulkanContext& operator=(VulkanContext&& other) noexcept = delete;
 
 		void PrepareImGuiFrame();
 		void RenderImGui();

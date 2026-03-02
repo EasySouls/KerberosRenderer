@@ -1,7 +1,7 @@
 #pragma once
 
 #include "Vulkan.hpp"
-#include "Vertex.hpp"
+#include "Renderer/Vertex.hpp"
 #include "Buffer.hpp"
 
 #include <vector>
