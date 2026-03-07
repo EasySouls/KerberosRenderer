@@ -4,6 +4,8 @@
 #include "Utils.hpp"
 #include "VulkanContext.hpp"
 
+// TODO: Use VMA
+
 void CreateBuffer(
 	const vk::raii::Device& device,
 	const vk::DeviceSize size,

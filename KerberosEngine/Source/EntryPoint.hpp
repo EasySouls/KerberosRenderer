@@ -10,7 +10,7 @@ namespace Kerberos
 	extern Application* CreateApplication(ApplicationCommandLineArgs args);
 }
 
-inline int main(const int argc, char** argv)
+int main(const int argc, char** argv)
 {
 	Kerberos::Log::Init();
 	KBR_CORE_INFO("Core logger initialized");

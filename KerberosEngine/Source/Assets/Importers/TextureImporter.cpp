@@ -1,7 +1,29 @@
 #include "kbrpch.hpp"
 #include "TextureImporter.hpp"
+#include "Renderer/Textures/Texture2D.hpp"
 
 #include <stb_image.h>
+
+#include <unordered_set>
+
+namespace 
+{
+	const std::unordered_set<std::string> SupportedExtensions = { ".png", ".jpg", ".jpeg", ".ktx", ".ktx2" };
+
+	bool IsExtensionSupported(const std::filesystem::path& filepath)
+	{
+		const auto extension = filepath.extension().string();
+		std::transform(extension.begin(), extension.end(), extension.begin(), ::tolower);
+		return SupportedExtensions.contains(extension);
+	}
+
+	bool IsKTXFormat(const std::filesystem::path& filepath)
+	{
+		const auto extension = filepath.extension().string();
+		std::transform(extension.begin(), extension.end(), extension.begin(), ::tolower);
+		return extension == ".ktx" || extension == ".ktx2";
+	}
+}
 
 namespace Kerberos
 {
@@ -14,16 +36,34 @@ namespace Kerberos
 	{
 		KBR_PROFILE_FUNCTION();
 
-		const auto [spec, data] = LoadTextureData(filepath, true);
+		const auto extension = filepath.extension();
+		if (!IsExtensionSupported(filepath))
+		{
+			KBR_CORE_ERROR("TextureImporter::ImportTexture - unsupported texture file format: {}", extension.string());
+			KBR_CORE_ASSERT(false, "TextureImporter::ImportTexture - unsupported texture file format: {}", extension.string());
+			return nullptr;
+		}
 
-		auto texture = Texture2D::Create(spec, data);
+		if (IsKTXFormat(filepath))
+		{
+			const Ref<Texture2D> texture = CreateRef<Texture2D>(filepath);
 
-		const std::string name = filepath.filename().string();
-		texture->SetDebugName(name);
+			const std::string name = filepath.filename().string();
+			//texture->SetDebugName(name);
+		}
+		else
+		{
+			const auto [spec, data] = LoadTextureData(filepath, true);
 
-		stbi_image_free(data.Data);
+			auto texture = CreateRef<Texture2D>(spec, data);
 
-		return texture;
+			const std::string name = filepath.filename().string();
+			//texture->SetDebugName(name);
+
+			stbi_image_free(data.Data);
+
+			return texture;
+		}
 	}
 
 	std::pair<TextureSpecification, Buffer> TextureImporter::LoadTextureData(const std::filesystem::path& filepath, const bool flip, const int desiredChannels)

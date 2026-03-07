@@ -1,7 +1,7 @@
 #pragma once
 
 #include "Assets/AssetMetadata.hpp"
-#include "Renderer/TextureCube.hpp"
+#include "Renderer/Textures/TextureCube.hpp"
 
 #include <filesystem>
 

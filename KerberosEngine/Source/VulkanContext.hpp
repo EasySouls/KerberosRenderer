@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Vulkan.hpp"
+#include "Renderer/VMA/VMA.hpp""
 #include "Utils/MemoryBudget.hpp"
 
 #include <vector>
@@ -55,6 +56,8 @@ namespace Kerberos
 
 		uint32_t GetMaxFramesInFlight() const;
 
+		const VMA::Allocator& GetAllocator() const { return m_Allocator; }
+
 		void WaitIdle() const;
 
 		void SetObjectDebugName(uint64_t objectHandle, vk::ObjectType objectType, const std::string& name) const;
@@ -96,6 +99,7 @@ namespace Kerberos
 		void CreateSurface();
 		void PickPhysicalDevice();
 		void CreateLogicalDevice();
+		void CreateAllocator();
 		void CreateSwapChain();
 		void CreateSwapChainImageViews();
 		void CreateCommandPool();
@@ -130,57 +134,61 @@ namespace Kerberos
 		static std::vector<char const*> GetRequiredExtensions();
 
 	private:
-		GLFWwindow* window = nullptr;
-		vk::raii::Context context;
-		vk::raii::Instance instance = nullptr;
-		vk::raii::DebugUtilsMessengerEXT debugMessenger = nullptr;
+		GLFWwindow* m_Window = nullptr;
+		vk::raii::Context m_Context;
+		vk::raii::Instance m_Instance = nullptr;
+		vk::raii::DebugUtilsMessengerEXT m_DebugMessenger = nullptr;
 
-		vk::raii::PhysicalDevice physicalDevice = nullptr;
-		vk::raii::Device device = nullptr;
-		vk::raii::Queue graphicsQueue = nullptr;
-		vk::raii::Queue presentQueue = nullptr;
-		uint32_t graphicsQueueFamilyIndex = 0;
-		uint32_t presentQueueFamilyIndex = 0;
+		vk::raii::PhysicalDevice m_PhysicalDevice = nullptr;
+		vk::raii::Device m_Device = nullptr;
+		vk::raii::Queue m_GraphicsQueue = nullptr;
+		vk::raii::Queue m_PresentQueue = nullptr;
+		vk::raii::Queue m_ComputeQueue = nullptr;
+		vk::raii::Queue m_TransferQueue = nullptr;
+		uint32_t m_GraphicsQueueFamilyIndex = 0;
+		uint32_t m_PresentQueueFamilyIndex = 0;
 
-		vk::SampleCountFlagBits msaaSamples = vk::SampleCountFlagBits::e1;
+		VMA::Allocator m_Allocator{};
 
-		vk::raii::SurfaceKHR surface = nullptr;
+		vk::SampleCountFlagBits m_MSAASamples = vk::SampleCountFlagBits::e1;
 
-		vk::raii::SwapchainKHR swapChain = nullptr;
-		vk::Format swapChainImageFormat = vk::Format::eUndefined;
-		vk::Extent2D swapChainExtent;
+		vk::raii::SurfaceKHR m_Surface = nullptr;
 
-		std::vector<vk::Image> swapChainImages;
-		std::vector<vk::raii::ImageView> swapChainImageViews;
+		vk::raii::SwapchainKHR m_SwapChain = nullptr;
+		vk::Format m_SwapChainImageFormat = vk::Format::eUndefined;
+		vk::Extent2D m_SwapChainExtent;
 
-		vk::raii::Image colorImage = nullptr;
-		vk::raii::DeviceMemory colorImageMemory = nullptr;
-		vk::raii::ImageView colorImageView = nullptr;
+		std::vector<vk::Image> m_SwapChainImages;
+		std::vector<vk::raii::ImageView> m_SwapChainImageViews;
 
-		vk::raii::Image depthImage = nullptr;
-		vk::raii::DeviceMemory depthImageMemory = nullptr;
-		vk::raii::ImageView depthImageView = nullptr;
-		vk::Format depthFormat = vk::Format::eUndefined;
+		vk::raii::Image m_ColorImage = nullptr;
+		vk::raii::DeviceMemory m_ColorImageMemory = nullptr;
+		vk::raii::ImageView m_ColorImageView = nullptr;
 
-		vk::raii::DescriptorPool descriptorPool = nullptr;
-		std::vector<vk::raii::DescriptorSet> descriptorSets;
-		vk::raii::DescriptorPool imGuiDescriptorPool = nullptr;
+		vk::raii::Image m_DepthImage = nullptr;
+		vk::raii::DeviceMemory m_DepthImageMemory = nullptr;
+		vk::raii::ImageView m_DepthImageView = nullptr;
+		vk::Format m_DepthFormat = vk::Format::eUndefined;
 
-		vk::raii::DescriptorSetLayout descriptorSetLayout = nullptr;
-		vk::raii::PipelineLayout pipelineLayout = nullptr;
-		vk::raii::Pipeline graphicsPipeline = nullptr;
+		vk::raii::DescriptorPool m_DescriptorPool = nullptr;
+		std::vector<vk::raii::DescriptorSet> m_DescriptorSets;
+		vk::raii::DescriptorPool m_ImGuiDescriptorPool = nullptr;
 
-		vk::raii::CommandPool commandPool = nullptr;
-		std::vector<vk::raii::CommandBuffer> commandBuffers;
+		vk::raii::DescriptorSetLayout m_DescriptorSetLayout = nullptr;
+		vk::raii::PipelineLayout m_PipelineLayout = nullptr;
+		vk::raii::Pipeline m_GraphicsPipeline = nullptr;
 
-		std::vector<vk::raii::Semaphore> presentCompleteSemaphores;
-		std::vector<vk::raii::Semaphore> renderFinishedSemaphores;
-		std::vector<vk::raii::Fence> inFlightFences;
+		vk::raii::CommandPool m_CommandPool = nullptr;
+		std::vector<vk::raii::CommandBuffer> m_CommandBuffers;
 
-		bool framebufferResized = false;
+		std::vector<vk::raii::Semaphore> m_PresentCompleteSemaphores;
+		std::vector<vk::raii::Semaphore> m_RenderFinishedSemaphores;
+		std::vector<vk::raii::Fence> m_InFlightFences;
 
-		uint32_t frameIndex = 0;
-		uint32_t currentImageIndex = 0;
+		bool m_FramebufferResized = false;
+
+		uint32_t m_FrameIndex = 0;
+		uint32_t m_CurrentImageIndex = 0;
 
 		MemoryBudget m_MemoryBudget;
 

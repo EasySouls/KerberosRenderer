@@ -1,13 +1,13 @@
 #include "kbrpch.hpp"
 #include "VulkanContext.hpp"
 
+#include "Renderer/Textures/Texture.hpp"
 #include <iostream>
 
 #include "imgui.h"
 #include "backends/imgui_impl_glfw.h"
 #include "backends/imgui_impl_vulkan.h"
 
-#include "Textures.hpp"
 #include "Utils.hpp"
 #include "logging/Log.hpp"
 
@@ -16,6 +16,7 @@
 #include <GLFW/glfw3.h>
 #define GLFW_EXPOSE_NATIVE_WIN32
 #include <GLFW/glfw3native.h>
+
 
 constexpr uint32_t maxFramesInFlight = 2;
 
@@ -113,7 +114,7 @@ namespace Kerberos
 	VulkanContext* VulkanContext::s_Instance = nullptr;
 
 	VulkanContext::VulkanContext(GLFWwindow* window)
-		: window(window)
+		: m_Window(window)
 	{
 		if (s_Instance != nullptr)
 		{
@@ -126,6 +127,7 @@ namespace Kerberos
 		CreateSurface();
 		PickPhysicalDevice();
 		CreateLogicalDevice();
+		CreateAllocator();
 		CreateSwapChain();
 		CreateSwapChainImageViews();
 
@@ -161,13 +163,13 @@ namespace Kerberos
 
 	void VulkanContext::Draw() 
 	{
-		const vk::Result fenceResult = device.waitForFences(*inFlightFences[frameIndex], vk::True, UINT64_MAX);
+		const vk::Result fenceResult = m_Device.waitForFences(*m_InFlightFences[m_FrameIndex], vk::True, UINT64_MAX);
 		if (fenceResult != vk::Result::eSuccess)
 		{
 			throw std::runtime_error("failed to wait for fence!");
 		}
 
-		auto [result, imageIndex] = swapChain.acquireNextImage(UINT64_MAX, *presentCompleteSemaphores[frameIndex], nullptr);
+		auto [result, imageIndex] = m_SwapChain.acquireNextImage(UINT64_MAX, *m_PresentCompleteSemaphores[m_FrameIndex], nullptr);
 		if (result == vk::Result::eErrorOutOfDateKHR) {
 			RecreateSwapchain();
 			return;
@@ -175,12 +177,12 @@ namespace Kerberos
 		if (result != vk::Result::eSuccess && result != vk::Result::eSuboptimalKHR) {
 			throw std::runtime_error("failed to acquire swap chain image!");
 		}
-		currentImageIndex = imageIndex;
+		m_CurrentImageIndex = imageIndex;
 
-		device.resetFences(*inFlightFences[frameIndex]);
+		m_Device.resetFences(*m_InFlightFences[m_FrameIndex]);
 
-		commandBuffers[frameIndex].reset();
-		RecordCommandBuffer(currentImageIndex);
+		m_CommandBuffers[m_FrameIndex].reset();
+		RecordCommandBuffer(m_CurrentImageIndex);
 
 		//UpdateUniformBuffers(frameIndex);
 
@@ -188,14 +190,14 @@ namespace Kerberos
 		vk::PipelineStageFlags waitDestinationStageMask(vk::PipelineStageFlagBits::eColorAttachmentOutput);
 		const vk::SubmitInfo submitInfo{
 			.waitSemaphoreCount = 1,
-			.pWaitSemaphores = &*presentCompleteSemaphores[frameIndex],
+			.pWaitSemaphores = &*m_PresentCompleteSemaphores[m_FrameIndex],
 			.pWaitDstStageMask = &waitDestinationStageMask,
 			.commandBufferCount = 1,
-			.pCommandBuffers = &*commandBuffers[frameIndex],
+			.pCommandBuffers = &*m_CommandBuffers[m_FrameIndex],
 			.signalSemaphoreCount = 1,
-			.pSignalSemaphores = &*renderFinishedSemaphores[imageIndex] };
+			.pSignalSemaphores = &*m_RenderFinishedSemaphores[imageIndex] };
 
-		graphicsQueue.submit(submitInfo, *inFlightFences[frameIndex]);
+		m_GraphicsQueue.submit(submitInfo, *m_InFlightFences[m_FrameIndex]);
 
 		// Refrech the memory budget info
 		// In the future it might be enough to call this from the client, since we do not need to update the memory budget info every frame,
@@ -214,32 +216,32 @@ namespace Kerberos
 
 		const vk::PresentInfoKHR presentInfoKHR{
 			.waitSemaphoreCount = 1,
-			.pWaitSemaphores = &*renderFinishedSemaphores[currentImageIndex],
+			.pWaitSemaphores = &*m_RenderFinishedSemaphores[m_CurrentImageIndex],
 			.swapchainCount = 1,
-			.pSwapchains = &*swapChain,
-			.pImageIndices = &currentImageIndex
+			.pSwapchains = &*m_SwapChain,
+			.pImageIndices = &m_CurrentImageIndex
 		};
 
-		const auto result = presentQueue.presentKHR(presentInfoKHR);
-		if (result == vk::Result::eErrorOutOfDateKHR || result == vk::Result::eSuboptimalKHR || framebufferResized) {
-			framebufferResized = false;
+		const auto result = m_PresentQueue.presentKHR(presentInfoKHR);
+		if (result == vk::Result::eErrorOutOfDateKHR || result == vk::Result::eSuboptimalKHR || m_FramebufferResized) {
+			m_FramebufferResized = false;
 			RecreateSwapchain();
 		}
 		else if (result != vk::Result::eSuccess) {
 			throw std::runtime_error("failed to present swap chain image!");
 		}
 
-		frameIndex = (frameIndex + 1) % maxFramesInFlight;
+		m_FrameIndex = (m_FrameIndex + 1) % maxFramesInFlight;
 	}
 
 	vk::raii::CommandBuffer VulkanContext::BeginSingleTimeCommands() const
 	{
 		const vk::CommandBufferAllocateInfo allocInfo{
-			.commandPool = commandPool,
+			.commandPool = m_CommandPool,
 			.level = vk::CommandBufferLevel::ePrimary,
 			.commandBufferCount = 1
 		};
-		vk::raii::CommandBuffer commandBuffer = std::move(vk::raii::CommandBuffers(device, allocInfo).front());
+		vk::raii::CommandBuffer commandBuffer = std::move(vk::raii::CommandBuffers(m_Device, allocInfo).front());
 
 		constexpr vk::CommandBufferBeginInfo beginInfo{
 			.flags = vk::CommandBufferUsageFlagBits::eOneTimeSubmit
@@ -255,8 +257,8 @@ namespace Kerberos
 			.commandBufferCount = 1,
 			.pCommandBuffers = &*commandBuffer
 		};
-		graphicsQueue.submit(submitInfo, nullptr);
-		graphicsQueue.waitIdle();
+		m_GraphicsQueue.submit(submitInfo, nullptr);
+		m_GraphicsQueue.waitIdle();
 	}
 
 	void VulkanContext::CopyBuffer(
@@ -268,11 +270,11 @@ namespace Kerberos
 	) const 
 	{
 		const vk::CommandBufferAllocateInfo allocInfo{
-			.commandPool = *commandPool,
+			.commandPool = *m_CommandPool,
 			.level = vk::CommandBufferLevel::ePrimary,
 			.commandBufferCount = 1
 		};
-		const vk::raii::CommandBuffer copyCmdBuffer = std::move(device.allocateCommandBuffers(allocInfo).front());
+		const vk::raii::CommandBuffer copyCmdBuffer = std::move(m_Device.allocateCommandBuffers(allocInfo).front());
 
 		constexpr vk::CommandBufferBeginInfo beginInfo{
 			.flags = vk::CommandBufferUsageFlagBits::eOneTimeSubmit
@@ -289,8 +291,8 @@ namespace Kerberos
 			.signalSemaphoreCount = signalSemaphore ? 1u : 0u,
 			.pSignalSemaphores = signalSemaphore ? reinterpret_cast<const vk::Semaphore*>(signalSemaphore) : nullptr,
 		};
-		graphicsQueue.submit(submitInfo, nullptr);
-		graphicsQueue.waitIdle();
+		m_GraphicsQueue.submit(submitInfo, nullptr);
+		m_GraphicsQueue.waitIdle();
 	}
 
 	void VulkanContext::TransitionImageLayout(const vk::raii::Image& image, const vk::ImageLayout oldLayout, const vk::ImageLayout newLayout, const uint32_t mipLevels) const
@@ -483,7 +485,7 @@ namespace Kerberos
 
 	void VulkanContext::WaitIdle() const 
 	{
-		device.waitIdle();
+		m_Device.waitIdle();
 	}
 
 	void VulkanContext::SetObjectDebugName(const uint64_t objectHandle, const vk::ObjectType objectType,
@@ -496,7 +498,7 @@ namespace Kerberos
 			.pObjectName = name.c_str()
 		};
 
-		device.setDebugUtilsObjectNameEXT(nameInfo);
+		m_Device.setDebugUtilsObjectNameEXT(nameInfo);
 #endif
 	}
 
@@ -507,46 +509,46 @@ namespace Kerberos
 
 	vk::raii::Device& VulkanContext::GetDevice() 
 	{
-		return device;
+		return m_Device;
 	}
 
 	vk::raii::PhysicalDevice& VulkanContext::GetPhysicalDevice() 
 	{
-		return physicalDevice;
+		return m_PhysicalDevice;
 	}
 
 	vk::PhysicalDeviceProperties VulkanContext::GetProperties() const 
 	{
-		return physicalDevice.getProperties();
+		return m_PhysicalDevice.getProperties();
 	}
 
 	vk::PhysicalDeviceMemoryProperties VulkanContext::GetMemoryProperties() const 
 	{
-		return physicalDevice.getMemoryProperties();
+		return m_PhysicalDevice.getMemoryProperties();
 	}
 
 	vk::FormatProperties VulkanContext::GetFormatProperties(const vk::Format format) const 
 	{
-		return physicalDevice.getFormatProperties(format);
+		return m_PhysicalDevice.getFormatProperties(format);
 	}
 
 	vk::SampleCountFlagBits VulkanContext::GetMSAASamples() const 
 	{
-		return msaaSamples;
+		return m_MSAASamples;
 	}
 
 	void VulkanContext::FramebufferResized(uint32_t width, uint32_t height) 
 	{
-		framebufferResized = true;
+		m_FramebufferResized = true;
 	}
 
 	void VulkanContext::RecordCommandBuffer(const uint32_t imageIndex) const 
 	{
-		commandBuffers[frameIndex].begin({});
+		m_CommandBuffers[m_FrameIndex].begin({});
 
 		// Transition the swapchain image to COLOR_ATTACHMENT_OPTIMAL
 		TransitionImageLayout(
-			swapChainImages[imageIndex],
+			m_SwapChainImages[imageIndex],
 			vk::ImageLayout::eUndefined,
 			vk::ImageLayout::eColorAttachmentOptimal,
 			{},
@@ -558,7 +560,7 @@ namespace Kerberos
 
 		// Transition the multisampled color image to COLOR_ATTACHMENT_OPTIMAL
 		TransitionImageLayout(
-			colorImage,
+			m_ColorImage,
 			vk::ImageLayout::eUndefined,
 			vk::ImageLayout::eColorAttachmentOptimal,
 			vk::AccessFlagBits2::eColorAttachmentWrite,
@@ -569,7 +571,7 @@ namespace Kerberos
 
 		// Transition the depth image to DEPTH_STENCIL_ATTACHMENT_OPTIMAL
 		TransitionImageLayout(
-			depthImage,
+			m_DepthImage,
 			vk::ImageLayout::eUndefined,
 			vk::ImageLayout::eDepthAttachmentOptimal,
 			vk::AccessFlagBits2::eDepthStencilAttachmentWrite,
@@ -583,10 +585,10 @@ namespace Kerberos
 
 		// Multisampled color attachment with resolve attachment
 		vk::RenderingAttachmentInfo attachmentInfo = {
-			.imageView = colorImageView,
+			.imageView = m_ColorImageView,
 			.imageLayout = vk::ImageLayout::eColorAttachmentOptimal,
 			.resolveMode = vk::ResolveModeFlagBits::eAverage,
-			.resolveImageView = swapChainImageViews[imageIndex],
+			.resolveImageView = m_SwapChainImageViews[imageIndex],
 			.resolveImageLayout = vk::ImageLayout::eColorAttachmentOptimal,
 			.loadOp = vk::AttachmentLoadOp::eClear,
 			.storeOp = vk::AttachmentStoreOp::eStore,
@@ -594,7 +596,7 @@ namespace Kerberos
 		};
 
 		vk::RenderingAttachmentInfo depthAttachmentInfo = {
-			.imageView = depthImageView,
+			.imageView = m_DepthImageView,
 			.imageLayout = vk::ImageLayout::eDepthStencilAttachmentOptimal,
 			.loadOp = vk::AttachmentLoadOp::eClear,
 			.storeOp = vk::AttachmentStoreOp::eDontCare,
@@ -602,14 +604,14 @@ namespace Kerberos
 		};
 
 		const vk::RenderingInfo renderingInfo = {
-			.renderArea = {.offset = {.x = 0, .y = 0 }, .extent = swapChainExtent },
+			.renderArea = {.offset = {.x = 0, .y = 0 }, .extent = m_SwapChainExtent },
 			.layerCount = 1,
 			.colorAttachmentCount = 1,
 			.pColorAttachments = &attachmentInfo,
 			.pDepthAttachment = &depthAttachmentInfo
 		};
 
-		commandBuffers[frameIndex].beginRendering(renderingInfo);
+		m_CommandBuffers[m_FrameIndex].beginRendering(renderingInfo);
 
 		//commandBuffers[frameIndex].bindPipeline(vk::PipelineBindPoint::eGraphics, graphicsPipeline);
 		//commandBuffers[frameIndex].bindVertexBuffers(0, *vertexBuffer, { 0 });
@@ -633,13 +635,13 @@ namespace Kerberos
 		//	commandBuffers[frameIndex].drawIndexed(static_cast<uint32_t>(indices.size()), 1, 0, 0, 0);
 		//}
 
-		ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), *commandBuffers[frameIndex]);
+		ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), *m_CommandBuffers[m_FrameIndex]);
 
-		commandBuffers[frameIndex].endRendering();
+		m_CommandBuffers[m_FrameIndex].endRendering();
 
 		// After rendering, transition the swapchain image to PRESENT_SRC
 		TransitionImageLayout(
-			swapChainImages[imageIndex],
+			m_SwapChainImages[imageIndex],
 			vk::ImageLayout::eColorAttachmentOptimal,
 			vk::ImageLayout::ePresentSrcKHR,
 			vk::AccessFlagBits2::eColorAttachmentWrite,
@@ -649,7 +651,7 @@ namespace Kerberos
 			vk::ImageAspectFlagBits::eColor
 		);
 
-		commandBuffers[frameIndex].end();
+		m_CommandBuffers[m_FrameIndex].end();
 	}
 
 	void VulkanContext::CreateInstance()
@@ -668,7 +670,7 @@ namespace Kerberos
 		}
 
 		// Check if the required layers are supported by the Vulkan implementation.
-		auto layerProperties = context.enumerateInstanceLayerProperties();
+		auto layerProperties = m_Context.enumerateInstanceLayerProperties();
 		if (std::ranges::any_of(requiredLayers, [&layerProperties](auto const& requiredLayer) {
 			return std::ranges::none_of(layerProperties,
 										[requiredLayer](auto const& layerProperty)
@@ -681,7 +683,7 @@ namespace Kerberos
 		const auto requiredExtensions = GetRequiredExtensions();
 
 		// Check if the required extensions are supported by the Vulkan implementation.
-		auto extensionProperties = context.enumerateInstanceExtensionProperties();
+		auto extensionProperties = m_Context.enumerateInstanceExtensionProperties();
 		for (auto const& requiredExtension : requiredExtensions)
 		{
 			if (std::ranges::none_of(extensionProperties,
@@ -700,7 +702,7 @@ namespace Kerberos
 			.ppEnabledExtensionNames = requiredExtensions.data()
 		};
 
-		instance = vk::raii::Instance{ context, createInfo };
+		m_Instance = vk::raii::Instance{ m_Context, createInfo };
 	}
 
 	void VulkanContext::SetupDebugMessenger() {
@@ -714,7 +716,7 @@ namespace Kerberos
 			.pfnUserCallback = &DebugCallback
 		};
 
-		debugMessenger = instance.createDebugUtilsMessengerEXT(debugUtilsMessengerCreateInfoEXT);
+		m_DebugMessenger = m_Instance.createDebugUtilsMessengerEXT(debugUtilsMessengerCreateInfoEXT);
 	}
 
 	std::vector<const char*> VulkanContext::GetRequiredExtensions()
@@ -734,15 +736,15 @@ namespace Kerberos
 	void VulkanContext::CreateSurface()
 	{
 		VkSurfaceKHR _surface;
-		if (glfwCreateWindowSurface(static_cast<VkInstance>(*instance), window, nullptr, &_surface) != VK_SUCCESS) {
+		if (glfwCreateWindowSurface(static_cast<VkInstance>(*m_Instance), m_Window, nullptr, &_surface) != VK_SUCCESS) {
 			throw std::runtime_error("failed to create window surface!");
 		}
-		surface = vk::raii::SurfaceKHR{ instance, _surface };
+		m_Surface = vk::raii::SurfaceKHR{ m_Instance, _surface };
 	}
 
 	void VulkanContext::PickPhysicalDevice()
 	{
-		const auto devices = instance.enumeratePhysicalDevices();
+		const auto devices = m_Instance.enumeratePhysicalDevices();
 		if (devices.empty()) {
 			throw std::runtime_error("Failed to find GPUs with Vulkan support!");
 		}
@@ -765,8 +767,8 @@ namespace Kerberos
 			}
 			isSuitable = isSuitable && found;
 			if (isSuitable) {
-				physicalDevice = device;
-				msaaSamples = GetMaxUsableSampleCount(physicalDevice);
+				m_PhysicalDevice = device;
+				m_MSAASamples = GetMaxUsableSampleCount(m_PhysicalDevice);
 			}
 			return isSuitable;
 		});
@@ -802,12 +804,12 @@ namespace Kerberos
 
 	void VulkanContext::CreateLogicalDevice()
 	{
-		std::vector<vk::QueueFamilyProperties> queueFamilyProperties = physicalDevice.getQueueFamilyProperties();
-		uint32_t graphicsIndex = FindQueueFamilies(physicalDevice);
+		std::vector<vk::QueueFamilyProperties> queueFamilyProperties = m_PhysicalDevice.getQueueFamilyProperties();
+		uint32_t graphicsIndex = FindQueueFamilies(m_PhysicalDevice);
 
 		// determine a queueFamilyIndex that supports present
 		// first check if the graphicsIndex is good enough
-		uint32_t presentIndex = physicalDevice.getSurfaceSupportKHR(graphicsIndex, *surface)
+		uint32_t presentIndex = m_PhysicalDevice.getSurfaceSupportKHR(graphicsIndex, *m_Surface)
 			? graphicsIndex
 			: static_cast<uint32_t>(queueFamilyProperties.size());
 
@@ -818,7 +820,7 @@ namespace Kerberos
 			for (size_t i = 0; i < queueFamilyProperties.size(); i++)
 			{
 				if ((queueFamilyProperties[i].queueFlags & vk::QueueFlagBits::eGraphics) &&
-					physicalDevice.getSurfaceSupportKHR(static_cast<uint32_t>(i), *surface))
+					m_PhysicalDevice.getSurfaceSupportKHR(static_cast<uint32_t>(i), *m_Surface))
 				{
 					graphicsIndex = static_cast<uint32_t>(i);
 					presentIndex = graphicsIndex;
@@ -831,7 +833,7 @@ namespace Kerberos
 				// family index that supports present
 				for (size_t i = 0; i < queueFamilyProperties.size(); i++)
 				{
-					if (physicalDevice.getSurfaceSupportKHR(static_cast<uint32_t>(i), *surface))
+					if (m_PhysicalDevice.getSurfaceSupportKHR(static_cast<uint32_t>(i), *m_Surface))
 					{
 						presentIndex = static_cast<uint32_t>(i);
 						break;
@@ -872,13 +874,22 @@ namespace Kerberos
 			.ppEnabledExtensionNames = deviceExtensions.data()
 		};
 
-		device = vk::raii::Device{ physicalDevice, deviceCreateInfo };
+		m_Device = vk::raii::Device{ m_PhysicalDevice, deviceCreateInfo };
 
-		graphicsQueue = device.getQueue(graphicsIndex, 0);
-		presentQueue = device.getQueue(presentIndex, 0);
+		m_GraphicsQueue = m_Device.getQueue(graphicsIndex, 0);
+		m_PresentQueue = m_Device.getQueue(presentIndex, 0);
 
-		graphicsQueueFamilyIndex = graphicsIndex;
-		presentQueueFamilyIndex = presentIndex;
+		m_GraphicsQueueFamilyIndex = graphicsIndex;
+		m_PresentQueueFamilyIndex = presentIndex;
+	}
+
+	void VulkanContext::CreateAllocator() 
+	{
+		KBR_CORE_ASSERT(instance != nullptr, "VkInstance has to be initialized to create allocator!");
+		KBR_CORE_ASSERT(physicalDevice != nullptr, "VkPhysicalDevice has to be initialized to create allocator!");
+		KBR_CORE_ASSERT(device != nullptr, "VkDevice has to be initialized to create allocator!");
+
+		m_Allocator = VMA::CreateAllocator(m_Instance, m_PhysicalDevice, m_Device);
 	}
 
 	static vk::SurfaceFormatKHR ChooseSwapSurfaceFormat(const std::vector<vk::SurfaceFormatKHR>& availableFormats)
@@ -916,7 +927,7 @@ namespace Kerberos
 		}
 
 		int width, height;
-		glfwGetFramebufferSize(window, &width, &height);
+		glfwGetFramebufferSize(m_Window, &width, &height);
 
 		return {
 			.width = std::clamp(static_cast<uint32_t>(width), capabilities.minImageExtent.width, capabilities.maxImageExtent.width),
@@ -926,8 +937,8 @@ namespace Kerberos
 
 	void VulkanContext::CreateSwapChain()
 	{
-		const auto surfaceCapabilities = physicalDevice.getSurfaceCapabilitiesKHR(surface);
-		const auto [format, colorSpace] = ChooseSwapSurfaceFormat(physicalDevice.getSurfaceFormatsKHR(surface));
+		const auto surfaceCapabilities = m_PhysicalDevice.getSurfaceCapabilitiesKHR(m_Surface);
+		const auto [format, colorSpace] = ChooseSwapSurfaceFormat(m_PhysicalDevice.getSurfaceFormatsKHR(m_Surface));
 		const auto extent = ChooseSwapExtent(surfaceCapabilities);
 
 		auto minImageCount = std::max(3u, surfaceCapabilities.minImageCount);
@@ -940,11 +951,11 @@ namespace Kerberos
 			imageCount = surfaceCapabilities.maxImageCount;
 		}
 
-		const vk::PresentModeKHR presentMode = ChooseSwapPresentMode(physicalDevice.getSurfacePresentModesKHR(surface));
+		const vk::PresentModeKHR presentMode = ChooseSwapPresentMode(m_PhysicalDevice.getSurfacePresentModesKHR(m_Surface));
 
 		const vk::SwapchainCreateInfoKHR swapChainCreateInfo{
 			.flags = vk::SwapchainCreateFlagsKHR(),
-			.surface = surface,
+			.surface = m_Surface,
 			.minImageCount = minImageCount,
 			.imageFormat = format,
 			.imageColorSpace = colorSpace,
@@ -958,20 +969,20 @@ namespace Kerberos
 			.clipped = true,
 			.oldSwapchain = nullptr };
 
-		swapChain = vk::raii::SwapchainKHR(device, swapChainCreateInfo);
-		swapChainImageFormat = format;
-		swapChainExtent = extent;
+		m_SwapChain = vk::raii::SwapchainKHR(m_Device, swapChainCreateInfo);
+		m_SwapChainImageFormat = format;
+		m_SwapChainExtent = extent;
 
-		swapChainImages = swapChain.getImages();
+		m_SwapChainImages = m_SwapChain.getImages();
 	}
 
 	void VulkanContext::CreateSwapChainImageViews()
 	{
-		swapChainImageViews.clear();
+		m_SwapChainImageViews.clear();
 
 		vk::ImageViewCreateInfo imageViewCreateInfo{
 			.viewType = vk::ImageViewType::e2D,
-			.format = swapChainImageFormat,
+			.format = m_SwapChainImageFormat,
 			.subresourceRange = {
 				.aspectMask = vk::ImageAspectFlagBits::eColor,
 				.baseMipLevel = 0,
@@ -981,9 +992,9 @@ namespace Kerberos
 			}
 		};
 
-		for (const auto image : swapChainImages) {
+		for (const auto image : m_SwapChainImages) {
 			imageViewCreateInfo.image = image;
-			swapChainImageViews.emplace_back(device, imageViewCreateInfo);
+			m_SwapChainImageViews.emplace_back(m_Device, imageViewCreateInfo);
 		}
 	}
 
@@ -991,36 +1002,36 @@ namespace Kerberos
 	{
 		const vk::CommandPoolCreateInfo poolInfo{
 			.flags = vk::CommandPoolCreateFlagBits::eResetCommandBuffer,
-			.queueFamilyIndex = graphicsQueueFamilyIndex
+			.queueFamilyIndex = m_GraphicsQueueFamilyIndex
 		};
 
-		commandPool = vk::raii::CommandPool(device, poolInfo);
+		m_CommandPool = vk::raii::CommandPool(m_Device, poolInfo);
 	}
 
 	void VulkanContext::CreateCommandBuffers()
 	{
 		const vk::CommandBufferAllocateInfo allocInfo{
-			.commandPool = commandPool,
+			.commandPool = m_CommandPool,
 			.level = vk::CommandBufferLevel::ePrimary,
 			.commandBufferCount = maxFramesInFlight
 		};
 
-		commandBuffers = vk::raii::CommandBuffers(device, allocInfo);
+		m_CommandBuffers = vk::raii::CommandBuffers(m_Device, allocInfo);
 	}
 
 	void VulkanContext::CreateSyncObjects()
 	{
-		assert(presentCompleteSemaphores.empty() && renderFinishedSemaphores.empty() && inFlightFences.empty());
+		assert(m_PresentCompleteSemaphores.empty() && m_RenderFinishedSemaphores.empty() && m_InFlightFences.empty());
 
-		for (size_t i = 0; i < swapChainImages.size(); i++)
+		for (size_t i = 0; i < m_SwapChainImages.size(); i++)
 		{
-			renderFinishedSemaphores.emplace_back(device, vk::SemaphoreCreateInfo());
+			m_RenderFinishedSemaphores.emplace_back(m_Device, vk::SemaphoreCreateInfo());
 		}
 
 		for (size_t i = 0; i < maxFramesInFlight; i++)
 		{
-			presentCompleteSemaphores.emplace_back(device, vk::SemaphoreCreateInfo());
-			inFlightFences.emplace_back(device, vk::FenceCreateInfo{ .flags = vk::FenceCreateFlagBits::eSignaled });
+			m_PresentCompleteSemaphores.emplace_back(m_Device, vk::SemaphoreCreateInfo());
+			m_InFlightFences.emplace_back(m_Device, vk::FenceCreateInfo{ .flags = vk::FenceCreateFlagBits::eSignaled });
 		}
 	}
 
@@ -1040,58 +1051,58 @@ namespace Kerberos
 
 	void VulkanContext::CreateColorResources()
 	{
-		const vk::Format colorFormat = swapChainImageFormat;
+		const vk::Format colorFormat = m_SwapChainImageFormat;
 
-		CreateImage(device,
-					swapChainExtent.width,
-					swapChainExtent.height,
+		CreateImage(m_Device,
+					m_SwapChainExtent.width,
+					m_SwapChainExtent.height,
 					1,
-					msaaSamples,
+					m_MSAASamples,
 					colorFormat,
 					vk::ImageTiling::eOptimal,
 					vk::ImageUsageFlagBits::eTransientAttachment | vk::ImageUsageFlagBits::eColorAttachment,
 					vk::MemoryPropertyFlagBits::eDeviceLocal,
-					colorImage,
-					colorImageMemory);
+					m_ColorImage,
+					m_ColorImageMemory);
 
-		colorImageView = CreateImageView(device, colorImage, colorFormat, vk::ImageAspectFlagBits::eColor, 1);
+		m_ColorImageView = CreateImageView(m_Device, m_ColorImage, colorFormat, vk::ImageAspectFlagBits::eColor, 1);
 	}
 
 	void VulkanContext::CreateDepthResources()
 	{
-		depthFormat = FindDepthFormat();
+		m_DepthFormat = FindDepthFormat();
 
-		CreateImage(device,
-					swapChainExtent.width,
-					swapChainExtent.height,
+		CreateImage(m_Device,
+					m_SwapChainExtent.width,
+					m_SwapChainExtent.height,
 					1,
-					msaaSamples,
-					depthFormat,
+					m_MSAASamples,
+					m_DepthFormat,
 					vk::ImageTiling::eOptimal,
 					vk::ImageUsageFlagBits::eDepthStencilAttachment,
 					vk::MemoryPropertyFlagBits::eDeviceLocal,
-					depthImage,
-					depthImageMemory);
+					m_DepthImage,
+					m_DepthImageMemory);
 
-		depthImageView = CreateImageView(device, depthImage, depthFormat, vk::ImageAspectFlagBits::eDepth, 1);
+		m_DepthImageView = CreateImageView(m_Device, m_DepthImage, m_DepthFormat, vk::ImageAspectFlagBits::eDepth, 1);
 	}
 
 	void VulkanContext::CleanupSwapChain() 
 	{
-		swapChainImageViews.clear();
-		swapChain = nullptr;
+		m_SwapChainImageViews.clear();
+		m_SwapChain = nullptr;
 	}
 
 	void VulkanContext::RecreateSwapchain() 
 	{
 		int width = 0, height = 0;
-		glfwGetFramebufferSize(window, &width, &height);
+		glfwGetFramebufferSize(m_Window, &width, &height);
 		while (width == 0 || height == 0) {
-			glfwGetFramebufferSize(window, &width, &height);
+			glfwGetFramebufferSize(m_Window, &width, &height);
 			glfwWaitEvents();
 		}
 
-		device.waitIdle();
+		m_Device.waitIdle();
 
 		CleanupSwapChain();
 
@@ -1136,7 +1147,7 @@ namespace Kerberos
 			.pImageMemoryBarriers = &barrier
 		};
 
-		commandBuffers[frameIndex].pipelineBarrier2(dependencyInfo);
+		m_CommandBuffers[m_FrameIndex].pipelineBarrier2(dependencyInfo);
 	}
 
 	vk::DescriptorSet VulkanContext::GenerateImGuiDescriptorSet(const vk::raii::Sampler& sampler,
@@ -1155,7 +1166,7 @@ namespace Kerberos
 
 	void VulkanContext::Cleanup() const 
 	{
-		device.waitIdle();
+		m_Device.waitIdle();
 
 		ImGui_ImplVulkan_Shutdown();
 		ImGui_ImplGlfw_Shutdown();
@@ -1216,7 +1227,7 @@ namespace Kerberos
 			.poolSizeCount = static_cast<uint32_t>(poolSizes.size()),
 			.pPoolSizes = poolSizes.data()
 		};
-		imGuiDescriptorPool = vk::raii::DescriptorPool{ device, poolInfo };
+		m_ImGuiDescriptorPool = vk::raii::DescriptorPool{ m_Device, poolInfo };
 	}
 
 	static void CheckVkResult(const VkResult err)
@@ -1255,10 +1266,10 @@ namespace Kerberos
 			style.Colors[ImGuiCol_WindowBg].w = 1.0f;
 		}
 
-		ImGui_ImplGlfw_InitForVulkan(window, true);
+		ImGui_ImplGlfw_InitForVulkan(m_Window, true);
 
-		const VkFormat colorFormatVk = static_cast<VkFormat>(swapChainImageFormat);
-		const VkFormat depthFormatVk = static_cast<VkFormat>(depthFormat);
+		const VkFormat colorFormatVk = static_cast<VkFormat>(m_SwapChainImageFormat);
+		const VkFormat depthFormatVk = static_cast<VkFormat>(m_DepthFormat);
 
 		const VkPipelineRenderingCreateInfoKHR pipelineRenderingCreateInfo = {
 			.sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO_KHR,
@@ -1270,20 +1281,20 @@ namespace Kerberos
 			.stencilAttachmentFormat = VK_FORMAT_UNDEFINED,
 		};
 
-		const VkSampleCountFlagBits msaaSamplesVk = static_cast<VkSampleCountFlagBits>(msaaSamples);
+		const VkSampleCountFlagBits msaaSamplesVk = static_cast<VkSampleCountFlagBits>(m_MSAASamples);
 		constexpr VkSampleCountFlagBits msaaSamplesViewportVk = VK_SAMPLE_COUNT_1_BIT;
 
 		ImGui_ImplVulkan_InitInfo initInfo = {};
 		ZeroMemory(&initInfo, sizeof(initInfo));
-		initInfo.Instance = *instance;
-		initInfo.PhysicalDevice = *physicalDevice;
-		initInfo.Device = *device;
-		initInfo.QueueFamily = graphicsQueueFamilyIndex;
-		initInfo.Queue = *graphicsQueue;
+		initInfo.Instance = *m_Instance;
+		initInfo.PhysicalDevice = *m_PhysicalDevice;
+		initInfo.Device = *m_Device;
+		initInfo.QueueFamily = m_GraphicsQueueFamilyIndex;
+		initInfo.Queue = *m_GraphicsQueue;
 		initInfo.PipelineCache = nullptr;
-		initInfo.DescriptorPool = *imGuiDescriptorPool;
-		initInfo.MinImageCount = static_cast<uint32_t>(swapChainImages.size());
-		initInfo.ImageCount = static_cast<uint32_t>(swapChainImages.size());
+		initInfo.DescriptorPool = *m_ImGuiDescriptorPool;
+		initInfo.MinImageCount = static_cast<uint32_t>(m_SwapChainImages.size());
+		initInfo.ImageCount = static_cast<uint32_t>(m_SwapChainImages.size());
 		initInfo.Allocator = nullptr;
 		initInfo.UseDynamicRendering = true;
 		initInfo.PipelineInfoMain.PipelineRenderingCreateInfo = pipelineRenderingCreateInfo;

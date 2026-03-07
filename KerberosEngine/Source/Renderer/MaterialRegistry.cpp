@@ -75,7 +75,7 @@ namespace Kerberos
 					.dstArrayElement = 0,
 					.descriptorCount = 1,
 					.descriptorType = vk::DescriptorType::eCombinedImageSampler,
-					.pImageInfo = &material->AlbedoTexture->descriptor
+					.pImageInfo = &material->AlbedoTexture->GetDescriptorInfo()
 				});
 			}
 			else
@@ -86,7 +86,7 @@ namespace Kerberos
 					.dstArrayElement = 0,
 					.descriptorCount = 1,
 					.descriptorType = vk::DescriptorType::eCombinedImageSampler,
-					.pImageInfo = &m_AlbedoPlaceholder.descriptor
+					.pImageInfo = &m_AlbedoPlaceholder.GetDescriptorInfo()
 				});
 			}
 
@@ -98,7 +98,7 @@ namespace Kerberos
 					.dstArrayElement = 0,
 					.descriptorCount = 1,
 					.descriptorType = vk::DescriptorType::eCombinedImageSampler,
-					.pImageInfo = &material->NormalTexture->descriptor
+					.pImageInfo = &material->NormalTexture->GetDescriptorInfo()
 				});
 			}
 			else 
@@ -109,7 +109,7 @@ namespace Kerberos
 					.dstArrayElement = 0,
 					.descriptorCount = 1,
 					.descriptorType = vk::DescriptorType::eCombinedImageSampler,
-					.pImageInfo = &m_NormalPlaceholder.descriptor
+					.pImageInfo = &m_NormalPlaceholder.GetDescriptorInfo()
 				});
 			}
 
@@ -167,6 +167,10 @@ namespace Kerberos
 		// TODO: Do not do this here
 
 		std::array<uint8_t, 4> albedoBuffer = { 1, 1, 1, 1 };
+		/*TextureSpecification albedoSpec{};
+		albedoSpec.Width = 1;
+		albedoSpec.Height = 1;
+		albedoSpec.Format = vk::Format::eR8G8B8A8Unorm;*/
 		m_AlbedoPlaceholder.FromBuffer(albedoBuffer.data(), sizeof(uint8_t) * albedoBuffer.size(), vk::Format::eR8G8B8A8Unorm, 1, 1);
 
 		std::array<uint8_t, 4> normalBuffer = { 1, 1, 1, 1 };

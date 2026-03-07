@@ -1,8 +1,8 @@
 #pragma once
 
-#include "Renderer/Mesh.h"
-#include "Renderer/Texture.h"
-#include "Assets/Asset.h"
+#include "Renderer/Mesh.hpp"
+#include "Renderer/Textures/Texture.hpp"
+#include "Assets/Asset.hpp"
 #include "Core/Core.hpp"
 
 #include <map>

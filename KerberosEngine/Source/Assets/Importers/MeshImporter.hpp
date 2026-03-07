@@ -5,7 +5,6 @@
 #include "Assets/AssetMetadata.hpp"
 #include "Renderer/Material.hpp"
 #include "Renderer/Mesh.hpp"
-#include "Renderer/Texture.hpp"
 
 #include <filesystem>
 

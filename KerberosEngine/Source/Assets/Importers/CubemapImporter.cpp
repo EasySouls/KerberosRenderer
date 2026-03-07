@@ -1,7 +1,7 @@
 #include "kbrpch.hpp"
 #include "CubemapImporter.hpp"
 
-#include "Renderer/TextureCube.hpp"
+#include "Renderer/Textures/TextureCube.hpp"
 #include "Assets/Importers/TextureImporter.hpp"
 
 #include <yaml-cpp/yaml.h>
@@ -31,6 +31,20 @@ namespace Kerberos
 		{
 			KBR_CORE_ERROR("CubemapImporter::ImportCubemap - Failed to load yaml file: {}", e.what());
 			return nullptr;
+		}
+
+		bool isFromOneFile = false; // TODO: Support loading cubemap from one ktx file
+
+		if (isFromOneFile)
+		{
+			const std::filesystem::path path = node["Path"].as<std::string>();
+			const Ref<TextureCube> cubemapTexture = CreateRef<TextureCube>(path);
+			if (!cubemapTexture)
+			{
+				KBR_CORE_ERROR("CubemapImporter::ImportCubemap - Failed to create cubemap texture from file: {}", path.string());
+				return nullptr;
+			}
+			return cubemapTexture;
 		}
 
 		if (auto cubemapNode = node["Cubemap"])
@@ -74,7 +88,7 @@ namespace Kerberos
 		cubemapData.Faces[4] = loadFace(descriptor.FrontPath);
 		cubemapData.Faces[5] = loadFace(descriptor.BackPath);
 
-		Ref<TextureCube> cubemapTexture = TextureCube::Create(cubemapData);
+		Ref<TextureCube> cubemapTexture = CreateRef<TextureCube>(cubemapData);
 
 		for (size_t i = 1; i < cubemapData.Faces.size(); ++i)
 		{

@@ -2,11 +2,11 @@
 
 #include "Assets/AssetMetadata.hpp"
 #include "Core/Buffer.hpp"
-#include "Renderer/Texture.hpp"
 
 namespace Kerberos
 {
 	class Texture2D;
+	struct TextureSpecification;
 
 	class TextureImporter
 	{

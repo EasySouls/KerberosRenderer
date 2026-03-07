@@ -15,7 +15,7 @@ file(GLOB_RECURSE ENGINE_SRC CMAKE_CONFIGURE_DEPENDS
 
 source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}/Source" PREFIX "Source" FILES ${ENGINE_SRC})
 
-target_sources(KerberosEngine PRIVATE ${ENGINE_SRC} "Source/Assets/AssetRegistry.cpp" "Source/Assets/EditorAssetManager.cpp" "Source/Assets/RuntimeAssetManager.cpp" "Source/Assets/Importers/AssetImporter.cpp" "Source/Audio/Sound.cpp" "Source/Audio/AudioManager.cpp" "Source/Audio/Windows/XAudio2AudioManager.cpp" "Source/Assets/Importers/SoundImporter.cpp" "Source/Assets/Importers/TextureImporter.cpp" "Source/Utils/Windows/WindowsSystemOperations.cpp" "Source/Assets/Importers/CubemapImporter.cpp" "Source/Assets/Importers/MeshImporter.cpp")
+target_sources(KerberosEngine PRIVATE ${ENGINE_SRC} "Source/Assets/AssetRegistry.cpp" "Source/Assets/EditorAssetManager.cpp" "Source/Assets/RuntimeAssetManager.cpp" "Source/Assets/Importers/AssetImporter.cpp" "Source/Audio/Sound.cpp" "Source/Audio/AudioManager.cpp" "Source/Audio/Windows/XAudio2AudioManager.cpp" "Source/Assets/Importers/SoundImporter.cpp" "Source/Assets/Importers/TextureImporter.cpp" "Source/Utils/Windows/WindowsSystemOperations.cpp" "Source/Assets/Importers/CubemapImporter.cpp" "Source/Assets/Importers/MeshImporter.cpp" "Source/Renderer/Textures/Texture.cpp" "Source/Renderer/Textures/Texture2D.cpp" "Source/Renderer/VMA/VMA.cpp" "Source/Renderer/Textures/TextureCube.cpp")
 
 # Precompiled header
 target_precompile_headers(KerberosEngine PRIVATE Source/kbrpch.hpp)

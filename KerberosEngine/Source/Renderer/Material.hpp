@@ -1,12 +1,13 @@
 #pragma once
 
 #include "Vulkan.hpp"
-#include "Textures.hpp"
+#include "Textures/Texture2D.hpp"
 
 #include <glm/vec3.hpp>
 
 #include <string>
 #include <memory>
+
 
 namespace Kerberos 
 {

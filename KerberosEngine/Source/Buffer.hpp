@@ -1,7 +1,7 @@
 #pragma once
 
 #include "Vulkan.hpp"
-#include "Vertex.hpp"
+#include "Renderer/Vertex.hpp"
 
 void CreateBuffer(
 	const vk::raii::Device& device,
