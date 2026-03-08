@@ -23,6 +23,9 @@ namespace Kerberos
 	class TextureCube : public Texture
 	{
 	public:
+		// TODO: Only needed for manually setting up the fields, should be deleted later
+		TextureCube() = default;
+
 		explicit TextureCube(const CubemapData& data);
 		explicit TextureCube(const std::filesystem::path& filepath);
 

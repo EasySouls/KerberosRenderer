@@ -26,6 +26,7 @@ namespace Kerberos
 		mipLevels = 1; // TODO: Parameterize
 		constexpr vk::ImageUsageFlags imageUsageFlags = vk::ImageUsageFlagBits::eSampled; // TODO: Parameterize
 		constexpr vk::Format format = vk::Format::eR8G8B8A8Unorm; // TODO: Parameterize
+		constexpr vk::ImageLayout imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal; // TODO: Parameterize
 
 		// Use a separate command buffer for texture loading
 		vk::raii::CommandBuffer copyCmd = context.BeginSingleTimeCommands();
@@ -134,13 +135,8 @@ namespace Kerberos
 
 		context.EndSingleTimeCommands(copyCmd);
 
-		// Create a default sampler
 		CreateSampler(device);
 
-		// Create image view
-		// Textures are not directly accessed by the shaders and
-		// are abstracted by image views containing additional
-		// information and sub resource ranges
 		vk::ImageViewCreateInfo viewCreateInfo{
 			.image = image,
 			.viewType = vk::ImageViewType::e2D,
@@ -164,9 +160,31 @@ namespace Kerberos
 		vk::ImageUsageFlags  imageUsageFlags = vk::ImageUsageFlagBits::eSampled;
 		vk::ImageLayout      imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal;
 
-		ktxTexture2* ktxTex;
-		ktxResult result = LoadKTXFile(filepath, &ktxTex);
-		assert(result == KTX_SUCCESS);
+		ktxTexture2* ktxTex = nullptr;
+
+		// TODO: Remove the conversion from here, it should happen in an importer
+		if (extension == ".ktx")
+		{
+			auto newFilePath = filepath;
+			newFilePath.replace_extension(".ktx2");
+
+			if (!std::filesystem::exists(newFilePath))
+			{
+				const std::string command = std::format("ktx2ktx2 -b {}", filepath.string());
+				int res = system(command.c_str());
+				KBR_CORE_ASSERT(res == 0, "Texture2D::Texture2D - failed to convert KTX file to KTX2 format using command: {}", command);
+			}
+			
+			ktxResult result = LoadKTXFile(newFilePath, &ktxTex);
+			KBR_CORE_ASSERT(result == KTX_SUCCESS, "Texture2D::Texture2D - Failed to load KTX file after converting it: {}", newFilePath.string());
+		}
+		else
+		{
+			ktxResult result = LoadKTXFile(filepath, &ktxTex);
+			KBR_CORE_ASSERT(result == KTX_SUCCESS, "Texture2D::Texture2D - Failed to load KTX file: {}", filepath.string());
+		}
+
+		KBR_CORE_ASSERT(ktxTex != nullptr, "Texture2D::Texture2D - ktxTexture2 pointer is null after loading KTX file: {}", filepath.string());
 
 		auto& context = VulkanContext::Get();
 		const auto& device = context.GetDevice();

@@ -14,6 +14,8 @@ namespace Kerberos
 		{ ".png", AssetType::Texture2D },
 		{ ".jpg", AssetType::Texture2D },
 		{ ".jpeg", AssetType::Texture2D },
+		{ ".ktx", AssetType::Texture2D },
+		{ ".ktx2", AssetType::Texture2D },
 		{ ".kbrcubemap", AssetType::TextureCube },
 		{ ".fbx", AssetType::Mesh },
 		{ ".obj", AssetType::Mesh },

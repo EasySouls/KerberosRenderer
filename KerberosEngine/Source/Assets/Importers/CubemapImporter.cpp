@@ -3,9 +3,12 @@
 
 #include "Renderer/Textures/TextureCube.hpp"
 #include "Assets/Importers/TextureImporter.hpp"
+#include "ImportUtils.hpp"
 
 #include <yaml-cpp/yaml.h>
 #include <stb_image.h>
+
+#include <format>
 
 namespace Kerberos
 {
@@ -33,15 +36,23 @@ namespace Kerberos
 			return nullptr;
 		}
 
-		bool isFromOneFile = false; // TODO: Support loading cubemap from one ktx file
+		constexpr bool isFromOneFile = true; // TODO: Support loading cubemap from multiple files
 
 		if (isFromOneFile)
 		{
-			const std::filesystem::path path = node["Path"].as<std::string>();
-			const Ref<TextureCube> cubemapTexture = CreateRef<TextureCube>(path);
+			const std::filesystem::path texPath = node["Path"].as<std::string>();
+
+			if (NeedsConvertingToKTX2(texPath))
+			{
+				const std::string command = std::format("ktx2ktx2 -b {}", texPath.string());
+				int res = system(command.c_str());
+				KBR_CORE_ASSERT(res == 0, "CubemapImporter::ImportCubemap - failed to convert KTX file to KTX2 format using command: {}", command);
+			}
+
+			const Ref<TextureCube> cubemapTexture = CreateRef<TextureCube>(texPath);
 			if (!cubemapTexture)
 			{
-				KBR_CORE_ERROR("CubemapImporter::ImportCubemap - Failed to create cubemap texture from file: {}", path.string());
+				KBR_CORE_ERROR("CubemapImporter::ImportCubemap - Failed to create cubemap texture from file: {}", texPath.string());
 				return nullptr;
 			}
 			return cubemapTexture;

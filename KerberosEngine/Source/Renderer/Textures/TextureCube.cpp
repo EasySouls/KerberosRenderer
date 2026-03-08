@@ -23,12 +23,34 @@ namespace Kerberos
 		const auto extension = filepath.extension();
 		KBR_CORE_ASSERT(extension == ".ktx" || extension == ".ktx2", "TextureCube::TextureCube - only KTX files are supported in this constructor");
 
+		ktxTexture2* ktxTex = nullptr;
+
+		// TODO: Remove the conversion from here, it should happen in an importer
+		if (extension == ".ktx")
+		{
+			auto newFilePath = filepath;
+			newFilePath.replace_extension(".ktx2");
+
+			if (!std::filesystem::exists(newFilePath))
+			{
+				const std::string command = std::format("ktx2ktx2 -b {}", filepath.string());
+				int res = system(command.c_str());
+				KBR_CORE_ASSERT(res == 0, "TextureCube::TextureCube - failed to convert KTX file to KTX2 format using command: {}", command);
+			}
+			
+			ktxResult result = LoadKTXFile(newFilePath, &ktxTex);
+			KBR_CORE_ASSERT(result == KTX_SUCCESS, "TextureCube::TextureCube - Failed to load KTX file after converting it: {}", newFilePath.string());
+		}
+		else
+		{
+			ktxResult result = LoadKTXFile(filepath, &ktxTex);
+			KBR_CORE_ASSERT(result == KTX_SUCCESS, "TextureCube::TextureCube - Failed to load KTX file: {}", filepath.string());
+		}
+
+		KBR_CORE_ASSERT(ktxTex != nullptr, "TextureCube::TextureCube - ktxTexture2 is null after loading KTX file: {}", filepath.string());
+
 		vk::ImageUsageFlags  imageUsageFlags = vk::ImageUsageFlagBits::eSampled;
 		vk::ImageLayout      imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal;
-
-		ktxTexture2* ktxTex;
-		ktxResult result = LoadKTXFile(filepath, &ktxTex);
-		assert(result == KTX_SUCCESS);
 
 		auto& context = VulkanContext::Get();
 		const auto& device = context.GetDevice();

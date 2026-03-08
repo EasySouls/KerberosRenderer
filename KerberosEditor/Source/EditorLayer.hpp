@@ -91,11 +91,11 @@ namespace Kerberos
 		vk::raii::PipelineLayout m_ShadowMapPipelineLayout = nullptr;
 		vk::raii::Pipeline m_ShadowMapPipeline = nullptr;
 
-		Ref<TextureCube> m_SkyboxTexture;
+		Ref<TextureCube> m_SkyboxTexture = CreateRef<TextureCube>();
 		// Generated at runtime
-		Ref<Texture2D> m_LutBrdfTexture;
-		Ref<TextureCube> m_IrradianceCubeTexture;
-		Ref<TextureCube> m_PrefilteredCubeTexture;
+		Ref<Texture2D> m_LutBrdfTexture = CreateRef<Texture2D>();
+		Ref<TextureCube> m_IrradianceCubeTexture = CreateRef<TextureCube>();
+		Ref<TextureCube> m_PrefilteredCubeTexture = CreateRef<TextureCube>();
 
 		vk::raii::Image m_ColorImage = nullptr;
 		vk::raii::DeviceMemory m_ColorImageMemory = nullptr;

@@ -53,6 +53,8 @@ namespace Kerberos
 				return "Scene";
 			case AssetType::Sound:
 				return "Sound";
+			case AssetType::Model:
+				return "Model";
 		}
 
 		KBR_CORE_ASSERT(false, "Unknown Asset Type!");
@@ -73,6 +75,8 @@ namespace Kerberos
 			return AssetType::Scene;
 		if (str == "Sound")
 			return AssetType::Sound;
+		if (str == "Model")
+			return AssetType::Model;
 
 		KBR_CORE_ASSERT(false, "Unknown Asset Type as string!");
 		return AssetType::Texture2D;

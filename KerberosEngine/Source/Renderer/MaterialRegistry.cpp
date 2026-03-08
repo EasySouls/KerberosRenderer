@@ -166,22 +166,22 @@ namespace Kerberos
 
 		// TODO: Do not do this here
 
-		std::array<uint8_t, 4> albedoBuffer = { 1, 1, 1, 1 };
+		constexpr std::array<uint8_t, 4> albedoBuffer = { 1, 1, 1, 1 };
 		TextureSpecification albedoSpec{};
 		albedoSpec.Width = 1;
 		albedoSpec.Height = 1;
 		albedoSpec.Format = ImageFormat::RGBA8;
-		Buffer albedoBufferStruct{ sizeof(uint8_t) * albedoBuffer.size() };
-		albedoBufferStruct.Data = albedoBuffer.data();
+		const Buffer albedoBufferStruct{ sizeof(uint8_t) * albedoBuffer.size() };
+		std::memcpy(albedoBufferStruct.Data, albedoBuffer.data(), albedoBufferStruct.Size);
 		m_AlbedoPlaceholder = Texture2D::FromBuffer(albedoSpec, albedoBufferStruct);
 
-		std::array<uint8_t, 4> normalBuffer = { 1, 1, 1, 1 };
+		constexpr std::array<uint8_t, 4> normalBuffer = { 1, 1, 1, 1 };
 		TextureSpecification normalSpec{};
 		normalSpec.Width = 1;
 		normalSpec.Height = 1;
 		normalSpec.Format = ImageFormat::RGBA8; // UNORM
-		Buffer normalBufferStruct{ sizeof(uint8_t) * normalBuffer.size() };
-		normalBufferStruct.Data = normalBuffer.data();
+		const Buffer normalBufferStruct{ sizeof(uint8_t) * normalBuffer.size() };
+		std::memcpy(normalBufferStruct.Data, normalBuffer.data(), normalBufferStruct.Size);
 		m_NormalPlaceholder = Texture2D::FromBuffer(normalSpec, normalBufferStruct);
 	}
 }
