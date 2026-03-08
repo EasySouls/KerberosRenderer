@@ -3,10 +3,10 @@
 
 #include "CubemapImporter.hpp"
 #include "TextureImporter.hpp"
-#include "MeshImporter.hpp"
+#include "AssimpModelImporter.hpp"
+#include "GLTFModelImporter.hpp"
 #include "SoundImporter.hpp"
 #include "Assets/Asset.hpp"
-#include "Renderer/Texture.h"
 
 namespace Kerberos
 {
@@ -25,15 +25,20 @@ namespace Kerberos
 				return CubemapImporter::ImportCubemap(handle, metadata);
 			case AssetType::Material:
 				break;
-			case AssetType::Mesh:
+			case AssetType::Model:
 			{
-				MeshImporter meshImporter;
-				return meshImporter.ImportMesh(metadata.Filepath);
+				const auto extension = metadata.Filepath.extension().string();
+				if (extension == ".gltf" || extension == ".glb")
+					return GLTFModelImporter::ImportModel(handle, metadata);
+				return AssimpModelImporter::ImportModel(metadata.Filepath);
 			}
 			case AssetType::Scene:
 				break;
 			case AssetType::Sound:
 				return SoundImporter::ImportSound(handle, metadata);
+			case AssetType::Mesh:
+				KBR_CORE_ASSERT(false, "Mesh should not be imported directly, it should be imported as part of a model!");
+				break;
 		}
 
 		KBR_CORE_ASSERT(false, "Unsupported asset type by AssetImporter!");

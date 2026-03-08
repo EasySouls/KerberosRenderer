@@ -3,8 +3,8 @@
 #include <ranges>
 
 #include "VulkanContext.hpp"
-#include "io.hpp"
-#include "Vertex.hpp"
+#include "IO.hpp"
+#include "Renderer/Vertex.hpp"
 #include "ModelLoader.hpp"
 #include "Renderer/Shaders/Shader.hpp"
 #include "Buffer.hpp"
@@ -68,11 +68,12 @@ namespace Kerberos
 		constexpr GLTFLoadingFlags loadingFlags = GLTFLoadingFlags::None;
 
 		m_SkyboxMesh = ModelLoader::LoadModel("assets/models/cube.gltf", loadingFlags);
-		m_SkyboxTexture.LoadFromFile(
+		/*m_SkyboxTexture.LoadFromFile(
 			"assets/textures/hdr/pisa_cube.ktx",
 			vk::Format::eR16G16B16A16Sfloat,
 			vk::ImageUsageFlagBits::eSampled
-		);
+		);*/
+		m_SkyboxTexture = TextureCube::FromFile("assets/textures/hdr/pisa_cube.ktx");
 
 		// Load models
 		m_Meshes["avocado"] = std::make_shared<Mesh>(ModelLoader::LoadModel("assets/models/avocado/Avocado.gltf", loadingFlags));
@@ -99,10 +100,9 @@ namespace Kerberos
 		};
 
 		m_Textures.reserve(textureFiles.size());
-		for (const auto& [filepath, format] : textureFiles)
+		for (const auto& filepath : textureFiles | std::views::keys)
 		{
-			auto texture = std::make_shared<Texture2D>();
-			texture->LoadFromFile(filepath, format);
+			auto texture = Texture2D::FromFile(filepath);
 			m_Textures.push_back(texture);
 		}
 
@@ -218,8 +218,8 @@ namespace Kerberos
 			.dstAccessMask = vk::AccessFlagBits2::eDepthStencilAttachmentWrite,
 			.oldLayout = vk::ImageLayout::eUndefined,
 			.newLayout = vk::ImageLayout::eDepthAttachmentOptimal,
-			.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-			.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+			.srcQueueFamilyIndex = vk::QueueFamilyIgnored,
+			.dstQueueFamilyIndex = vk::QueueFamilyIgnored,
 			.image = m_ShadowMapImage,
 			.subresourceRange = {
 				.aspectMask = vk::ImageAspectFlagBits::eDepth,
@@ -987,8 +987,8 @@ namespace Kerberos
 			};
 
 			const vk::DescriptorImageInfo skyboxImageInfo{
-				.sampler = *m_SkyboxTexture.GetSampler(),
-				.imageView = *m_SkyboxTexture.GetImageView(),
+				.sampler = *m_SkyboxTexture->GetSampler(),
+				.imageView = *m_SkyboxTexture->GetImageView(),
 				.imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal
 			};
 
@@ -1037,7 +1037,7 @@ namespace Kerberos
 					.dstArrayElement = 0,
 					.descriptorCount = 1,
 					.descriptorType = vk::DescriptorType::eCombinedImageSampler,
-					.pImageInfo = &m_IrradianceCubeTexture.descriptor
+					.pImageInfo = &m_IrradianceCubeTexture->GetDescriptorInfo()
 				},
 				vk::WriteDescriptorSet{
 					.dstSet = *m_DescriptorSets[i].scene,
@@ -1045,7 +1045,7 @@ namespace Kerberos
 					.dstArrayElement = 0,
 					.descriptorCount = 1,
 					.descriptorType = vk::DescriptorType::eCombinedImageSampler,
-					.pImageInfo = &m_LutBrdfTexture.descriptor
+					.pImageInfo = &m_LutBrdfTexture->GetDescriptorInfo()
 				},
 				vk::WriteDescriptorSet{
 					.dstSet = *m_DescriptorSets[i].scene,
@@ -1053,7 +1053,7 @@ namespace Kerberos
 					.dstArrayElement = 0,
 					.descriptorCount = 1,
 					.descriptorType = vk::DescriptorType::eCombinedImageSampler,
-					.pImageInfo = &m_PrefilteredCubeTexture.descriptor
+					.pImageInfo = &m_PrefilteredCubeTexture->GetDescriptorInfo()
 				}
 			};
 
@@ -1136,9 +1136,9 @@ namespace Kerberos
 
 	void EditorLayer::CreateVulkanResources()
 	{
-		SkyboxUtils::GenerateBRDFLUT(m_LutBrdfTexture);
-		SkyboxUtils::GenerateIrradianceCube(m_IrradianceCubeTexture, m_SkyboxTexture.descriptor, *m_SkyboxMesh);
-		SkyboxUtils::GeneratePrefilteredEnvMap(m_PrefilteredCubeTexture, m_SkyboxTexture.descriptor, *m_SkyboxMesh);
+		SkyboxUtils::GenerateBRDFLUT(*m_LutBrdfTexture);
+		SkyboxUtils::GenerateIrradianceCube(*m_IrradianceCubeTexture, m_SkyboxTexture->descriptor, *m_SkyboxMesh);
+		SkyboxUtils::GeneratePrefilteredEnvMap(*m_PrefilteredCubeTexture, m_SkyboxTexture->descriptor, *m_SkyboxMesh);
 
 		PrepareUniformBuffers();
 
@@ -1160,7 +1160,7 @@ namespace Kerberos
 				.compareEnable = vk::False,
 				.compareOp = vk::CompareOp::eAlways,
 				.minLod = 0.0f,
-				.maxLod = VK_LOD_CLAMP_NONE,
+				.maxLod = vk::LodClampNone,
 				.borderColor = vk::BorderColor::eIntOpaqueBlack,
 				.unnormalizedCoordinates = vk::False
 			};

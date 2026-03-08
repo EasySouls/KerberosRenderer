@@ -2,19 +2,21 @@
 
 #include "Vulkan.hpp"
 #include "Renderer/Vertex.hpp"
+#include "Assets/Asset.hpp"
 #include "Buffer.hpp"
 
 #include <vector>
 #include <string>
 
+
 namespace Kerberos
 {
-	class Mesh
+	class Mesh : public Asset
 	{
 	public:
 		Mesh(const std::vector<Vertex>& vertices, const std::vector<uint32_t>& indices);
 		Mesh(const std::string& name, const std::vector<Vertex>& vertices, const std::vector<uint32_t>& indices);
-		virtual ~Mesh() = default;
+		~Mesh() override = default;
 
 		Mesh(const Mesh&) = delete;
 		Mesh& operator=(const Mesh&) = delete;
@@ -25,6 +27,8 @@ namespace Kerberos
 		void Draw(vk::CommandBuffer commandBuffer) const;
 
 		void SetDebugName(const std::string& name) const;
+
+		AssetType GetType() override { return AssetType::Mesh; }
 
 	private:
 		std::vector<Vertex> m_Vertices;

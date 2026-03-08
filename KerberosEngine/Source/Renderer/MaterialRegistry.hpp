@@ -40,7 +40,7 @@ namespace Kerberos
 		uint32_t m_TexturePerMaterial = 5;
 
 		// TODO: Move from here
-		Texture2D m_AlbedoPlaceholder;
-		Texture2D m_NormalPlaceholder;
+		Ref<Texture2D> m_AlbedoPlaceholder;
+		Ref<Texture2D> m_NormalPlaceholder;
 	};
 }

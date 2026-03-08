@@ -320,4 +320,14 @@ namespace Kerberos
 	{
 		KBR_CORE_TRACE("Destroying Texture2D: {}", GetHandle());
 	}
+
+	Ref<Texture2D> Texture2D::FromBuffer(const TextureSpecification& spec, const Buffer& buffer) 
+	{
+		return CreateRef<Texture2D>(spec, buffer);
+	}
+
+	Ref<Texture2D> Texture2D::FromFile(const std::filesystem::path& filepath)
+	{
+		return CreateRef<Texture2D>(filepath);
+	}
 }

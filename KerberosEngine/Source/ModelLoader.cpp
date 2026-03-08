@@ -107,17 +107,17 @@ namespace Kerberos
 
 					const uint8_t* posBytes = posBuffer.data.data() + posBufferView.byteOffset + posAccessor.byteOffset + i * posStride;
 					const float* pos = reinterpret_cast<const float*>(posBytes);
-					vertex.pos = { pos[0], pos[1], pos[2] };
+					vertex.Position = { pos[0], pos[1], pos[2] };
 
 					if (hasNormals)
 					{
 						const uint8_t* normalBytes = normalBuffer->data.data() + normalBufferView->byteOffset + normalAccessor->byteOffset + i * normalStride;
 						const float* normal = reinterpret_cast<const float*>(normalBytes);
-						vertex.normal = { normal[0], normal[1], normal[2] };
+						vertex.Normal = { normal[0], normal[1], normal[2] };
 					}
 					else
 					{
-						vertex.normal = { 0.0f, 0.0f, 0.0f };
+						vertex.Normal = { 0.0f, 0.0f, 0.0f };
 					}
 
 					if (hasTexCoords)
@@ -125,11 +125,11 @@ namespace Kerberos
 						const uint8_t* uvBytes = texCoordBuffer->data.data() + texCoordBufferView->byteOffset + texCoordAccessor->byteOffset + i * uvStride;
 						const float* texCoord = reinterpret_cast<const float*>(uvBytes);
 						//vertex.texCoord = { texCoord[0], 1.0f - texCoord[1] };
-						vertex.texCoord = { texCoord[0], texCoord[1] };
+						vertex.TexCoord = { texCoord[0], texCoord[1] };
 					}
 					else
 					{
-						vertex.texCoord = { 0.0f, 0.0f };
+						vertex.TexCoord = { 0.0f, 0.0f };
 					}
 
 					auto it = uniqueVertices.find(vertex);
@@ -187,8 +187,8 @@ namespace Kerberos
 		{
 			for (auto& vertex : vertices)
 			{
-				vertex.pos.y *= -1.0f;
-				vertex.normal.y *= -1.0f;
+				vertex.Position.y *= -1.0f;
+				vertex.Normal.y *= -1.0f;
 			}
 
 			for (size_t i = 0; i < indices.size(); i += 3)
@@ -202,13 +202,13 @@ namespace Kerberos
 		{
 			for (int i = 0; i < 3; i++)
 			{
-				if (std::abs(vertex.normal[i]) < epsilon)
-					vertex.normal[i] = 0.0f;
+				if (std::abs(vertex.Normal[i]) < epsilon)
+					vertex.Normal[i] = 0.0f;
 			}
 
-			if (glm::length(vertex.normal) > 0.0f) 
+			if (glm::length(vertex.Normal) > 0.0f) 
 			{
-				vertex.normal = glm::normalize(vertex.normal);
+				vertex.Normal = glm::normalize(vertex.Normal);
 			}
 		}
 

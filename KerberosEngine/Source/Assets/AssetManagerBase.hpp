@@ -18,10 +18,10 @@ namespace Kerberos
 	public:
 		virtual ~AssetManagerBase() = default;
 		
-		AssetManagerBase(const AssetManagerBase& other) = delete;
+		/*AssetManagerBase(const AssetManagerBase& other) = delete;
 		AssetManagerBase(AssetManagerBase&& other) noexcept = delete;
 		AssetManagerBase& operator=(const AssetManagerBase& other) = delete;
-		AssetManagerBase& operator=(AssetManagerBase&& other) noexcept = delete;
+		AssetManagerBase& operator=(AssetManagerBase&& other) noexcept = delete;*/
 
 		virtual Ref<Asset> GetAsset(AssetHandle handle) = 0;
 

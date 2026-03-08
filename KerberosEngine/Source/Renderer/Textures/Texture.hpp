@@ -33,13 +33,15 @@ namespace Kerberos
 		vk::raii::ImageView& GetImageView();
 		vk::DescriptorImageInfo& GetDescriptorInfo();
 
+		void SetDebugName(const std::string& debugName) const;
+
 	protected:
 		Texture() = default;
 
 		void CreateSampler(const vk::raii::Device& device, vk::Filter filter = vk::Filter::eLinear);
-		void SetDebugName(const std::string& debugName) const;
 	
-	protected:
+		// TODO: Make this protected or private. Currently skybox utils use these directly
+	public:
 		vk::raii::Image         image = nullptr;
 		vk::ImageLayout         imageLayout{};
 		vk::raii::DeviceMemory  deviceMemory = nullptr;

@@ -86,7 +86,7 @@ namespace Kerberos
 					.dstArrayElement = 0,
 					.descriptorCount = 1,
 					.descriptorType = vk::DescriptorType::eCombinedImageSampler,
-					.pImageInfo = &m_AlbedoPlaceholder.GetDescriptorInfo()
+					.pImageInfo = &m_AlbedoPlaceholder->GetDescriptorInfo()
 				});
 			}
 
@@ -109,7 +109,7 @@ namespace Kerberos
 					.dstArrayElement = 0,
 					.descriptorCount = 1,
 					.descriptorType = vk::DescriptorType::eCombinedImageSampler,
-					.pImageInfo = &m_NormalPlaceholder.GetDescriptorInfo()
+					.pImageInfo = &m_NormalPlaceholder->GetDescriptorInfo()
 				});
 			}
 
@@ -167,13 +167,21 @@ namespace Kerberos
 		// TODO: Do not do this here
 
 		std::array<uint8_t, 4> albedoBuffer = { 1, 1, 1, 1 };
-		/*TextureSpecification albedoSpec{};
+		TextureSpecification albedoSpec{};
 		albedoSpec.Width = 1;
 		albedoSpec.Height = 1;
-		albedoSpec.Format = vk::Format::eR8G8B8A8Unorm;*/
-		m_AlbedoPlaceholder.FromBuffer(albedoBuffer.data(), sizeof(uint8_t) * albedoBuffer.size(), vk::Format::eR8G8B8A8Unorm, 1, 1);
+		albedoSpec.Format = ImageFormat::RGBA8;
+		Buffer albedoBufferStruct{ sizeof(uint8_t) * albedoBuffer.size() };
+		albedoBufferStruct.Data = albedoBuffer.data();
+		m_AlbedoPlaceholder = Texture2D::FromBuffer(albedoSpec, albedoBufferStruct);
 
 		std::array<uint8_t, 4> normalBuffer = { 1, 1, 1, 1 };
-		m_NormalPlaceholder.FromBuffer(normalBuffer.data(), sizeof(uint8_t) * normalBuffer.size(), vk::Format::eR8G8B8A8Unorm, 1, 1);
+		TextureSpecification normalSpec{};
+		normalSpec.Width = 1;
+		normalSpec.Height = 1;
+		normalSpec.Format = ImageFormat::RGBA8; // UNORM
+		Buffer normalBufferStruct{ sizeof(uint8_t) * normalBuffer.size() };
+		normalBufferStruct.Data = normalBuffer.data();
+		m_NormalPlaceholder = Texture2D::FromBuffer(normalSpec, normalBufferStruct);
 	}
 }

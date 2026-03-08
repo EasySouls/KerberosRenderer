@@ -4,7 +4,7 @@
 #include <glm/ext/matrix_transform.hpp>
 #include <glm/gtx/quaternion.hpp>
 
-#include "Mesh.hpp"
+#include "Renderer/Mesh.hpp"
 #include "Renderer/Material.hpp"
 
 #include <memory>

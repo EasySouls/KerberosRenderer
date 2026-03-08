@@ -5,6 +5,7 @@
 #include <stb_image.h>
 
 #include <unordered_set>
+#include <algorithm>
 
 namespace 
 {
@@ -12,15 +13,15 @@ namespace
 
 	bool IsExtensionSupported(const std::filesystem::path& filepath)
 	{
-		const auto extension = filepath.extension().string();
-		std::transform(extension.begin(), extension.end(), extension.begin(), ::tolower);
+		std::string extension = filepath.extension().string();
+		std::ranges::transform(extension, extension.begin(), ::tolower);
 		return SupportedExtensions.contains(extension);
 	}
 
 	bool IsKTXFormat(const std::filesystem::path& filepath)
 	{
-		const auto extension = filepath.extension().string();
-		std::transform(extension.begin(), extension.end(), extension.begin(), ::tolower);
+		std::string extension = filepath.extension().string();
+		std::ranges::transform(extension, extension.begin(), ::tolower);
 		return extension == ".ktx" || extension == ".ktx2";
 	}
 }

@@ -85,3 +85,42 @@ namespace Kerberos
 		}
 	};
 }
+
+template<>
+struct std::hash<Kerberos::Vertex>
+{
+	size_t operator()(const Kerberos::Vertex& v) const noexcept
+	{
+		size_t seed = 0;
+		const auto combine = [&seed]<typename T>(const T& value)
+		{
+			seed ^= std::hash<std::decay_t<T>>{}(value)
+				+0x9e3779b9 + (seed << 6) + (seed >> 2);
+		};
+
+		combine(v.Position);
+		combine(v.Normal);
+		combine(v.Tangent);
+		combine(v.TexCoord);
+		return seed;
+	}
+};
+
+template<>
+struct std::hash<Kerberos::TextVertex>
+{
+	size_t operator()(const Kerberos::TextVertex& v) const noexcept
+	{
+		size_t seed = 0;
+		const auto combine = [&seed]<typename T>(const T& value)
+		{
+			seed ^= std::hash<std::decay_t<T>>{}(value)
+				+0x9e3779b9 + (seed << 6) + (seed >> 2);
+		};
+
+		combine(v.Position);
+		combine(v.Color);
+		combine(v.TexCoord);
+		return seed;
+	}
+};

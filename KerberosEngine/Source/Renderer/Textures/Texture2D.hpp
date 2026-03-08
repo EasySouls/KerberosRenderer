@@ -17,5 +17,8 @@ namespace Kerberos
 		~Texture2D() override;
 
 		AssetType GetType() override { return AssetType::Texture2D; }
+
+		static Ref<Texture2D> FromBuffer(const TextureSpecification& spec, const Buffer& buffer);
+		static Ref<Texture2D> FromFile(const std::filesystem::path& filepath);
 	};
 }

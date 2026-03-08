@@ -1,7 +1,7 @@
 #include "kbrpch.hpp"
 
 #include "Core/Timer.hpp"
-#include "MeshImporter.hpp"
+#include "AssimpModelImporter.hpp"
 #include "TextureImporter.hpp"
 #include "Renderer/Vertex.hpp"
 
@@ -13,36 +13,56 @@
 
 namespace Kerberos
 {
-	Ref<Mesh> MeshImporter::ImportMesh(AssetHandle handle, const AssetMetadata& metadata)
+	Ref<Mesh> AssimpModelImporter::ImportModel(AssetHandle handle, const AssetMetadata& metadata)
 	{
-		return ImportMesh(metadata.Filepath);
+		return ImportModel(metadata.Filepath);
 	}
 
-	Ref<Mesh> MeshImporter::ImportMesh(const std::filesystem::path& filepath)
+	Ref<Mesh> AssimpModelImporter::ImportModel(const std::filesystem::path& filepath)
 	{
-		LoadModel(filepath);
+		const auto res = LoadModel(filepath);
 
-		if (m_Submeshes.empty())
+		if (!res)
+		{
+			switch (const auto error = res.error())
+			{
+				case ModelLoadingError::CannotOpenFile:
+					KBR_CORE_ERROR("Cannot open model file: {}", filepath.string());
+					break;
+				case ModelLoadingError::ImportFailed:
+					KBR_CORE_ERROR("Model import failed for file: {}", filepath.string());
+					break;
+				default:
+					KBR_CORE_ERROR("Unknown error occurred while loading model: {}", filepath.string());
+					break;
+			}
+			return nullptr;
+		}
+
+		const auto info = res.value();
+		if (info.submeshes.empty())
 		{
 			KBR_CORE_ERROR("No meshes found in the model at {}", filepath.string());
 			return nullptr;
 		}
-		return m_Submeshes[0].Mesh;
+		return info.submeshes[0].Mesh;
 	}
 
-	void MeshImporter::LoadModel(const std::filesystem::path& path)
+	std::expected<AssimpModelImporter::ModelLoadingInfo, AssimpModelImporter::ModelLoadingError> AssimpModelImporter::LoadModel(const std::filesystem::path& path)
 	{
 		Timer timer("Model Loading", [&](const TimerData& data)
 		{
 			KBR_CORE_INFO("Loading model from {} took {:.2f} ms", path.string(), data.DurationMs);
 		});
 
+		ModelLoadingInfo loadingInfo{};
+
 		{
 			std::ifstream file(path);
 			if (!file.is_open())
 			{
 				KBR_CORE_ERROR("Failed to open model file: {}", path.string());
-				return;
+				return std::unexpected(ModelLoadingError::CannotOpenFile);
 			}
 			const std::string data = std::string((std::istreambuf_iterator<char>(file)),
 												 std::istreambuf_iterator<char>());
@@ -59,25 +79,25 @@ namespace Kerberos
 		if (!scene || scene->mFlags & AI_SCENE_FLAGS_INCOMPLETE || !scene->mRootNode)
 		{
 			KBR_CORE_ERROR("Assimp error: {}", importer.GetErrorString());
-			return;
+			return std::unexpected(ModelLoadingError::ImportFailed);
 		}
 
-		m_Directory = path.parent_path();
+		loadingInfo.directory = path.parent_path();
 
-		ProcessMaterials(scene);
+		ProcessMaterials(scene, loadingInfo);
 
-		ProcessMeshes(scene);
+		ProcessMeshes(scene, loadingInfo);
 	}
 
-	void MeshImporter::ProcessMaterials(const aiScene* scene)
+	void AssimpModelImporter::ProcessMaterials(const aiScene* scene, ModelLoadingInfo& info)
 	{
 		KBR_CORE_TRACE("Loading {} materials...", scene->mNumMaterials);
-		m_Materials.reserve(scene->mNumMaterials);
+		info.materials.reserve(scene->mNumMaterials);
 
 		for (unsigned int i = 0; i < scene->mNumMaterials; ++i)
 		{
 			const aiMaterial* aiMat = scene->mMaterials[i];
-			auto material = CreateRef<Material>();
+			auto material = CreateRef<DeprecatedMaterial>();
 
 			// Get material name
 			aiString name;
@@ -104,29 +124,29 @@ namespace Kerberos
 			{
 				aiString str;
 				aiMat->GetTexture(aiTextureType_DIFFUSE, 0, &str);
-				const std::filesystem::path texturePath = m_Directory / str.C_Str();
+				const std::filesystem::path texturePath = info.directory / str.C_Str();
 
-				if (!m_LoadedTextures.contains(texturePath))
+				if (!info.loadedTextures.contains(texturePath))
 				{
 					/// Texture not loaded yet, load it
-					m_LoadedTextures[texturePath] = TextureImporter::ImportTexture(texturePath);
+					info.loadedTextures[texturePath] = TextureImporter::ImportTexture(texturePath);
 				}
-				material->DiffuseTexture = m_LoadedTextures[texturePath]; // Assign to material
+				material->DiffuseTexture = info.loadedTextures[texturePath]; // Assign to material
 			}
 
-			m_Materials.push_back(material);
+			info.materials.push_back(material);
 		}
 
 		/// Create a default material if none were loaded
-		if (m_Materials.empty())
+		if (info.materials.empty())
 		{
-			const auto material = CreateRef<Material>();
+			const auto material = CreateRef<DeprecatedMaterial>();
 			material->Name = "Default";
-			m_Materials.push_back(material);
+			info.materials.push_back(material);
 		}
 	}
 
-	void MeshImporter::ProcessMeshes(const aiScene* scene)
+	void AssimpModelImporter::ProcessMeshes(const aiScene* scene, ModelLoadingInfo& info)
 	{
 		// This map will hold all the geometry, grouped by material index.
 		std::map<uint32_t, std::vector<aiMesh*>> meshesByMaterial;
@@ -192,10 +212,10 @@ namespace Kerberos
 			const auto mergedMesh = CreateRef<Mesh>(combinedVertices, combinedIndices);
 
 			// Find the corresponding material
-			const Ref<Material> material = (m_Materials.size() > materialIndex) ? m_Materials[materialIndex] : m_Materials.front();
+			const Ref<DeprecatedMaterial> material = (info.materials.size() > materialIndex) ? info.materials[materialIndex] : info.materials.front();
 
 			// Store the submesh
-			m_Submeshes.push_back({ .Mesh = mergedMesh, .Material = material });
+			info.submeshes.push_back({ .Mesh = mergedMesh, .Material = material });
 		}
 	}
 }

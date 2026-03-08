@@ -29,5 +29,8 @@ namespace Kerberos
 		~TextureCube() override;
 
 		AssetType GetType() override { return AssetType::Texture2D; }
+
+		static Ref<TextureCube> FromData(const CubemapData& data);
+		static Ref<TextureCube> FromFile(const std::filesystem::path& filepath);
 	};
 }

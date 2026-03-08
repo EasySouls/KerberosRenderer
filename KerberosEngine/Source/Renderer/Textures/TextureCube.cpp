@@ -187,4 +187,14 @@ namespace Kerberos
 	{
 		KBR_CORE_TRACE("Destroying TextureCube: {}", GetHandle());
 	}
+
+	Ref<TextureCube> TextureCube::FromData(const CubemapData& data)
+	{
+		return CreateRef<TextureCube>(data);
+	}
+
+	Ref<TextureCube> TextureCube::FromFile(const std::filesystem::path& filepath)
+	{
+		return CreateRef<TextureCube>(filepath);
+	}
 }

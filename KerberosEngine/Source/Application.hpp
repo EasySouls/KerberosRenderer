@@ -4,6 +4,7 @@
 #include "Events/Event.hpp"
 #include "Audio/AudioManager.hpp"
 #include "Logging/Log.hpp"
+#include "Core/Core.hpp"
 #include "Layer.hpp"
 
 #include <memory>

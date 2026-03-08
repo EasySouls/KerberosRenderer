@@ -1,6 +1,7 @@
 #pragma once
 
-#include "Textures.hpp"
+#include "Textures/Texture2D.hpp"
+#include "Textures/TextureCube.hpp"
 #include "Mesh.hpp"
 
 namespace Kerberos::SkyboxUtils

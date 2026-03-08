@@ -3,9 +3,10 @@
 #include "Layer.hpp"
 #include "Vulkan.hpp"
 
-#include "Mesh.hpp"
+#include "Renderer/Mesh.hpp"
+#include "Renderer/Textures/Texture2D.hpp"
+#include "Renderer/Textures/TextureCube.hpp"
 #include "Buffer.hpp"
-#include "Textures.hpp"
 #include "Renderer/Material.hpp"
 #include "Core/Core.hpp"
 #include "Scene/Node.hpp"
@@ -18,6 +19,7 @@
 #include <memory>
 #include <optional>
 #include <unordered_map>
+
 
 namespace Kerberos
 {
@@ -89,11 +91,11 @@ namespace Kerberos
 		vk::raii::PipelineLayout m_ShadowMapPipelineLayout = nullptr;
 		vk::raii::Pipeline m_ShadowMapPipeline = nullptr;
 
-		TextureCube m_SkyboxTexture;
+		Ref<TextureCube> m_SkyboxTexture;
 		// Generated at runtime
-		Texture2D m_LutBrdfTexture;
-		TextureCube m_IrradianceCubeTexture;
-		TextureCube m_PrefilteredCubeTexture;
+		Ref<Texture2D> m_LutBrdfTexture;
+		Ref<TextureCube> m_IrradianceCubeTexture;
+		Ref<TextureCube> m_PrefilteredCubeTexture;
 
 		vk::raii::Image m_ColorImage = nullptr;
 		vk::raii::DeviceMemory m_ColorImageMemory = nullptr;

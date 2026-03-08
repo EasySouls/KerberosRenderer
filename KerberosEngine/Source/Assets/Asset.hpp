@@ -16,7 +16,8 @@ namespace Kerberos
 		Material,
 		Mesh,
 		Scene,
-		Sound
+		Sound,
+		Model
 	};
 
 	class Asset
