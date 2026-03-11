@@ -16,7 +16,7 @@ namespace Kerberos
 	{
 		glm::vec3 Position{ 0.0f };
 		glm::vec3 Normal{ 0.0f };
-		glm::vec3 Tangent{ 0.0f };
+		glm::vec4 Tangent{ 0.0f };
 		glm::vec2 TexCoord{ 0.0f };
 
 		static BufferLayout GetLayout()
@@ -38,7 +38,7 @@ namespace Kerberos
 			return {
 				vk::VertexInputAttributeDescription(0, 0, vk::Format::eR32G32B32Sfloat, offsetof(Vertex, Position)),
 				vk::VertexInputAttributeDescription(1, 0, vk::Format::eR32G32B32Sfloat, offsetof(Vertex, Normal)),
-				vk::VertexInputAttributeDescription(2, 0, vk::Format::eR32G32B32Sfloat, offsetof(Vertex, Tangent)),
+				vk::VertexInputAttributeDescription(2, 0, vk::Format::eR32G32B32A32Sfloat, offsetof(Vertex, Tangent)),
 				vk::VertexInputAttributeDescription(3, 0, vk::Format::eR32G32Sfloat, offsetof(Vertex, TexCoord)),
 			};
 		}

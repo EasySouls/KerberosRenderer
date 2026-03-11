@@ -94,6 +94,16 @@ namespace Kerberos
                     texCoordBuffer = &model.buffers[texCoordBufferView->buffer];
                 }
 
+				bool hasTangents = primitive.attributes.contains("TANGENT");
+				const tinygltf::Accessor* tangentAccessor = nullptr;
+				const tinygltf::BufferView* tangentBufferView = nullptr;
+				const tinygltf::Buffer* tangentBuffer = nullptr;
+				if (hasTangents) {
+					tangentAccessor = &model.accessors[primitive.attributes.at("TANGENT")];
+					tangentBufferView = &model.bufferViews[tangentAccessor->bufferView];
+					tangentBuffer = &model.buffers[tangentBufferView->buffer];
+				}
+
 				const size_t posStride = posBufferView.byteStride ? posBufferView.byteStride : sizeof(float) * 3;
 				const size_t normalStride = hasNormals && normalBufferView->byteStride ? normalBufferView->byteStride : sizeof(float) * 3;
 				const size_t uvStride = hasTexCoords && texCoordBufferView->byteStride ? texCoordBufferView->byteStride : sizeof(float) * 2;
@@ -130,6 +140,17 @@ namespace Kerberos
 					else
 					{
 						vertex.TexCoord = { 0.0f, 0.0f };
+					}
+
+					if (hasTangents)
+					{
+						const uint8_t* tangentBytes = tangentBuffer->data.data() + tangentBufferView->byteOffset + tangentAccessor->byteOffset + i * sizeof(float) * 4;
+						const float* tangent = reinterpret_cast<const float*>(tangentBytes);
+						vertex.Tangent = { tangent[0], tangent[1], tangent[2], tangent[3] };
+					}
+					else
+					{
+						vertex.Tangent = { 0.0f, 0.0f, 0.0f, 0.0f };
 					}
 
 					auto it = uniqueVertices.find(vertex);

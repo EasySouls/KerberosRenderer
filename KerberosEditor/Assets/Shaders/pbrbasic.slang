@@ -2,6 +2,7 @@ struct VSInput
 {
     float3 Pos;
     float3 Normal;
+    float4 Tangent;
     float2 TexCoord;
 };
 
@@ -10,6 +11,7 @@ struct VSOutput
     float4 Position : SV_POSITION;
     float3 FragPos_WorldSpace;
     float3 Normal_WorldSpace;
+    float3 Tangent_WorldSpace;
     float2 TexCoord : TEXCOORD0;
     float4 FragPos_LightSpace;
 };
@@ -195,6 +197,8 @@ VSOutput vertexMain(VSInput input)
 
     float3x3 normalMatrix = (float3x3)perObject.worldNormal;
     output.Normal_WorldSpace = mul(normalMatrix, input.Normal);
+
+    output.Tangent_WorldSpace = mul(normalMatrix, input.Tangent.xyz);
 
     output.TexCoord = input.TexCoord;
 
