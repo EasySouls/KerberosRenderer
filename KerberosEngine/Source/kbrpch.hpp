@@ -31,6 +31,6 @@
 #include <glm/gtc/type_ptr.hpp>
 
 #include "Core/Core.hpp"
-#include "Core/Asserts.hpp"
+#include "Core/UUID.hpp"
 #include "Logging/Log.hpp"
 #include "Debug/Instrumentor.hpp"

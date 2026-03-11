@@ -1,6 +1,6 @@
 #pragma once
 
-#include "Core/Asserts.hpp"
+#include "Core/Core.hpp"
 
 #include <cstdint>
 
@@ -33,7 +33,7 @@ namespace Kerberos
 			case ShaderDataType::Bool:     return 1;
 		}
 
-		KBR_ASSERT(false, "Unknown ShaderDataType!");
+		KBR_CORE_ASSERT(false, "Unknown ShaderDataType!");
 		return 0;
 	}
 }

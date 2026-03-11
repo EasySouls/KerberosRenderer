@@ -885,9 +885,9 @@ namespace Kerberos
 
 	void VulkanContext::CreateAllocator() 
 	{
-		KBR_CORE_ASSERT(instance != nullptr, "VkInstance has to be initialized to create allocator!");
-		KBR_CORE_ASSERT(physicalDevice != nullptr, "VkPhysicalDevice has to be initialized to create allocator!");
-		KBR_CORE_ASSERT(device != nullptr, "VkDevice has to be initialized to create allocator!");
+		KBR_CORE_ASSERT(m_Instance != nullptr, "VkInstance has to be initialized to create allocator!");
+		KBR_CORE_ASSERT(m_PhysicalDevice != nullptr, "VkPhysicalDevice has to be initialized to create allocator!");
+		KBR_CORE_ASSERT(m_Device != nullptr, "VkDevice has to be initialized to create allocator!");
 
 		m_Allocator = VMA::CreateAllocator(m_Instance, m_PhysicalDevice, m_Device);
 	}

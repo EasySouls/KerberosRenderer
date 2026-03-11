@@ -15,7 +15,7 @@ namespace Kerberos
 
 	TextureCube::TextureCube(const CubemapData& data)
 	{
-		KBR_CORE_ASSERT("TextureCube::TextureCube - CubemapData constructor is not implemented yet");
+		KBR_CORE_ASSERT(false, "TextureCube::TextureCube - CubemapData constructor is not implemented yet");
 	}
 
 	TextureCube::TextureCube(const std::filesystem::path& filepath)
@@ -101,7 +101,7 @@ namespace Kerberos
 			{
 				ktx_size_t offset;
 				KTX_error_code res = ktxTexture_GetImageOffset((ktxTexture*)ktxTex, level, 0, face, &offset);
-				KBR_CORE_ASSERT(res == KTX_SUCCESS);
+				KBR_CORE_ASSERT(res == KTX_SUCCESS, "TextureCube::TextureCube - Failed to get image offset for level {} face {}", level, face);
 				vk::BufferImageCopy bufferCopyRegion{
 					.bufferOffset = offset,
 					.imageSubresource = {

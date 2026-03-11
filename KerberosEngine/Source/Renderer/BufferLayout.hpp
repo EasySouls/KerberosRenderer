@@ -1,6 +1,6 @@
 #pragma once
 
-#include "Core/Asserts.hpp"
+#include "Core/Core.hpp"
 #include "Shaders/ShaderDataType.hpp"
 
 #include <vector>

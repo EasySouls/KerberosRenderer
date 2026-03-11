@@ -234,7 +234,7 @@ namespace Kerberos
 		for (uint32_t i = 0; i < mipLevels; i++) {
 			ktx_size_t offset;
 			KTX_error_code res = ktxTexture_GetImageOffset(reinterpret_cast<ktxTexture*>(ktxTex), i, 0, 0, &offset);
-			KBR_CORE_ASSERT(res == KTX_SUCCESS);
+			KBR_CORE_ASSERT(res == KTX_SUCCESS, "Texture2D::Texture2D - Failed to get image offset for mip level {}", i);
 			vk::BufferImageCopy bufferCopyRegion{
 				.bufferOffset = offset,
 				.imageSubresource = {
