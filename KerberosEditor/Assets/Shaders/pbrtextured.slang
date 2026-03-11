@@ -128,7 +128,7 @@ float3 prefilteredReflection(float3 R, float roughness)
     return lerp(a, b, lod - lodf);
 }
 
-float3 SpecularContribution(float3 L, float3 V, float3 N, float3 F0, Material material)
+float3 SpecularContribution(float3 L, float3 V, float3 N, float3 F0, float3 albedo, float metallic, float roughness)
 {
     // Precalculate vectors and dot products
     float3 H = normalize(V + L);
@@ -143,14 +143,14 @@ float3 SpecularContribution(float3 L, float3 V, float3 N, float3 F0, Material ma
 
     if (dotNL > 0.0) {
         // D = Normal distribution (Distribution of the microfacets)
-        float D = D_GGX(dotNH, material.roughness);
+        float D = D_GGX(dotNH, roughness);
         // G = Geometric shadowing term (Microfacets shadowing)
-        float G = G_SchlicksmithGGX(dotNL, dotNV, material.roughness);
+        float G = G_SchlicksmithGGX(dotNL, dotNV, roughness);
         // F = Fresnel factor (Reflectance depending on angle of incidence)
         float3 F = F_Schlick(dotNV, F0);
         float3 spec = D * F * G / (4.0 * dotNL * dotNV + 0.001);
-        float3 kD = (float3(1.0, 1.0, 1.0) - F) * (1.0 - material.metallic);
-        color += (kD * material.albedo / PI + spec) * dotNL;
+        float3 kD = (float3(1.0, 1.0, 1.0) - F) * (1.0 - metallic);
+        color += (kD * albedo / PI + spec) * dotNL;
     }
 
     return color;
@@ -198,6 +198,15 @@ float ShadowCalculation(float3 lightDir, float3 normal, float4 fragPosLightSpace
     return shadow;
 }
 
+float3 CalculateNormal(VSOutput input)
+{
+    float3 tangentNormal = normalMapSampler.Sample(input.TexCoord).xyz * 2.0 - 1.0;
+    float3x3 TBN = float3x3(normalize(input.Tangent_WorldSpace), 
+                            normalize(cross(input.Normal_WorldSpace, input.Tangent_WorldSpace)), 
+                            normalize(input.Normal_WorldSpace));
+    return mul(TBN, tangentNormal);
+}
+
 [shader("vertex")]
 VSOutput vertexMain(VSInput input)
 {
@@ -226,6 +235,9 @@ float4 fragmentMain(VSOutput input)
     float3 V = normalize(scene.camPos - input.FragPos_WorldSpace);
     float3 R = reflect(-V, N);
 
+    float metallic = perObject.material.metallic;  // metallicMapSampler.Sample(input.TexCoord).r;
+    float roughness = perObject.material.roughness; // roughnessMapSampler.Sample(input.TexCoord).r;
+
     // For point lights in the future
     // float3 lightDir = normalize(uboParams.lights[0].xyz - input.FragPos_WorldSpace);
 
@@ -235,7 +247,7 @@ float4 fragmentMain(VSOutput input)
 
     float3 F0 = float3(0.04, 0.04, 0.04);
     float3 albedo = pow(albedoMapSampler.Sample(input.TexCoord).rgb, float3(2.2, 2.2, 2.2));
-    F0 = lerp(F0, albedo, perObject.material.metallic);
+    F0 = lerp(F0, albedo, metallic);
 
 	// Specular contribution
 	float3 Lo = float3(0.0, 0.0, 0.0);
@@ -244,7 +256,7 @@ float4 fragmentMain(VSOutput input)
         // float3 L = normalize(normalize(uboParams.lights[i].xyz) - input.FragPos_WorldSpace);
         float3 L = normalize(uboParams.lights[i].xyz);
 
-        float3 contribution = SpecularContribution(L, V, N, F0, perObject.material);
+        float3 contribution = SpecularContribution(L, V, N, F0, albedo, metallic, roughness);
         if (i == 0) // Only apply shadow to the first light for now
             contribution *= (1.0 - shadow);
 
@@ -254,14 +266,14 @@ float4 fragmentMain(VSOutput input)
     float3 sampleN = float3(N.x, -N.y, N.z);
     float3 sampleR = float3(R.x, -R.y, R.z);
 
-    float2 brdf = samplerBRDFLUT.Sample(float2(max(dot(N, V), 0.0), perObject.material.roughness)).rg;
-    float3 reflection = prefilteredReflection(sampleR, perObject.material.roughness).rgb;
+    float2 brdf = samplerBRDFLUT.Sample(float2(max(dot(N, V), 0.0), roughness)).rg;
+    float3 reflection = prefilteredReflection(sampleR, roughness).rgb;
     float3 irradiance = samplerIrradiance.Sample(sampleN).rgb;
 
     // Diffuse based on irradiance
     float3 diffuse = irradiance * albedo;
 
-    float3 F = F_SchlickR(max(dot(N, V), 0.0), F0, perObject.material.roughness);
+    float3 F = F_SchlickR(max(dot(N, V), 0.0), F0, roughness);
 
     // Specular reflectance
     float3 specular = reflection * (F * brdf.x + brdf.y);
