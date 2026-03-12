@@ -10,8 +10,9 @@ struct VSOutput
 {
     float4 Position : SV_POSITION;
     float3 FragPos_WorldSpace;
-    float3 Normal_WorldSpace;
-    float3 Tangent_WorldSpace;
+    float3 Normal;
+    float3 Tangent;
+    float TangentW;  // glTF tangent handedness (+1 or -1)
     float2 TexCoord : TEXCOORD0;
     float4 FragPos_LightSpace;
 };
@@ -200,11 +201,22 @@ float ShadowCalculation(float3 lightDir, float3 normal, float4 fragPosLightSpace
 
 float3 CalculateNormal(VSOutput input)
 {
+    float3 N = normalize(input.Normal);
+    float3 T = input.Tangent;
+
+    if (dot(T, T) < 1e-6)
+        return N;
+
+    // Re-orthogonalize (Gram-Schmidt)
+    T = normalize(T - N * dot(N, T));
+
+    float3 B = cross(N, T) * input.TangentW;
+
+    float3x3 TBN = float3x3(T, B, N);
+
     float3 tangentNormal = normalMapSampler.Sample(input.TexCoord).xyz * 2.0 - 1.0;
-    float3x3 TBN = float3x3(normalize(input.Tangent_WorldSpace), 
-                            normalize(cross(input.Normal_WorldSpace, input.Tangent_WorldSpace)), 
-                            normalize(input.Normal_WorldSpace));
-    return mul(TBN, tangentNormal);
+
+    return normalize(mul(tangentNormal, TBN));
 }
 
 [shader("vertex")]
@@ -216,9 +228,9 @@ VSOutput vertexMain(VSInput input)
     output.FragPos_WorldSpace = worldPos.xyz;
 
     float3x3 normalMatrix = (float3x3)perObject.worldNormal;
-    output.Normal_WorldSpace = mul(normalMatrix, input.Normal);
-
-    output.Tangent_WorldSpace = mul(normalMatrix, input.Tangent.xyz);
+    output.Normal = mul(normalMatrix, input.Normal);
+    output.Tangent = mul(normalMatrix, input.Tangent.xyz);
+    output.TangentW = input.Tangent.w;
 
     output.TexCoord = input.TexCoord;
 
@@ -231,7 +243,7 @@ VSOutput vertexMain(VSInput input)
 [shader("fragment")]
 float4 fragmentMain(VSOutput input)
 {
-	float3 N = normalize(input.Normal_WorldSpace);
+    float3 N = CalculateNormal(input);
     float3 V = normalize(scene.camPos - input.FragPos_WorldSpace);
     float3 R = reflect(-V, N);
 
@@ -246,7 +258,7 @@ float4 fragmentMain(VSOutput input)
     float shadow = ShadowCalculation(lightDir, N, input.FragPos_LightSpace);
 
     float3 F0 = float3(0.04, 0.04, 0.04);
-    float3 albedo = pow(albedoMapSampler.Sample(input.TexCoord).rgb, float3(2.2, 2.2, 2.2));
+    float3 albedo = pow(albedoMapSampler.Sample(input.TexCoord).rgb * perObject.material.albedo, float3(2.2, 2.2, 2.2));
     F0 = lerp(F0, albedo, metallic);
 
 	// Specular contribution
@@ -263,12 +275,12 @@ float4 fragmentMain(VSOutput input)
         Lo += contribution;
 	};
 
-    float3 sampleN = float3(N.x, -N.y, N.z);
-    float3 sampleR = float3(R.x, -R.y, R.z);
+    //float3 sampleN = float3(N.x, -N.y, N.z);
+    //float3 sampleR = float3(R.x, -R.y, R.z);
 
     float2 brdf = samplerBRDFLUT.Sample(float2(max(dot(N, V), 0.0), roughness)).rg;
-    float3 reflection = prefilteredReflection(sampleR, roughness).rgb;
-    float3 irradiance = samplerIrradiance.Sample(sampleN).rgb;
+    float3 reflection = prefilteredReflection(R, roughness).rgb;
+    float3 irradiance = samplerIrradiance.Sample(N).rgb;
 
     // Diffuse based on irradiance
     float3 diffuse = irradiance * albedo;

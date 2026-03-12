@@ -166,7 +166,8 @@ namespace Kerberos
 
 		// TODO: Do not do this here
 
-		constexpr std::array<uint8_t, 4> albedoBuffer = { 1, 1, 1, 1 };
+		// White placeholder texture for albedo
+		constexpr std::array<uint8_t, 4> albedoBuffer = { 255, 255, 255, 255 };
 		TextureSpecification albedoSpec{};
 		albedoSpec.Width = 1;
 		albedoSpec.Height = 1;
@@ -175,7 +176,8 @@ namespace Kerberos
 		std::memcpy(albedoBufferStruct.Data, albedoBuffer.data(), albedoBufferStruct.Size);
 		m_AlbedoPlaceholder = Texture2D::FromBuffer(albedoSpec, albedoBufferStruct);
 
-		constexpr std::array<uint8_t, 4> normalBuffer = { 1, 1, 1, 1 };
+		// Flat normal placeholder — (128, 128, 255) decodes to tangent-space (0, 0, 1)
+		constexpr std::array<uint8_t, 4> normalBuffer = { 128, 128, 255, 255 };
 		TextureSpecification normalSpec{};
 		normalSpec.Width = 1;
 		normalSpec.Height = 1;

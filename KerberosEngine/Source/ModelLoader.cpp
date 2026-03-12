@@ -107,6 +107,7 @@ namespace Kerberos
 				const size_t posStride = posBufferView.byteStride ? posBufferView.byteStride : sizeof(float) * 3;
 				const size_t normalStride = hasNormals && normalBufferView->byteStride ? normalBufferView->byteStride : sizeof(float) * 3;
 				const size_t uvStride = hasTexCoords && texCoordBufferView->byteStride ? texCoordBufferView->byteStride : sizeof(float) * 2;
+				const size_t tangentStride = hasTangents && tangentBufferView->byteStride ? tangentBufferView->byteStride : sizeof(float) * 4;
 
                 std::vector<uint32_t> remap(posAccessor.count);
 
@@ -144,7 +145,7 @@ namespace Kerberos
 
 					if (hasTangents)
 					{
-						const uint8_t* tangentBytes = tangentBuffer->data.data() + tangentBufferView->byteOffset + tangentAccessor->byteOffset + i * sizeof(float) * 4;
+						const uint8_t* tangentBytes = tangentBuffer->data.data() + tangentBufferView->byteOffset + tangentAccessor->byteOffset + i * tangentStride;
 						const float* tangent = reinterpret_cast<const float*>(tangentBytes);
 						vertex.Tangent = { tangent[0], tangent[1], tangent[2], tangent[3] };
 					}

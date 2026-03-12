@@ -25,7 +25,7 @@ namespace Kerberos
 			{
 				{ ShaderDataType::Float3, "Position" },
 				{ ShaderDataType::Float3, "Normal"   },
-				{ ShaderDataType::Float3, "Tangent"  },
+				{ ShaderDataType::Float4, "Tangent"  },
 				{ ShaderDataType::Float2, "TexCoord" },
 			};
 		}
