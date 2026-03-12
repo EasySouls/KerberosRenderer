@@ -258,7 +258,9 @@ float4 fragmentMain(VSOutput input)
     float shadow = ShadowCalculation(lightDir, N, input.FragPos_LightSpace);
 
     float3 F0 = float3(0.04, 0.04, 0.04);
-    float3 albedo = pow(albedoMapSampler.Sample(input.TexCoord).rgb * perObject.material.albedo, float3(2.2, 2.2, 2.2));
+    // Use this when working with srgb textures
+    //float3 albedo = pow(albedoMapSampler.Sample(input.TexCoord).rgb * perObject.material.albedo, float3(2.2, 2.2, 2.2));
+    float3 albedo = albedoMapSampler.Sample(input.TexCoord).rgb * perObject.material.albedo;
     F0 = lerp(F0, albedo, metallic);
 
 	// Specular contribution

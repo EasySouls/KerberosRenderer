@@ -48,17 +48,17 @@ namespace Kerberos
 
 		m_ViewportSize = { 1280.0f, 720.0f };
 
-		m_MaterialRegistry.Add("Gold", std::make_shared<Material>("Gold", glm::vec3(1.0f, 0.765557f, 0.336057f), 0.1f, 1.0f));
-		m_MaterialRegistry.Add("Copper", std::make_shared<Material>("Copper", glm::vec3(0.955008f, 0.637427f, 0.538163f), 0.1f, 1.0f));
-		m_MaterialRegistry.Add("Chromium", std::make_shared<Material>("Chromium", glm::vec3(0.549585f, 0.556114f, 0.554256f), 0.1f, 1.0f));
-		m_MaterialRegistry.Add("Nickel", std::make_shared<Material>("Nickel", glm::vec3(0.659777f, 0.608679f, 0.525649f), 0.1f, 1.0f));
-		m_MaterialRegistry.Add("Titanium", std::make_shared<Material>("Titanium", glm::vec3(0.541931f, 0.496791f, 0.449419f), 0.1f, 1.0f));
-		m_MaterialRegistry.Add("Cobalt", std::make_shared<Material>("Cobalt", glm::vec3(0.662124f, 0.654864f, 0.633732f), 0.1f, 1.0f));
-		m_MaterialRegistry.Add("Platinum", std::make_shared<Material>("Platinum", glm::vec3(0.672411f, 0.637331f, 0.585456f), 0.1f, 1.0f));
-		m_MaterialRegistry.Add("White", std::make_shared<Material>("White", glm::vec3(1.0f), 0.1f, 1.0f));
-		m_MaterialRegistry.Add("Red", std::make_shared<Material>("Red", glm::vec3(1.0f, 0.0f, 0.0f), 0.1f, 1.0f));
-		m_MaterialRegistry.Add("Blue", std::make_shared<Material>("Blue", glm::vec3(0.0f, 0.0f, 1.0f), 0.1f, 1.0f));
-		m_MaterialRegistry.Add("Black", std::make_shared<Material>("Black", glm::vec3(0.0f), 0.1f, 1.0f));
+		m_MaterialRegistry.Add("Gold", CreateRef<Material>("Gold", glm::vec3(1.0f, 0.765557f, 0.336057f), 0.1f, 1.0f));
+		m_MaterialRegistry.Add("Copper", CreateRef<Material>("Copper", glm::vec3(0.955008f, 0.637427f, 0.538163f), 0.1f, 1.0f));
+		m_MaterialRegistry.Add("Chromium", CreateRef<Material>("Chromium", glm::vec3(0.549585f, 0.556114f, 0.554256f), 0.1f, 1.0f));
+		m_MaterialRegistry.Add("Nickel", CreateRef<Material>("Nickel", glm::vec3(0.659777f, 0.608679f, 0.525649f), 0.1f, 1.0f));
+		m_MaterialRegistry.Add("Titanium", CreateRef<Material>("Titanium", glm::vec3(0.541931f, 0.496791f, 0.449419f), 0.1f, 1.0f));
+		m_MaterialRegistry.Add("Cobalt", CreateRef<Material>("Cobalt", glm::vec3(0.662124f, 0.654864f, 0.633732f), 0.1f, 1.0f));
+		m_MaterialRegistry.Add("Platinum", CreateRef<Material>("Platinum", glm::vec3(0.672411f, 0.637331f, 0.585456f), 0.1f, 1.0f));
+		m_MaterialRegistry.Add("White", CreateRef<Material>("White", glm::vec3(1.0f), 0.1f, 1.0f));
+		m_MaterialRegistry.Add("Red", CreateRef<Material>("Red", glm::vec3(1.0f, 0.0f, 0.0f), 0.1f, 1.0f));
+		m_MaterialRegistry.Add("Blue", CreateRef<Material>("Blue", glm::vec3(0.0f, 0.0f, 1.0f), 0.1f, 1.0f));
+		m_MaterialRegistry.Add("Black", CreateRef<Material>("Black", glm::vec3(0.0f), 0.1f, 1.0f));
 
 		KBR_CORE_INFO("Size of SceneUniformData: {} bytes", sizeof(SceneUniformData));
 		KBR_CORE_INFO("Size of UniformDataParams: {} bytes", sizeof(UniformDataParams));
@@ -76,10 +76,10 @@ namespace Kerberos
 		m_SkyboxTexture = TextureCube::FromFile("assets/textures/hdr/pisa_cube.ktx");
 
 		// Load models
-		m_Meshes["avocado"] = std::make_shared<Mesh>(ModelLoader::LoadModel("assets/models/avocado/Avocado.gltf", loadingFlags));
-		m_Meshes["cube"] = std::make_shared<Mesh>(ModelLoader::LoadModel("assets/models/cube.gltf", loadingFlags));
-		m_Meshes["sphere"] = std::make_shared<Mesh>(ModelLoader::LoadModel("assets/models/sphere.gltf", loadingFlags));
-		m_Meshes["cerberus"] = std::make_shared<Mesh>(ModelLoader::LoadModel("assets/models/cerberus/cerberus.gltf", loadingFlags));
+		m_Meshes["avocado"] = CreateRef<Mesh>(ModelLoader::LoadModel("assets/models/avocado/Avocado.gltf", loadingFlags));
+		m_Meshes["cube"] = CreateRef<Mesh>(ModelLoader::LoadModel("assets/models/cube.gltf", loadingFlags));
+		m_Meshes["sphere"] = CreateRef<Mesh>(ModelLoader::LoadModel("assets/models/sphere.gltf", loadingFlags));
+		m_Meshes["cerberus"] = CreateRef<Mesh>(ModelLoader::LoadModel("assets/models/cerberus/cerberus.gltf", loadingFlags));
 
 
 		KBR_CORE_INFO("Loaded {} mesh(es)!", m_Meshes.size());
@@ -1103,7 +1103,7 @@ namespace Kerberos
 		lightProjection[1][1] *= -1.0f;
 
 		constexpr glm::vec3 sceneCenter = glm::vec3(0.0f, 0.0f, 0.0f);
-		constexpr float lightDistance = 20.0f;
+		constexpr float lightDistance = 80.0f;
 
 		/*const glm::vec3 lightDirRaw = glm::vec3(m_UniformDataParams.lights[0]);
 		const glm::vec3 lightDir = glm::length2(lightDirRaw) > std::numeric_limits<float>::epsilon()
