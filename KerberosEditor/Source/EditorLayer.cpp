@@ -789,7 +789,7 @@ namespace Kerberos
 	void EditorLayer::PrepareUniformBuffers()
 	{
 		const auto& context = VulkanContext::Get();
-		const auto properties = context.GetProperties();
+		const auto properties = context.GetProperties().properties;
 
 		m_MinUniformBufferOffsetAlignment = properties.limits.minUniformBufferOffsetAlignment;
 

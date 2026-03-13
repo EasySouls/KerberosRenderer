@@ -463,13 +463,13 @@ namespace Kerberos
 	{
 		for (const vk::Format format : candidates)
 		{
-			const vk::FormatProperties props = GetFormatProperties(format);
+			const vk::FormatProperties2 props = GetFormatProperties(format);
 
-			if (tiling == vk::ImageTiling::eLinear && (props.linearTilingFeatures & features) == features)
+			if (tiling == vk::ImageTiling::eLinear && (props.formatProperties.linearTilingFeatures & features) == features)
 			{
 				return format;
 			}
-			if (tiling == vk::ImageTiling::eOptimal && (props.optimalTilingFeatures & features) == features)
+			if (tiling == vk::ImageTiling::eOptimal && (props.formatProperties.optimalTilingFeatures & features) == features)
 			{
 				return format;
 			}
@@ -517,24 +517,24 @@ namespace Kerberos
 		return m_PhysicalDevice;
 	}
 
-	vk::PhysicalDeviceProperties VulkanContext::GetProperties() const 
+	vk::PhysicalDeviceProperties2 VulkanContext::GetProperties() const 
 	{
-		return m_PhysicalDevice.getProperties();
+		return m_PhysicalDevice.getProperties2();
 	}
 
-	vk::PhysicalDeviceMemoryProperties VulkanContext::GetMemoryProperties() const 
+	vk::PhysicalDeviceMemoryProperties2 VulkanContext::GetMemoryProperties() const 
 	{
-		return m_PhysicalDevice.getMemoryProperties();
+		return m_PhysicalDevice.getMemoryProperties2();
 	}
 
-	vk::FormatProperties VulkanContext::GetFormatProperties(const vk::Format format) const 
+	vk::FormatProperties2 VulkanContext::GetFormatProperties(const vk::Format format) const 
 	{
-		return m_PhysicalDevice.getFormatProperties(format);
+		return m_PhysicalDevice.getFormatProperties2(format);
 	}
 
-	vk::SampleCountFlagBits VulkanContext::GetMSAASamples() const 
+	vk::SampleCountFlagBits VulkanContext::GetMaxMSAASamples() const 
 	{
-		return m_MSAASamples;
+		return m_MaxMSAASamples;
 	}
 
 	void VulkanContext::FramebufferResized(uint32_t width, uint32_t height) 
@@ -752,7 +752,7 @@ namespace Kerberos
 		const auto devIter = std::ranges::find_if(devices,
 												  [&](auto const& device) {
 			auto queueFamilies = device.getQueueFamilyProperties();
-			bool isSuitable = device.getProperties().apiVersion >= VK_API_VERSION_1_3;
+			bool isSuitable = device.getProperties2().properties.apiVersion >= VK_API_VERSION_1_3;
 			const auto qfpIter = std::ranges::find_if(queueFamilies,
 													  [](vk::QueueFamilyProperties const& qfp)
 			{
@@ -768,7 +768,7 @@ namespace Kerberos
 			isSuitable = isSuitable && found;
 			if (isSuitable) {
 				m_PhysicalDevice = device;
-				m_MSAASamples = GetMaxUsableSampleCount(m_PhysicalDevice);
+				m_MaxMSAASamples = GetMaxUsableSampleCount(m_PhysicalDevice);
 			}
 			return isSuitable;
 		});
@@ -779,8 +779,8 @@ namespace Kerberos
 
 	static bool IsDeviceSuitable(const vk::raii::PhysicalDevice& physicalDevice)
 	{
-		const auto deviceProperties = physicalDevice.getProperties();
-		const auto deviceFeatures = physicalDevice.getFeatures();
+		const auto deviceProperties = physicalDevice.getProperties2().properties;
+		const auto deviceFeatures = physicalDevice.getFeatures2().features;
 
 		if (deviceProperties.deviceType == vk::PhysicalDeviceType::eDiscreteGpu && deviceFeatures.geometryShader) {
 			return true;
@@ -804,7 +804,7 @@ namespace Kerberos
 
 	void VulkanContext::CreateLogicalDevice()
 	{
-		std::vector<vk::QueueFamilyProperties> queueFamilyProperties = m_PhysicalDevice.getQueueFamilyProperties();
+		const std::vector<vk::QueueFamilyProperties> queueFamilyProperties = m_PhysicalDevice.getQueueFamilyProperties();
 		uint32_t graphicsIndex = FindQueueFamilies(m_PhysicalDevice);
 
 		// determine a queueFamilyIndex that supports present
@@ -1057,7 +1057,7 @@ namespace Kerberos
 					m_SwapChainExtent.width,
 					m_SwapChainExtent.height,
 					1,
-					m_MSAASamples,
+					m_MaxMSAASamples,
 					colorFormat,
 					vk::ImageTiling::eOptimal,
 					vk::ImageUsageFlagBits::eTransientAttachment | vk::ImageUsageFlagBits::eColorAttachment,
@@ -1076,7 +1076,7 @@ namespace Kerberos
 					m_SwapChainExtent.width,
 					m_SwapChainExtent.height,
 					1,
-					m_MSAASamples,
+					m_MaxMSAASamples,
 					m_DepthFormat,
 					vk::ImageTiling::eOptimal,
 					vk::ImageUsageFlagBits::eDepthStencilAttachment,
@@ -1281,7 +1281,7 @@ namespace Kerberos
 			.stencilAttachmentFormat = VK_FORMAT_UNDEFINED,
 		};
 
-		const VkSampleCountFlagBits msaaSamplesVk = static_cast<VkSampleCountFlagBits>(m_MSAASamples);
+		const VkSampleCountFlagBits msaaSamplesVk = static_cast<VkSampleCountFlagBits>(m_MaxMSAASamples);
 		constexpr VkSampleCountFlagBits msaaSamplesViewportVk = VK_SAMPLE_COUNT_1_BIT;
 
 		ImGui_ImplVulkan_InitInfo initInfo = {};
@@ -1307,7 +1307,7 @@ namespace Kerberos
 
 	vk::SampleCountFlagBits VulkanContext::GetMaxUsableSampleCount(const vk::raii::PhysicalDevice& physicalDevice)
 	{
-		const vk::PhysicalDeviceProperties physicalDeviceProperties = physicalDevice.getProperties();
+		const vk::PhysicalDeviceProperties physicalDeviceProperties = physicalDevice.getProperties2().properties;
 
 		const vk::SampleCountFlags counts = physicalDeviceProperties.limits.framebufferColorSampleCounts & physicalDeviceProperties.limits.framebufferDepthSampleCounts;
 		if (counts & vk::SampleCountFlagBits::e64) { return vk::SampleCountFlagBits::e64; }

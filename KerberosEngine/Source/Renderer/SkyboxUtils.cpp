@@ -97,7 +97,7 @@ namespace Kerberos::SkyboxUtils
 
 		context.SetObjectDebugName(texture.sampler, "BRDFLUT_Sampler");
 
-		vk::AttachmentDescription attrDesc{
+		vk::AttachmentDescription2 attrDesc{
 			.format = format,
 			.samples = vk::SampleCountFlagBits::e1,
 			.loadOp = vk::AttachmentLoadOp::eClear,
@@ -109,19 +109,19 @@ namespace Kerberos::SkyboxUtils
 		};
 
 		// Color attachment
-		vk::AttachmentReference colorReference{
+		vk::AttachmentReference2 colorReference{
 			.attachment = 0, 
 			.layout = vk::ImageLayout::eColorAttachmentOptimal 
 		};
 
-		vk::SubpassDescription subpassDescription{
+		vk::SubpassDescription2 subpassDescription{
 			.pipelineBindPoint = vk::PipelineBindPoint::eGraphics,
 			.colorAttachmentCount = 1,
 			.pColorAttachments = &colorReference
 		};
 
 		// Use subpass dependencies for layout transitions
-		std::array<vk::SubpassDependency, 2> dependencies;
+		std::array<vk::SubpassDependency2, 2> dependencies;
 		dependencies[0].srcSubpass = vk::SubpassExternal;
 		dependencies[0].dstSubpass = 0;
 		dependencies[0].srcStageMask = vk::PipelineStageFlagBits::eBottomOfPipe;
@@ -138,7 +138,7 @@ namespace Kerberos::SkyboxUtils
 		dependencies[1].dependencyFlags = vk::DependencyFlagBits::eByRegion;
 
 		// Create the actual renderpass
-		vk::RenderPassCreateInfo renderPassInfo{
+		vk::RenderPassCreateInfo2 renderPassInfo{
 			.attachmentCount = 1,
 			.pAttachments = &attrDesc,
 			.subpassCount = 1,
@@ -147,7 +147,7 @@ namespace Kerberos::SkyboxUtils
 			.pDependencies = dependencies.data()
 		};
 
-		vk::raii::RenderPass renderpass = device.createRenderPass(renderPassInfo);
+		vk::raii::RenderPass renderpass = device.createRenderPass2(renderPassInfo);
 		context.SetObjectDebugName(renderpass, "BRDFLUT_Renderpass");
 
 		vk::FramebufferCreateInfo framebufferInfo{
@@ -310,10 +310,15 @@ namespace Kerberos::SkyboxUtils
 		renderPassBeginInfo.pClearValues = clearValues;
 		renderPassBeginInfo.framebuffer = *framebuffer;
 
+		constexpr vk::SubpassBeginInfo subpassBeginInfo{
+			.contents = vk::SubpassContents::eInline
+		};
+		constexpr vk::SubpassEndInfo subpassEndInfo{};
+
 		const auto cmd = context.BeginSingleTimeCommands();
 		context.SetObjectDebugName(cmd, "BRDFLUT_CommandBuffer");
 
-		cmd.beginRenderPass(renderPassBeginInfo, vk::SubpassContents::eInline);
+     cmd.beginRenderPass2(renderPassBeginInfo, subpassBeginInfo);
 
 		vk::Viewport viewport{
 			.x = 0.0f,
@@ -332,7 +337,7 @@ namespace Kerberos::SkyboxUtils
 
 		cmd.bindPipeline(vk::PipelineBindPoint::eGraphics, pipeline);
 		cmd.draw(3, 1, 0, 0);
-		cmd.endRenderPass();
+        cmd.endRenderPass2(subpassEndInfo);
 
 		context.EndSingleTimeCommands(cmd);
 
@@ -424,7 +429,7 @@ namespace Kerberos::SkyboxUtils
 		irradianceTexture.UpdateDescriptor();
 		context.SetObjectDebugName(irradianceTexture.sampler, "IrradianceCube_Sampler");
 
-		vk::AttachmentDescription attrDesc{
+		vk::AttachmentDescription2 attrDesc{
 			.format = format,
 			.samples = vk::SampleCountFlagBits::e1,
 			.loadOp = vk::AttachmentLoadOp::eClear,
@@ -436,19 +441,19 @@ namespace Kerberos::SkyboxUtils
 		};
 
 		// Color attachment
-		vk::AttachmentReference colorReference{
+		vk::AttachmentReference2 colorReference{
 			.attachment = 0,
 			.layout = vk::ImageLayout::eColorAttachmentOptimal
 		};
 
-		vk::SubpassDescription subpassDescription{
+		vk::SubpassDescription2 subpassDescription{
 			.pipelineBindPoint = vk::PipelineBindPoint::eGraphics,
 			.colorAttachmentCount = 1,
 			.pColorAttachments = &colorReference
 		};
 
 		// Use subpass dependencies for layout transitions
-		std::array<vk::SubpassDependency, 2> dependencies;
+		std::array<vk::SubpassDependency2, 2> dependencies;
 		dependencies[0].srcSubpass = vk::SubpassExternal;
 		dependencies[0].dstSubpass = 0;
 		dependencies[0].srcStageMask = vk::PipelineStageFlagBits::eBottomOfPipe;
@@ -465,7 +470,7 @@ namespace Kerberos::SkyboxUtils
 		dependencies[1].dependencyFlags = vk::DependencyFlagBits::eByRegion;
 
 		// Create the actual renderpass
-		vk::RenderPassCreateInfo renderPassInfo{
+		vk::RenderPassCreateInfo2 renderPassInfo{
 			.attachmentCount = 1,
 			.pAttachments = &attrDesc,
 			.subpassCount = 1,
@@ -474,7 +479,7 @@ namespace Kerberos::SkyboxUtils
 			.pDependencies = dependencies.data()
 		};
 
-		vk::raii::RenderPass renderpass = device.createRenderPass(renderPassInfo);
+		vk::raii::RenderPass renderpass = device.createRenderPass2(renderPassInfo);
 		context.SetObjectDebugName(renderpass, "IrradianceCube_Renderpass");
 
 		struct OffscreenResources
@@ -751,6 +756,10 @@ namespace Kerberos::SkyboxUtils
 			.pClearValues = clearValues,
 		};
 
+		constexpr vk::SubpassBeginInfo subpassBeginInfo{
+			.contents = vk::SubpassContents::eInline
+		};
+
 		std::vector<glm::mat4> matrices = {
 			// POSITIVE_X
 			glm::rotate(glm::rotate(glm::mat4(1.0f), glm::radians(90.0f), glm::vec3(0.0f, 1.0f, 0.0f)), glm::radians(180.0f), glm::vec3(1.0f, 0.0f, 0.0f)),
@@ -802,14 +811,16 @@ namespace Kerberos::SkyboxUtils
 			irradianceSubresourceRange
 		);
 
-		for (uint32_t m = 0; m < numMips; m++) {
-			for (uint32_t f = 0; f < 6; f++) {
+		for (uint32_t m = 0; m < numMips; m++) 
+		{
+			for (uint32_t f = 0; f < 6; f++) 
+			{
 				viewport.width = static_cast<float>(dim * std::pow(0.5f, m));
 				viewport.height = static_cast<float>(dim * std::pow(0.5f, m));
 				cmd.setViewport(0, viewport);
 
 				// Render scene from cube face's point of view
-				cmd.beginRenderPass(renderPassBeginInfo, vk::SubpassContents::eInline);
+             cmd.beginRenderPass2(renderPassBeginInfo, subpassBeginInfo);
 
 				// Update shader push constant block
 				pushBlock.mvp = glm::perspective(static_cast<float>(std::numbers::pi / 2.0), 1.0f, 0.1f, 512.0f) * matrices[f];
@@ -821,7 +832,8 @@ namespace Kerberos::SkyboxUtils
 
 				cubeMesh.Draw(cmd);
 
-				cmd.endRenderPass();
+				constexpr vk::SubpassEndInfo subpassEndInfo{};
+                cmd.endRenderPass2(subpassEndInfo);
 
 				constexpr vk::ImageSubresourceRange offscreenSubresourceRange{
 					.aspectMask = vk::ImageAspectFlagBits::eColor,
@@ -973,7 +985,7 @@ namespace Kerberos::SkyboxUtils
 		prefilteredEnvMap.UpdateDescriptor();
 		context.SetObjectDebugName(prefilteredEnvMap.sampler, "PrefilteredEnvMap_Sampler");
 
-		vk::AttachmentDescription attrDesc{
+		vk::AttachmentDescription2 attrDesc{
 			.format = format,
 			.samples = vk::SampleCountFlagBits::e1,
 			.loadOp = vk::AttachmentLoadOp::eClear,
@@ -985,19 +997,19 @@ namespace Kerberos::SkyboxUtils
 		};
 
 		// Color attachment
-		vk::AttachmentReference colorReference{
+		vk::AttachmentReference2 colorReference{
 			.attachment = 0,
 			.layout = vk::ImageLayout::eColorAttachmentOptimal
 		};
 
-		vk::SubpassDescription subpassDescription{
+		vk::SubpassDescription2 subpassDescription{
 			.pipelineBindPoint = vk::PipelineBindPoint::eGraphics,
 			.colorAttachmentCount = 1,
 			.pColorAttachments = &colorReference
 		};
 
 		// Use subpass dependencies for layout transitions
-		std::array<vk::SubpassDependency, 2> dependencies;
+		std::array<vk::SubpassDependency2, 2> dependencies;
 		dependencies[0].srcSubpass = vk::SubpassExternal;
 		dependencies[0].dstSubpass = 0;
 		dependencies[0].srcStageMask = vk::PipelineStageFlagBits::eBottomOfPipe;
@@ -1014,7 +1026,7 @@ namespace Kerberos::SkyboxUtils
 		dependencies[1].dependencyFlags = vk::DependencyFlagBits::eByRegion;
 
 		// Create the actual renderpass
-		vk::RenderPassCreateInfo renderPassInfo{
+		vk::RenderPassCreateInfo2 renderPassInfo{
 			.attachmentCount = 1,
 			.pAttachments = &attrDesc,
 			.subpassCount = 1,
@@ -1023,7 +1035,7 @@ namespace Kerberos::SkyboxUtils
 			.pDependencies = dependencies.data()
 		};
 
-		vk::raii::RenderPass renderpass = device.createRenderPass(renderPassInfo);
+		vk::raii::RenderPass renderpass = device.createRenderPass2(renderPassInfo);
 		context.SetObjectDebugName(renderpass, "PrefilteredEnvMap_Renderpass");
 
 		struct OffscreenResources
@@ -1299,6 +1311,10 @@ namespace Kerberos::SkyboxUtils
 			.pClearValues = clearValues,
 		};
 
+		constexpr vk::SubpassBeginInfo subpassBeginInfo{
+			.contents = vk::SubpassContents::eInline
+		};
+
 		std::vector<glm::mat4> matrices = {
 			// POSITIVE_X
 			glm::rotate(glm::rotate(glm::mat4(1.0f), glm::radians(90.0f), glm::vec3(0.0f, 1.0f, 0.0f)), glm::radians(180.0f), glm::vec3(1.0f, 0.0f, 0.0f)),
@@ -1360,7 +1376,7 @@ namespace Kerberos::SkyboxUtils
 				cmd.setViewport(0, viewport);
 
 				// Render scene from cube face's point of view
-				cmd.beginRenderPass(renderPassBeginInfo, vk::SubpassContents::eInline);
+				cmd.beginRenderPass2(renderPassBeginInfo, subpassBeginInfo);
 
 				// Update shader push constant block
 				pushBlock.mvp = glm::perspective(static_cast<float>(std::numbers::pi / 2.0), 1.0f, 0.1f, 512.0f) * matrices[f];
@@ -1372,7 +1388,8 @@ namespace Kerberos::SkyboxUtils
 
 				cubeMesh.Draw(cmd);
 
-				cmd.endRenderPass();
+				constexpr vk::SubpassEndInfo subpassEndInfo{};
+                cmd.endRenderPass2(subpassEndInfo);
 
 				vk::ImageSubresourceRange offscreenSubresourceRange{
 					.aspectMask = vk::ImageAspectFlagBits::eColor,

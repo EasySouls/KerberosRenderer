@@ -199,7 +199,7 @@ namespace Kerberos
 		ktx_size_t ktxTextureSize = ktxTex->dataSize;
 
 		// Get device properties for the requested texture format
-		vk::FormatProperties formatProperties = context.GetFormatProperties(format);
+		//vk::FormatProperties formatProperties = context.GetFormatProperties(format);
 
 		// Use a separate command buffer for texture loading
 		vk::raii::CommandBuffer copyCmd = context.BeginSingleTimeCommands();

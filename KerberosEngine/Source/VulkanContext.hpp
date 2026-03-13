@@ -1,7 +1,7 @@
 #pragma once
 
 #include "Vulkan.hpp"
-#include "Renderer/VMA/VMA.hpp""
+#include "Renderer/VMA/VMA.hpp"
 #include "Utils/MemoryBudget.hpp"
 
 #include <vector>
@@ -77,10 +77,10 @@ namespace Kerberos
 
 		vk::raii::Device& GetDevice();
 		vk::raii::PhysicalDevice& GetPhysicalDevice();
-		vk::PhysicalDeviceProperties GetProperties() const;
-		vk::PhysicalDeviceMemoryProperties GetMemoryProperties() const;
-		vk::FormatProperties GetFormatProperties(vk::Format format) const;
-		vk::SampleCountFlagBits GetMSAASamples() const;
+		vk::PhysicalDeviceProperties2 GetProperties() const;
+		vk::PhysicalDeviceMemoryProperties2 GetMemoryProperties() const;
+		vk::FormatProperties2 GetFormatProperties(vk::Format format) const;
+		vk::SampleCountFlagBits GetMaxMSAASamples() const;
 
 		static vk::DescriptorSet GenerateImGuiDescriptorSet(const vk::raii::Sampler& sampler,
 															const vk::raii::ImageView& imageView, 
@@ -150,7 +150,7 @@ namespace Kerberos
 
 		VMA::Allocator m_Allocator{};
 
-		vk::SampleCountFlagBits m_MSAASamples = vk::SampleCountFlagBits::e1;
+		vk::SampleCountFlagBits m_MaxMSAASamples = vk::SampleCountFlagBits::e1;
 
 		vk::raii::SurfaceKHR m_Surface = nullptr;
 

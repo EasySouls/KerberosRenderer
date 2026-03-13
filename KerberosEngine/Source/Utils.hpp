@@ -8,11 +8,11 @@ namespace Kerberos {
 inline uint32_t FindMemoryType(const uint32_t typeFilter, const vk::MemoryPropertyFlags properties)
 {
 	const VulkanContext& context = VulkanContext::Get();
-	const vk::PhysicalDeviceMemoryProperties memProperties = context.GetMemoryProperties();
+	const vk::PhysicalDeviceMemoryProperties2 memProperties = context.GetMemoryProperties();
 
-	for (uint32_t i = 0; i < memProperties.memoryTypeCount; ++i)
+	for (uint32_t i = 0; i < memProperties.memoryProperties.memoryTypeCount; ++i)
 	{
-		if ((typeFilter & (1 << i)) && (memProperties.memoryTypes[i].propertyFlags & properties) == properties)
+		if ((typeFilter & (1 << i)) && (memProperties.memoryProperties.memoryTypes[i].propertyFlags & properties) == properties)
 		{
 			return i;
 		}
@@ -29,13 +29,13 @@ inline vk::Format FindSupportedFormat(
 	for (const vk::Format format : candidates)
 	{
 		const VulkanContext& context = VulkanContext::Get();
-		const vk::FormatProperties props = context.GetFormatProperties(format);
+		const vk::FormatProperties2 props = context.GetFormatProperties(format);
 
-		if (tiling == vk::ImageTiling::eLinear && (props.linearTilingFeatures & features) == features)
+		if (tiling == vk::ImageTiling::eLinear && (props.formatProperties.linearTilingFeatures & features) == features)
 		{
 			return format;
 		}
-		if (tiling == vk::ImageTiling::eOptimal && (props.optimalTilingFeatures & features) == features)
+		if (tiling == vk::ImageTiling::eOptimal && (props.formatProperties.optimalTilingFeatures & features) == features)
 		{
 			return format;
 		}
