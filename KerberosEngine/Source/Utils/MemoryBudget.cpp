@@ -70,13 +70,17 @@ namespace Kerberos
 
 	std::string MemoryBudget::ReadMemoryHeapFlags(const vk::MemoryHeapFlags inputVkMemoryHeapFlag)
 	{
-		if (inputVkMemoryHeapFlag == vk::MemoryHeapFlagBits::eDeviceLocal)
+		if (inputVkMemoryHeapFlag & vk::MemoryHeapFlagBits::eDeviceLocal)
 		{
 			return "Device Local Bit";
 		}
-		if (inputVkMemoryHeapFlag == vk::MemoryHeapFlagBits::eMultiInstance)
+		if (inputVkMemoryHeapFlag & vk::MemoryHeapFlagBits::eMultiInstance)
 		{
 			return "Multiple Instance Bit";
+		}
+		if (inputVkMemoryHeapFlag & vk::MemoryHeapFlagBits::eTileMemoryQCOM)
+		{
+			return "Tile Memory QCOM Bit";
 		}
 
 		// In case that it does not correspond to device local memory

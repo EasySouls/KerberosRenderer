@@ -4,6 +4,8 @@
 #include "Renderer/VMA/VMA.hpp"
 #include "Utils/MemoryBudget.hpp"
 
+#include <limits>
+#include <optional>
 #include <vector>
 
 struct GLFWwindow;
@@ -13,6 +15,8 @@ namespace Kerberos
 	class VulkanContext final
 	{
 	public:
+
+
 		explicit VulkanContext(GLFWwindow* window);
 		~VulkanContext();
 
@@ -73,6 +77,21 @@ namespace Kerberos
 			);
 		}
 
+		struct QueueFamilyInfo
+		{
+			uint32_t graphics = (std::numeric_limits<uint32_t>::max)();
+			uint32_t present = (std::numeric_limits<uint32_t>::max)();
+			std::optional<uint32_t> compute{};
+			std::optional<uint32_t> transfer{};
+
+			[[nodiscard]] bool HasSeparateComputeQueue() const { return compute.has_value() && compute.value() != graphics; }
+			[[nodiscard]] bool HasSeparateTransferQueue() const { return transfer.has_value() && transfer.value() != graphics; }
+			[[nodiscard]] bool HasDedicatedTransferQueue() const
+			{
+				return transfer.has_value() && transfer.value() != graphics && (!compute.has_value() || transfer.value() != compute.value());
+			}
+		};
+
 		MemoryBudgetInfo GetMemoryBudgetInfo() const;
 
 		vk::raii::Device& GetDevice();
@@ -81,6 +100,7 @@ namespace Kerberos
 		vk::PhysicalDeviceMemoryProperties2 GetMemoryProperties() const;
 		vk::FormatProperties2 GetFormatProperties(vk::Format format) const;
 		vk::SampleCountFlagBits GetMaxMSAASamples() const;
+		const QueueFamilyInfo& GetQueueFamilyInfo() const { return m_QueueFamilyInfo; }
 
 		static vk::DescriptorSet GenerateImGuiDescriptorSet(const vk::raii::Sampler& sampler,
 															const vk::raii::ImageView& imageView, 
@@ -128,7 +148,7 @@ namespace Kerberos
 
 		vk::Format FindDepthFormat() const;
 		vk::Extent2D ChooseSwapExtent(const vk::SurfaceCapabilitiesKHR& capabilities) const;
-		static uint32_t FindQueueFamilies(const vk::raii::PhysicalDevice& physicalDevice);
+      static QueueFamilyInfo FindQueueFamilies(const vk::raii::PhysicalDevice& physicalDevice, const vk::raii::SurfaceKHR& surface);
 		static bool HasStencilComponent(vk::Format format);
 		static vk::SampleCountFlagBits GetMaxUsableSampleCount(const vk::raii::PhysicalDevice& physicalDevice);
 		static std::vector<char const*> GetRequiredExtensions();
@@ -140,13 +160,13 @@ namespace Kerberos
 		vk::raii::DebugUtilsMessengerEXT m_DebugMessenger = nullptr;
 
 		vk::raii::PhysicalDevice m_PhysicalDevice = nullptr;
+		std::string m_PhysicalDeviceName;
 		vk::raii::Device m_Device = nullptr;
 		vk::raii::Queue m_GraphicsQueue = nullptr;
 		vk::raii::Queue m_PresentQueue = nullptr;
 		vk::raii::Queue m_ComputeQueue = nullptr;
 		vk::raii::Queue m_TransferQueue = nullptr;
-		uint32_t m_GraphicsQueueFamilyIndex = 0;
-		uint32_t m_PresentQueueFamilyIndex = 0;
+        QueueFamilyInfo m_QueueFamilyInfo{};
 
 		VMA::Allocator m_Allocator{};
 

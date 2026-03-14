@@ -2,6 +2,7 @@
 #include "VulkanContext.hpp"
 
 #include "Renderer/Textures/Texture.hpp"
+#include <algorithm>
 #include <iostream>
 
 #include "imgui.h"
@@ -147,7 +148,7 @@ namespace Kerberos
 		Cleanup();
 	};
 
-	void VulkanContext::PrepareImGuiFrame() 
+	void VulkanContext::PrepareImGuiFrame()
 	{
 		ImGui_ImplVulkan_NewFrame();
 		ImGui_ImplGlfw_NewFrame();
@@ -156,12 +157,12 @@ namespace Kerberos
 		ImGui::DockSpaceOverViewport(0, nullptr, ImGuiDockNodeFlags_PassthruCentralNode);
 	}
 
-	void VulkanContext::RenderImGui() 
+	void VulkanContext::RenderImGui()
 	{
 		ImGui::Render();
 	}
 
-	void VulkanContext::Draw() 
+	void VulkanContext::Draw()
 	{
 		const vk::Result fenceResult = m_Device.waitForFences(*m_InFlightFences[m_FrameIndex], vk::True, UINT64_MAX);
 		if (fenceResult != vk::Result::eSuccess)
@@ -205,7 +206,7 @@ namespace Kerberos
 		m_MemoryBudget.UpdateMemoryBudgetInfo();
 	}
 
-	void VulkanContext::Present() 
+	void VulkanContext::Present()
 	{
 		const ImGuiIO& io = ImGui::GetIO();
 		if (io.ConfigFlags & ImGuiConfigFlags_ViewportsEnable)
@@ -267,7 +268,7 @@ namespace Kerberos
 		const vk::DeviceSize size,
 		const vk::raii::Semaphore* waitSemaphore,
 		const vk::raii::Semaphore* signalSemaphore
-	) const 
+	) const
 	{
 		const vk::CommandBufferAllocateInfo allocInfo{
 			.commandPool = *m_CommandPool,
@@ -344,8 +345,8 @@ namespace Kerberos
 	}
 
 	void VulkanContext::TransitionImageLayout(const vk::raii::CommandBuffer& copyCmd, const vk::raii::Image& image,
-		vk::ImageLayout oldLayout, vk::ImageLayout newLayout, const vk::ImageSubresourceRange& subresourceRange,
-		vk::PipelineStageFlags2 srcStageMask, vk::PipelineStageFlags2 dstStageMask) const 
+											  vk::ImageLayout oldLayout, vk::ImageLayout newLayout, const vk::ImageSubresourceRange& subresourceRange,
+											  vk::PipelineStageFlags2 srcStageMask, vk::PipelineStageFlags2 dstStageMask) const
 	{
 		vk::ImageMemoryBarrier2 barrier = {
 			.oldLayout = oldLayout,
@@ -457,9 +458,9 @@ namespace Kerberos
 	}
 
 	vk::Format VulkanContext::FindSupportedFormat(
-		const std::vector<vk::Format>& candidates, 
+		const std::vector<vk::Format>& candidates,
 		const vk::ImageTiling tiling,
-		const vk::FormatFeatureFlags features) const 
+		const vk::FormatFeatureFlags features) const
 	{
 		for (const vk::Format format : candidates)
 		{
@@ -478,18 +479,18 @@ namespace Kerberos
 		throw std::runtime_error("Failed to find supported format!");
 	}
 
-	uint32_t VulkanContext::GetMaxFramesInFlight() const 
+	uint32_t VulkanContext::GetMaxFramesInFlight() const
 	{
 		return maxFramesInFlight;
 	}
 
-	void VulkanContext::WaitIdle() const 
+	void VulkanContext::WaitIdle() const
 	{
 		m_Device.waitIdle();
 	}
 
 	void VulkanContext::SetObjectDebugName(const uint64_t objectHandle, const vk::ObjectType objectType,
-	                                       const std::string& name) const 
+										   const std::string& name) const
 	{
 #ifdef KBR_DEBUG
 		const vk::DebugUtilsObjectNameInfoEXT nameInfo{
@@ -502,47 +503,47 @@ namespace Kerberos
 #endif
 	}
 
-	MemoryBudgetInfo VulkanContext::GetMemoryBudgetInfo() const 
+	MemoryBudgetInfo VulkanContext::GetMemoryBudgetInfo() const
 	{
 		return m_MemoryBudget.GetMemoryBudgetInfo();
 	}
 
-	vk::raii::Device& VulkanContext::GetDevice() 
+	vk::raii::Device& VulkanContext::GetDevice()
 	{
 		return m_Device;
 	}
 
-	vk::raii::PhysicalDevice& VulkanContext::GetPhysicalDevice() 
+	vk::raii::PhysicalDevice& VulkanContext::GetPhysicalDevice()
 	{
 		return m_PhysicalDevice;
 	}
 
-	vk::PhysicalDeviceProperties2 VulkanContext::GetProperties() const 
+	vk::PhysicalDeviceProperties2 VulkanContext::GetProperties() const
 	{
 		return m_PhysicalDevice.getProperties2();
 	}
 
-	vk::PhysicalDeviceMemoryProperties2 VulkanContext::GetMemoryProperties() const 
+	vk::PhysicalDeviceMemoryProperties2 VulkanContext::GetMemoryProperties() const
 	{
 		return m_PhysicalDevice.getMemoryProperties2();
 	}
 
-	vk::FormatProperties2 VulkanContext::GetFormatProperties(const vk::Format format) const 
+	vk::FormatProperties2 VulkanContext::GetFormatProperties(const vk::Format format) const
 	{
 		return m_PhysicalDevice.getFormatProperties2(format);
 	}
 
-	vk::SampleCountFlagBits VulkanContext::GetMaxMSAASamples() const 
+	vk::SampleCountFlagBits VulkanContext::GetMaxMSAASamples() const
 	{
 		return m_MaxMSAASamples;
 	}
 
-	void VulkanContext::FramebufferResized(uint32_t width, uint32_t height) 
+	void VulkanContext::FramebufferResized(uint32_t width, uint32_t height)
 	{
 		m_FramebufferResized = true;
 	}
 
-	void VulkanContext::RecordCommandBuffer(const uint32_t imageIndex) const 
+	void VulkanContext::RecordCommandBuffer(const uint32_t imageIndex) const
 	{
 		m_CommandBuffers[m_FrameIndex].begin({});
 
@@ -706,7 +707,8 @@ namespace Kerberos
 	}
 
 	void VulkanContext::SetupDebugMessenger() {
-		if (!enableValidationLayers) return;
+		if (!enableValidationLayers) 
+			return;
 
 		constexpr vk::DebugUtilsMessageSeverityFlagsEXT severityFlags(vk::DebugUtilsMessageSeverityFlagBitsEXT::eVerbose | vk::DebugUtilsMessageSeverityFlagBitsEXT::eWarning | vk::DebugUtilsMessageSeverityFlagBitsEXT::eError);
 		constexpr vk::DebugUtilsMessageTypeFlagsEXT    messageTypeFlags(vk::DebugUtilsMessageTypeFlagBitsEXT::eGeneral | vk::DebugUtilsMessageTypeFlagBitsEXT::ePerformance | vk::DebugUtilsMessageTypeFlagBitsEXT::eValidation);
@@ -769,6 +771,11 @@ namespace Kerberos
 			if (isSuitable) {
 				m_PhysicalDevice = device;
 				m_MaxMSAASamples = GetMaxUsableSampleCount(m_PhysicalDevice);
+
+				// Save name of the selected GPU
+				const auto deviceProperties = m_PhysicalDevice.getProperties2().properties;
+				m_PhysicalDeviceName = deviceProperties.deviceName.data();
+				KBR_CORE_INFO("Selected GPU: {}", m_PhysicalDeviceName);
 			}
 			return isSuitable;
 		});
@@ -789,101 +796,184 @@ namespace Kerberos
 		return false;
 	}
 
-	uint32_t VulkanContext::FindQueueFamilies(const vk::raii::PhysicalDevice& physicalDevice) {
-		// find the index of the first queue family that supports graphics
-		std::vector<vk::QueueFamilyProperties> queueFamilyProperties = physicalDevice.getQueueFamilyProperties();
+ VulkanContext::QueueFamilyInfo VulkanContext::FindQueueFamilies(const vk::raii::PhysicalDevice& physicalDevice, const vk::raii::SurfaceKHR& surface)
+	{
+		QueueFamilyInfo queueFamilyInfo{};
 
-		// get the first index into queueFamilyProperties which supports graphics
-		const auto graphicsQueueFamilyProperty =
-			std::find_if(queueFamilyProperties.begin(),
-						 queueFamilyProperties.end(),
-						 [](vk::QueueFamilyProperties const& qfp) { return qfp.queueFlags & vk::QueueFlagBits::eGraphics; });
+		const std::vector<vk::QueueFamilyProperties> queueFamilyProperties = physicalDevice.getQueueFamilyProperties();
+		std::optional<uint32_t> presentCandidate;
+		std::optional<uint32_t> dedicatedComputeCandidate;
+		std::optional<uint32_t> computeCandidate;
+		std::optional<uint32_t> dedicatedTransferCandidate;
+		std::optional<uint32_t> transferNoGraphicsCandidate;
+		std::optional<uint32_t> transferCandidate;
 
-		return static_cast<uint32_t>(std::distance(queueFamilyProperties.begin(), graphicsQueueFamilyProperty));
+		for (uint32_t i = 0; i < queueFamilyProperties.size(); ++i)
+		{
+			const auto& queueFamilyProperty = queueFamilyProperties[i];
+			const bool supportsGraphics = (queueFamilyProperty.queueFlags & vk::QueueFlagBits::eGraphics) != static_cast<vk::QueueFlags>(0);
+			const bool supportsCompute = (queueFamilyProperty.queueFlags & vk::QueueFlagBits::eCompute) != static_cast<vk::QueueFlags>(0);
+			const bool supportsTransfer = (queueFamilyProperty.queueFlags & vk::QueueFlagBits::eTransfer) != static_cast<vk::QueueFlags>(0);
+
+           if (queueFamilyInfo.graphics == (std::numeric_limits<uint32_t>::max)() && supportsGraphics)
+			{
+				queueFamilyInfo.graphics = i;
+			}
+
+			if (!presentCandidate.has_value() && physicalDevice.getSurfaceSupportKHR(i, *surface))
+			{
+				presentCandidate = i;
+			}
+
+			if (supportsCompute)
+			{
+				if (!computeCandidate.has_value())
+				{
+					computeCandidate = i;
+				}
+
+				if (!supportsGraphics && !dedicatedComputeCandidate.has_value())
+				{
+					dedicatedComputeCandidate = i;
+				}
+			}
+
+			if (supportsTransfer)
+			{
+				if (!transferCandidate.has_value())
+				{
+					transferCandidate = i;
+				}
+
+				if (!supportsGraphics && !transferNoGraphicsCandidate.has_value())
+				{
+					transferNoGraphicsCandidate = i;
+				}
+
+				if (!supportsGraphics && !supportsCompute && !dedicatedTransferCandidate.has_value())
+				{
+					dedicatedTransferCandidate = i;
+				}
+			}
+		}
+
+       if (queueFamilyInfo.graphics == std::numeric_limits<uint32_t>::max())
+		{
+			throw std::runtime_error("Could not find a graphics queue family -> terminating");
+		}
+
+		if (physicalDevice.getSurfaceSupportKHR(queueFamilyInfo.graphics, *surface))
+		{
+			queueFamilyInfo.present = queueFamilyInfo.graphics;
+		}
+		else if (presentCandidate.has_value())
+		{
+			queueFamilyInfo.present = presentCandidate.value();
+		}
+		else
+		{
+			throw std::runtime_error("Could not find a present queue family -> terminating");
+		}
+
+		if (dedicatedComputeCandidate.has_value())
+		{
+			queueFamilyInfo.compute = dedicatedComputeCandidate;
+		}
+		else if (computeCandidate.has_value())
+		{
+			queueFamilyInfo.compute = computeCandidate;
+		}
+
+		if (dedicatedTransferCandidate.has_value())
+		{
+			queueFamilyInfo.transfer = dedicatedTransferCandidate;
+		}
+		else if (transferNoGraphicsCandidate.has_value())
+		{
+			queueFamilyInfo.transfer = transferNoGraphicsCandidate;
+		}
+		else if (transferCandidate.has_value())
+		{
+			queueFamilyInfo.transfer = transferCandidate;
+		}
+
+		return queueFamilyInfo;
 	}
 
 	void VulkanContext::CreateLogicalDevice()
 	{
-		const std::vector<vk::QueueFamilyProperties> queueFamilyProperties = m_PhysicalDevice.getQueueFamilyProperties();
-		uint32_t graphicsIndex = FindQueueFamilies(m_PhysicalDevice);
-
-		// determine a queueFamilyIndex that supports present
-		// first check if the graphicsIndex is good enough
-		uint32_t presentIndex = m_PhysicalDevice.getSurfaceSupportKHR(graphicsIndex, *m_Surface)
-			? graphicsIndex
-			: static_cast<uint32_t>(queueFamilyProperties.size());
-
-		if (presentIndex == queueFamilyProperties.size())
-		{
-			// the graphicsIndex doesn't support present -> look for another family index that supports both
-			// graphics and present
-			for (size_t i = 0; i < queueFamilyProperties.size(); i++)
-			{
-				if ((queueFamilyProperties[i].queueFlags & vk::QueueFlagBits::eGraphics) &&
-					m_PhysicalDevice.getSurfaceSupportKHR(static_cast<uint32_t>(i), *m_Surface))
-				{
-					graphicsIndex = static_cast<uint32_t>(i);
-					presentIndex = graphicsIndex;
-					break;
-				}
-			}
-			if (presentIndex == queueFamilyProperties.size())
-			{
-				// there's nothing like a single family index that supports both graphics and present -> look for another
-				// family index that supports present
-				for (size_t i = 0; i < queueFamilyProperties.size(); i++)
-				{
-					if (m_PhysicalDevice.getSurfaceSupportKHR(static_cast<uint32_t>(i), *m_Surface))
-					{
-						presentIndex = static_cast<uint32_t>(i);
-						break;
-					}
-				}
-			}
-		}
-		if ((graphicsIndex == queueFamilyProperties.size()) || (presentIndex == queueFamilyProperties.size()))
-		{
-			throw std::runtime_error("Could not find a queue for graphics or present -> terminating");
-		}
+       m_QueueFamilyInfo = FindQueueFamilies(m_PhysicalDevice, m_Surface);
 
 		constexpr float queuePriority = 0.5f;
-		vk::DeviceQueueCreateInfo deviceQueueCreateInfo{
-			.queueFamilyIndex = graphicsIndex,
-			.queueCount = 1,
-			.pQueuePriorities = &queuePriority
-		};
+        std::vector<uint32_t> uniqueQueueFamilies = { m_QueueFamilyInfo.graphics, m_QueueFamilyInfo.present };
+
+		if (m_QueueFamilyInfo.compute.has_value())
+		{
+			uniqueQueueFamilies.push_back(m_QueueFamilyInfo.compute.value());
+		}
+		if (m_QueueFamilyInfo.transfer.has_value())
+		{
+			uniqueQueueFamilies.push_back(m_QueueFamilyInfo.transfer.value());
+		}
+
+		std::ranges::sort(uniqueQueueFamilies);
+		uniqueQueueFamilies.erase(std::ranges::unique(uniqueQueueFamilies).begin(), uniqueQueueFamilies.end());
+
+		std::vector<vk::DeviceQueueCreateInfo> queueCreateInfos;
+		queueCreateInfos.reserve(uniqueQueueFamilies.size());
+		for (const uint32_t queueFamilyIndex : uniqueQueueFamilies)
+		{
+			queueCreateInfos.emplace_back(vk::DeviceQueueCreateInfo{
+				.queueFamilyIndex = queueFamilyIndex,
+				.queueCount = 1,
+				.pQueuePriorities = &queuePriority
+			});
+		}
 
 		// Create a chain of feature structures
 		vk::StructureChain<vk::PhysicalDeviceFeatures2, vk::PhysicalDeviceVulkan11Features, vk::PhysicalDeviceVulkan12Features, vk::PhysicalDeviceVulkan13Features, vk::PhysicalDeviceExtendedDynamicStateFeaturesEXT> featureChain = {
-			{ .features = {
+			{.features = {
 				.geometryShader = true, .depthClamp = true, .depthBiasClamp = true, .samplerAnisotropy = true,
 				.shaderInt64 = true
-		       },
+			   },
 			},
-			{ .shaderDrawParameters = true },
-			{ .descriptorIndexing = true, .bufferDeviceAddress = true },
-			{ .synchronization2 = true, .dynamicRendering = true },
-			{ .extendedDynamicState = true }
+			{.shaderDrawParameters = true },
+			{.descriptorIndexing = true, .bufferDeviceAddress = true },
+			{.synchronization2 = true, .dynamicRendering = true },
+			{.extendedDynamicState = true }
 		};
 
 		const vk::DeviceCreateInfo deviceCreateInfo{
 			.pNext = &featureChain.get<vk::PhysicalDeviceFeatures2>(),
-			.queueCreateInfoCount = 1,
-			.pQueueCreateInfos = &deviceQueueCreateInfo,
+		    .queueCreateInfoCount = static_cast<uint32_t>(queueCreateInfos.size()),
+			.pQueueCreateInfos = queueCreateInfos.data(),
 			.enabledExtensionCount = static_cast<uint32_t>(deviceExtensions.size()),
 			.ppEnabledExtensionNames = deviceExtensions.data()
 		};
 
 		m_Device = vk::raii::Device{ m_PhysicalDevice, deviceCreateInfo };
 
-		m_GraphicsQueue = m_Device.getQueue(graphicsIndex, 0);
-		m_PresentQueue = m_Device.getQueue(presentIndex, 0);
+		m_GraphicsQueue = m_Device.getQueue(m_QueueFamilyInfo.graphics, 0);
+		m_PresentQueue = m_Device.getQueue(m_QueueFamilyInfo.present, 0);
+		m_ComputeQueue = m_QueueFamilyInfo.compute.has_value()
+			? m_Device.getQueue(m_QueueFamilyInfo.compute.value(), 0)
+			: m_GraphicsQueue;
+		m_TransferQueue = m_QueueFamilyInfo.transfer.has_value()
+			? m_Device.getQueue(m_QueueFamilyInfo.transfer.value(), 0)
+			: m_GraphicsQueue;
 
-		m_GraphicsQueueFamilyIndex = graphicsIndex;
-		m_PresentQueueFamilyIndex = presentIndex;
+		KBR_CORE_INFO(
+			"Queue families selected \n\tgraphics: {}, \n\tpresent: {}, \n\tcompute: {}, \n\ttransfer: {}, \n\tseparateCompute: {}, \n\tseparateTransfer: {}, \n\tdedicatedTransfer: {}",
+			m_QueueFamilyInfo.graphics,
+			m_QueueFamilyInfo.present,
+			m_QueueFamilyInfo.compute.has_value() ? std::to_string(m_QueueFamilyInfo.compute.value()) : std::string("None"),
+			m_QueueFamilyInfo.transfer.has_value() ? std::to_string(m_QueueFamilyInfo.transfer.value()) : std::string("None"),
+			m_QueueFamilyInfo.HasSeparateComputeQueue(),
+			m_QueueFamilyInfo.HasSeparateTransferQueue(),
+			m_QueueFamilyInfo.HasDedicatedTransferQueue());
 	}
 
-	void VulkanContext::CreateAllocator() 
+	void VulkanContext::CreateAllocator()
 	{
 		KBR_CORE_ASSERT(m_Instance != nullptr, "VkInstance has to be initialized to create allocator!");
 		KBR_CORE_ASSERT(m_PhysicalDevice != nullptr, "VkPhysicalDevice has to be initialized to create allocator!");
@@ -1002,7 +1092,7 @@ namespace Kerberos
 	{
 		const vk::CommandPoolCreateInfo poolInfo{
 			.flags = vk::CommandPoolCreateFlagBits::eResetCommandBuffer,
-			.queueFamilyIndex = m_GraphicsQueueFamilyIndex
+          .queueFamilyIndex = m_QueueFamilyInfo.graphics
 		};
 
 		m_CommandPool = vk::raii::CommandPool(m_Device, poolInfo);
@@ -1087,13 +1177,13 @@ namespace Kerberos
 		m_DepthImageView = CreateImageView(m_Device, m_DepthImage, m_DepthFormat, vk::ImageAspectFlagBits::eDepth, 1);
 	}
 
-	void VulkanContext::CleanupSwapChain() 
+	void VulkanContext::CleanupSwapChain()
 	{
 		m_SwapChainImageViews.clear();
 		m_SwapChain = nullptr;
 	}
 
-	void VulkanContext::RecreateSwapchain() 
+	void VulkanContext::RecreateSwapchain()
 	{
 		int width = 0, height = 0;
 		glfwGetFramebufferSize(m_Window, &width, &height);
@@ -1164,7 +1254,7 @@ namespace Kerberos
 		ImGui_ImplVulkan_RemoveTexture(descriptorSet);
 	}
 
-	void VulkanContext::Cleanup() const 
+	void VulkanContext::Cleanup() const
 	{
 		m_Device.waitIdle();
 
@@ -1289,7 +1379,7 @@ namespace Kerberos
 		initInfo.Instance = *m_Instance;
 		initInfo.PhysicalDevice = *m_PhysicalDevice;
 		initInfo.Device = *m_Device;
-		initInfo.QueueFamily = m_GraphicsQueueFamilyIndex;
+      initInfo.QueueFamily = m_QueueFamilyInfo.graphics;
 		initInfo.Queue = *m_GraphicsQueue;
 		initInfo.PipelineCache = nullptr;
 		initInfo.DescriptorPool = *m_ImGuiDescriptorPool;
