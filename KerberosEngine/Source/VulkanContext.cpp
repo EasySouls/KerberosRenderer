@@ -752,7 +752,7 @@ namespace Kerberos
 		}
 
 		const auto devIter = std::ranges::find_if(devices,
-												  [&](auto const& device) {
+												  [&](const vk::raii::PhysicalDevice& device) {
 			auto queueFamilies = device.getQueueFamilyProperties();
 			bool isSuitable = device.getProperties2().properties.apiVersion >= VK_API_VERSION_1_3;
 			const auto qfpIter = std::ranges::find_if(queueFamilies,

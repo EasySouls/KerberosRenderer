@@ -146,6 +146,6 @@ target_include_directories(filewatch INTERFACE
 set_target_properties(
     glfw imgui yaml-cpp msdf-atlas-gen freetype ktx
     ImGuizmo assimp Jolt tinygltf stb spdlog glm
-    filewatch
+    filewatch EnTT
     PROPERTIES FOLDER "KerberosEngine/ThirdParty"
 )

@@ -3,7 +3,7 @@
 #include "Asset.hpp"
 #include "Core/Core.hpp"
 #include "Renderer/Mesh.hpp"
-#include "Renderer/Texture.hpp"
+#include "Renderer/Textures/Texture2D.hpp"
 #include "Project/Project.hpp"
 
 #include <type_traits>
