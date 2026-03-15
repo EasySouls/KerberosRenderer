@@ -9,7 +9,7 @@ file(GLOB_RECURSE EDITOR_SRC CMAKE_CONFIGURE_DEPENDS
 
 source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}/Source" PREFIX "Source" FILES ${EDITOR_SRC})
 
-target_sources(KerberosEditor PRIVATE ${EDITOR_SRC})
+target_sources(KerberosEditor PRIVATE ${EDITOR_SRC} "Source/Notification/NotificationManager.cpp" "Source/Windows/AssetsPanel.cpp" "Source/Windows/HierarchyPanel.cpp")
 
 target_include_directories(KerberosEditor PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/Source
