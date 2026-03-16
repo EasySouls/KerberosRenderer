@@ -31,6 +31,7 @@ namespace Kerberos
 		static void Init();
 
 		static std::unique_ptr<spdlog::logger>& GetCoreLogger() { return s_CoreLogger; }
+		static std::unique_ptr<spdlog::logger>& GetEditorLogger() { return s_EditorLogger; }
 
 
 		/**
@@ -50,6 +51,23 @@ namespace Kerberos
 			}
 		}
 
+		/**
+		 * Sets the log level for the core logger.
+		 * @param level The minimum log level.
+		 */
+		static void SetEditorLogLevel(const LogLevel level)
+		{
+			switch (level)
+			{
+				case LogLevel::Trace: s_EditorLogger->set_level(spdlog::level::trace); break;
+				case LogLevel::Debug: s_EditorLogger->set_level(spdlog::level::debug); break;
+				case LogLevel::Info: s_EditorLogger->set_level(spdlog::level::info); break;
+				case LogLevel::Warn: s_EditorLogger->set_level(spdlog::level::warn); break;
+				case LogLevel::Error: s_EditorLogger->set_level(spdlog::level::err); break;
+				case LogLevel::Critical: s_EditorLogger->set_level(spdlog::level::critical); break;
+			}
+		}
+
 
 		/**
 		 * Sets the log level for both core and client loggers.
@@ -58,10 +76,12 @@ namespace Kerberos
 		static void SetLogLevel(const LogLevel level)
 		{
 			SetCoreLogLevel(level);
+			SetEditorLogLevel(level);
 		}
 
 	private:
 		static std::unique_ptr<spdlog::logger> s_CoreLogger;
+		static std::unique_ptr<spdlog::logger> s_EditorLogger;
 	};
 }
 
@@ -71,6 +91,12 @@ namespace Kerberos
 #define KBR_CORE_WARN(...)     ::Kerberos::Log::GetCoreLogger()->warn(__VA_ARGS__)
 #define KBR_CORE_ERROR(...)    ::Kerberos::Log::GetCoreLogger()->error(__VA_ARGS__)
 #define KBR_CORE_CRITICAL(...) ::Kerberos::Log::GetCoreLogger()->critical(__VA_ARGS__)
+
+#define KBR_EDITOR_TRACE(...)    ::Kerberos::Log::GetEditorLogger()->trace(__VA_ARGS__)
+#define KBR_EDITOR_INFO(...)     ::Kerberos::Log::GetEditorLogger()->info(__VA_ARGS__)
+#define KBR_EDITOR_WARN(...)     ::Kerberos::Log::GetEditorLogger()->warn(__VA_ARGS__)
+#define KBR_EDITOR_ERROR(...)    ::Kerberos::Log::GetEditorLogger()->error(__VA_ARGS__)
+#define KBR_EDITOR_CRITICAL(...) ::Kerberos::Log::GetEditorLogger()->critical(__VA_ARGS__)
 
 
 template<>

@@ -3,6 +3,7 @@
 #include "Core/Core.hpp"
 #include "Renderer/Textures/Texture2D.hpp"
 #include "Project/Project.hpp"
+#include "EditorWindow.hpp"
 #include "../Notification/NotificationManager.hpp"
 
 #include <imgui/imgui.h>
@@ -13,11 +14,11 @@
 
 namespace Kerberos
 {
-	class AssetsPanel
+	class AssetsPanel : public EditorWindow
 	{
 	public:
 		explicit AssetsPanel(NotificationManager notificationManager);
-		~AssetsPanel() = default;
+		~AssetsPanel() override = default;
 
 		AssetsPanel(const AssetsPanel& other) = default;
 		AssetsPanel(AssetsPanel&& other) noexcept = default;
@@ -29,7 +30,8 @@ namespace Kerberos
 		*/
 		void SetCurrentDir(const std::filesystem::path& path);
 
-		void OnImGuiRender();
+		void OnEvent(Event& event) override;
+		void OnImGuiRender() override;
 
 	private:
 		/**

@@ -54,16 +54,17 @@ namespace Kerberos
 			requires std::is_base_of_v<Layer, T>
 		void PushLayer();
 
-		void PushEvent(const std::shared_ptr<Event>& event)
-		{
-			//std::lock_guard<std::mutex> lock(m_QueueMutex);
-			m_EventQueue.push(event);
-		}
+		void OnEvent(Event& event) const;
+
+		void SubmitToMainThreadQueue(const std::function<void()>& fn);
 
 		static Application& Get() { return *s_Instance; }
 
 		GLFWwindow* GetWindow() const { return m_Window; }
 		AudioManager* GetAudioManager() const { return m_AudioManager.get(); }
+
+	private:
+		void ExecuteMainThreadQueue();
 
 	private:
 		ApplicationSpecification m_Specification;
@@ -78,8 +79,6 @@ namespace Kerberos
 		std::queue<std::function<void()>> m_MainThreadQueue;
 		std::mutex m_QueueMutex;
 
-		std::queue<std::shared_ptr<Event>> m_EventQueue;
-
 		static Application* s_Instance;
 	};
 
@@ -87,7 +86,7 @@ namespace Kerberos
 		requires std::is_base_of_v<Layer, T>
 	void Application::PushLayer() 
 	{
-		auto layer = std::make_unique<T>();
+		auto layer = Owner<T>();
 		layer->OnAttach();
 
 		m_Layers.emplace_back(std::move(layer));

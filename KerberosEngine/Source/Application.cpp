@@ -19,10 +19,24 @@
 #include <iostream>
 #include <filesystem>
 
+#include "Events/WindowClosedEvent.hpp"
+
+#if defined(KBR_PLATFORM_WINDOWS)
+extern "C"
+{
+	__declspec(dllexport) DWORD NvOptimusEnablement = 0x00000001;
+	__declspec(dllexport) int AmdPowerXpressRequestHighPerformance = 1;
+}
+#endif
 
 namespace Kerberos
 {
 	Application* Application::s_Instance = nullptr;
+
+	static void GLFWErrorCallback(const int error, const char* description)
+	{
+		KBR_CORE_ERROR("GLFW Error ({0}): {1}", error, description);
+	}
 
 	Application::Application(const ApplicationSpecification& spec)
 	{
@@ -51,6 +65,9 @@ namespace Kerberos
 		{
 			throw std::runtime_error("Failed to initialize GLFW");
 		}
+
+		glfwSetErrorCallback(GLFWErrorCallback);
+
 		// Create a GLFW window
 		glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
 		m_Window = glfwCreateWindow(1200, 800, "Kerberos Renderer", nullptr, nullptr);
@@ -64,53 +81,53 @@ namespace Kerberos
 
 		glfwSetFramebufferSizeCallback(m_Window, [](GLFWwindow* window, const int width, const int height)
 		{
-			const auto app = static_cast<Application*>(glfwGetWindowUserPointer(window));
+			const auto& app = *static_cast<Application*>(glfwGetWindowUserPointer(window));
 
 			KBR_CORE_INFO("Framebuffer resized: ({}, {})", width, height);
-			app->m_VulkanContext->FramebufferResized(static_cast<uint32_t>(width), static_cast<uint32_t>(height));
+			app.m_VulkanContext->FramebufferResized(static_cast<uint32_t>(width), static_cast<uint32_t>(height));
 		});
 
 		// Setup GLFW event handlers
 		glfwSetWindowSizeCallback(m_Window, [](GLFWwindow* window, const int width, const int height)
 		{
-			const auto app = static_cast<Application*>(glfwGetWindowUserPointer(window));
+			const auto& app = *static_cast<Application*>(glfwGetWindowUserPointer(window));
 
-			const auto event = std::make_shared<WindowResizedEvent>(width, height);
-			app->PushEvent(event);
+			auto event = WindowResizedEvent(width, height);
+			app.OnEvent(event);
 		});
 
-		/*glfwSetWindowCloseCallback(m_Window, [](GLFWwindow* window)
+		glfwSetWindowCloseCallback(m_Window, [](GLFWwindow* window)
 		{
-			const auto app = static_cast<Application*>(glfwGetWindowUserPointer(window));
+			const auto& app = *static_cast<Application*>(glfwGetWindowUserPointer(window));
 
-			const auto event = std::make_shared<WindowClosedEvent>();
-			app->PushEvent(event);
-		});*/
+			auto event = WindowClosedEvent();
+			app.OnEvent(event);
+		});
 
 		glfwSetKeyCallback(m_Window, [](GLFWwindow* window, const int key, const int scancode, const int action, const int mods)
 		{
-			const auto app = static_cast<Application*>(glfwGetWindowUserPointer(window));
+			const auto& app = *static_cast<Application*>(glfwGetWindowUserPointer(window));
 
 			switch (action)
 			{
 				case GLFW_PRESS:
 				{
-					const auto event = std::make_shared<KeyPressedEvent>(key, 0);
-					app->PushEvent(event);
+					auto event = KeyPressedEvent(key, 0);
+					app.OnEvent(event);
 					break;
 				}
 
 				case GLFW_RELEASE:
 				{
-					const auto event = std::make_shared<KeyReleasedEvent>(key);
-					app->PushEvent(event);
+					auto event = KeyReleasedEvent(key);
+					app.OnEvent(event);
 					break;
 				}
 
 				case GLFW_REPEAT:
 				{
-					const auto event = std::make_shared<KeyPressedEvent>(key, 1);
-					app->PushEvent(event);
+					auto event = KeyPressedEvent(key, 1);
+					app.OnEvent(event);
 					break;
 				}
 
@@ -121,27 +138,27 @@ namespace Kerberos
 
 		glfwSetCharCallback(m_Window, [](GLFWwindow* window, const unsigned int keycode)
 		{
-			const auto app = static_cast<Application*>(glfwGetWindowUserPointer(window));
+			const auto& app = *static_cast<Application*>(glfwGetWindowUserPointer(window));
 
-			const auto event = std::make_shared<KeyTypedEvent>(keycode);
-			app->PushEvent(event);
+			auto event = KeyTypedEvent(keycode);
+			app.OnEvent(event);
 		});
 
 		glfwSetMouseButtonCallback(m_Window, [](GLFWwindow* window, const int button, const int action, const int mods)
 		{
-			const auto app = static_cast<Application*>(glfwGetWindowUserPointer(window));
+			const auto& app = *static_cast<Application*>(glfwGetWindowUserPointer(window));
 			switch (action)
 			{
 				case GLFW_PRESS:
 				{
-					const auto event = std::make_shared<MouseButtonPressedEvent>(button);
-					app->PushEvent(event);
+					auto event = MouseButtonPressedEvent(button);
+					app.OnEvent(event);
 					break;
 				}
 				case GLFW_RELEASE:
 				{
-					const auto event = std::make_shared<MouseButtonReleasedEvent>(button);
-					app->PushEvent(event);
+					auto event = MouseButtonReleasedEvent(button);
+					app.OnEvent(event);
 					break;
 				}
 				default:
@@ -151,23 +168,23 @@ namespace Kerberos
 
 		glfwSetScrollCallback(m_Window, [](GLFWwindow* window, const double xOffset, const double yOffset)
 		{
-			const auto app = static_cast<Application*>(glfwGetWindowUserPointer(window));
+			const auto& app = *static_cast<Application*>(glfwGetWindowUserPointer(window));
 
-			const auto event = std::make_shared<MouseScrolledEvent>(static_cast<float>(xOffset), static_cast<float>(yOffset));
-			app->PushEvent(event);
+			auto event = MouseScrolledEvent(static_cast<float>(xOffset), static_cast<float>(yOffset));
+			app.OnEvent(event);
 		});
 
 		glfwSetCursorPosCallback(m_Window, [](GLFWwindow* window, const double xPos, const double yPos)
 		{
-			const auto app = static_cast<Application*>(glfwGetWindowUserPointer(window));
+			const auto& app = *static_cast<Application*>(glfwGetWindowUserPointer(window));
 
-			const auto event = std::make_shared<MouseMovedEvent>(static_cast<float>(xPos), static_cast<float>(yPos));
-			app->PushEvent(event);
+			auto event = MouseMovedEvent(static_cast<float>(xPos), static_cast<float>(yPos));
+			app.OnEvent(event);
 		});
 
 		glfwSetDropCallback(m_Window, [](GLFWwindow* window, const int pathCount, const char* paths[])
 		{
-			const auto app = static_cast<Application*>(glfwGetWindowUserPointer(window));
+			const auto& app = *static_cast<Application*>(glfwGetWindowUserPointer(window));
 
 			std::vector<std::filesystem::path> filepaths(pathCount);
 			for (int i = 0; i < pathCount; ++i)
@@ -175,11 +192,11 @@ namespace Kerberos
 				filepaths[i] = paths[i];
 			}
 
-			const auto event = std::make_shared<WindowDropEvent>(filepaths);
-			app->PushEvent(event);
+			auto event = WindowDropEvent(filepaths);
+			app.OnEvent(event);
 		});
 
-		m_VulkanContext = std::make_unique<VulkanContext>(m_Window);
+		m_VulkanContext = CreateOwner<VulkanContext>(m_Window);
 	}
 
 	Application::~Application()
@@ -203,39 +220,61 @@ namespace Kerberos
 			const float deltaTime = time - m_LastFrameTime;
 			m_LastFrameTime = time;
 
-			// Process events
-			while (!m_EventQueue.empty())
-			{
-				const auto event = m_EventQueue.front();
-				for (const auto& layer : m_Layers)
-				{
-					layer->OnEvent(event);
-				}
-				m_EventQueue.pop();
-			}
+			ExecuteMainThreadQueue();
 
 			for (const auto& layer : m_Layers)
 			{
 				layer->OnUpdate(deltaTime);
 			}
-			KBR_CORE_TRACE("Layers OnUpdate complete.");
 
 			m_VulkanContext->PrepareImGuiFrame();
-			KBR_CORE_TRACE("ImGui frame prepared.");
 
 			for (const auto& layer : m_Layers)
 			{
 				layer->OnImGuiRender();
 			}
-			KBR_CORE_TRACE("Layers ImGui render complete.");
 
 			m_VulkanContext->RenderImGui();
-			KBR_CORE_TRACE("ImGui rendered.");
 
 			m_VulkanContext->Draw();
-			KBR_CORE_TRACE("Frame drawn.");
 			m_VulkanContext->Present();
-			KBR_CORE_TRACE("Frame presented.");
+		}
+	}
+
+	void Application::OnEvent(Event& event) const 
+	{
+		/*EventDispatcher dispatcher(event);
+		dispatcher.Dispatch<WindowCloseEvent>(KBR_BIND_FN(Application::OnWindowClosed));
+		dispatcher.Dispatch<WindowResizeEvent>(KBR_BIND_FN(Application::OnWindowResize));*/
+
+		for (const auto& layer : m_Layers)
+		{
+			layer->OnEvent(event);
+			if (event.Handled)
+				break;
+		}
+	}
+
+	void Application::SubmitToMainThreadQueue(const std::function<void()>& fn) 
+	{
+		std::scoped_lock lock(m_QueueMutex);
+
+		m_MainThreadQueue.push(fn);
+	}
+
+	void Application::ExecuteMainThreadQueue() 
+	{
+		std::queue<std::function<void()>> functions;
+		{
+			std::scoped_lock lock(m_QueueMutex);
+			functions.swap(m_MainThreadQueue);
+		}
+
+		while (!functions.empty())
+		{
+			const auto fn = functions.front();
+			functions.pop();
+			fn();
 		}
 	}
 }

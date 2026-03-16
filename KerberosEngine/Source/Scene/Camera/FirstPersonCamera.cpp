@@ -56,45 +56,12 @@ namespace Kerberos
 		}
 	}
 
-	void FirstPersonCamera::OnEvent(const std::shared_ptr<Event>& event)
+	void FirstPersonCamera::OnEvent(Event& event)
 	{
-		if (const auto mouseButtonPressedEvent = std::dynamic_pointer_cast<MouseButtonPressedEvent>(event))
-		{
-			if (mouseButtonPressedEvent->GetButton() == Mouse::Button1)
-			{
-				//Input::SetCursorMode(CursorMode::Locked);
-				m_CanLookAround = true;
-			}
-		}
-		else if (const auto mouseButtonReleasedEvent = std::dynamic_pointer_cast<MouseButtonReleasedEvent>(event))
-		{
-			if (mouseButtonReleasedEvent->GetButton() == Mouse::Button1)
-			{
-				//Input::SetCursorMode(CursorMode::Normal);
-				m_CanLookAround = false;
-			}
-		}
-		else if (const auto mouseMovedEvent = std::dynamic_pointer_cast<MouseMovedEvent>(event))
-		{
-			const int32_t x = static_cast<int32_t>(mouseMovedEvent->GetX());
-			const int32_t y = static_cast<int32_t>(mouseMovedEvent->GetY());
-
-			const int32_t dx = static_cast<int32_t>(m_MousePosition.x) - x;
-			const int32_t dy = static_cast<int32_t>(m_MousePosition.y) - y;
-
-			m_MousePosition.x = static_cast<float>(x);
-			m_MousePosition.y = static_cast<float>(y);
-
-			if (!m_CanLookAround)
-				return;
-
-			constexpr float rotationSpeed = 0.3f;
-			m_Yaw -= static_cast<float>(dx) * rotationSpeed;
-			m_Pitch += static_cast<float>(dy) * rotationSpeed;
-			m_Pitch = std::min(m_Pitch, 89.0f);
-			m_Pitch = std::max(m_Pitch, -89.0f);
-			m_ViewDirty = true;
-		}
+		EventDispatcher dispatcher(event);
+		dispatcher.Dispatch<MouseButtonPressedEvent>(KBR_BIND_FN(FirstPersonCamera::OnMouseButtonPressed));
+		dispatcher.Dispatch<MouseButtonReleasedEvent>(KBR_BIND_FN(FirstPersonCamera::OnMouseButtonReleased));
+		dispatcher.Dispatch<MouseMovedEvent>(KBR_BIND_FN(FirstPersonCamera::OnMouseMoved));
 	}
 
 	void FirstPersonCamera::SetPosition(const glm::vec3& position)
@@ -230,4 +197,51 @@ namespace Kerberos
 		m_ProjectionDirty = false;
 	}
 
+	bool FirstPersonCamera::OnMouseButtonPressed(const MouseButtonPressedEvent& event) 
+	{
+		if (event.GetButton() == Mouse::Button1)
+		{
+			//Input::SetCursorMode(CursorMode::Locked);
+			m_CanLookAround = true;
+			return true;
+		}
+
+		return false;
+	}
+
+	bool FirstPersonCamera::OnMouseButtonReleased(const MouseButtonReleasedEvent& event) 
+	{
+		if (event.GetButton() == Mouse::Button1)
+		{
+			//Input::SetCursorMode(CursorMode::Normal);
+			m_CanLookAround = false;
+			return true;
+		}
+
+		return false;
+	}
+
+	bool FirstPersonCamera::OnMouseMoved(const MouseMovedEvent& event)
+	{
+		const int32_t x = static_cast<int32_t>(event.GetX());
+		const int32_t y = static_cast<int32_t>(event.GetY());
+
+		const int32_t dx = static_cast<int32_t>(m_MousePosition.x) - x;
+		const int32_t dy = static_cast<int32_t>(m_MousePosition.y) - y;
+
+		m_MousePosition.x = static_cast<float>(x);
+		m_MousePosition.y = static_cast<float>(y);
+
+		if (!m_CanLookAround)
+			return false;
+
+		constexpr float rotationSpeed = 0.3f;
+		m_Yaw -= static_cast<float>(dx) * rotationSpeed;
+		m_Pitch += static_cast<float>(dy) * rotationSpeed;
+		m_Pitch = std::min(m_Pitch, 89.0f);
+		m_Pitch = std::max(m_Pitch, -89.0f);
+		m_ViewDirty = true;
+
+		return true;
+	}
 }

@@ -105,9 +105,9 @@ namespace Kerberos
 				ImGui::PushID(itemStr.c_str());
 				// TODO: Get icon based on asset type
 
-				const Ref<Texture2D> icon = isDirectory ? m_FolderIcon : m_FileIcon;
+				/*const Ref<Texture2D> icon = isDirectory ? m_FolderIcon : m_FileIcon;
 				ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0, 0, 0, 0));
-				ImGui::ImageButton(item.string().c_str(), icon->GetRendererID(), { thumbnailSize, thumbnailSize }, { 0, 1 }, { 1, 0 });
+				ImGui::ImageButton(item.string().c_str(), icon->GetRendererID(), { thumbnailSize, thumbnailSize }, { 0, 1 }, { 1, 0 });*/
 
 				if (ImGui::BeginPopupContextItem())
 				{
@@ -155,13 +155,13 @@ namespace Kerberos
 
 				if (entry.is_directory())
 				{
-					ImGui::ImageButton(path.string().c_str(), m_FolderIcon->GetRendererID(), { thumbnailSize, thumbnailSize }, { 0, 1 }, { 1, 0 });
+					/*ImGui::ImageButton(path.string().c_str(), m_FolderIcon->GetRendererID(), { thumbnailSize, thumbnailSize }, { 0, 1 }, { 1, 0 });
 					if (ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left))
 					{
 						m_CurrentDirectory /= path.filename();
 					}
 
-					ShowFolderContextMenu(path);
+					ShowFolderContextMenu(path);*/
 				}
 				else
 				{
@@ -177,17 +177,17 @@ namespace Kerberos
 							m_AssetImages[path] = TextureImporter::ImportTexture(fullPath);
 						}
 
-						ImGui::ImageButton(path.string().c_str(), m_AssetImages[path]->GetRendererID(), { thumbnailSize, thumbnailSize }, { 0, 1 }, { 1, 0 });
+						/*ImGui::ImageButton(path.string().c_str(), m_AssetImages[path]->GetRendererID(), { thumbnailSize, thumbnailSize }, { 0, 1 }, { 1, 0 });
 						if (ImGui::IsItemHovered())
 						{
 							ImGui::BeginTooltip();
 							ImGui::Text("%s", fileName.c_str());
 							ImGui::EndTooltip();
-						}
+						}*/
 					}
 					else
 					{
-						ImGui::ImageButton(path.string().c_str(), m_FileIcon->GetRendererID(), { thumbnailSize, thumbnailSize }, { 0, 1 }, { 1, 0 });
+						//ImGui::ImageButton(path.string().c_str(), m_FileIcon->GetRendererID(), { thumbnailSize, thumbnailSize }, { 0, 1 }, { 1, 0 });
 					}
 
 					ShowFileContextMenu(path);
@@ -196,7 +196,7 @@ namespace Kerberos
 					{
 						const auto itemPath = relativePath.string();
 
-						ImGui::SetDragDropPayload(ASSET_BROWSER_ITEM, itemPath.c_str(), itemPath.size() + 1, ImGuiCond_Once);
+						ImGui::SetDragDropPayload(assetBrowserItem, itemPath.c_str(), itemPath.size() + 1, ImGuiCond_Once);
 						ImGui::Text("%s", fileName.c_str());
 						ImGui::EndDragDropSource();
 					}
@@ -379,10 +379,10 @@ namespace Kerberos
 			const std::filesystem::path extension = filename.extension();
 			if (extension == ".jpg" || extension == ".png" || extension == ".svg")
 			{
-				ImGui::SetDragDropPayload(ASSET_BROWSER_TEXTURE, &handle, sizeof(AssetHandle), ImGuiCond_Once);
+				ImGui::SetDragDropPayload(assetBrowserTexture, &handle, sizeof(AssetHandle), ImGuiCond_Once);
 				if (const Ref<Texture2D> texture = AssetManager::GetAsset<Texture2D>(handle))
 				{
-					ImGui::Image(texture->GetRendererID(), ImVec2(64, 64), ImVec2(0, 1), ImVec2(1, 0));
+					//ImGui::Image(texture->GetRendererID(), ImVec2(64, 64), ImVec2(0, 1), ImVec2(1, 0));
 				}
 				else
 				{
@@ -391,17 +391,17 @@ namespace Kerberos
 			}
 			else if (extension == ".kbrcubemap")
 			{
-				ImGui::SetDragDropPayload(ASSET_BROWSER_TEXTURE_CUBE, &handle, sizeof(AssetHandle), ImGuiCond_Once);
+				ImGui::SetDragDropPayload(assetBrowserTextureCube, &handle, sizeof(AssetHandle), ImGuiCond_Once);
 				ImGui::Text("%s", filename.string().c_str());
 			}
 			else if (extension == ".obj") /// TODO: Meshes should also have their own kerberos type
 			{
-				ImGui::SetDragDropPayload(ASSET_BROWSER_MESH, &handle, sizeof(AssetHandle), ImGuiCond_Once);
+				ImGui::SetDragDropPayload(assetBrowserMesh, &handle, sizeof(AssetHandle), ImGuiCond_Once);
 				ImGui::Text("%s", filename.string().c_str());
 			}
 			else if (assetType == AssetType::Sound)
 			{
-				ImGui::SetDragDropPayload(ASSET_BROWSER_AUDIO, &handle, sizeof(AssetHandle), ImGuiCond_Once);
+				ImGui::SetDragDropPayload(assetBrowserAudio, &handle, sizeof(AssetHandle), ImGuiCond_Once);
 				ImGui::Text("%s", filename.string().c_str());
 			}
 
@@ -420,4 +420,8 @@ namespace Kerberos
 		KBR_CORE_ERROR("Invalid directory path: {0}", path.string());
 	}
 
+	void AssetsPanel::OnEvent(Event& event)
+	{
+		
+	}
 }

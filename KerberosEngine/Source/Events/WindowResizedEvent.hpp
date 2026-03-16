@@ -15,13 +15,13 @@ namespace Kerberos
 		uint32_t GetWidth() const { return m_Width; }
 		uint32_t GetHeight() const { return m_Height; }
 
-		const char* GetName() const override { return "WindowResizedEvent"; }
-		int GetCategoryFlags() const override { return EventCategoryApplication; }
-
 		std::string ToString() const override
 		{
 			return std::string(GetName()) + ": " + std::to_string(m_Width) + "x" + std::to_string(m_Height);
 		}
+
+		EVENT_CLASS_TYPE(WindowResize)
+		EVENT_CLASS_CATEGORY(EventCategoryApplication)
 
 	private:
 		uint32_t m_Width;

@@ -41,6 +41,8 @@ namespace Kerberos
 #define KBR_CORE_ASSERT(x, ...) do {} while (0)
 #endif
 
+#define KBR_BIND_FN(fn) [this](auto&&... args) -> decltype(auto) { return fn(std::forward<decltype(args)>(args)...); }
+
 	template<typename T>
 	using Owner = std::unique_ptr<T>;
 

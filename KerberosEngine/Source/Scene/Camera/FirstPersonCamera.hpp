@@ -4,6 +4,10 @@
 
 namespace Kerberos 
 {
+	class MouseButtonPressedEvent;
+	class MouseButtonReleasedEvent;
+	class MouseMovedEvent;
+
 	class FirstPersonCamera : public Camera
 	{
 	public:
@@ -11,7 +15,7 @@ namespace Kerberos
 		~FirstPersonCamera() override = default;
 
 		void OnUpdate(float deltaTime) override;
-		void OnEvent(const std::shared_ptr<Event>& event) override;
+		void OnEvent(Event& event) override;
 
 		void SetPosition(const glm::vec3& position) override;
 		void SetRotation(const glm::vec3& rotation) override;
@@ -44,6 +48,10 @@ namespace Kerberos
 	private:
 		void UpdateView();
 		void UpdateProjection();
+
+		bool OnMouseButtonPressed(const MouseButtonPressedEvent& event);
+		bool OnMouseButtonReleased(const MouseButtonReleasedEvent& event);
+		bool OnMouseMoved(const MouseMovedEvent& event);
 
 	private:
 		glm::vec3 m_Position{ 0.0f, 0.0f, 0.0f };

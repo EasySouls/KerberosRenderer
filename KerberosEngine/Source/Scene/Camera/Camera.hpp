@@ -21,7 +21,7 @@ namespace Kerberos
 		virtual ~Camera() = default;
 
 		virtual void OnUpdate(float deltaTime) = 0;
-		virtual void OnEvent(const std::shared_ptr<Event>& event) = 0;
+		virtual void OnEvent(Event& event) = 0;
 
 		virtual void SetPosition(const glm::vec3& position) = 0;
 		virtual void SetRotation(const glm::vec3& rotation) = 0;

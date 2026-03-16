@@ -1,5 +1,6 @@
 #pragma once
 
+#include "EditorWindow.hpp"
 #include "Core/Core.hpp"
 #include "Scene/Scene.hpp"
 #include "Scene/Entity.hpp"
@@ -11,22 +12,22 @@
 
 namespace Kerberos
 {
-	class HierarchyPanel
+	class HierarchyPanel : public EditorWindow
 	{
 	public:
 		HierarchyPanel() = default;
 		explicit HierarchyPanel(const Ref<Scene>& context);
-		~HierarchyPanel() = default;
+		~HierarchyPanel() override = default;
 
 		void SetContext(const Ref<Scene>& context);
 
-		void OnImGuiRender();
+		void OnImGuiRender() override;
 		void DrawComponents(Entity entity);
 
 		Entity GetSelectedEntity() const { return m_SelectedEntity; }
 		void SetSelectedEntity(Entity entity);
 
-		void OnEvent(Event& event);
+		void OnEvent(Event& event) override;
 
 	private:
 		void DrawEntityNode(const Entity& entity);

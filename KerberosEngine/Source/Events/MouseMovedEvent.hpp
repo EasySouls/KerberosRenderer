@@ -15,13 +15,13 @@ namespace Kerberos
 		float GetX() const { return m_MouseX; }
 		float GetY() const { return m_MouseY; }
 
-		const char* GetName() const override { return "MouseMovedEvent"; }
-		int GetCategoryFlags() const override { return EventCategoryMouse | EventCategoryInput; }
-
 		std::string ToString() const override
 		{
 			return std::string(GetName()) + ": " + std::to_string(m_MouseX) + ", " + std::to_string(m_MouseY);
 		}
+
+		EVENT_CLASS_TYPE(MouseMoved)
+		EVENT_CLASS_CATEGORY(EventCategoryMouse | EventCategoryInput)
 
 	private:
 		float m_MouseX;

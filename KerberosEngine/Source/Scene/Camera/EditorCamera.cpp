@@ -162,12 +162,14 @@ namespace Kerberos
 		return speed;
 	}
 
-	void EditorCamera::OnEvent(const std::shared_ptr<Event>& event)
+	void EditorCamera::OnEvent(Event& event)
 	{
-		if (const auto mouseScrolled = std::dynamic_pointer_cast<MouseScrolledEvent>(event))
+		EventDispatcher dispatcher(event);
+		dispatcher.Dispatch<MouseScrolledEvent>([this](const MouseScrolledEvent& e)
 		{
-			OnMouseScrolled(*mouseScrolled);
-		}
+			OnMouseScrolled(e);
+			return true;
+		});
 	}
 
 	void EditorCamera::SetPosition(const glm::vec3& position)

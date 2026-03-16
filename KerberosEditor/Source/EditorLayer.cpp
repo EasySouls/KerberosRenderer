@@ -588,11 +588,15 @@ namespace Kerberos
 		KBR_CORE_TRACE("Frame rendered!");
 	}
 
-	void EditorLayer::OnEvent(const Ref<Event>& event)
+	void EditorLayer::OnEvent(Event& event)
 	{
 		m_Camera->OnEvent(event);
 
-		OnKeyPressed(event);
+		m_HierarchyPanel.OnEvent(event);
+		m_AssetsPanel->OnEvent(event);
+
+		EventDispatcher dispatcher(event);
+		dispatcher.Dispatch<KeyPressedEvent>(KBR_BIND_FN(EditorLayer::OnKeyPressed));
 	}
 
 	void EditorLayer::OnImGuiRender()
@@ -1860,16 +1864,15 @@ namespace Kerberos
 		m_OutputSize = m_ViewportSize;
 	}
 
-	void EditorLayer::OnKeyPressed(const std::shared_ptr<Event>& event) const 
+	bool EditorLayer::OnKeyPressed(const KeyPressedEvent& event) const
 	{
-		if (const auto keyPressedEvent = std::dynamic_pointer_cast<KeyPressedEvent>(event))
+		const int key = event.GetKeyCode();
+		if (key == Key::F)
 		{
-			const int key = keyPressedEvent->GetKeyCode();
-			if (key == Key::F)
-			{
-				const glm::vec3 avocadoPosition = m_SceneNodes[0]->Position;
-				m_Camera->Focus(avocadoPosition);
-			}
+			const glm::vec3 avocadoPosition = m_SceneNodes[0]->Position;
+			m_Camera->Focus(avocadoPosition);
+			return true;
 		}
+		return false;
 	}
 }

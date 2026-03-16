@@ -16,7 +16,7 @@ namespace Kerberos
 		EditorCamera(float fov, float aspectRatio, float nearClip, float farClip);
 
 		void OnUpdate(float deltaTime) override;
-		void OnEvent(const std::shared_ptr<Event>& event) override;
+		void OnEvent(Event& event) override;
 
 		void SetPosition(const glm::vec3& position) override;
 		void SetRotation(const glm::vec3& rotation) override;

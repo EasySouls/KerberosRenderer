@@ -3,6 +3,9 @@
 #include "Layer.hpp"
 #include "Vulkan.hpp"
 
+#include "Windows/AssetsPanel.hpp"
+#include "Windows/HierarchyPanel.hpp"
+
 #include "Renderer/Mesh.hpp"
 #include "Renderer/Textures/Texture2D.hpp"
 #include "Renderer/Textures/TextureCube.hpp"
@@ -32,7 +35,7 @@ namespace Kerberos
 		void OnDetach() override;
 
 		void OnUpdate(float deltaTime) override;
-		void OnEvent(const Ref<Event>& event) override;
+		void OnEvent(Event& event) override;
 		void OnImGuiRender() override;
 
 	private:
@@ -48,11 +51,16 @@ namespace Kerberos
 		void CreateVulkanResources();
 		void ResizeResources();
 
-		void OnKeyPressed(const Ref<Event>& event) const;
+		bool OnKeyPressed(const KeyPressedEvent& event) const;
 
 	private:
 		float m_Time = 0.0f;
 		float m_Fps = 0.0f;
+
+		HierarchyPanel m_HierarchyPanel;
+		Owner<AssetsPanel> m_AssetsPanel;
+
+		NotificationManager m_NotificationManager;
 
 		bool m_DisplaySkybox = true;
 		bool m_DisplayDebugNormals = false;

@@ -15,13 +15,13 @@ namespace Kerberos
 		double GetXOffset() const { return m_XOffset; }
 		double GetYOffset() const { return m_YOffset; }
 
-		const char* GetName() const override { return "MouseScrolledEvent"; }
-		int GetCategoryFlags() const override { return EventCategoryMouse | EventCategoryInput; }
-
 		std::string ToString() const override
 		{
 			return std::string(GetName()) + ": " + std::to_string(m_XOffset) + ", " + std::to_string(m_YOffset);
 		}
+
+		EVENT_CLASS_TYPE(MouseScrolled)
+		EVENT_CLASS_CATEGORY(EventCategoryMouse | EventCategoryInput)
 
 	private:
 		double m_XOffset;

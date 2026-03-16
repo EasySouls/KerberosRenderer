@@ -8,6 +8,7 @@
 #include "Assets/AssetManager.hpp"
 #include "Input/InputSystem.hpp"
 #include "Assets/Importers/TextureImporter.hpp"
+#include "Assets/AssetManager.hpp"
 #include "Events/KeyPressedEvent.hpp"
 //#include "Scripting/ScriptEngine.hpp"
 //#include "Scripting/ScriptInstance.hpp"
@@ -118,7 +119,7 @@ namespace Kerberos
 	void HierarchyPanel::OnEvent(Event& event)
 	{
 		EventDispatcher dispatcher(event);
-		dispatcher.Dispatch<KeyPressedEvent>(KBR_BIND_EVENT_FN(HierarchyPanel::OnKeyPressed));
+		dispatcher.Dispatch<KeyPressedEvent>(KBR_BIND_FN(HierarchyPanel::OnKeyPressed));
 	}
 
 	void HierarchyPanel::DrawEntityNode(const Entity& entity)
@@ -997,12 +998,12 @@ namespace Kerberos
 				/// Handle drag and drop for meshes
 				if (ImGui::BeginDragDropTarget())
 				{
-					if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload(ASSET_BROWSER_MESH))
+					if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload(assetBrowserMesh))
 					{
 						const AssetHandle handle = *static_cast<AssetHandle*>(payload->Data);
 						if (AssetManager::GetAssetType(handle) != AssetType::Mesh)
 						{
-							KBR_ERROR("Asset is not a mesh: {0}", handle);
+							KBR_EDITOR_ERROR("Asset is not a mesh: {0}", handle);
 							m_NotificationManager.AddNotification("Asset is not a mesh", Notification::Type::Error);
 							return;
 						}
@@ -1045,7 +1046,7 @@ namespace Kerberos
 				ImGui::Text("Texture");
 
 				std::string textureLabel = "None";
-				uint64_t textureID;
+				/*uint64_t textureID;
 				if (staticMesh.MeshTexture)
 				{
 					if (AssetManager::IsAssetHandleValid(staticMesh.MeshTexture->GetHandle()))
@@ -1063,20 +1064,20 @@ namespace Kerberos
 				else
 				{
 					textureID = m_WhiteTexture->GetRendererID();
-				}
+				}*/
 				ImGui::Text("%s", textureLabel.c_str());
 
-				ImGui::Image(textureID, ImVec2{ 64, 64 }, ImVec2{ 0, 1 }, ImVec2{ 1, 0 });
+				//ImGui::Image(textureID, ImVec2{ 64, 64 }, ImVec2{ 0, 1 }, ImVec2{ 1, 0 });
 
 				/// Handle drag and drop for textures
 				if (ImGui::BeginDragDropTarget())
 				{
-					if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload(ASSET_BROWSER_TEXTURE))
+					if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload(assetBrowserTexture))
 					{
 						const AssetHandle handle = *static_cast<AssetHandle*>(payload->Data);
 						if (AssetManager::GetAssetType(handle) != AssetType::Texture2D)
 						{
-							KBR_ERROR("Asset is not a texture: {0}", handle);
+							KBR_EDITOR_ERROR("Asset is not a texture: {0}", handle);
 							m_NotificationManager.AddNotification("Asset is not a texture", Notification::Type::Error);
 							return;
 						}
@@ -1361,18 +1362,18 @@ namespace Kerberos
 
 				/// Render the environment cubemap into an image
 				ImGui::Text("Skybox Texture");
-				const uint64_t textureID = m_CubemapFramebuffer->GetColorAttachmentRendererID();
-				ImGui::Image(textureID, ImVec2{ 256, 256 }, ImVec2{ 0, 1 }, ImVec2{ 1, 0 });
+				/*const uint64_t textureID = m_CubemapFramebuffer->GetColorAttachmentRendererID();
+				ImGui::Image(textureID, ImVec2{ 256, 256 }, ImVec2{ 0, 1 }, ImVec2{ 1, 0 });*/
 
 				/// Handle drag and drop for textures
 				if (ImGui::BeginDragDropTarget())
 				{
-					if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload(ASSET_BROWSER_TEXTURE_CUBE))
+					if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload(assetBrowserTextureCube))
 					{
 						const AssetHandle handle = *static_cast<AssetHandle*>(payload->Data);
 						if (AssetManager::GetAssetType(handle) != AssetType::TextureCube)
 						{
-							KBR_ERROR("Asset is not a texture: {0}", handle);
+							KBR_EDITOR_ERROR("Asset is not a texture: {0}", handle);
 							m_NotificationManager.AddNotification("Asset is not a cubemap", Notification::Type::Error);
 							return;
 						}
@@ -1436,25 +1437,24 @@ namespace Kerberos
 				ImGui::Separator();
 
 				ImGui::Text("Font: %s", text.Font->GetName().c_str());
-				ImGui::Image(text.Font->GetAtlasTexture()->GetRendererID(), ImVec2{ 128, 128 }, ImVec2{ 0, 1 }, ImVec2{ 1, 0 });
+				//ImGui::Image(text.Font->GetAtlasTexture()->GetRendererID(), ImVec2{ 128, 128 }, ImVec2{ 0, 1 }, ImVec2{ 1, 0 });
 
-				/// Handle drag and drop for fonts
-				if (ImGui::BeginDragDropTarget())
-				{
-					if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload(ASSET_BROWSER_FONT))
-					{
-						const AssetHandle handle = *static_cast<AssetHandle*>(payload->Data);
-						if (AssetManager::GetAssetType(handle) != AssetType::Texture2D) // TODO: Change to font type when it exists
-						{
-							KBR_ERROR("Asset is not a texture: {0}", handle);
-							/// TODO: Show a notification instead of an error log
-							m_NotificationManager.AddNotification("Asset is not a font", Notification::Type::Error);
-							return;
-						}
-						//text.Font = AssetManager::GetAsset<Font>(handle);
-					}
-					ImGui::EndDragDropTarget();
-				}
+				///// Handle drag and drop for fonts
+				//if (ImGui::BeginDragDropTarget())
+				//{
+				//	if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload(assetBrowserFont))
+				//	{
+				//		const AssetHandle handle = *static_cast<AssetHandle*>(payload->Data);
+				//		if (AssetManager::GetAssetType(handle) != AssetType::Texture2D) // TODO: Change to font type when it exists
+				//		{
+				//			KBR_EDITOR_ERROR("Asset is not a texture: {0}", handle);
+				//			m_NotificationManager.AddNotification("Asset is not a font", Notification::Type::Error);
+				//			return;
+				//		}
+				//		//text.Font = AssetManager::GetAsset<Font>(handle);
+				//	}
+				//	ImGui::EndDragDropTarget();
+				//}
 
 				ImGui::TreePop();
 			}
@@ -1495,12 +1495,12 @@ namespace Kerberos
 				/// Handle drag and drop for the audio asset
 				if (ImGui::BeginDragDropTarget())
 				{
-					if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload(ASSET_BROWSER_AUDIO))
+					if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload(assetBrowserAudio))
 					{
 						const AssetHandle handle = *static_cast<AssetHandle*>(payload->Data);
 						if (AssetManager::GetAssetType(handle) != AssetType::Sound)
 						{
-							KBR_ERROR("Asset is not a sound: {0}", handle);
+							KBR_EDITOR_ERROR("Asset is not a sound: {0}", handle);
 							m_NotificationManager.AddNotification("Asset is not a sound", Notification::Type::Error);
 							return;
 						}
@@ -1554,12 +1554,12 @@ namespace Kerberos
 				/// Handle drag and drop for the audio asset
 				if (ImGui::BeginDragDropTarget())
 				{
-					if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload(ASSET_BROWSER_AUDIO))
+					if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload(assetBrowserAudio))
 					{
 						const AssetHandle handle = *static_cast<AssetHandle*>(payload->Data);
 						if (AssetManager::GetAssetType(handle) != AssetType::Sound)
 						{
-							KBR_ERROR("Asset is not a sound: {0}", handle);
+							KBR_EDITOR_ERROR("Asset is not a sound: {0}", handle);
 							m_NotificationManager.AddNotification("Asset is not a sound", Notification::Type::Error);
 							return;
 						}

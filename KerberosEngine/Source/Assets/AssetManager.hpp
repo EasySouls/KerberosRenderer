@@ -11,9 +11,6 @@
 
 namespace Kerberos
 {
-	class Mesh;
-	class Texture2D;
-
 	class AssetManager
 	{
 	public:
