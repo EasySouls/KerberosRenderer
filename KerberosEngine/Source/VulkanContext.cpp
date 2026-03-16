@@ -145,6 +145,8 @@ namespace Kerberos
 
 	VulkanContext::~VulkanContext()
 	{
+		m_ImGuiDescriptorSetManager.Clear();
+
 		Cleanup();
 	};
 
@@ -1252,6 +1254,13 @@ namespace Kerberos
 
 	void VulkanContext::DestroyImGuiDescriptorSet(const vk::DescriptorSet& descriptorSet) {
 		ImGui_ImplVulkan_RemoveTexture(descriptorSet);
+	}
+
+	uint64_t VulkanContext::GetImGuiRendererID(const Ref<Texture2D>& texture)
+	{
+		const vk::DescriptorSet descriptorSet = m_ImGuiDescriptorSetManager.GetDescriptorSetForTexture(texture);
+		const uint64_t rendererID = reinterpret_cast<ImTextureID>(static_cast<VkDescriptorSet>(descriptorSet));
+		return rendererID;
 	}
 
 	void VulkanContext::Cleanup() const

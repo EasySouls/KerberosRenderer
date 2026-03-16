@@ -12,6 +12,7 @@
 #include "Renderer/SkyboxUtils.hpp"
 #include "Scene/Camera/EditorCamera.hpp"
 #include "Scene/Camera/FirstPersonCamera.hpp"
+#include "Serialization/SceneSerializer.hpp"
 #include "Input/KeyCodes.hpp"
 #include "Logging/Log.hpp"
 
@@ -20,10 +21,18 @@
 
 #include <imgui/imgui.h>
 
+#include "Application.hpp"
+#include "AssetConstants.hpp"
+#include "Assets/AssetManager.hpp"
+#include "Assets/Importers/TextureImporter.hpp"
+#include "ImGuizmo/ImGuizmo.h"
+#include "Input/InputSystem.hpp"
+#include "Utils/SystemOperations.hpp"
+
 namespace Kerberos
 {
 	EditorLayer::EditorLayer() 
-		: Layer("EditorLayer"), m_SkyboxMesh(std::nullopt)
+		: Layer("EditorLayer"), m_BasicFont(Font::GetDefaultFont()), m_SkyboxMesh(std::nullopt)
 	{
 	}
 
@@ -166,6 +175,13 @@ namespace Kerberos
 		m_MaterialRegistry.SetupDescriptorSets(m_DescriptorSetLayouts.textures);
 
 		KBR_CORE_INFO("Prepared Vulkan resources!");
+
+		m_AssetsPanel = CreateOwner<AssetsPanel>(m_NotificationManager);
+
+		m_IconPlay = TextureImporter::ImportTexture("Assets/Editor/play_button.png");
+		m_IconStop = TextureImporter::ImportTexture("Assets/Editor/stop_button.png");
+		m_IconPause = TextureImporter::ImportTexture("Assets/Editor/pause_button.png");
+		m_IconResume = TextureImporter::ImportTexture("Assets/Editor/outlined_play_button.png");
 	}
 	
 	void EditorLayer::OnDetach() 
@@ -597,6 +613,8 @@ namespace Kerberos
 
 		EventDispatcher dispatcher(event);
 		dispatcher.Dispatch<KeyPressedEvent>(KBR_BIND_FN(EditorLayer::OnKeyPressed));
+		dispatcher.Dispatch<MouseButtonPressedEvent>(KBR_BIND_FN(EditorLayer::OnMouseButtonPressed));
+		dispatcher.Dispatch<WindowDropEvent>(KBR_BIND_FN(EditorLayer::OnWindowDrop));
 	}
 
 	void EditorLayer::OnImGuiRender()
@@ -738,6 +756,369 @@ namespace Kerberos
 		ImGui::End();
 
 		KBR_CORE_TRACE("ImGui rendered!");
+	}
+
+	void EditorLayer::OnScenePlay()
+	{
+		m_SceneState = SceneState::Play;
+
+		m_RuntimeScene = Scene::Copy(m_EditorScene);
+
+		m_RuntimeScene->OnRuntimeStart();
+
+		m_ActiveScene = m_RuntimeScene;
+		m_HierarchyPanel.SetContext(m_ActiveScene);
+	}
+
+	void EditorLayer::OnSceneSimulate()
+	{
+		m_SceneState = SceneState::Simulate;
+
+		m_RuntimeScene = Scene::Copy(m_EditorScene);
+
+		m_RuntimeScene->OnSimulationStart();
+
+		m_ActiveScene = m_RuntimeScene;
+		m_HierarchyPanel.SetContext(m_ActiveScene);
+	}
+
+	void EditorLayer::OnSceneStop()
+	{
+		m_SceneState = SceneState::Edit;
+		m_IsScenePaused = false;
+
+		if (m_SceneState == SceneState::Play)
+			m_ActiveScene->OnRuntimeStop();
+		else if (m_SceneState == SceneState::Simulate)
+			m_ActiveScene->OnSimulationStop();
+
+		m_RuntimeScene = nullptr;
+
+		m_ActiveScene = m_EditorScene;
+		m_HierarchyPanel.SetContext(m_ActiveScene);
+	}
+
+	void EditorLayer::HandleDragAndDrop() 
+	{
+		if (ImGui::BeginDragDropTarget())
+		{
+			if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload(assetBrowserItem))
+			{
+				const auto& path = static_cast<const char*>(payload->Data);
+				KBR_EDITOR_INFO("Drag and drop payload: {0}", path);
+
+				const std::string message = "Drag and drop payload: " + std::string(path);
+				m_NotificationManager.AddNotification(message, Notification::Type::Info);
+
+				const AssetHandle assetHandle = *static_cast<AssetHandle*>(payload->Data);
+				const AssetType assetType = AssetManager::GetAssetType(assetHandle);
+				if (assetType == AssetType::Scene)
+				{
+					Ref<Scene> scene = AssetManager::GetAsset<Scene>(assetHandle);
+					//OpenScene(scene);
+				}
+			}
+			ImGui::EndDragDropTarget();
+		}
+	}
+
+	void EditorLayer::NewProject() 
+	{
+		const auto newProject = Project::New();
+
+		NewScene();
+		const std::string newSceneName = "Unnamed Scene.kerberos";
+		const std::filesystem::path scenePath = Project::GetAssetDirectory() / "scenes" / newSceneName;
+
+		const SceneSerializer serializer(m_ActiveScene);
+		serializer.Serialize(scenePath.string());
+
+		m_NotificationManager.AddNotification("Scene saved to " + scenePath.string(), Notification::Type::Info);
+
+		ProjectInfo projInfo;
+		projInfo.Name = newProject->GetInfo().Name;
+		projInfo.StartScenePath = "scenes/" + newSceneName;
+		projInfo.AssetDirectory = Project::GetAssetDirectory();
+		newProject->SetInfo(projInfo);
+
+		m_AssetsPanel = CreateOwner<AssetsPanel>(m_NotificationManager);
+	}
+
+	void EditorLayer::OpenProject(const std::filesystem::path& filepath) 
+	{
+		if (const auto project = Project::Load(filepath))
+		{
+			const auto startScenePath = Project::GetAssetDirectory() / project->GetInfo().StartScenePath;
+			OpenScene(startScenePath);
+
+			m_AssetsPanel = CreateOwner<AssetsPanel>(m_NotificationManager);
+		}
+	}
+
+	bool EditorLayer::OpenProject()
+	{
+		const std::string filepathString = FileDialog::OpenFile("Kerberos Project (*.kbrproj)\0*.kbrproj\0");
+
+		if (filepathString.empty())
+			return false;
+
+		OpenProject(filepathString);
+		return true;
+	}
+
+	void EditorLayer::SaveScene()
+	{
+		// TODO: Store the current scene path in the project and save to that path instead of hardcoding it here
+		const std::filesystem::path scenePath = "assets/scenes/Example.kerberos";
+
+		const SceneSerializer serializer(m_ActiveScene);
+		serializer.Serialize(scenePath.string());
+
+		m_NotificationManager.AddNotification("Scene saved to " + scenePath.string(), Notification::Type::Info);
+
+		Project::SaveActive();
+	}
+
+	void EditorLayer::SaveSceneAs()
+	{
+		const std::string filepath = FileDialog::SaveFile("Kerberos Scene (*.kerberos)\0*.kerberos\0");
+		if (filepath.empty())
+			return;
+
+		const SceneSerializer serializer(m_ActiveScene);
+		serializer.Serialize(filepath);
+
+		m_NotificationManager.AddNotification("Scene saved to " + filepath, Notification::Type::Info);
+
+		Project::SaveActive();
+	}
+
+	void EditorLayer::LoadScene()
+	{
+		const std::string filepathString = FileDialog::OpenFile("Kerberos Scene (*.kerberos)\0*.kerberos\0");
+
+		if (filepathString.empty())
+			return;
+
+		OpenScene(filepathString);
+	}
+
+	void EditorLayer::OpenScene(const std::filesystem::path& filepath)
+	{
+		if (m_SceneState != SceneState::Edit)
+		{
+			OnSceneStop();
+		}
+
+		/// TODO: Prompt to save the current scene if there are unsaved changes
+
+		const Ref<Scene> newScene = CreateRef<Scene>();
+		const SceneSerializer serializer(newScene);
+
+		if (!serializer.Deserialize(filepath))
+		{
+			KBR_EDITOR_ERROR("Failed to load scene from {0}", filepath.string());
+			return;
+		}
+
+		m_EditorScene = newScene;
+		m_EditorScene->OnViewportResize(static_cast<uint32_t>(m_ViewportSize.x), static_cast<uint32_t>(m_ViewportSize.y));
+		m_HierarchyPanel.SetContext(m_EditorScene);
+
+		m_ActiveScene = m_EditorScene;
+	}
+
+	void EditorLayer::NewScene() 
+	{
+		m_ActiveScene = CreateRef<Scene>();
+		m_ActiveScene->OnViewportResize(static_cast<uint32_t>(m_ViewportSize.x), static_cast<uint32_t>(m_ViewportSize.y));
+		m_HierarchyPanel.SetContext(m_ActiveScene);
+	}
+
+	void EditorLayer::DrawUIToolbar()
+	{
+		constexpr ImGuiWindowFlags flags = ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse;
+
+		ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.0f, 0.0f, 0.0f, 0.0f));
+		const auto& colors = ImGui::GetStyle().Colors;
+		const auto& buttonHovered = colors[ImGuiCol_ButtonHovered];
+		ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(buttonHovered.x, buttonHovered.y, buttonHovered.z, 0.5f));
+		const auto& buttonActive = colors[ImGuiCol_ButtonActive];
+		ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(buttonActive.x, buttonActive.y, buttonActive.z, 0.5f));
+
+		ImGui::Begin("Toolbar", nullptr, flags);
+
+		const float size = ImGui::GetWindowHeight() - 4.0f;
+
+		if (m_SceneState == SceneState::Edit)
+		{
+			constexpr int columns = 2;
+			ImGui::PushStyleVar(ImGuiStyleVar_ItemInnerSpacing, ImVec2(2.0f, 2.0f));
+			ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.0f, 2.0f));
+			constexpr ImGuiTableFlags tableFlags = ImGuiTableFlags_SizingFixedFit | ImGuiTableFlags_Resizable;
+			ImGui::BeginTable("##ToolbarButtonTable", columns, tableFlags, ImVec2(ImGui::GetWindowWidth(), size));
+			ImGui::PopStyleVar(2);
+
+			ImGui::TableNextColumn();
+
+			if (ImGui::ImageButton("PlayButton", VulkanContext::Get().GetImGuiRendererID(m_IconPlay), ImVec2(size, size), ImVec2(0, 0), ImVec2(1, 1)))
+			{
+				OnScenePlay();
+			}
+			if (ImGui::IsItemHovered())
+			{
+				ImGui::SetTooltip("Play (Ctrl + P)");
+			}
+
+			ImGui::TableNextColumn();
+
+			if (ImGui::ImageButton("SimulateButton", VulkanContext::Get().GetImGuiRendererID(m_IconPlay), ImVec2(size, size), ImVec2(0, 0), ImVec2(1, 1)))
+			{
+				OnSceneSimulate();
+			}
+			if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
+			{
+				ImGui::SetTooltip("Simulate (Ctrl + L)");
+			}
+
+			ImGui::EndTable();
+		}
+		else
+		{
+			ImGui::PushStyleVar(ImGuiStyleVar_ItemInnerSpacing, ImVec2(0.0f, 0.0f));
+			ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.0f, 2.0f));
+
+			constexpr int columns = 2;
+			constexpr ImGuiTableFlags tableFlags = ImGuiTableFlags_None;
+			ImGui::BeginTable("##ToolbarButtonTable", columns, tableFlags);
+
+			//ImGui::SetCursorPosX((ImGui::GetWindowContentRegionMax().x * 0.5f) - (size * 0.5f));
+
+			ImGui::TableNextColumn();
+
+			if (m_IsScenePaused)
+			{
+				if (ImGui::ImageButton("ResumeButton", VulkanContext::Get().GetImGuiRendererID(m_IconResume), ImVec2(size, size), ImVec2(0, 0), ImVec2(1, 1)))
+				{
+					m_IsScenePaused = false;
+					m_ActiveScene->SetScenePaused(m_IsScenePaused);
+				}
+				if (ImGui::IsItemHovered())
+				{
+					ImGui::SetTooltip("Resume");
+				}
+			}
+			else
+			{
+				if (ImGui::ImageButton("PauseButton", VulkanContext::Get().GetImGuiRendererID(m_IconPause), ImVec2(size, size), ImVec2(0, 0), ImVec2(1, 1)))
+				{
+					m_IsScenePaused = true;
+					m_ActiveScene->SetScenePaused(m_IsScenePaused);
+				}
+				if (ImGui::IsItemHovered())
+				{
+					ImGui::SetTooltip("Pause");
+				}
+			}
+
+			ImGui::TableNextColumn();
+
+			if (ImGui::ImageButton("StopButton", VulkanContext::Get().GetImGuiRendererID(m_IconStop), ImVec2(size, size), ImVec2(0, 0), ImVec2(1, 1)))
+			{
+				OnSceneStop();
+			}
+
+			if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
+			{
+				if (m_SceneState == SceneState::Play)
+					ImGui::SetTooltip("Stop (Ctrl + P)");
+				else if (m_SceneState == SceneState::Simulate)
+					ImGui::SetTooltip("Stop Simulation (Ctrl + L)");
+			}
+
+			ImGui::EndTable();
+
+			ImGui::PopStyleVar(2);
+		}
+
+		ImGui::PopStyleColor(3);
+
+		ImGui::End();
+	}
+
+	void EditorLayer::DrawMenuBar()
+	{
+		if (ImGui::BeginMenuBar())
+		{
+			if (ImGui::BeginMenu("File"))
+			{
+				if (ImGui::MenuItem("Exit"))
+				{
+					/// TODO: Show a confirmation dialog and whether to save the scene if there are unsaved changes 
+					Application::Get().Close();
+				}
+
+				ImGui::MenuItem("Fullscreen", nullptr, &m_IsFullScreenPersistent);
+
+				if (ImGui::MenuItem("New Scene", "Ctrl+N"))
+				{
+					NewScene();
+				}
+
+				if (ImGui::MenuItem("Save", "Ctrl+S"))
+				{
+					SaveScene();
+				}
+
+				if (ImGui::MenuItem("Save As...", "Ctrl+Shift+S"))
+				{
+					SaveSceneAs();
+				}
+
+				if (ImGui::MenuItem("Load...", "Ctrl+O"))
+				{
+					LoadScene();
+				}
+
+				ImGui::EndMenu();
+			}
+
+			if (ImGui::BeginMenu("Edit"))
+			{
+				/// Todo: Implement undo/redo system
+				if (ImGui::MenuItem("Undo", "Ctrl+Z", false, false)) {}
+				if (ImGui::MenuItem("Redo", "Ctrl+Y", false, false)) {}
+				ImGui::Separator();
+				if (ImGui::MenuItem("Cut", "Ctrl+X", false, false)) {}
+				if (ImGui::MenuItem("Copy", "Ctrl+C", false, false)) {}
+				if (ImGui::MenuItem("Paste", "Ctrl+V", false, false)) {}
+				if (ImGui::MenuItem("Duplicate", "Ctrl+D", false, false)) {}
+				ImGui::Separator();
+				if (ImGui::MenuItem("Delete", "Del", false, false)) {}
+				ImGui::EndMenu();
+			}
+
+			if (ImGui::BeginMenu("View"))
+			{
+				if (ImGui::MenuItem("Show Wireframe"))
+				{
+					/*m_ShowWireframe = !m_ShowWireframe;
+					Renderer3D::SetShowWireframe(m_ShowWireframe);*/
+				}
+				ImGui::EndMenu();
+			}
+
+			if (ImGui::BeginMenu("Debug"))
+			{
+				if (ImGui::MenuItem("Reload C# assemblies", "", nullptr, m_SceneState == SceneState::Edit))
+				{
+					//ScriptEngine::ReloadAssembly();
+				}
+				ImGui::EndMenu();
+			}
+
+			ImGui::EndMenuBar();
+		}
 	}
 
 	void EditorLayer::UpdateSceneUniformBuffers(const uint32_t currentImage) 
@@ -1864,15 +2245,81 @@ namespace Kerberos
 		m_OutputSize = m_ViewportSize;
 	}
 
-	bool EditorLayer::OnKeyPressed(const KeyPressedEvent& event) const
+	bool EditorLayer::OnKeyPressed(const KeyPressedEvent& event)
 	{
-		const int key = event.GetKeyCode();
-		if (key == Key::F)
+		/// Shortcuts
+		if (event.GetRepeatCount() > 0)
+			return false;
+
+		const bool ctrl = Input::IsKeyPressed(Key::LeftControl) || Input::IsKeyPressed(Key::RightControl);
+		const bool shift = Input::IsKeyPressed(Key::LeftShift) || Input::IsKeyPressed(Key::RightShift);
+
+		switch (event.GetKeyCode())
 		{
-			const glm::vec3 avocadoPosition = m_SceneNodes[0]->Position;
-			m_Camera->Focus(avocadoPosition);
-			return true;
+			case Key::S:
+				if (ctrl && shift)
+				{
+					SaveSceneAs();
+				}
+				else if (ctrl)
+				{
+					SaveScene();
+				}
+				break;
+			case Key::N:
+				if (ctrl)
+				{
+					NewScene();
+				}
+				break;
+			case Key::O:
+				if (ctrl)
+				{
+					LoadScene();
+				}
+				break;
+
+				/// Gizmos
+			case Key::Q:
+				m_GizmoType = GizmoType::None;
+				break;
+			case Key::W:
+				m_GizmoType = GizmoType::Translate;
+				break;
+			case Key::E:
+				m_GizmoType = GizmoType::Scale;
+				break;
+			case Key::R:
+				m_GizmoType = GizmoType::Rotate;
+				break;
+			case Key::F: {
+				if (const Entity& entity = m_HierarchyPanel.GetSelectedEntity())
+				{
+					m_Camera->Focus(entity.GetComponent<TransformComponent>().Translation);
+				}
+				break;
+			}
+			default:
+				break;
+		}
+
+		return false;
+	}
+
+	bool EditorLayer::OnMouseButtonPressed(const MouseButtonPressedEvent& event)
+	{
+		/// Handle mouse picking
+		/// Only select the entity if we are not using the gizmos or the camera
+		if (event.GetButton() == Mouse::ButtonLeft && !ImGuizmo::IsOver() && !Input::IsKeyPressed(Key::LeftAlt))
+		{
+			m_HierarchyPanel.SetSelectedEntity(m_HoveredEntity);
 		}
 		return false;
+	}
+
+	bool EditorLayer::OnWindowDrop(const WindowDropEvent& event) 
+	{
+		/// TODO: Implement file dropping to load scenes or import models
+		throw std::logic_error("Not implemented");
 	}
 }

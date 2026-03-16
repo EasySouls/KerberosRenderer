@@ -4,9 +4,12 @@
 #include "Renderer/VMA/VMA.hpp"
 #include "Utils/MemoryBudget.hpp"
 
+#include "Renderer/Textures/Texture2D.hpp"
+#include "Renderer/ImGuiDescriptorSetManager.hpp"
 #include <limits>
 #include <optional>
 #include <vector>
+
 
 struct GLFWwindow;
 
@@ -106,6 +109,7 @@ namespace Kerberos
 															const vk::raii::ImageView& imageView, 
 															vk::ImageLayout imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal);
 		static void DestroyImGuiDescriptorSet(const vk::DescriptorSet& descriptorSet);
+		uint64_t GetImGuiRendererID(const Ref<Texture2D>& texture);
 
 		void FramebufferResized(uint32_t width, uint32_t height);
 
@@ -211,6 +215,7 @@ namespace Kerberos
 		uint32_t m_CurrentImageIndex = 0;
 
 		MemoryBudget m_MemoryBudget;
+		ImGuiDescriptorSetManager m_ImGuiDescriptorSetManager;
 
 		// Singleton instance
 		static VulkanContext* s_Instance;

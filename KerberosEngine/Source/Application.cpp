@@ -90,7 +90,7 @@ namespace Kerberos
 		// Setup GLFW event handlers
 		glfwSetWindowSizeCallback(m_Window, [](GLFWwindow* window, const int width, const int height)
 		{
-			const auto& app = *static_cast<Application*>(glfwGetWindowUserPointer(window));
+			auto& app = *static_cast<Application*>(glfwGetWindowUserPointer(window));
 
 			auto event = WindowResizedEvent(width, height);
 			app.OnEvent(event);
@@ -98,7 +98,7 @@ namespace Kerberos
 
 		glfwSetWindowCloseCallback(m_Window, [](GLFWwindow* window)
 		{
-			const auto& app = *static_cast<Application*>(glfwGetWindowUserPointer(window));
+			auto& app = *static_cast<Application*>(glfwGetWindowUserPointer(window));
 
 			auto event = WindowClosedEvent();
 			app.OnEvent(event);
@@ -106,7 +106,7 @@ namespace Kerberos
 
 		glfwSetKeyCallback(m_Window, [](GLFWwindow* window, const int key, const int scancode, const int action, const int mods)
 		{
-			const auto& app = *static_cast<Application*>(glfwGetWindowUserPointer(window));
+			auto& app = *static_cast<Application*>(glfwGetWindowUserPointer(window));
 
 			switch (action)
 			{
@@ -138,7 +138,7 @@ namespace Kerberos
 
 		glfwSetCharCallback(m_Window, [](GLFWwindow* window, const unsigned int keycode)
 		{
-			const auto& app = *static_cast<Application*>(glfwGetWindowUserPointer(window));
+			auto& app = *static_cast<Application*>(glfwGetWindowUserPointer(window));
 
 			auto event = KeyTypedEvent(keycode);
 			app.OnEvent(event);
@@ -146,7 +146,7 @@ namespace Kerberos
 
 		glfwSetMouseButtonCallback(m_Window, [](GLFWwindow* window, const int button, const int action, const int mods)
 		{
-			const auto& app = *static_cast<Application*>(glfwGetWindowUserPointer(window));
+			auto& app = *static_cast<Application*>(glfwGetWindowUserPointer(window));
 			switch (action)
 			{
 				case GLFW_PRESS:
@@ -168,7 +168,7 @@ namespace Kerberos
 
 		glfwSetScrollCallback(m_Window, [](GLFWwindow* window, const double xOffset, const double yOffset)
 		{
-			const auto& app = *static_cast<Application*>(glfwGetWindowUserPointer(window));
+			auto& app = *static_cast<Application*>(glfwGetWindowUserPointer(window));
 
 			auto event = MouseScrolledEvent(static_cast<float>(xOffset), static_cast<float>(yOffset));
 			app.OnEvent(event);
@@ -176,7 +176,7 @@ namespace Kerberos
 
 		glfwSetCursorPosCallback(m_Window, [](GLFWwindow* window, const double xPos, const double yPos)
 		{
-			const auto& app = *static_cast<Application*>(glfwGetWindowUserPointer(window));
+			auto& app = *static_cast<Application*>(glfwGetWindowUserPointer(window));
 
 			auto event = MouseMovedEvent(static_cast<float>(xPos), static_cast<float>(yPos));
 			app.OnEvent(event);
@@ -184,7 +184,7 @@ namespace Kerberos
 
 		glfwSetDropCallback(m_Window, [](GLFWwindow* window, const int pathCount, const char* paths[])
 		{
-			const auto& app = *static_cast<Application*>(glfwGetWindowUserPointer(window));
+			auto& app = *static_cast<Application*>(glfwGetWindowUserPointer(window));
 
 			std::vector<std::filesystem::path> filepaths(pathCount);
 			for (int i = 0; i < pathCount; ++i)
@@ -212,7 +212,7 @@ namespace Kerberos
 
 	void Application::Run() 
 	{
-		while (!glfwWindowShouldClose(m_Window))
+		while (!glfwWindowShouldClose(m_Window) && m_IsRunning)
 		{
 			glfwPollEvents();
 
@@ -241,11 +241,16 @@ namespace Kerberos
 		}
 	}
 
-	void Application::OnEvent(Event& event) const 
+	void Application::Close()
 	{
-		/*EventDispatcher dispatcher(event);
-		dispatcher.Dispatch<WindowCloseEvent>(KBR_BIND_FN(Application::OnWindowClosed));
-		dispatcher.Dispatch<WindowResizeEvent>(KBR_BIND_FN(Application::OnWindowResize));*/
+		m_IsRunning = false;
+	}
+
+	void Application::OnEvent(Event& event) 
+	{
+		EventDispatcher dispatcher(event);
+		dispatcher.Dispatch<WindowClosedEvent>(KBR_BIND_FN(Application::OnWindowClose));
+		// dispatcher.Dispatch<WindowResizeEvent>(KBR_BIND_FN(Application::OnWindowResize));
 
 		for (const auto& layer : m_Layers)
 		{
@@ -276,5 +281,11 @@ namespace Kerberos
 			functions.pop();
 			fn();
 		}
+	}
+
+	bool Application::OnWindowClose(const WindowClosedEvent&) 
+	{
+		m_IsRunning = false;
+		return true;
 	}
 }

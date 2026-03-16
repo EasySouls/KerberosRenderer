@@ -2,6 +2,7 @@
 
 #include "VulkanContext.hpp"
 #include "Events/Event.hpp"
+#include "Events/WindowClosedEvent.hpp"
 #include "Audio/AudioManager.hpp"
 #include "Logging/Log.hpp"
 #include "Core/Core.hpp"
@@ -13,6 +14,7 @@
 #include <queue>
 #include <functional>
 #include <filesystem>
+
 
 struct GLFWwindow;
 
@@ -50,11 +52,13 @@ namespace Kerberos
 
 		void Run();
 
+		void Close();
+
 		template<typename T> 
 			requires std::is_base_of_v<Layer, T>
 		void PushLayer();
 
-		void OnEvent(Event& event) const;
+		void OnEvent(Event& event);
 
 		void SubmitToMainThreadQueue(const std::function<void()>& fn);
 
@@ -66,6 +70,8 @@ namespace Kerberos
 	private:
 		void ExecuteMainThreadQueue();
 
+		bool OnWindowClose(const WindowClosedEvent& event);
+
 	private:
 		ApplicationSpecification m_Specification;
 
@@ -75,6 +81,8 @@ namespace Kerberos
 
 		std::vector<std::unique_ptr<Layer>> m_Layers;
 		float m_LastFrameTime = 0.0f;
+
+		bool m_IsRunning = true;
 
 		std::queue<std::function<void()>> m_MainThreadQueue;
 		std::mutex m_QueueMutex;
@@ -86,7 +94,7 @@ namespace Kerberos
 		requires std::is_base_of_v<Layer, T>
 	void Application::PushLayer() 
 	{
-		auto layer = Owner<T>();
+        auto layer = CreateOwner<T>();
 		layer->OnAttach();
 
 		m_Layers.emplace_back(std::move(layer));
