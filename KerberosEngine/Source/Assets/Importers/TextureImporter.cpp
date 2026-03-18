@@ -58,14 +58,11 @@ namespace Kerberos
 		}
 		else
 		{
-			const auto [spec, data] = LoadTextureData(filepath, true);
-
-			auto texture = CreateRef<Texture2D>(spec, data);
+			auto [spec, buffer] = LoadTextureData(filepath, true);
+			auto texture = CreateRef<Texture2D>(spec, buffer);
 
 			const std::string name = filepath.filename().string();
 			//texture->SetDebugName(name);
-
-			stbi_image_free(data.Data);
 
 			return texture;
 		}
@@ -78,39 +75,39 @@ namespace Kerberos
 		stbi_set_flip_vertically_on_load(flip);
 		Buffer data;
 
+		if (!std::filesystem::exists(filepath))
 		{
-			KBR_PROFILE_SCOPE("TextureImporter::ImportTexture - stbi_load");
-			data.Data = stbi_load(filepath.string().c_str(), &width, &height, &channels, desiredChannels);
-		}
-
-		if (data.Data == nullptr)
-		{
-			KBR_CORE_ERROR("TextureImporter::ImportTexture - failed to load texture from filepath: {}", filepath.string());
+			KBR_CORE_ERROR("TextureImporter::ImportTexture - file does not exist: {}", filepath.string());
+			KBR_CORE_ASSERT(false, "TextureImporter::ImportTexture - file does not exist: {}", filepath.string());
 			return std::make_pair(TextureSpecification{}, Buffer{});
 		}
 
-		const int actualChannels = desiredChannels == 0 ? channels : desiredChannels;
-		data.Size = static_cast<uint64_t>(width) * height * actualChannels;
+		stbi_uc* pixels = nullptr;
+		{
+			KBR_PROFILE_SCOPE("TextureImporter::ImportTexture - stbi_load");
+			pixels = stbi_load(filepath.string().c_str(), &width, &height, &channels, STBI_rgb_alpha);
+		}
+
+		if (pixels == nullptr)
+		{
+			KBR_CORE_ERROR("TextureImporter::ImportTexture - failed to load texture from filepath: {}", filepath.string());
+			KBR_CORE_ASSERT(false, "TextureImporter::ImportTexture - stbi_load returned null data for filepath: {}", filepath.string());
+			return std::make_pair(TextureSpecification{}, Buffer{});
+		}
+
+		KBR_CORE_ASSERT(width > 0 && height > 0, "TextureImporter::ImportTexture - failed to load texture with valid dimensions from filepath: {}", filepath.string());
+
+		constexpr int outputChannels = 4;
+		data.Size = static_cast<uint64_t>(width) * static_cast<uint64_t>(height) * outputChannels;
+		data.Allocate(data.Size);
+		std::memcpy(data.Data, pixels, data.Size);
+		stbi_image_free(pixels);
 
 		TextureSpecification spec;
 		spec.Width = width;
 		spec.Height = height;
-		switch (actualChannels)
-		{
-			case 1:
-				spec.Format = ImageFormat::R8;
-				break;
-			case 3:
-				spec.Format = ImageFormat::RGB8;
-				break;
-			case 4:
-				spec.Format = ImageFormat::RGBA8;
-				break;
-			default:
-				KBR_CORE_ASSERT(false, "TextureImporter::ImportTexture - unsupported number of image channels: {}", actualChannels);
-				break;
-		}
+		spec.Format = ImageFormat::RGBA8;
 
-		return std::make_pair(spec, data);
+		return std::make_pair(spec, std::move(data));
 	}
 }

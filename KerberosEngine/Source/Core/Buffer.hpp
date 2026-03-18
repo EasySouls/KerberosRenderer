@@ -21,15 +21,31 @@ namespace Kerberos
 			Allocate(size);
 		}
 
-		Buffer(const Buffer&) = default;
-		Buffer(Buffer&& other) noexcept = delete;
+		Buffer(const Buffer&) = delete;
+		Buffer(Buffer&& other) noexcept
+			: Data(other.Data), Size(other.Size)
+		{
+			other.Data = nullptr;
+			other.Size = 0;
+		}
 
-		Buffer& operator=(const Buffer& other) = default;
-		Buffer& operator=(Buffer&& other) noexcept = delete;
+		Buffer& operator=(const Buffer& other) = delete;
+		Buffer& operator=(Buffer&& other) noexcept
+		{
+			if (this == &other)
+				return *this;
+
+			Release();
+			Data = other.Data;
+			Size = other.Size;
+			other.Data = nullptr;
+			other.Size = 0;
+			return *this;
+		}
 
 		static Buffer Copy(const Buffer& other)
 		{
-			const Buffer result(other.Size);
+			Buffer result(other.Size);
 			std::memcpy(result.Data, other.Data, other.Size);
 			return result;
 		}

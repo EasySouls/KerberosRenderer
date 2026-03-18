@@ -43,8 +43,6 @@ namespace Kerberos
 		std::vector<Entity> m_DeletionQueue;
 
 		// Examples
-		Ref<Texture2D> m_IceTexture;
-		Ref<Texture2D> m_SpriteSheetTexture;
 		Ref<Texture2D> m_WhiteTexture;
 
 		Ref<Mesh> m_CubeMesh;

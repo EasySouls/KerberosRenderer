@@ -1,0 +1,4 @@
+Project:
+  Name: TestProject
+  AssetDirectory: Assets
+  StartScenePath: Scenes/Example.kerberos

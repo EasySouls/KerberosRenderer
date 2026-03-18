@@ -188,6 +188,7 @@ namespace Kerberos
 		catch (const YAML::Exception& e)
 		{
 			KBR_CORE_ERROR("Failed to load asset registry: {0}", e.what());
+			KBR_CORE_ASSERT(false, "Failed to load asset registry");
 			return false;
 		}
 

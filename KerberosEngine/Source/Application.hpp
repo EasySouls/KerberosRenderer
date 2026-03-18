@@ -66,6 +66,7 @@ namespace Kerberos
 
 		GLFWwindow* GetWindow() const { return m_Window; }
 		AudioManager* GetAudioManager() const { return m_AudioManager.get(); }
+		const ApplicationSpecification& GetSpecification() const { return m_Specification; }
 
 	private:
 		void ExecuteMainThreadQueue();

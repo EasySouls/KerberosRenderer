@@ -50,6 +50,37 @@ namespace Kerberos
 	{
 		KBR_CORE_INFO("EditorLayer attached!");
 
+		constexpr bool isTesting = true;
+		if (isTesting)
+		{
+			OpenProject("TestProject.kbrproj");
+		}
+		else
+		{
+			/// If there is a command line argument, try to open the project specified in it
+			const auto& [Count, Args] = Application::Get().GetSpecification().CommandLineArgs;
+			if (Count > 1)
+			{
+				const std::filesystem::path projectPath = Args[1];
+				if (std::filesystem::exists(projectPath))
+				{
+					OpenProject(projectPath);
+				}
+				else
+				{
+					NewProject();
+				}
+			}
+			else
+			{
+				/// If there is no command line argument, the user is prompted to open a project
+				if (!OpenProject())
+				{
+					Application::Get().Close();
+				}
+			}
+		}
+
 		m_Camera = std::make_unique<FirstPersonCamera>(45.0f, 16.0f / 9.0f, 0.1f, 1000.0f);
 		m_Camera->SetFlipY(true);
 		m_Camera->SetPosition(glm::vec3(0.0f, 15.0f, -45.0f));
@@ -824,11 +855,14 @@ namespace Kerberos
 
 	void EditorLayer::NewProject() 
 	{
+		/// Choose location for the new project
+		//const std::string filepathString = FileDialog::SaveFile("Kerberos Project (*.kbrproj)\0*.kbrproj\0");
+
 		const auto newProject = Project::New();
 
 		NewScene();
 		const std::string newSceneName = "Unnamed Scene.kerberos";
-		const std::filesystem::path scenePath = Project::GetAssetDirectory() / "scenes" / newSceneName;
+		const std::filesystem::path scenePath = Project::GetAssetDirectory() / "Scenes" / newSceneName;
 
 		const SceneSerializer serializer(m_ActiveScene);
 		serializer.Serialize(scenePath.string());
@@ -837,7 +871,7 @@ namespace Kerberos
 
 		ProjectInfo projInfo;
 		projInfo.Name = newProject->GetInfo().Name;
-		projInfo.StartScenePath = "scenes/" + newSceneName;
+		projInfo.StartScenePath = "Scenes/" + newSceneName;
 		projInfo.AssetDirectory = Project::GetAssetDirectory();
 		newProject->SetInfo(projInfo);
 

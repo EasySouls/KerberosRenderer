@@ -40,7 +40,7 @@ namespace Kerberos
 		TextureSpecification spec;
 		spec.Width = bitmap.width;
 		spec.Height = bitmap.height;
-		spec.Format = ImageFormat::RGB8;
+		spec.Format = ImageFormat::RGBA8;
 		spec.GenerateMips = false;
 
 		Buffer textureBuffer;
@@ -153,7 +153,7 @@ namespace Kerberos
 			}
 		}
 
-		m_AtlasTexture = GenerateAtlas<uint8_t, float, 3, msdf_atlas::msdfGenerator>(m_MSDFData->Glyphs, width, height);
+		m_AtlasTexture = GenerateAtlas<uint8_t, float, 4, msdf_atlas::mtsdfGenerator>(m_MSDFData->Glyphs, width, height);
 
 		msdfgen::destroyFont(font);
 		msdfgen::deinitializeFreetype(ft);
@@ -214,8 +214,12 @@ namespace Kerberos
 
 	Ref<Font> Font::GetDefaultFont()
 	{
-		if (!s_DefaultFont)
-			s_DefaultFont = CreateRef<Font>("InterRegular", "assets/fonts/Inter/Inter_18pt-Regular.ttf");
+		if (!s_DefaultFont) 
+		{
+			KBR_CORE_INFO("Loading default font...");
+
+			s_DefaultFont = CreateRef<Font>("InterRegular", "Assets/Fonts/Inter/Inter_18pt-Regular.ttf");
+		}
 
 		return s_DefaultFont;
 	}

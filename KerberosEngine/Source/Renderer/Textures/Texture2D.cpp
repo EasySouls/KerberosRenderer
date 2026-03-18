@@ -41,6 +41,18 @@ namespace Kerberos
 
 		// Get memory requirements for the staging buffer (alignment, memory type bits)
 		vk::MemoryRequirements memReqs = stagingBuffer.getMemoryRequirements();
+
+		if (memReqs.size == 0) 
+		{
+			KBR_CORE_ERROR("Texture2D::Texture2D - failed to create staging buffer for texture upload, memory requirements size is 0");
+			return;
+		}
+		if (memReqs.size != buffer.Size)
+		{
+			KBR_CORE_WARN("Texture2D::Texture2D - staging buffer memory requirements size ({}) does not match buffer size ({}), this may lead to issues when copying data", memReqs.size, buffer.Size);
+			KBR_CORE_ASSERT(memReqs.size >= buffer.Size, "Texture2D::Texture2D - staging buffer memory requirements size ({}) is smaller than buffer size ({}), cannot copy data", memReqs.size, buffer.Size);
+		}
+
 		vk::MemoryAllocateInfo memAllocInfo{
 			.allocationSize = memReqs.size,
 			// Get memory type index for a host visible buffer
@@ -50,8 +62,7 @@ namespace Kerberos
 		stagingBuffer.bindMemory(stagingMemory, 0);
 
 		// Copy texture data into staging buffer
-		uint8_t* data{ nullptr };
-		data = static_cast<uint8_t*>(stagingMemory.mapMemory(0, memReqs.size));
+		void* data = stagingMemory.mapMemory(0, memReqs.size);
 		std::memcpy(data, buffer.Data, buffer.Size);
 		stagingMemory.unmapMemory();
 

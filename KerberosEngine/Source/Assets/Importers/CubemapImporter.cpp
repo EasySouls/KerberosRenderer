@@ -88,7 +88,7 @@ namespace Kerberos
 
 			const auto [spec, buffer] = TextureImporter::LoadTextureData(facePath, flip, desiredChannels);
 			faceData.Specification = spec;
-			faceData.Buffer = buffer;
+			faceData.Buffer = Buffer::Copy(buffer);
 			return faceData;
 		};
 

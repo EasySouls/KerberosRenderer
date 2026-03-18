@@ -37,8 +37,6 @@ namespace Kerberos
 		/// when loading a new scene
 		m_SelectedEntity = {};
 
-		m_IceTexture = TextureImporter::ImportTexture("assets/textures/y2k_ice_texture.png");
-		m_SpriteSheetTexture = TextureImporter::ImportTexture("assets/game/textures/RPGpack_sheet_2X.png");
 		/*m_CubeMesh = Mesh::CreateCube(1.0f);
 		m_SphereMesh = Mesh::CreateSphere(1.0f, 16, 16);*/
 		m_CubeMesh = nullptr;

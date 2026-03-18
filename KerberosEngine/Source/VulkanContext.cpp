@@ -225,13 +225,20 @@ namespace Kerberos
 			.pImageIndices = &m_CurrentImageIndex
 		};
 
-		const auto result = m_PresentQueue.presentKHR(presentInfoKHR);
-		if (result == vk::Result::eErrorOutOfDateKHR || result == vk::Result::eSuboptimalKHR || m_FramebufferResized) {
-			m_FramebufferResized = false;
+		try 
+		{
+			const auto result = m_PresentQueue.presentKHR(presentInfoKHR);
+			if (result == vk::Result::eErrorOutOfDateKHR || result == vk::Result::eSuboptimalKHR || m_FramebufferResized) {
+				m_FramebufferResized = false;
+				RecreateSwapchain();
+			}
+			else if (result != vk::Result::eSuccess) {
+				throw std::runtime_error("failed to present swap chain image!");
+			}
+		} 
+		catch (const vk::OutOfDateKHRError&) 
+		{
 			RecreateSwapchain();
-		}
-		else if (result != vk::Result::eSuccess) {
-			throw std::runtime_error("failed to present swap chain image!");
 		}
 
 		m_FrameIndex = (m_FrameIndex + 1) % maxFramesInFlight;
