@@ -28,9 +28,6 @@ namespace Kerberos
 		constexpr vk::Format format = vk::Format::eR8G8B8A8Unorm; // TODO: Parameterize
 		constexpr vk::ImageLayout imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal; // TODO: Parameterize
 
-		// Use a separate command buffer for texture loading
-		vk::raii::CommandBuffer copyCmd = context.BeginSingleTimeCommands();
-
 		// Create a host-visible staging buffer that contains the raw image data
 		vk::BufferCreateInfo bufferCreateInfo{
 			.size = buffer.Size,
@@ -119,32 +116,33 @@ namespace Kerberos
 			.layerCount = 1,
 		};
 
-		// Image barrier for optimal image (target)
-		// Optimal image will be used as destination for the copy
-		context.TransitionImageLayout(
-			copyCmd,
-			image,
-			vk::ImageLayout::eUndefined,
-			vk::ImageLayout::eTransferDstOptimal,
-			subresourceRange);
+		context.Submit(VulkanContext::OperationType::Graphics, [&](const vk::raii::CommandBuffer& copyCmd)
+		{
+			// Image barrier for optimal image (target)
+			// Optimal image will be used as destination for the copy
+			context.TransitionImageLayout(
+				copyCmd,
+				image,
+				vk::ImageLayout::eUndefined,
+				vk::ImageLayout::eTransferDstOptimal,
+				subresourceRange);
 
-		// Copy mip levels from staging buffer
-		copyCmd.copyBufferToImage(
-			stagingBuffer,
-			image,
-			vk::ImageLayout::eTransferDstOptimal,
-			bufferCopyRegions);
+			// Copy mip levels from staging buffer
+			copyCmd.copyBufferToImage(
+				stagingBuffer,
+				image,
+				vk::ImageLayout::eTransferDstOptimal,
+				bufferCopyRegions);
 
-		// Change texture image layout to shader read after all mip levels have been copied
-		this->imageLayout = imageLayout;
-		context.TransitionImageLayout(
-			copyCmd,
-			image,
-			vk::ImageLayout::eTransferDstOptimal,
-			imageLayout,
-			subresourceRange);
-
-		context.EndSingleTimeCommands(copyCmd);
+			// Change texture image layout to shader read after all mip levels have been copied
+			this->imageLayout = imageLayout;
+			context.TransitionImageLayout(
+				copyCmd,
+				image,
+				vk::ImageLayout::eTransferDstOptimal,
+				imageLayout,
+				subresourceRange);
+		});
 
 		CreateSampler(device);
 
@@ -211,9 +209,6 @@ namespace Kerberos
 
 		// Get device properties for the requested texture format
 		//vk::FormatProperties formatProperties = context.GetFormatProperties(format);
-
-		// Use a separate command buffer for texture loading
-		vk::raii::CommandBuffer copyCmd = context.BeginSingleTimeCommands();
 
 		// Create a host-visible staging buffer that contains the raw image data
 		vk::BufferCreateInfo bufferCreateInfo{
@@ -294,32 +289,33 @@ namespace Kerberos
 			.layerCount = 1,
 		};
 
-		// Image barrier for optimal image (target)
-		// Optimal image will be used as destination for the copy
-		context.TransitionImageLayout(
-			copyCmd,
-			image,
-			vk::ImageLayout::eUndefined,
-			vk::ImageLayout::eTransferDstOptimal,
-			subresourceRange);
+		context.Submit(VulkanContext::OperationType::Graphics, [&](const vk::raii::CommandBuffer& copyCmd)
+		{
+			// Image barrier for optimal image (target)
+			// Optimal image will be used as destination for the copy
+			context.TransitionImageLayout(
+				copyCmd,
+				image,
+				vk::ImageLayout::eUndefined,
+				vk::ImageLayout::eTransferDstOptimal,
+				subresourceRange);
 
-		// Copy mip levels from staging buffer
-		copyCmd.copyBufferToImage(
-			stagingBuffer,
-			image,
-			vk::ImageLayout::eTransferDstOptimal,
-			bufferCopyRegions);
+			// Copy mip levels from staging buffer
+			copyCmd.copyBufferToImage(
+				stagingBuffer,
+				image,
+				vk::ImageLayout::eTransferDstOptimal,
+				bufferCopyRegions);
 
-		// Change texture image layout to shader read after all mip levels have been copied
-		this->imageLayout = imageLayout;
-		context.TransitionImageLayout(
-			copyCmd,
-			image,
-			vk::ImageLayout::eTransferDstOptimal,
-			imageLayout,
-			subresourceRange);
-
-		context.EndSingleTimeCommands(copyCmd);
+			// Change texture image layout to shader read after all mip levels have been copied
+			this->imageLayout = imageLayout;
+			context.TransitionImageLayout(
+				copyCmd,
+				image,
+				vk::ImageLayout::eTransferDstOptimal,
+				imageLayout,
+				subresourceRange);
+		});
 
 		ktxTexture2_Destroy(ktxTex);
 

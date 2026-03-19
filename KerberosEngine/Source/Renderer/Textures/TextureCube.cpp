@@ -63,10 +63,6 @@ namespace Kerberos
 		ktx_uint8_t* ktxTextureData = ktxTex->pData;
 		ktx_size_t ktxTextureSize = ktxTex->dataSize;
 
-
-		// Use a separate command buffer for texture loading
-		vk::raii::CommandBuffer copyCmd = context.BeginSingleTimeCommands();
-
 		// Create a host-visible staging buffer that contains the raw image data
 
 		vk::BufferCreateInfo bufferCreateInfo{
@@ -154,32 +150,33 @@ namespace Kerberos
 			.layerCount = 6,
 		};
 
-		// Image barrier for optimal image (target)
-		// Optimal image will be used as destination for the copy
-		context.TransitionImageLayout(
-			copyCmd,
-			image,
-			vk::ImageLayout::eUndefined,
-			vk::ImageLayout::eTransferDstOptimal,
-			subresourceRange);
+		context.Submit(VulkanContext::OperationType::Graphics, [&](const vk::raii::CommandBuffer& copyCmd)
+		{
+			// Image barrier for optimal image (target)
+			// Optimal image will be used as destination for the copy
+			context.TransitionImageLayout(
+				copyCmd,
+				image,
+				vk::ImageLayout::eUndefined,
+				vk::ImageLayout::eTransferDstOptimal,
+				subresourceRange);
 
-		// Copy mip levels from staging buffer
-		copyCmd.copyBufferToImage(
-			stagingBuffer,
-			image,
-			vk::ImageLayout::eTransferDstOptimal,
-			bufferCopyRegions);
+			// Copy mip levels from staging buffer
+			copyCmd.copyBufferToImage(
+				stagingBuffer,
+				image,
+				vk::ImageLayout::eTransferDstOptimal,
+				bufferCopyRegions);
 
-		// Change texture image layout to shader read after all mip levels have been copied
-		this->imageLayout = imageLayout;
-		context.TransitionImageLayout(
-			copyCmd,
-			image,
-			vk::ImageLayout::eTransferDstOptimal,
-			imageLayout,
-			subresourceRange);
-
-		context.EndSingleTimeCommands(copyCmd);
+			// Change texture image layout to shader read after all mip levels have been copied
+			this->imageLayout = imageLayout;
+			context.TransitionImageLayout(
+				copyCmd,
+				image,
+				vk::ImageLayout::eTransferDstOptimal,
+				imageLayout,
+				subresourceRange);
+		});
 
 		ktxTexture2_Destroy(ktxTex);
 

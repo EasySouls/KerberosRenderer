@@ -135,7 +135,7 @@ namespace Kerberos
 		CreateColorResources();
 		CreateDepthResources();
 
-		CreateCommandPool();
+		CreateCommandPools();
 		CreateCommandBuffers();
 		CreateSyncObjects();
 
@@ -247,7 +247,7 @@ namespace Kerberos
 	vk::raii::CommandBuffer VulkanContext::BeginSingleTimeCommands() const
 	{
 		const vk::CommandBufferAllocateInfo allocInfo{
-			.commandPool = m_CommandPool,
+			.commandPool = *m_GraphicsCommandPool,
 			.level = vk::CommandBufferLevel::ePrimary,
 			.commandBufferCount = 1
 		};
@@ -271,6 +271,129 @@ namespace Kerberos
 		m_GraphicsQueue.waitIdle();
 	}
 
+	void VulkanContext::Submit(const OperationType type, const std::function<void(const vk::raii::CommandBuffer&)>& cmd) const 
+	{
+		vk::CommandPool commandPool;
+		vk::Queue queue;
+		if (type == OperationType::Graphics)
+		{
+			commandPool = *m_GraphicsCommandPool;
+			queue = *m_GraphicsQueue;
+		}
+		else if (type == OperationType::Compute) 
+		{
+			commandPool = *m_ComputeCommandPool;
+			queue = *m_ComputeQueue;
+		}
+		else if (type == OperationType::Transfer) 
+		{
+			commandPool = *m_TransferCommandPool;
+			queue = *m_TransferQueue;
+		}
+		else 
+		{
+			KBR_CORE_ASSERT(false, "Unsupported operation type!");
+			throw std::invalid_argument("unsupported operation type!");
+		}
+
+		constexpr vk::FenceCreateInfo oneTimeFenceCreateInfo{};
+		const vk::raii::Fence oneTimeFence = vk::raii::Fence(m_Device, oneTimeFenceCreateInfo);
+
+		const vk::CommandBufferAllocateInfo allocInfo{
+			.commandPool = commandPool,
+			.level = vk::CommandBufferLevel::ePrimary,
+			.commandBufferCount = 1
+		};
+		const vk::raii::CommandBuffer commandBuffer = std::move(vk::raii::CommandBuffers(m_Device, allocInfo).front());
+
+		constexpr vk::CommandBufferBeginInfo beginInfo{
+			.flags = vk::CommandBufferUsageFlagBits::eOneTimeSubmit
+		};
+		commandBuffer.begin(beginInfo);
+
+		cmd(commandBuffer);
+		
+		commandBuffer.end();
+
+		const vk::SubmitInfo submitInfo{
+			.commandBufferCount = 1,
+			.pCommandBuffers = &*commandBuffer
+		};
+		queue.submit(submitInfo, *oneTimeFence);
+		const vk::Result result = m_Device.waitForFences(*oneTimeFence, vk::True, UINT64_MAX);
+		KBR_CORE_ASSERT(result == vk::Result::eSuccess, "Failed to wait for fence!");
+	}
+
+	vk::raii::CommandBuffer VulkanContext::BeginSingleTimeCommands(OperationType type) const 
+	{
+		vk::CommandPool commandPool;
+		if (type == OperationType::Graphics)
+		{
+			commandPool = *m_GraphicsCommandPool;
+		}
+		else if (type == OperationType::Compute)
+		{
+			commandPool = *m_ComputeCommandPool;
+		}
+		else if (type == OperationType::Transfer)
+		{
+			commandPool = *m_TransferCommandPool;
+		}
+		else
+		{
+			KBR_CORE_ASSERT(false, "Unsupported operation type!");
+			throw std::invalid_argument("unsupported operation type!");
+		}
+
+		const vk::CommandBufferAllocateInfo allocInfo{
+			.commandPool = commandPool,
+			.level = vk::CommandBufferLevel::ePrimary,
+			.commandBufferCount = 1
+		};
+		vk::raii::CommandBuffer commandBuffer = std::move(vk::raii::CommandBuffers(m_Device, allocInfo).front());
+
+		constexpr vk::CommandBufferBeginInfo beginInfo{
+			.flags = vk::CommandBufferUsageFlagBits::eOneTimeSubmit
+		};
+		commandBuffer.begin(beginInfo);
+		return commandBuffer;
+	}
+
+	void VulkanContext::EndSingleTimeCommands(const vk::raii::CommandBuffer& commandBuffer, const OperationType type) const 
+	{
+		vk::Queue queue;
+		if (type == OperationType::Graphics)
+		{
+			queue = *m_GraphicsQueue;
+		}
+		else if (type == OperationType::Compute)
+		{
+			queue = *m_ComputeQueue;
+		}
+		else if (type == OperationType::Transfer)
+		{
+			queue = *m_TransferQueue;
+		}
+		else
+		{
+			KBR_CORE_ASSERT(false, "Unsupported operation type!");
+			throw std::invalid_argument("unsupported operation type!");
+		}
+
+		constexpr vk::FenceCreateInfo oneTimeFenceCreateInfo{};
+		const vk::raii::Fence oneTimeFence = vk::raii::Fence(m_Device, oneTimeFenceCreateInfo);
+
+		commandBuffer.end();
+
+		const vk::SubmitInfo submitInfo{
+			.commandBufferCount = 1,
+			.pCommandBuffers = &*commandBuffer
+		};
+		queue.submit(submitInfo, *oneTimeFence);
+		const vk::Result result = m_Device.waitForFences(*oneTimeFence, vk::True, UINT64_MAX);
+		KBR_CORE_ASSERT(result == vk::Result::eSuccess, "Failed to wait for fence!");
+	}
+
 	void VulkanContext::CopyBuffer(
 		const vk::raii::Buffer& srcBuffer,
 		const vk::raii::Buffer& dstBuffer,
@@ -280,7 +403,7 @@ namespace Kerberos
 	) const
 	{
 		const vk::CommandBufferAllocateInfo allocInfo{
-			.commandPool = *m_CommandPool,
+			.commandPool = *m_TransferCommandPool,
 			.level = vk::CommandBufferLevel::ePrimary,
 			.commandBufferCount = 1
 		};
@@ -301,8 +424,8 @@ namespace Kerberos
 			.signalSemaphoreCount = signalSemaphore ? 1u : 0u,
 			.pSignalSemaphores = signalSemaphore ? reinterpret_cast<const vk::Semaphore*>(signalSemaphore) : nullptr,
 		};
-		m_GraphicsQueue.submit(submitInfo, nullptr);
-		m_GraphicsQueue.waitIdle();
+		m_TransferQueue.submit(submitInfo, nullptr);
+		m_TransferQueue.waitIdle();
 	}
 
 	void VulkanContext::TransitionImageLayout(const vk::raii::Image& image, const vk::ImageLayout oldLayout, const vk::ImageLayout newLayout, const uint32_t mipLevels) const
@@ -354,8 +477,8 @@ namespace Kerberos
 	}
 
 	void VulkanContext::TransitionImageLayout(const vk::raii::CommandBuffer& copyCmd, const vk::raii::Image& image,
-											  vk::ImageLayout oldLayout, vk::ImageLayout newLayout, const vk::ImageSubresourceRange& subresourceRange,
-											  vk::PipelineStageFlags2 srcStageMask, vk::PipelineStageFlags2 dstStageMask) const
+	                                          vk::ImageLayout oldLayout, vk::ImageLayout newLayout, const vk::ImageSubresourceRange& subresourceRange,
+	                                          vk::PipelineStageFlags2 srcStageMask, vk::PipelineStageFlags2 dstStageMask) const
 	{
 		vk::ImageMemoryBarrier2 barrier = {
 			.oldLayout = oldLayout,
@@ -368,90 +491,90 @@ namespace Kerberos
 
 		switch (oldLayout)
 		{
-			case vk::ImageLayout::eUndefined:
-				// Image layout is undefined (or does not matter)
-				// Only valid as initial layout
-				// No flags required, listed only for completeness
-				barrier.srcAccessMask = {};
-				break;
+		case vk::ImageLayout::eUndefined:
+			// Image layout is undefined (or does not matter)
+			// Only valid as initial layout
+			// No flags required, listed only for completeness
+			barrier.srcAccessMask = {};
+			break;
 
-			case vk::ImageLayout::ePreinitialized:
-				// Image is preinitialized
-				// Only valid as initial layout for linear images, preserves memory contents
-				// Make sure host writes have been finished
-				barrier.srcAccessMask = vk::AccessFlagBits2::eHostWrite;
-				break;
+		case vk::ImageLayout::ePreinitialized:
+			// Image is preinitialized
+			// Only valid as initial layout for linear images, preserves memory contents
+			// Make sure host writes have been finished
+			barrier.srcAccessMask = vk::AccessFlagBits2::eHostWrite;
+			break;
 
-			case vk::ImageLayout::eColorAttachmentOptimal:
-				// Image is a color attachment
-				// Make sure any writes to the color buffer have been finished
-				barrier.srcAccessMask = vk::AccessFlagBits2::eColorAttachmentWrite;
-				break;
+		case vk::ImageLayout::eColorAttachmentOptimal:
+			// Image is a color attachment
+			// Make sure any writes to the color buffer have been finished
+			barrier.srcAccessMask = vk::AccessFlagBits2::eColorAttachmentWrite;
+			break;
 
-			case vk::ImageLayout::eDepthStencilAttachmentOptimal:
-				// Image is a depth/stencil attachment
-				// Make sure any writes to the depth/stencil buffer have been finished
-				barrier.srcAccessMask = vk::AccessFlagBits2::eDepthStencilAttachmentWrite;
-				break;
+		case vk::ImageLayout::eDepthStencilAttachmentOptimal:
+			// Image is a depth/stencil attachment
+			// Make sure any writes to the depth/stencil buffer have been finished
+			barrier.srcAccessMask = vk::AccessFlagBits2::eDepthStencilAttachmentWrite;
+			break;
 
-			case vk::ImageLayout::eTransferSrcOptimal:
-				// Image is a transfer source
-				// Make sure any reads from the image have been finished
-				barrier.srcAccessMask = vk::AccessFlagBits2::eTransferRead;
-				break;
+		case vk::ImageLayout::eTransferSrcOptimal:
+			// Image is a transfer source
+			// Make sure any reads from the image have been finished
+			barrier.srcAccessMask = vk::AccessFlagBits2::eTransferRead;
+			break;
 
-			case vk::ImageLayout::eTransferDstOptimal:
-				// Image is a transfer destination
-				// Make sure any writes to the image have been finished
-				barrier.srcAccessMask = vk::AccessFlagBits2::eTransferWrite;
-				break;
+		case vk::ImageLayout::eTransferDstOptimal:
+			// Image is a transfer destination
+			// Make sure any writes to the image have been finished
+			barrier.srcAccessMask = vk::AccessFlagBits2::eTransferWrite;
+			break;
 
-			case vk::ImageLayout::eShaderReadOnlyOptimal:
-				// Image is read by a shader
-				// Make sure any shader reads from the image have been finished
-				barrier.srcAccessMask = vk::AccessFlagBits2::eShaderRead;
-				break;
-			default:
-				throw std::invalid_argument("unsupported layout transition!");
+		case vk::ImageLayout::eShaderReadOnlyOptimal:
+			// Image is read by a shader
+			// Make sure any shader reads from the image have been finished
+			barrier.srcAccessMask = vk::AccessFlagBits2::eShaderRead;
+			break;
+		default:
+			throw std::invalid_argument("unsupported layout transition!");
 		}
 
 		switch (newLayout)
 		{
-			case vk::ImageLayout::eTransferDstOptimal:
-				// Image will be used as a transfer destination
-				// Make sure any writes to the image have been finished
-				barrier.dstAccessMask = vk::AccessFlagBits2::eTransferWrite;
-				break;
+		case vk::ImageLayout::eTransferDstOptimal:
+			// Image will be used as a transfer destination
+			// Make sure any writes to the image have been finished
+			barrier.dstAccessMask = vk::AccessFlagBits2::eTransferWrite;
+			break;
 
-			case vk::ImageLayout::eTransferSrcOptimal:
-				// Image will be used as a transfer source
-				// Make sure any reads from the image have been finished
-				barrier.dstAccessMask = vk::AccessFlagBits2::eTransferRead;
-				break;
+		case vk::ImageLayout::eTransferSrcOptimal:
+			// Image will be used as a transfer source
+			// Make sure any reads from the image have been finished
+			barrier.dstAccessMask = vk::AccessFlagBits2::eTransferRead;
+			break;
 
-			case vk::ImageLayout::eColorAttachmentOptimal:
-				// Image will be used as a color attachment
-				// Make sure any writes to the color buffer have been finished
-				barrier.dstAccessMask = vk::AccessFlagBits2::eColorAttachmentWrite;
-				break;
+		case vk::ImageLayout::eColorAttachmentOptimal:
+			// Image will be used as a color attachment
+			// Make sure any writes to the color buffer have been finished
+			barrier.dstAccessMask = vk::AccessFlagBits2::eColorAttachmentWrite;
+			break;
 
-			case vk::ImageLayout::eDepthStencilAttachmentOptimal:
-				// Image layout will be used as a depth/stencil attachment
-				// Make sure any writes to depth/stencil buffer have been finished
-				barrier.dstAccessMask = barrier.dstAccessMask | vk::AccessFlagBits2::eDepthStencilAttachmentWrite;
-				break;
+		case vk::ImageLayout::eDepthStencilAttachmentOptimal:
+			// Image layout will be used as a depth/stencil attachment
+			// Make sure any writes to depth/stencil buffer have been finished
+			barrier.dstAccessMask = barrier.dstAccessMask | vk::AccessFlagBits2::eDepthStencilAttachmentWrite;
+			break;
 
-			case vk::ImageLayout::eShaderReadOnlyOptimal:
-				// Image will be read in a shader (sampler, input attachment)
-				// Make sure any writes to the image have been finished
-				if (barrier.srcAccessMask == vk::AccessFlagBits2::eNone)
-				{
-					barrier.srcAccessMask = vk::AccessFlagBits2::eHostWrite | vk::AccessFlagBits2::eTransferWrite;
-				}
-				barrier.dstAccessMask = vk::AccessFlagBits2::eShaderRead;
-				break;
-			default:
-				throw std::invalid_argument("unsupported layout transition!");
+		case vk::ImageLayout::eShaderReadOnlyOptimal:
+			// Image will be read in a shader (sampler, input attachment)
+			// Make sure any writes to the image have been finished
+			if (barrier.srcAccessMask == vk::AccessFlagBits2::eNone)
+			{
+				barrier.srcAccessMask = vk::AccessFlagBits2::eHostWrite | vk::AccessFlagBits2::eTransferWrite;
+			}
+			barrier.dstAccessMask = vk::AccessFlagBits2::eShaderRead;
+			break;
+		default:
+			throw std::invalid_argument("unsupported layout transition!");
 		}
 
 		barrier.srcStageMask = srcStageMask;
@@ -499,7 +622,7 @@ namespace Kerberos
 	}
 
 	void VulkanContext::SetObjectDebugName(const uint64_t objectHandle, const vk::ObjectType objectType,
-										   const std::string& name) const
+	                                       const std::string& name) const
 	{
 #ifdef KBR_DEBUG
 		const vk::DebugUtilsObjectNameInfoEXT nameInfo{
@@ -683,8 +806,8 @@ namespace Kerberos
 		auto layerProperties = m_Context.enumerateInstanceLayerProperties();
 		if (std::ranges::any_of(requiredLayers, [&layerProperties](auto const& requiredLayer) {
 			return std::ranges::none_of(layerProperties,
-										[requiredLayer](auto const& layerProperty)
-			{ return strcmp(layerProperty.layerName, requiredLayer) == 0; });
+			                            [requiredLayer](auto const& layerProperty)
+			                            { return strcmp(layerProperty.layerName, requiredLayer) == 0; });
 		}))
 		{
 			throw std::runtime_error("One or more required layers are not supported!");
@@ -697,8 +820,8 @@ namespace Kerberos
 		for (auto const& requiredExtension : requiredExtensions)
 		{
 			if (std::ranges::none_of(extensionProperties,
-									 [requiredExtension](auto const& extensionProperty)
-			{ return strcmp(extensionProperty.extensionName, requiredExtension) == 0; }))
+			                         [requiredExtension](auto const& extensionProperty)
+			                         { return strcmp(extensionProperty.extensionName, requiredExtension) == 0; }))
 			{
 				throw std::runtime_error("Required extension not supported: " + std::string(requiredExtension));
 			}
@@ -730,20 +853,6 @@ namespace Kerberos
 		m_DebugMessenger = m_Instance.createDebugUtilsMessengerEXT(debugUtilsMessengerCreateInfoEXT);
 	}
 
-	std::vector<const char*> VulkanContext::GetRequiredExtensions()
-	{
-		uint32_t glfwExtensionCount = 0;
-		const auto glfwExtensions = glfwGetRequiredInstanceExtensions(&glfwExtensionCount);
-
-		std::vector extensions(glfwExtensions, glfwExtensions + glfwExtensionCount);
-
-		if (enableValidationLayers) {
-			extensions.push_back(vk::EXTDebugUtilsExtensionName);
-		}
-
-		return extensions;
-	}
-
 	void VulkanContext::CreateSurface()
 	{
 		VkSurfaceKHR _surface;
@@ -761,36 +870,50 @@ namespace Kerberos
 		}
 
 		const auto devIter = std::ranges::find_if(devices,
-												  [&](const vk::raii::PhysicalDevice& device) {
-			auto queueFamilies = device.getQueueFamilyProperties();
-			bool isSuitable = device.getProperties2().properties.apiVersion >= VK_API_VERSION_1_3;
-			const auto qfpIter = std::ranges::find_if(queueFamilies,
-													  [](vk::QueueFamilyProperties const& qfp)
-			{
-				return (qfp.queueFlags & vk::QueueFlagBits::eGraphics) != static_cast<vk::QueueFlags>(0);
-			});
-			isSuitable = isSuitable && (qfpIter != queueFamilies.end());
-			auto extensions = device.enumerateDeviceExtensionProperties();
-			bool found = true;
-			for (auto const& extension : deviceExtensions) {
-				auto extensionIter = std::ranges::find_if(extensions, [extension](auto const& ext) {return strcmp(ext.extensionName, extension) == 0; });
-				found = found && extensionIter != extensions.end();
-			}
-			isSuitable = isSuitable && found;
-			if (isSuitable) {
-				m_PhysicalDevice = device;
-				m_MaxMSAASamples = GetMaxUsableSampleCount(m_PhysicalDevice);
+		                                          [&](const vk::raii::PhysicalDevice& device) {
+			                                          auto queueFamilies = device.getQueueFamilyProperties();
+			                                          bool isSuitable = device.getProperties2().properties.apiVersion >= VK_API_VERSION_1_3;
+			                                          const auto qfpIter = std::ranges::find_if(queueFamilies,
+				                                          [](vk::QueueFamilyProperties const& qfp)
+				                                          {
+					                                          return (qfp.queueFlags & vk::QueueFlagBits::eGraphics) != static_cast<vk::QueueFlags>(0);
+				                                          });
+			                                          isSuitable = isSuitable && (qfpIter != queueFamilies.end());
+			                                          auto extensions = device.enumerateDeviceExtensionProperties();
+			                                          bool found = true;
+			                                          for (auto const& extension : deviceExtensions) {
+				                                          auto extensionIter = std::ranges::find_if(extensions, [extension](auto const& ext) {return strcmp(ext.extensionName, extension) == 0; });
+				                                          found = found && extensionIter != extensions.end();
+			                                          }
+			                                          isSuitable = isSuitable && found;
+			                                          if (isSuitable) {
+				                                          m_PhysicalDevice = device;
+				                                          m_MaxMSAASamples = GetMaxUsableSampleCount(m_PhysicalDevice);
 
-				// Save name of the selected GPU
-				const auto deviceProperties = m_PhysicalDevice.getProperties2().properties;
-				m_PhysicalDeviceName = deviceProperties.deviceName.data();
-				KBR_CORE_INFO("Selected GPU: {}", m_PhysicalDeviceName);
-			}
-			return isSuitable;
-		});
+				                                          // Save name of the selected GPU
+				                                          const auto deviceProperties = m_PhysicalDevice.getProperties2().properties;
+				                                          m_PhysicalDeviceName = deviceProperties.deviceName.data();
+				                                          KBR_CORE_INFO("Selected GPU: {}", m_PhysicalDeviceName);
+			                                          }
+			                                          return isSuitable;
+		                                          });
 		if (devIter == devices.end()) {
 			throw std::runtime_error("failed to find a suitable GPU!");
 		}
+	}
+
+	std::vector<const char*> VulkanContext::GetRequiredExtensions()
+	{
+		uint32_t glfwExtensionCount = 0;
+		const auto glfwExtensions = glfwGetRequiredInstanceExtensions(&glfwExtensionCount);
+
+		std::vector extensions(glfwExtensions, glfwExtensions + glfwExtensionCount);
+
+		if (enableValidationLayers) {
+			extensions.push_back(vk::EXTDebugUtilsExtensionName);
+		}
+
+		return extensions;
 	}
 
 	static bool IsDeviceSuitable(const vk::raii::PhysicalDevice& physicalDevice)
@@ -1097,20 +1220,38 @@ namespace Kerberos
 		}
 	}
 
-	void VulkanContext::CreateCommandPool()
+	void VulkanContext::CreateCommandPools()
 	{
-		const vk::CommandPoolCreateInfo poolInfo{
+		const vk::CommandPoolCreateInfo graphicsPoolInfo{
 			.flags = vk::CommandPoolCreateFlagBits::eResetCommandBuffer,
-          .queueFamilyIndex = m_QueueFamilyInfo.graphics
+		    .queueFamilyIndex = m_QueueFamilyInfo.graphics
 		};
+		m_GraphicsCommandPool = vk::raii::CommandPool(m_Device, graphicsPoolInfo);
 
-		m_CommandPool = vk::raii::CommandPool(m_Device, poolInfo);
+		if (m_QueueFamilyInfo.HasSeparateComputeQueue())
+		{
+			const vk::CommandPoolCreateInfo computePoolInfo{
+				.flags = vk::CommandPoolCreateFlagBits::eResetCommandBuffer,
+				.queueFamilyIndex = m_QueueFamilyInfo.compute.value()
+			};
+			m_ComputeCommandPool = vk::raii::CommandPool(m_Device, computePoolInfo);
+		}
+
+		if (m_QueueFamilyInfo.HasSeparateTransferQueue())
+		{
+			const vk::CommandPoolCreateInfo transferPoolInfo{
+				.flags = vk::CommandPoolCreateFlagBits::eResetCommandBuffer,
+				.queueFamilyIndex = m_QueueFamilyInfo.transfer.value()
+			};
+
+			m_TransferCommandPool = vk::raii::CommandPool(m_Device, transferPoolInfo);
+		}
 	}
 
 	void VulkanContext::CreateCommandBuffers()
 	{
 		const vk::CommandBufferAllocateInfo allocInfo{
-			.commandPool = m_CommandPool,
+			.commandPool = m_GraphicsCommandPool,
 			.level = vk::CommandBufferLevel::ePrimary,
 			.commandBufferCount = maxFramesInFlight
 		};
@@ -1120,7 +1261,7 @@ namespace Kerberos
 
 	void VulkanContext::CreateSyncObjects()
 	{
-		assert(m_PresentCompleteSemaphores.empty() && m_RenderFinishedSemaphores.empty() && m_InFlightFences.empty());
+		KBR_CORE_ASSERT(m_PresentCompleteSemaphores.empty() && m_RenderFinishedSemaphores.empty() && m_InFlightFences.empty(), "Sync objects are not empty!");
 
 		for (size_t i = 0; i < m_SwapChainImages.size(); i++)
 		{

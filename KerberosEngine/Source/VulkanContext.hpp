@@ -36,6 +36,18 @@ namespace Kerberos
 		vk::raii::CommandBuffer BeginSingleTimeCommands() const;
 		void EndSingleTimeCommands(const vk::raii::CommandBuffer& commandBuffer) const;
 
+		enum class OperationType : std::uint8_t
+		{
+			Graphics,
+			Compute,
+			Transfer
+		};
+
+		void Submit(OperationType type, const std::function<void(const vk::raii::CommandBuffer&)>& cmd) const;
+
+		vk::raii::CommandBuffer BeginSingleTimeCommands(OperationType type) const;
+		void EndSingleTimeCommands(const vk::raii::CommandBuffer& commandBuffer, OperationType type) const;
+
 		void CopyBuffer(
 			const vk::raii::Buffer& srcBuffer,
 			const vk::raii::Buffer& dstBuffer,
@@ -126,7 +138,7 @@ namespace Kerberos
 		void CreateAllocator();
 		void CreateSwapChain();
 		void CreateSwapChainImageViews();
-		void CreateCommandPool();
+		void CreateCommandPools();
 		void CreateCommandBuffers();
 		void CreateSyncObjects();
 		void CreateColorResources();
@@ -202,7 +214,9 @@ namespace Kerberos
 		vk::raii::PipelineLayout m_PipelineLayout = nullptr;
 		vk::raii::Pipeline m_GraphicsPipeline = nullptr;
 
-		vk::raii::CommandPool m_CommandPool = nullptr;
+		vk::raii::CommandPool m_GraphicsCommandPool = nullptr;
+		vk::raii::CommandPool m_ComputeCommandPool = nullptr;
+		vk::raii::CommandPool m_TransferCommandPool = nullptr;
 		std::vector<vk::raii::CommandBuffer> m_CommandBuffers;
 
 		std::vector<vk::raii::Semaphore> m_PresentCompleteSemaphores;

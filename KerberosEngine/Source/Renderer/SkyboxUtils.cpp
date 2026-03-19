@@ -315,31 +315,28 @@ namespace Kerberos::SkyboxUtils
 		};
 		constexpr vk::SubpassEndInfo subpassEndInfo{};
 
-		const auto cmd = context.BeginSingleTimeCommands();
-		context.SetObjectDebugName(cmd, "BRDFLUT_CommandBuffer");
-
-     cmd.beginRenderPass2(renderPassBeginInfo, subpassBeginInfo);
-
-		vk::Viewport viewport{
-			.x = 0.0f,
-			.y = 0.0f,
-			.width = static_cast<float>(dim),
-			.height = static_cast<float>(dim),
-			.minDepth = 0.0f,
-			.maxDepth = 1.0f
-		};
-		vk::Rect2D scissor{
-			.offset = { .x = 0, .y = 0 },
-			.extent = { .width = static_cast<uint32_t>(dim), .height = static_cast<uint32_t>(dim) }
-		};
-		cmd.setViewport(0, viewport);
-		cmd.setScissor(0, scissor);
-
-		cmd.bindPipeline(vk::PipelineBindPoint::eGraphics, pipeline);
-		cmd.draw(3, 1, 0, 0);
-        cmd.endRenderPass2(subpassEndInfo);
-
-		context.EndSingleTimeCommands(cmd);
+		context.Submit(VulkanContext::OperationType::Graphics, [&](const vk::raii::CommandBuffer& cmd) 
+		{
+			context.SetObjectDebugName(cmd, "BRDFLUT_CommandBuffer");
+			cmd.beginRenderPass2(renderPassBeginInfo, subpassBeginInfo);
+			constexpr vk::Viewport viewport{
+				.x = 0.0f,
+				.y = 0.0f,
+				.width = static_cast<float>(dim),
+				.height = static_cast<float>(dim),
+				.minDepth = 0.0f,
+				.maxDepth = 1.0f
+			};
+			constexpr vk::Rect2D scissor{
+				.offset = { .x = 0, .y = 0 },
+				.extent = { .width = static_cast<uint32_t>(dim), .height = static_cast<uint32_t>(dim) }
+			};
+			cmd.setViewport(0, viewport);
+			cmd.setScissor(0, scissor);
+			cmd.bindPipeline(vk::PipelineBindPoint::eGraphics, pipeline);
+			cmd.draw(3, 1, 0, 0);
+			cmd.endRenderPass2(subpassEndInfo);
+		});
 
 		auto tEnd = std::chrono::high_resolution_clock::now();
 		auto tDiff = std::chrono::duration<double, std::milli>(tEnd - tStart).count();
@@ -546,23 +543,24 @@ namespace Kerberos::SkyboxUtils
 			offscreen.framebuffer = device.createFramebuffer(offscreenFramebufferInfo);
 			context.SetObjectDebugName(offscreen.framebuffer, "IrradianceCube_OffscreenFramebuffer");
 
-			const auto cmd = context.BeginSingleTimeCommands();
-			context.SetObjectDebugName(cmd, "IrradianceCube_OffscreenImageLayoutCmd");
+			context.Submit(VulkanContext::OperationType::Graphics, [&](const vk::raii::CommandBuffer& cmd)
+			{
+				context.SetObjectDebugName(cmd, "IrradianceCube_OffscreenImageLayoutCmd");
 
-			context.TransitionImageLayout(
-				cmd,
-				offscreen.image,
-				vk::ImageLayout::eUndefined,
-				vk::ImageLayout::eColorAttachmentOptimal,
-				vk::ImageSubresourceRange{
-					.aspectMask = vk::ImageAspectFlagBits::eColor,
-					.baseMipLevel = 0,
-					.levelCount = 1,
-					.baseArrayLayer = 0,
-					.layerCount = 1
-				}
-			);
-			context.EndSingleTimeCommands(cmd);
+				context.TransitionImageLayout(
+					cmd,
+					offscreen.image,
+					vk::ImageLayout::eUndefined,
+					vk::ImageLayout::eColorAttachmentOptimal,
+					vk::ImageSubresourceRange{
+						.aspectMask = vk::ImageAspectFlagBits::eColor,
+						.baseMipLevel = 0,
+						.levelCount = 1,
+						.baseArrayLayer = 0,
+						.layerCount = 1
+					}
+				);
+			});
 		}
 
 		// Descriptors
@@ -775,7 +773,7 @@ namespace Kerberos::SkyboxUtils
 			glm::rotate(glm::mat4(1.0f), glm::radians(180.0f), glm::vec3(0.0f, 0.0f, 1.0f)),
 		};
 
-		const auto cmd = context.BeginSingleTimeCommands();
+		const auto cmd = context.BeginSingleTimeCommands(VulkanContext::OperationType::Graphics);
 		context.SetObjectDebugName(cmd, "IrradianceCube_RenderCommandBuffer");
 
 		vk::Viewport viewport{
@@ -820,7 +818,7 @@ namespace Kerberos::SkyboxUtils
 				cmd.setViewport(0, viewport);
 
 				// Render scene from cube face's point of view
-             cmd.beginRenderPass2(renderPassBeginInfo, subpassBeginInfo);
+				cmd.beginRenderPass2(renderPassBeginInfo, subpassBeginInfo);
 
 				// Update shader push constant block
 				pushBlock.mvp = glm::perspective(static_cast<float>(std::numbers::pi / 2.0), 1.0f, 0.1f, 512.0f) * matrices[f];
@@ -896,7 +894,7 @@ namespace Kerberos::SkyboxUtils
 			irradianceSubresourceRange
 		);
 
-		context.EndSingleTimeCommands(cmd);
+		context.EndSingleTimeCommands(cmd, VulkanContext::OperationType::Graphics);
 
 		auto tEnd = std::chrono::high_resolution_clock::now();
 		auto tDiff = std::chrono::duration<double, std::milli>(tEnd - tStart).count();
@@ -1103,22 +1101,24 @@ namespace Kerberos::SkyboxUtils
 			context.SetObjectDebugName(offscreen.framebuffer, "PrefilteredEnvMap_OffscreenFramebuffer");
 
 			const auto cmd = context.BeginSingleTimeCommands();
-			context.SetObjectDebugName(cmd, "PrefilteredEnvMap_OffscreenCommandBuffer");
+			context.Submit(VulkanContext::OperationType::Graphics, [&](const vk::raii::CommandBuffer& cmd)
+			{
+				context.SetObjectDebugName(cmd, "PrefilteredEnvMap_OffscreenCommandBuffer");
 
-			context.TransitionImageLayout(
-				cmd,
-				offscreen.image,
-				vk::ImageLayout::eUndefined,
-				vk::ImageLayout::eColorAttachmentOptimal,
-				vk::ImageSubresourceRange{
-					.aspectMask = vk::ImageAspectFlagBits::eColor,
-					.baseMipLevel = 0,
-					.levelCount = 1,
-					.baseArrayLayer = 0,
-					.layerCount = 1
-				}
-			);
-			context.EndSingleTimeCommands(cmd);
+				context.TransitionImageLayout(
+					cmd,
+					offscreen.image,
+					vk::ImageLayout::eUndefined,
+					vk::ImageLayout::eColorAttachmentOptimal,
+					vk::ImageSubresourceRange{
+						.aspectMask = vk::ImageAspectFlagBits::eColor,
+						.baseMipLevel = 0,
+						.levelCount = 1,
+						.baseArrayLayer = 0,
+						.layerCount = 1
+					}
+				);
+			});
 		}
 
 		// Descriptors
@@ -1330,7 +1330,7 @@ namespace Kerberos::SkyboxUtils
 			glm::rotate(glm::mat4(1.0f), glm::radians(180.0f), glm::vec3(0.0f, 0.0f, 1.0f)),
 		};
 
-		const auto cmd = context.BeginSingleTimeCommands();
+		const auto cmd = context.BeginSingleTimeCommands(VulkanContext::OperationType::Graphics);
 		context.SetObjectDebugName(cmd, "PrefilteredEnvMap_RenderCommandBuffer");
 
 		vk::Viewport viewport{
@@ -1453,7 +1453,7 @@ namespace Kerberos::SkyboxUtils
 			prefilterSubresourceRange
 		);
 
-		context.EndSingleTimeCommands(cmd);
+		context.EndSingleTimeCommands(cmd, VulkanContext::OperationType::Graphics);
 
 		auto tEnd = std::chrono::high_resolution_clock::now();
 		auto tDiff = std::chrono::duration<double, std::milli>(tEnd - tStart).count();
