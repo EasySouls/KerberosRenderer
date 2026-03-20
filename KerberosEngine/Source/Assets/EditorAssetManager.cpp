@@ -41,6 +41,17 @@ namespace Kerberos
 	EditorAssetManager::EditorAssetManager()
 	{
 		AssetImporter::Init();
+
+		m_DefaultFont = CreateRef<Font>("InterRegular", "Assets/Fonts/Inter/Inter_18pt-Regular.ttf");
+
+		constexpr std::array<uint8_t, 4> albedoBuffer = { 255, 255, 255, 255 };
+		TextureSpecification albedoSpec{};
+		albedoSpec.Width = 1;
+		albedoSpec.Height = 1;
+		albedoSpec.Format = ImageFormat::RGBA8;
+		const Buffer albedoBufferStruct{ sizeof(uint8_t) * albedoBuffer.size() };
+		std::memcpy(albedoBufferStruct.Data, albedoBuffer.data(), albedoBufferStruct.Size);
+		m_DefaultColorTexture = Texture2D::FromBuffer(albedoSpec, albedoBufferStruct);
 	}
 
 	Ref<Asset> EditorAssetManager::GetAsset(const AssetHandle handle)
@@ -141,6 +152,16 @@ namespace Kerberos
 	const AssetMetadata& EditorAssetManager::GetMetadata(const AssetHandle handle) const
 	{
 		return m_AssetRegistry.Get(handle);
+	}
+
+	Ref<Texture2D> EditorAssetManager::GetDefaultColorTexture() const 
+	{
+		return m_DefaultColorTexture;
+	}
+
+	Ref<Font> EditorAssetManager::GetDefaultFont() const 
+	{
+		return m_DefaultFont;
 	}
 
 	void EditorAssetManager::SerializeAssetRegistry()

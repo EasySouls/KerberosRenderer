@@ -39,8 +39,6 @@ namespace Kerberos
 		double GetAdvance(char character) const;
 		void GetNextAdvance(double& advance, char character, char nextCharacter) const;
 
-		static Ref<Font> GetDefaultFont();
-
 	private:
 		std::string m_Name;
 		std::filesystem::path m_Filepath;

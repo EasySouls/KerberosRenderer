@@ -10,6 +10,7 @@
 #include <glm/gtx/quaternion.hpp>
 
 #include "Assets/Asset.hpp"
+#include "Assets/AssetManager.hpp"
 #include "Renderer/Mesh.hpp"
 #include "Renderer/Lights.hpp"
 #include "Renderer/Material.hpp"
@@ -258,7 +259,7 @@ namespace Kerberos
 
 	struct TextComponent
 	{
-		Ref<Font> Font = Font::GetDefaultFont();
+		Ref<Font> Font = AssetManager::GetDefaultFont();
 		std::string Text = "Sample Text";
 		glm::vec4 Color = glm::vec4(1.0f);
 		float FontSize = 12.0f;

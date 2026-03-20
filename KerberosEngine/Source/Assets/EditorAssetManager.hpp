@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Core/Core.hpp"
+#include "Renderer/Font.hpp"
 #include "AssetRegistry.hpp"
 #include "AssetManagerBase.hpp"
 
@@ -32,6 +33,9 @@ namespace Kerberos
 
 		const AssetMetadata& GetMetadata(AssetHandle handle) const;
 
+		Ref<Texture2D> GetDefaultColorTexture() const;
+		Ref<Font> GetDefaultFont() const;
+
 		void SerializeAssetRegistry();
 		bool DeserializeAssetRegistry();
 
@@ -40,5 +44,8 @@ namespace Kerberos
 	private:
 		AssetMap m_LoadedAssets;
 		AssetRegistry m_AssetRegistry;
+
+		Ref<Texture2D> m_DefaultColorTexture;
+		Ref<Font> m_DefaultFont;
 	};
 }

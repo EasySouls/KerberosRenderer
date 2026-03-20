@@ -44,8 +44,9 @@ namespace Kerberos
 		spec.GenerateMips = false;
 
 		Buffer textureBuffer;
-		textureBuffer.Allocate(bitmap.width * bitmap.height * sizeof(T) * N);
-		std::memcpy(textureBuffer.Data, bitmap.pixels, bitmap.width * bitmap.height * sizeof(T) * N);
+		const uint64_t bufferSize = bitmap.width * bitmap.height * sizeof(T) * N;
+		textureBuffer.Allocate(bufferSize);
+		std::memcpy(textureBuffer.Data, bitmap.pixels, bufferSize);
 
 		const Ref<Texture2D> atlasTexture = Texture2D::FromBuffer(spec, textureBuffer);
 		//atlasTexture->SetData(static_cast<void*>(const_cast<T*>(bitmap.pixels)), bitmap.width * bitmap.height * sizeof(T) * N);
@@ -54,7 +55,7 @@ namespace Kerberos
 	}
 
 	Font::Font(std::string name, const std::filesystem::path& filepath)
-		: m_Name(std::move(name)), m_Filepath(filepath), m_MSDFData(new MSDFData)
+		: m_Name(std::move(name)), m_Filepath(filepath), m_MSDFData(new MSDFData{})
 	{
 		KBR_PROFILE_FUNCTION();
 
@@ -208,19 +209,5 @@ namespace Kerberos
 	void Font::GetNextAdvance(double& advance, const char character, const char nextCharacter) const
 	{
 		m_MSDFData->FontGeometry.getAdvance(advance, character, nextCharacter);
-	}
-
-	static Ref<Font> s_DefaultFont = nullptr;
-
-	Ref<Font> Font::GetDefaultFont()
-	{
-		if (!s_DefaultFont) 
-		{
-			KBR_CORE_INFO("Loading default font...");
-
-			s_DefaultFont = CreateRef<Font>("InterRegular", "Assets/Fonts/Inter/Inter_18pt-Regular.ttf");
-		}
-
-		return s_DefaultFont;
 	}
 }

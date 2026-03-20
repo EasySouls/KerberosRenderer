@@ -3,6 +3,7 @@
 #include "Asset.hpp"
 #include "Core/Core.hpp"
 #include "Renderer/Mesh.hpp"
+#include "Renderer/Font.hpp"
 #include "Renderer/Textures/Texture2D.hpp"
 #include "Project/Project.hpp"
 
@@ -34,5 +35,6 @@ namespace Kerberos
 
 		static Ref<Texture2D> GetDefaultTexture2D();
 		static Ref<Mesh> GetDefaultCubeMesh();
+		static Ref<Font> GetDefaultFont();
 	};
 }

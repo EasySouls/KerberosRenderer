@@ -32,7 +32,7 @@
 namespace Kerberos
 {
 	EditorLayer::EditorLayer() 
-		: Layer("EditorLayer"), m_BasicFont(Font::GetDefaultFont()), m_SkyboxMesh(std::nullopt)
+		: Layer("EditorLayer"), m_SkyboxMesh(std::nullopt)
 	{
 	}
 
@@ -80,6 +80,8 @@ namespace Kerberos
 				}
 			}
 		}
+
+		m_BasicFont = AssetManager::GetDefaultFont();
 
 		m_Camera = std::make_unique<FirstPersonCamera>(45.0f, 16.0f / 9.0f, 0.1f, 1000.0f);
 		m_Camera->SetFlipY(true);
