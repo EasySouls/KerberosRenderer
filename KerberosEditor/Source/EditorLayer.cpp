@@ -634,7 +634,7 @@ namespace Kerberos
 
 		context.EndSingleTimeCommands(cmd);
 
-		KBR_CORE_TRACE("Frame rendered!");
+		HandleMousePicking();
 	}
 
 	void EditorLayer::OnEvent(Event& event)
@@ -652,143 +652,62 @@ namespace Kerberos
 
 	void EditorLayer::OnImGuiRender()
 	{
-		ImGui::Begin("Viewport");
+		static bool dockspaceOpen = true;
+		static ImGuiDockNodeFlags dockspaceFlags = ImGuiDockNodeFlags_None;
 
-		m_ViewportSize = { ImGui::GetContentRegionAvail().x, ImGui::GetContentRegionAvail().y };
+		ImGuiWindowFlags windowFlags = ImGuiWindowFlags_MenuBar | ImGuiWindowFlags_NoDocking;
 
-		ImGui::Image((ImTextureID)m_ColorOutputDescriptorSet, ImVec2(m_ViewportSize.x, m_ViewportSize.y));
-
-		ImGui::End();
-
-		ImGui::Begin("Debug");
-
-		ImGui::Text("Time: %.2f seconds", m_Time);
-		ImGui::Text("FPS: %.2f", m_Fps);
-
-		ImGui::Separator();
-
-		ImGui::Text("EditorCamera");
-		const auto& camPos = m_Camera->GetPosition();
-		ImGui::Text("Position: (%.2f, %.2f, %.2f)", camPos.x, camPos.y, camPos.z);
-		ImGui::Text("Rotation: (Pitch: %.2f, Yaw: %.2f)", m_Camera->GetPitch(), m_Camera->GetYaw());
-		ImGui::Text("Distance: %.2f", m_Camera->GetDistance());
-
-		glm::vec3 focalPoint = m_Camera->GetFocalPoint();
-		ImGui::DragFloat3("Focal point", glm::value_ptr(focalPoint), 0.1f, 0.0f, 0.0f, "%.3f", ImGuiSliderFlags_NoInput);
-
-		ImGui::Separator();
-
-		ImGui::Text("Color Output Image");
-		ImGui::Text("Viewport size: %.2f x %.2f", m_ViewportSize.x, m_ViewportSize.y);
-		ImGui::Text("Output size: %.2f x %.2f", m_OutputSize.x, m_OutputSize.y);
-
-		ImGui::Separator();
-
-		// Object transform controls
-		ImGui::Text("Nodes");
-		for (size_t i = 0; i < m_SceneNodes.size(); ++i)
+		if (m_IsFullScreenPersistent)
 		{
-			if (ImGui::TreeNode(m_SceneNodes[i]->Name.c_str()))
-			{
-				ImGui::Checkbox(("Visible##" + std::to_string(i)).c_str(), &m_SceneNodes[i]->Visible);
-
-				ImGui::Separator();
-
-				ImGui::DragFloat3(("Position##" + std::to_string(i)).c_str(), glm::value_ptr(m_SceneNodes[i]->Position), 0.1f);
-				ImGui::DragFloat3(("Rotation##" + std::to_string(i)).c_str(), glm::value_ptr(m_SceneNodes[i]->Rotation), 0.01f);
-				ImGui::DragFloat3(("Scale##" + std::to_string(i)).c_str(), glm::value_ptr(m_SceneNodes[i]->Scale), 0.1f, 0.1f, 100.0f);
-
-				ImGui::Separator();
-
-				ImGui::Text("Material");
-				ImGui::Text("Name: %s", m_SceneNodes[i]->Material->name.c_str());
-				ImGui::ColorEdit3(("Albedo Color##" + std::to_string(i)).c_str(), glm::value_ptr(m_SceneNodes[i]->Material->Params.albedo));
-				ImGui::DragFloat(("Metallic##" + std::to_string(i)).c_str(), &m_SceneNodes[i]->Material->Params.metallic, 0.01f, 0.0f, 1.0f);
-				ImGui::DragFloat(("Roughness##" + std::to_string(i)).c_str(), &m_SceneNodes[i]->Material->Params.roughness, 0.01f, 0.0f, 1.0f);
-				ImGui::TreePop();
-			}
+			const ImGuiViewport* viewport = ImGui::GetMainViewport();
+			ImGui::SetNextWindowPos(viewport->Pos);
+			ImGui::SetNextWindowSize(viewport->Size);
+			ImGui::SetNextWindowViewport(viewport->ID);
+			ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 0.0f);
+			ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
+			windowFlags |= ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove;
+			windowFlags |= ImGuiWindowFlags_NoBringToFrontOnFocus | ImGuiWindowFlags_NoNavFocus;
 		}
 
-		ImGui::Separator();
+		if (dockspaceFlags & ImGuiDockNodeFlags_PassthruCentralNode)
+			windowFlags |= ImGuiWindowFlags_NoBackground;
 
-		// Light controls
-		ImGui::Text("Light directions");
-		ImGui::DragFloat3("Light 1 Direction", glm::value_ptr(m_UniformDataParams.lights[0]), 0.1f);
-		ImGui::Text("Light 2: (%.2f, %.2f, %.2f)", m_UniformDataParams.lights[1].x, m_UniformDataParams.lights[1].y, m_UniformDataParams.lights[1].z);
-		ImGui::Text("Light 2: (%.2f, %.2f, %.2f)", m_UniformDataParams.lights[2].x, m_UniformDataParams.lights[2].y, m_UniformDataParams.lights[2].z);
-		ImGui::DragFloat3("Light 4 Direction", glm::value_ptr(m_UniformDataParams.lights[3]), 0.1f);
-		ImGui::DragFloat("Exposure", &m_UniformDataParams.exposure, 0.1f, 0.1f, 10.0f);
-		ImGui::DragFloat("Gamma", &m_UniformDataParams.gamma, 0.1f, 0.1f, 10.0f);
-		ImGui::DragFloat3("Ambient Light Color", glm::value_ptr(m_SceneUniformData.ambientLightColor), 0.01f, 0.0f, 1.0f);
+		//TODO const std::string sceneName = m_ActiveScene ? m_ActiveScene->GetName() : "No Scene Loaded";
+		const std::string sceneName = "Example Scene";
 
-		ImGui::Separator();
+		ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.0f, 0.0f));
+		ImGui::Begin(sceneName.c_str(), &dockspaceOpen, windowFlags);
+		ImGui::PopStyleVar();
 
-		// Material selection
-		ImGui::Text("Material");
-		
-		std::vector<const char*> materialNames;
-		const uint32_t materialCount = m_MaterialRegistry.Size();
-		materialNames.reserve(materialCount);
-		for (const auto& mat : m_MaterialRegistry | std::views::values)
+		if (m_IsFullScreenPersistent)
+			ImGui::PopStyleVar(2);
+
+		const ImGuiIO& io = ImGui::GetIO();
+		if (io.ConfigFlags & ImGuiConfigFlags_DockingEnable)
 		{
-			materialNames.push_back(mat->name.c_str());
-		}
-		ImGui::Combo("Select Material", &m_SelectedMaterialIndex, materialNames.data(), static_cast<int>(materialCount));
-
-		ImGui::Separator();
-
-		// Display shadow map
-		ImGui::Text("Shadow Map");
-		ImGui::Image((ImTextureID)m_ShadowMapDescriptorSet, ImVec2(256.0f, 256.0f));
-
-		ImGui::Text("Light position for shadow map calculation:");
-		ImGui::Text("(%.2f, %.2f, %.2f)",
-					m_LightPosForShadowMapCalculation.x,
-					m_LightPosForShadowMapCalculation.y,
-					m_LightPosForShadowMapCalculation.z);
-
-		ImGui::Text("Depth Bias");
-		ImGui::DragFloat("Constant Factor", &m_DepthBias.constantFactor, 0.001f, 0.0f, 5.0f);
-		ImGui::DragFloat("Clamp", &m_DepthBias.clamp, 0.001f, 0.0f, 1.0f);
-		ImGui::DragFloat("Slope Factor", &m_DepthBias.slopeFactor, 0.01f, 0.0f, 10.0f);
-
-		ImGui::Separator();
-
-		// Scene settings
-		ImGui::Text("Settings");
-		ImGui::Checkbox("Display Skybox", &m_DisplaySkybox);
-		ImGui::Checkbox("Display normals", &m_DisplayDebugNormals);
-		ImGui::Checkbox("Enable PCF", &m_EnablePCF);
-
-		ImGui::Separator();
-
-		const auto memoryBudgetInfo = VulkanContext::Get().GetMemoryBudgetInfo();
-
-		auto convertedMemory = MemoryBudget::ConvertBytes(memoryBudgetInfo.DeviceMemoryTotalUsage);
-		ImGui::Text("Total memory usage: %.2f %s", convertedMemory.data, convertedMemory.units.c_str());
-
-		convertedMemory = MemoryBudget::ConvertBytes(memoryBudgetInfo.DeviceMemoryTotalBudget);
-		ImGui::Text("Total memory budget: %.2f %s", convertedMemory.data, convertedMemory.units.c_str());
-		if (ImGui::CollapsingHeader("Detailed Memory Usage"))
-		{
-			for (int i = 0; i < static_cast<int>(memoryBudgetInfo.DeviceMemoryHeapCount); i++)
-			{
-				std::string header = "Memory Heap Index: " + std::to_string(i);
-				if (ImGui::CollapsingHeader(header.c_str()))
-				{
-					convertedMemory = MemoryBudget::ConvertBytes(memoryBudgetInfo.MemoryBudgetProps.heapUsage[i]);
-					ImGui::Text("Usage: %.2f %s", convertedMemory.data, convertedMemory.units.c_str());
-
-					convertedMemory = MemoryBudget::ConvertBytes(memoryBudgetInfo.MemoryBudgetProps.heapBudget[i]);
-					ImGui::Text("Budget: %.2f %s", convertedMemory.data, convertedMemory.units.c_str());
-					ImGui::Text("Heap Flag: %s", MemoryBudget::ReadMemoryHeapFlags(memoryBudgetInfo.DeviceMemoryProps.memoryHeaps[i].flags).c_str());
-				}
-			}
+			const ImGuiID dockspaceId = ImGui::GetID("MyDockspace");
+			ImGui::DockSpace(dockspaceId, ImVec2(0.0f, 0.0f), dockspaceFlags);
 		}
 
-		ImGui::End();
+		DrawMenuBar();
 
-		KBR_CORE_TRACE("ImGui rendered!");
+		m_HierarchyPanel.OnImGuiRender();
+		m_AssetsPanel->OnImGuiRender();
+
+		DrawViewport();
+
+		DrawDebugWindow();
+
+		DrawUIToolbar();
+
+		m_NotificationManager.RenderNotifications();
+
+		ImGui::End(); // End of main dockspace window
+
+		if (Input::IsKeyPressed(Key::RightControl))
+		{
+			ImGui::DebugStartItemPicker();
+		}
 	}
 
 	void EditorLayer::OnScenePlay()
@@ -852,6 +771,36 @@ namespace Kerberos
 				}
 			}
 			ImGui::EndDragDropTarget();
+		}
+	}
+
+	void EditorLayer::HandleMousePicking() 
+	{
+		{
+			auto [mx, my] = ImGui::GetMousePos();
+			mx -= m_ViewportBounds[0].x;
+			my -= m_ViewportBounds[0].y;
+			const glm::vec2 viewportSize = m_ViewportBounds[1] - m_ViewportBounds[0];
+
+			/// Flip the y coord (works with opengl)
+			my = viewportSize.y - my;
+
+			const int mouseX = static_cast<int>(mx);
+			const int mouseY = static_cast<int>(my);
+
+			if (mouseX >= 0 && mouseY >= 0 && mouseX <= static_cast<int>(viewportSize.x) && mouseY <= static_cast<int>(viewportSize.y))
+			{
+				/*int pixelData = m_ActiveScene->GetEditorFramebuffer()->ReadPixel(1, mouseX, mouseY);
+
+				if (pixelData < 0)
+				{
+					m_HoveredEntity = {};
+				}
+				else
+				{
+					m_HoveredEntity = Entity{ static_cast<entt::entity>(pixelData), m_ActiveScene.get() };
+				}*/
+			}
 		}
 	}
 
@@ -969,6 +918,87 @@ namespace Kerberos
 		m_ActiveScene = CreateRef<Scene>();
 		m_ActiveScene->OnViewportResize(static_cast<uint32_t>(m_ViewportSize.x), static_cast<uint32_t>(m_ViewportSize.y));
 		m_HierarchyPanel.SetContext(m_ActiveScene);
+	}
+
+	void EditorLayer::DrawViewport()
+	{
+		ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.0f, 0.0f));
+		ImGui::Begin("Viewport");
+		ImGui::PopStyleVar();
+
+		const auto viewportOffset = ImGui::GetCursorPos(); // Includes the tab bar
+
+		m_ViewportFocused = ImGui::IsWindowFocused();
+		m_ViewportHovered = ImGui::IsWindowHovered();
+
+		// Application::Get().GetImGuiLayer()->BlockEvents(!m_ViewportHovered);
+
+		m_ViewportSize = { ImGui::GetContentRegionAvail().x, ImGui::GetContentRegionAvail().y };
+
+		ImGui::Image((ImTextureID)m_ColorOutputDescriptorSet, ImVec2(m_ViewportSize.x, m_ViewportSize.y));
+
+		HandleDragAndDrop();
+
+		/// Set the bounds of the viewport
+		const auto windowSize = ImGui::GetWindowSize();
+		ImVec2 minBound = ImGui::GetWindowPos();
+		minBound.x += viewportOffset.x;
+		minBound.y += viewportOffset.y;
+
+		ImVec2 maxBound = { minBound.x + windowSize.x, minBound.y + windowSize.y };
+		m_ViewportBounds[0] = { minBound.x, minBound.y };
+		m_ViewportBounds[1] = { maxBound.x, maxBound.y };
+
+		/// Gizmos
+		const bool gizmosEnabled = m_SceneState == SceneState::Edit || m_SceneState == SceneState::Simulate;
+		if (const Entity selectedEntity = m_HierarchyPanel.GetSelectedEntity(); selectedEntity && m_GizmoType != GizmoType::None && gizmosEnabled)
+		{
+			ImGuizmo::SetOrthographic(false);
+			ImGuizmo::SetDrawlist();
+
+			const float windowWidth = ImGui::GetWindowWidth();
+			const float windowHeight = ImGui::GetWindowHeight();
+			ImGuizmo::SetRect(ImGui::GetWindowPos().x, ImGui::GetWindowPos().y, windowWidth, windowHeight);
+
+			/// Will be used for the Runtime camera
+			/*const Entity cameraEntity = m_ActiveScene->GetPrimaryCameraEntity();
+			const auto& camera = cameraEntity.GetComponent<CameraComponent>().Camera;
+
+			const glm::mat4 cameraProjection = camera.GetProjection();
+			const glm::mat4 cameraView = glm::inverse(cameraEntity.GetComponent<TransformComponent>().GetTransform());*/
+
+			const glm::mat4 cameraProjection = m_Camera->GetProjectionMatrix();
+			const glm::mat4 cameraView = m_Camera->GetViewMatrix();
+
+			/// Entity transform
+			auto& tc = selectedEntity.GetComponent<TransformComponent>();
+			auto transform = tc.GetTransform();
+
+			/// Snapping 
+			const bool snap = Input::IsKeyPressed(Key::LeftControl);
+			float snapValue = 0.5f;
+			if (m_GizmoType == GizmoType::Rotate)
+				snapValue = 45.0f;
+
+			const float snapValues[3] = { snap ? snapValue : 0.0f, snap ? snapValue : 0.0f, snap ? snapValue : 0.0f };
+
+			ImGuizmo::Manipulate(glm::value_ptr(cameraView), glm::value_ptr(cameraProjection),
+								 static_cast<ImGuizmo::OPERATION>(m_GizmoType), ImGuizmo::WORLD, glm::value_ptr(transform), nullptr, snapValues);
+
+			if (ImGuizmo::IsUsing())
+			{
+				glm::vec3 translation, rotationDegrees, scale;
+				ImGuizmo::DecomposeMatrixToComponents(glm::value_ptr(transform), glm::value_ptr(translation), glm::value_ptr(rotationDegrees), glm::value_ptr(scale));
+
+				tc.Translation = translation;
+				tc.Rotation = glm::radians(rotationDegrees);
+				tc.Scale = scale;
+
+				//CalculateEntityTransform(selectedEntity);
+			}
+		}
+
+		ImGui::End();
 	}
 
 	void EditorLayer::DrawUIToolbar()
@@ -1155,6 +1185,137 @@ namespace Kerberos
 
 			ImGui::EndMenuBar();
 		}
+	}
+
+	void EditorLayer::DrawDebugWindow() 
+	{
+		ImGui::Begin("Debug");
+
+		ImGui::Text("Time: %.2f seconds", m_Time);
+		ImGui::Text("FPS: %.2f", m_Fps);
+
+		ImGui::Separator();
+
+		ImGui::Text("EditorCamera");
+		const auto& camPos = m_Camera->GetPosition();
+		ImGui::Text("Position: (%.2f, %.2f, %.2f)", camPos.x, camPos.y, camPos.z);
+		ImGui::Text("Rotation: (Pitch: %.2f, Yaw: %.2f)", m_Camera->GetPitch(), m_Camera->GetYaw());
+		ImGui::Text("Distance: %.2f", m_Camera->GetDistance());
+
+		glm::vec3 focalPoint = m_Camera->GetFocalPoint();
+		ImGui::DragFloat3("Focal point", glm::value_ptr(focalPoint), 0.1f, 0.0f, 0.0f, "%.3f", ImGuiSliderFlags_NoInput);
+
+		ImGui::Separator();
+
+		ImGui::Text("Color Output Image");
+		ImGui::Text("Viewport size: %.2f x %.2f", m_ViewportSize.x, m_ViewportSize.y);
+		ImGui::Text("Output size: %.2f x %.2f", m_OutputSize.x, m_OutputSize.y);
+
+		ImGui::Separator();
+
+		// Object transform controls
+		ImGui::Text("Nodes");
+		for (size_t i = 0; i < m_SceneNodes.size(); ++i)
+		{
+			if (ImGui::TreeNode(m_SceneNodes[i]->Name.c_str()))
+			{
+				ImGui::Checkbox(("Visible##" + std::to_string(i)).c_str(), &m_SceneNodes[i]->Visible);
+
+				ImGui::Separator();
+
+				ImGui::DragFloat3(("Position##" + std::to_string(i)).c_str(), glm::value_ptr(m_SceneNodes[i]->Position), 0.1f);
+				ImGui::DragFloat3(("Rotation##" + std::to_string(i)).c_str(), glm::value_ptr(m_SceneNodes[i]->Rotation), 0.01f);
+				ImGui::DragFloat3(("Scale##" + std::to_string(i)).c_str(), glm::value_ptr(m_SceneNodes[i]->Scale), 0.1f, 0.1f, 100.0f);
+
+				ImGui::Separator();
+
+				ImGui::Text("Material");
+				ImGui::Text("Name: %s", m_SceneNodes[i]->Material->name.c_str());
+				ImGui::ColorEdit3(("Albedo Color##" + std::to_string(i)).c_str(), glm::value_ptr(m_SceneNodes[i]->Material->Params.albedo));
+				ImGui::DragFloat(("Metallic##" + std::to_string(i)).c_str(), &m_SceneNodes[i]->Material->Params.metallic, 0.01f, 0.0f, 1.0f);
+				ImGui::DragFloat(("Roughness##" + std::to_string(i)).c_str(), &m_SceneNodes[i]->Material->Params.roughness, 0.01f, 0.0f, 1.0f);
+				ImGui::TreePop();
+			}
+		}
+
+		ImGui::Separator();
+
+		// Light controls
+		ImGui::Text("Light directions");
+		ImGui::DragFloat3("Light 1 Direction", glm::value_ptr(m_UniformDataParams.lights[0]), 0.1f);
+		ImGui::Text("Light 2: (%.2f, %.2f, %.2f)", m_UniformDataParams.lights[1].x, m_UniformDataParams.lights[1].y, m_UniformDataParams.lights[1].z);
+		ImGui::Text("Light 2: (%.2f, %.2f, %.2f)", m_UniformDataParams.lights[2].x, m_UniformDataParams.lights[2].y, m_UniformDataParams.lights[2].z);
+		ImGui::DragFloat3("Light 4 Direction", glm::value_ptr(m_UniformDataParams.lights[3]), 0.1f);
+		ImGui::DragFloat("Exposure", &m_UniformDataParams.exposure, 0.1f, 0.1f, 10.0f);
+		ImGui::DragFloat("Gamma", &m_UniformDataParams.gamma, 0.1f, 0.1f, 10.0f);
+		ImGui::DragFloat3("Ambient Light Color", glm::value_ptr(m_SceneUniformData.ambientLightColor), 0.01f, 0.0f, 1.0f);
+
+		ImGui::Separator();
+
+		// Material selection
+		ImGui::Text("Material");
+
+		std::vector<const char*> materialNames;
+		const uint32_t materialCount = m_MaterialRegistry.Size();
+		materialNames.reserve(materialCount);
+		for (const auto& mat : m_MaterialRegistry | std::views::values)
+		{
+			materialNames.push_back(mat->name.c_str());
+		}
+		ImGui::Combo("Select Material", &m_SelectedMaterialIndex, materialNames.data(), static_cast<int>(materialCount));
+
+		ImGui::Separator();
+
+		// Display shadow map
+		ImGui::Text("Shadow Map");
+		ImGui::Image((ImTextureID)m_ShadowMapDescriptorSet, ImVec2(256.0f, 256.0f));
+
+		ImGui::Text("Light position for shadow map calculation:");
+		ImGui::Text("(%.2f, %.2f, %.2f)",
+					m_LightPosForShadowMapCalculation.x,
+					m_LightPosForShadowMapCalculation.y,
+					m_LightPosForShadowMapCalculation.z);
+
+		ImGui::Text("Depth Bias");
+		ImGui::DragFloat("Constant Factor", &m_DepthBias.constantFactor, 0.001f, 0.0f, 5.0f);
+		ImGui::DragFloat("Clamp", &m_DepthBias.clamp, 0.001f, 0.0f, 1.0f);
+		ImGui::DragFloat("Slope Factor", &m_DepthBias.slopeFactor, 0.01f, 0.0f, 10.0f);
+
+		ImGui::Separator();
+
+		// Scene settings
+		ImGui::Text("Settings");
+		ImGui::Checkbox("Display Skybox", &m_DisplaySkybox);
+		ImGui::Checkbox("Display normals", &m_DisplayDebugNormals);
+		ImGui::Checkbox("Enable PCF", &m_EnablePCF);
+
+		ImGui::Separator();
+
+		const auto memoryBudgetInfo = VulkanContext::Get().GetMemoryBudgetInfo();
+
+		auto convertedMemory = MemoryBudget::ConvertBytes(memoryBudgetInfo.DeviceMemoryTotalUsage);
+		ImGui::Text("Total memory usage: %.2f %s", convertedMemory.data, convertedMemory.units.c_str());
+
+		convertedMemory = MemoryBudget::ConvertBytes(memoryBudgetInfo.DeviceMemoryTotalBudget);
+		ImGui::Text("Total memory budget: %.2f %s", convertedMemory.data, convertedMemory.units.c_str());
+		if (ImGui::CollapsingHeader("Detailed Memory Usage"))
+		{
+			for (int i = 0; i < static_cast<int>(memoryBudgetInfo.DeviceMemoryHeapCount); i++)
+			{
+				std::string header = "Memory Heap Index: " + std::to_string(i);
+				if (ImGui::CollapsingHeader(header.c_str()))
+				{
+					convertedMemory = MemoryBudget::ConvertBytes(memoryBudgetInfo.MemoryBudgetProps.heapUsage[i]);
+					ImGui::Text("Usage: %.2f %s", convertedMemory.data, convertedMemory.units.c_str());
+
+					convertedMemory = MemoryBudget::ConvertBytes(memoryBudgetInfo.MemoryBudgetProps.heapBudget[i]);
+					ImGui::Text("Budget: %.2f %s", convertedMemory.data, convertedMemory.units.c_str());
+					ImGui::Text("Heap Flag: %s", MemoryBudget::ReadMemoryHeapFlags(memoryBudgetInfo.DeviceMemoryProps.memoryHeaps[i].flags).c_str());
+				}
+			}
+		}
+
+		ImGui::End();
 	}
 
 	void EditorLayer::UpdateSceneUniformBuffers(const uint32_t currentImage) 

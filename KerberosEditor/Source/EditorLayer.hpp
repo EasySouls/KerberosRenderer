@@ -47,6 +47,7 @@ namespace Kerberos
 		void OnSceneStop();
 
 		void HandleDragAndDrop();
+		void HandleMousePicking();
 
 		void NewProject();
 		void OpenProject(const std::filesystem::path& filepath);
@@ -67,8 +68,10 @@ namespace Kerberos
 		void OpenScene(const std::filesystem::path& filepath);
 		void NewScene();
 
+		void DrawViewport();
 		void DrawUIToolbar();
 		void DrawMenuBar();
+		void DrawDebugWindow();
 
 		void UpdateLights(float time, uint32_t currentImage);
 		void UpdateSceneUniformBuffers(uint32_t currentImage);
@@ -114,6 +117,10 @@ namespace Kerberos
 		SceneState m_SceneState = SceneState::Edit;
 		bool m_IsScenePaused = false;
 
+		bool m_ViewportFocused = false;
+		bool m_ViewportHovered = false;
+		std::array<glm::vec2, 2> m_ViewportBounds;
+
 		// From ImGuizmo.h
 		enum class GizmoType : std::uint16_t
 		{
@@ -129,7 +136,7 @@ namespace Kerberos
 		Ref<Texture2D> m_IconPause;
 		Ref<Texture2D> m_IconResume;
 
-		bool m_IsFullScreenPersistent = false;
+		bool m_IsFullScreenPersistent = true;
 
 		bool m_DisplaySkybox = true;
 		bool m_DisplayDebugNormals = false;
