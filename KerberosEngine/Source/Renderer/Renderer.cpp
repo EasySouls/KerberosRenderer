@@ -11,13 +11,6 @@
 
 namespace Kerberos
 {
-	struct DepthBias
-	{
-		float constantFactor = 1.25f;
-		float slopeFactor = 1.75f;
-		float clamp = 0.0f;
-	};
-
 	struct ShadowMap
 	{
 		vk::raii::Image Image = nullptr;
@@ -158,6 +151,12 @@ namespace Kerberos
 
 		s_Data = CreateOwner<RendererData>();
 
+		KBR_CORE_INFO("Size of SceneUniformData: {} bytes", sizeof(SceneUniformData));
+		KBR_CORE_INFO("Size of UniformDataParams: {} bytes", sizeof(UniformDataParams));
+		KBR_CORE_INFO("Size of PerObjectData: {} bytes", sizeof(PerObjectData));
+		KBR_CORE_INFO("Size of SkyboxData: {} bytes", sizeof(SkyboxData));
+		KBR_CORE_INFO("Size of material UniformBlock: {} bytes", sizeof(Material::UniformBlock));
+
 		CreateDefaultMaterials();
 
 		// Setup initial directional light which we will use to generate the shadow map
@@ -172,6 +171,8 @@ namespace Kerberos
 	{
 		KBR_CORE_ASSERT(s_Data, "Renderer not initialized!");
 
+		VulkanContext::Get().WaitIdle();
+
 		VulkanContext::DestroyImGuiDescriptorSet(s_Data->ColorOutputDescriptorSet);
 		VulkanContext::DestroyImGuiDescriptorSet(s_Data->ShadowMapDescriptorSet);
 
@@ -179,7 +180,7 @@ namespace Kerberos
 		s_Data = nullptr;
 	}
 
-	void Renderer::RenderSceneEditor(const Ref<Scene>& scene, const EditorCamera& camera) 
+	void Renderer::RenderSceneEditor(const Ref<Scene>& scene, const Camera& camera) 
 	{
 		const auto& context = VulkanContext::Get();
 
@@ -264,7 +265,7 @@ namespace Kerberos
 
 			cmd.bindPipeline(vk::PipelineBindPoint::eGraphics, *s_Data->ShadowMap.Pipeline);
 
-			cmd.setDepthBias(s_Data->DepthBias.constantFactor, s_Data->DepthBias.clamp, s_Data->DepthBias.slopeFactor);
+			cmd.setDepthBias(s_Data->DepthBias.ConstantFactor, s_Data->DepthBias.Clamp, s_Data->DepthBias.SlopeFactor);
 
 			const auto meshView = scene->m_Registry.view<TransformComponent, StaticMeshComponent>();
 			int i = 0;
@@ -624,6 +625,11 @@ namespace Kerberos
 		KBR_CORE_ASSERT(s_Data, "Renderer not initialized!");
 
 		// TODO: Set default skybox texture if none is set by the user
+		/*s_Data->Skybox.SkyboxTexture = TextureCube::FromFile(
+			"assets/textures/hdr/pisa_cube.ktx",
+			vk::Format::eR16G16B16A16Sfloat,
+			vk::ImageUsageFlagBits::eSampled
+		);*/
 		s_Data->Skybox.SkyboxTexture = TextureCube::FromFile("Assets/Textures/hdr/pisa_cube.ktx");
 
 		CreateSkyboxResources();
@@ -1345,7 +1351,7 @@ namespace Kerberos
 									   "Color Output Descriptor Set for ImGui");
 		}
 
-		//m_OutputSize = m_ViewportSize;
+		s_Data->OutputSize = { static_cast<float>(width), static_cast<float>(height) };
 	}
 
 	glm::vec3 Renderer::GetLightPositionForShadowMapCalculation() 
@@ -1355,16 +1361,67 @@ namespace Kerberos
 		return s_Data->ShadowMap.LightPosForCalculation;
 	}
 
-	bool Renderer::GetIsPCFEnabledForShadowMap() 
+	DepthBias& Renderer::GetShadowMapDepthBiasSettings() 
+	{
+		KBR_CORE_ASSERT(s_Data, "Renderer not initialized!");
+
+		return s_Data->DepthBias;
+	}
+
+	bool& Renderer::GetIsPCFEnabledForShadowMap() 
 	{
 		KBR_CORE_ASSERT(s_Data, "Renderer not initialized!");
 
 		return s_Data->ShadowMap.EnablePCF;
 	}
 
-	bool Renderer::GetDisplayDebugNormals() 
+	bool& Renderer::GetDisplayDebugNormals() 
 	{
-		throw std::logic_error("Not implemented");
+		KBR_CORE_ASSERT(s_Data, "Renderer not initialized!");
+
+		return s_Data->DisplayDebugNormals;
+	}
+
+	bool& Renderer::GetDisplaySkybox() 
+	{
+		KBR_CORE_ASSERT(s_Data, "Renderer not initialized!");
+
+		return s_Data->Skybox.ShowSkybox;
+	}
+
+	float& Renderer::GetGamma() 
+	{
+		KBR_CORE_ASSERT(s_Data, "Renderer not initialized!");
+
+		return s_Data->UniformDataParams.gamma;
+	}
+
+	float& Renderer::GetExposure()
+	{
+		KBR_CORE_ASSERT(s_Data, "Renderer not initialized!");
+
+		return s_Data->UniformDataParams.exposure;
+	}
+
+	glm::vec2 Renderer::GetOutputImageSize() 
+	{
+		KBR_CORE_ASSERT(s_Data, "Renderer not initialized!");
+
+		return s_Data->OutputSize;
+	}
+
+	uint64_t Renderer::GetCompositedOutputImageID() 
+	{
+		KBR_CORE_ASSERT(s_Data->ColorOutputDescriptorSet, "ImGui descriptor set is not created for composited color output image!");
+
+		return reinterpret_cast<uint64_t>(static_cast<VkDescriptorSet>(s_Data->ColorOutputDescriptorSet));
+	}
+
+	uint64_t Renderer::GetShadowMapDepthImageID() 
+	{
+		KBR_CORE_ASSERT(s_Data->ShadowMapDescriptorSet, "ImGui descriptor set is not created for shadow map depth image!");
+
+		return reinterpret_cast<uint64_t>(static_cast<VkDescriptorSet>(s_Data->ShadowMapDescriptorSet));
 	}
 
 	void Renderer::UpdateLights(const uint32_t currentImage) 

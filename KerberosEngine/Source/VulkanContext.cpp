@@ -1536,7 +1536,7 @@ namespace Kerberos
 		initInfo.Instance = *m_Instance;
 		initInfo.PhysicalDevice = *m_PhysicalDevice;
 		initInfo.Device = *m_Device;
-      initInfo.QueueFamily = m_QueueFamilyInfo.graphics;
+		initInfo.QueueFamily = m_QueueFamilyInfo.graphics;
 		initInfo.Queue = *m_GraphicsQueue;
 		initInfo.PipelineCache = nullptr;
 		initInfo.DescriptorPool = *m_ImGuiDescriptorPool;
@@ -1550,6 +1550,13 @@ namespace Kerberos
 		initInfo.PipelineInfoForViewports.MSAASamples = msaaSamplesViewportVk;
 		initInfo.CheckVkResultFn = CheckVkResult;
 		ImGui_ImplVulkan_Init(&initInfo);
+
+		io.Fonts->AddFontFromFileTTF("Assets/Fonts/Inter/Inter_18pt-Italic.ttf", 18.0f);
+		io.Fonts->AddFontFromFileTTF("Assets/Fonts/Inter/Inter_18pt-Bold.ttf", 18.0f);
+		io.Fonts->AddFontFromFileTTF("Assets/Fonts/Inter/Inter_18pt-SemiBold.ttf", 18.0f);
+		ImFont* interRegular = io.Fonts->AddFontFromFileTTF("Assets/Fonts/Inter/Inter_18pt-Regular.ttf", 18.0f);
+		KBR_CORE_ASSERT(interRegular != nullptr, "Failed to load font!");
+		io.FontDefault = interRegular;
 	}
 
 	vk::SampleCountFlagBits VulkanContext::GetMaxUsableSampleCount(const vk::raii::PhysicalDevice& physicalDevice)

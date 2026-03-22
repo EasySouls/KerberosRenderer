@@ -4,23 +4,7 @@
 
 #include "VulkanContext.hpp"
 #include "IO.hpp"
-#include "Renderer/Vertex.hpp"
-#include "ModelLoader.hpp"
-#include "Renderer/Shaders/Shader.hpp"
-#include "Buffer.hpp"
-#include "Events/WindowResizedEvent.hpp"
-#include "Renderer/SkyboxUtils.hpp"
-#include "Scene/Camera/EditorCamera.hpp"
-#include "Scene/Camera/FirstPersonCamera.hpp"
-#include "Serialization/SceneSerializer.hpp"
-#include "Input/KeyCodes.hpp"
-#include "Logging/Log.hpp"
-
-#include <glm/gtc/matrix_inverse.hpp>
-#include <glm/gtc/type_ptr.hpp>
-
-#include <imgui/imgui.h>
-
+#include "Renderer/Renderer.hpp"
 #include "Application.hpp"
 #include "AssetConstants.hpp"
 #include "Assets/AssetManager.hpp"
@@ -29,22 +13,26 @@
 #include "ImGuizmo/ImGuizmo.h"
 #include "Input/InputSystem.hpp"
 #include "Utils/SystemOperations.hpp"
+#include "ModelLoader.hpp"
+#include "Scene/Camera/FirstPersonCamera.hpp"
+#include "Serialization/SceneSerializer.hpp"
+#include "Input/KeyCodes.hpp"
+#include "Logging/Log.hpp"
+
+#include <glm/gtc/matrix_inverse.hpp>
+#include <glm/gtc/type_ptr.hpp>
+#include <imgui/imgui.h>
 
 namespace Kerberos
 {
 	EditorLayer::EditorLayer() 
-		: Layer("EditorLayer"), m_SkyboxMesh(std::nullopt)
+		: Layer("EditorLayer")
 	{
 	}
 
 	EditorLayer::~EditorLayer() 
 	{
 		m_SceneNodes.clear();
-		
-		VulkanContext::Get().WaitIdle();
-
-		VulkanContext::DestroyImGuiDescriptorSet(m_ColorOutputDescriptorSet);
-		VulkanContext::DestroyImGuiDescriptorSet(m_ShadowMapDescriptorSet);
 	}
 
 	void EditorLayer::OnAttach() 
@@ -91,27 +79,13 @@ namespace Kerberos
 
 		m_ViewportSize = { 1280.0f, 720.0f };
 
-		KBR_CORE_INFO("Size of SceneUniformData: {} bytes", sizeof(SceneUniformData));
-		KBR_CORE_INFO("Size of UniformDataParams: {} bytes", sizeof(UniformDataParams));
-		KBR_CORE_INFO("Size of PerObjectData: {} bytes", sizeof(PerObjectData));
-		KBR_CORE_INFO("Size of material UniformBlock: {} bytes", sizeof(Material::UniformBlock));
-
 		constexpr GLTFLoadingFlags loadingFlags = GLTFLoadingFlags::None;
-
-		m_SkyboxMesh = ModelLoader::LoadModel("assets/models/cube.gltf", loadingFlags);
-		/*m_SkyboxTexture.LoadFromFile(
-			"assets/textures/hdr/pisa_cube.ktx",
-			vk::Format::eR16G16B16A16Sfloat,
-			vk::ImageUsageFlagBits::eSampled
-		);*/
-		m_SkyboxTexture = TextureCube::FromFile("assets/textures/hdr/pisa_cube.ktx");
 
 		// Load models
 		m_Meshes["avocado"] = CreateRef<Mesh>(ModelLoader::LoadModel("assets/models/avocado/Avocado.gltf", loadingFlags));
 		m_Meshes["cube"] = CreateRef<Mesh>(ModelLoader::LoadModel("assets/models/cube.gltf", loadingFlags));
 		m_Meshes["sphere"] = CreateRef<Mesh>(ModelLoader::LoadModel("assets/models/sphere.gltf", loadingFlags));
 		m_Meshes["cerberus"] = CreateRef<Mesh>(ModelLoader::LoadModel("assets/models/cerberus/cerberus.gltf", loadingFlags));
-
 
 		KBR_CORE_INFO("Loaded {} mesh(es)!", m_Meshes.size());
 
@@ -210,8 +184,9 @@ namespace Kerberos
 		m_Time += deltaTime;
 
 		// Resize the output images and the camera if the viewport size has changed
+		const glm::vec2 outputSize = Renderer::GetOutputImageSize();
 		if (m_ViewportSize.x > 0.0f && m_ViewportSize.y > 0.0f && 
-			(static_cast<int>(m_OutputSize.x) != static_cast<int>(m_ViewportSize.x) || static_cast<int>(m_OutputSize.y) != static_cast<int>(m_ViewportSize.y)))
+			(static_cast<int>(outputSize.x) != static_cast<int>(m_ViewportSize.x) || static_cast<int>(outputSize.y) != static_cast<int>(m_ViewportSize.y)))
 		{
 			m_EditorCamera->SetViewportSize(m_ViewportSize.x, m_ViewportSize.y);
 			m_ActiveScene->OnViewportResize(static_cast<uint32_t>(m_ViewportSize.x), static_cast<uint32_t>(m_ViewportSize.y));
@@ -397,31 +372,29 @@ namespace Kerberos
 
 	void EditorLayer::HandleMousePicking() 
 	{
+		auto [mx, my] = ImGui::GetMousePos();
+		mx -= m_ViewportBounds[0].x;
+		my -= m_ViewportBounds[0].y;
+		const glm::vec2 viewportSize = m_ViewportBounds[1] - m_ViewportBounds[0];
+
+		/// Flip the y coord (works with opengl)
+		my = viewportSize.y - my;
+
+		const int mouseX = static_cast<int>(mx);
+		const int mouseY = static_cast<int>(my);
+
+		if (mouseX >= 0 && mouseY >= 0 && mouseX <= static_cast<int>(viewportSize.x) && mouseY <= static_cast<int>(viewportSize.y))
 		{
-			auto [mx, my] = ImGui::GetMousePos();
-			mx -= m_ViewportBounds[0].x;
-			my -= m_ViewportBounds[0].y;
-			const glm::vec2 viewportSize = m_ViewportBounds[1] - m_ViewportBounds[0];
+			/*int pixelData = m_ActiveScene->GetEditorFramebuffer()->ReadPixel(1, mouseX, mouseY);
 
-			/// Flip the y coord (works with opengl)
-			my = viewportSize.y - my;
-
-			const int mouseX = static_cast<int>(mx);
-			const int mouseY = static_cast<int>(my);
-
-			if (mouseX >= 0 && mouseY >= 0 && mouseX <= static_cast<int>(viewportSize.x) && mouseY <= static_cast<int>(viewportSize.y))
+			if (pixelData < 0)
 			{
-				/*int pixelData = m_ActiveScene->GetEditorFramebuffer()->ReadPixel(1, mouseX, mouseY);
-
-				if (pixelData < 0)
-				{
-					m_HoveredEntity = {};
-				}
-				else
-				{
-					m_HoveredEntity = Entity{ static_cast<entt::entity>(pixelData), m_ActiveScene.get() };
-				}*/
+				m_HoveredEntity = {};
 			}
+			else
+			{
+				m_HoveredEntity = Entity{ static_cast<entt::entity>(pixelData), m_ActiveScene.get() };
+			}*/
 		}
 	}
 
@@ -563,7 +536,8 @@ namespace Kerberos
 
 		m_ViewportSize = { ImGui::GetContentRegionAvail().x, ImGui::GetContentRegionAvail().y };
 
-		ImGui::Image((ImTextureID)m_ColorOutputDescriptorSet, ImVec2(m_ViewportSize.x, m_ViewportSize.y));
+		const auto viewportImage = Renderer::GetCompositedOutputImageID();
+		ImGui::Image(viewportImage, ImVec2(m_ViewportSize.x, m_ViewportSize.y));
 
 		HandleDragAndDrop();
 
@@ -837,7 +811,6 @@ namespace Kerberos
 
 		ImGui::Text("Color Output Image");
 		ImGui::Text("Viewport size: %.2f x %.2f", m_ViewportSize.x, m_ViewportSize.y);
-		ImGui::Text("Output size: %.2f x %.2f", m_OutputSize.x, m_OutputSize.y);
 
 		ImGui::Separator();
 
@@ -869,39 +842,45 @@ namespace Kerberos
 		ImGui::Separator();
 
 		// Light controls
-		ImGui::Text("Light directions");
+		/*ImGui::Text("Light directions");
 		ImGui::DragFloat3("Light 1 Direction", glm::value_ptr(m_UniformDataParams.lights[0]), 0.1f);
 		ImGui::Text("Light 2: (%.2f, %.2f, %.2f)", m_UniformDataParams.lights[1].x, m_UniformDataParams.lights[1].y, m_UniformDataParams.lights[1].z);
 		ImGui::Text("Light 2: (%.2f, %.2f, %.2f)", m_UniformDataParams.lights[2].x, m_UniformDataParams.lights[2].y, m_UniformDataParams.lights[2].z);
-		ImGui::DragFloat3("Light 4 Direction", glm::value_ptr(m_UniformDataParams.lights[3]), 0.1f);
-		ImGui::DragFloat("Exposure", &m_UniformDataParams.exposure, 0.1f, 0.1f, 10.0f);
-		ImGui::DragFloat("Gamma", &m_UniformDataParams.gamma, 0.1f, 0.1f, 10.0f);
-		ImGui::DragFloat3("Ambient Light Color", glm::value_ptr(m_SceneUniformData.ambientLightColor), 0.01f, 0.0f, 1.0f);
+		ImGui::DragFloat3("Light 4 Direction", glm::value_ptr(m_UniformDataParams.lights[3]), 0.1f);*/
+		ImGui::Text("Lighting settings");
+		float& exposure = Renderer::GetExposure();
+		ImGui::DragFloat("Exposure", &exposure, 0.1f, 0.1f, 10.0f);
+		float& gamma = Renderer::GetGamma();
+		ImGui::DragFloat("Gamma", &gamma, 0.1f, 0.1f, 10.0f);
+		//ImGui::DragFloat3("Ambient Light Color", glm::value_ptr(m_SceneUniformData.ambientLightColor), 0.01f, 0.0f, 1.0f);
 
 		ImGui::Separator();
 
 		// Display shadow map
 		ImGui::Text("Shadow Map");
-		ImGui::Image((ImTextureID)m_ShadowMapDescriptorSet, ImVec2(256.0f, 256.0f));
+		const auto shadowMapImage = Renderer::GetShadowMapDepthImageID();
+		ImGui::Image(shadowMapImage, ImVec2(256.0f, 256.0f));
 
+		const glm::vec3 lightPosForShadowMapCalculation = Renderer::GetLightPositionForShadowMapCalculation();
 		ImGui::Text("Light position for shadow map calculation:");
 		ImGui::Text("(%.2f, %.2f, %.2f)",
-					m_LightPosForShadowMapCalculation.x,
-					m_LightPosForShadowMapCalculation.y,
-					m_LightPosForShadowMapCalculation.z);
+					lightPosForShadowMapCalculation.x,
+					lightPosForShadowMapCalculation.y,
+					lightPosForShadowMapCalculation.z);
 
 		ImGui::Text("Depth Bias");
-		ImGui::DragFloat("Constant Factor", &m_DepthBias.constantFactor, 0.001f, 0.0f, 5.0f);
-		ImGui::DragFloat("Clamp", &m_DepthBias.clamp, 0.001f, 0.0f, 1.0f);
-		ImGui::DragFloat("Slope Factor", &m_DepthBias.slopeFactor, 0.01f, 0.0f, 10.0f);
+		auto& [ConstantFactor, SlopeFactor, Clamp] = Renderer::GetShadowMapDepthBiasSettings();
+		ImGui::DragFloat("Constant Factor", &ConstantFactor, 0.001f, 0.0f, 5.0f);
+		ImGui::DragFloat("Clamp", &Clamp, 0.001f, 0.0f, 1.0f);
+		ImGui::DragFloat("Slope Factor", &SlopeFactor, 0.01f, 0.0f, 10.0f);
 
 		ImGui::Separator();
 
 		// Scene settings
 		ImGui::Text("Settings");
-		ImGui::Checkbox("Display Skybox", &m_DisplaySkybox);
-		ImGui::Checkbox("Display normals", &m_DisplayDebugNormals);
-		ImGui::Checkbox("Enable PCF", &m_EnablePCF);
+		ImGui::Checkbox("Display Skybox", &Renderer::GetDisplaySkybox());
+		ImGui::Checkbox("Display normals", &Renderer::GetDisplayDebugNormals());
+		ImGui::Checkbox("Enable PCF", &Renderer::GetIsPCFEnabledForShadowMap());
 
 		ImGui::Separator();
 
@@ -930,97 +909,6 @@ namespace Kerberos
 		}
 
 		ImGui::End();
-	}
-
-	void EditorLayer::UpdateSceneUniformBuffers(const uint32_t currentImage) 
-	{
-		const glm::mat4& projection = m_EditorCamera->GetProjectionMatrix();
-		const glm::mat4& view = m_EditorCamera->GetViewMatrix();
-
-		m_SceneUniformData.projection = projection;
-		m_SceneUniformData.view = view;
-		m_SceneUniformData.lightSpaceMatrix = CalculateLightSpaceMatrix();
-		m_SceneUniformData.camPos = m_EditorCamera->GetPosition();
-
-		std::memcpy(m_UniformBuffers[currentImage].scene->GetMappedData(), &m_SceneUniformData, sizeof(SceneUniformData));
-
-		const glm::mat4 skyboxModel = glm::mat4(glm::mat3(view));
-		m_SkyboxData.model = skyboxModel;
-		m_SkyboxData.projection = projection;
-		std::memcpy(m_UniformBuffers[currentImage].skybox->GetMappedData(), &m_SkyboxData, sizeof(SkyboxData));
-	}
-
-	void EditorLayer::UpdatePerObjectUniformBuffer(const uint32_t currentImage, const uint32_t objectIndex,
-	                                             const glm::mat4& model, const Material& material) 
-	{
-		m_PerObjectUniformData = {
-			.model = model,
-			.worldNormal = glm::inverseTranspose(model),
-			.material = material.Params
-		};
-
-		char* data = static_cast<char*>(m_UniformBuffers[currentImage].perObject->GetMappedData());
-		data += static_cast<size_t>(objectIndex) * m_DynamicAlignment;
-
-		std::memcpy(data, &m_PerObjectUniformData, sizeof(PerObjectData));
-	}
-
-	void EditorLayer::UpdateLights(const float time, const uint32_t currentImage) 
-	{
-		/*constexpr float p = 3.0f;
-		m_UniformDataParams.lights[1] = glm::vec4(-p, -p * 0.5f, -p, 1.0f);
-		m_UniformDataParams.lights[2] = glm::vec4(-p, -p * 0.5f, p, 1.0f);
-
-		m_UniformDataParams.lights[1].x = sin(glm::radians(time * 80.0f)) * 20.0f;
-		m_UniformDataParams.lights[1].z = cos(glm::radians(time * 80.0f)) * 20.0f;
-		m_UniformDataParams.lights[2].x = cos(glm::radians(time * 80.0f)) * 20.0f;
-		m_UniformDataParams.lights[2].y = sin(glm::radians(time * 80.0f)) * 20.0f;*/
-
-		m_UniformDataParams.lights[1] = glm::vec4{ 0.0f };
-		m_UniformDataParams.lights[2] = glm::vec4{ 0.0f };
-
-		std::memcpy(m_UniformBuffers[currentImage].params->GetMappedData(), &m_UniformDataParams, sizeof(UniformDataParams));
-	}
-
-	glm::mat4 EditorLayer::CalculateLightSpaceMatrix() 
-	{
-		constexpr float nearPlane = 0.1f;
-		constexpr float farPlane = 100.0f;
-		constexpr float orthoSize = 20.0f;
-		glm::mat4 lightProjection = glm::ortho(-orthoSize, orthoSize, -orthoSize, orthoSize, nearPlane, farPlane);
-		lightProjection[1][1] *= -1.0f;
-
-		constexpr glm::vec3 sceneCenter = glm::vec3(0.0f, 0.0f, 0.0f);
-		constexpr float lightDistance = 80.0f;
-
-		/*const glm::vec3 lightDirRaw = glm::vec3(m_UniformDataParams.lights[0]);
-		const glm::vec3 lightDir = glm::length2(lightDirRaw) > std::numeric_limits<float>::epsilon()
-			? glm::normalize(lightDirRaw) 
-			: glm::vec3(0.0f, 1.0f, 0.0f);*/
-
-		const glm::vec3 lightDir = glm::normalize(glm::vec3(m_UniformDataParams.lights[0]));
-
-		const glm::vec3 lightPos = sceneCenter + lightDir * lightDistance;
-		m_LightPosForShadowMapCalculation = lightPos;
-		constexpr glm::vec3 lightTarget = sceneCenter; /// Look at origin
-
-		glm::vec3 lightUp = glm::vec3(0.0f, 1.0f, 0.0f);
-		if (glm::abs(glm::dot(lightDir, lightUp)) > 0.99f)
-		{
-			lightUp = glm::vec3(1.0f, 0.0f, 0.0f);
-		}
-
-		const glm::mat4 lightView = glm::lookAt(lightPos, lightTarget, lightUp);
-
-		// Correction matrix for Vulkan Clip Space
-		// Y: -1 (flip logic), Z: 0.5 scale + 0.5 offset ([-1,1] -> [0,1])
-		//constexpr glm::mat4 correction = glm::mat4(
-		//	1.0f, 0.0f, 0.0f, 0.0f,
-		//	0.0f, -1.0f, 0.0f, 0.0f,
-		//	0.0f, 0.0f, 0.5f, 0.0f,
-		//	0.0f, 0.0f, 0.5f, 1.0f);
-
-		return lightProjection * lightView;
 	}
 
 	void EditorLayer::CalculateEntityTransform(const Entity& entity) const 

@@ -5,6 +5,13 @@
 
 namespace Kerberos
 {
+	struct DepthBias
+	{
+		float ConstantFactor = 1.25f;
+		float SlopeFactor = 1.75f;
+		float Clamp = 0.0f;
+	};
+
 	struct RendererSettings
 	{
 
@@ -16,14 +23,23 @@ namespace Kerberos
 		static void Init();
 		static void Shutdown();
 
-		static void RenderSceneEditor(const Ref<Scene>& scene, const EditorCamera& camera);
+		static void RenderSceneEditor(const Ref<Scene>& scene, const Camera& camera);
 		static void RenderSceneRuntime(const Ref<Scene>& scene, const SceneCamera* mainCamera, const glm::mat4& mainCameraTransform);
 
 		static void ResizeResources(uint32_t width, uint32_t height);
 
 		static glm::vec3 GetLightPositionForShadowMapCalculation();
-		static bool GetIsPCFEnabledForShadowMap();
-		static bool GetDisplayDebugNormals();
+		static DepthBias& GetShadowMapDepthBiasSettings();
+		static bool& GetIsPCFEnabledForShadowMap();
+		static bool& GetDisplayDebugNormals();
+		static bool& GetDisplaySkybox();
+		static float& GetGamma();
+		static float& GetExposure();
+
+		static glm::vec2 GetOutputImageSize();
+
+		static uint64_t GetCompositedOutputImageID();
+		static uint64_t GetShadowMapDepthImageID();
 
 	private:
 		static void UpdateLights(uint32_t currentImage);
