@@ -12,6 +12,8 @@
 
 #include <algorithm>
 
+#include "VulkanContext.hpp"
+
 
 namespace Kerberos
 {
@@ -105,9 +107,10 @@ namespace Kerberos
 				ImGui::PushID(itemStr.c_str());
 				// TODO: Get icon based on asset type
 
-				/*const Ref<Texture2D> icon = isDirectory ? m_FolderIcon : m_FileIcon;
+				const Ref<Texture2D> icon = isDirectory ? m_FolderIcon : m_FileIcon;
 				ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0, 0, 0, 0));
-				ImGui::ImageButton(item.string().c_str(), icon->GetRendererID(), { thumbnailSize, thumbnailSize }, { 0, 1 }, { 1, 0 });*/
+				const uint64_t iconRendererID = VulkanContext::Get().GetImGuiRendererID(icon);
+				ImGui::ImageButton(item.string().c_str(), iconRendererID, { thumbnailSize, thumbnailSize }, { 0, 1 }, { 1, 0 });
 
 				if (ImGui::BeginPopupContextItem())
 				{
@@ -155,13 +158,14 @@ namespace Kerberos
 
 				if (entry.is_directory())
 				{
-					/*ImGui::ImageButton(path.string().c_str(), m_FolderIcon->GetRendererID(), { thumbnailSize, thumbnailSize }, { 0, 1 }, { 1, 0 });
+					const uint64_t folderRendererID = VulkanContext::Get().GetImGuiRendererID(m_FolderIcon);
+					ImGui::ImageButton(path.string().c_str(), folderRendererID, { thumbnailSize, thumbnailSize }, { 0, 1 }, { 1, 0 });
 					if (ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left))
 					{
 						m_CurrentDirectory /= path.filename();
 					}
 
-					ShowFolderContextMenu(path);*/
+					ShowFolderContextMenu(path);
 				}
 				else
 				{
@@ -177,17 +181,19 @@ namespace Kerberos
 							m_AssetImages[path] = TextureImporter::ImportTexture(fullPath);
 						}
 
-						/*ImGui::ImageButton(path.string().c_str(), m_AssetImages[path]->GetRendererID(), { thumbnailSize, thumbnailSize }, { 0, 1 }, { 1, 0 });
+						const uint64_t imageRendererID = VulkanContext::Get().GetImGuiRendererID(m_AssetImages[path]);
+						ImGui::ImageButton(path.string().c_str(), imageRendererID, { thumbnailSize, thumbnailSize }, { 0, 1 }, { 1, 0 });
 						if (ImGui::IsItemHovered())
 						{
 							ImGui::BeginTooltip();
 							ImGui::Text("%s", fileName.c_str());
 							ImGui::EndTooltip();
-						}*/
+						}
 					}
 					else
 					{
-						//ImGui::ImageButton(path.string().c_str(), m_FileIcon->GetRendererID(), { thumbnailSize, thumbnailSize }, { 0, 1 }, { 1, 0 });
+						const uint64_t fileRendererID = VulkanContext::Get().GetImGuiRendererID(m_FileIcon);
+						ImGui::ImageButton(path.string().c_str(), fileRendererID, { thumbnailSize, thumbnailSize }, { 0, 1 }, { 1, 0 });
 					}
 
 					ShowFileContextMenu(path);
@@ -382,7 +388,8 @@ namespace Kerberos
 				ImGui::SetDragDropPayload(assetBrowserTexture, &handle, sizeof(AssetHandle), ImGuiCond_Once);
 				if (const Ref<Texture2D> texture = AssetManager::GetAsset<Texture2D>(handle))
 				{
-					//ImGui::Image(texture->GetRendererID(), ImVec2(64, 64), ImVec2(0, 1), ImVec2(1, 0));
+					const uint64_t textureRendererID = VulkanContext::Get().GetImGuiRendererID(texture);
+					ImGui::Image(textureRendererID, ImVec2(64, 64), ImVec2(0, 1), ImVec2(1, 0));
 				}
 				else
 				{

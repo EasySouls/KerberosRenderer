@@ -20,6 +20,8 @@
 
 #include <filesystem>
 
+#include "VulkanContext.hpp"
+
 
 namespace Kerberos
 {
@@ -64,13 +66,13 @@ namespace Kerberos
 			DrawEntityNode(rootEntity);
 		}
 
-		//for (const auto entityId : m_Context->m_Registry.view<entt::entity>())
-		//{
-		//	Entity e{ entityId, m_Context.get() };
+		for (const auto entityId : m_Context->m_Registry.view<entt::entity>())
+		{
+			Entity e{ entityId, m_Context.get() };
 
-		//	if (!m_Context->GetParent(e))
-		//		DrawEntityNode(e);
-		//}
+			if (!m_Context->GetParent(e))
+				DrawEntityNode(e);
+		}
 
 		/// If an empty space is clicked, deselect the entity
 		if (ImGui::IsMouseDown(0) && ImGui::IsWindowHovered())
@@ -1044,7 +1046,7 @@ namespace Kerberos
 				ImGui::Text("Texture");
 
 				std::string textureLabel = "None";
-				/*uint64_t textureID;
+				uint64_t textureID;
 				if (staticMesh.MeshTexture)
 				{
 					if (AssetManager::IsAssetHandleValid(staticMesh.MeshTexture->GetHandle()))
@@ -1057,15 +1059,15 @@ namespace Kerberos
 						textureLabel = "Invalid texture";
 					}
 
-					textureID = staticMesh.MeshTexture->GetRendererID();
+					textureID = VulkanContext::Get().GetImGuiRendererID(staticMesh.MeshTexture);
 				}
 				else
 				{
-					textureID = m_WhiteTexture->GetRendererID();
-				}*/
-				ImGui::Text("%s", textureLabel.c_str());
+					textureID = VulkanContext::Get().GetImGuiRendererID(m_WhiteTexture);
+				}
 
-				//ImGui::Image(textureID, ImVec2{ 64, 64 }, ImVec2{ 0, 1 }, ImVec2{ 1, 0 });
+				ImGui::Text("%s", textureLabel.c_str());
+				ImGui::Image(textureID, ImVec2{ 64, 64 }, ImVec2{ 0, 1 }, ImVec2{ 1, 0 });
 
 				/// Handle drag and drop for textures
 				if (ImGui::BeginDragDropTarget())
@@ -1435,24 +1437,25 @@ namespace Kerberos
 				ImGui::Separator();
 
 				ImGui::Text("Font: %s", text.Font->GetName().c_str());
-				//ImGui::Image(text.Font->GetAtlasTexture()->GetRendererID(), ImVec2{ 128, 128 }, ImVec2{ 0, 1 }, ImVec2{ 1, 0 });
+				const uint64_t fontAtlasRendererID = VulkanContext::Get().GetImGuiRendererID(text.Font->GetAtlasTexture());
+				ImGui::Image(fontAtlasRendererID, ImVec2{ 128, 128 }, ImVec2{ 0, 1 }, ImVec2{ 1, 0 });
 
-				///// Handle drag and drop for fonts
-				//if (ImGui::BeginDragDropTarget())
-				//{
-				//	if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload(assetBrowserFont))
-				//	{
-				//		const AssetHandle handle = *static_cast<AssetHandle*>(payload->Data);
-				//		if (AssetManager::GetAssetType(handle) != AssetType::Texture2D) // TODO: Change to font type when it exists
-				//		{
-				//			KBR_EDITOR_ERROR("Asset is not a texture: {0}", handle);
-				//			m_NotificationManager.AddNotification("Asset is not a font", Notification::Type::Error);
-				//			return;
-				//		}
-				//		//text.Font = AssetManager::GetAsset<Font>(handle);
-				//	}
-				//	ImGui::EndDragDropTarget();
-				//}
+				/// Handle drag and drop for fonts
+				if (ImGui::BeginDragDropTarget())
+				{
+					if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload(assetBrowserFont))
+					{
+						const AssetHandle handle = *static_cast<AssetHandle*>(payload->Data);
+						if (AssetManager::GetAssetType(handle) != AssetType::Texture2D) // TODO: Change to font type when it exists
+						{
+							KBR_EDITOR_ERROR("Asset is not a texture: {0}", handle);
+							m_NotificationManager.AddNotification("Asset is not a font", Notification::Type::Error);
+							return;
+						}
+						//text.Font = AssetManager::GetAsset<Font>(handle);
+					}
+					ImGui::EndDragDropTarget();
+				}
 
 				ImGui::TreePop();
 			}
