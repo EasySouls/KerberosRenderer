@@ -1,5 +1,8 @@
 #pragma once
 
+#include "Scene/Scene.hpp"
+#include "Scene/Camera/EditorCamera.hpp"
+
 namespace Kerberos
 {
 	struct RendererSettings
@@ -13,6 +16,28 @@ namespace Kerberos
 		static void Init();
 		static void Shutdown();
 
+		static void RenderSceneEditor(const Ref<Scene>& scene, const EditorCamera& camera);
+		static void RenderSceneRuntime(const Ref<Scene>& scene, const SceneCamera* mainCamera, const glm::mat4& mainCameraTransform);
 
+		static void ResizeResources(uint32_t width, uint32_t height);
+
+		static glm::vec3 GetLightPositionForShadowMapCalculation();
+		static bool GetIsPCFEnabledForShadowMap();
+		static bool GetDisplayDebugNormals();
+
+	private:
+		static void UpdateLights(uint32_t currentImage);
+		static void UpdateSceneUniformBuffers(uint32_t currentImage, const Camera* mainCamera);
+		static void UpdatePerObjectUniformBuffer(uint32_t currentImage, uint32_t objectIndex, const glm::mat4& model, const Material& material);
+
+		static glm::mat4 CalculateLightSpaceMatrix();
+
+		static void CreateDefaultMaterials();
+		static void CreateResources();
+
+		static void PrepareUniformBuffers();
+		static void SetupDescriptors();
+
+		static void CreateSkyboxResources();
 	};
 }

@@ -66,6 +66,7 @@ namespace Kerberos
 		 * @param filepath The path to the scene file to open.
 		 */
 		void OpenScene(const std::filesystem::path& filepath);
+		void OpenScene(const Ref<Scene>& scene);
 		void NewScene();
 
 		void DrawViewport();
@@ -77,13 +78,9 @@ namespace Kerberos
 		void UpdateSceneUniformBuffers(uint32_t currentImage);
 		void UpdatePerObjectUniformBuffer(uint32_t currentImage, uint32_t objectIndex, const glm::mat4& model, const Material& material);
 
-		void PrepareUniformBuffers();
-		void SetupDescriptors();
-
 		glm::mat4 CalculateLightSpaceMatrix();
 
-		void CreateVulkanResources();
-		void ResizeResources();
+		void CalculateEntityTransform(const Entity& entity) const;
 
 		bool OnKeyPressed(const KeyPressedEvent& event);
 		bool OnMouseButtonPressed(const MouseButtonPressedEvent& event);
@@ -144,7 +141,7 @@ namespace Kerberos
 
 		glm::vec3 m_LightPosForShadowMapCalculation{ 0.0f };
 
-		Owner<Camera> m_Camera = nullptr;
+		Owner<Camera> m_EditorCamera = nullptr;
 		// Size of the ImGui viewport.
 		glm::vec2 m_ViewportSize{ 0.f };
 		// Size of the output images.

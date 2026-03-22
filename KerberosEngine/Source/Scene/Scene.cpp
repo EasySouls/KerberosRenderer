@@ -15,6 +15,7 @@
 
 #include "Application.hpp"
 #include "Assets/AssetManager.hpp"
+#include "Renderer/Renderer.hpp"
 //#include "Renderer/RenderCommand.h"
 //#include "Scripting/ScriptEngine.hpp"
 
@@ -92,12 +93,12 @@ namespace Kerberos
 		m_IsScenePaused = isPaused;
 	}
 
-	void Scene::OnUpdateEditor(float ts, const EditorCamera& camera)
+	void Scene::OnUpdateEditor(float ts, const Camera& camera)
 	{
 		Render3DEditor(camera);
 	}
 
-	void Scene::OnUpdateSimulation(const float ts, const EditorCamera& camera)
+	void Scene::OnUpdateSimulation(const float ts, const Camera& camera)
 	{
 		/// If the scene is paused, do not update the physics system, but still render the scene
 		if (!m_IsScenePaused)
@@ -426,6 +427,8 @@ namespace Kerberos
 				cameraComponent.Camera.SetViewportSize(width, height);
 			}
 		}
+
+		Renderer::ResizeResources(width, height);
 	}
 
 	const PhysicsSystem& Scene::GetPhysicsSystem() const
@@ -680,7 +683,7 @@ namespace Kerberos
 		//Renderer3D::EndScene();
 	}
 
-	void Scene::Render3DEditor(const EditorCamera& camera)
+	void Scene::Render3DEditor(const Camera& camera)
 	{
 		DirectionalLightComponent* dlc = nullptr;
 		const auto sunView = m_Registry.view<DirectionalLightComponent, TransformComponent>();
@@ -891,6 +894,8 @@ namespace Kerberos
 		return {};
 	}
 
+#pragma region ComponentAddedSpecializations
+
 	template <typename T>
 	void Scene::OnComponentAdded(Entity /*entity*/, T& /*component*/)
 	{
@@ -1015,4 +1020,6 @@ namespace Kerberos
 	void Scene::OnComponentAdded<AudioListenerComponent>(Entity entity, AudioListenerComponent& component)
 	{
 	}
+
+#pragma endregion
 }

@@ -1,16 +1,17 @@
 #include "kbrpch.hpp"
 #include "Application.hpp"
 
-#include "events/KeyPressedEvent.hpp"
-#include "events/KeyReleasedEvent.hpp"
-#include "events/KeyTypedEvent.hpp"
-#include "events/MouseButtonPressedEvent.hpp"
-#include "events/MouseButtonReleasedEvent.hpp"
-#include "events/MouseMovedEvent.hpp"
-#include "events/MouseScrolledEvent.hpp"
-#include "events/WindowDropEvent.hpp"
-#include "events/WindowResizedEvent.hpp"
-
+#include "Events/KeyPressedEvent.hpp"
+#include "Events/KeyReleasedEvent.hpp"
+#include "Events/KeyTypedEvent.hpp"
+#include "Events/MouseButtonPressedEvent.hpp"
+#include "Events/MouseButtonReleasedEvent.hpp"
+#include "Events/MouseMovedEvent.hpp"
+#include "Events/MouseScrolledEvent.hpp"
+#include "Events/WindowDropEvent.hpp"
+#include "Events/WindowClosedEvent.hpp"
+#include "Events/WindowResizedEvent.hpp"
+#include "Renderer/Renderer.hpp"
 #include "Logging/Log.hpp"
 
 #include <GLFW/glfw3.h>
@@ -19,9 +20,8 @@
 #include <iostream>
 #include <filesystem>
 
-#include "Events/WindowClosedEvent.hpp"
 
-#if defined(KBR_PLATFORM_WINDOWS)
+#ifdef KBR_PLATFORM_WINDOWS
 extern "C"
 {
 	__declspec(dllexport) DWORD NvOptimusEnablement = 0x00000001;
@@ -197,6 +197,8 @@ namespace Kerberos
 		});
 
 		m_VulkanContext = CreateOwner<VulkanContext>(m_Window);
+
+		Renderer::Init();
 	}
 
 	Application::~Application()
@@ -205,6 +207,8 @@ namespace Kerberos
 		{
 			layer->OnDetach();
 		}
+
+		Renderer::Shutdown();
 
 		glfwDestroyWindow(m_Window);
 		glfwTerminate();

@@ -7,22 +7,22 @@ namespace Kerberos
 	class KeyReleasedEvent : public Event
 	{
 	public:
-		explicit KeyReleasedEvent(const char keyChar)
-			: m_KeyChar(keyChar) 
+		explicit KeyReleasedEvent(const int keyCode)
+			: m_KeyCode(keyCode) 
 		{
 		}
 
-		char GetKeyChar() const { return m_KeyChar; }
+		int GetKeyCode() const { return m_KeyCode; }
 
 		std::string ToString() const override
 		{
-			return std::string(GetName()) + ": " + m_KeyChar;
+			return std::string(GetName()) + ": " + std::to_string(m_KeyCode);
 		}
 
 		EVENT_CLASS_TYPE(KeyReleased)
 		EVENT_CLASS_CATEGORY(EventCategoryKeyboard | EventCategoryInput)
 
 	private:
-		char m_KeyChar;
+		int m_KeyCode;
 	};
 }

@@ -1,15 +1,1791 @@
 #include "kbrpch.hpp"
 #include "Renderer.hpp"
 
+#include <glm/gtc/matrix_inverse.hpp>
+
+#include "MaterialRegistry.hpp"
+#include "ModelLoader.hpp"
+#include "SkyboxUtils.hpp"
+#include "VulkanContext.hpp"
+#include "Shaders/Shader.hpp"
+
 namespace Kerberos
 {
+	struct DepthBias
+	{
+		float constantFactor = 1.25f;
+		float slopeFactor = 1.75f;
+		float clamp = 0.0f;
+	};
+
+	struct ShadowMap
+	{
+		vk::raii::Image Image = nullptr;
+		vk::raii::DeviceMemory ImageMemory = nullptr;
+		vk::raii::ImageView ImageView = nullptr;
+		vk::raii::PipelineLayout PipelineLayout = nullptr;
+		vk::raii::Pipeline Pipeline = nullptr;
+
+		// Settings
+		uint32_t Size = 2048;
+		bool EnablePCF = true;
+
+		// Calculated at runtime
+		glm::vec3 LightPosForCalculation{ 0.0f , 1.0f, 0.0f };
+	};
+
+	struct Skybox
+	{
+		Ref<Mesh> SkyboxMesh = nullptr;
+		Ref<TextureCube> SkyboxTexture = nullptr;
+		bool IsSkyboxDirty = true; // Flag to indicate if the skybox needs to be re-rendered
+		bool ShowSkybox = true;
+		// Generated at runtime
+		Ref<Texture2D> LutBrdfTexture = nullptr;
+		Ref<TextureCube> IrradianceCubeTexture = nullptr;
+		Ref<TextureCube> PrefilteredCubeTexture = nullptr;
+	};
+
+	struct ImageData
+	{
+		vk::raii::Image Image = nullptr;
+		vk::raii::DeviceMemory ImageMemory = nullptr;
+		vk::raii::ImageView ImageView = nullptr;
+	};
+
+	struct DescriptorSetLayouts
+	{
+		vk::raii::DescriptorSetLayout scene = nullptr;
+		vk::raii::DescriptorSetLayout textures = nullptr;
+	};
+
+	struct SceneUniformData
+	{
+		glm::mat4 projection{ 0.f };
+		glm::mat4 view{ 0.f };
+		glm::mat4 lightSpaceMatrix{ 0.f };
+		alignas(16) glm::vec3 ambientLightColor{ 0.1f, 0.1f, 0.1f };
+		alignas(16) glm::vec3 camPos{ 0.f };
+	};
+
+	struct UniformDataParams
+	{
+		// Direction of the lights
+		alignas(16) std::array<glm::vec4, 4> lights{};
+		float exposure = 4.5f;
+		float gamma = 2.2f;
+	};
+
+	struct PerObjectData
+	{
+		alignas(16) glm::mat4 model{ 0.f };
+		alignas(16) glm::mat4 worldNormal{ 0.f };
+		alignas(16) Material::UniformBlock material;
+	};
+
+	struct SkyboxData
+	{
+		glm::mat4 projection{ 0.f };
+		glm::mat4 model{ 0.f };
+	};
+
+	struct UniformBufferObject
+	{
+		std::shared_ptr<UniformBuffer> scene;
+		std::shared_ptr<UniformBuffer> params;
+		std::shared_ptr<UniformBuffer> perObject;
+		std::shared_ptr<UniformBuffer> skybox;
+	};
+
+	struct DescriptorSets
+	{
+		vk::raii::DescriptorSet scene = nullptr;
+		vk::raii::DescriptorSet skybox = nullptr;
+	};
+
+	struct RendererData
+	{
+		MaterialRegistry MaterialRegistry;
+		DepthBias DepthBias;
+		ShadowMap ShadowMap;
+		Skybox Skybox;
+		ImageData ColorImage;
+		ImageData DepthImage;
+
+		vk::raii::DescriptorPool DescriptorPool = nullptr;
+		DescriptorSetLayouts DescriptorSetLayouts;
+
+		vk::raii::PipelineLayout PBRPipelineLayout = nullptr;
+		vk::raii::Pipeline PBROpaquePipeline = nullptr;
+		vk::raii::Pipeline PBROpaquePipelinePCF = nullptr;
+		vk::raii::Pipeline PBRTransparentPipeline = nullptr;
+		vk::raii::Pipeline SkyboxPipeline = nullptr;
+		vk::raii::Pipeline NormalDebugPipeline = nullptr;
+
+		vk::raii::Sampler ColorSampler = nullptr;
+		vk::raii::Sampler ShadowMapSampler = nullptr;
+
+		SceneUniformData SceneUniformData{};
+		UniformDataParams UniformDataParams{};
+		PerObjectData PerObjectData{};
+		SkyboxData SkyboxData{};
+
+		// TODO: This should hold multiple UBOs for multiple frames in flight
+		std::array<UniformBufferObject, 1> UniformBuffers{};
+
+		// TODO: This should hold multiple descriptor sets for multiple frames in flight
+		std::array<DescriptorSets, 1> DescriptorSets{};
+
+		// Dynamic uniform buffer related members
+		VkDeviceSize MinUniformBufferOffsetAlignment = 0;
+		uint64_t DynamicAlignment = 0;
+
+		vk::DescriptorSet ColorOutputDescriptorSet = nullptr;
+		vk::DescriptorSet ShadowMapDescriptorSet = nullptr;
+
+		glm::vec2 OutputSize{ 1280.0f, 720.0f };
+
+		// Settings
+		bool DisplayDebugNormals = false;
+	};
+
+	static Owner<RendererData> s_Data = nullptr;
+
 	void Renderer::Init()
 	{
+		KBR_CORE_ASSERT(s_Data == nullptr, "Renderer is already initialized!");
 		KBR_CORE_INFO("Initializing Renderer...");
+
+		s_Data = CreateOwner<RendererData>();
+
+		CreateDefaultMaterials();
+
+		// Setup initial directional light which we will use to generate the shadow map
+		s_Data->UniformDataParams.lights[0] = glm::vec4(0.0f, 1.0f, 0.0f, 0.0f);
+
+		CreateResources();
+
+		s_Data->MaterialRegistry.SetupDescriptorSets(s_Data->DescriptorSetLayouts.textures);
 	}
 
 	void Renderer::Shutdown() 
 	{
+		KBR_CORE_ASSERT(s_Data, "Renderer not initialized!");
+
+		VulkanContext::DestroyImGuiDescriptorSet(s_Data->ColorOutputDescriptorSet);
+		VulkanContext::DestroyImGuiDescriptorSet(s_Data->ShadowMapDescriptorSet);
+
+		s_Data.reset();
+		s_Data = nullptr;
+	}
+
+	void Renderer::RenderSceneEditor(const Ref<Scene>& scene, const EditorCamera& camera) 
+	{
+		const auto& context = VulkanContext::Get();
+
+		const auto cmd = context.BeginSingleTimeCommands();
+
+		context.SetObjectDebugName(reinterpret_cast<uint64_t>(static_cast<VkCommandBuffer>(*cmd)),
+								   vk::ObjectType::eCommandBuffer,
+								   "EditorLayer Single Time Command Buffer");
+
+		// TODO: Get current image index from VulkanContext
+		constexpr uint32_t currentImage = 0;
+
+		UpdateLights(currentImage);
+		UpdateSceneUniformBuffers(currentImage, &camera);
+
+		/*const glm::mat4 translation = glm::translate(glm::mat4(1.0f), m_ObjectPosition);
+		const glm::mat4 model = translation *
+			glm::rotate(glm::mat4(1.0f), m_ObjectRotation.x, glm::vec3(1.0f, 0.0f, 0.0f)) *
+			glm::rotate(glm::mat4(1.0f), m_ObjectRotation.y, glm::vec3(0.0f, 1.0f, 0.0f)) *
+			glm::rotate(glm::mat4(1.0f), m_ObjectRotation.z, glm::vec3(0.0f, 0.0f, 1.0f)) *
+			glm::scale(glm::mat4(1.0f), m_ObjectScale);*/
+
+			// Render shadow map
+		{
+			vk::ImageMemoryBarrier2 barrier = {
+			.srcStageMask = vk::PipelineStageFlagBits2::eEarlyFragmentTests | vk::PipelineStageFlagBits2::eLateFragmentTests,
+			.srcAccessMask = vk::AccessFlagBits2::eDepthStencilAttachmentWrite,
+			.dstStageMask = vk::PipelineStageFlagBits2::eEarlyFragmentTests | vk::PipelineStageFlagBits2::eLateFragmentTests,
+			.dstAccessMask = vk::AccessFlagBits2::eDepthStencilAttachmentWrite,
+			.oldLayout = vk::ImageLayout::eUndefined,
+			.newLayout = vk::ImageLayout::eDepthAttachmentOptimal,
+			.srcQueueFamilyIndex = vk::QueueFamilyIgnored,
+			.dstQueueFamilyIndex = vk::QueueFamilyIgnored,
+			.image = s_Data->ShadowMap.Image,
+			.subresourceRange = {
+				.aspectMask = vk::ImageAspectFlagBits::eDepth,
+				.baseMipLevel = 0,
+				.levelCount = 1,
+				.baseArrayLayer = 0,
+				.layerCount = 1
+			}
+			};
+
+			const vk::DependencyInfo dependencyInfo = {
+				.dependencyFlags = {},
+				.imageMemoryBarrierCount = 1,
+				.pImageMemoryBarriers = &barrier
+			};
+
+			cmd.pipelineBarrier2(dependencyInfo);
+
+			vk::RenderingAttachmentInfo shadowMapDepthAttachmentInfo{
+				.imageView = s_Data->ShadowMap.ImageView,
+				.imageLayout = vk::ImageLayout::eDepthAttachmentOptimal,
+				.loadOp = vk::AttachmentLoadOp::eClear,
+				.storeOp = vk::AttachmentStoreOp::eStore,
+				.clearValue = vk::ClearDepthStencilValue{.depth = 1.0f, .stencil = 0 }
+			};
+
+			const vk::Rect2D renderArea{
+				.offset = vk::Offset2D{.x = 0, .y = 0 },
+				.extent = vk::Extent2D{.width = s_Data->ShadowMap.Size, .height = s_Data->ShadowMap.Size }
+			};
+
+			const vk::RenderingInfo shadowMapRenderingInfo{
+				.renderArea = renderArea,
+				.layerCount = 1,
+				.colorAttachmentCount = 0,
+				.pColorAttachments = nullptr,
+				.pDepthAttachment = &shadowMapDepthAttachmentInfo
+			};
+
+			cmd.beginRendering(shadowMapRenderingInfo);
+			cmd.setViewport(0, vk::Viewport{
+								.x = 0.0f, .y = 0.0f,
+								.width = static_cast<float>(s_Data->ShadowMap.Size),
+								.height = static_cast<float>(s_Data->ShadowMap.Size),
+								.minDepth = 0.0f,
+								.maxDepth = 1.0f
+							});
+			cmd.setScissor(0, renderArea);
+
+			cmd.bindPipeline(vk::PipelineBindPoint::eGraphics, *s_Data->ShadowMap.Pipeline);
+
+			cmd.setDepthBias(s_Data->DepthBias.constantFactor, s_Data->DepthBias.clamp, s_Data->DepthBias.slopeFactor);
+
+			const auto meshView = scene->m_Registry.view<TransformComponent, StaticMeshComponent>();
+			int i = 0;
+			for (auto entity : meshView)
+			{
+				auto& transform = meshView.get<TransformComponent>(entity);
+				auto& staticMesh = meshView.get<StaticMeshComponent>(entity);
+				if (!staticMesh.Visible || !staticMesh.StaticMesh || !staticMesh.MeshMaterial || staticMesh.MeshMaterial->IsTransparent())
+					continue;
+
+				UpdatePerObjectUniformBuffer(currentImage, static_cast<uint32_t>(i), transform.GetTransform(), *staticMesh.MeshMaterial);
+				uint32_t dynamicOffset = static_cast<uint32_t>(i * s_Data->DynamicAlignment);
+
+				cmd.bindDescriptorSets(
+					vk::PipelineBindPoint::eGraphics,
+					*s_Data->PBRPipelineLayout,
+					0,
+					*s_Data->DescriptorSets[currentImage].scene,
+					{ dynamicOffset });
+
+				staticMesh.StaticMesh->Draw(cmd);
+
+				++i;
+			}
+
+			cmd.endRendering();
+
+			KBR_CORE_TRACE("Shadow pass done!");
+		}
+
+		// Transition shadow map image layout for shader read
+		{
+			vk::ImageMemoryBarrier2 barrier = {
+			.srcStageMask = vk::PipelineStageFlagBits2::eEarlyFragmentTests | vk::PipelineStageFlagBits2::eLateFragmentTests,
+			.srcAccessMask = vk::AccessFlagBits2::eDepthStencilAttachmentWrite,
+			.dstStageMask = vk::PipelineStageFlagBits2::eFragmentShader,
+			.dstAccessMask = vk::AccessFlagBits2::eShaderRead,
+			.oldLayout = vk::ImageLayout::eDepthAttachmentOptimal,
+			.newLayout = vk::ImageLayout::eShaderReadOnlyOptimal,
+			.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+			.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+			.image = s_Data->ShadowMap.Image,
+			.subresourceRange = {
+				.aspectMask = vk::ImageAspectFlagBits::eDepth,
+				.baseMipLevel = 0,
+				.levelCount = 1,
+				.baseArrayLayer = 0,
+				.layerCount = 1
+			}
+			};
+			const vk::DependencyInfo dependencyInfo = {
+				.dependencyFlags = {},
+				.imageMemoryBarrierCount = 1,
+				.pImageMemoryBarriers = &barrier
+			};
+			cmd.pipelineBarrier2(dependencyInfo);
+		}
+
+		// Transition color image layout for color attachment
+		{
+			vk::ImageMemoryBarrier2 barrier = {
+			.srcStageMask = vk::PipelineStageFlagBits2::eFragmentShader,
+			.srcAccessMask = vk::AccessFlagBits2::eShaderRead,
+			.dstStageMask = vk::PipelineStageFlagBits2::eColorAttachmentOutput,
+			.dstAccessMask = vk::AccessFlagBits2::eColorAttachmentWrite,
+			.oldLayout = vk::ImageLayout::eShaderReadOnlyOptimal,
+			.newLayout = vk::ImageLayout::eColorAttachmentOptimal,
+			.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+			.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+			.image = s_Data->ColorImage.Image,
+			.subresourceRange = {
+				.aspectMask = vk::ImageAspectFlagBits::eColor,
+				.baseMipLevel = 0,
+				.levelCount = 1,
+				.baseArrayLayer = 0,
+				.layerCount = 1
+			}
+			};
+			const vk::DependencyInfo dependencyInfo = {
+				.dependencyFlags = {},
+				.imageMemoryBarrierCount = 1,
+				.pImageMemoryBarriers = &barrier
+			};
+			cmd.pipelineBarrier2(dependencyInfo);
+		}
+
+		// Transition depth image to depth attachment optimal
+		{
+			vk::ImageMemoryBarrier2 barrier = {
+			.srcStageMask = vk::PipelineStageFlagBits2::eFragmentShader,
+			.srcAccessMask = vk::AccessFlagBits2::eShaderRead,
+			.dstStageMask = vk::PipelineStageFlagBits2::eEarlyFragmentTests | vk::PipelineStageFlagBits2::eLateFragmentTests,
+			.dstAccessMask = vk::AccessFlagBits2::eDepthStencilAttachmentWrite,
+			.oldLayout = vk::ImageLayout::eUndefined,
+			.newLayout = vk::ImageLayout::eDepthAttachmentOptimal,
+			.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+			.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+			.image = s_Data->DepthImage.Image,
+			.subresourceRange = {
+				.aspectMask = vk::ImageAspectFlagBits::eDepth,
+				.baseMipLevel = 0,
+				.levelCount = 1,
+				.baseArrayLayer = 0,
+				.layerCount = 1
+			}
+			};
+			const vk::DependencyInfo dependencyInfo = {
+				.dependencyFlags = {},
+				.imageMemoryBarrierCount = 1,
+				.pImageMemoryBarriers = &barrier
+			};
+			cmd.pipelineBarrier2(dependencyInfo);
+		}
+
+		const vk::Viewport viewport{
+			.x = 0.0f,
+			.y = 0.0f,
+			.width = s_Data->OutputSize.x,
+			.height = s_Data->OutputSize.y,
+			.minDepth = 0.0f,
+			.maxDepth = 1.0f
+		};
+
+		const vk::Rect2D renderArea{
+				.offset = vk::Offset2D{.x = 0, .y = 0 },
+				.extent = vk::Extent2D{.width = static_cast<uint32_t>(s_Data->OutputSize.x), .height = static_cast<uint32_t>(s_Data->OutputSize.y) }
+		};
+
+		// Render opaque objects
+		{
+			vk::RenderingAttachmentInfo colorAttachmentInfo{
+				.imageView = s_Data->ColorImage.ImageView,
+				.imageLayout = vk::ImageLayout::eColorAttachmentOptimal,
+				.loadOp = vk::AttachmentLoadOp::eClear,
+				.storeOp = vk::AttachmentStoreOp::eStore,
+				.clearValue = vk::ClearColorValue{ std::array{0.0f, 0.0f, 0.0f, 1.0f} }
+			};
+
+			vk::RenderingAttachmentInfo depthAttachmentInfo{
+				.imageView = s_Data->DepthImage.ImageView,
+				.imageLayout = vk::ImageLayout::eDepthAttachmentOptimal,
+				.loadOp = vk::AttachmentLoadOp::eClear,
+				.storeOp = vk::AttachmentStoreOp::eDontCare,
+				.clearValue = vk::ClearDepthStencilValue{.depth = 1.0f, .stencil = 0 }
+			};
+
+			const vk::RenderingInfo renderingInfo{
+				.renderArea = renderArea,
+				.layerCount = 1,
+				.colorAttachmentCount = 1,
+				.pColorAttachments = &colorAttachmentInfo,
+				.pDepthAttachment = &depthAttachmentInfo
+			};
+
+			cmd.beginRendering(renderingInfo);
+
+			cmd.setViewport(0, viewport);
+
+			cmd.setScissor(0, renderArea);
+
+			if (s_Data->Skybox.ShowSkybox && s_Data->Skybox.SkyboxMesh)
+			{
+				cmd.bindPipeline(vk::PipelineBindPoint::eGraphics, *s_Data->SkyboxPipeline);
+				cmd.bindDescriptorSets(
+					vk::PipelineBindPoint::eGraphics,
+					*s_Data->PBRPipelineLayout,
+					0,
+					*s_Data->DescriptorSets[currentImage].skybox,
+					{ 0 });
+
+				s_Data->Skybox.SkyboxMesh->Draw(cmd);
+			}
+
+			const auto& opaquePipeline = GetIsPCFEnabledForShadowMap() ? s_Data->PBROpaquePipelinePCF : s_Data->PBROpaquePipeline;
+			cmd.bindPipeline(vk::PipelineBindPoint::eGraphics, *opaquePipeline);
+
+			{
+				const auto meshView = scene->m_Registry.view<TransformComponent, StaticMeshComponent>();
+				int i = 0;
+				for (const auto entity : meshView)
+				{
+					auto& transform = meshView.get<TransformComponent>(entity);
+					auto& staticMesh = meshView.get<StaticMeshComponent>(entity);
+					if (!staticMesh.Visible || !staticMesh.StaticMesh || !staticMesh.MeshMaterial)
+						continue;
+
+					UpdatePerObjectUniformBuffer(currentImage, static_cast<uint32_t>(i), transform.GetTransform(), *staticMesh.MeshMaterial);
+					uint32_t dynamicOffset = static_cast<uint32_t>(i * s_Data->DynamicAlignment);
+
+					cmd.bindDescriptorSets(
+						vk::PipelineBindPoint::eGraphics,
+						*s_Data->PBRPipelineLayout,
+						0,
+						{ s_Data->DescriptorSets[currentImage].scene, staticMesh.MeshMaterial->DescriptorSet },
+						{ dynamicOffset });
+
+					staticMesh.StaticMesh->Draw(cmd);
+
+					++i;
+				}
+			}
+
+			if (s_Data->DisplayDebugNormals)
+			{
+				cmd.bindPipeline(vk::PipelineBindPoint::eGraphics, *s_Data->NormalDebugPipeline);
+
+				const auto meshView = scene->m_Registry.view<TransformComponent, StaticMeshComponent>();
+				int i = 0;
+				for (const auto entity : meshView)
+				{
+					auto& transform = meshView.get<TransformComponent>(entity);
+					auto& meshComp = meshView.get<StaticMeshComponent>(entity);
+					if (!meshComp.Visible || !meshComp.StaticMesh || !meshComp.MeshMaterial)
+						continue;
+
+					UpdatePerObjectUniformBuffer(currentImage, static_cast<uint32_t>(i), transform.GetTransform(), *meshComp.MeshMaterial);
+					uint32_t dynamicOffset = static_cast<uint32_t>(i * s_Data->DynamicAlignment);
+
+					cmd.bindDescriptorSets(
+						vk::PipelineBindPoint::eGraphics,
+						*s_Data->PBRPipelineLayout,
+						0,
+						{ s_Data->DescriptorSets[currentImage].scene },
+						{ dynamicOffset });
+
+					meshComp.StaticMesh->Draw(cmd);
+
+					++i;
+				}
+			}
+
+			cmd.endRendering();
+
+			KBR_CORE_TRACE("Opaque pass done!");
+		}
+
+		// Render transparent objects
+		{
+			vk::RenderingAttachmentInfo colorAttachmentInfo{
+				.imageView = s_Data->ColorImage.ImageView,
+				.imageLayout = vk::ImageLayout::eColorAttachmentOptimal,
+				.loadOp = vk::AttachmentLoadOp::eLoad,
+				.storeOp = vk::AttachmentStoreOp::eStore,
+			};
+
+			vk::RenderingAttachmentInfo depthAttachmentInfo{
+				.imageView = s_Data->DepthImage.ImageView,
+				.imageLayout = vk::ImageLayout::eDepthAttachmentOptimal,
+				.loadOp = vk::AttachmentLoadOp::eLoad,
+				.storeOp = vk::AttachmentStoreOp::eDontCare,
+			};
+
+			const vk::RenderingInfo renderingInfo{
+				.renderArea = renderArea,
+				.layerCount = 1,
+				.colorAttachmentCount = 1,
+				.pColorAttachments = &colorAttachmentInfo,
+				.pDepthAttachment = &depthAttachmentInfo
+			};
+
+			cmd.beginRendering(renderingInfo);
+
+			cmd.setViewport(0, viewport);
+
+			cmd.setScissor(0, renderArea);
+
+			cmd.bindPipeline(vk::PipelineBindPoint::eGraphics, *s_Data->PBRTransparentPipeline);
+
+			//{
+			//	const auto meshView = scene->m_Registry.view<TransformComponent, StaticMeshComponent>();
+			//	int i = 0;
+			//	for (const auto entity : meshView)
+			//	{
+			//		auto& [transform, staticMesh] = meshView.get<TransformComponent, StaticMeshComponent>(entity);
+			//		if (!staticMesh.Visible || !staticMesh.StaticMesh || !staticMesh.MeshMaterial || !staticMesh.MeshMaterial->IsTransparent())
+			//			continue;
+
+			//		UpdatePerObjectUniformBuffer(currentImage, static_cast<uint32_t>(i), transform.GetTransform(), *staticMesh.MeshMaterial);
+			//		uint32_t dynamicOffset = static_cast<uint32_t>(i * s_Data->DynamicAlignment);
+
+			//		cmd.bindDescriptorSets(
+			//			vk::PipelineBindPoint::eGraphics,
+			//			*s_Data->PBRPipelineLayout,
+			//			0,
+			//			{ s_Data->DescriptorSets[currentImage].scene, staticMesh.MeshMaterial->DescriptorSet },
+			//			{ dynamicOffset });
+
+			//		staticMesh.StaticMesh->Draw(cmd);
+
+			//		++i;
+			//	}
+			//}
+
+			cmd.endRendering();
+
+			KBR_CORE_TRACE("Transparent pass done!");
+		}
+
+		// Transition color image layout for shader read in ImGui
+		{
+			vk::ImageMemoryBarrier2 barrier = {
+			.srcStageMask = vk::PipelineStageFlagBits2::eColorAttachmentOutput,
+			.srcAccessMask = vk::AccessFlagBits2::eColorAttachmentWrite,
+			.dstStageMask = vk::PipelineStageFlagBits2::eFragmentShader,
+			.dstAccessMask = vk::AccessFlagBits2::eShaderRead,
+			.oldLayout = vk::ImageLayout::eColorAttachmentOptimal,
+			.newLayout = vk::ImageLayout::eShaderReadOnlyOptimal,
+			.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+			.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+			.image = s_Data->ColorImage.Image,
+			.subresourceRange = {
+				.aspectMask = vk::ImageAspectFlagBits::eColor,
+				.baseMipLevel = 0,
+				.levelCount = 1,
+				.baseArrayLayer = 0,
+				.layerCount = 1
+			}
+			};
+			const vk::DependencyInfo dependencyInfo = {
+				.dependencyFlags = {},
+				.imageMemoryBarrierCount = 1,
+				.pImageMemoryBarriers = &barrier
+			};
+			cmd.pipelineBarrier2(dependencyInfo);
+
+			KBR_CORE_TRACE("Color image transitioned for ImGui!");
+		}
+
+		context.EndSingleTimeCommands(cmd);
+	}
+
+	void Renderer::RenderSceneRuntime(const Ref<Scene>& scene, const SceneCamera* mainCamera,
+		const glm::mat4& mainCameraTransform) 
+	{
+		throw std::logic_error("Not implemented");
+	}
+
+	void Renderer::CreateDefaultMaterials() 
+	{
+		KBR_CORE_ASSERT(s_Data, "Renderer not initialized!");
+
+		s_Data->MaterialRegistry.Add("Gold", CreateRef<Material>("Gold", glm::vec3(1.0f, 0.765557f, 0.336057f), 0.1f, 1.0f));
+		s_Data->MaterialRegistry.Add("Copper", CreateRef<Material>("Copper", glm::vec3(0.955008f, 0.637427f, 0.538163f), 0.1f, 1.0f));
+		s_Data->MaterialRegistry.Add("Chromium", CreateRef<Material>("Chromium", glm::vec3(0.549585f, 0.556114f, 0.554256f), 0.1f, 1.0f));
+		s_Data->MaterialRegistry.Add("Nickel", CreateRef<Material>("Nickel", glm::vec3(0.659777f, 0.608679f, 0.525649f), 0.1f, 1.0f));
+		s_Data->MaterialRegistry.Add("Titanium", CreateRef<Material>("Titanium", glm::vec3(0.541931f, 0.496791f, 0.449419f), 0.1f, 1.0f));
+		s_Data->MaterialRegistry.Add("Cobalt", CreateRef<Material>("Cobalt", glm::vec3(0.662124f, 0.654864f, 0.633732f), 0.1f, 1.0f));
+		s_Data->MaterialRegistry.Add("Platinum", CreateRef<Material>("Platinum", glm::vec3(0.672411f, 0.637331f, 0.585456f), 0.1f, 1.0f));
+		s_Data->MaterialRegistry.Add("White", CreateRef<Material>("White", glm::vec3(1.0f), 0.1f, 1.0f));
+		s_Data->MaterialRegistry.Add("Red", CreateRef<Material>("Red", glm::vec3(1.0f, 0.0f, 0.0f), 0.1f, 1.0f));
+		s_Data->MaterialRegistry.Add("Blue", CreateRef<Material>("Blue", glm::vec3(0.0f, 0.0f, 1.0f), 0.1f, 1.0f));
+		s_Data->MaterialRegistry.Add("Black", CreateRef<Material>("Black", glm::vec3(0.0f), 0.1f, 1.0f));
+	}
+
+	void Renderer::CreateResources()
+	{
+		KBR_CORE_ASSERT(s_Data, "Renderer not initialized!");
+
+		// TODO: Set default skybox texture if none is set by the user
+		s_Data->Skybox.SkyboxTexture = TextureCube::FromFile("Assets/Textures/hdr/pisa_cube.ktx");
+
+		CreateSkyboxResources();
 		
+		PrepareUniformBuffers();
+
+		auto& context = VulkanContext::Get();
+		const auto& device = context.GetDevice();
+
+		// Create samplers
+		{
+			vk::SamplerCreateInfo samplerInfo{
+				.magFilter = vk::Filter::eLinear,
+				.minFilter = vk::Filter::eLinear,
+				.mipmapMode = vk::SamplerMipmapMode::eLinear,
+				.addressModeU = vk::SamplerAddressMode::eRepeat,
+				.addressModeV = vk::SamplerAddressMode::eRepeat,
+				.addressModeW = vk::SamplerAddressMode::eRepeat,
+				.mipLodBias = 0.0f,
+				.anisotropyEnable = vk::True,
+				.maxAnisotropy = 16.0f,
+				.compareEnable = vk::False,
+				.compareOp = vk::CompareOp::eAlways,
+				.minLod = 0.0f,
+				.maxLod = vk::LodClampNone,
+				.borderColor = vk::BorderColor::eIntOpaqueBlack,
+				.unnormalizedCoordinates = vk::False
+			};
+			s_Data->ColorSampler = vk::raii::Sampler{ device, samplerInfo };
+
+			context.SetObjectDebugName(s_Data->ColorSampler, "Color Texture Sampler");
+
+			vk::SamplerCreateInfo shadowSamplerInfo{
+				.magFilter = vk::Filter::eLinear,
+				.minFilter = vk::Filter::eLinear,
+				.mipmapMode = vk::SamplerMipmapMode::eLinear,
+				.addressModeU = vk::SamplerAddressMode::eClampToBorder,
+				.addressModeV = vk::SamplerAddressMode::eClampToBorder,
+				.addressModeW = vk::SamplerAddressMode::eClampToBorder,
+				.mipLodBias = 0.0f,
+				.anisotropyEnable = vk::False,
+				.compareEnable = vk::False,
+				.compareOp = vk::CompareOp::eAlways,
+				.minLod = 0.0f,
+				.maxLod = 1.0f,
+				.borderColor = vk::BorderColor::eFloatOpaqueWhite,
+				.unnormalizedCoordinates = vk::False
+			};
+			s_Data->ShadowMapSampler = vk::raii::Sampler{ device, shadowSamplerInfo };
+
+			context.SetObjectDebugName(s_Data->ShadowMapSampler, "Shadow Map Sampler");
+		}
+
+		// Create shared pipeline states
+
+		vk::PipelineInputAssemblyStateCreateInfo inputAssembly{ .topology = vk::PrimitiveTopology::eTriangleList };
+
+		vk::PipelineViewportStateCreateInfo viewportState{ .viewportCount = 1, .scissorCount = 1 };
+
+		// Create the shadow map resources
+		{
+			// Create shadow map image
+			const vk::Format shadowMapFormat = context.FindSupportedFormat(
+				{ vk::Format::eD32Sfloat },
+				vk::ImageTiling::eOptimal,
+				vk::FormatFeatureFlagBits::eDepthStencilAttachment | vk::FormatFeatureFlagBits::eSampledImage
+			);
+
+			constexpr uint32_t shadowMapMipLevels = 1;
+
+			CreateImage(device,
+						s_Data->ShadowMap.Size,
+						s_Data->ShadowMap.Size,
+						shadowMapMipLevels,
+						vk::SampleCountFlagBits::e1,
+						shadowMapFormat,
+						vk::ImageTiling::eOptimal,
+						vk::ImageUsageFlagBits::eDepthStencilAttachment | vk::ImageUsageFlagBits::eSampled,
+						vk::MemoryPropertyFlagBits::eDeviceLocal,
+						s_Data->ShadowMap.Image,
+						s_Data->ShadowMap.ImageMemory);
+
+			context.SetObjectDebugName(reinterpret_cast<uint64_t>(static_cast<VkImage>(*s_Data->ShadowMap.Image)),
+									   vk::ObjectType::eImage,
+									   "Shadow Map Image");
+			context.SetObjectDebugName(reinterpret_cast<uint64_t>(static_cast<VkDeviceMemory>(*s_Data->ShadowMap.ImageMemory)),
+									   vk::ObjectType::eDeviceMemory,
+									   "Shadow Map Image Memory");
+
+			s_Data->ShadowMap.ImageView = CreateImageView(device,
+												   s_Data->ShadowMap.Image,
+												   shadowMapFormat,
+												   vk::ImageAspectFlagBits::eDepth,
+												   shadowMapMipLevels);
+
+			context.SetObjectDebugName(reinterpret_cast<uint64_t>(static_cast<VkImageView>(*s_Data->ShadowMap.ImageView)),
+									   vk::ObjectType::eImageView,
+									   "Shadow Map Image View");
+
+			// We do this here, because the descriptors will use the shadow map image view,
+			// but has to happen before we create the pipeline
+			SetupDescriptors();
+
+			// Create shadow map image layout transition
+			/*context.TransitionImageLayout(shadowMapImage,
+										  vk::ImageLayout::eUndefined,
+										  vk::ImageLayout::eDepthStencilAttachmentOptimal,
+										  shadowMapMipLevels);*/
+
+
+			vk::PipelineLayoutCreateInfo pipelineLayoutInfo{
+				.setLayoutCount = 1,
+				.pSetLayouts = &*s_Data->DescriptorSetLayouts.scene,
+				.pushConstantRangeCount = 0,
+				.pPushConstantRanges = nullptr
+			};
+
+			s_Data->ShadowMap.PipelineLayout = vk::raii::PipelineLayout{ device, pipelineLayoutInfo };
+			context.SetObjectDebugName(reinterpret_cast<uint64_t>(static_cast<VkPipelineLayout>(*s_Data->ShadowMap.PipelineLayout)),
+									   vk::ObjectType::ePipelineLayout,
+									   "Shadow Map Pipeline Layout");
+
+			// Create shader for shadow mapping
+			Shader shadowMapShader("shadowmap", "ShadowMap");
+
+			/*constexpr vk::VertexInputBindingDescription bindingDescription = { 0, sizeof(glm::vec3), vk::VertexInputRate::eVertex };
+			constexpr std::array attributeDescriptions = {
+				vk::VertexInputAttributeDescription{.location = 0, .binding = 0, .format = vk::Format::eR32G32B32Sfloat, .offset = 0 }
+			};
+			vk::PipelineVertexInputStateCreateInfo vertexInputInfo{
+				.vertexBindingDescriptionCount = 1,
+				.pVertexBindingDescriptions = &bindingDescription,
+				.vertexAttributeDescriptionCount = static_cast<uint32_t>(attributeDescriptions.size()),
+				.pVertexAttributeDescriptions = attributeDescriptions.data(),
+			};*/
+
+			const auto bindingDesc = Vertex::GetBindingDescription();
+			const auto attributeDescs = Vertex::GetAttributeDescriptions();
+
+			vk::PipelineVertexInputStateCreateInfo vertexInputInfo{
+				.vertexBindingDescriptionCount = 1,
+				.pVertexBindingDescriptions = &bindingDesc,
+				.vertexAttributeDescriptionCount = static_cast<uint32_t>(attributeDescs.size()),
+				.pVertexAttributeDescriptions = attributeDescs.data(),
+			};
+
+			vk::PipelineRasterizationStateCreateInfo rasterizer{
+				.depthClampEnable = vk::True,
+				.rasterizerDiscardEnable = vk::False,
+				.polygonMode = vk::PolygonMode::eFill,
+				.cullMode = vk::CullModeFlagBits::eFront,
+				.frontFace = vk::FrontFace::eCounterClockwise,
+				.depthBiasEnable = vk::True,
+				.lineWidth = 1.0f
+			};
+
+			vk::PipelineMultisampleStateCreateInfo multisampling{
+				.rasterizationSamples = vk::SampleCountFlagBits::e1,
+				.sampleShadingEnable = vk::False,
+				.minSampleShading = 1.0f,
+				.pSampleMask = nullptr,
+				.alphaToCoverageEnable = vk::False,
+				.alphaToOneEnable = vk::False
+			};
+
+			vk::PipelineDepthStencilStateCreateInfo depthStencil{
+				.depthTestEnable = vk::True,
+				.depthWriteEnable = vk::True,
+				.depthCompareOp = vk::CompareOp::eLessOrEqual,
+				.depthBoundsTestEnable = vk::False,
+				.stencilTestEnable = vk::False,
+				.minDepthBounds = 0.0f,
+				.maxDepthBounds = 1.0f,
+			};
+
+			vk::PipelineColorBlendAttachmentState colorBlendAttachment{
+				.blendEnable = vk::False,
+				.colorWriteMask = vk::ColorComponentFlagBits::eR | vk::ColorComponentFlagBits::eG | vk::ColorComponentFlagBits::eB | vk::ColorComponentFlagBits::eA
+			};
+
+			vk::PipelineColorBlendStateCreateInfo colorBlending{
+				.logicOpEnable = vk::False,
+				.logicOp = vk::LogicOp::eCopy,
+				.attachmentCount = 1,
+				.pAttachments = &colorBlendAttachment
+			};
+
+			vk::PipelineRenderingCreateInfo pipelineRenderingCreateInfo{
+				.colorAttachmentCount = 0,
+				.pColorAttachmentFormats = nullptr,
+				.depthAttachmentFormat = shadowMapFormat
+			};
+
+			const auto shaderStages = shadowMapShader.GetPipelineShaderStageCreateInfo();
+
+			std::vector shadowMapDynamicState = {
+				vk::DynamicState::eViewport,
+				vk::DynamicState::eScissor,
+				vk::DynamicState::eDepthBias,
+			};
+
+			const vk::PipelineDynamicStateCreateInfo shadowMapDynamicStateInfo{
+				.dynamicStateCount = static_cast<uint32_t>(shadowMapDynamicState.size()),
+				.pDynamicStates = shadowMapDynamicState.data()
+			};
+
+			vk::GraphicsPipelineCreateInfo pipelineInfo{
+				.pNext = &pipelineRenderingCreateInfo,
+				.stageCount = 2,
+				.pStages = shaderStages.data(),
+				.pVertexInputState = &vertexInputInfo,
+				.pInputAssemblyState = &inputAssembly,
+				.pViewportState = &viewportState,
+				.pRasterizationState = &rasterizer,
+				.pMultisampleState = &multisampling,
+				.pDepthStencilState = &depthStencil,
+				.pColorBlendState = &colorBlending,
+				.pDynamicState = &shadowMapDynamicStateInfo,
+				.layout = s_Data->ShadowMap.PipelineLayout,
+				.renderPass = nullptr
+			};
+
+			s_Data->ShadowMap.Pipeline = vk::raii::Pipeline(device, nullptr, pipelineInfo);
+
+			context.SetObjectDebugName(reinterpret_cast<uint64_t>(static_cast<VkPipeline>(*s_Data->ShadowMap.Pipeline)),
+									   vk::ObjectType::ePipeline,
+									   "Shadow Map Pipeline");
+		}
+
+		// Create the opaque and transparent pipeline resources
+		{
+			std::vector dynamicStates = {
+				vk::DynamicState::eViewport,
+				vk::DynamicState::eScissor
+			};
+
+			const vk::PipelineDynamicStateCreateInfo dynamicStateInfo{
+				.dynamicStateCount = static_cast<uint32_t>(dynamicStates.size()),
+				.pDynamicStates = dynamicStates.data()
+			};
+
+			const vk::Format colorFormat = context.FindSupportedFormat(
+				{ vk::Format::eR32G32B32A32Sfloat, vk::Format::eR32G32B32A32Uint },
+				vk::ImageTiling::eOptimal,
+				vk::FormatFeatureFlagBits::eColorAttachment | vk::FormatFeatureFlagBits::eColorAttachmentBlend | vk::FormatFeatureFlagBits::eSampledImage
+			);
+
+			constexpr uint32_t initialImageWidth = 1920;
+			constexpr uint32_t initialImageHeight = 1080;
+			constexpr uint32_t mipLevels = 1;
+
+			CreateImage(device,
+						initialImageWidth,
+						initialImageHeight,
+						mipLevels,
+						vk::SampleCountFlagBits::e1,
+						colorFormat,
+						vk::ImageTiling::eOptimal,
+						vk::ImageUsageFlagBits::eColorAttachment | vk::ImageUsageFlagBits::eSampled,
+						vk::MemoryPropertyFlagBits::eDeviceLocal,
+						s_Data->ColorImage.Image,
+						s_Data->ColorImage.ImageMemory);
+
+			context.SetObjectDebugName(reinterpret_cast<uint64_t>(static_cast<VkImage>(*s_Data->ColorImage.Image)),
+									   vk::ObjectType::eImage,
+									   "Color Attachment Image");
+
+			context.SetObjectDebugName(reinterpret_cast<uint64_t>(static_cast<VkDeviceMemory>(*s_Data->ColorImage.ImageMemory)),
+									   vk::ObjectType::eDeviceMemory,
+									   "Color Attachment Image Memory");
+
+			s_Data->ColorImage.ImageView = CreateImageView(device, s_Data->ColorImage.Image, colorFormat, vk::ImageAspectFlagBits::eColor, mipLevels);
+
+			context.SetObjectDebugName(reinterpret_cast<uint64_t>(static_cast<VkImageView>(*s_Data->ColorImage.ImageView)),
+									   vk::ObjectType::eImageView,
+									   "Color Attachment Image View");
+
+			const vk::Format depthFormat = context.FindSupportedFormat(
+				{ vk::Format::eD32Sfloat },
+				vk::ImageTiling::eOptimal,
+				vk::FormatFeatureFlagBits::eDepthStencilAttachment
+			);
+
+			CreateImage(
+				device,
+				initialImageWidth,
+				initialImageHeight,
+				mipLevels,
+				vk::SampleCountFlagBits::e1,
+				depthFormat,
+				vk::ImageTiling::eOptimal,
+				vk::ImageUsageFlagBits::eDepthStencilAttachment,
+				vk::MemoryPropertyFlagBits::eDeviceLocal,
+				s_Data->DepthImage.Image,
+				s_Data->DepthImage.ImageMemory);
+
+			context.SetObjectDebugName(reinterpret_cast<uint64_t>(static_cast<VkImage>(*s_Data->DepthImage.Image)),
+									   vk::ObjectType::eImage,
+									   "Depth Attachment Image");
+
+			context.SetObjectDebugName(reinterpret_cast<uint64_t>(static_cast<VkDeviceMemory>(*s_Data->DepthImage.ImageMemory)),
+									   vk::ObjectType::eDeviceMemory,
+									   "Depth Attachment Image Memory");
+
+			s_Data->DepthImage.ImageView = CreateImageView(device, s_Data->DepthImage.Image, depthFormat, vk::ImageAspectFlagBits::eDepth, mipLevels);
+
+			context.SetObjectDebugName(reinterpret_cast<uint64_t>(static_cast<VkImageView>(*s_Data->DepthImage.ImageView)),
+									   vk::ObjectType::eImageView,
+									   "Depth Attachment Image View");
+
+			const std::array<vk::DescriptorSetLayout, 2> setLayouts = {
+				s_Data->DescriptorSetLayouts.scene,
+				s_Data->DescriptorSetLayouts.textures
+			};
+
+			vk::PipelineLayoutCreateInfo pipelineLayoutInfo{
+				.setLayoutCount = static_cast<uint32_t>(setLayouts.size()),
+				.pSetLayouts = setLayouts.data(),
+				.pushConstantRangeCount = 0,
+				.pPushConstantRanges = nullptr
+			};
+
+			s_Data->PBRPipelineLayout = vk::raii::PipelineLayout{ device, pipelineLayoutInfo };
+
+			context.SetObjectDebugName(reinterpret_cast<uint64_t>(static_cast<VkPipelineLayout>(*s_Data->PBRPipelineLayout)),
+									   vk::ObjectType::ePipelineLayout,
+									   "PBR Pipeline Layout");
+
+			const auto bindingDesc = Vertex::GetBindingDescription();
+			const auto attributeDescs = Vertex::GetAttributeDescriptions();
+
+			vk::PipelineVertexInputStateCreateInfo vertexInputInfo{
+				.vertexBindingDescriptionCount = 1,
+				.pVertexBindingDescriptions = &bindingDesc,
+				.vertexAttributeDescriptionCount = static_cast<uint32_t>(attributeDescs.size()),
+				.pVertexAttributeDescriptions = attributeDescs.data(),
+			};
+
+			vk::PipelineMultisampleStateCreateInfo multisampling{
+				.rasterizationSamples = vk::SampleCountFlagBits::e1,
+				.sampleShadingEnable = vk::False,
+				.minSampleShading = 1.0f,
+				.pSampleMask = nullptr,
+				.alphaToCoverageEnable = vk::False,
+				.alphaToOneEnable = vk::False
+			};
+
+			vk::PipelineRasterizationStateCreateInfo opaqueRasterizer{
+				.depthClampEnable = vk::False,
+				.rasterizerDiscardEnable = vk::False,
+				.polygonMode = vk::PolygonMode::eFill,
+				.cullMode = vk::CullModeFlagBits::eBack,
+				.frontFace = vk::FrontFace::eCounterClockwise,
+				.depthBiasEnable = vk::False,
+				.lineWidth = 1.0f
+			};
+
+			vk::PipelineRasterizationStateCreateInfo transparentRasterizer{
+				.depthClampEnable = vk::False,
+				.rasterizerDiscardEnable = vk::False,
+				.polygonMode = vk::PolygonMode::eFill,
+				.cullMode = vk::CullModeFlagBits::eNone,
+				.frontFace = vk::FrontFace::eCounterClockwise,
+				.depthBiasEnable = vk::False,
+				.lineWidth = 1.0f
+			};
+
+			vk::PipelineDepthStencilStateCreateInfo opaqueDepthStencil{
+				.depthTestEnable = vk::True,
+				.depthWriteEnable = vk::True,
+				.depthCompareOp = vk::CompareOp::eLessOrEqual,
+				.depthBoundsTestEnable = vk::False,
+				.stencilTestEnable = vk::False,
+				.minDepthBounds = 0.0f,
+				.maxDepthBounds = 1.0f,
+			};
+
+			vk::PipelineDepthStencilStateCreateInfo transparentDepthStencil{
+				.depthTestEnable = vk::True,
+				.depthWriteEnable = vk::False,
+				.depthCompareOp = vk::CompareOp::eLess,
+				.depthBoundsTestEnable = vk::False,
+				.stencilTestEnable = vk::False,
+				.minDepthBounds = 0.0f,
+				.maxDepthBounds = 1.0f,
+			};
+
+			vk::PipelineColorBlendAttachmentState opaqueColorBlendAttachment{
+				.blendEnable = vk::False,
+				.colorWriteMask = vk::ColorComponentFlagBits::eR | vk::ColorComponentFlagBits::eG | vk::ColorComponentFlagBits::eB | vk::ColorComponentFlagBits::eA
+			};
+
+			vk::PipelineColorBlendStateCreateInfo colorBlending{
+				.logicOpEnable = vk::False,
+				.logicOp = vk::LogicOp::eCopy,
+				.attachmentCount = 1,
+				.pAttachments = &opaqueColorBlendAttachment
+			};
+
+			vk::PipelineColorBlendAttachmentState transparentColorBlendAttachment{
+				.blendEnable = vk::True,
+				.srcColorBlendFactor = vk::BlendFactor::eSrcAlpha,
+				.dstColorBlendFactor = vk::BlendFactor::eOneMinusSrcAlpha,
+				.colorBlendOp = vk::BlendOp::eAdd,
+				.srcAlphaBlendFactor = vk::BlendFactor::eOne,
+				.dstAlphaBlendFactor = vk::BlendFactor::eZero,
+				.alphaBlendOp = vk::BlendOp::eAdd,
+				.colorWriteMask = vk::ColorComponentFlagBits::eR | vk::ColorComponentFlagBits::eG | vk::ColorComponentFlagBits::eB | vk::ColorComponentFlagBits::eA
+			};
+
+			vk::PipelineColorBlendStateCreateInfo transparentColorBlending{
+				.logicOpEnable = vk::False,
+				.logicOp = vk::LogicOp::eCopy,
+				.attachmentCount = 1,
+				.pAttachments = &transparentColorBlendAttachment
+			};
+
+			vk::PipelineRenderingCreateInfo pipelineRenderingCreateInfo{
+				.colorAttachmentCount = 1,
+				.pColorAttachmentFormats = &colorFormat,
+				.depthAttachmentFormat = depthFormat
+			};
+
+			Shader pbrShader("pbrtextured", "PBR");
+			auto shaderStages = pbrShader.GetPipelineShaderStageCreateInfo();
+
+			vk::GraphicsPipelineCreateInfo opaquePipelineInfo{
+				.pNext = &pipelineRenderingCreateInfo,
+				.stageCount = static_cast<uint32_t>(shaderStages.size()),
+				.pStages = shaderStages.data(),
+				.pVertexInputState = &vertexInputInfo,
+				.pInputAssemblyState = &inputAssembly,
+				.pViewportState = &viewportState,
+				.pRasterizationState = &opaqueRasterizer,
+				.pMultisampleState = &multisampling,
+				.pDepthStencilState = &opaqueDepthStencil,
+				.pColorBlendState = &colorBlending,
+				.pDynamicState = &dynamicStateInfo,
+				.layout = s_Data->PBRPipelineLayout,
+				.renderPass = nullptr
+			};
+
+			uint32_t enablePCF = 0;
+			vk::SpecializationMapEntry specializationMapEntry{
+				.constantID = 0,
+				.offset = 0,
+				.size = sizeof(uint32_t)
+			};
+			vk::SpecializationInfo specializationInfo{
+				.mapEntryCount = 1,
+				.pMapEntries = &specializationMapEntry,
+				.dataSize = sizeof(uint32_t),
+				.pData = &enablePCF
+			};
+			shaderStages[1].pSpecializationInfo = &specializationInfo;
+
+			s_Data->PBROpaquePipeline = vk::raii::Pipeline(device, nullptr, opaquePipelineInfo);
+
+			context.SetObjectDebugName(s_Data->PBROpaquePipeline, "PBR Opaque Pipeline");
+
+			enablePCF = 1;
+			s_Data->PBROpaquePipelinePCF = vk::raii::Pipeline(device, nullptr, opaquePipelineInfo);
+
+			context.SetObjectDebugName(s_Data->PBROpaquePipelinePCF, "PBR Opaque Pipeline PCF");
+
+			Shader normalDebugShader("normaldebug", "NormalDebug");
+			const auto normalDebugShaderStages = normalDebugShader.GetPipelineShaderStageCreateInfo();
+
+			opaquePipelineInfo.stageCount = static_cast<uint32_t>(normalDebugShaderStages.size());
+			opaquePipelineInfo.pStages = normalDebugShaderStages.data();
+
+			s_Data->NormalDebugPipeline = vk::raii::Pipeline(device, nullptr, opaquePipelineInfo);
+
+			context.SetObjectDebugName(s_Data->NormalDebugPipeline, "Normal Debug Pipeline");
+
+			vk::GraphicsPipelineCreateInfo transparentPipelineInfo{
+				.pNext = &pipelineRenderingCreateInfo,
+				.stageCount = 2,
+				.pStages = shaderStages.data(),
+				.pVertexInputState = &vertexInputInfo,
+				.pInputAssemblyState = &inputAssembly,
+				.pViewportState = &viewportState,
+				.pRasterizationState = &transparentRasterizer,
+				.pMultisampleState = &multisampling,
+				.pDepthStencilState = &transparentDepthStencil,
+				.pColorBlendState = &transparentColorBlending,
+				.pDynamicState = &dynamicStateInfo,
+				.layout = s_Data->PBRPipelineLayout,
+				.renderPass = nullptr
+			};
+
+			s_Data->PBRTransparentPipeline = vk::raii::Pipeline(device, nullptr, transparentPipelineInfo);
+			context.SetObjectDebugName(s_Data->PBRTransparentPipeline, "PBR Transparent Pipeline");
+
+			Shader skyboxShader("skybox", "Skybox");
+			const auto skyboxShaderStages = skyboxShader.GetPipelineShaderStageCreateInfo();
+
+			opaqueDepthStencil.depthWriteEnable = vk::False;
+			opaqueDepthStencil.depthTestEnable = vk::False;
+
+			vk::PipelineDepthStencilStateCreateInfo skyboxDepthStencil{
+				.depthTestEnable = vk::True,
+				.depthWriteEnable = vk::False,
+				.depthCompareOp = vk::CompareOp::eLessOrEqual,
+				.depthBoundsTestEnable = vk::False,
+				.stencilTestEnable = vk::False,
+				.minDepthBounds = 0.0f,
+				.maxDepthBounds = 1.0f,
+			};
+
+			vk::PipelineRasterizationStateCreateInfo skyboxRasterizer{
+				.depthClampEnable = vk::False,
+				.rasterizerDiscardEnable = vk::False,
+				.polygonMode = vk::PolygonMode::eFill,
+				.cullMode = vk::CullModeFlagBits::eFront,
+				.frontFace = vk::FrontFace::eCounterClockwise,
+				.depthBiasEnable = vk::False,
+				.lineWidth = 1.0f
+			};
+
+			opaqueRasterizer.cullMode = vk::CullModeFlagBits::eFront;
+
+			vk::GraphicsPipelineCreateInfo skyboxPipelineInfo{
+				.pNext = &pipelineRenderingCreateInfo,
+				.stageCount = 2,
+				.pStages = skyboxShaderStages.data(),
+				.pVertexInputState = &vertexInputInfo,
+				.pInputAssemblyState = &inputAssembly,
+				.pViewportState = &viewportState,
+				.pRasterizationState = &skyboxRasterizer,
+				.pMultisampleState = &multisampling,
+				.pDepthStencilState = &skyboxDepthStencil,
+				.pColorBlendState = &colorBlending,
+				.pDynamicState = &dynamicStateInfo,
+				.layout = s_Data->PBRPipelineLayout,
+				.renderPass = nullptr
+			};
+			s_Data->SkyboxPipeline = vk::raii::Pipeline(device, nullptr, skyboxPipelineInfo);
+			context.SetObjectDebugName(s_Data->SkyboxPipeline, "Skybox Pipeline");
+		}
+
+		// Transition color image to shader read layout
+		{
+			vk::ImageMemoryBarrier2 barrier = {
+				.srcStageMask = vk::PipelineStageFlagBits2::eTopOfPipe,
+				.srcAccessMask = {},
+				.dstStageMask = vk::PipelineStageFlagBits2::eFragmentShader,
+				.dstAccessMask = vk::AccessFlagBits2::eShaderRead,
+				.oldLayout = vk::ImageLayout::eUndefined,
+				.newLayout = vk::ImageLayout::eShaderReadOnlyOptimal,
+				.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+				.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+				.image = s_Data->ColorImage.Image,
+				.subresourceRange = {
+					.aspectMask = vk::ImageAspectFlagBits::eColor,
+					.baseMipLevel = 0,
+					.levelCount = 1,
+					.baseArrayLayer = 0,
+					.layerCount = 1
+				}
+			};
+			const vk::DependencyInfo dependencyInfo = {
+				.dependencyFlags = {},
+				.imageMemoryBarrierCount = 1,
+				.pImageMemoryBarriers = &barrier
+			};
+
+			const auto cmd = context.BeginSingleTimeCommands();
+			context.SetObjectDebugName(reinterpret_cast<uint64_t>(static_cast<VkCommandBuffer>(*cmd)),
+									   vk::ObjectType::eCommandBuffer,
+									   "EditorLayer Single Time Command Buffer for Color Image Layout Transition");
+			cmd.pipelineBarrier2(dependencyInfo);
+			context.EndSingleTimeCommands(cmd);
+		}
+
+		// Create descriptor set for the output image for ImGui rendering
+		{
+			s_Data->ColorOutputDescriptorSet = VulkanContext::GenerateImGuiDescriptorSet(s_Data->ColorSampler, s_Data->ColorImage.ImageView);
+
+			context.SetObjectDebugName(reinterpret_cast<uint64_t>(static_cast<VkDescriptorSet>(s_Data->ColorOutputDescriptorSet)),
+									   vk::ObjectType::eDescriptorSet,
+									   "Color Output Descriptor Set for ImGui");
+
+			s_Data->ShadowMapDescriptorSet = VulkanContext::GenerateImGuiDescriptorSet(s_Data->ColorSampler, s_Data->ShadowMap.ImageView);
+			context.SetObjectDebugName(reinterpret_cast<uint64_t>(static_cast<VkDescriptorSet>(s_Data->ShadowMapDescriptorSet)),
+									   vk::ObjectType::eDescriptorSet,
+									   "Shadow Map Descriptor Set for ImGui");
+		}
+
+		//m_OutputSize = m_ViewportSize;
+	}
+
+	void Renderer::ResizeResources(const uint32_t width, const uint32_t height) 
+	{
+		KBR_CORE_ASSERT(s_Data, "Renderer not initialized!");
+
+		// Resize the color and depth image, the shadowmap image can keep its size
+		auto& context = VulkanContext::Get();
+		const auto& device = context.GetDevice();
+
+		constexpr uint32_t mipLevels = 1;
+		const vk::Format colorFormat = context.FindSupportedFormat(
+			{ vk::Format::eR32G32B32A32Sfloat, vk::Format::eR32G32B32A32Uint },
+			vk::ImageTiling::eOptimal,
+			vk::FormatFeatureFlagBits::eColorAttachment | vk::FormatFeatureFlagBits::eColorAttachmentBlend | vk::FormatFeatureFlagBits::eSampledImage
+		);
+
+		device.waitIdle();
+
+		// Destroy old resources
+		VulkanContext::DestroyImGuiDescriptorSet(s_Data->ColorOutputDescriptorSet);
+
+		s_Data->ColorImage.ImageView.clear();
+		s_Data->ColorImage.Image.clear();
+		s_Data->ColorImage.ImageMemory.clear();
+		s_Data->DepthImage.ImageView.clear();
+		s_Data->DepthImage.Image.clear();
+		s_Data->DepthImage.ImageMemory.clear();
+
+		// Recreate resources with new size
+		CreateImage(device,
+					width,
+					height,
+					mipLevels,
+					vk::SampleCountFlagBits::e1,
+					colorFormat,
+					vk::ImageTiling::eOptimal,
+					vk::ImageUsageFlagBits::eColorAttachment | vk::ImageUsageFlagBits::eSampled,
+					vk::MemoryPropertyFlagBits::eDeviceLocal,
+					s_Data->ColorImage.Image,
+					s_Data->ColorImage.ImageMemory);
+
+		context.SetObjectDebugName(reinterpret_cast<uint64_t>(static_cast<VkImage>(*s_Data->ColorImage.Image)),
+								   vk::ObjectType::eImage,
+								   "Color Attachment Image");
+
+		context.SetObjectDebugName(reinterpret_cast<uint64_t>(static_cast<VkDeviceMemory>(*s_Data->ColorImage.ImageMemory)),
+								   vk::ObjectType::eDeviceMemory,
+								   "Color Attachment Image Memory");
+
+		s_Data->ColorImage.ImageView = CreateImageView(device, s_Data->ColorImage.Image, colorFormat, vk::ImageAspectFlagBits::eColor, mipLevels);
+		context.SetObjectDebugName(reinterpret_cast<uint64_t>(static_cast<VkImageView>(*s_Data->ColorImage.ImageView)),
+								   vk::ObjectType::eImageView,
+								   "Color Attachment Image View");
+
+		const vk::Format depthFormat = context.FindSupportedFormat(
+			{ vk::Format::eD32Sfloat },
+			vk::ImageTiling::eOptimal,
+			vk::FormatFeatureFlagBits::eDepthStencilAttachment
+		);
+
+		CreateImage(
+			device,
+			width,
+			height,
+			mipLevels,
+			vk::SampleCountFlagBits::e1,
+			depthFormat,
+			vk::ImageTiling::eOptimal,
+			vk::ImageUsageFlagBits::eDepthStencilAttachment,
+			vk::MemoryPropertyFlagBits::eDeviceLocal,
+			s_Data->DepthImage.Image,
+			s_Data->DepthImage.ImageMemory);
+
+		context.SetObjectDebugName(reinterpret_cast<uint64_t>(static_cast<VkImage>(*s_Data->DepthImage.Image)),
+								   vk::ObjectType::eImage,
+								   "Depth Attachment Image");
+
+		context.SetObjectDebugName(reinterpret_cast<uint64_t>(static_cast<VkDeviceMemory>(*s_Data->DepthImage.ImageMemory)),
+								   vk::ObjectType::eDeviceMemory,
+								   "Depth Attachment Image Memory");
+
+		s_Data->DepthImage.ImageView = CreateImageView(device, s_Data->DepthImage.Image, depthFormat, vk::ImageAspectFlagBits::eDepth, mipLevels);
+
+		context.SetObjectDebugName(reinterpret_cast<uint64_t>(static_cast<VkImageView>(*s_Data->DepthImage.ImageView)),
+								   vk::ObjectType::eImageView,
+								   "Depth Attachment Image View");
+
+		// Transition color image to shader read layout
+		{
+			vk::ImageMemoryBarrier2 barrier = {
+				.srcStageMask = vk::PipelineStageFlagBits2::eTopOfPipe,
+				.srcAccessMask = {},
+				.dstStageMask = vk::PipelineStageFlagBits2::eFragmentShader,
+				.dstAccessMask = vk::AccessFlagBits2::eShaderRead,
+				.oldLayout = vk::ImageLayout::eUndefined,
+				.newLayout = vk::ImageLayout::eShaderReadOnlyOptimal,
+				.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+				.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+				.image = s_Data->ColorImage.Image,
+				.subresourceRange = {
+					.aspectMask = vk::ImageAspectFlagBits::eColor,
+					.baseMipLevel = 0,
+					.levelCount = 1,
+					.baseArrayLayer = 0,
+					.layerCount = 1
+				}
+			};
+			const vk::DependencyInfo dependencyInfo = {
+				.dependencyFlags = {},
+				.imageMemoryBarrierCount = 1,
+				.pImageMemoryBarriers = &barrier
+			};
+			const auto cmd = context.BeginSingleTimeCommands();
+			context.SetObjectDebugName(reinterpret_cast<uint64_t>(static_cast<VkCommandBuffer>(*cmd)),
+									   vk::ObjectType::eCommandBuffer,
+									   "EditorLayer Single Time Command Buffer for Color Image Layout Transition");
+			cmd.pipelineBarrier2(dependencyInfo);
+			context.EndSingleTimeCommands(cmd);
+		}
+
+		// Recreate descriptor set for the output image for ImGui rendering
+		{
+			KBR_CORE_ASSERT(s_Data->ColorSampler != nullptr && s_Data->ColorImage.ImageView != nullptr, "Sampler and image view has to be initialized to create an ImGui descriptor set");
+
+			s_Data->ColorOutputDescriptorSet = VulkanContext::GenerateImGuiDescriptorSet(s_Data->ColorSampler, s_Data->ColorImage.ImageView);
+			context.SetObjectDebugName(reinterpret_cast<uint64_t>(static_cast<VkDescriptorSet>(s_Data->ColorOutputDescriptorSet)),
+									   vk::ObjectType::eDescriptorSet,
+									   "Color Output Descriptor Set for ImGui");
+		}
+
+		//m_OutputSize = m_ViewportSize;
+	}
+
+	glm::vec3 Renderer::GetLightPositionForShadowMapCalculation() 
+	{
+		KBR_CORE_ASSERT(s_Data, "Renderer not initialized!");
+
+		return s_Data->ShadowMap.LightPosForCalculation;
+	}
+
+	bool Renderer::GetIsPCFEnabledForShadowMap() 
+	{
+		KBR_CORE_ASSERT(s_Data, "Renderer not initialized!");
+
+		return s_Data->ShadowMap.EnablePCF;
+	}
+
+	bool Renderer::GetDisplayDebugNormals() 
+	{
+		throw std::logic_error("Not implemented");
+	}
+
+	void Renderer::UpdateLights(const uint32_t currentImage) 
+	{
+		KBR_CORE_ASSERT(s_Data, "Renderer not initialized!");
+
+		s_Data->UniformDataParams.lights[1] = glm::vec4{ 0.0f };
+		s_Data->UniformDataParams.lights[2] = glm::vec4{ 0.0f };
+
+		std::memcpy(s_Data->UniformBuffers[currentImage].params->GetMappedData(), &s_Data->UniformDataParams, sizeof(UniformDataParams));
+	}
+
+	void Renderer::UpdateSceneUniformBuffers(const uint32_t currentImage, const Camera* mainCamera) 
+	{
+		KBR_CORE_ASSERT(s_Data, "Renderer not initialized!");
+
+		const glm::mat4& projection = mainCamera->GetProjectionMatrix();
+		const glm::mat4& view = mainCamera->GetViewMatrix();
+
+		s_Data->SceneUniformData.projection = projection;
+		s_Data->SceneUniformData.view = view;
+		s_Data->SceneUniformData.lightSpaceMatrix = CalculateLightSpaceMatrix();
+		s_Data->SceneUniformData.camPos = mainCamera->GetPosition();
+		std::memcpy(s_Data->UniformBuffers[currentImage].scene->GetMappedData(), &s_Data->SceneUniformData, sizeof(SceneUniformData));
+
+		const glm::mat4 skyboxModel = glm::mat4(glm::mat3(view));
+		s_Data->SkyboxData.model = skyboxModel;
+		s_Data->SkyboxData.projection = projection;
+		std::memcpy(s_Data->UniformBuffers[currentImage].skybox->GetMappedData(), &s_Data->SkyboxData, sizeof(SkyboxData));
+	}
+
+	void Renderer::UpdatePerObjectUniformBuffer(const uint32_t currentImage, const uint32_t objectIndex, const glm::mat4& model,
+		const Material& material) 
+	{
+		KBR_CORE_ASSERT(s_Data, "Renderer not initialized!");
+
+		s_Data->PerObjectData = {
+			.model = model,
+			.worldNormal = glm::inverseTranspose(model),
+			.material = material.Params
+		};
+
+		char* data = static_cast<char*>(s_Data->UniformBuffers[currentImage].perObject->GetMappedData());
+		data += static_cast<size_t>(objectIndex) * s_Data->DynamicAlignment;
+
+		std::memcpy(data, &s_Data->PerObjectData, sizeof(PerObjectData));
+	}
+
+	glm::mat4 Renderer::CalculateLightSpaceMatrix() 
+	{
+		KBR_CORE_ASSERT(s_Data, "Renderer not initialized!");
+
+		constexpr float nearPlane = 0.1f;
+		constexpr float farPlane = 100.0f;
+		constexpr float orthoSize = 20.0f;
+		glm::mat4 lightProjection = glm::ortho(-orthoSize, orthoSize, -orthoSize, orthoSize, nearPlane, farPlane);
+		lightProjection[1][1] *= -1.0f;
+
+		constexpr glm::vec3 sceneCenter = glm::vec3(0.0f, 0.0f, 0.0f);
+		constexpr float lightDistance = 80.0f;
+
+		/*const glm::vec3 lightDirRaw = glm::vec3(m_UniformDataParams.lights[0]);
+		const glm::vec3 lightDir = glm::length2(lightDirRaw) > std::numeric_limits<float>::epsilon()
+			? glm::normalize(lightDirRaw)
+			: glm::vec3(0.0f, 1.0f, 0.0f);*/
+
+		const glm::vec3 lightDir = glm::normalize(glm::vec3(s_Data->UniformDataParams.lights[0]));
+
+		const glm::vec3 lightPos = sceneCenter + lightDir * lightDistance;
+		s_Data->ShadowMap.LightPosForCalculation = lightPos;
+		constexpr glm::vec3 lightTarget = sceneCenter; /// Look at origin
+
+		glm::vec3 lightUp = glm::vec3(0.0f, 1.0f, 0.0f);
+		if (glm::abs(glm::dot(lightDir, lightUp)) > 0.99f)
+		{
+			lightUp = glm::vec3(1.0f, 0.0f, 0.0f);
+		}
+
+		const glm::mat4 lightView = glm::lookAt(lightPos, lightTarget, lightUp);
+
+		// Correction matrix for Vulkan Clip Space
+		// Y: -1 (flip logic), Z: 0.5 scale + 0.5 offset ([-1,1] -> [0,1])
+		//constexpr glm::mat4 correction = glm::mat4(
+		//	1.0f, 0.0f, 0.0f, 0.0f,
+		//	0.0f, -1.0f, 0.0f, 0.0f,
+		//	0.0f, 0.0f, 0.5f, 0.0f,
+		//	0.0f, 0.0f, 0.5f, 1.0f);
+
+		return lightProjection * lightView;
+	}
+
+	void Renderer::PrepareUniformBuffers()
+	{
+		const auto& context = VulkanContext::Get();
+		const auto properties = context.GetProperties().properties;
+
+		s_Data->MinUniformBufferOffsetAlignment = properties.limits.minUniformBufferOffsetAlignment;
+
+		s_Data->DynamicAlignment = sizeof(PerObjectData);
+		if (s_Data->MinUniformBufferOffsetAlignment > 0)
+		{
+			s_Data->DynamicAlignment = (s_Data->DynamicAlignment + s_Data->MinUniformBufferOffsetAlignment - 1) & ~(s_Data->MinUniformBufferOffsetAlignment - 1);
+		}
+
+		for (auto& [scene, params, perObject, skybox] : s_Data->UniformBuffers)
+		{
+			scene = std::make_shared<UniformBuffer>(sizeof(SceneUniformData));
+
+			params = std::make_shared<UniformBuffer>(sizeof(UniformDataParams));
+
+			// TODO: Allocate a large enough buffer for a maximum number of objects, and allocate a bigger one if needed.
+			constexpr size_t maxObjects = 1000;
+			perObject = std::make_shared<UniformBuffer>(s_Data->DynamicAlignment * maxObjects);
+
+			skybox = std::make_shared<UniformBuffer>(sizeof(SkyboxData));
+		}
+	}
+
+	void Renderer::SetupDescriptors()
+	{
+		auto& context = VulkanContext::Get();
+		const auto& device = context.GetDevice();
+
+		std::vector<vk::DescriptorPoolSize> poolSizes = {
+			vk::DescriptorPoolSize{
+				.type = vk::DescriptorType::eUniformBuffer,
+				.descriptorCount = 10
+			},
+			vk::DescriptorPoolSize{
+				.type = vk::DescriptorType::eUniformBufferDynamic,
+				.descriptorCount = 10
+			},
+			vk::DescriptorPoolSize{
+				.type = vk::DescriptorType::eCombinedImageSampler,
+				.descriptorCount = 20
+			}
+		};
+
+		vk::DescriptorPoolCreateInfo poolInfo{
+			.flags = vk::DescriptorPoolCreateFlagBits::eFreeDescriptorSet,
+			.maxSets = 10,
+			.poolSizeCount = static_cast<uint32_t>(poolSizes.size()),
+			.pPoolSizes = poolSizes.data()
+		};
+
+		s_Data->DescriptorPool = vk::raii::DescriptorPool{ device, poolInfo };
+		context.SetObjectDebugName(reinterpret_cast<uint64_t>(static_cast<VkDescriptorPool>(*s_Data->DescriptorPool)),
+								   vk::ObjectType::eDescriptorPool,
+								   "PBR Descriptor Pool");
+
+		std::vector<vk::DescriptorSetLayoutBinding> bindings = {
+			vk::DescriptorSetLayoutBinding{ // Scene data
+				.binding = 0,
+				.descriptorType = vk::DescriptorType::eUniformBuffer,
+				.descriptorCount = 1,
+				.stageFlags = vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment | vk::ShaderStageFlagBits::eGeometry,
+				.pImmutableSamplers = nullptr
+			},
+			vk::DescriptorSetLayoutBinding{ // Light data and other params
+				.binding = 1,
+				.descriptorType = vk::DescriptorType::eUniformBuffer,
+				.descriptorCount = 1,
+				.stageFlags = vk::ShaderStageFlagBits::eFragment,
+				.pImmutableSamplers = nullptr
+			},
+			vk::DescriptorSetLayoutBinding{ // Per-object data
+				.binding = 2,
+				.descriptorType = vk::DescriptorType::eUniformBufferDynamic,
+				.descriptorCount = 1,
+				.stageFlags = vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment | vk::ShaderStageFlagBits::eGeometry,
+				.pImmutableSamplers = nullptr
+			},
+			vk::DescriptorSetLayoutBinding{ // Shadow map
+				.binding = 3,
+				.descriptorType = vk::DescriptorType::eCombinedImageSampler,
+				.descriptorCount = 1,
+				.stageFlags = vk::ShaderStageFlagBits::eFragment,
+				.pImmutableSamplers = nullptr
+			},
+			vk::DescriptorSetLayoutBinding{ // Irradiance map
+				.binding = 4,
+				.descriptorType = vk::DescriptorType::eCombinedImageSampler,
+				.descriptorCount = 1,
+				.stageFlags = vk::ShaderStageFlagBits::eFragment,
+				.pImmutableSamplers = nullptr
+			},
+			vk::DescriptorSetLayoutBinding{ // BRDF LUT
+				.binding = 5,
+				.descriptorType = vk::DescriptorType::eCombinedImageSampler,
+				.descriptorCount = 1,
+				.stageFlags = vk::ShaderStageFlagBits::eFragment,
+				.pImmutableSamplers = nullptr
+			},
+			vk::DescriptorSetLayoutBinding{ // Prefiltered environment map
+				.binding = 6,
+				.descriptorType = vk::DescriptorType::eCombinedImageSampler,
+				.descriptorCount = 1,
+				.stageFlags = vk::ShaderStageFlagBits::eFragment,
+				.pImmutableSamplers = nullptr
+			},
+		};
+
+		const vk::DescriptorSetLayoutCreateInfo layoutInfo{
+			.bindingCount = static_cast<uint32_t>(bindings.size()),
+			.pBindings = bindings.data()
+		};
+
+
+		s_Data->DescriptorSetLayouts.scene = vk::raii::DescriptorSetLayout{ device, layoutInfo };
+		context.SetObjectDebugName(s_Data->DescriptorSetLayouts.scene, "PBR Descriptor Set Layout");
+
+		std::vector<vk::DescriptorSetLayoutBinding> textureBindings = {
+			vk::DescriptorSetLayoutBinding{ // Albedo map
+				.binding = 0,
+				.descriptorType = vk::DescriptorType::eCombinedImageSampler,
+				.descriptorCount = 1,
+				.stageFlags = vk::ShaderStageFlagBits::eFragment,
+			},
+			vk::DescriptorSetLayoutBinding{ // Normal map
+				.binding = 1,
+				.descriptorType = vk::DescriptorType::eCombinedImageSampler,
+				.descriptorCount = 1,
+				.stageFlags = vk::ShaderStageFlagBits::eFragment,
+			},
+			//vk::DescriptorSetLayoutBinding{ // Ambient occlusion map
+			//	.binding = 2,
+			//	.descriptorType = vk::DescriptorType::eCombinedImageSampler,
+			//	.descriptorCount = 1,
+			//	.stageFlags = vk::ShaderStageFlagBits::eFragment,
+			//},
+			//vk::DescriptorSetLayoutBinding{ // Metallic map
+			//	.binding = 3,
+			//	.descriptorType = vk::DescriptorType::eCombinedImageSampler,
+			//	.descriptorCount = 1,
+			//	.stageFlags = vk::ShaderStageFlagBits::eFragment,
+			//},
+			//vk::DescriptorSetLayoutBinding{ // Roughness map
+			//	.binding = 4,
+			//	.descriptorType = vk::DescriptorType::eCombinedImageSampler,
+			//	.descriptorCount = 1,
+			//	.stageFlags = vk::ShaderStageFlagBits::eFragment,
+			//},
+		};
+
+		const vk::DescriptorSetLayoutCreateInfo textureLayoutInfo{
+			.bindingCount = static_cast<uint32_t>(textureBindings.size()),
+			.pBindings = textureBindings.data()
+		};
+
+		s_Data->DescriptorSetLayouts.textures = vk::raii::DescriptorSetLayout{ device, textureLayoutInfo };
+		context.SetObjectDebugName(s_Data->DescriptorSetLayouts.textures, "Texture Descriptor Set Layout");
+
+		const std::array<vk::DescriptorSetLayout, 2> setLayouts = {
+			*s_Data->DescriptorSetLayouts.scene,
+			*s_Data->DescriptorSetLayouts.textures
+		};
+
+		vk::DescriptorSetAllocateInfo allocInfo{
+			.descriptorPool = *s_Data->DescriptorPool,
+			.descriptorSetCount = static_cast<uint32_t>(s_Data->DescriptorSets.size()), // TODO: Check if this is correct
+			.pSetLayouts = setLayouts.data()
+		};
+
+		std::vector<vk::raii::DescriptorSet> sceneDescriptorSets = device.allocateDescriptorSets(allocInfo);
+		std::vector<vk::raii::DescriptorSet> skyboxDescriptorSets = device.allocateDescriptorSets(allocInfo);
+		for (uint32_t i = 0; i < s_Data->UniformBuffers.size(); i++)
+		{
+			s_Data->DescriptorSets[i].scene = std::move(sceneDescriptorSets[i]);
+			context.SetObjectDebugName(s_Data->DescriptorSets[i].scene, "PBR Descriptor Set[" + std::to_string(i) + "]");
+
+			const vk::DescriptorBufferInfo sceneBufferInfo{
+				.buffer = *s_Data->UniformBuffers[i].scene->GetBuffer(),
+				.offset = 0,
+				.range = sizeof(SceneUniformData)
+			};
+
+			const vk::DescriptorBufferInfo paramsBufferInfo{
+				.buffer = *s_Data->UniformBuffers[i].params->GetBuffer(),
+				.offset = 0,
+				.range = sizeof(UniformDataParams)
+			};
+
+			const vk::DescriptorBufferInfo perObjectBufferInfo{
+				.buffer = *s_Data->UniformBuffers[i].perObject->GetBuffer(),
+				.offset = 0,
+				.range = sizeof(PerObjectData)
+			};
+
+			const vk::DescriptorImageInfo shadowMapImageInfo{
+				.sampler = *s_Data->ShadowMapSampler,
+				.imageView = *s_Data->ShadowMap.ImageView,
+				.imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal
+			};
+
+			const vk::DescriptorImageInfo skyboxImageInfo{
+				.sampler = *s_Data->Skybox.SkyboxTexture->GetSampler(),
+				.imageView = *s_Data->Skybox.SkyboxTexture->GetImageView(),
+				.imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal
+			};
+
+			const vk::DescriptorBufferInfo skyboxBufferInfo{
+				.buffer = *s_Data->UniformBuffers[i].skybox->GetBuffer(),
+				.offset = 0,
+				.range = sizeof(SkyboxData)
+			};
+
+			const std::vector descriptorWrites = {
+				vk::WriteDescriptorSet{
+					.dstSet = *s_Data->DescriptorSets[i].scene,
+					.dstBinding = 0,
+					.dstArrayElement = 0,
+					.descriptorCount = 1,
+					.descriptorType = vk::DescriptorType::eUniformBuffer,
+					.pBufferInfo = &sceneBufferInfo
+				},
+				vk::WriteDescriptorSet{
+					.dstSet = *s_Data->DescriptorSets[i].scene,
+					.dstBinding = 1,
+					.dstArrayElement = 0,
+					.descriptorCount = 1,
+					.descriptorType = vk::DescriptorType::eUniformBuffer,
+					.pBufferInfo = &paramsBufferInfo
+				},
+				vk::WriteDescriptorSet{
+					.dstSet = *s_Data->DescriptorSets[i].scene,
+					.dstBinding = 2,
+					.dstArrayElement = 0,
+					.descriptorCount = 1,
+					.descriptorType = vk::DescriptorType::eUniformBufferDynamic,
+					.pBufferInfo = &perObjectBufferInfo
+				},
+				vk::WriteDescriptorSet{
+					.dstSet = *s_Data->DescriptorSets[i].scene,
+					.dstBinding = 3,
+					.dstArrayElement = 0,
+					.descriptorCount = 1,
+					.descriptorType = vk::DescriptorType::eCombinedImageSampler,
+					.pImageInfo = &shadowMapImageInfo
+				},
+				vk::WriteDescriptorSet{
+					.dstSet = *s_Data->DescriptorSets[i].scene,
+					.dstBinding = 4,
+					.dstArrayElement = 0,
+					.descriptorCount = 1,
+					.descriptorType = vk::DescriptorType::eCombinedImageSampler,
+					.pImageInfo = &s_Data->Skybox.IrradianceCubeTexture->GetDescriptorInfo()
+				},
+				vk::WriteDescriptorSet{
+					.dstSet = *s_Data->DescriptorSets[i].scene,
+					.dstBinding = 5,
+					.dstArrayElement = 0,
+					.descriptorCount = 1,
+					.descriptorType = vk::DescriptorType::eCombinedImageSampler,
+					.pImageInfo = &s_Data->Skybox.LutBrdfTexture->GetDescriptorInfo()
+				},
+				vk::WriteDescriptorSet{
+					.dstSet = *s_Data->DescriptorSets[i].scene,
+					.dstBinding = 6,
+					.dstArrayElement = 0,
+					.descriptorCount = 1,
+					.descriptorType = vk::DescriptorType::eCombinedImageSampler,
+					.pImageInfo = &s_Data->Skybox.PrefilteredCubeTexture->GetDescriptorInfo()
+				}
+			};
+
+			device.updateDescriptorSets(descriptorWrites, {});
+
+			s_Data->DescriptorSets[i].skybox = std::move(skyboxDescriptorSets[i]);
+			context.SetObjectDebugName(s_Data->DescriptorSets[i].skybox, "Skybox Descriptor Set[" + std::to_string(i) + "]");
+
+			const std::vector skyboxDescriptorWrites = {
+				vk::WriteDescriptorSet{
+					.dstSet = *s_Data->DescriptorSets[i].skybox,
+					.dstBinding = 0,
+					.dstArrayElement = 0,
+					.descriptorCount = 1,
+					.descriptorType = vk::DescriptorType::eUniformBuffer,
+					.pBufferInfo = &skyboxBufferInfo
+				},
+				vk::WriteDescriptorSet{
+					.dstSet = *s_Data->DescriptorSets[i].skybox,
+					.dstBinding = 1,
+					.dstArrayElement = 0,
+					.descriptorCount = 1,
+					.descriptorType = vk::DescriptorType::eUniformBuffer,
+					.pBufferInfo = &paramsBufferInfo
+				},
+				vk::WriteDescriptorSet{
+					.dstSet = *s_Data->DescriptorSets[i].skybox,
+					.dstBinding = 4,
+					.dstArrayElement = 0,
+					.descriptorCount = 1,
+					.descriptorType = vk::DescriptorType::eCombinedImageSampler,
+					.pImageInfo = &skyboxImageInfo
+				}
+			};
+
+			device.updateDescriptorSets(skyboxDescriptorWrites, {});
+		}
+	}
+
+	void Renderer::CreateSkyboxResources() 
+	{
+		KBR_CORE_ASSERT(s_Data->Skybox.SkyboxTexture != nullptr, "Skybox texture has to be set before creating skybox resources");
+
+		// TODO: Set default skybox texture if none is set by the user
+
+		if (s_Data->Skybox.SkyboxMesh == nullptr)
+		{
+			s_Data->Skybox.SkyboxMesh = CreateRef<Mesh>(ModelLoader::LoadModel("Assets/Models/cube.gltf", None));
+		}
+		if (s_Data->Skybox.LutBrdfTexture == nullptr)
+		{
+			s_Data->Skybox.LutBrdfTexture = CreateRef<Texture2D>();
+			SkyboxUtils::GenerateBRDFLUT(*s_Data->Skybox.LutBrdfTexture);
+		}
+
+		s_Data->Skybox.IrradianceCubeTexture = CreateRef<TextureCube>();
+		s_Data->Skybox.PrefilteredCubeTexture = CreateRef<TextureCube>();
+
+		SkyboxUtils::GenerateIrradianceCube(*s_Data->Skybox.IrradianceCubeTexture, s_Data->Skybox.SkyboxTexture->descriptor, *s_Data->Skybox.SkyboxMesh);
+		SkyboxUtils::GeneratePrefilteredEnvMap(*s_Data->Skybox.PrefilteredCubeTexture, s_Data->Skybox.SkyboxTexture->descriptor, *s_Data->Skybox.SkyboxMesh);
 	}
 }

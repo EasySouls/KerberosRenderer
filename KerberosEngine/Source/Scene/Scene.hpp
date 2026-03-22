@@ -29,8 +29,8 @@ namespace Kerberos
 		void OnSimulationStop() const;
 		void SetScenePaused(bool isPaused);
 
-		void OnUpdateEditor(float ts, const EditorCamera& camera);
-		void OnUpdateSimulation(float ts, const EditorCamera& camera);
+		void OnUpdateEditor(float ts, const Camera& camera);
+		void OnUpdateSimulation(float ts, const Camera& camera);
 		void OnUpdateRuntime(float ts);
 
 		/**
@@ -96,7 +96,7 @@ namespace Kerberos
 
 		void Render2DRuntime(const SceneCamera* mainCamera, const glm::mat4& mainCameraTransform);
 		void Render3DRuntime(const SceneCamera* mainCamera, const glm::mat4& mainCameraTransform);
-		void Render3DEditor(const EditorCamera& camera);
+		void Render3DEditor(const Camera& camera);
 
 		void UpdateScripts(float ts);
 
@@ -129,6 +129,7 @@ namespace Kerberos
 		JoltPhysicsSystem* m_PhysicsSystem;
 
 		friend class Entity;
+		friend class Renderer;
 		friend class JoltPhysicsSystem;
 		friend class HierarchyPanel;
 		friend class SceneSerializer;
