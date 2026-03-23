@@ -401,7 +401,7 @@ namespace Kerberos
 				ImGui::SetDragDropPayload(assetBrowserTextureCube, &handle, sizeof(AssetHandle), ImGuiCond_Once);
 				ImGui::Text("%s", filename.string().c_str());
 			}
-			else if (extension == ".obj") /// TODO: Meshes should also have their own kerberos type
+			else if (assetType == AssetType::Mesh || assetType == AssetType::Model)
 			{
 				ImGui::SetDragDropPayload(assetBrowserMesh, &handle, sizeof(AssetHandle), ImGuiCond_Once);
 				ImGui::Text("%s", filename.string().c_str());

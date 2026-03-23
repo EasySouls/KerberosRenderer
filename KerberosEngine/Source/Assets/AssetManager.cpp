@@ -10,8 +10,7 @@ namespace Kerberos
 
 	Ref<Mesh> AssetManager::GetDefaultCubeMesh() 
 	{
-		// TODO: Package a cube.gltf alongside the editor or create a mesh programmatically
-		throw std::logic_error("Not implemented");
+		return Project::GetActive()->GetEditorAssetManager()->GetDefaultCubeMesh();
 	}
 
 	Ref<Font> AssetManager::GetDefaultFont() 

@@ -368,36 +368,36 @@ namespace Kerberos
 			out << YAML::EndMap;
 		}
 
-		//if (entity.HasComponent<StaticMeshComponent>())
-		//{
-		//	out << YAML::Key << "StaticMeshComponent";
-		//	out << YAML::BeginMap;
-		//	const auto& staticMesh = entity.GetComponent<StaticMeshComponent>();
-		//	out << YAML::Key << "Mesh" << YAML::Value << (staticMesh.StaticMesh ? staticMesh.StaticMesh->GetHandle() : UUID::Invalid());
-		//	if (auto& mat = staticMesh.MeshMaterial)
-		//	{
-		//		//out << YAML::Key << "Material" << YAML::Value << staticMesh.MeshMaterial->GetHandle();
-		//		out << YAML::Key << "Material";
-		//		out << YAML::BeginMap;
+		if (entity.HasComponent<StaticMeshComponent>())
+		{
+			out << YAML::Key << "StaticMeshComponent";
+			out << YAML::BeginMap;
+			const auto& staticMesh = entity.GetComponent<StaticMeshComponent>();
+			out << YAML::Key << "Mesh" << YAML::Value << (staticMesh.StaticMesh ? staticMesh.StaticMesh->GetHandle() : UUID::Invalid());
+			if (auto& mat = staticMesh.MeshMaterial)
+			{
+				//out << YAML::Key << "Material" << YAML::Value << staticMesh.MeshMaterial->GetHandle();
+				/*out << YAML::Key << "Material";
+				out << YAML::BeginMap;
 
-		//		out << YAML::Key << "Ambient" << YAML::Value << mat->Ambient;
-		//		out << YAML::Key << "Diffuse" << YAML::Value << mat->Diffuse;
-		//		out << YAML::Key << "Specular" << YAML::Value << mat->Specular;
-		//		out << YAML::Key << "Shininess" << YAML::Value << mat->Shininess;
+				out << YAML::Key << "Ambient" << YAML::Value << mat->Ambient;
+				out << YAML::Key << "Diffuse" << YAML::Value << mat->Diffuse;
+				out << YAML::Key << "Specular" << YAML::Value << mat->Specular;
+				out << YAML::Key << "Shininess" << YAML::Value << mat->Shininess;
 
-		//		out << YAML::EndMap;
-		//	}
-		//	//else
-		//	//{
-		//	//	out << YAML::Key << "Material" << YAML::Value << UUID::Invalid();
-		//	//}
+				out << YAML::EndMap;*/
+			}
+			else
+			{
+				out << YAML::Key << "Material" << YAML::Value << UUID::Invalid();
+			}
 
-		//	if (staticMesh.MeshTexture)
-		//		out << YAML::Key << "Texture" << YAML::Value << staticMesh.MeshTexture->GetHandle();
-		//	else
-		//		out << YAML::Key << "Texture" << YAML::Value << UUID::Invalid();
-		//	out << YAML::EndMap;
-		//}
+			if (staticMesh.MeshTexture)
+				out << YAML::Key << "Texture" << YAML::Value << staticMesh.MeshTexture->GetHandle();
+			else
+				out << YAML::Key << "Texture" << YAML::Value << UUID::Invalid();
+			out << YAML::EndMap;
+		}
 
 		if (entity.HasComponent<EnvironmentComponent>())
 		{
@@ -734,42 +734,42 @@ namespace Kerberos
 					}
 				}
 
-				//if (auto staticMeshComponent = entity["StaticMeshComponent"])
-				//{
-				//	auto& staticMesh = deserializedEntity.AddComponent<StaticMeshComponent>();
+				if (auto staticMeshComponent = entity["StaticMeshComponent"])
+				{
+					auto& staticMesh = deserializedEntity.AddComponent<StaticMeshComponent>();
 
-				//	/// Get the material and texture handles
-				//	/// If they are valid, load the assets, else use default ones
+					/// Get the material and texture handles
+					/// If they are valid, load the assets, else use default ones
 
-				//	/*const auto matNode = staticMeshComponent["Material"].as<std::uint64_t>();
-				//	const AssetHandle materialHandle = UUID(matNode);
-				//	if (materialHandle.IsValid())
-				//		staticMesh.MeshMaterial = AssetManager::GetAsset<Material>(materialHandle);*/
+					/*const auto matNode = staticMeshComponent["Material"].as<std::uint64_t>();
+					const AssetHandle materialHandle = UUID(matNode);
+					if (materialHandle.IsValid())
+						staticMesh.MeshMaterial = AssetManager::GetAsset<Material>(materialHandle);*/
 
-				//	staticMesh.MeshMaterial = CreateRef<Material>();
-				//	if (auto matNode = staticMeshComponent["Material"])
-				//	{
-				//		staticMesh.MeshMaterial->Ambient = matNode["Ambient"].as<glm::vec3>();
-				//		staticMesh.MeshMaterial->Diffuse = matNode["Diffuse"].as<glm::vec3>();
-				//		staticMesh.MeshMaterial->Specular = matNode["Specular"].as<glm::vec3>();
-				//		staticMesh.MeshMaterial->Shininess = matNode["Shininess"].as<float>();
-				//	}
+					staticMesh.MeshMaterial = CreateRef<Material>();
+					/*if (auto matNode = staticMeshComponent["Material"])
+					{
+						staticMesh.MeshMaterial->Ambient = matNode["Ambient"].as<glm::vec3>();
+						staticMesh.MeshMaterial->Diffuse = matNode["Diffuse"].as<glm::vec3>();
+						staticMesh.MeshMaterial->Specular = matNode["Specular"].as<glm::vec3>();
+						staticMesh.MeshMaterial->Shininess = matNode["Shininess"].as<float>();
+					}*/
 
-				//	const AssetHandle textureHandle = AssetHandle(staticMeshComponent["Texture"].as<uint64_t>());
-				//	if (textureHandle.IsValid())
-				//		staticMesh.MeshTexture = AssetManager::GetAsset<Texture2D>(textureHandle);
+					const AssetHandle textureHandle = AssetHandle(staticMeshComponent["Texture"].as<uint64_t>());
+					if (textureHandle.IsValid())
+						staticMesh.MeshTexture = AssetManager::GetAsset<Texture2D>(textureHandle);
 
-				//	const AssetHandle meshHandle = AssetHandle(staticMeshComponent["Mesh"].as<uint64_t>());
-				//	if (meshHandle.IsValid())
-				//	{
-				//		staticMesh.StaticMesh = AssetManager::GetAsset<Mesh>(meshHandle);
-				//	}
-				//	else
-				//	{
-				//		KBR_CORE_WARN("AssetHandle for mesh is invalid, using default cube mesh.");
-				//		staticMesh.StaticMesh = AssetManager::GetDefaultCubeMesh();
-				//	}
-				//}
+					const AssetHandle meshHandle = AssetHandle(staticMeshComponent["Mesh"].as<uint64_t>());
+					if (meshHandle.IsValid())
+					{
+						staticMesh.StaticMesh = AssetManager::GetAsset<Mesh>(meshHandle);
+					}
+					else
+					{
+						KBR_CORE_WARN("AssetHandle for mesh is invalid, using default cube mesh.");
+						staticMesh.StaticMesh = AssetManager::GetDefaultCubeMesh();
+					}
+				}
 
 				if (auto environmentComponent = entity["EnvironmentComponent"])
 				{

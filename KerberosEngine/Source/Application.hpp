@@ -62,6 +62,8 @@ namespace Kerberos
 
 		void SubmitToMainThreadQueue(const std::function<void()>& fn);
 
+		void BlockEvents(bool shouldBlock);
+
 		static Application& Get() { return *s_Instance; }
 
 		GLFWwindow* GetWindow() const { return m_Window; }
@@ -87,6 +89,8 @@ namespace Kerberos
 
 		std::queue<std::function<void()>> m_MainThreadQueue;
 		std::mutex m_QueueMutex;
+
+		bool m_BlockEvents = false;
 
 		static Application* s_Instance;
 	};

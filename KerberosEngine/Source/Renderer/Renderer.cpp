@@ -1831,6 +1831,8 @@ namespace Kerberos
 
 		if (s_Data->Skybox.SkyboxMesh == nullptr)
 		{
+			//The project has not been initialized this far
+			//s_Data->Skybox.SkyboxMesh = AssetManager::GetDefaultCubeMesh();
 			s_Data->Skybox.SkyboxMesh = CreateRef<Mesh>(ModelLoader::LoadModel("Assets/Models/cube.gltf", None));
 		}
 		if (s_Data->Skybox.LutBrdfTexture == nullptr)

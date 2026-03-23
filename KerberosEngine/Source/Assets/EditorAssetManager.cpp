@@ -3,6 +3,7 @@
 
 #include "Assets/Importers/AssetImporter.hpp"
 #include "Project/Project.hpp"
+#include "ModelLoader.hpp"
 
 #include <yaml-cpp/yaml.h>
 #include <fstream>
@@ -19,7 +20,7 @@ namespace Kerberos
 		{ ".kbrcubemap", AssetType::TextureCube },
 		{ ".fbx", AssetType::Mesh },
 		{ ".obj", AssetType::Mesh },
-		{ ".gltf", AssetType::Mesh },
+		{ ".gltf", AssetType::Model },
 		{ ".kerberos", AssetType::Scene },
 		{ ".wav", AssetType::Sound } // TODO: Add more audio file types when supported
 	};
@@ -52,6 +53,8 @@ namespace Kerberos
 		const Buffer albedoBufferStruct{ sizeof(uint8_t) * albedoBuffer.size() };
 		std::memcpy(albedoBufferStruct.Data, albedoBuffer.data(), albedoBufferStruct.Size);
 		m_DefaultColorTexture = Texture2D::FromBuffer(albedoSpec, albedoBufferStruct);
+
+		m_DefaultCubeMesh = CreateRef<Mesh>(ModelLoader::LoadModel("Assets/Models/cube.gltf", None));
 	}
 
 	EditorAssetManager::~EditorAssetManager() 
@@ -159,13 +162,25 @@ namespace Kerberos
 		return m_AssetRegistry.Get(handle);
 	}
 
+	Ref<Mesh> EditorAssetManager::GetDefaultCubeMesh() const
+	{
+		KBR_CORE_ASSERT(m_DefaultCubeMesh, "Default cube mesh has not been loaded");
+
+		// TODO: Package a cube.gltf alongside the editor or create a mesh programmatically
+		return m_DefaultCubeMesh;
+	}
+
 	Ref<Texture2D> EditorAssetManager::GetDefaultColorTexture() const 
 	{
+		KBR_CORE_ASSERT(m_DefaultColorTexture, "Default color texture has not been loaded");
+
 		return m_DefaultColorTexture;
 	}
 
 	Ref<Font> EditorAssetManager::GetDefaultFont() const 
 	{
+		KBR_CORE_ASSERT(m_DefaultFont, "Default font has not been loaded");
+
 		return m_DefaultFont;
 	}
 
@@ -249,7 +264,7 @@ namespace Kerberos
 
 			const AssetType type = AssetTypeFromString(typeStr);
 			// TODO: This check is not needed when every asset type is supported
-			if (type == AssetType::Texture2D || type == AssetType::TextureCube || type == AssetType::Mesh || type == AssetType::Sound)
+			if (type == AssetType::Texture2D || type == AssetType::TextureCube || type == AssetType::Mesh || type == AssetType::Sound || type == AssetType::Model)
 			{
 				m_AssetRegistry.Add(handle, { .Type = type, .Filepath = filepath });
 			}

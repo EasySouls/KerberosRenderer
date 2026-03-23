@@ -20,6 +20,8 @@
 #include <iostream>
 #include <filesystem>
 
+#include "imgui.h"
+
 
 #ifdef KBR_PLATFORM_WINDOWS
 extern "C"
@@ -259,6 +261,13 @@ namespace Kerberos
 		dispatcher.Dispatch<WindowClosedEvent>(KBR_BIND_FN(Application::OnWindowClose));
 		// dispatcher.Dispatch<WindowResizeEvent>(KBR_BIND_FN(Application::OnWindowResize));
 
+		if (m_BlockEvents)
+		{
+			const ImGuiIO& io = ImGui::GetIO();
+			event.Handled |= event.IsInCategory(EventCategoryMouse) & io.WantCaptureMouse;
+			event.Handled |= event.IsInCategory(EventCategoryKeyboard) & io.WantCaptureKeyboard;
+		}
+
 		for (const auto& layer : m_Layers)
 		{
 			layer->OnEvent(event);
@@ -272,6 +281,11 @@ namespace Kerberos
 		std::scoped_lock lock(m_QueueMutex);
 
 		m_MainThreadQueue.push(fn);
+	}
+
+	void Application::BlockEvents(bool shouldBlock)
+	{
+		m_BlockEvents = shouldBlock;
 	}
 
 	void Application::ExecuteMainThreadQueue() 

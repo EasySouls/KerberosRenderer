@@ -34,6 +34,7 @@ namespace Kerberos
 
 		const AssetMetadata& GetMetadata(AssetHandle handle) const;
 
+		Ref<Mesh> GetDefaultCubeMesh() const;
 		Ref<Texture2D> GetDefaultColorTexture() const;
 		Ref<Font> GetDefaultFont() const;
 
@@ -46,6 +47,7 @@ namespace Kerberos
 		AssetMap m_LoadedAssets;
 		AssetRegistry m_AssetRegistry;
 
+		Ref<Mesh> m_DefaultCubeMesh;
 		Ref<Texture2D> m_DefaultColorTexture;
 		Ref<Font> m_DefaultFont;
 	};

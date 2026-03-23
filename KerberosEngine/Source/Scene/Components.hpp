@@ -179,7 +179,7 @@ namespace Kerberos
 		Ref<Mesh> StaticMesh = nullptr;
 		Ref<Material> MeshMaterial = nullptr;
 		Ref<Texture2D> MeshTexture = nullptr;
-		//AssetHandle MeshTexture;
+
 		bool Visible = true;
 		bool CastShadows = true;
 

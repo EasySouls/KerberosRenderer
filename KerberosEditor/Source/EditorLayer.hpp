@@ -72,13 +72,15 @@ namespace Kerberos
 		void DrawViewport();
 		void DrawUIToolbar();
 		void DrawMenuBar();
-		void DrawDebugWindow();
+		void DrawDebugWindow() const;
 
 		void CalculateEntityTransform(const Entity& entity) const;
 
 		bool OnKeyPressed(const KeyPressedEvent& event);
 		bool OnMouseButtonPressed(const MouseButtonPressedEvent& event);
 		bool OnWindowDrop(const WindowDropEvent& event);
+
+		std::string GetActiveGizmoTypeString() const;
 
 	private:
 		float m_Time = 0.0f;

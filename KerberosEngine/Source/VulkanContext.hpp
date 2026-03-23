@@ -18,8 +18,6 @@ namespace Kerberos
 	class VulkanContext final
 	{
 	public:
-
-
 		explicit VulkanContext(GLFWwindow* window);
 		~VulkanContext();
 

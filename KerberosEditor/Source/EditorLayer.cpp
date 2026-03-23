@@ -532,7 +532,7 @@ namespace Kerberos
 		m_ViewportFocused = ImGui::IsWindowFocused();
 		m_ViewportHovered = ImGui::IsWindowHovered();
 
-		// Application::Get().GetImGuiLayer()->BlockEvents(!m_ViewportHovered);
+		Application::Get().BlockEvents(!m_ViewportHovered);
 
 		m_ViewportSize = { ImGui::GetContentRegionAvail().x, ImGui::GetContentRegionAvail().y };
 
@@ -555,7 +555,7 @@ namespace Kerberos
 		const bool gizmosEnabled = m_SceneState == SceneState::Edit || m_SceneState == SceneState::Simulate;
 		if (const Entity selectedEntity = m_HierarchyPanel.GetSelectedEntity(); selectedEntity && m_GizmoType != GizmoType::None && gizmosEnabled)
 		{
-			ImGuizmo::SetOrthographic(false);
+			ImGuizmo::SetOrthographic(true);
 			ImGuizmo::SetDrawlist();
 
 			const float windowWidth = ImGui::GetWindowWidth();
@@ -789,7 +789,7 @@ namespace Kerberos
 		}
 	}
 
-	void EditorLayer::DrawDebugWindow() 
+	void EditorLayer::DrawDebugWindow() const
 	{
 		ImGui::Begin("Debug");
 
@@ -809,35 +809,18 @@ namespace Kerberos
 
 		ImGui::Separator();
 
-		ImGui::Text("Color Output Image");
+		std::string activeGizmoTypeString = GetActiveGizmoTypeString();
+		ImGui::Text("Gizmo Type: %s", activeGizmoTypeString.c_str());
 		ImGui::Text("Viewport size: %.2f x %.2f", m_ViewportSize.x, m_ViewportSize.y);
+		ImGui::Text("Viewport Focused: %s", m_ViewportFocused ? "Yes" : "No");
+		ImGui::Text("Viewport Hovered: %s", m_ViewportHovered ? "Yes" : "No");
 
-		ImGui::Separator();
-
-		// Object transform controls
-		ImGui::Text("Nodes");
-		for (size_t i = 0; i < m_SceneNodes.size(); ++i)
+		std::string hoveredEntityName = "None";
+		if (m_HoveredEntity)
 		{
-			if (ImGui::TreeNode(m_SceneNodes[i]->Name.c_str()))
-			{
-				ImGui::Checkbox(("Visible##" + std::to_string(i)).c_str(), &m_SceneNodes[i]->Visible);
-
-				ImGui::Separator();
-
-				ImGui::DragFloat3(("Position##" + std::to_string(i)).c_str(), glm::value_ptr(m_SceneNodes[i]->Position), 0.1f);
-				ImGui::DragFloat3(("Rotation##" + std::to_string(i)).c_str(), glm::value_ptr(m_SceneNodes[i]->Rotation), 0.01f);
-				ImGui::DragFloat3(("Scale##" + std::to_string(i)).c_str(), glm::value_ptr(m_SceneNodes[i]->Scale), 0.1f, 0.1f, 100.0f);
-
-				ImGui::Separator();
-
-				ImGui::Text("Material");
-				ImGui::Text("Name: %s", m_SceneNodes[i]->Material->name.c_str());
-				ImGui::ColorEdit3(("Albedo Color##" + std::to_string(i)).c_str(), glm::value_ptr(m_SceneNodes[i]->Material->Params.albedo));
-				ImGui::DragFloat(("Metallic##" + std::to_string(i)).c_str(), &m_SceneNodes[i]->Material->Params.metallic, 0.01f, 0.0f, 1.0f);
-				ImGui::DragFloat(("Roughness##" + std::to_string(i)).c_str(), &m_SceneNodes[i]->Material->Params.roughness, 0.01f, 0.0f, 1.0f);
-				ImGui::TreePop();
-			}
+			hoveredEntityName = m_HoveredEntity.GetComponent<TagComponent>().Tag;
 		}
+		ImGui::Text("Hovered entity: %s", hoveredEntityName.c_str());
 
 		ImGui::Separator();
 
@@ -873,6 +856,12 @@ namespace Kerberos
 		ImGui::DragFloat("Constant Factor", &ConstantFactor, 0.001f, 0.0f, 5.0f);
 		ImGui::DragFloat("Clamp", &Clamp, 0.001f, 0.0f, 1.0f);
 		ImGui::DragFloat("Slope Factor", &SlopeFactor, 0.01f, 0.0f, 10.0f);
+
+		ImGui::Separator();
+
+		ImGui::Text("Font Atlas");
+		const uint64_t fontAtlasTextureID = VulkanContext::Get().GetImGuiRendererID(m_BasicFont->GetAtlasTexture());
+		ImGui::Image(fontAtlasTextureID, ImVec2{ 256, 256 }, ImVec2{ 0, 1 }, ImVec2{ 1, 0 });
 
 		ImGui::Separator();
 
@@ -981,7 +970,8 @@ namespace Kerberos
 	{
 		/// Handle mouse picking
 		/// Only select the entity if we are not using the gizmos or the camera
-		if (event.GetButton() == Mouse::ButtonLeft && !ImGuizmo::IsOver() && !Input::IsKeyPressed(Key::LeftAlt))
+		/// TODO: Check if isViewportHovered is needed, Application::BlockEvents should prevent this from firing
+		if (event.GetButton() == Mouse::ButtonLeft && !ImGuizmo::IsOver() && !Input::IsKeyPressed(Key::LeftAlt) && m_ViewportHovered)
 		{
 			m_HierarchyPanel.SetSelectedEntity(m_HoveredEntity);
 		}
@@ -992,5 +982,23 @@ namespace Kerberos
 	{
 		/// TODO: Implement file dropping to load scenes or import models
 		throw std::logic_error("Not implemented");
+	}
+
+	std::string EditorLayer::GetActiveGizmoTypeString() const 
+	{
+		switch (m_GizmoType)
+		{
+		case GizmoType::None:
+			return "None";
+		case GizmoType::Translate:
+			return "Translate";
+		case GizmoType::Rotate:
+			return "Rotate";
+		case GizmoType::Scale:
+			return "Scale";
+		}
+
+		KBR_CORE_ASSERT(false, "Invalid gizmo type");
+		return "";
 	}
 }

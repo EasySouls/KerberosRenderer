@@ -41,7 +41,7 @@ namespace Kerberos
 
 		/*m_CubeMesh = Mesh::CreateCube(1.0f);
 		m_SphereMesh = Mesh::CreateSphere(1.0f, 16, 16);*/
-		m_CubeMesh = nullptr;
+		m_CubeMesh = AssetManager::GetDefaultCubeMesh();
 		m_SphereMesh = nullptr;
 		m_WhiteMaterial = CreateRef<Material>();
 
@@ -993,7 +993,7 @@ namespace Kerberos
 					if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload(assetBrowserMesh))
 					{
 						const AssetHandle handle = *static_cast<AssetHandle*>(payload->Data);
-						if (AssetManager::GetAssetType(handle) != AssetType::Mesh)
+						if (const AssetType assetType = AssetManager::GetAssetType(handle); assetType != AssetType::Mesh && assetType != AssetType::Model)
 						{
 							KBR_EDITOR_ERROR("Asset is not a mesh: {0}", handle);
 							m_NotificationManager.AddNotification("Asset is not a mesh", Notification::Type::Error);
