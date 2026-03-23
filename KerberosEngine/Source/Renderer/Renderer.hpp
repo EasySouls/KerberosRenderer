@@ -24,7 +24,8 @@ namespace Kerberos
 		static void Shutdown();
 
 		static void RenderSceneEditor(const Ref<Scene>& scene, const Camera& camera);
-		static void RenderSceneRuntime(const Ref<Scene>& scene, const SceneCamera* mainCamera, const glm::mat4& mainCameraTransform);
+		static void RenderScene(const Ref<Scene>& scene, const glm::mat4& view, const glm::mat4& projection, const glm::vec3& camPos);
+		static void RenderSceneRuntime(const Ref<Scene>& scene, const Camera& mainCamera, const glm::mat4& mainCameraTransform);
 
 		static void ResizeResources(uint32_t width, uint32_t height);
 
@@ -44,6 +45,7 @@ namespace Kerberos
 	private:
 		static void UpdateLights(uint32_t currentImage);
 		static void UpdateSceneUniformBuffers(uint32_t currentImage, const Camera* mainCamera);
+		static void UpdateSceneUniformBuffers(uint32_t currentImage, const glm::mat4& view, const glm::mat4& projection, const glm::vec3& camPos);
 		static void UpdatePerObjectUniformBuffer(uint32_t currentImage, uint32_t objectIndex, const glm::mat4& model, const Material& material);
 
 		static glm::mat4 CalculateLightSpaceMatrix();

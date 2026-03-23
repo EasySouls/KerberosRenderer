@@ -109,7 +109,7 @@ namespace Kerberos
 		Render3DEditor(camera);
 	}
 
-	void Scene::OnUpdateRuntime(const float ts)
+	void Scene::OnUpdateRuntime(const float ts, const Camera& camera)
 	{
 		KBR_PROFILE_FUNCTION();
 
@@ -145,7 +145,9 @@ namespace Kerberos
 		{
 			if (m_Is3D)
 			{
-				Render3DRuntime(mainCamera, mainCameraTransform);
+				//Render3DRuntime(mainCamera, mainCameraTransform);
+				// TODO: Implement rendering with CameraComponent
+				Render3DRuntime(camera);
 			}
 			else
 			{
@@ -585,107 +587,120 @@ namespace Kerberos
 	void Scene::Render3DRuntime(const SceneCamera* mainCamera, const glm::mat4& mainCameraTransform)
 	{
 		KBR_PROFILE_FUNCTION();
+#pragma region old_rendering_code
+		//DirectionalLightComponent* dlc = nullptr;
+		//const auto sunView = m_Registry.view<DirectionalLightComponent, TransformComponent>();
+		//for (const auto entity : sunView)
+		//{
+		//	auto [light, transform] = sunView.get<DirectionalLightComponent, TransformComponent>(entity);
+		//	if (light.IsEnabled)
+		//	{
+		//		dlc = &light;
+		//		break;
+		//	}
+		//}
 
-		DirectionalLightComponent* dlc = nullptr;
-		const auto sunView = m_Registry.view<DirectionalLightComponent, TransformComponent>();
-		for (const auto entity : sunView)
-		{
-			auto [light, transform] = sunView.get<DirectionalLightComponent, TransformComponent>(entity);
-			if (light.IsEnabled)
-			{
-				dlc = &light;
-				break;
-			}
-		}
+		//if (ShouldRenderShadows(dlc))
+		//{
+		//	/*ShadowMapSettings shadowSettings;
+		//	shadowSettings.Resolution = 1024;
+		//	shadowSettings.OrthoSize = 15.0f;
+		//	shadowSettings.NearPlane = 1.0f;
+		//	shadowSettings.FarPlane = 100.0f;
+		//	shadowSettings.EnableShadows = true;
 
-		if (ShouldRenderShadows(dlc))
-		{
-			/*ShadowMapSettings shadowSettings;
-			shadowSettings.Resolution = 1024;
-			shadowSettings.OrthoSize = 15.0f;
-			shadowSettings.NearPlane = 1.0f;
-			shadowSettings.FarPlane = 100.0f;
-			shadowSettings.EnableShadows = true;
+		//	Renderer3D::BeginShadowPass(dlc->Light, shadowSettings, m_ShadowMapFramebuffer);*/
 
-			Renderer3D::BeginShadowPass(dlc->Light, shadowSettings, m_ShadowMapFramebuffer);*/
+		//	/// Render all shadow-casting meshes
+		//	const auto meshView = m_Registry.view<StaticMeshComponent, TransformComponent>();
+		//	for (auto entity : meshView)
+		//	{
+		//		auto& meshComp = meshView.get<StaticMeshComponent>(entity);
+		//		auto& transformComp = meshView.get<TransformComponent>(entity);
 
-			/// Render all shadow-casting meshes
-			const auto meshView = m_Registry.view<StaticMeshComponent, TransformComponent>();
-			for (auto entity : meshView)
-			{
-				auto& meshComp = meshView.get<StaticMeshComponent>(entity);
-				auto& transformComp = meshView.get<TransformComponent>(entity);
+		//		if (meshComp.StaticMesh && meshComp.MeshMaterial && meshComp.Visible)
+		//		{
+		//			/*Renderer3D::SubmitMesh(meshComp.StaticMesh, transformComp.WorldTransform,
+		//								   meshComp.MeshMaterial, meshComp.MeshTexture, 1.0f,
+		//								   static_cast<int>(entity), meshComp.CastShadows);*/
+		//		}
+		//	}
 
-				if (meshComp.StaticMesh && meshComp.MeshMaterial && meshComp.Visible)
-				{
-					/*Renderer3D::SubmitMesh(meshComp.StaticMesh, transformComp.WorldTransform,
-										   meshComp.MeshMaterial, meshComp.MeshTexture, 1.0f,
-										   static_cast<int>(entity), meshComp.CastShadows);*/
-				}
-			}
+		//	dlc->NeedsUpdate = false;
 
-			dlc->NeedsUpdate = false;
+		//	//Renderer3D::EndPass();
+		//}
 
-			//Renderer3D::EndPass();
-		}
+		//std::vector<PointLight> pointLights;
+		//const auto pointLightView = m_Registry.view<PointLightComponent, TransformComponent>();
+		//for (const auto entity : pointLightView)
+		//{
+		//	auto [light, transform] = pointLightView.get<PointLightComponent, TransformComponent>(entity);
+		//	if (light.IsEnabled)
+		//	{
+		//		pointLights.push_back(light.Light);
+		//	}
+		//}
 
-		std::vector<PointLight> pointLights;
-		const auto pointLightView = m_Registry.view<PointLightComponent, TransformComponent>();
-		for (const auto entity : pointLightView)
-		{
-			auto [light, transform] = pointLightView.get<PointLightComponent, TransformComponent>(entity);
-			if (light.IsEnabled)
-			{
-				pointLights.push_back(light.Light);
-			}
-		}
+		//Ref<TextureCube> skyboxTexture = nullptr;
+		//const auto skyboxView = m_Registry.view<EnvironmentComponent>();
+		//for (const auto entity : skyboxView)
+		//{
+		//	const auto& skybox = skyboxView.get<EnvironmentComponent>(entity);
+		//	if (skybox.IsSkyboxEnabled && skybox.SkyboxTexture)
+		//	{
+		//		skyboxTexture = AssetManager::GetAsset<TextureCube>(skybox.SkyboxTexture);
+		//		break;
+		//	}
+		//}
 
-		Ref<TextureCube> skyboxTexture = nullptr;
-		const auto skyboxView = m_Registry.view<EnvironmentComponent>();
-		for (const auto entity : skyboxView)
-		{
-			const auto& skybox = skyboxView.get<EnvironmentComponent>(entity);
-			if (skybox.IsSkyboxEnabled && skybox.SkyboxTexture)
-			{
-				skyboxTexture = AssetManager::GetAsset<TextureCube>(skybox.SkyboxTexture);
-				break;
-			}
-		}
+		///*m_EditorFramebuffer->Bind();
 
-		/*m_EditorFramebuffer->Bind();
+		//RenderCommand::SetClearColor({ 0.1f, 0.1f, 0.1f, 1 });
+		//RenderCommand::Clear();
 
-		RenderCommand::SetClearColor({ 0.1f, 0.1f, 0.1f, 1 });
-		RenderCommand::Clear();
+		///// Clear our entity ID attachment to -1, so when rendering entities they fill that space with their entity ID,
+		///// and empty spacces will have -1, signaling that there is no entity.
+		///// Used for mouse picking.
+		//m_EditorFramebuffer->ClearAttachment(1, -1);
 
-		/// Clear our entity ID attachment to -1, so when rendering entities they fill that space with their entity ID,
-		/// and empty spacces will have -1, signaling that there is no entity.
-		/// Used for mouse picking.
-		m_EditorFramebuffer->ClearAttachment(1, -1);
+		//Renderer3D::BeginGeometryPass(*mainCamera, mainCameraTransform, &dlc->Light, pointLights, skyboxTexture);*/
 
-		Renderer3D::BeginGeometryPass(*mainCamera, mainCameraTransform, &dlc->Light, pointLights, skyboxTexture);*/
+		//const auto view = m_Registry.view<TransformComponent, StaticMeshComponent>();
+		//for (const auto entity : view)
+		//{
+		//	auto [transform, mesh] = view.get<TransformComponent, StaticMeshComponent>(entity);
 
-		const auto view = m_Registry.view<TransformComponent, StaticMeshComponent>();
-		for (const auto entity : view)
-		{
-			auto [transform, mesh] = view.get<TransformComponent, StaticMeshComponent>(entity);
+		//	if (mesh.Visible)
+		//	{
+		//		//Renderer3D::SubmitMesh(mesh.StaticMesh, transform.WorldTransform, mesh.MeshMaterial, mesh.MeshTexture);
+		//	}
+		//}
 
-			if (mesh.Visible)
-			{
-				//Renderer3D::SubmitMesh(mesh.StaticMesh, transform.WorldTransform, mesh.MeshMaterial, mesh.MeshTexture);
-			}
-		}
+		////Renderer3D::EndPass();
 
-		//Renderer3D::EndPass();
+		//const auto textView = m_Registry.view<TransformComponent, TextComponent>();
+		//for (const auto entity : textView)
+		//{
+		//	auto [transform, text] = textView.get<TransformComponent, TextComponent>(entity);
 
-		const auto textView = m_Registry.view<TransformComponent, TextComponent>();
-		for (const auto entity : textView)
-		{
-			auto [transform, text] = textView.get<TransformComponent, TextComponent>(entity);
+		//	//Renderer3D::SubmitText(text.Text, text.Font, transform.WorldTransform, text.Color, text.FontSize, static_cast<int>(entity));
+		//}
 
-			//Renderer3D::SubmitText(text.Text, text.Font, transform.WorldTransform, text.Color, text.FontSize, static_cast<int>(entity));
-		}
+		////Renderer3D::EndScene();
 
-		//Renderer3D::EndScene();
+#pragma endregion
+
+		throw std::runtime_error("Not implemented");
+		//Renderer::RenderSceneRuntime(shared_from_this(), mainCamera, mainCameraTransform);
+	}
+
+	void Scene::Render3DRuntime(const Camera& camera) 
+	{
+		glm::mat4 cameraTransform(1.0f);
+		const glm::vec4 camPos = { camera.GetPosition().x, camera.GetPosition().y, camera.GetPosition().z, 1.0f };
+		cameraTransform[3] = camPos;
+		Renderer::RenderSceneRuntime(shared_from_this(), camera, cameraTransform);
 	}
 
 	void Scene::Render3DEditor(const Camera& camera)

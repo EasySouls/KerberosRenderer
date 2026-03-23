@@ -225,7 +225,7 @@ namespace Kerberos
 					m_ActiveScene->OnUpdateSimulation(deltaTime, *m_EditorCamera);
 					break;
 				case SceneState::Play:
-					m_ActiveScene->OnUpdateRuntime(deltaTime);
+					m_ActiveScene->OnUpdateRuntime(deltaTime, *m_EditorCamera);
 					break;
 			}
 		}

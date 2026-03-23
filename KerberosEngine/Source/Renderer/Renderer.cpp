@@ -182,6 +182,12 @@ namespace Kerberos
 
 	void Renderer::RenderSceneEditor(const Ref<Scene>& scene, const Camera& camera) 
 	{
+		RenderScene(scene, camera.GetViewMatrix(), camera.GetProjectionMatrix(), camera.GetPosition());
+	}
+
+	void Renderer::RenderScene(const Ref<Scene>& scene, const glm::mat4& view, const glm::mat4& projection,
+		const glm::vec3& camPos) 
+	{
 		const auto& context = VulkanContext::Get();
 
 		const auto cmd = context.BeginSingleTimeCommands();
@@ -194,7 +200,7 @@ namespace Kerberos
 		constexpr uint32_t currentImage = 0;
 
 		UpdateLights(currentImage);
-		UpdateSceneUniformBuffers(currentImage, &camera);
+		UpdateSceneUniformBuffers(currentImage, view, projection, camPos);
 
 		/*const glm::mat4 translation = glm::translate(glm::mat4(1.0f), m_ObjectPosition);
 		const glm::mat4 model = translation *
@@ -600,10 +606,11 @@ namespace Kerberos
 		context.EndSingleTimeCommands(cmd);
 	}
 
-	void Renderer::RenderSceneRuntime(const Ref<Scene>& scene, const SceneCamera* mainCamera,
-		const glm::mat4& mainCameraTransform) 
+	void Renderer::RenderSceneRuntime(const Ref<Scene>& scene, const Camera& mainCamera,
+	                                  const glm::mat4& mainCameraTransform) 
 	{
-		throw std::logic_error("Not implemented");
+		const glm::vec3 camPos = mainCameraTransform[3];
+		RenderScene(scene, mainCamera.GetProjectionMatrix(), mainCamera.GetViewMatrix(), camPos);
 	}
 
 	void Renderer::CreateDefaultMaterials() 
@@ -1456,8 +1463,25 @@ namespace Kerberos
 		std::memcpy(s_Data->UniformBuffers[currentImage].skybox->GetMappedData(), &s_Data->SkyboxData, sizeof(SkyboxData));
 	}
 
+	void Renderer::UpdateSceneUniformBuffers(const uint32_t currentImage, const glm::mat4& view, const glm::mat4& projection,
+		const glm::vec3& camPos) 
+	{
+		KBR_CORE_ASSERT(s_Data, "Renderer not initialized!");
+
+		s_Data->SceneUniformData.projection = projection;
+		s_Data->SceneUniformData.view = view;
+		s_Data->SceneUniformData.lightSpaceMatrix = CalculateLightSpaceMatrix();
+		s_Data->SceneUniformData.camPos = camPos;
+		std::memcpy(s_Data->UniformBuffers[currentImage].scene->GetMappedData(), &s_Data->SceneUniformData, sizeof(SceneUniformData));
+
+		const glm::mat4 skyboxModel = glm::mat4(glm::mat3(view));
+		s_Data->SkyboxData.model = skyboxModel;
+		s_Data->SkyboxData.projection = projection;
+		std::memcpy(s_Data->UniformBuffers[currentImage].skybox->GetMappedData(), &s_Data->SkyboxData, sizeof(SkyboxData));
+	}
+
 	void Renderer::UpdatePerObjectUniformBuffer(const uint32_t currentImage, const uint32_t objectIndex, const glm::mat4& model,
-		const Material& material) 
+	                                            const Material& material) 
 	{
 		KBR_CORE_ASSERT(s_Data, "Renderer not initialized!");
 
