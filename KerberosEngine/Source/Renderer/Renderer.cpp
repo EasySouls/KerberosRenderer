@@ -452,6 +452,9 @@ namespace Kerberos
 					if (!staticMesh.Visible || !staticMesh.StaticMesh || !staticMesh.MeshMaterial)
 						continue;
 
+					// TODO: Remove this once we have a proper material system
+					staticMesh.MeshMaterial = s_Data->MaterialRegistry.Get("White");
+
 					UpdatePerObjectUniformBuffer(currentImage, static_cast<uint32_t>(i), transform.GetTransform(), *staticMesh.MeshMaterial);
 					uint32_t dynamicOffset = static_cast<uint32_t>(i * s_Data->DynamicAlignment);
 
@@ -614,7 +617,7 @@ namespace Kerberos
 		s_Data->MaterialRegistry.Add("Titanium", CreateRef<Material>("Titanium", glm::vec3(0.541931f, 0.496791f, 0.449419f), 0.1f, 1.0f));
 		s_Data->MaterialRegistry.Add("Cobalt", CreateRef<Material>("Cobalt", glm::vec3(0.662124f, 0.654864f, 0.633732f), 0.1f, 1.0f));
 		s_Data->MaterialRegistry.Add("Platinum", CreateRef<Material>("Platinum", glm::vec3(0.672411f, 0.637331f, 0.585456f), 0.1f, 1.0f));
-		s_Data->MaterialRegistry.Add("White", CreateRef<Material>("White", glm::vec3(1.0f), 0.1f, 1.0f));
+		s_Data->MaterialRegistry.Add("White", CreateRef<Material>("White", glm::vec3(1.0f), 1.0f, 0.0f));
 		s_Data->MaterialRegistry.Add("Red", CreateRef<Material>("Red", glm::vec3(1.0f, 0.0f, 0.0f), 0.1f, 1.0f));
 		s_Data->MaterialRegistry.Add("Blue", CreateRef<Material>("Blue", glm::vec3(0.0f, 0.0f, 1.0f), 0.1f, 1.0f));
 		s_Data->MaterialRegistry.Add("Black", CreateRef<Material>("Black", glm::vec3(0.0f), 0.1f, 1.0f));

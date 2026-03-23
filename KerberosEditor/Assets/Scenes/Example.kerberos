@@ -1,18 +1,18 @@
 Scene: Unnamed Scene
 Entities:
-  - Entity: 4943794690679386388
+  - Entity: 1004823327772732650
     TagComponent:
-      Tag: Ground
+      Tag: Revolver
     TransformComponent:
-      Translation: [0, -11.6, 0]
-      Rotation: [0, 0, 0]
-      Scale: [20, 0.2, 20]
+      Translation: [-6.473844, 15, 0.34905815]
+      Rotation: [-1.4831889, 1.4999994, -4.2130736e-07]
+      Scale: [20, 20.000006, 20.000374]
     HierarchyComponent:
       Parent: 0
       Children:
         []
     StaticMeshComponent:
-      Mesh: 5556831655075431416
+      Mesh: 12640333732108170778
       Texture: 0
   - Entity: 44958100548870983
     TagComponent:
@@ -28,17 +28,17 @@ Entities:
     StaticMeshComponent:
       Mesh: 2971773807105207837
       Texture: 0
-  - Entity: 1004823327772732650
+  - Entity: 4943794690679386388
     TagComponent:
-      Tag: Revolver
+      Tag: Ground
     TransformComponent:
-      Translation: [-7.1, 15, 0]
-      Rotation: [4.8, 1.5, 0]
-      Scale: [20, 20, 20]
+      Translation: [0, -11.6, 0]
+      Rotation: [0, 0, 0]
+      Scale: [20, 0.2, 20]
     HierarchyComponent:
       Parent: 0
       Children:
         []
     StaticMeshComponent:
-      Mesh: 12640333732108170778
+      Mesh: 5556831655075431416
       Texture: 0
