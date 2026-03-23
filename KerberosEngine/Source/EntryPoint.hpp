@@ -26,5 +26,7 @@ int main(const int argc, char** argv)
 
 	//KBR_PROFILE_BEGIN_SESSION("Shutdown", "KerberosProfile-Shutdown.json");
 	delete app;
+
+	Kerberos::Log::Shutdown();
 	//KBR_PROFILE_END_SESSION();
 }

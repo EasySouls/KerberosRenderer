@@ -36,6 +36,8 @@ namespace Kerberos
 
 	bool Project::SaveActive()
 	{
+		KBR_CORE_ASSERT(s_ActiveProject, "Active project has not been set!");
+
 		const auto savePath = GetActive()->m_ProjectDirectory / (GetActive()->m_Info.Name + ".kbrproj");
 
 		const ProjectSerializer serializer(s_ActiveProject);
@@ -60,9 +62,16 @@ namespace Kerberos
 
 	void Project::SetInfo(const ProjectInfo& info)
 	{
+		KBR_CORE_ASSERT(s_ActiveProject, "Active project has not been set!");
+
 		m_Info = info;
 
 		/// The project info has changed, so we might need to update the assets
 		s_ActiveProject->m_AssetManager = CreateRef<EditorAssetManager>();
+	}
+
+	void Project::ReleaseActiveProjectResources() 
+	{
+		s_ActiveProject.reset();
 	}
 }

@@ -29,6 +29,7 @@ namespace Kerberos
 	{
 	public:
 		static void Init();
+		static void Shutdown();
 
 		static std::unique_ptr<spdlog::logger>& GetCoreLogger() { return s_CoreLogger; }
 		static std::unique_ptr<spdlog::logger>& GetEditorLogger() { return s_EditorLogger; }

@@ -66,14 +66,6 @@ namespace Kerberos
 			DrawEntityNode(rootEntity);
 		}
 
-		for (const auto entityId : m_Context->m_Registry.view<entt::entity>())
-		{
-			Entity e{ entityId, m_Context.get() };
-
-			if (!m_Context->GetParent(e))
-				DrawEntityNode(e);
-		}
-
 		/// If an empty space is clicked, deselect the entity
 		if (ImGui::IsMouseDown(0) && ImGui::IsWindowHovered())
 		{

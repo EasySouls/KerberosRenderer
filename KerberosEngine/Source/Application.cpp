@@ -70,6 +70,7 @@ namespace Kerberos
 
 		// Create a GLFW window
 		glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
+		glfwWindowHint(GLFW_MAXIMIZED, GLFW_TRUE);
 		m_Window = glfwCreateWindow(1200, 800, "Kerberos Renderer", nullptr, nullptr);
 		if (!m_Window)
 		{
@@ -209,6 +210,8 @@ namespace Kerberos
 		}
 
 		Renderer::Shutdown();
+
+		Project::ReleaseActiveProjectResources();
 
 		glfwDestroyWindow(m_Window);
 		glfwTerminate();

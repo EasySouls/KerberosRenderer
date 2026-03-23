@@ -54,6 +54,11 @@ namespace Kerberos
 		m_DefaultColorTexture = Texture2D::FromBuffer(albedoSpec, albedoBufferStruct);
 	}
 
+	EditorAssetManager::~EditorAssetManager() 
+	{
+		KBR_CORE_TRACE("EditorAssetManager destructed");
+	}
+
 	Ref<Asset> EditorAssetManager::GetAsset(const AssetHandle handle)
 	{
 		if (!IsAssetHandleValid(handle))

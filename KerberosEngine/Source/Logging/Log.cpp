@@ -30,4 +30,12 @@ namespace Kerberos
 		s_EditorLogger = std::make_unique<spdlog::logger>(spdlog::logger("EDITOR", { editorConsoleSink, editorFileSink }));
 		s_EditorLogger->set_level(spdlog::level::info);
 	}
+
+	void Log::Shutdown()
+	{
+		KBR_CORE_ASSERT(s_CoreLogger && s_EditorLogger, "Loggers have been destructed before calling Log::Shutdown");
+
+		s_CoreLogger.reset();
+		s_EditorLogger.reset();
+	}
 }

@@ -53,6 +53,7 @@ namespace Kerberos
 		ProjectInfo& GetInfo() { return m_Info; }
 
 		static Ref<Project> GetActive() { return s_ActiveProject; }
+		static void ReleaseActiveProjectResources();
 
 		Ref<AssetManagerBase> GetAssetManager() const { return m_AssetManager; }
 		Ref<EditorAssetManager> GetEditorAssetManager() const { return std::static_pointer_cast<EditorAssetManager>(m_AssetManager); }

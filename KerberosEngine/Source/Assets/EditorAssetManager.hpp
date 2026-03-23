@@ -12,6 +12,7 @@ namespace Kerberos
 	{
 	public:
 		EditorAssetManager();
+		~EditorAssetManager() override;
 
 		Ref<Asset> GetAsset(AssetHandle handle) override;
 
