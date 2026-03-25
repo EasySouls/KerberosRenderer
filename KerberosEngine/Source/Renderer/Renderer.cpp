@@ -117,9 +117,9 @@ namespace Kerberos
 		ShadowMap ShadowMap;
 		Skybox Skybox;
 		ImageData ColorImage;
+		ImageData DepthImage;
 		ImageData PickingImage;
 		vk::ImageLayout PickingImageLayout = vk::ImageLayout::eUndefined;
-		ImageData DepthImage;
 
 		vk::raii::DescriptorPool DescriptorPool = nullptr;
 		DescriptorSetLayouts DescriptorSetLayouts;
@@ -365,7 +365,7 @@ namespace Kerberos
 
 		// Transition picking image to color attachment optimal
 		{
-         const vk::PipelineStageFlags2 srcStageMask = s_Data->PickingImageLayout == vk::ImageLayout::eTransferSrcOptimal
+			const vk::PipelineStageFlags2 srcStageMask = s_Data->PickingImageLayout == vk::ImageLayout::eTransferSrcOptimal
 				? vk::PipelineStageFlagBits2::eTransfer
 				: vk::PipelineStageFlagBits2::eTopOfPipe;
 			const vk::AccessFlags2 srcAccessMask = s_Data->PickingImageLayout == vk::ImageLayout::eTransferSrcOptimal
@@ -373,22 +373,22 @@ namespace Kerberos
 				: vk::AccessFlags2{};
 
 			vk::ImageMemoryBarrier2 barrier = {
-          .srcStageMask = srcStageMask,
-			.srcAccessMask = srcAccessMask,
-			.dstStageMask = vk::PipelineStageFlagBits2::eColorAttachmentOutput,
-			.dstAccessMask = vk::AccessFlagBits2::eColorAttachmentWrite,
-           .oldLayout = s_Data->PickingImageLayout,
-			.newLayout = vk::ImageLayout::eColorAttachmentOptimal,
-			.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-			.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-			.image = s_Data->PickingImage.Image,
-			.subresourceRange = {
-				.aspectMask = vk::ImageAspectFlagBits::eColor,
-				.baseMipLevel = 0,
-				.levelCount = 1,
-				.baseArrayLayer = 0,
-				.layerCount = 1
-			}
+				.srcStageMask = srcStageMask,
+				.srcAccessMask = srcAccessMask,
+				.dstStageMask = vk::PipelineStageFlagBits2::eColorAttachmentOutput,
+				.dstAccessMask = vk::AccessFlagBits2::eColorAttachmentWrite,
+				.oldLayout = s_Data->PickingImageLayout,
+				.newLayout = vk::ImageLayout::eColorAttachmentOptimal,
+				.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+				.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+				.image = s_Data->PickingImage.Image,
+				.subresourceRange = {
+					.aspectMask = vk::ImageAspectFlagBits::eColor,
+					.baseMipLevel = 0,
+					.levelCount = 1,
+					.baseArrayLayer = 0,
+					.layerCount = 1
+				}
 			};
 			const vk::DependencyInfo dependencyInfo = {
 				.dependencyFlags = {},
@@ -667,86 +667,7 @@ namespace Kerberos
 			KBR_CORE_TRACE("Transparent pass done!");
 		}
 
-		// Poll completed readback slot and issue the next copy request without stalling the CPU.
-		{
-            ++s_Data->MousePickingReadbackFrameCounter;
-
-            for (auto& readSlot : s_Data->MousePickingReadbackSlots)
-			{
-               if (readSlot.Pending && s_Data->MousePickingReadbackFrameCounter > readSlot.FrameSubmitted)
-				{
-					const auto pickedEntity = *static_cast<const uint32_t*>(readSlot.MappedData);
-					s_Data->LatestMousePickingEntityID = pickedEntity;
-					readSlot.Pending = false;
-				}
-			}
-
-			if (s_Data->MousePickingRequestPending)
-			{
-				auto& writeSlot = s_Data->MousePickingReadbackSlots[s_Data->MousePickingReadbackWriteSlot];
-                {
-					vk::ImageMemoryBarrier2 toTransferSrcBarrier = {
-						.srcStageMask = vk::PipelineStageFlagBits2::eColorAttachmentOutput,
-						.srcAccessMask = vk::AccessFlagBits2::eColorAttachmentWrite,
-						.dstStageMask = vk::PipelineStageFlagBits2::eTransfer,
-						.dstAccessMask = vk::AccessFlagBits2::eTransferRead,
-						.oldLayout = vk::ImageLayout::eColorAttachmentOptimal,
-						.newLayout = vk::ImageLayout::eTransferSrcOptimal,
-						.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-						.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-						.image = s_Data->PickingImage.Image,
-						.subresourceRange = {
-							.aspectMask = vk::ImageAspectFlagBits::eColor,
-							.baseMipLevel = 0,
-							.levelCount = 1,
-							.baseArrayLayer = 0,
-							.layerCount = 1
-						}
-					};
-
-					const vk::DependencyInfo toTransferDependencyInfo = {
-						.dependencyFlags = {},
-						.imageMemoryBarrierCount = 1,
-						.pImageMemoryBarriers = &toTransferSrcBarrier
-					};
-					cmd.pipelineBarrier2(toTransferDependencyInfo);
-					s_Data->PickingImageLayout = vk::ImageLayout::eTransferSrcOptimal;
-
-					const vk::BufferImageCopy copyRegion{
-						.bufferOffset = 0,
-						.bufferRowLength = 0,
-						.bufferImageHeight = 0,
-						.imageSubresource = {
-							.aspectMask = vk::ImageAspectFlagBits::eColor,
-							.mipLevel = 0,
-							.baseArrayLayer = 0,
-							.layerCount = 1
-						},
-						.imageOffset = {
-							.x = static_cast<int32_t>(s_Data->MousePickingRequestPixel.x),
-							.y = static_cast<int32_t>(s_Data->MousePickingRequestPixel.y),
-							.z = 0
-						},
-						.imageExtent = {
-							.width = 1,
-							.height = 1,
-							.depth = 1
-						}
-					};
-
-					cmd.copyImageToBuffer(
-						s_Data->PickingImage.Image,
-						vk::ImageLayout::eTransferSrcOptimal,
-						writeSlot.Buffer,
-						copyRegion);
-
-					writeSlot.Pending = true;
-					writeSlot.FrameSubmitted = s_Data->MousePickingReadbackFrameCounter;
-					s_Data->MousePickingReadbackWriteSlot = (s_Data->MousePickingReadbackWriteSlot + 1) % RendererData::MousePickingReadbackFrameLag;
-					s_Data->MousePickingRequestPending = false;
-				}
-			}
-		}
+		HandleMousePickingReadback(cmd);
 
 		// Transition color image layout for shader read in ImGui
 		{
@@ -1122,7 +1043,6 @@ namespace Kerberos
 			context.SetObjectDebugName(reinterpret_cast<uint64_t>(static_cast<VkImageView>(*s_Data->PickingImage.ImageView)),
 									   vk::ObjectType::eImageView,
 									   "Picking Attachment Image View");
-			s_Data->PickingImageLayout = vk::ImageLayout::eUndefined;
 			s_Data->PickingImageLayout = vk::ImageLayout::eUndefined;
 
 			const vk::Format depthFormat = context.FindSupportedFormat(
@@ -1833,6 +1753,90 @@ namespace Kerberos
 		//	0.0f, 0.0f, 0.5f, 1.0f);
 
 		return lightProjection * lightView;
+	}
+
+	void Renderer::HandleMousePickingReadback(const vk::raii::CommandBuffer& cmd) 
+	{
+		// Poll completed readback slot and issue the next copy request without stalling the CPU.
+		++s_Data->MousePickingReadbackFrameCounter;
+
+		for (auto& readSlot : s_Data->MousePickingReadbackSlots)
+		{
+			if (readSlot.Pending && s_Data->MousePickingReadbackFrameCounter > readSlot.FrameSubmitted)
+			{
+				const auto pickedEntity = *static_cast<const uint32_t*>(readSlot.MappedData);
+				s_Data->LatestMousePickingEntityID = pickedEntity;
+				readSlot.Pending = false;
+			}
+		}
+
+		if (s_Data->MousePickingRequestPending)
+		{
+			auto& writeSlot = s_Data->MousePickingReadbackSlots[s_Data->MousePickingReadbackWriteSlot];
+
+			vk::ImageMemoryBarrier2 toTransferSrcBarrier = {
+				.srcStageMask = vk::PipelineStageFlagBits2::eColorAttachmentOutput,
+				.srcAccessMask = vk::AccessFlagBits2::eColorAttachmentWrite,
+				.dstStageMask = vk::PipelineStageFlagBits2::eTransfer,
+				.dstAccessMask = vk::AccessFlagBits2::eTransferRead,
+				.oldLayout = vk::ImageLayout::eColorAttachmentOptimal,
+				.newLayout = vk::ImageLayout::eTransferSrcOptimal,
+				.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+				.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+				.image = s_Data->PickingImage.Image,
+				.subresourceRange = {
+					.aspectMask = vk::ImageAspectFlagBits::eColor,
+					.baseMipLevel = 0,
+					.levelCount = 1,
+					.baseArrayLayer = 0,
+					.layerCount = 1
+				}
+			};
+
+			const vk::DependencyInfo toTransferDependencyInfo = {
+				.dependencyFlags = {},
+				.imageMemoryBarrierCount = 1,
+				.pImageMemoryBarriers = &toTransferSrcBarrier
+			};
+			cmd.pipelineBarrier2(toTransferDependencyInfo);
+			s_Data->PickingImageLayout = vk::ImageLayout::eTransferSrcOptimal;
+
+			KBR_CORE_ASSERT(s_Data->MousePickingRequestPixel.x < static_cast<uint32_t>(s_Data->OutputSize.x) && s_Data->MousePickingRequestPixel.y < static_cast<uint32_t>(s_Data->OutputSize.y),
+							"Requested mouse picking pixel is out of bounds!");
+
+			const vk::BufferImageCopy copyRegion{
+				.bufferOffset = 0,
+				.bufferRowLength = 0,
+				.bufferImageHeight = 0,
+				.imageSubresource = {
+					.aspectMask = vk::ImageAspectFlagBits::eColor,
+					.mipLevel = 0,
+					.baseArrayLayer = 0,
+					.layerCount = 1
+				},
+				.imageOffset = {
+					.x = static_cast<int32_t>(s_Data->MousePickingRequestPixel.x),
+					.y = static_cast<int32_t>(s_Data->MousePickingRequestPixel.y),
+					.z = 0
+				},
+				.imageExtent = {
+					.width = 1,
+					.height = 1,
+					.depth = 1
+				}
+			};
+
+			cmd.copyImageToBuffer(
+				s_Data->PickingImage.Image,
+				vk::ImageLayout::eTransferSrcOptimal,
+				writeSlot.Buffer,
+				copyRegion);
+
+			writeSlot.Pending = true;
+			writeSlot.FrameSubmitted = s_Data->MousePickingReadbackFrameCounter;
+			s_Data->MousePickingReadbackWriteSlot = (s_Data->MousePickingReadbackWriteSlot + 1) % RendererData::MousePickingReadbackFrameLag;
+			s_Data->MousePickingRequestPending = false;
+		}
 	}
 
 	void Renderer::PrepareUniformBuffers()

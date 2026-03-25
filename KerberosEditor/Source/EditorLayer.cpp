@@ -231,7 +231,11 @@ namespace Kerberos
 			}
 		}
 
-		HandleMousePicking();
+		{
+			KBR_PROFILE_SCOPE("HandleMousePicking");
+
+			HandleMousePicking();
+		}
 	}
 
 	void EditorLayer::OnEvent(Event& event)

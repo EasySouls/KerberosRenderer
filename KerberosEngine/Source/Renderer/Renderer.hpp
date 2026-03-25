@@ -54,6 +54,8 @@ namespace Kerberos
 
 		static glm::mat4 CalculateLightSpaceMatrix();
 
+		static void HandleMousePickingReadback(const vk::raii::CommandBuffer& cmd);
+
 		static void CreateDefaultMaterials();
 		static void CreateResources();
 

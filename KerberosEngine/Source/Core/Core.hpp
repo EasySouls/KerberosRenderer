@@ -7,6 +7,7 @@
 namespace Kerberos
 {
 #ifdef KBR_DEBUG
+    #define KBR_PROFILE
     #define KBR_ENABLE_ASSERTS
     #if defined(KBR_PLATFORM_WINDOWS)
         #define KBR_DEBUGBREAK() __debugbreak()

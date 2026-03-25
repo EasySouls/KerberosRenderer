@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Application.hpp"
+#include "Debug/Instrumentor.hpp"
 
 namespace Kerberos
 {
@@ -16,17 +17,17 @@ int main(const int argc, char** argv)
 	KBR_CORE_INFO("Core logger initialized");
 	//KBR_INFO("Client logger initialized");
 
-	//KBR_PROFILE_BEGIN_SESSION("Startup", "KerberosProfile-Startup.json");
+	KBR_PROFILE_BEGIN_SESSION("Startup", "KerberosRenderer_StartupProfile.json");
 	const auto app = Kerberos::CreateApplication({ .Count = argc, .Args = argv });
-	//KBR_PROFILE_END_SESSION();
+	KBR_PROFILE_END_SESSION();
 
-	//KBR_PROFILE_BEGIN_SESSION("Runtime", "KerberosProfile-Runtime.json");
+	KBR_PROFILE_BEGIN_SESSION("Runtime", "KerberosRenderer_RuntimeProfile.json");
 	app->Run();
-	//KBR_PROFILE_END_SESSION();
+	KBR_PROFILE_END_SESSION();
 
-	//KBR_PROFILE_BEGIN_SESSION("Shutdown", "KerberosProfile-Shutdown.json");
+	KBR_PROFILE_BEGIN_SESSION("Shutdown", "KerberosRenderer_ShutdownProfile.json");
 	delete app;
 
 	Kerberos::Log::Shutdown();
-	//KBR_PROFILE_END_SESSION();
+	KBR_PROFILE_END_SESSION();
 }
