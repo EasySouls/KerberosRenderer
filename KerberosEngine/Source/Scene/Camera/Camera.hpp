@@ -15,6 +15,12 @@
 
 namespace Kerberos
 {
+	enum class Handedness
+	{
+		Left,
+		Right
+	};
+
 	class Camera
 	{
 	public:
@@ -37,9 +43,9 @@ namespace Kerberos
 
 		virtual void SetFlipY(bool flip) = 0;
 
-		virtual const glm::mat4& GetViewMatrix() const = 0;
-		virtual const glm::mat4& GetProjectionMatrix() const = 0;
-		virtual glm::mat4 GetViewProjectionMatrix() const = 0;
+		virtual const glm::mat4& GetViewMatrix(Handedness handedness = Handedness::Right) const = 0;
+		virtual const glm::mat4& GetProjectionMatrix(Handedness handedness = Handedness::Right) const = 0;
+		virtual glm::mat4 GetViewProjectionMatrix(Handedness handedness = Handedness::Right) const = 0;
 
 		virtual glm::vec3 GetUp() const = 0;
 		virtual glm::vec3 GetRight() const = 0;

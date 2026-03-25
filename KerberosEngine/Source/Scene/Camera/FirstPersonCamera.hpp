@@ -31,9 +31,9 @@ namespace Kerberos
 
 		void SetFlipY(bool flip) override;
 
-		const glm::mat4& GetViewMatrix() const override;
-		const glm::mat4& GetProjectionMatrix() const override;
-		glm::mat4 GetViewProjectionMatrix() const override;
+		const glm::mat4& GetViewMatrix(Handedness handedness = Handedness::Right) const override;
+		const glm::mat4& GetProjectionMatrix(Handedness handedness = Handedness::Right) const override;
+		glm::mat4 GetViewProjectionMatrix(Handedness handedness = Handedness::Right) const override;
 
 		glm::vec3 GetUp() const override;
 		glm::vec3 GetRight() const override;
@@ -70,6 +70,8 @@ namespace Kerberos
 		float m_FarClip;
 		glm::mat4 m_ViewMatrix{ 1.0f };
 		glm::mat4 m_ProjectionMatrix{ 1.0f };
+		glm::mat4 m_ViewMatrixLH{ 1.0f };
+		glm::mat4 m_ProjectionMatrixLH{ 1.0f };
 		bool m_ViewDirty = true;
 		bool m_ProjectionDirty = true;
 	};

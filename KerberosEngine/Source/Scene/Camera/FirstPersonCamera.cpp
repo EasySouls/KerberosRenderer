@@ -121,19 +121,34 @@ namespace Kerberos
 		m_ProjectionDirty = true;
 	}
 
-	const glm::mat4& FirstPersonCamera::GetViewMatrix() const
+	const glm::mat4& FirstPersonCamera::GetViewMatrix(const Handedness handedness) const
 	{
-		return m_ViewMatrix;
+		if (handedness == Handedness::Right) 
+		{
+			return m_ViewMatrix;
+		}
+
+		return m_ViewMatrixLH;
 	}
 
-	const glm::mat4& FirstPersonCamera::GetProjectionMatrix() const
+	const glm::mat4& FirstPersonCamera::GetProjectionMatrix(const Handedness handedness) const 
 	{
-		return m_ProjectionMatrix;
+		if (handedness == Handedness::Right) 
+		{
+			return m_ProjectionMatrix;
+		}
+
+		return m_ProjectionMatrixLH;
 	}
 
-	glm::mat4 FirstPersonCamera::GetViewProjectionMatrix() const
+	glm::mat4 FirstPersonCamera::GetViewProjectionMatrix(const Handedness handedness) const 
 	{
-		return m_ProjectionMatrix * m_ViewMatrix;
+		if (handedness == Handedness::Right) 
+		{
+			return m_ProjectionMatrix * m_ViewMatrix;
+		}
+
+		return m_ProjectionMatrixLH * m_ViewMatrixLH;
 	}
 
 	glm::vec3 FirstPersonCamera::GetUp() const
@@ -185,6 +200,9 @@ namespace Kerberos
 	{
 		const glm::vec3 direction = GetForward();
 		m_ViewMatrix = glm::lookAt(m_Position, m_Position + direction, GetUp());
+
+		m_ViewMatrixLH = glm::lookAtLH(m_Position, m_Position + direction, GetUp());
+
 		m_ViewDirty = false;
 	}
 
@@ -194,6 +212,12 @@ namespace Kerberos
 		if (m_FlipY) {
 			m_ProjectionMatrix[1][1] *= -1; // Invert Y for Vulkan
 		}
+
+		m_ProjectionMatrixLH = glm::perspectiveLH(glm::radians(m_Fov), m_AspectRatio, m_NearClip, m_FarClip);
+		if (m_FlipY) {
+			m_ProjectionMatrixLH[1][1] *= -1; // Invert Y for Vulkan
+		}
+
 		m_ProjectionDirty = false;
 	}
 

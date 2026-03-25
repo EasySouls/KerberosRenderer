@@ -58,6 +58,36 @@ namespace Kerberos
 		UpdateProjection();
 	}
 
+	const glm::mat4& EditorCamera::GetViewMatrix(const Handedness handedness) const 
+	{
+		if (handedness == Handedness::Right)
+		{
+			return m_View;
+		}
+
+		return m_ViewLH;
+	}
+
+	const glm::mat4& EditorCamera::GetProjectionMatrix(const Handedness handedness) const
+	{
+		if (handedness == Handedness::Right)
+		{
+			return m_Projection;
+		}
+
+		return m_ProjectionLH;
+	}
+
+	glm::mat4 EditorCamera::GetViewProjectionMatrix(const Handedness handedness) const 
+	{
+		if (handedness == Handedness::Right)
+		{
+			return m_Projection * m_View;
+		}
+
+		return m_ProjectionLH * m_ViewLH;
+	}
+
 	glm::vec3 EditorCamera::GetUp() const
 	{
 		return glm::rotate(GetOrientation(), glm::vec3(0.0f, 1.0f, 0.0f));
@@ -85,6 +115,11 @@ namespace Kerberos
 		if (m_FlipY) {
 			m_Projection[1][1] *= -1; // Invert Y coordinate for Vulkan
 		}
+
+		glm::mat4 projectionLH = glm::perspectiveLH_ZO(glm::radians(m_Fov), m_AspectRatio, m_NearClip, m_FarClip);
+		if (m_FlipY)
+			projectionLH[1][1] *= -1.0f;
+		m_ProjectionLH = projectionLH;
 	}
 
 	void EditorCamera::UpdateView()
@@ -102,6 +137,8 @@ namespace Kerberos
 		const glm::quat orientation = GetOrientation();
 		m_View = glm::translate(glm::mat4(1.0f), translation) * glm::toMat4(orientation);
 		m_View = glm::inverse(m_View);
+
+		m_ViewLH = glm::lookAtLH(m_Position, m_Position + GetForward(), GetUp());
 	}
 
 	void EditorCamera::MousePan(const glm::vec2& delta)

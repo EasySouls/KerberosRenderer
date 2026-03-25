@@ -1,29 +1,32 @@
 Scene: Unnamed Scene
 Entities:
-  - Entity: 4943794690679386388
+  - Entity: 1211823799333201449
     TagComponent:
-      Tag: Ground
+      Tag: Cube
     TransformComponent:
-      Translation: [0, -11.6, 0]
-      Rotation: [0, 0, 0]
-      Scale: [20, 0.2, 20]
+      Translation: [25.182259, 0, 0]
+      Rotation: [0, -0, 0]
+      Scale: [5, 5, 5]
     HierarchyComponent:
       Parent: 0
       Children:
         []
-    RigidBody3DComponent:
-      Mass: 1
-      Type: 0
-      Velocity: [0, 0, 0]
-      AngularVelocity: [0, 0, 0]
-      UseGravity: true
-      Friction: 0.5
-      Restitution: 0.5
-    BoxCollider3DComponent:
-      Size: [20, 0.2, 20]
-      Offset: [0, 3.3, 0]
     StaticMeshComponent:
       Mesh: 5556831655075431416
+      Texture: 0
+  - Entity: 1004823327772732650
+    TagComponent:
+      Tag: Revolver
+    TransformComponent:
+      Translation: [-6.473844, 15, 0.34905815]
+      Rotation: [-1.4831889, 1.4999994, -4.2130736e-07]
+      Scale: [20, 20.000006, 20.000374]
+    HierarchyComponent:
+      Parent: 0
+      Children:
+        []
+    StaticMeshComponent:
+      Mesh: 12640333732108170778
       Texture: 0
   - Entity: 44958100548870983
     TagComponent:
@@ -50,17 +53,28 @@ Entities:
     StaticMeshComponent:
       Mesh: 2971773807105207837
       Texture: 0
-  - Entity: 1004823327772732650
+  - Entity: 4943794690679386388
     TagComponent:
-      Tag: Revolver
+      Tag: Ground
     TransformComponent:
-      Translation: [-6.473844, 15, 0.34905815]
-      Rotation: [-1.4831889, 1.4999994, -4.2130736e-07]
-      Scale: [20, 20.000006, 20.000374]
+      Translation: [0, -11.6, 0]
+      Rotation: [0, 0, 0]
+      Scale: [40, 0.2, 40]
     HierarchyComponent:
       Parent: 0
       Children:
         []
+    RigidBody3DComponent:
+      Mass: 1
+      Type: 0
+      Velocity: [0, 0, 0]
+      AngularVelocity: [0, 0, 0]
+      UseGravity: true
+      Friction: 0.5
+      Restitution: 0.5
+    BoxCollider3DComponent:
+      Size: [20, 0.2, 20]
+      Offset: [0, 3.3, 0]
     StaticMeshComponent:
-      Mesh: 12640333732108170778
+      Mesh: 5556831655075431416
       Texture: 0

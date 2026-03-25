@@ -44,8 +44,9 @@ namespace Kerberos
 		{
 			if (NeedsConvertingToKTX2(filepath))
 			{
-				const std::string command = std::format("ktx2ktx2 -b {}", filepath.string());
-				int res = system(command.c_str());
+				// TODO: Check if it is already converted, not in the ctor of Texture2D
+				const std::string command = std::format("ktx2ktx2 -f -b {}", filepath.string());
+				const int res = system(command.c_str());
 				KBR_CORE_ASSERT(res == 0, "TextureImporter::ImportTexture - failed to convert KTX file to KTX2 format using command: {}", command);
 			}
 

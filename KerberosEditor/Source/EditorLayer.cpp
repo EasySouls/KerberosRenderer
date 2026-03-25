@@ -555,7 +555,7 @@ namespace Kerberos
 		const bool gizmosEnabled = m_SceneState == SceneState::Edit || m_SceneState == SceneState::Simulate;
 		if (const Entity selectedEntity = m_HierarchyPanel.GetSelectedEntity(); selectedEntity && m_GizmoType != GizmoType::None && gizmosEnabled)
 		{
-			ImGuizmo::SetOrthographic(true);
+			ImGuizmo::SetOrthographic(false);
 			ImGuizmo::SetDrawlist();
 
 			const float windowWidth = ImGui::GetWindowWidth();
@@ -569,8 +569,8 @@ namespace Kerberos
 			const glm::mat4 cameraProjection = camera.GetProjection();
 			const glm::mat4 cameraView = glm::inverse(cameraEntity.GetComponent<TransformComponent>().GetTransform());*/
 
-			const glm::mat4 cameraProjection = m_EditorCamera->GetProjectionMatrix();
-			const glm::mat4 cameraView = m_EditorCamera->GetViewMatrix();
+			const glm::mat4 cameraProjection = m_EditorCamera->GetProjectionMatrix(Handedness::Left);
+			const glm::mat4 cameraView = m_EditorCamera->GetViewMatrix(Handedness::Left);
 
 			/// Entity transform
 			auto& tc = selectedEntity.GetComponent<TransformComponent>();

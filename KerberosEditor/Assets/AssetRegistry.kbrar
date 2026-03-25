@@ -2,9 +2,15 @@ AssetRegistry:
   - Handle: 2971773807105207837
     Type: Model
     Path: Assets\Models\voyager.gltf
+  - Handle: 2995231662383101662
+    Type: Texture2D
+    Path: Assets\Textures\lavaplanet_rgba.ktx
   - Handle: 5556831655075431416
     Type: Model
     Path: Assets\Models\cube.gltf
+  - Handle: 6728996633782092594
+    Type: Model
+    Path: Assets\Models\avocado\Avocado.gltf
   - Handle: 12640333732108170778
     Type: Model
     Path: Assets\Models\cerberus\cerberus.gltf

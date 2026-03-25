@@ -16,30 +16,37 @@ namespace Kerberos
 		tinygltf::TinyGLTF loader;
 		std::string err;
 		std::string warn;
-		/*bool ret = false;
+		bool ret = false;
+
+		const std::filesystem::path currentPath = std::filesystem::current_path();
+		const std::filesystem::path fullPath = currentPath / path;
+		const std::filesystem::path relativePath = std::filesystem::relative(fullPath, currentPath);
+
 		if (path.extension() == ".glb")
 		{
 			ret = loader.LoadBinaryFromFile(&model, &err, &warn, path.string());
 		}
-		else
+		else if (path.extension() == ".gltf")
 		{
 			ret = loader.LoadASCIIFromFile(&model, &err, &warn, path.string());
-		}*/
-		const std::filesystem::path currentPath = std::filesystem::current_path();
-		const std::filesystem::path fullPath = currentPath / path;
-		const std::filesystem::path relativePath = std::filesystem::relative(fullPath, currentPath);
-		const bool ret = loader.LoadASCIIFromFile(&model, &err, &warn, path.string());
+		}
+		else 
+		{
+			KBR_CORE_ERROR("Unsupported file format: {0}", path.extension().string());
+			throw std::runtime_error("Unsupported file format: " + path.extension().string());
+		}
 
 		if (!warn.empty())
 		{
-			std::cout << "GLTF Warning: " << warn << '\n';
+			KBR_CORE_WARN("GLTF Warning: {0}", warn);
 		}
 		if (!err.empty())
 		{
-			std::cerr << "GLTF Error: " << err << '\n';
+			KBR_CORE_ERROR("GLTF Error: {0}", err);
 		}
 		if (!ret)
 		{
+			KBR_CORE_ASSERT(false, "Failed to load glTF model: {0}", path.string());
 			throw std::runtime_error("Failed to load glTF model: " + path.string());
 		}
 

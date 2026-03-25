@@ -170,7 +170,7 @@ namespace Kerberos
 				else
 				{
 					const auto fileExtension = path.extension();
-					const bool isImageFile = (fileExtension == ".png" || fileExtension == ".jpg" || fileExtension == ".jpeg");
+					const bool isImageFile = (fileExtension == ".png" || fileExtension == ".jpg" || fileExtension == ".jpeg" || fileExtension == ".ktx" || fileExtension == ".ktx2");
 					if (isImageFile)
 					{
 						if (!m_AssetImages.contains(path))
