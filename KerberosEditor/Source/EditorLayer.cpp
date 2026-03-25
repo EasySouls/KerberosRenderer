@@ -22,6 +22,7 @@
 #include <glm/gtc/matrix_inverse.hpp>
 #include <glm/gtc/type_ptr.hpp>
 #include <imgui/imgui.h>
+#include <limits>
 
 namespace Kerberos
 {
@@ -372,29 +373,36 @@ namespace Kerberos
 
 	void EditorLayer::HandleMousePicking() 
 	{
+		KBR_PROFILE_FUNCTION();
+
 		auto [mx, my] = ImGui::GetMousePos();
 		mx -= m_ViewportBounds[0].x;
 		my -= m_ViewportBounds[0].y;
 		const glm::vec2 viewportSize = m_ViewportBounds[1] - m_ViewportBounds[0];
-
-		/// Flip the y coord (works with opengl)
-		my = viewportSize.y - my;
 
 		const int mouseX = static_cast<int>(mx);
 		const int mouseY = static_cast<int>(my);
 
 		if (mouseX >= 0 && mouseY >= 0 && mouseX <= static_cast<int>(viewportSize.x) && mouseY <= static_cast<int>(viewportSize.y))
 		{
-			/*int pixelData = m_ActiveScene->GetEditorFramebuffer()->ReadPixel(1, mouseX, mouseY);
+          Renderer::RequestMousePickingPixel(static_cast<uint32_t>(mouseX), static_cast<uint32_t>(mouseY));
 
-			if (pixelData < 0)
+			if (const auto pickedEntityID = Renderer::GetMousePickingEntityID())
 			{
-				m_HoveredEntity = {};
+				constexpr uint32_t invalidEntityID = std::numeric_limits<uint32_t>::max();
+				if (*pickedEntityID == invalidEntityID)
+				{
+					m_HoveredEntity = {};
+				}
+				else
+				{
+					m_HoveredEntity = Entity{ static_cast<entt::entity>(*pickedEntityID), m_ActiveScene.get() };
+				}
 			}
-			else
-			{
-				m_HoveredEntity = Entity{ static_cast<entt::entity>(pixelData), m_ActiveScene.get() };
-			}*/
+		}
+		else
+		{
+			m_HoveredEntity = {};
 		}
 	}
 

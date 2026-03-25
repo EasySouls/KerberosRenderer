@@ -3,6 +3,8 @@
 #include "Scene/Scene.hpp"
 #include "Scene/Camera/EditorCamera.hpp"
 
+#include <optional>
+
 namespace Kerberos
 {
 	struct DepthBias
@@ -41,12 +43,14 @@ namespace Kerberos
 
 		static uint64_t GetCompositedOutputImageID();
 		static uint64_t GetShadowMapDepthImageID();
+		static void RequestMousePickingPixel(uint32_t x, uint32_t y);
+		static std::optional<uint32_t> GetMousePickingEntityID();
 
 	private:
 		static void UpdateLights(uint32_t currentImage);
 		static void UpdateSceneUniformBuffers(uint32_t currentImage, const Camera* mainCamera);
 		static void UpdateSceneUniformBuffers(uint32_t currentImage, const glm::mat4& view, const glm::mat4& projection, const glm::vec3& camPos);
-		static void UpdatePerObjectUniformBuffer(uint32_t currentImage, uint32_t objectIndex, const glm::mat4& model, const Material& material);
+        static void UpdatePerObjectUniformBuffer(uint32_t currentImage, uint32_t objectIndex, const glm::mat4& model, const Material& material, uint32_t entityID);
 
 		static glm::mat4 CalculateLightSpaceMatrix();
 

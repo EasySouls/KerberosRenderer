@@ -2,10 +2,12 @@
 #include "Renderer.hpp"
 
 #include <glm/gtc/matrix_inverse.hpp>
+#include <limits>
 
 #include "MaterialRegistry.hpp"
 #include "ModelLoader.hpp"
 #include "SkyboxUtils.hpp"
+#include "Buffer.hpp"
 #include "VulkanContext.hpp"
 #include "Shaders/Shader.hpp"
 
@@ -46,6 +48,16 @@ namespace Kerberos
 		vk::raii::ImageView ImageView = nullptr;
 	};
 
+	struct PickingReadbackSlot
+	{
+		vk::raii::Buffer Buffer = nullptr;
+		vk::raii::DeviceMemory Memory = nullptr;
+		vk::raii::Fence Fence = nullptr;
+		void* MappedData = nullptr;
+		bool Pending = false;
+		uint32_t FrameSubmitted = 0;
+	};
+
 	struct DescriptorSetLayouts
 	{
 		vk::raii::DescriptorSetLayout scene = nullptr;
@@ -74,6 +86,8 @@ namespace Kerberos
 		alignas(16) glm::mat4 model{ 0.f };
 		alignas(16) glm::mat4 worldNormal{ 0.f };
 		alignas(16) Material::UniformBlock material;
+		alignas(16) uint32_t entityID = std::numeric_limits<uint32_t>::max();
+		alignas(16) glm::vec3 _Padding{ 0.0f };
 	};
 
 	struct SkyboxData
@@ -103,6 +117,8 @@ namespace Kerberos
 		ShadowMap ShadowMap;
 		Skybox Skybox;
 		ImageData ColorImage;
+		ImageData PickingImage;
+		vk::ImageLayout PickingImageLayout = vk::ImageLayout::eUndefined;
 		ImageData DepthImage;
 
 		vk::raii::DescriptorPool DescriptorPool = nullptr;
@@ -135,6 +151,14 @@ namespace Kerberos
 
 		vk::DescriptorSet ColorOutputDescriptorSet = nullptr;
 		vk::DescriptorSet ShadowMapDescriptorSet = nullptr;
+
+		static constexpr uint32_t MousePickingReadbackFrameLag = 3;
+		std::array<PickingReadbackSlot, MousePickingReadbackFrameLag> MousePickingReadbackSlots{};
+		uint32_t MousePickingReadbackWriteSlot = 0;
+		uint32_t MousePickingReadbackFrameCounter = 0;
+		bool MousePickingRequestPending = false;
+		glm::uvec2 MousePickingRequestPixel{ 0, 0 };
+		std::optional<uint32_t> LatestMousePickingEntityID;
 
 		glm::vec2 OutputSize{ 1280.0f, 720.0f };
 
@@ -175,6 +199,15 @@ namespace Kerberos
 
 		VulkanContext::DestroyImGuiDescriptorSet(s_Data->ColorOutputDescriptorSet);
 		VulkanContext::DestroyImGuiDescriptorSet(s_Data->ShadowMapDescriptorSet);
+
+		for (auto& slot : s_Data->MousePickingReadbackSlots)
+		{
+         if (slot.Memory != nullptr && slot.MappedData)
+			{
+				slot.Memory.unmapMemory();
+				slot.MappedData = nullptr;
+			}
+		}
 
 		s_Data.reset();
 		s_Data = nullptr;
@@ -282,7 +315,7 @@ namespace Kerberos
 				if (!staticMesh.Visible || !staticMesh.StaticMesh || !staticMesh.MeshMaterial || staticMesh.MeshMaterial->IsTransparent())
 					continue;
 
-				UpdatePerObjectUniformBuffer(currentImage, static_cast<uint32_t>(i), transform.GetTransform(), *staticMesh.MeshMaterial);
+				UpdatePerObjectUniformBuffer(currentImage, static_cast<uint32_t>(i), transform.GetTransform(), *staticMesh.MeshMaterial, std::numeric_limits<uint32_t>::max());
 				uint32_t dynamicOffset = static_cast<uint32_t>(i * s_Data->DynamicAlignment);
 
 				cmd.bindDescriptorSets(
@@ -328,6 +361,42 @@ namespace Kerberos
 				.pImageMemoryBarriers = &barrier
 			};
 			cmd.pipelineBarrier2(dependencyInfo);
+		}
+
+		// Transition picking image to color attachment optimal
+		{
+         const vk::PipelineStageFlags2 srcStageMask = s_Data->PickingImageLayout == vk::ImageLayout::eTransferSrcOptimal
+				? vk::PipelineStageFlagBits2::eTransfer
+				: vk::PipelineStageFlagBits2::eTopOfPipe;
+			const vk::AccessFlags2 srcAccessMask = s_Data->PickingImageLayout == vk::ImageLayout::eTransferSrcOptimal
+				? vk::AccessFlagBits2::eTransferRead
+				: vk::AccessFlags2{};
+
+			vk::ImageMemoryBarrier2 barrier = {
+          .srcStageMask = srcStageMask,
+			.srcAccessMask = srcAccessMask,
+			.dstStageMask = vk::PipelineStageFlagBits2::eColorAttachmentOutput,
+			.dstAccessMask = vk::AccessFlagBits2::eColorAttachmentWrite,
+           .oldLayout = s_Data->PickingImageLayout,
+			.newLayout = vk::ImageLayout::eColorAttachmentOptimal,
+			.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+			.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+			.image = s_Data->PickingImage.Image,
+			.subresourceRange = {
+				.aspectMask = vk::ImageAspectFlagBits::eColor,
+				.baseMipLevel = 0,
+				.levelCount = 1,
+				.baseArrayLayer = 0,
+				.layerCount = 1
+			}
+			};
+			const vk::DependencyInfo dependencyInfo = {
+				.dependencyFlags = {},
+				.imageMemoryBarrierCount = 1,
+				.pImageMemoryBarriers = &barrier
+			};
+			cmd.pipelineBarrier2(dependencyInfo);
+			s_Data->PickingImageLayout = vk::ImageLayout::eColorAttachmentOptimal;
 		}
 
 		// Transition color image layout for color attachment
@@ -410,6 +479,19 @@ namespace Kerberos
 				.clearValue = vk::ClearColorValue{ std::array{0.0f, 0.0f, 0.0f, 1.0f} }
 			};
 
+			vk::RenderingAttachmentInfo pickingAttachmentInfo{
+				.imageView = s_Data->PickingImage.ImageView,
+				.imageLayout = vk::ImageLayout::eColorAttachmentOptimal,
+				.loadOp = vk::AttachmentLoadOp::eClear,
+				.storeOp = vk::AttachmentStoreOp::eStore,
+				.clearValue = vk::ClearColorValue{ std::array{std::numeric_limits<uint32_t>::max(), 0u, 0u, 0u} }
+			};
+
+			const std::array<vk::RenderingAttachmentInfo, 2> colorAttachments = {
+				colorAttachmentInfo,
+				pickingAttachmentInfo
+			};
+
 			vk::RenderingAttachmentInfo depthAttachmentInfo{
 				.imageView = s_Data->DepthImage.ImageView,
 				.imageLayout = vk::ImageLayout::eDepthAttachmentOptimal,
@@ -421,8 +503,8 @@ namespace Kerberos
 			const vk::RenderingInfo renderingInfo{
 				.renderArea = renderArea,
 				.layerCount = 1,
-				.colorAttachmentCount = 1,
-				.pColorAttachments = &colorAttachmentInfo,
+			    .colorAttachmentCount = static_cast<uint32_t>(colorAttachments.size()),
+				.pColorAttachments = colorAttachments.data(),
 				.pDepthAttachment = &depthAttachmentInfo
 			};
 
@@ -461,7 +543,7 @@ namespace Kerberos
 					// TODO: Remove this once we have a proper material system
 					staticMesh.MeshMaterial = s_Data->MaterialRegistry.Get("White");
 
-					UpdatePerObjectUniformBuffer(currentImage, static_cast<uint32_t>(i), transform.GetTransform(), *staticMesh.MeshMaterial);
+					UpdatePerObjectUniformBuffer(currentImage, static_cast<uint32_t>(i), transform.GetTransform(), *staticMesh.MeshMaterial, static_cast<uint32_t>(entity));
 					uint32_t dynamicOffset = static_cast<uint32_t>(i * s_Data->DynamicAlignment);
 
 					cmd.bindDescriptorSets(
@@ -490,7 +572,7 @@ namespace Kerberos
 					if (!meshComp.Visible || !meshComp.StaticMesh || !meshComp.MeshMaterial)
 						continue;
 
-					UpdatePerObjectUniformBuffer(currentImage, static_cast<uint32_t>(i), transform.GetTransform(), *meshComp.MeshMaterial);
+					UpdatePerObjectUniformBuffer(currentImage, static_cast<uint32_t>(i), transform.GetTransform(), *meshComp.MeshMaterial, std::numeric_limits<uint32_t>::max());
 					uint32_t dynamicOffset = static_cast<uint32_t>(i * s_Data->DynamicAlignment);
 
 					cmd.bindDescriptorSets(
@@ -520,6 +602,18 @@ namespace Kerberos
 				.storeOp = vk::AttachmentStoreOp::eStore,
 			};
 
+			vk::RenderingAttachmentInfo pickingAttachmentInfo{
+				.imageView = s_Data->PickingImage.ImageView,
+				.imageLayout = vk::ImageLayout::eColorAttachmentOptimal,
+				.loadOp = vk::AttachmentLoadOp::eLoad,
+				.storeOp = vk::AttachmentStoreOp::eStore,
+			};
+
+			const std::array<vk::RenderingAttachmentInfo, 2> colorAttachments = {
+				colorAttachmentInfo,
+				pickingAttachmentInfo
+			};
+
 			vk::RenderingAttachmentInfo depthAttachmentInfo{
 				.imageView = s_Data->DepthImage.ImageView,
 				.imageLayout = vk::ImageLayout::eDepthAttachmentOptimal,
@@ -530,8 +624,8 @@ namespace Kerberos
 			const vk::RenderingInfo renderingInfo{
 				.renderArea = renderArea,
 				.layerCount = 1,
-				.colorAttachmentCount = 1,
-				.pColorAttachments = &colorAttachmentInfo,
+			    .colorAttachmentCount = static_cast<uint32_t>(colorAttachments.size()),
+				.pColorAttachments = colorAttachments.data(),
 				.pDepthAttachment = &depthAttachmentInfo
 			};
 
@@ -571,6 +665,87 @@ namespace Kerberos
 			cmd.endRendering();
 
 			KBR_CORE_TRACE("Transparent pass done!");
+		}
+
+		// Poll completed readback slot and issue the next copy request without stalling the CPU.
+		{
+            ++s_Data->MousePickingReadbackFrameCounter;
+
+            for (auto& readSlot : s_Data->MousePickingReadbackSlots)
+			{
+               if (readSlot.Pending && s_Data->MousePickingReadbackFrameCounter > readSlot.FrameSubmitted)
+				{
+					const auto pickedEntity = *static_cast<const uint32_t*>(readSlot.MappedData);
+					s_Data->LatestMousePickingEntityID = pickedEntity;
+					readSlot.Pending = false;
+				}
+			}
+
+			if (s_Data->MousePickingRequestPending)
+			{
+				auto& writeSlot = s_Data->MousePickingReadbackSlots[s_Data->MousePickingReadbackWriteSlot];
+                {
+					vk::ImageMemoryBarrier2 toTransferSrcBarrier = {
+						.srcStageMask = vk::PipelineStageFlagBits2::eColorAttachmentOutput,
+						.srcAccessMask = vk::AccessFlagBits2::eColorAttachmentWrite,
+						.dstStageMask = vk::PipelineStageFlagBits2::eTransfer,
+						.dstAccessMask = vk::AccessFlagBits2::eTransferRead,
+						.oldLayout = vk::ImageLayout::eColorAttachmentOptimal,
+						.newLayout = vk::ImageLayout::eTransferSrcOptimal,
+						.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+						.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+						.image = s_Data->PickingImage.Image,
+						.subresourceRange = {
+							.aspectMask = vk::ImageAspectFlagBits::eColor,
+							.baseMipLevel = 0,
+							.levelCount = 1,
+							.baseArrayLayer = 0,
+							.layerCount = 1
+						}
+					};
+
+					const vk::DependencyInfo toTransferDependencyInfo = {
+						.dependencyFlags = {},
+						.imageMemoryBarrierCount = 1,
+						.pImageMemoryBarriers = &toTransferSrcBarrier
+					};
+					cmd.pipelineBarrier2(toTransferDependencyInfo);
+					s_Data->PickingImageLayout = vk::ImageLayout::eTransferSrcOptimal;
+
+					const vk::BufferImageCopy copyRegion{
+						.bufferOffset = 0,
+						.bufferRowLength = 0,
+						.bufferImageHeight = 0,
+						.imageSubresource = {
+							.aspectMask = vk::ImageAspectFlagBits::eColor,
+							.mipLevel = 0,
+							.baseArrayLayer = 0,
+							.layerCount = 1
+						},
+						.imageOffset = {
+							.x = static_cast<int32_t>(s_Data->MousePickingRequestPixel.x),
+							.y = static_cast<int32_t>(s_Data->MousePickingRequestPixel.y),
+							.z = 0
+						},
+						.imageExtent = {
+							.width = 1,
+							.height = 1,
+							.depth = 1
+						}
+					};
+
+					cmd.copyImageToBuffer(
+						s_Data->PickingImage.Image,
+						vk::ImageLayout::eTransferSrcOptimal,
+						writeSlot.Buffer,
+						copyRegion);
+
+					writeSlot.Pending = true;
+					writeSlot.FrameSubmitted = s_Data->MousePickingReadbackFrameCounter;
+					s_Data->MousePickingReadbackWriteSlot = (s_Data->MousePickingReadbackWriteSlot + 1) % RendererData::MousePickingReadbackFrameLag;
+					s_Data->MousePickingRequestPending = false;
+				}
+			}
 		}
 
 		// Transition color image layout for shader read in ImGui
@@ -886,6 +1061,11 @@ namespace Kerberos
 				vk::ImageTiling::eOptimal,
 				vk::FormatFeatureFlagBits::eColorAttachment | vk::FormatFeatureFlagBits::eColorAttachmentBlend | vk::FormatFeatureFlagBits::eSampledImage
 			);
+			const vk::Format pickingFormat = context.FindSupportedFormat(
+				{ vk::Format::eR32Uint },
+				vk::ImageTiling::eOptimal,
+				vk::FormatFeatureFlagBits::eColorAttachment | vk::FormatFeatureFlagBits::eTransferSrc
+			);
 
 			constexpr uint32_t initialImageWidth = 1920;
 			constexpr uint32_t initialImageHeight = 1080;
@@ -916,6 +1096,34 @@ namespace Kerberos
 			context.SetObjectDebugName(reinterpret_cast<uint64_t>(static_cast<VkImageView>(*s_Data->ColorImage.ImageView)),
 									   vk::ObjectType::eImageView,
 									   "Color Attachment Image View");
+
+			CreateImage(device,
+						initialImageWidth,
+						initialImageHeight,
+						mipLevels,
+						vk::SampleCountFlagBits::e1,
+						pickingFormat,
+						vk::ImageTiling::eOptimal,
+						vk::ImageUsageFlagBits::eColorAttachment | vk::ImageUsageFlagBits::eTransferSrc,
+						vk::MemoryPropertyFlagBits::eDeviceLocal,
+						s_Data->PickingImage.Image,
+						s_Data->PickingImage.ImageMemory);
+
+			context.SetObjectDebugName(reinterpret_cast<uint64_t>(static_cast<VkImage>(*s_Data->PickingImage.Image)),
+									   vk::ObjectType::eImage,
+									   "Picking Attachment Image");
+
+			context.SetObjectDebugName(reinterpret_cast<uint64_t>(static_cast<VkDeviceMemory>(*s_Data->PickingImage.ImageMemory)),
+									   vk::ObjectType::eDeviceMemory,
+									   "Picking Attachment Image Memory");
+
+			s_Data->PickingImage.ImageView = CreateImageView(device, s_Data->PickingImage.Image, pickingFormat, vk::ImageAspectFlagBits::eColor, mipLevels);
+
+			context.SetObjectDebugName(reinterpret_cast<uint64_t>(static_cast<VkImageView>(*s_Data->PickingImage.ImageView)),
+									   vk::ObjectType::eImageView,
+									   "Picking Attachment Image View");
+			s_Data->PickingImageLayout = vk::ImageLayout::eUndefined;
+			s_Data->PickingImageLayout = vk::ImageLayout::eUndefined;
 
 			const vk::Format depthFormat = context.FindSupportedFormat(
 				{ vk::Format::eD32Sfloat },
@@ -1027,16 +1235,26 @@ namespace Kerberos
 				.maxDepthBounds = 1.0f,
 			};
 
-			vk::PipelineColorBlendAttachmentState opaqueColorBlendAttachment{
+           vk::PipelineColorBlendAttachmentState opaqueColorBlendAttachment{
 				.blendEnable = vk::False,
 				.colorWriteMask = vk::ColorComponentFlagBits::eR | vk::ColorComponentFlagBits::eG | vk::ColorComponentFlagBits::eB | vk::ColorComponentFlagBits::eA
+			};
+
+			vk::PipelineColorBlendAttachmentState pickingColorBlendAttachment{
+				.blendEnable = vk::False,
+				.colorWriteMask = vk::ColorComponentFlagBits::eR | vk::ColorComponentFlagBits::eG | vk::ColorComponentFlagBits::eB | vk::ColorComponentFlagBits::eA
+			};
+
+			std::array<vk::PipelineColorBlendAttachmentState, 2> opaqueColorBlendAttachments = {
+				opaqueColorBlendAttachment,
+				pickingColorBlendAttachment
 			};
 
 			vk::PipelineColorBlendStateCreateInfo colorBlending{
 				.logicOpEnable = vk::False,
 				.logicOp = vk::LogicOp::eCopy,
-				.attachmentCount = 1,
-				.pAttachments = &opaqueColorBlendAttachment
+                .attachmentCount = static_cast<uint32_t>(opaqueColorBlendAttachments.size()),
+				.pAttachments = opaqueColorBlendAttachments.data()
 			};
 
 			vk::PipelineColorBlendAttachmentState transparentColorBlendAttachment{
@@ -1050,16 +1268,23 @@ namespace Kerberos
 				.colorWriteMask = vk::ColorComponentFlagBits::eR | vk::ColorComponentFlagBits::eG | vk::ColorComponentFlagBits::eB | vk::ColorComponentFlagBits::eA
 			};
 
+			std::array<vk::PipelineColorBlendAttachmentState, 2> transparentColorBlendAttachments = {
+				transparentColorBlendAttachment,
+				pickingColorBlendAttachment
+			};
+
 			vk::PipelineColorBlendStateCreateInfo transparentColorBlending{
 				.logicOpEnable = vk::False,
 				.logicOp = vk::LogicOp::eCopy,
-				.attachmentCount = 1,
-				.pAttachments = &transparentColorBlendAttachment
+                .attachmentCount = static_cast<uint32_t>(transparentColorBlendAttachments.size()),
+				.pAttachments = transparentColorBlendAttachments.data()
 			};
 
+            const std::array colorAttachmentFormats = { colorFormat, pickingFormat };
+
 			vk::PipelineRenderingCreateInfo pipelineRenderingCreateInfo{
-				.colorAttachmentCount = 1,
-				.pColorAttachmentFormats = &colorFormat,
+			    .colorAttachmentCount = static_cast<uint32_t>(colorAttachmentFormats.size()),
+				.pColorAttachmentFormats = colorAttachmentFormats.data(),
 				.depthAttachmentFormat = depthFormat
 			};
 
@@ -1229,6 +1454,24 @@ namespace Kerberos
 									   "Shadow Map Descriptor Set for ImGui");
 		}
 
+		for (uint32_t i = 0; i < RendererData::MousePickingReadbackFrameLag; ++i)
+		{
+			auto& slot = s_Data->MousePickingReadbackSlots[i];
+			CreateBuffer(device,
+						 sizeof(uint32_t),
+						 vk::BufferUsageFlagBits::eTransferDst,
+						 vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent,
+						 slot.Buffer,
+						 slot.Memory);
+
+			slot.MappedData = slot.Memory.mapMemory(0, sizeof(uint32_t));
+
+			constexpr vk::FenceCreateInfo signaledFenceCreateInfo{
+				.flags = vk::FenceCreateFlagBits::eSignaled
+			};
+			slot.Fence = vk::raii::Fence(device, signaledFenceCreateInfo);
+		}
+
 		//m_OutputSize = m_ViewportSize;
 	}
 
@@ -1246,6 +1489,11 @@ namespace Kerberos
 			vk::ImageTiling::eOptimal,
 			vk::FormatFeatureFlagBits::eColorAttachment | vk::FormatFeatureFlagBits::eColorAttachmentBlend | vk::FormatFeatureFlagBits::eSampledImage
 		);
+		const vk::Format pickingFormat = context.FindSupportedFormat(
+			{ vk::Format::eR32Uint },
+			vk::ImageTiling::eOptimal,
+			vk::FormatFeatureFlagBits::eColorAttachment | vk::FormatFeatureFlagBits::eTransferSrc
+		);
 
 		device.waitIdle();
 
@@ -1255,6 +1503,9 @@ namespace Kerberos
 		s_Data->ColorImage.ImageView.clear();
 		s_Data->ColorImage.Image.clear();
 		s_Data->ColorImage.ImageMemory.clear();
+        s_Data->PickingImage.ImageView.clear();
+		s_Data->PickingImage.Image.clear();
+		s_Data->PickingImage.ImageMemory.clear();
 		s_Data->DepthImage.ImageView.clear();
 		s_Data->DepthImage.Image.clear();
 		s_Data->DepthImage.ImageMemory.clear();
@@ -1284,6 +1535,31 @@ namespace Kerberos
 		context.SetObjectDebugName(reinterpret_cast<uint64_t>(static_cast<VkImageView>(*s_Data->ColorImage.ImageView)),
 								   vk::ObjectType::eImageView,
 								   "Color Attachment Image View");
+
+		CreateImage(device,
+					width,
+					height,
+					mipLevels,
+					vk::SampleCountFlagBits::e1,
+					pickingFormat,
+					vk::ImageTiling::eOptimal,
+					vk::ImageUsageFlagBits::eColorAttachment | vk::ImageUsageFlagBits::eTransferSrc,
+					vk::MemoryPropertyFlagBits::eDeviceLocal,
+					s_Data->PickingImage.Image,
+					s_Data->PickingImage.ImageMemory);
+
+		context.SetObjectDebugName(reinterpret_cast<uint64_t>(static_cast<VkImage>(*s_Data->PickingImage.Image)),
+								   vk::ObjectType::eImage,
+								   "Picking Attachment Image");
+
+		context.SetObjectDebugName(reinterpret_cast<uint64_t>(static_cast<VkDeviceMemory>(*s_Data->PickingImage.ImageMemory)),
+								   vk::ObjectType::eDeviceMemory,
+								   "Picking Attachment Image Memory");
+
+		s_Data->PickingImage.ImageView = CreateImageView(device, s_Data->PickingImage.Image, pickingFormat, vk::ImageAspectFlagBits::eColor, mipLevels);
+		context.SetObjectDebugName(reinterpret_cast<uint64_t>(static_cast<VkImageView>(*s_Data->PickingImage.ImageView)),
+								   vk::ObjectType::eImageView,
+								   "Picking Attachment Image View");
 
 		const vk::Format depthFormat = context.FindSupportedFormat(
 			{ vk::Format::eD32Sfloat },
@@ -1434,6 +1710,24 @@ namespace Kerberos
 		return reinterpret_cast<uint64_t>(static_cast<VkDescriptorSet>(s_Data->ShadowMapDescriptorSet));
 	}
 
+	void Renderer::RequestMousePickingPixel(const uint32_t x, const uint32_t y)
+	{
+		KBR_CORE_ASSERT(s_Data, "Renderer not initialized!");
+
+		if (x >= static_cast<uint32_t>(s_Data->OutputSize.x) || y >= static_cast<uint32_t>(s_Data->OutputSize.y))
+			return;
+
+		s_Data->MousePickingRequestPixel = { x, y };
+		s_Data->MousePickingRequestPending = true;
+	}
+
+	std::optional<uint32_t> Renderer::GetMousePickingEntityID()
+	{
+		KBR_CORE_ASSERT(s_Data, "Renderer not initialized!");
+
+		return s_Data->LatestMousePickingEntityID;
+	}
+
 	void Renderer::UpdateLights(const uint32_t currentImage) 
 	{
 		KBR_CORE_ASSERT(s_Data, "Renderer not initialized!");
@@ -1480,15 +1774,16 @@ namespace Kerberos
 		std::memcpy(s_Data->UniformBuffers[currentImage].skybox->GetMappedData(), &s_Data->SkyboxData, sizeof(SkyboxData));
 	}
 
-	void Renderer::UpdatePerObjectUniformBuffer(const uint32_t currentImage, const uint32_t objectIndex, const glm::mat4& model,
-	                                            const Material& material) 
+    void Renderer::UpdatePerObjectUniformBuffer(const uint32_t currentImage, const uint32_t objectIndex, const glm::mat4& model,
+												const Material& material, const uint32_t entityID) 
 	{
 		KBR_CORE_ASSERT(s_Data, "Renderer not initialized!");
 
 		s_Data->PerObjectData = {
 			.model = model,
 			.worldNormal = glm::inverseTranspose(model),
-			.material = material.Params
+		    .material = material.Params,
+			.entityID = entityID
 		};
 
 		char* data = static_cast<char*>(s_Data->UniformBuffers[currentImage].perObject->GetMappedData());

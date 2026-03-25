@@ -46,9 +46,17 @@ struct PerObject {
     float4x4 model;
     float4x4 worldNormal;
     Material material;
+    uint entityID;
+    float3 _Padding;
 };
 [[vk::binding(2, 0)]]
 ConstantBuffer<PerObject> perObject;
+
+struct PSOutput
+{
+    float4 Color : SV_Target0;
+    uint EntityID : SV_Target1;
+};
 
 [[vk::binding(3, 0)]]
 Sampler2D shadowMap;
@@ -241,7 +249,7 @@ VSOutput vertexMain(VSInput input)
 }
 
 [shader("fragment")]
-float4 fragmentMain(VSOutput input)
+PSOutput fragmentMain(VSOutput input)
 {
     float3 N = CalculateNormal(input);
     float3 V = normalize(scene.camPos - input.FragPos_WorldSpace);
@@ -305,5 +313,8 @@ float4 fragmentMain(VSOutput input)
     // Gamma correction
     color = pow(color, (1.0f / uboParams.gamma).xxx);
 
-    return float4(color, 1.0);
+    PSOutput output;
+    output.Color = float4(color, 1.0);
+    output.EntityID = perObject.entityID;
+    return output;
 }
