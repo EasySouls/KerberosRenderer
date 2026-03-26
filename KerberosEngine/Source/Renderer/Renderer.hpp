@@ -2,6 +2,7 @@
 
 #include "Scene/Scene.hpp"
 #include "Scene/Camera/EditorCamera.hpp"
+#include "Vulkan.hpp"
 
 #include <optional>
 
@@ -17,6 +18,15 @@ namespace Kerberos
 	struct RendererSettings
 	{
 
+	};
+
+	struct GPUTimings
+	{
+		float FrameMilliseconds = 0.0f;
+		float ShadowPassMilliseconds = 0.0f;
+		float OpaquePassMilliseconds = 0.0f;
+		float TransparentPassMilliseconds = 0.0f;
+		bool  IsValid = false;
 	};
 
 	class Renderer
@@ -45,12 +55,15 @@ namespace Kerberos
 		static uint64_t GetShadowMapDepthImageID();
 		static void RequestMousePickingPixel(uint32_t x, uint32_t y);
 		static std::optional<uint32_t> GetMousePickingEntityID();
+		static GPUTimings GetLatestGPUTimings();
 
 	private:
 		static void UpdateLights(uint32_t currentImage);
 		static void UpdateSceneUniformBuffers(uint32_t currentImage, const Camera* mainCamera);
 		static void UpdateSceneUniformBuffers(uint32_t currentImage, const glm::mat4& view, const glm::mat4& projection, const glm::vec3& camPos);
         static void UpdatePerObjectUniformBuffer(uint32_t currentImage, uint32_t objectIndex, const glm::mat4& model, const Material& material, uint32_t entityID);
+		static void WriteGPUTimestamp(const vk::raii::CommandBuffer& cmd, uint32_t index);
+		static void ResolveGPUTimings();
 
 		static glm::mat4 CalculateLightSpaceMatrix();
 

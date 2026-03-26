@@ -110,6 +110,19 @@ namespace Kerberos
 		vk::raii::DescriptorSet skybox = nullptr;
 	};
 
+	enum class GPUTimestampQuery : uint32_t
+	{
+		FrameBegin = 0,
+		ShadowBegin,
+		ShadowEnd,
+		OpaqueBegin,
+		OpaqueEnd,
+		TransparentBegin,
+		TransparentEnd,
+		FrameEnd,
+		Count
+	};
+
 	struct RendererData
 	{
 		MaterialRegistry MaterialRegistry;
@@ -159,6 +172,11 @@ namespace Kerberos
 		bool MousePickingRequestPending = false;
 		glm::uvec2 MousePickingRequestPixel{ 0, 0 };
 		std::optional<uint32_t> LatestMousePickingEntityID;
+
+		vk::raii::QueryPool GPUTimestampQueryPool = nullptr;
+		float GPUTimestampPeriodNanoseconds = 0.0f;
+		bool SupportsGPUTimestamps = false;
+		GPUTimings LatestGPUTimings{};
 
 		glm::vec2 OutputSize{ 1280.0f, 720.0f };
 
@@ -225,6 +243,12 @@ namespace Kerberos
 
 		const auto cmd = context.BeginSingleTimeCommands();
 
+		if (s_Data->SupportsGPUTimestamps && s_Data->GPUTimestampQueryPool != nullptr)
+		{
+			cmd.resetQueryPool(s_Data->GPUTimestampQueryPool, 0, static_cast<uint32_t>(GPUTimestampQuery::Count));
+		}
+		WriteGPUTimestamp(cmd, static_cast<uint32_t>(GPUTimestampQuery::FrameBegin));
+
 		context.SetObjectDebugName(reinterpret_cast<uint64_t>(static_cast<VkCommandBuffer>(*cmd)),
 								   vk::ObjectType::eCommandBuffer,
 								   "EditorLayer Single Time Command Buffer");
@@ -244,6 +268,7 @@ namespace Kerberos
 
 			// Render shadow map
 		{
+         WriteGPUTimestamp(cmd, static_cast<uint32_t>(GPUTimestampQuery::ShadowBegin));
 			vk::ImageMemoryBarrier2 barrier = {
 			.srcStageMask = vk::PipelineStageFlagBits2::eEarlyFragmentTests | vk::PipelineStageFlagBits2::eLateFragmentTests,
 			.srcAccessMask = vk::AccessFlagBits2::eDepthStencilAttachmentWrite,
@@ -331,6 +356,7 @@ namespace Kerberos
 			}
 
 			cmd.endRendering();
+			WriteGPUTimestamp(cmd, static_cast<uint32_t>(GPUTimestampQuery::ShadowEnd));
 
 			KBR_CORE_TRACE("Shadow pass done!");
 		}
@@ -377,7 +403,7 @@ namespace Kerberos
 				.srcAccessMask = srcAccessMask,
 				.dstStageMask = vk::PipelineStageFlagBits2::eColorAttachmentOutput,
 				.dstAccessMask = vk::AccessFlagBits2::eColorAttachmentWrite,
-				.oldLayout = s_Data->PickingImageLayout,
+				.oldLayout = vk::ImageLayout::eUndefined,
 				.newLayout = vk::ImageLayout::eColorAttachmentOptimal,
 				.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
 				.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
@@ -471,6 +497,7 @@ namespace Kerberos
 
 		// Render opaque objects
 		{
+            WriteGPUTimestamp(cmd, static_cast<uint32_t>(GPUTimestampQuery::OpaqueBegin));
 			vk::RenderingAttachmentInfo colorAttachmentInfo{
 				.imageView = s_Data->ColorImage.ImageView,
 				.imageLayout = vk::ImageLayout::eColorAttachmentOptimal,
@@ -589,12 +616,14 @@ namespace Kerberos
 			}
 
 			cmd.endRendering();
+			WriteGPUTimestamp(cmd, static_cast<uint32_t>(GPUTimestampQuery::OpaqueEnd));
 
 			KBR_CORE_TRACE("Opaque pass done!");
 		}
 
 		// Render transparent objects
 		{
+            WriteGPUTimestamp(cmd, static_cast<uint32_t>(GPUTimestampQuery::TransparentBegin));
 			vk::RenderingAttachmentInfo colorAttachmentInfo{
 				.imageView = s_Data->ColorImage.ImageView,
 				.imageLayout = vk::ImageLayout::eColorAttachmentOptimal,
@@ -663,6 +692,7 @@ namespace Kerberos
 			//}
 
 			cmd.endRendering();
+			WriteGPUTimestamp(cmd, static_cast<uint32_t>(GPUTimestampQuery::TransparentEnd));
 
 			KBR_CORE_TRACE("Transparent pass done!");
 		}
@@ -699,7 +729,10 @@ namespace Kerberos
 			KBR_CORE_TRACE("Color image transitioned for ImGui!");
 		}
 
+		WriteGPUTimestamp(cmd, static_cast<uint32_t>(GPUTimestampQuery::FrameEnd));
+
 		context.EndSingleTimeCommands(cmd);
+		ResolveGPUTimings();
 	}
 
 	void Renderer::RenderSceneRuntime(const Ref<Scene>& scene, const Camera& mainCamera,
@@ -744,6 +777,26 @@ namespace Kerberos
 
 		auto& context = VulkanContext::Get();
 		const auto& device = context.GetDevice();
+		const auto queueFamilyInfo = context.GetQueueFamilyInfo();
+		const auto queueFamilyProperties = context.GetPhysicalDevice().getQueueFamilyProperties();
+
+		s_Data->SupportsGPUTimestamps = false;
+		if (queueFamilyInfo.graphics < queueFamilyProperties.size())
+		{
+			s_Data->SupportsGPUTimestamps = queueFamilyProperties[queueFamilyInfo.graphics].timestampValidBits > 0;
+		}
+
+		s_Data->GPUTimestampPeriodNanoseconds = context.GetProperties().properties.limits.timestampPeriod;
+
+		if (s_Data->SupportsGPUTimestamps)
+		{
+			const vk::QueryPoolCreateInfo queryPoolInfo{
+				.queryType = vk::QueryType::eTimestamp,
+				.queryCount = static_cast<uint32_t>(GPUTimestampQuery::Count)
+			};
+			s_Data->GPUTimestampQueryPool = vk::raii::QueryPool(device, queryPoolInfo);
+			context.SetObjectDebugName(s_Data->GPUTimestampQueryPool, "Renderer GPU Timestamp Query Pool");
+		}
 
 		// Create samplers
 		{
@@ -1646,6 +1699,65 @@ namespace Kerberos
 		KBR_CORE_ASSERT(s_Data, "Renderer not initialized!");
 
 		return s_Data->LatestMousePickingEntityID;
+	}
+
+	GPUTimings Renderer::GetLatestGPUTimings()
+	{
+		KBR_CORE_ASSERT(s_Data, "Renderer not initialized!");
+
+		return s_Data->LatestGPUTimings;
+	}
+
+	void Renderer::WriteGPUTimestamp(const vk::raii::CommandBuffer& cmd, const uint32_t index)
+	{
+		if (!s_Data->SupportsGPUTimestamps || s_Data->GPUTimestampQueryPool == nullptr)
+			return;
+
+		cmd.writeTimestamp2(vk::PipelineStageFlagBits2::eBottomOfPipe, s_Data->GPUTimestampQueryPool, index);
+	}
+
+	void Renderer::ResolveGPUTimings()
+	{
+		if (!s_Data->SupportsGPUTimestamps || s_Data->GPUTimestampQueryPool == nullptr)
+		{
+			s_Data->LatestGPUTimings.IsValid = false;
+			return;
+		}
+
+		std::array<uint64_t, static_cast<size_t>(GPUTimestampQuery::Count)> timestamps{};
+		const auto& device = VulkanContext::Get().GetDevice();
+		const vk::Result result = static_cast<vk::Device>(device).getQueryPoolResults(
+			s_Data->GPUTimestampQueryPool,
+			0,
+			static_cast<uint32_t>(timestamps.size()),
+			timestamps.size() * sizeof(uint64_t),
+			timestamps.data(),
+			sizeof(uint64_t),
+			vk::QueryResultFlagBits::e64);
+
+		if (result != vk::Result::eSuccess)
+		{
+			s_Data->LatestGPUTimings.IsValid = false;
+			return;
+		}
+
+		auto toMilliseconds = [&](const GPUTimestampQuery begin, const GPUTimestampQuery end) -> float
+		{
+			const auto beginTicks = timestamps[static_cast<size_t>(begin)];
+			const auto endTicks = timestamps[static_cast<size_t>(end)];
+			if (endTicks <= beginTicks)
+				return 0.0f;
+
+			const double deltaTicks = static_cast<double>(endTicks - beginTicks);
+			const double nanoseconds = deltaTicks * static_cast<double>(s_Data->GPUTimestampPeriodNanoseconds);
+			return static_cast<float>(nanoseconds * 1e-6);
+		};
+
+		s_Data->LatestGPUTimings.FrameMilliseconds = toMilliseconds(GPUTimestampQuery::FrameBegin, GPUTimestampQuery::FrameEnd);
+		s_Data->LatestGPUTimings.ShadowPassMilliseconds = toMilliseconds(GPUTimestampQuery::ShadowBegin, GPUTimestampQuery::ShadowEnd);
+		s_Data->LatestGPUTimings.OpaquePassMilliseconds = toMilliseconds(GPUTimestampQuery::OpaqueBegin, GPUTimestampQuery::OpaqueEnd);
+		s_Data->LatestGPUTimings.TransparentPassMilliseconds = toMilliseconds(GPUTimestampQuery::TransparentBegin, GPUTimestampQuery::TransparentEnd);
+		s_Data->LatestGPUTimings.IsValid = true;
 	}
 
 	void Renderer::UpdateLights(const uint32_t currentImage) 

@@ -808,6 +808,19 @@ namespace Kerberos
 		ImGui::Text("Time: %.2f seconds", m_Time);
 		ImGui::Text("FPS: %.2f", m_Fps);
 
+		const GPUTimings gpuTimings = Renderer::GetLatestGPUTimings();
+		if (gpuTimings.IsValid)
+		{
+			ImGui::Text("GPU Frame: %.3f ms", gpuTimings.FrameMilliseconds);
+			ImGui::Text("GPU Shadow: %.3f ms", gpuTimings.ShadowPassMilliseconds);
+			ImGui::Text("GPU Opaque: %.3f ms", gpuTimings.OpaquePassMilliseconds);
+			ImGui::Text("GPU Transparent: %.3f ms", gpuTimings.TransparentPassMilliseconds);
+		}
+		else
+		{
+			ImGui::Text("GPU timings: unavailable");
+		}
+
 		ImGui::Separator();
 
 		ImGui::Text("EditorCamera");
