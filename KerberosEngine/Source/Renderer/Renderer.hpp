@@ -57,6 +57,9 @@ namespace Kerberos
 		static std::optional<uint32_t> GetMousePickingEntityID();
 		static GPUTimings GetLatestGPUTimings();
 
+	public:
+		static constexpr uint32_t MousePickingReadbackFrameLag = 3;
+
 	private:
 		static void UpdateLights(uint32_t currentImage);
 		static void UpdateSceneUniformBuffers(uint32_t currentImage, const Camera* mainCamera);

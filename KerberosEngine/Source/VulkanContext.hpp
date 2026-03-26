@@ -32,7 +32,9 @@ namespace Kerberos
 		void Present();
 
 		vk::raii::CommandBuffer BeginSingleTimeCommands() const;
-		void EndSingleTimeCommands(const vk::raii::CommandBuffer& commandBuffer) const;
+     void EndSingleTimeCommands(const vk::raii::CommandBuffer& commandBuffer,
+			const vk::raii::Semaphore* signalTimelineSemaphore = nullptr,
+			uint64_t signalTimelineValue = 0) const;
 
 		enum class OperationType : std::uint8_t
 		{

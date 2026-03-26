@@ -52,10 +52,21 @@ namespace Kerberos
 	{
 		vk::raii::Buffer Buffer = nullptr;
 		vk::raii::DeviceMemory Memory = nullptr;
-		vk::raii::Fence Fence = nullptr;
 		void* MappedData = nullptr;
 		bool Pending = false;
-		uint32_t FrameSubmitted = 0;
+        uint64_t TimelineValue = 0;
+	};
+
+	struct MousePickingReadback
+	{
+		std::array<PickingReadbackSlot, Renderer::MousePickingReadbackFrameLag> Slots{};
+		uint32_t WriteIndex = 0;
+		vk::raii::Semaphore TimelineSemaphore = nullptr;
+		uint64_t TimelineValue = 0;
+		uint64_t PendingTimelineSignalValue = 0;
+		bool RequestPending = false;
+		glm::uvec2 RequestedPixel{ 0, 0 };
+		std::optional<uint32_t> LatestEntityID;
 	};
 
 	struct DescriptorSetLayouts
@@ -165,13 +176,7 @@ namespace Kerberos
 		vk::DescriptorSet ColorOutputDescriptorSet = nullptr;
 		vk::DescriptorSet ShadowMapDescriptorSet = nullptr;
 
-		static constexpr uint32_t MousePickingReadbackFrameLag = 3;
-		std::array<PickingReadbackSlot, MousePickingReadbackFrameLag> MousePickingReadbackSlots{};
-		uint32_t MousePickingReadbackWriteSlot = 0;
-		uint32_t MousePickingReadbackFrameCounter = 0;
-		bool MousePickingRequestPending = false;
-		glm::uvec2 MousePickingRequestPixel{ 0, 0 };
-		std::optional<uint32_t> LatestMousePickingEntityID;
+		MousePickingReadback MousePickingReadback{};
 
 		vk::raii::QueryPool GPUTimestampQueryPool = nullptr;
 		float GPUTimestampPeriodNanoseconds = 0.0f;
@@ -218,7 +223,7 @@ namespace Kerberos
 		VulkanContext::DestroyImGuiDescriptorSet(s_Data->ColorOutputDescriptorSet);
 		VulkanContext::DestroyImGuiDescriptorSet(s_Data->ShadowMapDescriptorSet);
 
-		for (auto& slot : s_Data->MousePickingReadbackSlots)
+		for (auto& slot : s_Data->MousePickingReadback.Slots)
 		{
          if (slot.Memory != nullptr && slot.MappedData)
 			{
@@ -731,7 +736,16 @@ namespace Kerberos
 
 		WriteGPUTimestamp(cmd, static_cast<uint32_t>(GPUTimestampQuery::FrameEnd));
 
-		context.EndSingleTimeCommands(cmd);
+		if (s_Data->MousePickingReadback.PendingTimelineSignalValue > 0)
+		{
+			context.EndSingleTimeCommands(cmd, &s_Data->MousePickingReadback.TimelineSemaphore, s_Data->MousePickingReadback.PendingTimelineSignalValue);
+			s_Data->MousePickingReadback.PendingTimelineSignalValue = 0;
+		}
+		else
+		{
+			context.EndSingleTimeCommands(cmd);
+		}
+
 		ResolveGPUTimings();
 	}
 
@@ -777,6 +791,17 @@ namespace Kerberos
 
 		auto& context = VulkanContext::Get();
 		const auto& device = context.GetDevice();
+
+		const vk::SemaphoreTypeCreateInfo timelineSemaphoreTypeInfo{
+			.semaphoreType = vk::SemaphoreType::eTimeline,
+			.initialValue = 0
+		};
+		const vk::SemaphoreCreateInfo timelineSemaphoreCreateInfo{
+			.pNext = &timelineSemaphoreTypeInfo
+		};
+		s_Data->MousePickingReadback.TimelineSemaphore = vk::raii::Semaphore(device, timelineSemaphoreCreateInfo);
+		context.SetObjectDebugName(s_Data->MousePickingReadback.TimelineSemaphore, "Mouse Picking Timeline Semaphore");
+
 		const auto queueFamilyInfo = context.GetQueueFamilyInfo();
 		const auto queueFamilyProperties = context.GetPhysicalDevice().getQueueFamilyProperties();
 
@@ -1427,9 +1452,9 @@ namespace Kerberos
 									   "Shadow Map Descriptor Set for ImGui");
 		}
 
-		for (uint32_t i = 0; i < RendererData::MousePickingReadbackFrameLag; ++i)
+		for (uint32_t i = 0; i < Renderer::MousePickingReadbackFrameLag; ++i)
 		{
-			auto& slot = s_Data->MousePickingReadbackSlots[i];
+			auto& slot = s_Data->MousePickingReadback.Slots[i];
 			CreateBuffer(device,
 						 sizeof(uint32_t),
 						 vk::BufferUsageFlagBits::eTransferDst,
@@ -1439,10 +1464,6 @@ namespace Kerberos
 
 			slot.MappedData = slot.Memory.mapMemory(0, sizeof(uint32_t));
 
-			constexpr vk::FenceCreateInfo signaledFenceCreateInfo{
-				.flags = vk::FenceCreateFlagBits::eSignaled
-			};
-			slot.Fence = vk::raii::Fence(device, signaledFenceCreateInfo);
 		}
 
 		//m_OutputSize = m_ViewportSize;
@@ -1690,15 +1711,15 @@ namespace Kerberos
 		if (x >= static_cast<uint32_t>(s_Data->OutputSize.x) || y >= static_cast<uint32_t>(s_Data->OutputSize.y))
 			return;
 
-		s_Data->MousePickingRequestPixel = { x, y };
-		s_Data->MousePickingRequestPending = true;
+		s_Data->MousePickingReadback.RequestedPixel = { x, y };
+		s_Data->MousePickingReadback.RequestPending = true;
 	}
 
 	std::optional<uint32_t> Renderer::GetMousePickingEntityID()
 	{
 		KBR_CORE_ASSERT(s_Data, "Renderer not initialized!");
 
-		return s_Data->LatestMousePickingEntityID;
+		return s_Data->MousePickingReadback.LatestEntityID;
 	}
 
 	GPUTimings Renderer::GetLatestGPUTimings()
@@ -1869,22 +1890,24 @@ namespace Kerberos
 
 	void Renderer::HandleMousePickingReadback(const vk::raii::CommandBuffer& cmd) 
 	{
-		// Poll completed readback slot and issue the next copy request without stalling the CPU.
-		++s_Data->MousePickingReadbackFrameCounter;
+		const auto& device = VulkanContext::Get().GetDevice();
+		const uint64_t completedTimelineValue = s_Data->MousePickingReadback.TimelineSemaphore != nullptr
+			? static_cast<vk::Device>(device).getSemaphoreCounterValue(s_Data->MousePickingReadback.TimelineSemaphore)
+			: 0;
 
-		for (auto& readSlot : s_Data->MousePickingReadbackSlots)
+		for (auto& readSlot : s_Data->MousePickingReadback.Slots)
 		{
-			if (readSlot.Pending && s_Data->MousePickingReadbackFrameCounter > readSlot.FrameSubmitted)
+			if (readSlot.Pending && completedTimelineValue >= readSlot.TimelineValue)
 			{
 				const auto pickedEntity = *static_cast<const uint32_t*>(readSlot.MappedData);
-				s_Data->LatestMousePickingEntityID = pickedEntity;
+				s_Data->MousePickingReadback.LatestEntityID = pickedEntity;
 				readSlot.Pending = false;
 			}
 		}
 
-		if (s_Data->MousePickingRequestPending)
+		if (s_Data->MousePickingReadback.RequestPending)
 		{
-			auto& writeSlot = s_Data->MousePickingReadbackSlots[s_Data->MousePickingReadbackWriteSlot];
+			auto& writeSlot = s_Data->MousePickingReadback.Slots[s_Data->MousePickingReadback.WriteIndex];
 
 			vk::ImageMemoryBarrier2 toTransferSrcBarrier = {
 				.srcStageMask = vk::PipelineStageFlagBits2::eColorAttachmentOutput,
@@ -1913,8 +1936,17 @@ namespace Kerberos
 			cmd.pipelineBarrier2(toTransferDependencyInfo);
 			s_Data->PickingImageLayout = vk::ImageLayout::eTransferSrcOptimal;
 
-			KBR_CORE_ASSERT(s_Data->MousePickingRequestPixel.x < static_cast<uint32_t>(s_Data->OutputSize.x) && s_Data->MousePickingRequestPixel.y < static_cast<uint32_t>(s_Data->OutputSize.y),
-							"Requested mouse picking pixel is out of bounds!");
+            const uint32_t outputWidth = static_cast<uint32_t>(s_Data->OutputSize.x);
+			const uint32_t outputHeight = static_cast<uint32_t>(s_Data->OutputSize.y);
+
+			if (outputWidth == 0 || outputHeight == 0 ||
+				s_Data->MousePickingReadback.RequestedPixel.x >= outputWidth ||
+				s_Data->MousePickingReadback.RequestedPixel.y >= outputHeight)
+			{
+				s_Data->MousePickingReadback.RequestPending = false;
+				s_Data->MousePickingReadback.LatestEntityID = std::numeric_limits<uint32_t>::max();
+				return;
+			}
 
 			const vk::BufferImageCopy copyRegion{
 				.bufferOffset = 0,
@@ -1927,8 +1959,8 @@ namespace Kerberos
 					.layerCount = 1
 				},
 				.imageOffset = {
-					.x = static_cast<int32_t>(s_Data->MousePickingRequestPixel.x),
-					.y = static_cast<int32_t>(s_Data->MousePickingRequestPixel.y),
+					.x = static_cast<int32_t>(s_Data->MousePickingReadback.RequestedPixel.x),
+					.y = static_cast<int32_t>(s_Data->MousePickingReadback.RequestedPixel.y),
 					.z = 0
 				},
 				.imageExtent = {
@@ -1945,9 +1977,10 @@ namespace Kerberos
 				copyRegion);
 
 			writeSlot.Pending = true;
-			writeSlot.FrameSubmitted = s_Data->MousePickingReadbackFrameCounter;
-			s_Data->MousePickingReadbackWriteSlot = (s_Data->MousePickingReadbackWriteSlot + 1) % RendererData::MousePickingReadbackFrameLag;
-			s_Data->MousePickingRequestPending = false;
+            writeSlot.TimelineValue = ++s_Data->MousePickingReadback.TimelineValue;
+			s_Data->MousePickingReadback.PendingTimelineSignalValue = writeSlot.TimelineValue;
+			s_Data->MousePickingReadback.WriteIndex = (s_Data->MousePickingReadback.WriteIndex + 1) % Renderer::MousePickingReadbackFrameLag;
+			s_Data->MousePickingReadback.RequestPending = false;
 		}
 	}
 

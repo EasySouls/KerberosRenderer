@@ -264,13 +264,30 @@ namespace Kerberos
 		return commandBuffer;
 	}
 
-	void VulkanContext::EndSingleTimeCommands(const vk::raii::CommandBuffer& commandBuffer) const
+   void VulkanContext::EndSingleTimeCommands(const vk::raii::CommandBuffer& commandBuffer,
+		const vk::raii::Semaphore* signalTimelineSemaphore,
+		const uint64_t signalTimelineValue) const
 	{
 		commandBuffer.end();
-		const vk::SubmitInfo submitInfo{
+
+		vk::TimelineSemaphoreSubmitInfo timelineSemaphoreSubmitInfo{};
+		vk::SubmitInfo submitInfo{
 			.commandBufferCount = 1,
 			.pCommandBuffers = &*commandBuffer
 		};
+
+		if (signalTimelineSemaphore != nullptr)
+		{
+			timelineSemaphoreSubmitInfo = vk::TimelineSemaphoreSubmitInfo{
+				.signalSemaphoreValueCount = 1,
+				.pSignalSemaphoreValues = &signalTimelineValue
+			};
+
+			submitInfo.signalSemaphoreCount = 1;
+			submitInfo.pSignalSemaphores = &**signalTimelineSemaphore;
+			submitInfo.pNext = &timelineSemaphoreSubmitInfo;
+		}
+
 		m_GraphicsQueue.submit(submitInfo, nullptr);
 		m_GraphicsQueue.waitIdle();
 	}
