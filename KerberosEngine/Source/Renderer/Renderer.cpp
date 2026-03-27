@@ -121,6 +121,15 @@ namespace Kerberos
 		vk::raii::DescriptorSet skybox = nullptr;
 	};
 
+	struct PendingSceneRender
+	{
+		Ref<Scene> Scene = nullptr;
+		glm::mat4 View{ 1.0f };
+		glm::mat4 Projection{ 1.0f };
+		glm::vec3 CameraPosition{ 0.0f };
+		bool IsValid = false;
+	};
+
 	enum class GPUTimestampQuery : uint32_t
 	{
 		FrameBegin = 0,
@@ -163,11 +172,9 @@ namespace Kerberos
 		PerObjectData PerObjectData{};
 		SkyboxData SkyboxData{};
 
-		// TODO: This should hold multiple UBOs for multiple frames in flight
-		std::array<UniformBufferObject, 1> UniformBuffers{};
+       std::array<UniformBufferObject, VulkanContext::MaxFramesInFlight> UniformBuffers{};
 
-		// TODO: This should hold multiple descriptor sets for multiple frames in flight
-		std::array<DescriptorSets, 1> DescriptorSets{};
+        std::array<DescriptorSets, VulkanContext::MaxFramesInFlight> DescriptorSets{};
 
 		// Dynamic uniform buffer related members
 		VkDeviceSize MinUniformBufferOffsetAlignment = 0;
@@ -176,9 +183,11 @@ namespace Kerberos
 		vk::DescriptorSet ColorOutputDescriptorSet = nullptr;
 		vk::DescriptorSet ShadowMapDescriptorSet = nullptr;
 
+        PendingSceneRender PendingRender{};
+
 		MousePickingReadback MousePickingReadback{};
 
-		vk::raii::QueryPool GPUTimestampQueryPool = nullptr;
+        std::vector<vk::raii::QueryPool> GPUTimestampQueryPools;
 		float GPUTimestampPeriodNanoseconds = 0.0f;
 		bool SupportsGPUTimestamps = false;
 		GPUTimings LatestGPUTimings{};
@@ -244,36 +253,43 @@ namespace Kerberos
 	void Renderer::RenderScene(const Ref<Scene>& scene, const glm::mat4& view, const glm::mat4& projection,
 		const glm::vec3& camPos) 
 	{
+		KBR_CORE_ASSERT(!s_Data->PendingRender.IsValid, "Scene has already been queued for rendering!");
+
+		s_Data->PendingRender.Scene = scene;
+		s_Data->PendingRender.View = view;
+		s_Data->PendingRender.Projection = projection;
+		s_Data->PendingRender.CameraPosition = camPos;
+		s_Data->PendingRender.IsValid = scene != nullptr;
+	}
+
+	void Renderer::RecordQueuedSceneRender(const vk::raii::CommandBuffer& cmd)
+	{
+		KBR_CORE_ASSERT(s_Data->PendingRender.IsValid, "No pending scene render to record!");
+
+		if (!s_Data->PendingRender.IsValid || !s_Data->PendingRender.Scene)
+			return;
+
 		const auto& context = VulkanContext::Get();
+		const uint32_t frameIndex = context.GetCurrentFrameIndex();
 
-		const auto cmd = context.BeginSingleTimeCommands();
+		ResetQueryPool(cmd, frameIndex);
 
-		if (s_Data->SupportsGPUTimestamps && s_Data->GPUTimestampQueryPool != nullptr)
-		{
-			cmd.resetQueryPool(s_Data->GPUTimestampQueryPool, 0, static_cast<uint32_t>(GPUTimestampQuery::Count));
-		}
-		WriteGPUTimestamp(cmd, static_cast<uint32_t>(GPUTimestampQuery::FrameBegin));
+		WriteGPUTimestamp(cmd, frameIndex, static_cast<uint32_t>(GPUTimestampQuery::FrameBegin));
 
-		context.SetObjectDebugName(reinterpret_cast<uint64_t>(static_cast<VkCommandBuffer>(*cmd)),
-								   vk::ObjectType::eCommandBuffer,
-								   "EditorLayer Single Time Command Buffer");
-
-		// TODO: Get current image index from VulkanContext
-		constexpr uint32_t currentImage = 0;
+        const uint32_t currentImage = frameIndex;
 
 		UpdateLights(currentImage);
-		UpdateSceneUniformBuffers(currentImage, view, projection, camPos);
+		UpdateSceneUniformBuffers(currentImage,
+            s_Data->PendingRender.View,
+			s_Data->PendingRender.Projection,
+			s_Data->PendingRender.CameraPosition);
 
-		/*const glm::mat4 translation = glm::translate(glm::mat4(1.0f), m_ObjectPosition);
-		const glm::mat4 model = translation *
-			glm::rotate(glm::mat4(1.0f), m_ObjectRotation.x, glm::vec3(1.0f, 0.0f, 0.0f)) *
-			glm::rotate(glm::mat4(1.0f), m_ObjectRotation.y, glm::vec3(0.0f, 1.0f, 0.0f)) *
-			glm::rotate(glm::mat4(1.0f), m_ObjectRotation.z, glm::vec3(0.0f, 0.0f, 1.0f)) *
-			glm::scale(glm::mat4(1.0f), m_ObjectScale);*/
+		const Ref<Scene>& scene = s_Data->PendingRender.Scene;
 
-			// Render shadow map
-		{
-         WriteGPUTimestamp(cmd, static_cast<uint32_t>(GPUTimestampQuery::ShadowBegin));
+		// Render shadow map
+       {
+			WriteGPUTimestamp(cmd, frameIndex, static_cast<uint32_t>(GPUTimestampQuery::ShadowBegin));
+
 			vk::ImageMemoryBarrier2 barrier = {
 			.srcStageMask = vk::PipelineStageFlagBits2::eEarlyFragmentTests | vk::PipelineStageFlagBits2::eLateFragmentTests,
 			.srcAccessMask = vk::AccessFlagBits2::eDepthStencilAttachmentWrite,
@@ -361,7 +377,8 @@ namespace Kerberos
 			}
 
 			cmd.endRendering();
-			WriteGPUTimestamp(cmd, static_cast<uint32_t>(GPUTimestampQuery::ShadowEnd));
+
+			WriteGPUTimestamp(cmd, frameIndex, static_cast<uint32_t>(GPUTimestampQuery::ShadowEnd));
 
 			KBR_CORE_TRACE("Shadow pass done!");
 		}
@@ -408,7 +425,7 @@ namespace Kerberos
 				.srcAccessMask = srcAccessMask,
 				.dstStageMask = vk::PipelineStageFlagBits2::eColorAttachmentOutput,
 				.dstAccessMask = vk::AccessFlagBits2::eColorAttachmentWrite,
-				.oldLayout = vk::ImageLayout::eUndefined,
+                .oldLayout = vk::ImageLayout::eUndefined, //s_Data->PickingImageLayout,
 				.newLayout = vk::ImageLayout::eColorAttachmentOptimal,
 				.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
 				.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
@@ -501,8 +518,9 @@ namespace Kerberos
 		};
 
 		// Render opaque objects
-		{
-            WriteGPUTimestamp(cmd, static_cast<uint32_t>(GPUTimestampQuery::OpaqueBegin));
+       {
+			WriteGPUTimestamp(cmd, frameIndex, static_cast<uint32_t>(GPUTimestampQuery::OpaqueBegin));
+
 			vk::RenderingAttachmentInfo colorAttachmentInfo{
 				.imageView = s_Data->ColorImage.ImageView,
 				.imageLayout = vk::ImageLayout::eColorAttachmentOptimal,
@@ -621,14 +639,16 @@ namespace Kerberos
 			}
 
 			cmd.endRendering();
-			WriteGPUTimestamp(cmd, static_cast<uint32_t>(GPUTimestampQuery::OpaqueEnd));
+
+			WriteGPUTimestamp(cmd, frameIndex, static_cast<uint32_t>(GPUTimestampQuery::OpaqueEnd));
 
 			KBR_CORE_TRACE("Opaque pass done!");
 		}
 
 		// Render transparent objects
-		{
-            WriteGPUTimestamp(cmd, static_cast<uint32_t>(GPUTimestampQuery::TransparentBegin));
+       {
+			WriteGPUTimestamp(cmd, frameIndex, static_cast<uint32_t>(GPUTimestampQuery::TransparentBegin));
+
 			vk::RenderingAttachmentInfo colorAttachmentInfo{
 				.imageView = s_Data->ColorImage.ImageView,
 				.imageLayout = vk::ImageLayout::eColorAttachmentOptimal,
@@ -697,7 +717,8 @@ namespace Kerberos
 			//}
 
 			cmd.endRendering();
-			WriteGPUTimestamp(cmd, static_cast<uint32_t>(GPUTimestampQuery::TransparentEnd));
+
+			WriteGPUTimestamp(cmd, frameIndex, static_cast<uint32_t>(GPUTimestampQuery::TransparentEnd));
 
 			KBR_CORE_TRACE("Transparent pass done!");
 		}
@@ -734,19 +755,10 @@ namespace Kerberos
 			KBR_CORE_TRACE("Color image transitioned for ImGui!");
 		}
 
-		WriteGPUTimestamp(cmd, static_cast<uint32_t>(GPUTimestampQuery::FrameEnd));
+		WriteGPUTimestamp(cmd, frameIndex, static_cast<uint32_t>(GPUTimestampQuery::FrameEnd));
+		s_Data->PendingRender.IsValid = false;
 
-		if (s_Data->MousePickingReadback.PendingTimelineSignalValue > 0)
-		{
-			context.EndSingleTimeCommands(cmd, &s_Data->MousePickingReadback.TimelineSemaphore, s_Data->MousePickingReadback.PendingTimelineSignalValue);
-			s_Data->MousePickingReadback.PendingTimelineSignalValue = 0;
-		}
-		else
-		{
-			context.EndSingleTimeCommands(cmd);
-		}
-
-		ResolveGPUTimings();
+		ResolveGPUTimings(frameIndex);
 	}
 
 	void Renderer::RenderSceneRuntime(const Ref<Scene>& scene, const Camera& mainCamera,
@@ -815,12 +827,19 @@ namespace Kerberos
 
 		if (s_Data->SupportsGPUTimestamps)
 		{
-			const vk::QueryPoolCreateInfo queryPoolInfo{
+            s_Data->GPUTimestampQueryPools.clear();
+			s_Data->GPUTimestampQueryPools.reserve(context.GetMaxFramesInFlight());
+
+            constexpr vk::QueryPoolCreateInfo queryPoolInfo{
 				.queryType = vk::QueryType::eTimestamp,
 				.queryCount = static_cast<uint32_t>(GPUTimestampQuery::Count)
 			};
-			s_Data->GPUTimestampQueryPool = vk::raii::QueryPool(device, queryPoolInfo);
-			context.SetObjectDebugName(s_Data->GPUTimestampQueryPool, "Renderer GPU Timestamp Query Pool");
+
+			for (uint32_t i = 0; i < context.GetMaxFramesInFlight(); ++i)
+			{
+				s_Data->GPUTimestampQueryPools.emplace_back(device, queryPoolInfo);
+				context.SetObjectDebugName(s_Data->GPUTimestampQueryPools.back(), "Renderer GPU Timestamp Query Pool[" + std::to_string(i) + "]");
+			}
 		}
 
 		// Create samplers
@@ -1722,6 +1741,19 @@ namespace Kerberos
 		return s_Data->MousePickingReadback.LatestEntityID;
 	}
 
+	bool Renderer::ConsumePendingMousePickingTimelineSignal(vk::Semaphore& semaphore, uint64_t& value)
+	{
+		KBR_CORE_ASSERT(s_Data, "Renderer not initialized!");
+
+		if (s_Data->MousePickingReadback.PendingTimelineSignalValue == 0 || s_Data->MousePickingReadback.TimelineSemaphore == nullptr)
+			return false;
+
+		semaphore = s_Data->MousePickingReadback.TimelineSemaphore;
+		value = s_Data->MousePickingReadback.PendingTimelineSignalValue;
+		s_Data->MousePickingReadback.PendingTimelineSignalValue = 0;
+		return true;
+	}
+
 	GPUTimings Renderer::GetLatestGPUTimings()
 	{
 		KBR_CORE_ASSERT(s_Data, "Renderer not initialized!");
@@ -1729,17 +1761,17 @@ namespace Kerberos
 		return s_Data->LatestGPUTimings;
 	}
 
-	void Renderer::WriteGPUTimestamp(const vk::raii::CommandBuffer& cmd, const uint32_t index)
+	void Renderer::WriteGPUTimestamp(const vk::raii::CommandBuffer& cmd, const uint32_t frameIndex, const uint32_t index)
 	{
-		if (!s_Data->SupportsGPUTimestamps || s_Data->GPUTimestampQueryPool == nullptr)
+		if (!s_Data->SupportsGPUTimestamps || frameIndex >= s_Data->GPUTimestampQueryPools.size() || s_Data->GPUTimestampQueryPools[frameIndex] == nullptr)
 			return;
 
-		cmd.writeTimestamp2(vk::PipelineStageFlagBits2::eBottomOfPipe, s_Data->GPUTimestampQueryPool, index);
+       cmd.writeTimestamp2(vk::PipelineStageFlagBits2::eBottomOfPipe, s_Data->GPUTimestampQueryPools[frameIndex], index);
 	}
 
-	void Renderer::ResolveGPUTimings()
+	void Renderer::ResolveGPUTimings(const uint32_t frameIndex)
 	{
-		if (!s_Data->SupportsGPUTimestamps || s_Data->GPUTimestampQueryPool == nullptr)
+		if (!s_Data->SupportsGPUTimestamps || frameIndex >= s_Data->GPUTimestampQueryPools.size() || s_Data->GPUTimestampQueryPools[frameIndex] == nullptr)
 		{
 			s_Data->LatestGPUTimings.IsValid = false;
 			return;
@@ -1748,7 +1780,7 @@ namespace Kerberos
 		std::array<uint64_t, static_cast<size_t>(GPUTimestampQuery::Count)> timestamps{};
 		const auto& device = VulkanContext::Get().GetDevice();
 		const vk::Result result = static_cast<vk::Device>(device).getQueryPoolResults(
-			s_Data->GPUTimestampQueryPool,
+          s_Data->GPUTimestampQueryPools[frameIndex],
 			0,
 			static_cast<uint32_t>(timestamps.size()),
 			timestamps.size() * sizeof(uint64_t),
@@ -1779,6 +1811,17 @@ namespace Kerberos
 		s_Data->LatestGPUTimings.OpaquePassMilliseconds = toMilliseconds(GPUTimestampQuery::OpaqueBegin, GPUTimestampQuery::OpaqueEnd);
 		s_Data->LatestGPUTimings.TransparentPassMilliseconds = toMilliseconds(GPUTimestampQuery::TransparentBegin, GPUTimestampQuery::TransparentEnd);
 		s_Data->LatestGPUTimings.IsValid = true;
+	}
+
+	void Renderer::ResetQueryPool(const vk::raii::CommandBuffer& cmd, const uint32_t frameIndex)
+	{
+		if (!s_Data->SupportsGPUTimestamps)
+			return;
+
+		KBR_CORE_ASSERT(frameIndex < s_Data->GPUTimestampQueryPools.size(), "Current frame index exceeds GPU Timestamp Query Pools size!");
+		KBR_CORE_ASSERT(s_Data->GPUTimestampQueryPools[frameIndex] != nullptr, "GPU Timestamp Query Pool for current frame is null!");
+
+		cmd.resetQueryPool(s_Data->GPUTimestampQueryPools[frameIndex], 0, static_cast<uint32_t>(GPUTimestampQuery::Count));
 	}
 
 	void Renderer::UpdateLights(const uint32_t currentImage) 
@@ -2145,15 +2188,14 @@ namespace Kerberos
 		s_Data->DescriptorSetLayouts.textures = vk::raii::DescriptorSetLayout{ device, textureLayoutInfo };
 		context.SetObjectDebugName(s_Data->DescriptorSetLayouts.textures, "Texture Descriptor Set Layout");
 
-		const std::array<vk::DescriptorSetLayout, 2> setLayouts = {
-			*s_Data->DescriptorSetLayouts.scene,
-			*s_Data->DescriptorSetLayouts.textures
-		};
+     const std::vector<vk::DescriptorSetLayout> sceneSetLayouts(
+			s_Data->DescriptorSets.size(),
+			*s_Data->DescriptorSetLayouts.scene);
 
 		vk::DescriptorSetAllocateInfo allocInfo{
 			.descriptorPool = *s_Data->DescriptorPool,
-			.descriptorSetCount = static_cast<uint32_t>(s_Data->DescriptorSets.size()), // TODO: Check if this is correct
-			.pSetLayouts = setLayouts.data()
+           .descriptorSetCount = static_cast<uint32_t>(s_Data->DescriptorSets.size()),
+			.pSetLayouts = sceneSetLayouts.data()
 		};
 
 		std::vector<vk::raii::DescriptorSet> sceneDescriptorSets = device.allocateDescriptorSets(allocInfo);

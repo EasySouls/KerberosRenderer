@@ -11,6 +11,7 @@
 
 #include "Utils.hpp"
 #include "logging/Log.hpp"
+#include "Renderer/Renderer.hpp"
 
 #define VK_USE_PLATFORM_WIN32_KHR
 #define GLFW_INCLUDE_VULKAN
@@ -19,9 +20,6 @@
 #include <GLFW/glfw3native.h>
 
 #include "ImGuizmo.h"
-
-
-constexpr uint32_t maxFramesInFlight = 2;
 
 const std::vector<char const*> validationLayers = {
 	"VK_LAYER_KHRONOS_validation"
@@ -191,18 +189,39 @@ namespace Kerberos
 		m_CommandBuffers[m_FrameIndex].reset();
 		RecordCommandBuffer(m_CurrentImageIndex);
 
-		//UpdateUniformBuffers(frameIndex);
-
-		//vk::PipelineStageFlags waitDestinationStageMask(vk::PipelineStageFlagBits::eTopOfPipe);
 		vk::PipelineStageFlags waitDestinationStageMask(vk::PipelineStageFlagBits::eColorAttachmentOutput);
+
+		std::array<vk::Semaphore, 2> signalSemaphores = {
+			*m_RenderFinishedSemaphores[imageIndex],
+			VK_NULL_HANDLE
+		};
+		std::array<uint64_t, 2> signalSemaphoreValues = { 0, 0 };
+		uint32_t signalSemaphoreCount = 1;
+
+		vk::Semaphore rendererTimelineSemaphore = VK_NULL_HANDLE;
+		uint64_t rendererTimelineSignalValue = 0;
+		if (Renderer::ConsumePendingMousePickingTimelineSignal(rendererTimelineSemaphore, rendererTimelineSignalValue))
+		{
+			signalSemaphores[1] = rendererTimelineSemaphore;
+			signalSemaphoreValues[1] = rendererTimelineSignalValue;
+			signalSemaphoreCount = 2;
+		}
+
+		vk::TimelineSemaphoreSubmitInfo timelineSubmitInfo{
+			.signalSemaphoreValueCount = signalSemaphoreCount,
+			.pSignalSemaphoreValues = signalSemaphoreValues.data()
+		};
+
 		const vk::SubmitInfo submitInfo{
+			.pNext = signalSemaphoreCount > 1 ? &timelineSubmitInfo : nullptr,
 			.waitSemaphoreCount = 1,
 			.pWaitSemaphores = &*m_PresentCompleteSemaphores[m_FrameIndex],
 			.pWaitDstStageMask = &waitDestinationStageMask,
 			.commandBufferCount = 1,
 			.pCommandBuffers = &*m_CommandBuffers[m_FrameIndex],
-			.signalSemaphoreCount = 1,
-			.pSignalSemaphores = &*m_RenderFinishedSemaphores[imageIndex] };
+			.signalSemaphoreCount = signalSemaphoreCount,
+			.pSignalSemaphores = signalSemaphores.data()
+		};
 
 		m_GraphicsQueue.submit(submitInfo, *m_InFlightFences[m_FrameIndex]);
 
@@ -245,7 +264,7 @@ namespace Kerberos
 			RecreateSwapchain();
 		}
 
-		m_FrameIndex = (m_FrameIndex + 1) % maxFramesInFlight;
+		m_FrameIndex = (m_FrameIndex + 1) % VulkanContext::MaxFramesInFlight;
 	}
 
 	vk::raii::CommandBuffer VulkanContext::BeginSingleTimeCommands() const
@@ -270,7 +289,7 @@ namespace Kerberos
 	{
 		commandBuffer.end();
 
-		vk::TimelineSemaphoreSubmitInfo timelineSemaphoreSubmitInfo{};
+		vk::TimelineSemaphoreSubmitInfo timelineSemaphoreSubmitInfo;
 		vk::SubmitInfo submitInfo{
 			.commandBufferCount = 1,
 			.pCommandBuffers = &*commandBuffer
@@ -634,7 +653,7 @@ namespace Kerberos
 
 	uint32_t VulkanContext::GetMaxFramesInFlight() const
 	{
-		return maxFramesInFlight;
+		return VulkanContext::MaxFramesInFlight;
 	}
 
 	void VulkanContext::WaitIdle() const
@@ -699,6 +718,8 @@ namespace Kerberos
 	void VulkanContext::RecordCommandBuffer(const uint32_t imageIndex) const
 	{
 		m_CommandBuffers[m_FrameIndex].begin({});
+
+		Renderer::RecordQueuedSceneRender(m_CommandBuffers[m_FrameIndex]);
 
 		// Transition the swapchain image to COLOR_ATTACHMENT_OPTIMAL
 		TransitionImageLayout(
@@ -1092,7 +1113,7 @@ namespace Kerberos
 			   },
 			},
 			{.shaderDrawParameters = true },
-			{.descriptorIndexing = true, .bufferDeviceAddress = true },
+			{.descriptorIndexing = true, .timelineSemaphore = true, .bufferDeviceAddress = true },
 			{.synchronization2 = true, .dynamicRendering = true },
 			{.extendedDynamicState = true }
 		};
@@ -1275,7 +1296,7 @@ namespace Kerberos
 		const vk::CommandBufferAllocateInfo allocInfo{
 			.commandPool = m_GraphicsCommandPool,
 			.level = vk::CommandBufferLevel::ePrimary,
-			.commandBufferCount = maxFramesInFlight
+			.commandBufferCount = VulkanContext::MaxFramesInFlight
 		};
 
 		m_CommandBuffers = vk::raii::CommandBuffers(m_Device, allocInfo);
@@ -1290,7 +1311,7 @@ namespace Kerberos
 			m_RenderFinishedSemaphores.emplace_back(m_Device, vk::SemaphoreCreateInfo());
 		}
 
-		for (size_t i = 0; i < maxFramesInFlight; i++)
+		for (size_t i = 0; i < VulkanContext::MaxFramesInFlight; i++)
 		{
 			m_PresentCompleteSemaphores.emplace_back(m_Device, vk::SemaphoreCreateInfo());
 			m_InFlightFences.emplace_back(m_Device, vk::FenceCreateInfo{ .flags = vk::FenceCreateFlagBits::eSignaled });

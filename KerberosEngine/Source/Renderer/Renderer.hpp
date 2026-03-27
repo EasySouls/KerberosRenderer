@@ -38,6 +38,7 @@ namespace Kerberos
 		static void RenderSceneEditor(const Ref<Scene>& scene, const Camera& camera);
 		static void RenderScene(const Ref<Scene>& scene, const glm::mat4& view, const glm::mat4& projection, const glm::vec3& camPos);
 		static void RenderSceneRuntime(const Ref<Scene>& scene, const Camera& mainCamera, const glm::mat4& mainCameraTransform);
+		static void RecordQueuedSceneRender(const vk::raii::CommandBuffer& cmd);
 
 		static void ResizeResources(uint32_t width, uint32_t height);
 
@@ -55,6 +56,7 @@ namespace Kerberos
 		static uint64_t GetShadowMapDepthImageID();
 		static void RequestMousePickingPixel(uint32_t x, uint32_t y);
 		static std::optional<uint32_t> GetMousePickingEntityID();
+        static bool ConsumePendingMousePickingTimelineSignal(vk::Semaphore& semaphore, uint64_t& value);
 		static GPUTimings GetLatestGPUTimings();
 
 	public:
@@ -65,8 +67,10 @@ namespace Kerberos
 		static void UpdateSceneUniformBuffers(uint32_t currentImage, const Camera* mainCamera);
 		static void UpdateSceneUniformBuffers(uint32_t currentImage, const glm::mat4& view, const glm::mat4& projection, const glm::vec3& camPos);
         static void UpdatePerObjectUniformBuffer(uint32_t currentImage, uint32_t objectIndex, const glm::mat4& model, const Material& material, uint32_t entityID);
-		static void WriteGPUTimestamp(const vk::raii::CommandBuffer& cmd, uint32_t index);
-		static void ResolveGPUTimings();
+		
+		static void WriteGPUTimestamp(const vk::raii::CommandBuffer& cmd, uint32_t frameIndex, uint32_t index);
+		static void ResolveGPUTimings(uint32_t frameIndex);
+		static void ResetQueryPool(const vk::raii::CommandBuffer& cmd, uint32_t frameIndex);
 
 		static glm::mat4 CalculateLightSpaceMatrix();
 

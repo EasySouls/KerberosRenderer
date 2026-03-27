@@ -18,6 +18,8 @@ namespace Kerberos
 	class VulkanContext final
 	{
 	public:
+		inline static constexpr uint32_t MaxFramesInFlight = 2;
+
 		explicit VulkanContext(GLFWwindow* window);
 		~VulkanContext();
 
@@ -26,13 +28,13 @@ namespace Kerberos
 		VulkanContext& operator=(const VulkanContext& other) = delete;
 		VulkanContext& operator=(VulkanContext&& other) noexcept = delete;
 
-		void PrepareImGuiFrame();
-		void RenderImGui();
+		static void PrepareImGuiFrame();
+		static void RenderImGui();
 		void Draw();
 		void Present();
 
 		vk::raii::CommandBuffer BeginSingleTimeCommands() const;
-     void EndSingleTimeCommands(const vk::raii::CommandBuffer& commandBuffer,
+		void EndSingleTimeCommands(const vk::raii::CommandBuffer& commandBuffer,
 			const vk::raii::Semaphore* signalTimelineSemaphore = nullptr,
 			uint64_t signalTimelineValue = 0) const;
 
@@ -74,6 +76,7 @@ namespace Kerberos
 									   vk::FormatFeatureFlags features) const;
 
 		uint32_t GetMaxFramesInFlight() const;
+		uint32_t GetCurrentFrameIndex() const { return m_FrameIndex; }
 
 		const VMA::Allocator& GetAllocator() const { return m_Allocator; }
 
