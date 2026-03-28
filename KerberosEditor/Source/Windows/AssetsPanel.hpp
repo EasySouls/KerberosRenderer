@@ -37,12 +37,12 @@ namespace Kerberos
 		/**
 		* Context menu displayed when right-clicking on a file in the Assets panel.
 		*/
-		void ShowFileContextMenu(std::filesystem::path::iterator::reference path);
+		void ShowFileContextMenu(const std::filesystem::path& path);
 
 		/**
 		* Context menu displayed when right-clicking on a folder in the Assets panel.
 		*/
-		void ShowFolderContextMenu(std::filesystem::path::iterator::reference path);
+		void ShowFolderContextMenu(const std::filesystem::path& path);
 
 		/**
 		* Context menu displayed when right-clicking on an empty area of the Assets panel.

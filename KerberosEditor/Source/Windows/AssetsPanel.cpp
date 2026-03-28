@@ -237,7 +237,7 @@ namespace Kerberos
 		ImGui::End();
 	}
 
-	void AssetsPanel::ShowFileContextMenu(std::filesystem::path::iterator::reference path)
+	void AssetsPanel::ShowFileContextMenu(const std::filesystem::path& path)
 	{
 		if (ImGui::BeginPopupContextItem("FileContextMenu"))
 		{
@@ -248,7 +248,16 @@ namespace Kerberos
 				const bool success = FileOperations::OpenFile(path.string().c_str());
 				if (!success)
 				{
-					ImGui::Text("Could not open file: %s", path.filename().string().c_str());
+					m_NotificationManager.AddNotification("Could not open file: " + path.string(), Notification::Type::Error);
+				}
+				ImGui::CloseCurrentPopup();
+			}
+			if (ImGui::MenuItem("Reveal in Explorer"))
+			{
+				const bool success = FileOperations::RevealInFileExplorer(path.string().c_str());
+				if (!success)
+				{
+					m_NotificationManager.AddNotification("Could not reveal file in explorer: " + path.string(), Notification::Type::Error);
 				}
 				ImGui::CloseCurrentPopup();
 			}
@@ -274,7 +283,7 @@ namespace Kerberos
 		}
 	}
 
-	void AssetsPanel::ShowFolderContextMenu(std::filesystem::path::iterator::reference path)
+	void AssetsPanel::ShowFolderContextMenu(const std::filesystem::path& path)
 	{
 		if (ImGui::BeginPopupContextItem("FolderContextMenu"))
 		{
@@ -283,6 +292,15 @@ namespace Kerberos
 			if (ImGui::MenuItem("Open"))
 			{
 				m_CurrentDirectory /= path.filename();
+				ImGui::CloseCurrentPopup();
+			}
+			if (ImGui::MenuItem("Reveal in Explorer"))
+			{
+				const bool success = FileOperations::RevealInFileExplorer(path.string().c_str());
+				if (!success)
+				{
+					m_NotificationManager.AddNotification("Could not reveal folder in explorer: " + path.string(), Notification::Type::Error);
+				}
 				ImGui::CloseCurrentPopup();
 			}
 			if (ImGui::MenuItem("Delete Folder"))
@@ -299,6 +317,10 @@ namespace Kerberos
 	{
 		if (ImGui::BeginPopupContextWindow(nullptr, popupFlags))
 		{
+			// Add horizontal space
+			ImGui::Text("Folder");
+			ImGui::Dummy(ImVec2(20, 0));
+			ImGui::SameLine();
 			if (ImGui::MenuItem("New Folder"))
 			{
 				std::filesystem::path newFolderPath = m_CurrentDirectory / "New Folder";
@@ -308,6 +330,43 @@ namespace Kerberos
 					newFolderPath = m_CurrentDirectory / ("New Folder " + std::to_string(counter++));
 				}
 				std::filesystem::create_directory(newFolderPath);
+			}
+
+			ImGui::Text("Create basic asset");
+			ImGui::Dummy(ImVec2(20, 0));
+			ImGui::SameLine();
+
+			// Creating basic assets
+			if (ImGui::MenuItem("Material"))
+			{
+				const std::string materialName = "New Material";
+				const std::string materialPathStr = FileDialog::SaveFile("Kerberos Material (*.kbrmat)\0*.kbrmat\0");
+				const std::filesystem::path materialPath = materialPathStr;
+				// Write name and default properties to the file
+				if (!materialPathStr.empty())
+				{
+					std::ofstream materialFile(materialPath);
+					if (materialFile.is_open())
+					{
+						materialFile << "Name: " << materialName << "\n";
+						materialFile << "Shader: Default\n";
+						materialFile << "Properties:\n";
+						materialFile << "  - AlbedoColor: 1.0, 1.0, 1.0\n";
+						materialFile << "  - Metallic: 0.0\n";
+						materialFile << "  - Roughness: 1.0\n";
+						materialFile.close();
+					}
+					else
+					{
+						KBR_CORE_ERROR("Could not create material file at path: {0}", materialPathStr);
+					}
+				}
+				else
+				{
+					KBR_CORE_ERROR("Material creation cancelled or invalid path.");
+				}
+
+				ImGui::CloseCurrentPopup();
 			}
 
 			ImGui::EndPopup();
