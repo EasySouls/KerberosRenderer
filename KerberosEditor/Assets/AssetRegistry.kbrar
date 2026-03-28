@@ -17,3 +17,6 @@ AssetRegistry:
   - Handle: 14931318297342753047
     Type: Texture2D
     Path: Assets\Textures\colored_glass_rgba.ktx
+  - Handle: 18177791179963863543
+    Type: Model
+    Path: Assets\Models\chinesedragon.gltf

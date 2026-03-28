@@ -78,3 +78,17 @@ Entities:
     StaticMeshComponent:
       Mesh: 5556831655075431416
       Texture: 0
+  - Entity: 2427611190598499102
+    TagComponent:
+      Tag: Dragon
+    TransformComponent:
+      Translation: [0, 0, 10.6]
+      Rotation: [4.8, 0, 3.14]
+      Scale: [1, 1, 1]
+    HierarchyComponent:
+      Parent: 0
+      Children:
+        []
+    StaticMeshComponent:
+      Mesh: 18177791179963863543
+      Texture: 0

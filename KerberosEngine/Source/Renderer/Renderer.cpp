@@ -831,20 +831,16 @@ namespace Kerberos
 			s_Data->GPUTimestampQueryPools.reserve(context.GetMaxFramesInFlight());
 
             constexpr vk::QueryPoolCreateInfo queryPoolInfo{
+				.flags = vk::QueryPoolCreateFlagBits::eResetKHR,
 				.queryType = vk::QueryType::eTimestamp,
 				.queryCount = static_cast<uint32_t>(GPUTimestampQuery::Count)
 			};
 
-			context.Submit(VulkanContext::OperationType::Graphics, [&](const vk::raii::CommandBuffer& cmd)
+			for (uint32_t i = 0; i < context.GetMaxFramesInFlight(); ++i)
 			{
-				for (uint32_t i = 0; i < context.GetMaxFramesInFlight(); ++i)
-				{
-					s_Data->GPUTimestampQueryPools.emplace_back(device, queryPoolInfo);
-					context.SetObjectDebugName(s_Data->GPUTimestampQueryPools.back(), "Renderer GPU Timestamp Query Pool[" + std::to_string(i) + "]");
-					// Reset query pool at the beginning so that we can immediately start using it without waiting for the first render to reset it
-					cmd.resetQueryPool(s_Data->GPUTimestampQueryPools.back(), 0, static_cast<uint32_t>(GPUTimestampQuery::Count));
-				}
-			});
+				s_Data->GPUTimestampQueryPools.emplace_back(device, queryPoolInfo);
+				context.SetObjectDebugName(s_Data->GPUTimestampQueryPools.back(), "Renderer GPU Timestamp Query Pool[" + std::to_string(i) + "]");
+			}
 		}
 
 		// Create samplers
