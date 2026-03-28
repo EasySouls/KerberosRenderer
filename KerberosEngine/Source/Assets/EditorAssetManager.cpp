@@ -11,7 +11,7 @@
 
 namespace Kerberos
 {
-	static const std::map<std::string_view, AssetType> s_AssetExtensionMap = {
+	static const std::map<std::string_view, AssetType> assetExtensionMap = {
 		{ ".png", AssetType::Texture2D },
 		{ ".jpg", AssetType::Texture2D },
 		{ ".jpeg", AssetType::Texture2D },
@@ -22,7 +22,8 @@ namespace Kerberos
 		{ ".obj", AssetType::Mesh },
 		{ ".gltf", AssetType::Model },
 		{ ".kerberos", AssetType::Scene },
-		{ ".wav", AssetType::Sound } // TODO: Add more audio file types when supported
+		{ ".wav", AssetType::Sound }, // TODO: Add more audio file types when supported
+		{ ".kbrmat", AssetType::Material }
 	};
 
 	static AssetType AssetTypeFromFileExtension(const std::filesystem::path& filepath)
@@ -30,9 +31,9 @@ namespace Kerberos
 		const std::string extension = filepath.extension().string();
 		const std::string_view extensionView(extension);
 
-		if (s_AssetExtensionMap.contains(extensionView))
+		if (assetExtensionMap.contains(extensionView))
 		{
-			return s_AssetExtensionMap.at(extensionView);
+			return assetExtensionMap.at(extensionView);
 		}
 
 		KBR_CORE_WARN("Unknown asset type for file: {0}", filepath.string());
@@ -264,7 +265,7 @@ namespace Kerberos
 
 			const AssetType type = AssetTypeFromString(typeStr);
 			// TODO: This check is not needed when every asset type is supported
-			if (type == AssetType::Texture2D || type == AssetType::TextureCube || type == AssetType::Mesh || type == AssetType::Sound || type == AssetType::Model)
+			if (type == AssetType::Texture2D || type == AssetType::TextureCube || type == AssetType::Mesh || type == AssetType::Sound || type == AssetType::Model || type == AssetType::Material)
 			{
 				m_AssetRegistry.Add(handle, { .Type = type, .Filepath = filepath });
 			}

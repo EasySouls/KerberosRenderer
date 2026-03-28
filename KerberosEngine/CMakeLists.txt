@@ -15,7 +15,7 @@ file(GLOB_RECURSE ENGINE_SRC CMAKE_CONFIGURE_DEPENDS
 
 source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}/Source" PREFIX "Source" FILES ${ENGINE_SRC})
 
-target_sources(KerberosEngine PRIVATE ${ENGINE_SRC} "Source/Assets/AssetRegistry.cpp" "Source/Assets/EditorAssetManager.cpp" "Source/Assets/RuntimeAssetManager.cpp" "Source/Assets/Importers/AssetImporter.cpp" "Source/Audio/Sound.cpp" "Source/Audio/AudioManager.cpp" "Source/Audio/Windows/XAudio2AudioManager.cpp" "Source/Assets/Importers/SoundImporter.cpp" "Source/Assets/Importers/TextureImporter.cpp" "Source/Utils/Windows/WindowsSystemOperations.cpp" "Source/Assets/Importers/CubemapImporter.cpp" "Source/Assets/Importers/AssimpModelImporter.cpp" "Source/Renderer/Textures/Texture.cpp" "Source/Renderer/Textures/Texture2D.cpp" "Source/Renderer/VMA/VMA.cpp" "Source/Renderer/Textures/TextureCube.cpp" "Source/Assets/Importers/GLTFModelImporter.cpp" "Source/Scene/Scene.cpp" "Source/Physics/Jolt/JoltPhysicsSystem.cpp" "Source/Renderer/Font.cpp" "Source/Scene/Camera/SceneCamera.cpp" "Source/Assets/AssetManager.cpp" "Source/Serialization/SceneSerializer.cpp" "Source/Renderer/ImGuiDescriptorSetManager.cpp" "Source/Renderer/Renderer.cpp")
+target_sources(KerberosEngine PRIVATE ${ENGINE_SRC} "Source/Assets/AssetRegistry.cpp" "Source/Assets/EditorAssetManager.cpp" "Source/Assets/RuntimeAssetManager.cpp" "Source/Assets/Importers/AssetImporter.cpp" "Source/Audio/Sound.cpp" "Source/Audio/AudioManager.cpp" "Source/Audio/Windows/XAudio2AudioManager.cpp" "Source/Assets/Importers/SoundImporter.cpp" "Source/Assets/Importers/TextureImporter.cpp" "Source/Utils/Windows/WindowsSystemOperations.cpp" "Source/Assets/Importers/CubemapImporter.cpp" "Source/Assets/Importers/AssimpModelImporter.cpp" "Source/Renderer/Textures/Texture.cpp" "Source/Renderer/Textures/Texture2D.cpp" "Source/Renderer/VMA/VMA.cpp" "Source/Renderer/Textures/TextureCube.cpp" "Source/Assets/Importers/GLTFModelImporter.cpp" "Source/Scene/Scene.cpp" "Source/Physics/Jolt/JoltPhysicsSystem.cpp" "Source/Renderer/Font.cpp" "Source/Scene/Camera/SceneCamera.cpp" "Source/Assets/AssetManager.cpp" "Source/Serialization/SceneSerializer.cpp" "Source/Renderer/ImGuiDescriptorSetManager.cpp" "Source/Renderer/Renderer.cpp" "Source/Assets/Importers/MaterialImporter.cpp")
 
 # Precompiled header
 target_precompile_headers(KerberosEngine PRIVATE Source/kbrpch.hpp)
@@ -44,6 +44,13 @@ target_compile_definitions(KerberosEngine PUBLIC
     $<$<CONFIG:Release>:KBR_RELEASE>
     $<$<CONFIG:Dist>:KBR_DIST>
 )
+
+# Enable these later, but a few libraries are compiled as part of the engine that have warnings
+#target_compile_options(KerberosEngine PRIVATE
+#    $<$<CXX_COMPILER_ID:MSVC>:/Wall /W4 /WX /MP /permissive->
+#    $<$<CXX_COMPILER_ID:GNU>:-Wall -Wextra -Werror -Wpedantic>
+#    $<$<CXX_COMPILER_ID:Clang>:-Wall -Wextra -Werror -Wpedantic>
+#)
 
 # Link engine build settings
 target_link_libraries(KerberosEngine PRIVATE KerberosBuildSettings)

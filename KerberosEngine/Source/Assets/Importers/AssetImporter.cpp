@@ -5,6 +5,7 @@
 #include "TextureImporter.hpp"
 #include "AssimpModelImporter.hpp"
 #include "GLTFModelImporter.hpp"
+#include "MaterialImporter.hpp"
 #include "SoundImporter.hpp"
 #include "Assets/Asset.hpp"
 
@@ -24,6 +25,7 @@ namespace Kerberos
 			case AssetType::TextureCube:
 				return CubemapImporter::ImportCubemap(handle, metadata);
 			case AssetType::Material:
+				return MaterialImporter::ImportMaterial(handle, metadata);
 				break;
 			case AssetType::Model:
 			{

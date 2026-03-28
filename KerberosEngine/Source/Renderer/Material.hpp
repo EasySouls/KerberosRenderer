@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Vulkan.hpp"
+#include "Assets/Asset.hpp"
 #include "Textures/Texture2D.hpp"
 
 #include <glm/vec3.hpp>
@@ -11,7 +12,7 @@
 
 namespace Kerberos 
 {
-	struct Material
+	struct Material : public Asset
 	{
 		// Parameter block used as uniform buffer block
 		struct UniformBlock
@@ -23,8 +24,12 @@ namespace Kerberos
 		UniformBlock Params{};
 
 		std::string name;
-		std::shared_ptr<Texture2D> AlbedoTexture = nullptr;
-		std::shared_ptr<Texture2D> NormalTexture = nullptr;
+
+		Ref<Texture2D> AlbedoTexture = nullptr;
+		Ref<Texture2D> NormalTexture = nullptr;
+		Ref<Texture2D> MetallicTexture = nullptr;
+		Ref<Texture2D> RoughnessTexture = nullptr;
+		Ref<Texture2D> AOTexture = nullptr;
 
 		vk::raii::DescriptorSet DescriptorSet{ nullptr };
 
@@ -73,5 +78,7 @@ namespace Kerberos
 			}
 			return *this;
 		}
+
+		AssetType GetType() override { return AssetType::Material; }
 	};
 }
