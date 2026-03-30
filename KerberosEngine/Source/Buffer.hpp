@@ -21,10 +21,12 @@ namespace Kerberos
 
 		const vk::raii::Buffer& GetBuffer() const { return m_Buffer; }
 		const vk::raii::DeviceMemory& GetBufferMemory() const { return m_BufferMemory; }
+		vk::DeviceAddress GetDeviceAddress() const { return m_DeviceAddress; }
 
 	private:
 		vk::raii::Buffer m_Buffer = nullptr;
 		vk::raii::DeviceMemory m_BufferMemory = nullptr;
+		vk::DeviceAddress m_DeviceAddress = 0;
 	};
 
 	class IndexBuffer
@@ -34,10 +36,12 @@ namespace Kerberos
 
 		const vk::raii::Buffer& GetBuffer() const { return m_Buffer; }
 		const vk::raii::DeviceMemory& GetBufferMemory() const { return m_BufferMemory; }
+		vk::DeviceAddress GetDeviceAddress() const { return m_DeviceAddress; }
 
 	private:
 		vk::raii::Buffer m_Buffer = nullptr;
 		vk::raii::DeviceMemory m_BufferMemory = nullptr;
+		vk::DeviceAddress m_DeviceAddress = 0;
 	};
 
 	class UniformBuffer

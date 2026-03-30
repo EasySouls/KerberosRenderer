@@ -134,5 +134,6 @@ namespace Kerberos
 		friend class JoltPhysicsSystem;
 		friend class HierarchyPanel;
 		friend class SceneSerializer;
+		friend class RayTracingSceneCache;
 	};
 }

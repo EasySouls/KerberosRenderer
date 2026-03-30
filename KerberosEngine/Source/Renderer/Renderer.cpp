@@ -10,6 +10,7 @@
 #include "Buffer.hpp"
 #include "VulkanContext.hpp"
 #include "Shaders/Shader.hpp"
+#include "RayTracingSceneCache.hpp"
 
 namespace Kerberos
 {
@@ -192,6 +193,8 @@ namespace Kerberos
 		bool SupportsGPUTimestamps = false;
 		GPUTimings LatestGPUTimings{};
 
+		RayTracingSceneCache RayTracingCache{};
+
 		glm::vec2 OutputSize{ 1280.0f, 720.0f };
 
 		// Settings
@@ -271,6 +274,8 @@ namespace Kerberos
 
 		const auto& context = VulkanContext::Get();
 		const uint32_t frameIndex = context.GetCurrentFrameIndex();
+
+		s_Data->RayTracingCache.BuildAccelerationStructures(s_Data->PendingRender.Scene);
 
 		ResetQueryPool(cmd, frameIndex);
 

@@ -23,7 +23,9 @@ void CreateBuffer(
 	buffer = vk::raii::Buffer(device, bufferInfo);
 
 	const vk::MemoryRequirements memRequirements = buffer.getMemoryRequirements();
+	constexpr vk::MemoryAllocateFlagsInfo flagsInfo{ .flags = vk::MemoryAllocateFlagBits::eDeviceAddress };
 	const vk::MemoryAllocateInfo allocInfo{
+		.pNext = usage & vk::BufferUsageFlagBits::eShaderDeviceAddress ? &flagsInfo : nullptr,
 		.allocationSize = memRequirements.size,
 		.memoryTypeIndex = Kerberos::FindMemoryType(memRequirements.memoryTypeBits, properties)
 	};
@@ -38,7 +40,11 @@ VertexBuffer::VertexBuffer(const std::vector<Vertex>& vertices)
 	const vk::raii::Device& device = VulkanContext::Get().GetDevice();
 
 	const vk::DeviceSize bufferSize = sizeof(vertices[0]) * vertices.size();
-	const vk::BufferCreateInfo stagingInfo{ .size = bufferSize, .usage = vk::BufferUsageFlagBits::eTransferSrc, .sharingMode = vk::SharingMode::eExclusive };
+	const vk::BufferCreateInfo stagingInfo{ 
+		.size = bufferSize, 
+		.usage = vk::BufferUsageFlagBits::eTransferSrc, 
+		.sharingMode = vk::SharingMode::eExclusive 
+	};
 	const vk::raii::Buffer stagingBuffer(device, stagingInfo);
 	const vk::MemoryRequirements memRequirementsStaging = stagingBuffer.getMemoryRequirements();
 	const vk::MemoryAllocateInfo memoryAllocateInfoStaging{
@@ -55,22 +61,29 @@ VertexBuffer::VertexBuffer(const std::vector<Vertex>& vertices)
 
 	const vk::BufferCreateInfo bufferInfo{
 		.size = bufferSize,
-		.usage = vk::BufferUsageFlagBits::eVertexBuffer | vk::BufferUsageFlagBits::eTransferDst,
+		.usage = vk::BufferUsageFlagBits::eVertexBuffer | vk::BufferUsageFlagBits::eTransferDst | vk::BufferUsageFlagBits::eShaderDeviceAddress | vk::BufferUsageFlagBits::eAccelerationStructureBuildInputReadOnlyKHR,
 		.sharingMode = vk::SharingMode::eExclusive
 	};
 	m_Buffer = vk::raii::Buffer(device, bufferInfo);
 
 	const vk::MemoryRequirements memRequirements = m_Buffer.getMemoryRequirements();
+	constexpr vk::MemoryAllocateFlagsInfo flagsInfo{ .flags = vk::MemoryAllocateFlagBits::eDeviceAddress };
 	const vk::MemoryAllocateInfo memoryAllocateInfo{
+		.pNext = &flagsInfo,
 		.allocationSize = memRequirements.size,
 		.memoryTypeIndex = FindMemoryType(memRequirements.memoryTypeBits,
-										  vk::MemoryPropertyFlagBits::eDeviceLocal)
+										  vk::MemoryPropertyFlagBits::eDeviceLocal),
 	};
 	m_BufferMemory = vk::raii::DeviceMemory(device, memoryAllocateInfo);
 
 	m_Buffer.bindMemory(*m_BufferMemory, 0);
 
 	VulkanContext::Get().CopyBuffer(stagingBuffer, m_Buffer, stagingInfo.size);
+
+	const vk::BufferDeviceAddressInfo bufferDeviceAddressInfo{
+		.buffer = *m_Buffer
+	};
+	m_DeviceAddress = device.getBufferAddress(bufferDeviceAddressInfo);
 }
 
 IndexBuffer::IndexBuffer(const std::vector<uint32_t>& indices) 
@@ -92,11 +105,16 @@ IndexBuffer::IndexBuffer(const std::vector<uint32_t>& indices)
 	stagingBufferMemory.unmapMemory();
 
 	CreateBuffer(device, bufferSize,
-				 vk::BufferUsageFlagBits::eTransferDst | vk::BufferUsageFlagBits::eIndexBuffer,
+				 vk::BufferUsageFlagBits::eTransferDst | vk::BufferUsageFlagBits::eIndexBuffer | vk::BufferUsageFlagBits::eShaderDeviceAddress | vk::BufferUsageFlagBits::eAccelerationStructureBuildInputReadOnlyKHR,
 				 vk::MemoryPropertyFlagBits::eDeviceLocal,
 				 m_Buffer, m_BufferMemory);
 
 	VulkanContext::Get().CopyBuffer(stagingBuffer, m_Buffer, bufferSize);
+
+	const vk::BufferDeviceAddressInfo bufferDeviceAddressInfo{
+		.buffer = *m_Buffer
+	};
+	m_DeviceAddress = device.getBufferAddress(bufferDeviceAddressInfo);
 }
 
 UniformBuffer::UniformBuffer(const vk::DeviceSize bufferSize) 

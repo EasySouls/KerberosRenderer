@@ -30,6 +30,12 @@ const std::vector<const char*> deviceExtensions = {
 	vk::KHRSpirv14ExtensionName,
 	vk::KHRSynchronization2ExtensionName,
 	vk::KHRCreateRenderpass2ExtensionName,
+
+	// TODO: These are not neccessary, implement a fallback when ray tracing is not supported
+	vk::KHRAccelerationStructureExtensionName,
+	vk::KHRBufferDeviceAddressExtensionName,
+	vk::KHRDeferredHostOperationsExtensionName,
+	vk::KHRRayQueryExtensionName,
 #ifdef KBR_DEBUG
 	vk::KHRShaderNonSemanticInfoExtensionName,
 	vk::GOOGLEHlslFunctionality1ExtensionName,
@@ -897,11 +903,11 @@ namespace Kerberos
 
 	void VulkanContext::CreateSurface()
 	{
-		VkSurfaceKHR _surface;
-		if (glfwCreateWindowSurface(static_cast<VkInstance>(*m_Instance), m_Window, nullptr, &_surface) != VK_SUCCESS) {
+		VkSurfaceKHR surface;
+		if (glfwCreateWindowSurface(static_cast<VkInstance>(*m_Instance), m_Window, nullptr, &surface) != VK_SUCCESS) {
 			throw std::runtime_error("failed to create window surface!");
 		}
-		m_Surface = vk::raii::SurfaceKHR{ m_Instance, _surface };
+		m_Surface = vk::raii::SurfaceKHR{ m_Instance, surface };
 	}
 
 	void VulkanContext::PickPhysicalDevice()
@@ -913,7 +919,9 @@ namespace Kerberos
 
 		const auto devIter = std::ranges::find_if(devices,
 		                                          [&](const vk::raii::PhysicalDevice& device) {
-			                                          auto queueFamilies = device.getQueueFamilyProperties();
+			                                          auto queueFamilies = device.getQueueFamilyProperties2() 
+														  | std::views::transform([](const vk::QueueFamilyProperties2& qfp2) { return qfp2.queueFamilyProperties; });
+
 			                                          bool isSuitable = device.getProperties2().properties.apiVersion >= VK_API_VERSION_1_3;
 			                                          const auto qfpIter = std::ranges::find_if(queueFamilies,
 				                                          [](vk::QueueFamilyProperties const& qfp)
@@ -974,7 +982,9 @@ namespace Kerberos
 	{
 		QueueFamilyInfo queueFamilyInfo{};
 
-		const std::vector<vk::QueueFamilyProperties> queueFamilyProperties = physicalDevice.getQueueFamilyProperties();
+		auto queueFamilyProperties = physicalDevice.getQueueFamilyProperties2()
+			| std::views::transform([](const vk::QueueFamilyProperties2& qfp2) { return qfp2.queueFamilyProperties; });
+		
 		std::optional<uint32_t> presentCandidate;
 		std::optional<uint32_t> dedicatedComputeCandidate;
 		std::optional<uint32_t> computeCandidate;
@@ -1074,79 +1084,95 @@ namespace Kerberos
 		return queueFamilyInfo;
 	}
 
-	void VulkanContext::CreateLogicalDevice()
-	{
-       m_QueueFamilyInfo = FindQueueFamilies(m_PhysicalDevice, m_Surface);
-
-		constexpr float queuePriority = 0.5f;
-        std::vector<uint32_t> uniqueQueueFamilies = { m_QueueFamilyInfo.graphics, m_QueueFamilyInfo.present };
-
-		if (m_QueueFamilyInfo.compute.has_value())
-		{
-			uniqueQueueFamilies.push_back(m_QueueFamilyInfo.compute.value());
-		}
-		if (m_QueueFamilyInfo.transfer.has_value())
-		{
-			uniqueQueueFamilies.push_back(m_QueueFamilyInfo.transfer.value());
-		}
-
-		std::ranges::sort(uniqueQueueFamilies);
-		uniqueQueueFamilies.erase(std::ranges::unique(uniqueQueueFamilies).begin(), uniqueQueueFamilies.end());
-
-		std::vector<vk::DeviceQueueCreateInfo> queueCreateInfos;
-		queueCreateInfos.reserve(uniqueQueueFamilies.size());
-		for (const uint32_t queueFamilyIndex : uniqueQueueFamilies)
-		{
-			queueCreateInfos.emplace_back(vk::DeviceQueueCreateInfo{
-				.queueFamilyIndex = queueFamilyIndex,
-				.queueCount = 1,
-				.pQueuePriorities = &queuePriority
-			});
-		}
-
-		// Create a chain of feature structures
-		vk::StructureChain<vk::PhysicalDeviceFeatures2, vk::PhysicalDeviceVulkan11Features, vk::PhysicalDeviceVulkan12Features, vk::PhysicalDeviceVulkan13Features, vk::PhysicalDeviceExtendedDynamicStateFeaturesEXT> featureChain = {
-			{.features = {
-				.independentBlend = true,
-				.geometryShader = true, .depthClamp = true, .depthBiasClamp = true, .samplerAnisotropy = true,
-				.shaderInt64 = true
-			   },
-			},
-			{.shaderDrawParameters = true },
-			{.descriptorIndexing = true, .timelineSemaphore = true, .bufferDeviceAddress = true },
-			{.synchronization2 = true, .dynamicRendering = true },
-			{.extendedDynamicState = true }
-		};
-
-		const vk::DeviceCreateInfo deviceCreateInfo{
-			.pNext = &featureChain.get<vk::PhysicalDeviceFeatures2>(),
-		    .queueCreateInfoCount = static_cast<uint32_t>(queueCreateInfos.size()),
-			.pQueueCreateInfos = queueCreateInfos.data(),
-			.enabledExtensionCount = static_cast<uint32_t>(deviceExtensions.size()),
-			.ppEnabledExtensionNames = deviceExtensions.data()
-		};
-
-		m_Device = vk::raii::Device{ m_PhysicalDevice, deviceCreateInfo };
-
-		m_GraphicsQueue = m_Device.getQueue(m_QueueFamilyInfo.graphics, 0);
-		m_PresentQueue = m_Device.getQueue(m_QueueFamilyInfo.present, 0);
-		m_ComputeQueue = m_QueueFamilyInfo.compute.has_value()
-			? m_Device.getQueue(m_QueueFamilyInfo.compute.value(), 0)
-			: m_GraphicsQueue;
-		m_TransferQueue = m_QueueFamilyInfo.transfer.has_value()
-			? m_Device.getQueue(m_QueueFamilyInfo.transfer.value(), 0)
-			: m_GraphicsQueue;
-
-		KBR_CORE_INFO(
-			"Queue families selected \n\tgraphics: {}, \n\tpresent: {}, \n\tcompute: {}, \n\ttransfer: {}, \n\tseparateCompute: {}, \n\tseparateTransfer: {}, \n\tdedicatedTransfer: {}",
-			m_QueueFamilyInfo.graphics,
-			m_QueueFamilyInfo.present,
-			m_QueueFamilyInfo.compute.has_value() ? std::to_string(m_QueueFamilyInfo.compute.value()) : std::string("None"),
-			m_QueueFamilyInfo.transfer.has_value() ? std::to_string(m_QueueFamilyInfo.transfer.value()) : std::string("None"),
-			m_QueueFamilyInfo.HasSeparateComputeQueue(),
-			m_QueueFamilyInfo.HasSeparateTransferQueue(),
-			m_QueueFamilyInfo.HasDedicatedTransferQueue());
-	}
+	 void VulkanContext::CreateLogicalDevice()
+	 {
+		 m_QueueFamilyInfo = FindQueueFamilies(m_PhysicalDevice, m_Surface);
+	
+		 constexpr float queuePriority = 0.5f;
+		 std::vector<uint32_t> uniqueQueueFamilies = { m_QueueFamilyInfo.graphics, m_QueueFamilyInfo.present };
+	
+		 if (m_QueueFamilyInfo.compute.has_value())
+		 {
+			 uniqueQueueFamilies.push_back(m_QueueFamilyInfo.compute.value());
+		 }
+		 if (m_QueueFamilyInfo.transfer.has_value())
+		 {
+			 uniqueQueueFamilies.push_back(m_QueueFamilyInfo.transfer.value());
+		 }
+	
+		 std::ranges::sort(uniqueQueueFamilies);
+		 uniqueQueueFamilies.erase(std::ranges::unique(uniqueQueueFamilies).begin(), uniqueQueueFamilies.end());
+	
+		 std::vector<vk::DeviceQueueCreateInfo> queueCreateInfos;
+		 queueCreateInfos.reserve(uniqueQueueFamilies.size());
+		 for (const uint32_t queueFamilyIndex : uniqueQueueFamilies)
+		 {
+			 queueCreateInfos.emplace_back(vk::DeviceQueueCreateInfo{
+				 .queueFamilyIndex = queueFamilyIndex,
+				 .queueCount = 1,
+				 .pQueuePriorities = &queuePriority
+			 });
+		 }
+	
+		 // Create a chain of feature structures
+		 vk::StructureChain<vk::PhysicalDeviceFeatures2, vk::PhysicalDeviceVulkan11Features, vk::PhysicalDeviceVulkan12Features, vk::PhysicalDeviceVulkan13Features, vk::PhysicalDeviceExtendedDynamicStateFeaturesEXT, vk::PhysicalDeviceAccelerationStructureFeaturesKHR, vk::PhysicalDeviceRayQueryFeaturesKHR> featureChain = {
+			 {.features = {
+				 .independentBlend = true,
+				 .geometryShader = true, .depthClamp = true, .depthBiasClamp = true, .samplerAnisotropy = true,
+				 .shaderInt64 = true
+				},
+			 },
+			 {.shaderDrawParameters = true },
+			 {.descriptorIndexing = true, .timelineSemaphore = true, .bufferDeviceAddress = true },
+			 {.synchronization2 = true, .dynamicRendering = true },
+			 {.extendedDynamicState = true },
+			 {.accelerationStructure = true },
+			 {.rayQuery = true }
+		 };
+	
+		 const vk::DeviceCreateInfo deviceCreateInfo{
+			 .pNext = &featureChain.get<vk::PhysicalDeviceFeatures2>(),
+			 .queueCreateInfoCount = static_cast<uint32_t>(queueCreateInfos.size()),
+			 .pQueueCreateInfos = queueCreateInfos.data(),
+			 .enabledExtensionCount = static_cast<uint32_t>(deviceExtensions.size()),
+			 .ppEnabledExtensionNames = deviceExtensions.data()
+		 };
+	
+		 m_Device = vk::raii::Device{ m_PhysicalDevice, deviceCreateInfo };
+	
+		 m_GraphicsQueue = m_Device.getQueue(m_QueueFamilyInfo.graphics, 0);
+		 m_PresentQueue = m_Device.getQueue(m_QueueFamilyInfo.present, 0);
+		 m_ComputeQueue = m_QueueFamilyInfo.compute.has_value()
+			 ? m_Device.getQueue(m_QueueFamilyInfo.compute.value(), 0)
+			 : m_GraphicsQueue;
+		 m_TransferQueue = m_QueueFamilyInfo.transfer.has_value()
+			 ? m_Device.getQueue(m_QueueFamilyInfo.transfer.value(), 0)
+			 : m_GraphicsQueue;
+	
+		 KBR_CORE_INFO(
+			 "Queue families selected \n\tgraphics: {}, \n\tpresent: {}, \n\tcompute: {}, \n\ttransfer: {}, \n\tseparateCompute: {}, \n\tseparateTransfer: {}, \n\tdedicatedTransfer: {}",
+			 m_QueueFamilyInfo.graphics,
+			 m_QueueFamilyInfo.present,
+			 m_QueueFamilyInfo.compute.has_value() ? std::to_string(m_QueueFamilyInfo.compute.value()) : std::string("None"),
+			 m_QueueFamilyInfo.transfer.has_value() ? std::to_string(m_QueueFamilyInfo.transfer.value()) : std::string("None"),
+			 m_QueueFamilyInfo.HasSeparateComputeQueue(),
+			 m_QueueFamilyInfo.HasSeparateTransferQueue(),
+			 m_QueueFamilyInfo.HasDedicatedTransferQueue());
+	
+		 SetObjectDebugName(m_GraphicsQueue, "Graphics Queue");
+		 if (m_QueueFamilyInfo.present != m_QueueFamilyInfo.graphics)
+		 {
+			 SetObjectDebugName(m_PresentQueue, "Present Queue");
+		 }
+		 if (m_QueueFamilyInfo.HasSeparateComputeQueue())
+		 {
+			 SetObjectDebugName(m_ComputeQueue, "Compute Queue");
+		 }
+		 if (m_QueueFamilyInfo.HasSeparateTransferQueue())
+		 {
+			 SetObjectDebugName(m_TransferQueue, "Transfer Queue");
+		 }
+	 }
 
 	void VulkanContext::CreateAllocator()
 	{

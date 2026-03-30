@@ -33,6 +33,9 @@ namespace Kerberos
 		const std::vector<Vertex>& GetVertices() const { return m_Vertices; }
 		const std::vector<uint32_t>& GetIndices() const { return m_Indices; }
 
+		const VertexBuffer& GetVertexBuffer() const { return m_VertexBuffer; }
+		const IndexBuffer& GetIndexBuffer() const { return m_IndexBuffer; }
+
 	private:
 		std::vector<Vertex> m_Vertices;
 		std::vector<uint32_t> m_Indices;
