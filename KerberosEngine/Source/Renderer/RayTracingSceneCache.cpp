@@ -21,6 +21,7 @@ namespace Kerberos
         });
 
 		std::set<Ref<Mesh>> uniqueMeshes;
+        std::unordered_map<Ref<Mesh>, std::vector<entt::entity>> meshToEntitiesMap;
 
 		const auto view = scene->m_Registry.view<StaticMeshComponent>();
         for (const auto entity : view)
@@ -29,6 +30,9 @@ namespace Kerberos
 			const Ref<Mesh>& mesh = staticMeshComponent.StaticMesh;
 
 			uniqueMeshes.insert(mesh);
+
+            auto& entitiesByMesh = meshToEntitiesMap[mesh];
+            entitiesByMesh.push_back(entity);
         }
 
 		auto& context = VulkanContext::Get();
@@ -118,16 +122,34 @@ namespace Kerberos
             };
             vk::DeviceAddress blasDeviceAddr = device.getAccelerationStructureAddressKHR(addrInfo);
 
-            // TODO: Get entity from scene
-            vk::TransformMatrixKHR tm{};
+            for (const auto& entity : meshToEntitiesMap[mesh])
+            {
+				const auto& transformComponent = scene->m_Registry.get<TransformComponent>(entity);
 
-            vk::AccelerationStructureInstanceKHR instance{
-                .transform = tm,
-                .mask = 0xFF,
-                .accelerationStructureReference = blasDeviceAddr
-            };
+				const glm::mat4 transform = transformComponent.GetTransform();
 
-			m_InstancesCache.InstanceData.push_back(instance);
+                vk::TransformMatrixKHR tm{};
+				tm.matrix[0][0] = transform[0][0];
+				tm.matrix[0][1] = transform[1][0];
+				tm.matrix[0][2] = transform[2][0];
+				tm.matrix[0][3] = transform[3][0];
+				tm.matrix[1][0] = transform[0][1];
+				tm.matrix[1][1] = transform[1][1];
+				tm.matrix[1][2] = transform[2][1];
+				tm.matrix[1][3] = transform[3][1];
+				tm.matrix[2][0] = transform[0][2];
+				tm.matrix[2][1] = transform[1][2];
+				tm.matrix[2][2] = transform[2][2];
+				tm.matrix[2][3] = transform[3][2];
+
+                vk::AccelerationStructureInstanceKHR instance{
+                    .transform = tm,
+                    .mask = 0xFF,
+                    .accelerationStructureReference = blasDeviceAddr
+                };
+
+                m_InstancesCache.InstanceData.push_back(instance);
+            }
 
             m_BLASCache.push_back(std::move(blas));
         }
