@@ -49,6 +49,20 @@ namespace Kerberos
 		std::vector<CompilerOptionEntry> compilerOptions;
 		compilerOptions.push_back({ .name = CompilerOptionName::EmitSpirvDirectly, .value = { .intValue0 = 1 } });
 		compilerOptions.push_back({ .name = CompilerOptionName::VulkanUseEntryPointName, .value = { .intValue0 = 1 } });
+		compilerOptions.push_back({
+			.name = CompilerOptionName::Capability,
+			.value = {
+				.kind = CompilerOptionValueKind::String,
+				.stringValue0 = "spvRayQueryKHR"
+			}
+		});
+		compilerOptions.push_back({
+			.name = CompilerOptionName::Capability,
+			.value = {
+				.kind = CompilerOptionValueKind::String,
+				.stringValue0 = "spvAccelerationStructureKHR"
+			}
+		});
 #ifdef KBR_DEBUG
 		compilerOptions.push_back({ .name = CompilerOptionName::VulkanEmitReflection, .value = { .intValue0 = 1 } });
 		//compilerOptions.push_back({ .name = CompilerOptionName::DebugInformation, .value = { .intValue0 = SLANG_DEBUG_INFO_LEVEL_MAXIMAL } });
@@ -77,10 +91,15 @@ namespace Kerberos
 			IO::ReadFileBlob(filepath),
 			diagnostics.writeRef());*/
 		const Slang::ComPtr<IModule> module(session->loadModule(moduleName.c_str(), moduleDiagnostics.writeRef()));
-		if (moduleDiagnostics || !module)
+		if (!module)
 		{
-			KBR_CORE_ERROR("Shader compilation error: {}", static_cast<const char*>(moduleDiagnostics->getBufferPointer()));
-			throw CompilationFailedException("Shader compilation error: " + std::string(static_cast<const char*>(moduleDiagnostics->getBufferPointer())));
+			const char* msg = moduleDiagnostics ? static_cast<const char*>(moduleDiagnostics->getBufferPointer()) : "Unknown module load error";
+			KBR_CORE_ERROR("Shader compilation error: {}", msg);
+			throw CompilationFailedException(std::string("Shader compilation error: ") + msg);
+		}
+		if (moduleDiagnostics)
+		{
+			KBR_CORE_WARN("Shader compilation diagnostics: {}", static_cast<const char*>(moduleDiagnostics->getBufferPointer()));
 		}
 
 		std::vector<IComponentType*> entryPointComponents;
@@ -149,11 +168,16 @@ namespace Kerberos
 
 		Slang::ComPtr<IComponentType> linkedProgram;
 		Slang::ComPtr<ISlangBlob> linkDiagnostics;
-		program->linkWithOptions(linkedProgram.writeRef(), static_cast<uint32_t>(compilerOptions.size()), compilerOptions.data(), linkDiagnostics.writeRef());
+		const SlangResult linkResult = program->linkWithOptions(linkedProgram.writeRef(), static_cast<uint32_t>(compilerOptions.size()), compilerOptions.data(), linkDiagnostics.writeRef());
+		if (SLANG_FAILED(linkResult))
+		{
+			const char* msg = linkDiagnostics ? static_cast<const char*>(linkDiagnostics->getBufferPointer()) : "Unknown link error";
+			KBR_CORE_ERROR("Shader linking error: {}", msg);
+			throw CompilationFailedException(std::string("Shader linking error: ") + msg);
+		}
 		if (linkDiagnostics)
 		{
-			KBR_CORE_ERROR("Shader linking error: {}", static_cast<const char*>(linkDiagnostics->getBufferPointer()));
-			throw CompilationFailedException("Shader linking error: " + std::string(static_cast<const char*>(linkDiagnostics->getBufferPointer())));
+			KBR_CORE_WARN("Shader linking diagnostics: {}", static_cast<const char*>(linkDiagnostics->getBufferPointer()));
 		}
 
 		std::vector<uint32_t> spirvCode;

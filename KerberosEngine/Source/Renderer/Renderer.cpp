@@ -272,10 +272,27 @@ namespace Kerberos
 		if (!s_Data->PendingRender.IsValid || !s_Data->PendingRender.Scene)
 			return;
 
-		const auto& context = VulkanContext::Get();
+		auto& context = VulkanContext::Get();
 		const uint32_t frameIndex = context.GetCurrentFrameIndex();
 
 		s_Data->RayTracingCache.BuildAccelerationStructures(s_Data->PendingRender.Scene);
+
+		const auto& tlas = s_Data->RayTracingCache.GetTLAS(frameIndex);
+		const vk::WriteDescriptorSetAccelerationStructureKHR asInfo{
+			.accelerationStructureCount = 1,
+			.pAccelerationStructures = &tlas
+		};
+		const std::vector asWrite = {
+			vk::WriteDescriptorSet{
+						.pNext = &asInfo,
+						.dstSet = *s_Data->DescriptorSets[frameIndex].scene,
+						.dstBinding = 7,
+						.dstArrayElement = 0,
+						.descriptorCount = 1,
+						.descriptorType = vk::DescriptorType::eAccelerationStructureKHR,
+			}
+		};
+		context.GetDevice().updateDescriptorSets(asWrite, {});
 
 		ResetQueryPool(cmd, frameIndex);
 
@@ -2077,6 +2094,10 @@ namespace Kerberos
 			vk::DescriptorPoolSize{
 				.type = vk::DescriptorType::eCombinedImageSampler,
 				.descriptorCount = 20
+			},
+			vk::DescriptorPoolSize{
+				.type = vk::DescriptorType::eAccelerationStructureKHR,
+				.descriptorCount = 2
 			}
 		};
 
@@ -2138,6 +2159,13 @@ namespace Kerberos
 			vk::DescriptorSetLayoutBinding{ // Prefiltered environment map
 				.binding = 6,
 				.descriptorType = vk::DescriptorType::eCombinedImageSampler,
+				.descriptorCount = 1,
+				.stageFlags = vk::ShaderStageFlagBits::eFragment,
+				.pImmutableSamplers = nullptr
+			},
+			vk::DescriptorSetLayoutBinding{ // TLAS
+				.binding = 7,
+				.descriptorType = vk::DescriptorType::eAccelerationStructureKHR,
 				.descriptorCount = 1,
 				.stageFlags = vk::ShaderStageFlagBits::eFragment,
 				.pImmutableSamplers = nullptr
@@ -2247,6 +2275,12 @@ namespace Kerberos
 				.range = sizeof(SkyboxData)
 			};
 
+			const auto& tlas = s_Data->RayTracingCache.GetTLAS(i);
+			const vk::WriteDescriptorSetAccelerationStructureKHR asInfo{
+				.accelerationStructureCount = 1,
+				.pAccelerationStructures = &tlas
+			};
+
 			const std::vector descriptorWrites = {
 				vk::WriteDescriptorSet{
 					.dstSet = *s_Data->DescriptorSets[i].scene,
@@ -2303,6 +2337,14 @@ namespace Kerberos
 					.descriptorCount = 1,
 					.descriptorType = vk::DescriptorType::eCombinedImageSampler,
 					.pImageInfo = &s_Data->Skybox.PrefilteredCubeTexture->GetDescriptorInfo()
+				},
+				vk::WriteDescriptorSet{
+					.pNext = &asInfo,
+					.dstSet = *s_Data->DescriptorSets[i].scene,
+					.dstBinding = 7,
+					.dstArrayElement = 0,
+					.descriptorCount = 1,
+					.descriptorType = vk::DescriptorType::eAccelerationStructureKHR,
 				}
 			};
 

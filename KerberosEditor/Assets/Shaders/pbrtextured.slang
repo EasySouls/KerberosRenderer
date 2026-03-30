@@ -68,6 +68,9 @@ Sampler2D samplerBRDFLUT;
 [[vk::binding(6, 0)]]
 SamplerCube prefilteredMapSampler;
 
+[[vk::binding(7, 0)]]
+RaytracingAccelerationStructure accelerationStructure;
+
 [[vk::binding(0, 1)]]
 Sampler2D albedoMapSampler;
 [[vk::binding(1, 1)]]
@@ -248,6 +251,29 @@ VSOutput vertexMain(VSInput input)
     return output;
 }
 
+bool IsInShadow_RayQuery(float3 worldPos, float3 lightDir)
+{
+    RayDesc shadowRayDesc;
+    shadowRayDesc.Origin = worldPos;
+    shadowRayDesc.Direction = normalize(lightDir);
+    shadowRayDesc.TMin = 0.01;
+    shadowRayDesc.TMax = 1e4;
+
+    RayQuery<RAY_FLAG_SKIP_PROCEDURAL_PRIMITIVES |
+             RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH> sq;
+    let rayFlags = RAY_FLAG_SKIP_PROCEDURAL_PRIMITIVES |
+             RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH;
+
+    sq.TraceRayInline(accelerationStructure, rayFlags, 0xFF, shadowRayDesc);
+
+    sq.Proceed();
+
+    // If the shadow ray intersects an opaque triangle, we consider the pixel in shadow
+    bool hit = (sq.CommittedStatus() == COMMITTED_TRIANGLE_HIT);
+
+    return hit;
+}
+
 [shader("fragment")]
 PSOutput fragmentMain(VSOutput input)
 {
@@ -263,7 +289,9 @@ PSOutput fragmentMain(VSOutput input)
 
     // Currently we are using light 0 only for generating the shadow map
     float3 lightDir = normalize(uboParams.lights[0].xyz);
-    float shadow = ShadowCalculation(lightDir, N, input.FragPos_LightSpace);
+    //float shadow = ShadowCalculation(lightDir, N, input.FragPos_LightSpace);
+
+    bool inShadowRayQuery = IsInShadow_RayQuery(input.FragPos_WorldSpace, lightDir);
 
     float3 F0 = float3(0.04, 0.04, 0.04);
     // Use this when working with srgb textures
@@ -279,8 +307,10 @@ PSOutput fragmentMain(VSOutput input)
         float3 L = normalize(uboParams.lights[i].xyz);
 
         float3 contribution = SpecularContribution(L, V, N, F0, albedo, metallic, roughness);
-        if (i == 0) // Only apply shadow to the first light for now
-            contribution *= (1.0 - shadow);
+        //if (i == 0) // Only apply shadow to the first light for now
+        //    contribution *= (1.0 - shadow);
+        if (i == 0 && inShadowRayQuery)
+            contribution *= 0.1; // Simple shadowing for the first light, reduce contribution if in shadow
 
         Lo += contribution;
 	};

@@ -246,4 +246,9 @@ namespace Kerberos
 
         context.EndSingleTimeCommands(cmd);
 	}
+
+	vk::AccelerationStructureKHR RayTracingSceneCache::GetTLAS(const uint32_t frameIndex) const
+    {
+		return m_TLASCache[frameIndex].Handle;
+	}
 }

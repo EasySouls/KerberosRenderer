@@ -45,6 +45,8 @@ namespace Kerberos
 
 		void BuildAccelerationStructures(const Ref<Scene>& scene);
 
+		vk::AccelerationStructureKHR GetTLAS(uint32_t frameIndex) const;
+
 	private:
 		std::vector<BLAS> m_BLASCache;
 		Instances m_InstancesCache;
