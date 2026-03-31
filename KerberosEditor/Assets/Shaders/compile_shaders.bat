@@ -19,5 +19,6 @@ if not exist "%SLANGC%" (
 "%SLANGC%" irradiancecube.slang -target spirv -profile spirv_1_6 -emit-spirv-directly -fvk-use-entrypoint-name -entry vertexMain -entry fragmentMain -o ../Cache/Shaders/irradiancecube.spv
 "%SLANGC%" prefilterenvmap.slang -target spirv -profile spirv_1_6 -emit-spirv-directly -fvk-use-entrypoint-name -entry vertexMain -entry fragmentMain -o ../Cache/Shaders/prefilterenvmap.spv
 "%SLANGC%" normaldebug.slang -target spirv -profile spirv_1_6 -emit-spirv-directly -fvk-use-entrypoint-name -entry vertexMain -entry geometryMain -entry fragmentMain -o ../Cache/Shaders/normaldebug.spv
+"%SLANGC%" pbr_ray_query_shadows.slang -target spirv -profile spirv_1_6 -emit-spirv-directly -fvk-use-entrypoint-name -entry vertexMain -entry fragmentMain -o ../Cache/Shaders/pbr_ray_query_shadows.spv
 
 PAUSE

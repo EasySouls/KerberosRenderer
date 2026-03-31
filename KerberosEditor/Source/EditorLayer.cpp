@@ -894,6 +894,7 @@ namespace Kerberos
 		ImGui::Text("Settings");
 		ImGui::Checkbox("Display Skybox", &Renderer::GetDisplaySkybox());
 		ImGui::Checkbox("Display normals", &Renderer::GetDisplayDebugNormals());
+		ImGui::Checkbox("Ray query based shadows", &Renderer::GetUseRayQueryBasedShadows());
 		ImGui::Checkbox("Enable PCF", &Renderer::GetIsPCFEnabledForShadowMap());
 
 		ImGui::Separator();

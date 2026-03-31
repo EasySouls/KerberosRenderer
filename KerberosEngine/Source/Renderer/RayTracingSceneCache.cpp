@@ -5,6 +5,27 @@
 #include "Scene/Scene.hpp"
 #include "Scene/Entity.hpp"
 
+namespace
+{
+    vk::TransformMatrixKHR ToVkTransformMatrix(const glm::mat4& transform)
+    {
+        vk::TransformMatrixKHR tm{};
+        tm.matrix[0][0] = transform[0][0];
+        tm.matrix[0][1] = transform[1][0];
+        tm.matrix[0][2] = transform[2][0];
+        tm.matrix[0][3] = transform[3][0];
+        tm.matrix[1][0] = transform[0][1];
+        tm.matrix[1][1] = transform[1][1];
+        tm.matrix[1][2] = transform[2][1];
+        tm.matrix[1][3] = transform[3][1];
+        tm.matrix[2][0] = transform[0][2];
+        tm.matrix[2][1] = transform[1][2];
+        tm.matrix[2][2] = transform[2][2];
+        tm.matrix[2][3] = transform[3][2];
+        return tm;
+	}
+}
+
 namespace Kerberos
 {
 	void RayTracingSceneCache::BuildAccelerationStructures(const Ref<Scene>& scene) 
@@ -128,19 +149,7 @@ namespace Kerberos
 
 				const glm::mat4 transform = transformComponent.GetTransform();
 
-                vk::TransformMatrixKHR tm{};
-				tm.matrix[0][0] = transform[0][0];
-				tm.matrix[0][1] = transform[1][0];
-				tm.matrix[0][2] = transform[2][0];
-				tm.matrix[0][3] = transform[3][0];
-				tm.matrix[1][0] = transform[0][1];
-				tm.matrix[1][1] = transform[1][1];
-				tm.matrix[1][2] = transform[2][1];
-				tm.matrix[1][3] = transform[3][1];
-				tm.matrix[2][0] = transform[0][2];
-				tm.matrix[2][1] = transform[1][2];
-				tm.matrix[2][2] = transform[2][2];
-				tm.matrix[2][3] = transform[3][2];
+				vk::TransformMatrixKHR tm = ToVkTransformMatrix(transform);
 
                 vk::AccelerationStructureInstanceKHR instance{
                     .transform = tm,
@@ -250,5 +259,10 @@ namespace Kerberos
 	vk::AccelerationStructureKHR RayTracingSceneCache::GetTLAS(const uint32_t frameIndex) const
     {
 		return m_TLASCache[frameIndex].Handle;
+	}
+
+	void RayTracingSceneCache::UpdateTLAS(const Ref<Scene>& scene) 
+    {
+		
 	}
 }

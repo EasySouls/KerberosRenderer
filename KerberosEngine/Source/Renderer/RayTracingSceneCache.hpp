@@ -48,6 +48,9 @@ namespace Kerberos
 		vk::AccelerationStructureKHR GetTLAS(uint32_t frameIndex) const;
 
 	private:
+		void UpdateTLAS(const Ref<Scene>& scene);
+
+	private:
 		std::vector<BLAS> m_BLASCache;
 		Instances m_InstancesCache;
 		std::array<TLAS, VulkanContext::MaxFramesInFlight> m_TLASCache;

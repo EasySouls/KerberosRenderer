@@ -47,6 +47,7 @@ namespace Kerberos
 		static bool& GetIsPCFEnabledForShadowMap();
 		static bool& GetDisplayDebugNormals();
 		static bool& GetDisplaySkybox();
+		static bool& GetUseRayQueryBasedShadows();
 		static float& GetGamma();
 		static float& GetExposure();
 

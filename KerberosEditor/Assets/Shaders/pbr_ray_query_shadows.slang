@@ -168,48 +168,6 @@ float3 SpecularContribution(float3 L, float3 V, float3 N, float3 F0, float3 albe
     return color;
 }
 
-float ShadowCalculation(float3 lightDir, float3 normal, float4 fragPosLightSpace)
-{
-    // Perform perspective divide
-    float3 projCoords = fragPosLightSpace.xyz / fragPosLightSpace.w;
-
-    // Transform to [0,1] range
-    float2 shadowUV = projCoords.xy * 0.5 + 0.5;
-
-    float closestDepth = shadowMap.Sample(shadowUV).r;
-    float currentDepth = projCoords.z;
-
-    // Hardware-based depth bias is enabled
-    //float bias = max(0.005 * (1.0 - dot(normal, lightDir)), 0.0005);
-    float shadow = 0.0;
-    if (enablePCF == 1) {
-        // Percentage-closer filtering (PCF)
-        uint width, height;
-        shadowMap.GetDimensions(width, height);
-        float2 texelSize = 1.0 / float2(width, height);
-
-        for (int x = -1; x <= 1; ++x)
-        {
-            for(int y = -1; y <= 1; ++y)
-            {
-                float pcfDepth = shadowMap.Sample(shadowUV + float2(x, y) * texelSize).r;
-                //shadow += currentDepth - bias > pcfDepth ? 1.0 : 0.0;
-                shadow += currentDepth > pcfDepth ? 1.0 : 0.0;
-            }
-        }
-        shadow /= 9.0;
-    } else {
-        //shadow = currentDepth - bias > closestDepth ? 1.0 : 0.0;
-        shadow = currentDepth > closestDepth ? 1.0 : 0.0;
-    }
-
-    // Keep the shadow at 0.0 when outside the far plane of the light's orthographic frustum.
-    if (currentDepth > 1.0 || shadowUV.x < 0.0 || shadowUV.x > 1.0 || shadowUV.y < 0.0 || shadowUV.y > 1.0)
-        shadow = 0.0;
-
-    return shadow;
-}
-
 float3 CalculateNormal(VSOutput input)
 {
     float3 N = normalize(input.Normal);
@@ -251,6 +209,33 @@ VSOutput vertexMain(VSInput input)
     return output;
 }
 
+static const float RASTER_SHADOW_EPS = 0.002;
+
+bool IsInShadow_RayQuery(float3 origin, float3 direction, float tMin, float tMax)
+{
+    RayDesc shadowRayDesc;
+    shadowRayDesc.Origin = origin;
+    shadowRayDesc.Direction = normalize(direction);
+    shadowRayDesc.TMin = tMin;
+    shadowRayDesc.TMax = tMax;
+
+    RayQuery<RAY_FLAG_SKIP_PROCEDURAL_PRIMITIVES |
+             RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH> sq;
+    let rayFlags = RAY_FLAG_SKIP_PROCEDURAL_PRIMITIVES |
+             RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH;
+
+    sq.TraceRayInline(accelerationStructure, rayFlags, 0xFF, shadowRayDesc);
+
+    while (sq.Proceed())
+    {
+    }
+
+    // If the shadow ray intersects an opaque triangle, we consider the pixel in shadow
+    bool hit = (sq.CommittedStatus() == COMMITTED_TRIANGLE_HIT);
+
+    return hit;
+}
+
 [shader("fragment")]
 PSOutput fragmentMain(VSOutput input)
 {
@@ -266,7 +251,7 @@ PSOutput fragmentMain(VSOutput input)
 
     // Currently we are using light 0 only for generating the shadow map
     float3 lightDir = normalize(uboParams.lights[0].xyz);
-    float shadow = ShadowCalculation(lightDir, N, input.FragPos_LightSpace);
+    bool inShadowRayQuery = IsInShadow_RayQuery(input.FragPos_WorldSpace, lightDir, RASTER_SHADOW_EPS, 1e4);
 
     float3 F0 = float3(0.04, 0.04, 0.04);
     // Use this when working with srgb textures
@@ -282,8 +267,8 @@ PSOutput fragmentMain(VSOutput input)
         float3 L = normalize(uboParams.lights[i].xyz);
 
         float3 contribution = SpecularContribution(L, V, N, F0, albedo, metallic, roughness);
-        if (i == 0) // Only apply shadow to the first light for now
-            contribution *= (1.0 - shadow);
+        if (i == 0 && inShadowRayQuery)
+            contribution *= 0.1; // Simple shadowing for the first light, reduce contribution if in shadow
 
         Lo += contribution;
 	};

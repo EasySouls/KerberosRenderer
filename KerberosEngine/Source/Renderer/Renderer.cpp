@@ -164,6 +164,7 @@ namespace Kerberos
 		vk::raii::Pipeline PBRTransparentPipeline = nullptr;
 		vk::raii::Pipeline SkyboxPipeline = nullptr;
 		vk::raii::Pipeline NormalDebugPipeline = nullptr;
+		vk::raii::Pipeline PBRRayQueryShadowsPipeline = nullptr;
 
 		vk::raii::Sampler ColorSampler = nullptr;
 		vk::raii::Sampler ShadowMapSampler = nullptr;
@@ -173,7 +174,7 @@ namespace Kerberos
 		PerObjectData PerObjectData{};
 		SkyboxData SkyboxData{};
 
-       std::array<UniformBufferObject, VulkanContext::MaxFramesInFlight> UniformBuffers{};
+		std::array<UniformBufferObject, VulkanContext::MaxFramesInFlight> UniformBuffers{};
 
         std::array<DescriptorSets, VulkanContext::MaxFramesInFlight> DescriptorSets{};
 
@@ -199,6 +200,8 @@ namespace Kerberos
 
 		// Settings
 		bool DisplayDebugNormals = false;
+
+		bool UseRayQueryBasedShadows = false;
 	};
 
 	static Owner<RendererData> s_Data = nullptr;
@@ -599,8 +602,15 @@ namespace Kerberos
 				s_Data->Skybox.SkyboxMesh->Draw(cmd);
 			}
 
-			const auto& opaquePipeline = GetIsPCFEnabledForShadowMap() ? s_Data->PBROpaquePipelinePCF : s_Data->PBROpaquePipeline;
-			cmd.bindPipeline(vk::PipelineBindPoint::eGraphics, *opaquePipeline);
+			if (s_Data->UseRayQueryBasedShadows)
+			{
+				cmd.bindPipeline(vk::PipelineBindPoint::eGraphics, *s_Data->PBRRayQueryShadowsPipeline);
+			}
+			else
+			{
+				const auto& opaquePipeline = GetIsPCFEnabledForShadowMap() ? s_Data->PBROpaquePipelinePCF : s_Data->PBROpaquePipeline;
+				cmd.bindPipeline(vk::PipelineBindPoint::eGraphics, *opaquePipeline);
+			}
 
 			{
 				const auto meshView = scene->m_Registry.view<TransformComponent, StaticMeshComponent>();
@@ -1370,6 +1380,15 @@ namespace Kerberos
 
 			context.SetObjectDebugName(s_Data->PBROpaquePipelinePCF, "PBR Opaque Pipeline PCF");
 
+			Shader pbrRayQueryShadowsShader("pbr_ray_query_shadows", "PBR Ray Query Shadows");
+			const auto pbrRayQueryShadowsShaderStages = pbrRayQueryShadowsShader.GetPipelineShaderStageCreateInfo();
+
+			opaquePipelineInfo.stageCount = static_cast<uint32_t>(pbrRayQueryShadowsShaderStages.size());
+			opaquePipelineInfo.pStages = pbrRayQueryShadowsShaderStages.data();
+
+			s_Data->PBRRayQueryShadowsPipeline = vk::raii::Pipeline(device, nullptr, opaquePipelineInfo);
+			context.SetObjectDebugName(s_Data->PBRRayQueryShadowsPipeline, "PBR Ray Query Shadows Pipeline");
+
 			Shader normalDebugShader("normaldebug", "NormalDebug");
 			const auto normalDebugShaderStages = normalDebugShader.GetPipelineShaderStageCreateInfo();
 
@@ -1709,6 +1728,13 @@ namespace Kerberos
 		KBR_CORE_ASSERT(s_Data, "Renderer not initialized!");
 
 		return s_Data->Skybox.ShowSkybox;
+	}
+
+	bool& Renderer::GetUseRayQueryBasedShadows() 
+	{
+		KBR_CORE_ASSERT(s_Data, "Renderer not initialized!");
+
+		return s_Data->UseRayQueryBasedShadows;
 	}
 
 	float& Renderer::GetGamma() 
