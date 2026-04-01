@@ -165,6 +165,7 @@ namespace Kerberos
 		vk::raii::Pipeline SkyboxPipeline = nullptr;
 		vk::raii::Pipeline NormalDebugPipeline = nullptr;
 		vk::raii::Pipeline PBRRayQueryShadowsPipeline = nullptr;
+		vk::raii::Pipeline PBRRayQuerySoftShadowsPipeline = nullptr;
 
 		vk::raii::Sampler ColorSampler = nullptr;
 		vk::raii::Sampler ShadowMapSampler = nullptr;
@@ -202,6 +203,7 @@ namespace Kerberos
 		bool DisplayDebugNormals = false;
 
 		bool UseRayQueryBasedShadows = false;
+		bool UseRayQueryBasedSoftShadows = false;
 	};
 
 	static Owner<RendererData> s_Data = nullptr;
@@ -604,7 +606,8 @@ namespace Kerberos
 
 			if (s_Data->UseRayQueryBasedShadows)
 			{
-				cmd.bindPipeline(vk::PipelineBindPoint::eGraphics, *s_Data->PBRRayQueryShadowsPipeline);
+				const auto& pipeline = GetUseRayQueryBasedSoftShadows() ? s_Data->PBRRayQuerySoftShadowsPipeline : s_Data->PBRRayQueryShadowsPipeline;
+				cmd.bindPipeline(vk::PipelineBindPoint::eGraphics, *pipeline);
 			}
 			else
 			{
@@ -1381,13 +1384,30 @@ namespace Kerberos
 			context.SetObjectDebugName(s_Data->PBROpaquePipelinePCF, "PBR Opaque Pipeline PCF");
 
 			Shader pbrRayQueryShadowsShader("pbr_ray_query_shadows", "PBR Ray Query Shadows");
-			const auto pbrRayQueryShadowsShaderStages = pbrRayQueryShadowsShader.GetPipelineShaderStageCreateInfo();
+			auto pbrRayQueryShadowsShaderStages = pbrRayQueryShadowsShader.GetPipelineShaderStageCreateInfo();
 
 			opaquePipelineInfo.stageCount = static_cast<uint32_t>(pbrRayQueryShadowsShaderStages.size());
 			opaquePipelineInfo.pStages = pbrRayQueryShadowsShaderStages.data();
 
+			uint32_t enableRayQuerySoftShadows = 0;
+			vk::SpecializationMapEntry rayQuerySoftShadowsSpecializationMapEntry{
+				.constantID = 0,
+				.offset = 0,
+				.size = sizeof(uint32_t)
+			};
+			vk::SpecializationInfo rayQuerySoftShadowsSpecializationInfo{
+				.mapEntryCount = 1,
+				.pMapEntries = &rayQuerySoftShadowsSpecializationMapEntry,
+				.dataSize = sizeof(uint32_t),
+				.pData = &enableRayQuerySoftShadows
+			};
+			pbrRayQueryShadowsShaderStages[1].pSpecializationInfo = &rayQuerySoftShadowsSpecializationInfo;
 			s_Data->PBRRayQueryShadowsPipeline = vk::raii::Pipeline(device, nullptr, opaquePipelineInfo);
 			context.SetObjectDebugName(s_Data->PBRRayQueryShadowsPipeline, "PBR Ray Query Shadows Pipeline");
+
+			enableRayQuerySoftShadows = 1;
+			s_Data->PBRRayQuerySoftShadowsPipeline = vk::raii::Pipeline(device, nullptr, opaquePipelineInfo);
+			context.SetObjectDebugName(s_Data->PBRRayQuerySoftShadowsPipeline, "PBR Ray Query Soft Shadows Pipeline");
 
 			Shader normalDebugShader("normaldebug", "NormalDebug");
 			const auto normalDebugShaderStages = normalDebugShader.GetPipelineShaderStageCreateInfo();
@@ -1735,6 +1755,13 @@ namespace Kerberos
 		KBR_CORE_ASSERT(s_Data, "Renderer not initialized!");
 
 		return s_Data->UseRayQueryBasedShadows;
+	}
+
+	bool& Renderer::GetUseRayQueryBasedSoftShadows()
+	{
+		KBR_CORE_ASSERT(s_Data, "Renderer not initialized!");
+
+		return s_Data->UseRayQueryBasedSoftShadows;
 	}
 
 	float& Renderer::GetGamma() 

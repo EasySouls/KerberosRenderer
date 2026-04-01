@@ -82,7 +82,7 @@ Sampler2D normalMapSampler;
 //[[vk::binding(4, 1)]]
 //Sampler2D roughnessMapSampler;
 
-[SpecializationConstant] const int enablePCF = 0;
+[SpecializationConstant] const int enableSoftShadows = 0;
 
 static const float PI = 3.14159265359;
 
@@ -236,6 +236,29 @@ bool IsInShadow_RayQuery(float3 origin, float3 direction, float tMin, float tMax
     return hit;
 }
 
+//float Hammersley(int i, int N)
+//{
+//    uint bits = (uint(i) << 16) | (uint(i) >> 16);
+//    bits = ((bits & 0x55555555) << 1) | ((bits & 0xAAAAAAAA) >> 1);
+//    bits = ((bits & 0x33333333) << 2) | ((bits & 0xCCCCCCCC) >> 2);
+//    bits = ((bits & 0x0F0F0F0F) << 4) | ((bits & 0xF0F0F0F0) >> 4);
+//    bits = ((bits & 0x00FF00FF) << 8) | ((bits & 0xFF00FF00) >> 8);
+//    return float(bits) * (1.0 / float(1 << 32));
+//}
+
+float2 Hammersley2D(int i, int N)
+{
+    uint bits = (uint(i) << 16) | (uint(i) >> 16);
+    bits = ((bits & 0x55555555) << 1) | ((bits & 0xAAAAAAAA) >> 1);
+    bits = ((bits & 0x33333333) << 2) | ((bits & 0xCCCCCCCC) >> 2);
+    bits = ((bits & 0x0F0F0F0F) << 4) | ((bits & 0xF0F0F0F0) >> 4);
+    bits = ((bits & 0x00FF00FF) << 8) | ((bits & 0xFF00FF00) >> 8);
+
+    float u = (float(i) + 0.5) / float(N);
+    float v = float(bits) * (1.0 / 4294967296.0);
+    return float2(u, v);
+}
+
 [shader("fragment")]
 PSOutput fragmentMain(VSOutput input)
 {
@@ -251,7 +274,25 @@ PSOutput fragmentMain(VSOutput input)
 
     // Currently we are using light 0 only for generating the shadow map
     float3 lightDir = normalize(uboParams.lights[0].xyz);
-    bool inShadowRayQuery = IsInShadow_RayQuery(input.FragPos_WorldSpace, lightDir, RASTER_SHADOW_EPS, 1e4);
+    float finalVisibility = 0.0;
+    if (enableSoftShadows == 0)
+    {
+        float3 origin = input.FragPos_WorldSpace + N * RASTER_SHADOW_EPS; // Offset to prevent self-intersection
+        finalVisibility = IsInShadow_RayQuery(origin, lightDir, RASTER_SHADOW_EPS, 1e4) ? 0.0 : 1.0;
+    } 
+    else 
+    {
+        const int shadowSampleCount = 8;
+        float visibilityAcc = 0.0;
+        for (int i = 0; i < shadowSampleCount; i++) {
+            float2 offset = Hammersley2D(i, shadowSampleCount) * 2.0 - 1.0; // Sample in [-1, 1] range
+            float3 samplePos = input.FragPos_WorldSpace + N * RASTER_SHADOW_EPS + (offset.x * N + offset.y * cross(N, lightDir)) * RASTER_SHADOW_EPS;
+            if (!IsInShadow_RayQuery(samplePos, lightDir, RASTER_SHADOW_EPS, 1e4)) {
+                visibilityAcc += 1.0;
+            }
+        }
+        finalVisibility = visibilityAcc / (float)shadowSampleCount;
+    }
 
     float3 F0 = float3(0.04, 0.04, 0.04);
     // Use this when working with srgb textures
@@ -267,8 +308,8 @@ PSOutput fragmentMain(VSOutput input)
         float3 L = normalize(uboParams.lights[i].xyz);
 
         float3 contribution = SpecularContribution(L, V, N, F0, albedo, metallic, roughness);
-        if (i == 0 && inShadowRayQuery)
-            contribution *= 0.1; // Simple shadowing for the first light, reduce contribution if in shadow
+        if (i == 0)
+            contribution *= finalVisibility; // Simple shadowing for the first light, reduce contribution based on visibility
 
         Lo += contribution;
 	};

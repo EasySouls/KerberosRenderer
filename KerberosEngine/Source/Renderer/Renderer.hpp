@@ -48,6 +48,7 @@ namespace Kerberos
 		static bool& GetDisplayDebugNormals();
 		static bool& GetDisplaySkybox();
 		static bool& GetUseRayQueryBasedShadows();
+		static bool& GetUseRayQueryBasedSoftShadows();
 		static float& GetGamma();
 		static float& GetExposure();
 
