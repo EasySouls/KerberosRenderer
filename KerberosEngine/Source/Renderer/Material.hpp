@@ -62,7 +62,10 @@ namespace Kerberos
 			: Params(other.Params)
 			, name(other.name)
 			, AlbedoTexture(other.AlbedoTexture)
-			, NormalTexture(other.NormalTexture) 
+			, NormalTexture(other.NormalTexture)
+			, MetallicTexture(other.MetallicTexture)
+			, RoughnessTexture(other.RoughnessTexture)
+			, AOTexture(other.AOTexture)
 		{
 		}
 
@@ -74,6 +77,9 @@ namespace Kerberos
 				name = other.name;
 				AlbedoTexture = other.AlbedoTexture;
 				NormalTexture = other.NormalTexture;
+				MetallicTexture = other.MetallicTexture;
+				RoughnessTexture = other.RoughnessTexture;
+				AOTexture = other.AOTexture;
 				// DescriptorSet intentionally not copied
 			}
 			return *this;

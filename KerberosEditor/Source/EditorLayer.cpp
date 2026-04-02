@@ -919,10 +919,12 @@ namespace Kerberos
 		ImGui::Text("Total memory budget: %.2f %s", convertedMemory.data, convertedMemory.units.c_str());
 		if (ImGui::CollapsingHeader("Detailed Memory Usage"))
 		{
-			for (int i = 0; i < static_cast<int>(memoryBudgetInfo.DeviceMemoryHeapCount); i++)
+			ImGui::Indent();
+
+			for (uint32_t i = 0; i < static_cast<uint32_t>(memoryBudgetInfo.DeviceMemoryHeapCount); i++)
 			{
 				std::string header = "Memory Heap Index: " + std::to_string(i);
-				if (ImGui::CollapsingHeader(header.c_str()))
+				if (ImGui::CollapsingHeader(header.c_str(), ImGuiTreeNodeFlags_DefaultOpen))
 				{
 					convertedMemory = MemoryBudget::ConvertBytes(memoryBudgetInfo.MemoryBudgetProps.heapUsage[i]);
 					ImGui::Text("Usage: %.2f %s", convertedMemory.data, convertedMemory.units.c_str());
@@ -932,6 +934,8 @@ namespace Kerberos
 					ImGui::Text("Heap Flag: %s", MemoryBudget::ReadMemoryHeapFlags(memoryBudgetInfo.DeviceMemoryProps.memoryHeaps[i].flags).c_str());
 				}
 			}
+
+			ImGui::Unindent();
 		}
 
 		ImGui::End();

@@ -33,7 +33,7 @@ namespace Kerberos
 		return {};
 	}
 
-	std::string FileDialog::SaveFile(const char* filter)
+	std::string FileDialog::SaveFile(const char* filter, const char* requiredExtension)
 	{
 		OPENFILENAMEA ofn;
 		CHAR szFile[260] = { 0 };
@@ -45,8 +45,13 @@ namespace Kerberos
 		ofn.nMaxFile = sizeof(szFile);
 		ofn.lpstrFilter = filter;
 		ofn.nFilterIndex = 1;
-		ofn.Flags = OFN_PATHMUSTEXIST | OFN_FILEMUSTEXIST | OFN_NOCHANGEDIR;
+		ofn.Flags = OFN_PATHMUSTEXIST | OFN_NOCHANGEDIR;
 		ofn.lpstrTitle = "Select a location to save the file to";
+
+		if (requiredExtension)
+		{
+			ofn.lpstrDefExt = requiredExtension;
+		}
 
 		if (GetSaveFileNameA(&ofn) == TRUE)
 		{

@@ -3,6 +3,7 @@
 #include "AssetConstants.hpp"
 #include "Logging/Log.hpp"
 #include "Assets/AssetManager.hpp"
+#include "Assets/Importers/MaterialImporter.hpp"
 #include "Assets/Importers/TextureImporter.hpp"
 #include "Debug/Instrumentor.hpp"
 #include "Project/Project.hpp"
@@ -210,13 +211,17 @@ namespace Kerberos
 					/// Open the file on double click
 					if (ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left))
 					{
-						/// TODO: If the file is a kerberos scene, open it in the scene editor
-
-						/// Open the file using the default application
-						const bool opened = FileOperations::OpenFile(path.string().c_str());
-						if (!opened)
+						if (path.extension() == ".kbrmat")
 						{
-							ImGui::Text("Could not open file: %s", fileName.c_str());
+							OpenMaterialEditor(path);
+						}
+						else
+						{
+							const bool opened = FileOperations::OpenFile(path.string().c_str());
+							if (!opened)
+							{
+								ImGui::Text("Could not open file: %s", fileName.c_str());
+							}
 						}
 					}
 
@@ -235,6 +240,8 @@ namespace Kerberos
 		ImGui::Columns(1);
 
 		ImGui::End();
+
+		RenderMaterialEditors();
 	}
 
 	void AssetsPanel::ShowFileContextMenu(const std::filesystem::path& path)
@@ -339,26 +346,23 @@ namespace Kerberos
 			// Creating basic assets
 			if (ImGui::MenuItem("Material"))
 			{
-				const std::string materialName = "New Material";
-				const std::string materialPathStr = FileDialog::SaveFile("Kerberos Material (*.kbrmat)\0*.kbrmat\0");
+				const std::string materialPathStr = FileDialog::SaveFile("Kerberos Material (*.kbrmat)\0*.kbrmat\0", "kbrmat");
 				const std::filesystem::path materialPath = materialPathStr;
-				// Write name and default properties to the file
 				if (!materialPathStr.empty())
 				{
-					std::ofstream materialFile(materialPath);
-					if (materialFile.is_open())
+					Material material;
+					material.name = materialPath.stem().string();
+					material.Params.albedo = glm::vec3(1.0f);
+					material.Params.metallic = 0.0f;
+					material.Params.roughness = 1.0f;
+
+					if (!MaterialImporter::SaveMaterial(materialPath, material))
 					{
-						materialFile << "Name: " << materialName << "\n";
-						materialFile << "Shader: Default\n";
-						materialFile << "Properties:\n";
-						materialFile << "  - AlbedoColor: 1.0, 1.0, 1.0\n";
-						materialFile << "  - Metallic: 0.0\n";
-						materialFile << "  - Roughness: 1.0\n";
-						materialFile.close();
+						KBR_CORE_ERROR("Could not create material file at path: {0}", materialPathStr);
 					}
 					else
 					{
-						KBR_CORE_ERROR("Could not create material file at path: {0}", materialPathStr);
+						Project::GetActive()->GetEditorAssetManager()->ImportAsset(materialPath);
 					}
 				}
 				else
@@ -371,11 +375,14 @@ namespace Kerberos
 
 			ImGui::EndPopup();
 		}
-	}
+   }
 
 	void AssetsPanel::RefreshAssetTree()
 	{
 		KBR_PROFILE_FUNCTION();
+
+		m_AssetTreeNodes.clear();
+		m_AssetTreeNodes.emplace_back("/", AssetHandle::Invalid());
 
 		const AssetRegistry& assetRegistry = Project::GetActive()->GetEditorAssetManager()->GetAssetRegistry();
 		for (const auto& [handle, metadata] : assetRegistry)
@@ -399,6 +406,155 @@ namespace Kerberos
 					currentNodeIndex = static_cast<uint32_t>(m_AssetTreeNodes.size()) - 1;
 				}
 
+			}
+		}
+	}
+
+	void AssetsPanel::OpenMaterialEditor(const std::filesystem::path& materialPath)
+	{
+		const std::filesystem::path absolutePath = std::filesystem::absolute(materialPath);
+		const std::string key = absolutePath.string();
+
+		if (m_OpenMaterialEditors.contains(key))
+		{
+			m_OpenMaterialEditors[key].Open = true;
+			return;
+		}
+
+		const Ref<Material> material = MaterialImporter::ImportMaterial(absolutePath);
+		if (!material)
+		{
+			m_NotificationManager.AddNotification("Could not open material: " + absolutePath.string(), Notification::Type::Error);
+			return;
+		}
+
+		MaterialEditorState state;
+		state.Filepath = absolutePath;
+		state.WorkingCopy = material;
+		state.Open = true;
+
+		m_OpenMaterialEditors.emplace(key, std::move(state));
+	}
+
+	void AssetsPanel::DrawMaterialTextureField(const char* label, const std::filesystem::path& materialFilepath, Ref<Texture2D>& texture)
+	{
+		std::string textureLabel = "None";
+		if (texture && texture->GetHandle().IsValid())
+		{
+			const Ref<EditorAssetManager> assetManager = Project::GetActive()->GetEditorAssetManager();
+			if (assetManager->IsAssetHandleValid(texture->GetHandle()))
+			{
+				textureLabel = assetManager->GetMetadata(texture->GetHandle()).Filepath.filename().string();
+			}
+		}
+
+		ImGui::Text("%s: %s", label, textureLabel.c_str());
+		ImGui::SameLine();
+		const std::string buttonLabel = std::string("Set##") + label;
+		if (ImGui::Button(buttonLabel.c_str()))
+		{
+			const std::string selectedPath = FileDialog::OpenFile("Textures (*.png;*.jpg;*.jpeg;*.ktx;*.ktx2)\0*.png;*.jpg;*.jpeg;*.ktx;*.ktx2\0");
+			if (!selectedPath.empty())
+			{
+				std::filesystem::path pathToImport = selectedPath;
+				if (pathToImport.is_relative())
+				{
+					pathToImport = materialFilepath.parent_path() / pathToImport;
+				}
+
+				const Ref<EditorAssetManager> assetManager = Project::GetActive()->GetEditorAssetManager();
+				const AssetHandle handle = assetManager->ImportAsset(pathToImport);
+				if (handle.IsValid())
+				{
+					texture = AssetManager::GetAsset<Texture2D>(handle);
+				}
+			}
+		}
+
+		ImGui::SameLine();
+		const std::string clearButtonLabel = std::string("Clear##") + label;
+		if (ImGui::Button(clearButtonLabel.c_str()))
+		{
+			texture = nullptr;
+		}
+	}
+
+	void AssetsPanel::RenderMaterialEditors()
+	{
+		for (auto it = m_OpenMaterialEditors.begin(); it != m_OpenMaterialEditors.end();)
+		{
+			auto& [key, state] = *it;
+			bool open = state.Open;
+			const std::string windowTitle = std::string("Material Editor - ") + state.Filepath.filename().string() + "##" + key;
+
+			if (open ? ImGui::Begin(windowTitle.c_str(), &open) : false)
+			{
+				char nameBuffer[256];
+				strcpy_s(nameBuffer, sizeof(nameBuffer), state.WorkingCopy->name.c_str());
+				if (ImGui::InputText("Name", nameBuffer, sizeof(nameBuffer)))
+				{
+					state.WorkingCopy->name = nameBuffer;
+				}
+
+				ImGui::ColorEdit3("Albedo", &state.WorkingCopy->Params.albedo[0]);
+				ImGui::DragFloat("Roughness", &state.WorkingCopy->Params.roughness, 0.01f, 0.0f, 1.0f);
+				ImGui::DragFloat("Metallic", &state.WorkingCopy->Params.metallic, 0.01f, 0.0f, 1.0f);
+
+				ImGui::Separator();
+				ImGui::Text("Preview Mesh");
+				int previewMesh = static_cast<int>(state.PreviewMesh);
+				ImGui::RadioButton("Sphere", &previewMesh, static_cast<int>(MaterialPreviewMesh::Sphere));
+				ImGui::SameLine();
+				ImGui::RadioButton("Cube", &previewMesh, static_cast<int>(MaterialPreviewMesh::Cube));
+				state.PreviewMesh = static_cast<MaterialPreviewMesh>(previewMesh);
+				ImGui::TextDisabled("Preview mesh selection is saved for this editor session.");
+
+				ImGui::Separator();
+				DrawMaterialTextureField("Albedo Texture", state.Filepath, state.WorkingCopy->AlbedoTexture);
+				DrawMaterialTextureField("Normal Texture", state.Filepath, state.WorkingCopy->NormalTexture);
+				DrawMaterialTextureField("Metallic Texture", state.Filepath, state.WorkingCopy->MetallicTexture);
+				DrawMaterialTextureField("Roughness Texture", state.Filepath, state.WorkingCopy->RoughnessTexture);
+				DrawMaterialTextureField("AO Texture", state.Filepath, state.WorkingCopy->AOTexture);
+
+				ImGui::Separator();
+				if (ImGui::Button("Save"))
+				{
+					if (MaterialImporter::SaveMaterial(state.Filepath, *state.WorkingCopy))
+					{
+						const Ref<EditorAssetManager> assetManager = Project::GetActive()->GetEditorAssetManager();
+						const AssetHandle materialHandle = assetManager->ImportAsset(state.Filepath);
+						if (materialHandle.IsValid())
+						{
+							if (const Ref<Material> loadedMaterial = AssetManager::GetAsset<Material>(materialHandle))
+							{
+								*loadedMaterial = *state.WorkingCopy;
+								loadedMaterial->GetHandle() = materialHandle;
+							}
+						}
+
+						m_NotificationManager.AddNotification("Saved material: " + state.Filepath.string(), Notification::Type::Info);
+					}
+					else
+					{
+						m_NotificationManager.AddNotification("Failed to save material: " + state.Filepath.string(), Notification::Type::Error);
+					}
+				}
+			}
+
+			if (open)
+			{
+				ImGui::End();
+			}
+
+			state.Open = open;
+
+			if (state.Open)
+			{
+				++it;
+			}
+			else
+			{
+				it = m_OpenMaterialEditors.erase(it);
 			}
 		}
 	}

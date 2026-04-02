@@ -2,6 +2,7 @@
 
 #include "Core/Core.hpp"
 #include "Renderer/Textures/Texture2D.hpp"
+#include "Renderer/Material.hpp"
 #include "Project/Project.hpp"
 #include "EditorWindow.hpp"
 #include "../Notification/NotificationManager.hpp"
@@ -11,6 +12,7 @@
 #include <filesystem>
 #include <map>
 #include <set>
+#include <unordered_map>
 
 namespace Kerberos
 {
@@ -55,6 +57,24 @@ namespace Kerberos
 
 		void HandleAssetDragAndDrop(AssetHandle handle, const std::filesystem::path& filename);
 
+		void OpenMaterialEditor(const std::filesystem::path& materialPath);
+		void RenderMaterialEditors();
+		static void DrawMaterialTextureField(const char* label, const std::filesystem::path& materialFilepath, Ref<Texture2D>& texture);
+
+		enum class MaterialPreviewMesh : uint8_t
+		{
+			Cube = 0,
+			Sphere = 1
+		};
+
+		struct MaterialEditorState
+		{
+			std::filesystem::path Filepath;
+			Ref<Material> WorkingCopy;
+			MaterialPreviewMesh PreviewMesh = MaterialPreviewMesh::Sphere;
+			bool Open = true;
+		};
+
 	private:
 		std::filesystem::path m_AssetsDirectory = "Assets";
 		std::filesystem::path m_CurrentDirectory = std::filesystem::current_path();
@@ -86,6 +106,8 @@ namespace Kerberos
 		};
 
 		Mode m_Mode = Mode::Filesystem;
+
+		std::unordered_map<std::string, MaterialEditorState> m_OpenMaterialEditors;
 
 		NotificationManager m_NotificationManager;
 	};

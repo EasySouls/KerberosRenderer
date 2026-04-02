@@ -7,6 +7,7 @@
 #include "Serialization/SerializationUtils.hpp"
 
 #include <yaml-cpp/yaml.h>
+#include <fstream>
 
 namespace Kerberos
 {
@@ -30,10 +31,10 @@ namespace Kerberos
 			return nullptr;
 		}
 
-		const std::string name = node["Name"].as<std::string>();
-		const glm::vec3 albedo = node["Albedo"].as<glm::vec3>();
-		const float roughness = node["Roughness"].as<float>();
-		const float metallic = node["Metallic"].as<float>();
+        const std::string name = node["Name"].as<std::string>(filepath.stem().string());
+		const glm::vec3 albedo = node["Albedo"].as<glm::vec3>(glm::vec3(1.0f));
+		const float roughness = node["Roughness"].as<float>(1.0f);
+		const float metallic = node["Metallic"].as<float>(0.0f);
 
 		const std::string albedoTexPath = node["AlbedoTexture"].as<std::string>("");
 		const std::string normalTexPath = node["NormalTexture"].as<std::string>("");
@@ -41,19 +42,86 @@ namespace Kerberos
 		const std::string roughnessTexPath = node["RoughnessTexture"].as<std::string>("");
 		const std::string aoTexPath = node["AOTexture"].as<std::string>("");
 
-
 		const Ref<EditorAssetManager> assetManager = Project::GetActive()->GetEditorAssetManager();
 
 		Material material;
 		material.name = name;
 		material.Params = { .albedo = albedo, .roughness = roughness, .metallic = metallic };
 
-		material.AlbedoTexture = albedoTexPath.empty() ? nullptr : AssetManager::GetAsset<Texture2D>(assetManager->ImportAsset(albedoTexPath));
-		material.NormalTexture = normalTexPath.empty() ? nullptr : AssetManager::GetAsset<Texture2D>(assetManager->ImportAsset(normalTexPath));
-		material.MetallicTexture = metallicTexPath.empty() ? nullptr : AssetManager::GetAsset<Texture2D>(assetManager->ImportAsset(metallicTexPath));
-		material.RoughnessTexture = roughnessTexPath.empty() ? nullptr : AssetManager::GetAsset<Texture2D>(assetManager->ImportAsset(roughnessTexPath));
-		material.AOTexture = aoTexPath.empty() ? nullptr : AssetManager::GetAsset<Texture2D>(assetManager->ImportAsset(aoTexPath));
+		auto loadTexture = [&](const std::string& texturePath) -> Ref<Texture2D>
+		{
+			if (texturePath.empty())
+				return nullptr;
+
+			std::filesystem::path resolvedPath = texturePath;
+			if (resolvedPath.is_relative())
+			{
+				resolvedPath = absolutePath.parent_path() / resolvedPath;
+			}
+
+			const AssetHandle textureHandle = assetManager->ImportAsset(resolvedPath);
+			if (!textureHandle.IsValid())
+			{
+				KBR_CORE_WARN("MaterialImporter::ImportMaterial - Failed to import texture: {}", resolvedPath.string());
+				return nullptr;
+			}
+
+			return AssetManager::GetAsset<Texture2D>(textureHandle);
+		};
+
+		material.AlbedoTexture = loadTexture(albedoTexPath);
+		material.NormalTexture = loadTexture(normalTexPath);
+		material.MetallicTexture = loadTexture(metallicTexPath);
+		material.RoughnessTexture = loadTexture(roughnessTexPath);
+		material.AOTexture = loadTexture(aoTexPath);
 
 		return CreateRef<Material>(material);
+	}
+
+	bool MaterialImporter::SaveMaterial(const std::filesystem::path& filepath, const Material& material)
+	{
+		auto texturePathFor = [&](const Ref<Texture2D>& texture) -> std::string
+		{
+			if (!texture || !texture->GetHandle().IsValid())
+				return "";
+
+			const Ref<EditorAssetManager> assetManager = Project::GetActive()->GetEditorAssetManager();
+			if (!assetManager || !assetManager->IsAssetHandleValid(texture->GetHandle()))
+				return "";
+
+			std::filesystem::path texturePath = assetManager->GetMetadata(texture->GetHandle()).Filepath;
+			if (texturePath.is_absolute())
+			{
+				std::error_code ec;
+				const std::filesystem::path relativePath = std::filesystem::relative(texturePath, filepath.parent_path(), ec);
+				if (!ec)
+					texturePath = relativePath;
+			}
+
+			return texturePath.generic_string();
+		};
+
+		YAML::Emitter out;
+		out << YAML::BeginMap;
+		out << YAML::Key << "Name" << YAML::Value << material.name;
+		out << YAML::Key << "Albedo" << YAML::Value << material.Params.albedo;
+		out << YAML::Key << "Roughness" << YAML::Value << material.Params.roughness;
+		out << YAML::Key << "Metallic" << YAML::Value << material.Params.metallic;
+		out << YAML::Key << "AlbedoTexture" << YAML::Value << texturePathFor(material.AlbedoTexture);
+		out << YAML::Key << "NormalTexture" << YAML::Value << texturePathFor(material.NormalTexture);
+		out << YAML::Key << "MetallicTexture" << YAML::Value << texturePathFor(material.MetallicTexture);
+		out << YAML::Key << "RoughnessTexture" << YAML::Value << texturePathFor(material.RoughnessTexture);
+		out << YAML::Key << "AOTexture" << YAML::Value << texturePathFor(material.AOTexture);
+		out << YAML::EndMap;
+
+		std::ofstream file(filepath);
+		if (!file.is_open())
+		{
+			KBR_CORE_ERROR("MaterialImporter::SaveMaterial - Failed to open file for writing: {}", filepath.string());
+			return false;
+		}
+
+		file << out.c_str();
+		return true;
 	}
 }

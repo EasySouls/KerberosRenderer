@@ -19,10 +19,11 @@ namespace Kerberos
 		/**
 		 * Opens a file dialog to select a file to save.
 		 * @param filter A string that specifies the file types to display in the dialog. The format is "Description (*.ext1;*.ext2)|*.ext1;*.ext2".
+		 * @param requiredExtension An optional string specifying the required file extension (without the dot). If provided, the dialog will automatically append this extension to the filename if the user doesn't specify it.
 		 * @return An absolute path to a file selected by the user, or an empty string if the user cancelled the dialog.
 		 */
 		[[nodiscard]]
-		static std::string SaveFile(const char* filter = "");
+		static std::string SaveFile(const char* filter = "", const char* requiredExtension = nullptr);
 	};
 
 	class FileOperations

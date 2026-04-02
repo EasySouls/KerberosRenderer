@@ -932,77 +932,77 @@ namespace Kerberos
 	}
 
 	template <>
-	void Scene::OnComponentAdded<IDComponent>(Entity entity, IDComponent& component)
+	void Scene::OnComponentAdded<IDComponent>(Entity, IDComponent&)
 	{
 	}
 
 	template <>
-	void Scene::OnComponentAdded<TransformComponent>(Entity entity, TransformComponent& component)
+	void Scene::OnComponentAdded<TransformComponent>(Entity, TransformComponent&)
 	{
 	}
 
 	template <>
-	void Scene::OnComponentAdded<TagComponent>(Entity entity, TagComponent& component)
+	void Scene::OnComponentAdded<TagComponent>(Entity, TagComponent&)
 	{
 	}
 
 	template <>
-	void Scene::OnComponentAdded<SpriteRendererComponent>(Entity entity, SpriteRendererComponent& component)
+	void Scene::OnComponentAdded<SpriteRendererComponent>(Entity, SpriteRendererComponent&)
 	{
 	}
 
 	template <>
-	void Scene::OnComponentAdded<ScriptComponent>(Entity entity, ScriptComponent& component)
+	void Scene::OnComponentAdded<ScriptComponent>(Entity, ScriptComponent&)
 	{
 	}
 
 	template <>
-	void Scene::OnComponentAdded<NativeScriptComponent>(Entity entity, NativeScriptComponent& component)
+	void Scene::OnComponentAdded<NativeScriptComponent>(Entity, NativeScriptComponent&)
 	{
 	}
 
 	template <>
-	void Scene::OnComponentAdded<StaticMeshComponent>(Entity entity, StaticMeshComponent& component)
+	void Scene::OnComponentAdded<StaticMeshComponent>(Entity, StaticMeshComponent&)
 	{
 	}
 
 	template <>
-	void Scene::OnComponentAdded<DirectionalLightComponent>(Entity entity, DirectionalLightComponent& component)
+	void Scene::OnComponentAdded<DirectionalLightComponent>(Entity, DirectionalLightComponent&)
 	{
 	}
 
 	template <>
-	void Scene::OnComponentAdded<PointLightComponent>(Entity entity, PointLightComponent& component)
+	void Scene::OnComponentAdded<PointLightComponent>(Entity, PointLightComponent&)
 	{
 	}
 
 	template <>
-	void Scene::OnComponentAdded<SpotLightComponent>(Entity entity, SpotLightComponent& component)
+	void Scene::OnComponentAdded<SpotLightComponent>(Entity, SpotLightComponent&)
 	{
 	}
 
 	template <>
-	void Scene::OnComponentAdded<HierarchyComponent>(Entity entity, HierarchyComponent& component)
+	void Scene::OnComponentAdded<HierarchyComponent>(Entity, HierarchyComponent&)
 	{
 	}
 
 	template <>
-	void Scene::OnComponentAdded<RigidBody3DComponent>(Entity entity, RigidBody3DComponent& component)
+	void Scene::OnComponentAdded<RigidBody3DComponent>(Entity, RigidBody3DComponent&)
 	{
 	}
 
 	template <>
-	void Scene::OnComponentAdded<BoxCollider3DComponent>(Entity entity, BoxCollider3DComponent& component)
+	void Scene::OnComponentAdded<BoxCollider3DComponent>(Entity, BoxCollider3DComponent&)
 	{
 	}
 
 	template <>
-	void Scene::OnComponentAdded<SphereCollider3DComponent>(Entity entity, SphereCollider3DComponent& component)
+	void Scene::OnComponentAdded<SphereCollider3DComponent>(Entity, SphereCollider3DComponent&)
 	{
 	}
 
 	template <>
-	void Scene::OnComponentAdded<CapsuleCollider3DComponent>(Entity entity, CapsuleCollider3DComponent& component)
+	void Scene::OnComponentAdded<CapsuleCollider3DComponent>(Entity, CapsuleCollider3DComponent&)
 	{
 	}
 
@@ -1020,27 +1020,27 @@ namespace Kerberos
 	}
 
 	template <>
-	void Scene::OnComponentAdded<EnvironmentComponent>(Entity entity, EnvironmentComponent& component)
+	void Scene::OnComponentAdded<EnvironmentComponent>(Entity, EnvironmentComponent&)
 	{
 	}
 
 	template <>
-	void Scene::OnComponentAdded<TextComponent>(Entity entity, TextComponent& component)
+	void Scene::OnComponentAdded<TextComponent>(Entity, TextComponent&)
 	{
 	}
 
 	template <>
-	void Scene::OnComponentAdded<AudioSource3DComponent>(Entity entity, AudioSource3DComponent& component)
+	void Scene::OnComponentAdded<AudioSource3DComponent>(Entity, AudioSource3DComponent&)
 	{
 	}
 
 	template <>
-	void Scene::OnComponentAdded<AudioSource2DComponent>(Entity entity, AudioSource2DComponent& component)
+	void Scene::OnComponentAdded<AudioSource2DComponent>(Entity, AudioSource2DComponent&)
 	{
 	}
 
 	template <>
-	void Scene::OnComponentAdded<AudioListenerComponent>(Entity entity, AudioListenerComponent& component)
+	void Scene::OnComponentAdded<AudioListenerComponent>(Entity, AudioListenerComponent&)
 	{
 	}
 
