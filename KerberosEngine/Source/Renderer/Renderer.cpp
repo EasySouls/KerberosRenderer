@@ -10,17 +10,20 @@
 #include "Buffer.hpp"
 #include "VulkanContext.hpp"
 #include "Shaders/Shader.hpp"
+#include "GraphicsPipeline.hpp"
 #include "RayTracingSceneCache.hpp"
 
-namespace Kerberos
+namespace
 {
+	using namespace Kerberos;
+
 	struct ShadowMap
 	{
 		vk::raii::Image Image = nullptr;
 		vk::raii::DeviceMemory ImageMemory = nullptr;
 		vk::raii::ImageView ImageView = nullptr;
 		vk::raii::PipelineLayout PipelineLayout = nullptr;
-		vk::raii::Pipeline Pipeline = nullptr;
+		Ref<GraphicsPipeline> Pipeline = nullptr;
 
 		// Settings
 		uint32_t Size = 2048;
@@ -55,7 +58,7 @@ namespace Kerberos
 		vk::raii::DeviceMemory Memory = nullptr;
 		void* MappedData = nullptr;
 		bool Pending = false;
-        uint64_t TimelineValue = 0;
+		uint64_t TimelineValue = 0;
 	};
 
 	struct MousePickingReadback
@@ -159,13 +162,13 @@ namespace Kerberos
 		DescriptorSetLayouts DescriptorSetLayouts;
 
 		vk::raii::PipelineLayout PBRPipelineLayout = nullptr;
-		vk::raii::Pipeline PBROpaquePipeline = nullptr;
-		vk::raii::Pipeline PBROpaquePipelinePCF = nullptr;
-		vk::raii::Pipeline PBRTransparentPipeline = nullptr;
-		vk::raii::Pipeline SkyboxPipeline = nullptr;
-		vk::raii::Pipeline NormalDebugPipeline = nullptr;
-		vk::raii::Pipeline PBRRayQueryShadowsPipeline = nullptr;
-		vk::raii::Pipeline PBRRayQuerySoftShadowsPipeline = nullptr;
+		Ref<GraphicsPipeline> PBROpaquePipeline = nullptr;
+		Ref<GraphicsPipeline> PBROpaquePipelinePCF = nullptr;
+		Ref<GraphicsPipeline> PBRTransparentPipeline = nullptr;
+		Ref<GraphicsPipeline> SkyboxPipeline = nullptr;
+		Ref<GraphicsPipeline> NormalDebugPipeline = nullptr;
+		Ref<GraphicsPipeline> PBRRayQueryShadowsPipeline = nullptr;
+		Ref<GraphicsPipeline> PBRRayQuerySoftShadowsPipeline = nullptr;
 
 		vk::raii::Sampler ColorSampler = nullptr;
 		vk::raii::Sampler ShadowMapSampler = nullptr;
@@ -177,7 +180,7 @@ namespace Kerberos
 
 		std::array<UniformBufferObject, VulkanContext::MaxFramesInFlight> UniformBuffers{};
 
-        std::array<DescriptorSets, VulkanContext::MaxFramesInFlight> DescriptorSets{};
+		std::array<DescriptorSets, VulkanContext::MaxFramesInFlight> DescriptorSets{};
 
 		// Dynamic uniform buffer related members
 		VkDeviceSize MinUniformBufferOffsetAlignment = 0;
@@ -186,11 +189,11 @@ namespace Kerberos
 		vk::DescriptorSet ColorOutputDescriptorSet = nullptr;
 		vk::DescriptorSet ShadowMapDescriptorSet = nullptr;
 
-        PendingSceneRender PendingRender{};
+		PendingSceneRender PendingRender{};
 
 		MousePickingReadback MousePickingReadback{};
 
-        std::vector<vk::raii::QueryPool> GPUTimestampQueryPools;
+		std::vector<vk::raii::QueryPool> GPUTimestampQueryPools;
 		float GPUTimestampPeriodNanoseconds = 0.0f;
 		bool SupportsGPUTimestamps = false;
 		GPUTimings LatestGPUTimings{};
@@ -205,6 +208,11 @@ namespace Kerberos
 		bool UseRayQueryBasedShadows = false;
 		bool UseRayQueryBasedSoftShadows = false;
 	};
+
+}
+
+namespace Kerberos
+{
 
 	static Owner<RendererData> s_Data = nullptr;
 
@@ -375,7 +383,7 @@ namespace Kerberos
 							});
 			cmd.setScissor(0, renderArea);
 
-			cmd.bindPipeline(vk::PipelineBindPoint::eGraphics, *s_Data->ShadowMap.Pipeline);
+			cmd.bindPipeline(vk::PipelineBindPoint::eGraphics, *s_Data->ShadowMap.Pipeline->GetVulkanPipeline());
 
 			cmd.setDepthBias(s_Data->DepthBias.ConstantFactor, s_Data->DepthBias.Clamp, s_Data->DepthBias.SlopeFactor);
 
@@ -593,7 +601,7 @@ namespace Kerberos
 
 			if (s_Data->Skybox.ShowSkybox && s_Data->Skybox.SkyboxMesh)
 			{
-				cmd.bindPipeline(vk::PipelineBindPoint::eGraphics, *s_Data->SkyboxPipeline);
+				s_Data->SkyboxPipeline->Bind(cmd);
 				cmd.bindDescriptorSets(
 					vk::PipelineBindPoint::eGraphics,
 					*s_Data->PBRPipelineLayout,
@@ -607,12 +615,12 @@ namespace Kerberos
 			if (s_Data->UseRayQueryBasedShadows)
 			{
 				const auto& pipeline = GetUseRayQueryBasedSoftShadows() ? s_Data->PBRRayQuerySoftShadowsPipeline : s_Data->PBRRayQueryShadowsPipeline;
-				cmd.bindPipeline(vk::PipelineBindPoint::eGraphics, *pipeline);
+				pipeline->Bind(cmd);
 			}
 			else
 			{
 				const auto& opaquePipeline = GetIsPCFEnabledForShadowMap() ? s_Data->PBROpaquePipelinePCF : s_Data->PBROpaquePipeline;
-				cmd.bindPipeline(vk::PipelineBindPoint::eGraphics, *opaquePipeline);
+				opaquePipeline->Bind(cmd);
 			}
 
 			{
@@ -646,7 +654,7 @@ namespace Kerberos
 
 			if (s_Data->DisplayDebugNormals)
 			{
-				cmd.bindPipeline(vk::PipelineBindPoint::eGraphics, *s_Data->NormalDebugPipeline);
+				s_Data->NormalDebugPipeline->Bind(cmd);
 
 				const auto meshView = scene->m_Registry.view<TransformComponent, StaticMeshComponent>();
 				int i = 0;
@@ -724,7 +732,7 @@ namespace Kerberos
 
 			cmd.setScissor(0, renderArea);
 
-			cmd.bindPipeline(vk::PipelineBindPoint::eGraphics, *s_Data->PBRTransparentPipeline);
+			s_Data->PBRTransparentPipeline->Bind(cmd);
 
 			//{
 			//	const auto meshView = scene->m_Registry.view<TransformComponent, StaticMeshComponent>();
@@ -992,7 +1000,7 @@ namespace Kerberos
 									   "Shadow Map Pipeline Layout");
 
 			// Create shader for shadow mapping
-			Shader shadowMapShader("shadowmap", "ShadowMap");
+			Ref<Shader> shadowMapShader = CreateRef<Shader>("shadowmap", "ShadowMap");
 
 			/*constexpr vk::VertexInputBindingDescription bindingDescription = { 0, sizeof(glm::vec3), vk::VertexInputRate::eVertex };
 			constexpr std::array attributeDescriptions = {
@@ -1005,97 +1013,32 @@ namespace Kerberos
 				.pVertexAttributeDescriptions = attributeDescriptions.data(),
 			};*/
 
-			const auto bindingDesc = Vertex::GetBindingDescription();
-			const auto attributeDescs = Vertex::GetAttributeDescriptions();
-
-			vk::PipelineVertexInputStateCreateInfo vertexInputInfo{
-				.vertexBindingDescriptionCount = 1,
-				.pVertexBindingDescriptions = &bindingDesc,
-				.vertexAttributeDescriptionCount = static_cast<uint32_t>(attributeDescs.size()),
-				.pVertexAttributeDescriptions = attributeDescs.data(),
-			};
-
-			vk::PipelineRasterizationStateCreateInfo rasterizer{
-				.depthClampEnable = vk::True,
-				.rasterizerDiscardEnable = vk::False,
-				.polygonMode = vk::PolygonMode::eFill,
-				.cullMode = vk::CullModeFlagBits::eFront,
-				.frontFace = vk::FrontFace::eCounterClockwise,
-				.depthBiasEnable = vk::True,
-				.lineWidth = 1.0f
-			};
-
-			vk::PipelineMultisampleStateCreateInfo multisampling{
-				.rasterizationSamples = vk::SampleCountFlagBits::e1,
-				.sampleShadingEnable = vk::False,
-				.minSampleShading = 1.0f,
-				.pSampleMask = nullptr,
-				.alphaToCoverageEnable = vk::False,
-				.alphaToOneEnable = vk::False
-			};
-
-			vk::PipelineDepthStencilStateCreateInfo depthStencil{
-				.depthTestEnable = vk::True,
-				.depthWriteEnable = vk::True,
-				.depthCompareOp = vk::CompareOp::eLessOrEqual,
-				.depthBoundsTestEnable = vk::False,
-				.stencilTestEnable = vk::False,
-				.minDepthBounds = 0.0f,
-				.maxDepthBounds = 1.0f,
-			};
-
-			vk::PipelineColorBlendAttachmentState colorBlendAttachment{
-				.blendEnable = vk::False,
-				.colorWriteMask = vk::ColorComponentFlagBits::eR | vk::ColorComponentFlagBits::eG | vk::ColorComponentFlagBits::eB | vk::ColorComponentFlagBits::eA
-			};
-
-			vk::PipelineColorBlendStateCreateInfo colorBlending{
-				.logicOpEnable = vk::False,
-				.logicOp = vk::LogicOp::eCopy,
-				.attachmentCount = 1,
-				.pAttachments = &colorBlendAttachment
-			};
-
-			vk::PipelineRenderingCreateInfo pipelineRenderingCreateInfo{
-				.colorAttachmentCount = 0,
-				.pColorAttachmentFormats = nullptr,
-				.depthAttachmentFormat = shadowMapFormat
-			};
-
-			const auto shaderStages = shadowMapShader.GetPipelineShaderStageCreateInfo();
-
 			std::vector shadowMapDynamicState = {
 				vk::DynamicState::eViewport,
 				vk::DynamicState::eScissor,
 				vk::DynamicState::eDepthBias,
 			};
 
-			const vk::PipelineDynamicStateCreateInfo shadowMapDynamicStateInfo{
-				.dynamicStateCount = static_cast<uint32_t>(shadowMapDynamicState.size()),
-				.pDynamicStates = shadowMapDynamicState.data()
-			};
+			const auto bindingDesc = Vertex::GetBindingDescription();
+			const auto attributeDescs = Vertex::GetAttributeDescriptions();
 
-			vk::GraphicsPipelineCreateInfo pipelineInfo{
-				.pNext = &pipelineRenderingCreateInfo,
-				.stageCount = 2,
-				.pStages = shaderStages.data(),
-				.pVertexInputState = &vertexInputInfo,
-				.pInputAssemblyState = &inputAssembly,
-				.pViewportState = &viewportState,
-				.pRasterizationState = &rasterizer,
-				.pMultisampleState = &multisampling,
-				.pDepthStencilState = &depthStencil,
-				.pColorBlendState = &colorBlending,
-				.pDynamicState = &shadowMapDynamicStateInfo,
-				.layout = s_Data->ShadowMap.PipelineLayout,
-				.renderPass = nullptr
-			};
+			GraphicsPipelineSpecification shadowPipelineSpec{};
+			shadowPipelineSpec.Name = "Shadow Map Pipeline";
+			shadowPipelineSpec.Shader = shadowMapShader;
+			shadowPipelineSpec.PipelineLayout = *s_Data->ShadowMap.PipelineLayout;
+			shadowPipelineSpec.BindingDescription = bindingDesc;
+			shadowPipelineSpec.InputAttributeDescriptions = { attributeDescs.begin(), attributeDescs.end() };
+			shadowPipelineSpec.SampleCount = vk::SampleCountFlagBits::e1;
+			shadowPipelineSpec.CullMode = CullMode::Front;
+			shadowPipelineSpec.EnableDepthClamp = true;
+			shadowPipelineSpec.EnableDepthBias = true;
+			shadowPipelineSpec.EnableDepthTest = true;
+			shadowPipelineSpec.EnableDepthWrite = true;
+			shadowPipelineSpec.DepthTestFunc = DepthTestFunc::LessOrEqual;
+			shadowPipelineSpec.DepthAttachmentFormat = shadowMapFormat;
+			shadowPipelineSpec.DynamicStates = shadowMapDynamicState;
 
-			s_Data->ShadowMap.Pipeline = vk::raii::Pipeline(device, nullptr, pipelineInfo);
-
-			context.SetObjectDebugName(reinterpret_cast<uint64_t>(static_cast<VkPipeline>(*s_Data->ShadowMap.Pipeline)),
-									   vk::ObjectType::ePipeline,
-									   "Shadow Map Pipeline");
+			s_Data->ShadowMap.Pipeline = CreateRef<GraphicsPipeline>(shadowPipelineSpec);
 		}
 
 		// Create the opaque and transparent pipeline resources
@@ -1232,133 +1175,7 @@ namespace Kerberos
 			const auto bindingDesc = Vertex::GetBindingDescription();
 			const auto attributeDescs = Vertex::GetAttributeDescriptions();
 
-			vk::PipelineVertexInputStateCreateInfo vertexInputInfo{
-				.vertexBindingDescriptionCount = 1,
-				.pVertexBindingDescriptions = &bindingDesc,
-				.vertexAttributeDescriptionCount = static_cast<uint32_t>(attributeDescs.size()),
-				.pVertexAttributeDescriptions = attributeDescs.data(),
-			};
-
-			vk::PipelineMultisampleStateCreateInfo multisampling{
-				.rasterizationSamples = vk::SampleCountFlagBits::e1,
-				.sampleShadingEnable = vk::False,
-				.minSampleShading = 1.0f,
-				.pSampleMask = nullptr,
-				.alphaToCoverageEnable = vk::False,
-				.alphaToOneEnable = vk::False
-			};
-
-			vk::PipelineRasterizationStateCreateInfo opaqueRasterizer{
-				.depthClampEnable = vk::False,
-				.rasterizerDiscardEnable = vk::False,
-				.polygonMode = vk::PolygonMode::eFill,
-				.cullMode = vk::CullModeFlagBits::eBack,
-				.frontFace = vk::FrontFace::eCounterClockwise,
-				.depthBiasEnable = vk::False,
-				.lineWidth = 1.0f
-			};
-
-			vk::PipelineRasterizationStateCreateInfo transparentRasterizer{
-				.depthClampEnable = vk::False,
-				.rasterizerDiscardEnable = vk::False,
-				.polygonMode = vk::PolygonMode::eFill,
-				.cullMode = vk::CullModeFlagBits::eNone,
-				.frontFace = vk::FrontFace::eCounterClockwise,
-				.depthBiasEnable = vk::False,
-				.lineWidth = 1.0f
-			};
-
-			vk::PipelineDepthStencilStateCreateInfo opaqueDepthStencil{
-				.depthTestEnable = vk::True,
-				.depthWriteEnable = vk::True,
-				.depthCompareOp = vk::CompareOp::eLessOrEqual,
-				.depthBoundsTestEnable = vk::False,
-				.stencilTestEnable = vk::False,
-				.minDepthBounds = 0.0f,
-				.maxDepthBounds = 1.0f,
-			};
-
-			vk::PipelineDepthStencilStateCreateInfo transparentDepthStencil{
-				.depthTestEnable = vk::True,
-				.depthWriteEnable = vk::False,
-				.depthCompareOp = vk::CompareOp::eLess,
-				.depthBoundsTestEnable = vk::False,
-				.stencilTestEnable = vk::False,
-				.minDepthBounds = 0.0f,
-				.maxDepthBounds = 1.0f,
-			};
-
-           vk::PipelineColorBlendAttachmentState opaqueColorBlendAttachment{
-				.blendEnable = vk::False,
-				.colorWriteMask = vk::ColorComponentFlagBits::eR | vk::ColorComponentFlagBits::eG | vk::ColorComponentFlagBits::eB | vk::ColorComponentFlagBits::eA
-			};
-
-			vk::PipelineColorBlendAttachmentState pickingColorBlendAttachment{
-				.blendEnable = vk::False,
-				.colorWriteMask = vk::ColorComponentFlagBits::eR | vk::ColorComponentFlagBits::eG | vk::ColorComponentFlagBits::eB | vk::ColorComponentFlagBits::eA
-			};
-
-			std::array<vk::PipelineColorBlendAttachmentState, 2> opaqueColorBlendAttachments = {
-				opaqueColorBlendAttachment,
-				pickingColorBlendAttachment
-			};
-
-			vk::PipelineColorBlendStateCreateInfo colorBlending{
-				.logicOpEnable = vk::False,
-				.logicOp = vk::LogicOp::eCopy,
-                .attachmentCount = static_cast<uint32_t>(opaqueColorBlendAttachments.size()),
-				.pAttachments = opaqueColorBlendAttachments.data()
-			};
-
-			vk::PipelineColorBlendAttachmentState transparentColorBlendAttachment{
-				.blendEnable = vk::True,
-				.srcColorBlendFactor = vk::BlendFactor::eSrcAlpha,
-				.dstColorBlendFactor = vk::BlendFactor::eOneMinusSrcAlpha,
-				.colorBlendOp = vk::BlendOp::eAdd,
-				.srcAlphaBlendFactor = vk::BlendFactor::eOne,
-				.dstAlphaBlendFactor = vk::BlendFactor::eZero,
-				.alphaBlendOp = vk::BlendOp::eAdd,
-				.colorWriteMask = vk::ColorComponentFlagBits::eR | vk::ColorComponentFlagBits::eG | vk::ColorComponentFlagBits::eB | vk::ColorComponentFlagBits::eA
-			};
-
-			std::array<vk::PipelineColorBlendAttachmentState, 2> transparentColorBlendAttachments = {
-				transparentColorBlendAttachment,
-				pickingColorBlendAttachment
-			};
-
-			vk::PipelineColorBlendStateCreateInfo transparentColorBlending{
-				.logicOpEnable = vk::False,
-				.logicOp = vk::LogicOp::eCopy,
-                .attachmentCount = static_cast<uint32_t>(transparentColorBlendAttachments.size()),
-				.pAttachments = transparentColorBlendAttachments.data()
-			};
-
-            const std::array colorAttachmentFormats = { colorFormat, pickingFormat };
-
-			vk::PipelineRenderingCreateInfo pipelineRenderingCreateInfo{
-			    .colorAttachmentCount = static_cast<uint32_t>(colorAttachmentFormats.size()),
-				.pColorAttachmentFormats = colorAttachmentFormats.data(),
-				.depthAttachmentFormat = depthFormat
-			};
-
-			Shader pbrShader("pbrtextured", "PBR");
-			auto shaderStages = pbrShader.GetPipelineShaderStageCreateInfo();
-
-			vk::GraphicsPipelineCreateInfo opaquePipelineInfo{
-				.pNext = &pipelineRenderingCreateInfo,
-				.stageCount = static_cast<uint32_t>(shaderStages.size()),
-				.pStages = shaderStages.data(),
-				.pVertexInputState = &vertexInputInfo,
-				.pInputAssemblyState = &inputAssembly,
-				.pViewportState = &viewportState,
-				.pRasterizationState = &opaqueRasterizer,
-				.pMultisampleState = &multisampling,
-				.pDepthStencilState = &opaqueDepthStencil,
-				.pColorBlendState = &colorBlending,
-				.pDynamicState = &dynamicStateInfo,
-				.layout = s_Data->PBRPipelineLayout,
-				.renderPass = nullptr
-			};
+			Ref<Shader> pbrShader = CreateRef<Shader>("pbrtextured", "PBR");
 
 			uint32_t enablePCF = 0;
 			vk::SpecializationMapEntry specializationMapEntry{
@@ -1372,22 +1189,33 @@ namespace Kerberos
 				.dataSize = sizeof(uint32_t),
 				.pData = &enablePCF
 			};
-			shaderStages[1].pSpecializationInfo = &specializationInfo;
 
-			s_Data->PBROpaquePipeline = vk::raii::Pipeline(device, nullptr, opaquePipelineInfo);
+			GraphicsPipelineSpecification opaquePipelineSpec{};
+			opaquePipelineSpec.Name = "PBR Opaque Pipeline";
+			opaquePipelineSpec.Shader = pbrShader;
+			opaquePipelineSpec.PipelineLayout = *s_Data->PBRPipelineLayout;
+			opaquePipelineSpec.BindingDescription = bindingDesc;
+			opaquePipelineSpec.InputAttributeDescriptions = { attributeDescs.begin(), attributeDescs.end() };
+			opaquePipelineSpec.SampleCount = vk::SampleCountFlagBits::e1;
+			opaquePipelineSpec.CullMode = CullMode::Back;
+			opaquePipelineSpec.EnableDepthClamp = false;
+			opaquePipelineSpec.EnableDepthBias = false;
+			opaquePipelineSpec.EnableDepthTest = true;
+			opaquePipelineSpec.EnableDepthWrite = true;
+			opaquePipelineSpec.DepthTestFunc = DepthTestFunc::LessOrEqual;
+			opaquePipelineSpec.BlendModes = { BlendMode::None, BlendMode::None };
+			opaquePipelineSpec.ColorAttachmentFormats = { colorFormat, pickingFormat };
+			opaquePipelineSpec.DepthAttachmentFormat = depthFormat;
+			opaquePipelineSpec.DynamicStates = dynamicStates;
+			opaquePipelineSpec.SpecializationMapEntries = { { vk::ShaderStageFlagBits::eFragment, specializationInfo } };
 
-			context.SetObjectDebugName(s_Data->PBROpaquePipeline, "PBR Opaque Pipeline");
+			s_Data->PBROpaquePipeline = CreateRef<GraphicsPipeline>(opaquePipelineSpec);
 
 			enablePCF = 1;
-			s_Data->PBROpaquePipelinePCF = vk::raii::Pipeline(device, nullptr, opaquePipelineInfo);
+			opaquePipelineSpec.Name = "PBR Opaque Pipeline with PCF Shadows";
+			s_Data->PBROpaquePipelinePCF = CreateRef<GraphicsPipeline>(opaquePipelineSpec);
 
-			context.SetObjectDebugName(s_Data->PBROpaquePipelinePCF, "PBR Opaque Pipeline PCF");
-
-			Shader pbrRayQueryShadowsShader("pbr_ray_query_shadows", "PBR Ray Query Shadows");
-			auto pbrRayQueryShadowsShaderStages = pbrRayQueryShadowsShader.GetPipelineShaderStageCreateInfo();
-
-			opaquePipelineInfo.stageCount = static_cast<uint32_t>(pbrRayQueryShadowsShaderStages.size());
-			opaquePipelineInfo.pStages = pbrRayQueryShadowsShaderStages.data();
+			Ref<Shader> pbrRayQueryShadowsShader = CreateRef<Shader>("pbr_ray_query_shadows", "PBR Ray Query Shadows");
 
 			uint32_t enableRayQuerySoftShadows = 0;
 			vk::SpecializationMapEntry rayQuerySoftShadowsSpecializationMapEntry{
@@ -1401,88 +1229,64 @@ namespace Kerberos
 				.dataSize = sizeof(uint32_t),
 				.pData = &enableRayQuerySoftShadows
 			};
-			pbrRayQueryShadowsShaderStages[1].pSpecializationInfo = &rayQuerySoftShadowsSpecializationInfo;
-			s_Data->PBRRayQueryShadowsPipeline = vk::raii::Pipeline(device, nullptr, opaquePipelineInfo);
-			context.SetObjectDebugName(s_Data->PBRRayQueryShadowsPipeline, "PBR Ray Query Shadows Pipeline");
+
+			opaquePipelineSpec.Name = "PBR Ray Query Shadows Pipeline";
+			opaquePipelineSpec.Shader = pbrRayQueryShadowsShader;
+			opaquePipelineSpec.SpecializationMapEntries = { { vk::ShaderStageFlagBits::eFragment, rayQuerySoftShadowsSpecializationInfo } };
+			s_Data->PBRRayQueryShadowsPipeline = CreateRef<GraphicsPipeline>(opaquePipelineSpec);
 
 			enableRayQuerySoftShadows = 1;
-			s_Data->PBRRayQuerySoftShadowsPipeline = vk::raii::Pipeline(device, nullptr, opaquePipelineInfo);
-			context.SetObjectDebugName(s_Data->PBRRayQuerySoftShadowsPipeline, "PBR Ray Query Soft Shadows Pipeline");
+			opaquePipelineSpec.Name = "PBR Ray Query Soft hadows Pipeline";
+			s_Data->PBRRayQuerySoftShadowsPipeline = CreateRef<GraphicsPipeline>(opaquePipelineSpec);
 
-			Shader normalDebugShader("normaldebug", "NormalDebug");
-			const auto normalDebugShaderStages = normalDebugShader.GetPipelineShaderStageCreateInfo();
+			Ref<Shader> normalDebugShader = CreateRef<Shader>("normaldebug", "NormalDebug");
 
-			opaquePipelineInfo.stageCount = static_cast<uint32_t>(normalDebugShaderStages.size());
-			opaquePipelineInfo.pStages = normalDebugShaderStages.data();
+			opaquePipelineSpec.Name = "Normal Debug Pipeline";
+			opaquePipelineSpec.Shader = normalDebugShader;
+			opaquePipelineSpec.SpecializationMapEntries = {};
+			s_Data->NormalDebugPipeline = CreateRef<GraphicsPipeline>(opaquePipelineSpec);
 
-			s_Data->NormalDebugPipeline = vk::raii::Pipeline(device, nullptr, opaquePipelineInfo);
+			GraphicsPipelineSpecification transparentPipelineSpec{};
+			transparentPipelineSpec.Name = "PBR Transparent Pipeline";
+			transparentPipelineSpec.Shader = pbrShader;
+			transparentPipelineSpec.PipelineLayout = *s_Data->PBRPipelineLayout;
+			transparentPipelineSpec.BindingDescription = bindingDesc;
+			transparentPipelineSpec.InputAttributeDescriptions = { attributeDescs.begin(), attributeDescs.end() };
+			transparentPipelineSpec.SampleCount = vk::SampleCountFlagBits::e1;
+			transparentPipelineSpec.CullMode = CullMode::None;
+			transparentPipelineSpec.EnableDepthClamp = false;
+			transparentPipelineSpec.EnableDepthBias = false;
+			transparentPipelineSpec.EnableDepthTest = true;
+			transparentPipelineSpec.EnableDepthWrite = false;
+			transparentPipelineSpec.DepthTestFunc = DepthTestFunc::Less;
+			transparentPipelineSpec.BlendModes = { BlendMode::AlphaBlend, BlendMode::None };
+			transparentPipelineSpec.ColorAttachmentFormats = { colorFormat, pickingFormat };
+			transparentPipelineSpec.DepthAttachmentFormat = depthFormat;
+			transparentPipelineSpec.DynamicStates = dynamicStates;
 
-			context.SetObjectDebugName(s_Data->NormalDebugPipeline, "Normal Debug Pipeline");
+			s_Data->PBRTransparentPipeline = CreateRef<GraphicsPipeline>(transparentPipelineSpec);
 
-			vk::GraphicsPipelineCreateInfo transparentPipelineInfo{
-				.pNext = &pipelineRenderingCreateInfo,
-				.stageCount = 2,
-				.pStages = shaderStages.data(),
-				.pVertexInputState = &vertexInputInfo,
-				.pInputAssemblyState = &inputAssembly,
-				.pViewportState = &viewportState,
-				.pRasterizationState = &transparentRasterizer,
-				.pMultisampleState = &multisampling,
-				.pDepthStencilState = &transparentDepthStencil,
-				.pColorBlendState = &transparentColorBlending,
-				.pDynamicState = &dynamicStateInfo,
-				.layout = s_Data->PBRPipelineLayout,
-				.renderPass = nullptr
-			};
+			Ref<Shader> skyboxShader = CreateRef<Shader>("skybox", "Skybox");
 
-			s_Data->PBRTransparentPipeline = vk::raii::Pipeline(device, nullptr, transparentPipelineInfo);
-			context.SetObjectDebugName(s_Data->PBRTransparentPipeline, "PBR Transparent Pipeline");
+			GraphicsPipelineSpecification skyboxPipelineSpec{};
+			skyboxPipelineSpec.Name = "Skybox Pipeline";
+			skyboxPipelineSpec.Shader = skyboxShader;
+			skyboxPipelineSpec.PipelineLayout = *s_Data->PBRPipelineLayout;
+			skyboxPipelineSpec.BindingDescription = bindingDesc;
+			skyboxPipelineSpec.InputAttributeDescriptions = { attributeDescs.begin(), attributeDescs.end() };
+			skyboxPipelineSpec.SampleCount = vk::SampleCountFlagBits::e1;
+			skyboxPipelineSpec.CullMode = CullMode::Front;
+			skyboxPipelineSpec.EnableDepthClamp = false;
+			skyboxPipelineSpec.EnableDepthBias = false;
+			skyboxPipelineSpec.EnableDepthTest = true;
+			skyboxPipelineSpec.EnableDepthWrite = false;
+			skyboxPipelineSpec.DepthTestFunc = DepthTestFunc::LessOrEqual;
+			skyboxPipelineSpec.BlendModes = { BlendMode::None, BlendMode::None };
+			skyboxPipelineSpec.ColorAttachmentFormats = { colorFormat, pickingFormat };
+			skyboxPipelineSpec.DepthAttachmentFormat = depthFormat;
+			skyboxPipelineSpec.DynamicStates = dynamicStates;
 
-			Shader skyboxShader("skybox", "Skybox");
-			const auto skyboxShaderStages = skyboxShader.GetPipelineShaderStageCreateInfo();
-
-			opaqueDepthStencil.depthWriteEnable = vk::False;
-			opaqueDepthStencil.depthTestEnable = vk::False;
-
-			vk::PipelineDepthStencilStateCreateInfo skyboxDepthStencil{
-				.depthTestEnable = vk::True,
-				.depthWriteEnable = vk::False,
-				.depthCompareOp = vk::CompareOp::eLessOrEqual,
-				.depthBoundsTestEnable = vk::False,
-				.stencilTestEnable = vk::False,
-				.minDepthBounds = 0.0f,
-				.maxDepthBounds = 1.0f,
-			};
-
-			vk::PipelineRasterizationStateCreateInfo skyboxRasterizer{
-				.depthClampEnable = vk::False,
-				.rasterizerDiscardEnable = vk::False,
-				.polygonMode = vk::PolygonMode::eFill,
-				.cullMode = vk::CullModeFlagBits::eFront,
-				.frontFace = vk::FrontFace::eCounterClockwise,
-				.depthBiasEnable = vk::False,
-				.lineWidth = 1.0f
-			};
-
-			opaqueRasterizer.cullMode = vk::CullModeFlagBits::eFront;
-
-			vk::GraphicsPipelineCreateInfo skyboxPipelineInfo{
-				.pNext = &pipelineRenderingCreateInfo,
-				.stageCount = 2,
-				.pStages = skyboxShaderStages.data(),
-				.pVertexInputState = &vertexInputInfo,
-				.pInputAssemblyState = &inputAssembly,
-				.pViewportState = &viewportState,
-				.pRasterizationState = &skyboxRasterizer,
-				.pMultisampleState = &multisampling,
-				.pDepthStencilState = &skyboxDepthStencil,
-				.pColorBlendState = &colorBlending,
-				.pDynamicState = &dynamicStateInfo,
-				.layout = s_Data->PBRPipelineLayout,
-				.renderPass = nullptr
-			};
-			s_Data->SkyboxPipeline = vk::raii::Pipeline(device, nullptr, skyboxPipelineInfo);
-			context.SetObjectDebugName(s_Data->SkyboxPipeline, "Skybox Pipeline");
+			s_Data->SkyboxPipeline = CreateRef<GraphicsPipeline>(skyboxPipelineSpec);
 		}
 
 		// Transition color image to shader read layout
@@ -1713,6 +1517,29 @@ namespace Kerberos
 		}
 
 		s_Data->OutputSize = { static_cast<float>(width), static_cast<float>(height) };
+	}
+
+	void Renderer::RecompileShaders() 
+	{
+		const auto& context = VulkanContext::Get();
+		context.WaitIdle();
+
+		if (const auto& shadowMapPipeline = s_Data->ShadowMap.Pipeline)
+			shadowMapPipeline->Recompile();
+		if (const auto& pbrOpaquePipeline = s_Data->PBROpaquePipeline)
+			pbrOpaquePipeline->Recompile();
+		if (const auto& pbrOpaquePipelinePCF = s_Data->PBROpaquePipelinePCF)
+			pbrOpaquePipelinePCF->Recompile();
+		if (const auto& pbrRayQueryShadowsPipeline = s_Data->PBRRayQueryShadowsPipeline)
+			pbrRayQueryShadowsPipeline->Recompile();
+		if (const auto& pbrRayQuerySoftShadowsPipeline = s_Data->PBRRayQuerySoftShadowsPipeline)
+			pbrRayQuerySoftShadowsPipeline->Recompile();
+		if (const auto& normalDebugPipeline = s_Data->NormalDebugPipeline)
+			normalDebugPipeline->Recompile();
+		if (const auto& transparentPipeline = s_Data->PBRTransparentPipeline)
+			transparentPipeline->Recompile();
+		if (const auto& skyboxPipeline = s_Data->SkyboxPipeline)
+			skyboxPipeline->Recompile();
 	}
 
 	glm::vec3 Renderer::GetLightPositionForShadowMapCalculation() 

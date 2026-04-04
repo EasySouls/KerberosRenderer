@@ -137,6 +137,44 @@ namespace Kerberos
 		Reflect();
 	}
 
+	bool Shader::Recompile() 
+	{
+		KBR_PROFILE_FUNCTION();
+
+		try 
+		{
+			m_SpirvCode = SlangCompiler::CompileToSpirv(m_Filepath);
+
+			const vk::ShaderModuleCreateInfo shaderInfo{
+				.codeSize = m_SpirvCode.size() * sizeof(uint32_t),
+				.pCode = m_SpirvCode.data()
+			};
+
+			auto& context = VulkanContext::Get();
+			const auto& device = context.GetDevice();
+
+			m_ShaderModule = vk::raii::ShaderModule{ device, shaderInfo };
+
+			context.SetObjectDebugName(reinterpret_cast<uint64_t>(static_cast<VkShaderModule>(*m_ShaderModule)),
+									   vk::ObjectType::eShaderModule,
+									   m_Name + "_ShaderModule");
+
+			Reflect();
+		}
+		catch (const CompilationFailedException& e) 
+		{
+			KBR_CORE_ERROR("Shader recompilation failed for '{}': {}", m_Filepath.filename().string(), e.what());
+			return false;
+		} 
+		catch (const std::exception& e) 
+		{
+			KBR_CORE_ERROR("Failed to recompile shader '{}': {}", m_Filepath.filename().string(), e.what());
+			return false;
+		}
+
+		return true;
+	}
+
 	std::vector<vk::PipelineShaderStageCreateInfo> Shader::GetPipelineShaderStageCreateInfo() const 
 	{
 		std::vector<vk::PipelineShaderStageCreateInfo> stages;

@@ -25,6 +25,8 @@ namespace Kerberos
 		Shader(Shader&&) = default;
 		Shader& operator=(Shader&&) = default;
 
+		bool Recompile();
+
 		std::vector<vk::PipelineShaderStageCreateInfo> GetPipelineShaderStageCreateInfo() const;
 
 	private:

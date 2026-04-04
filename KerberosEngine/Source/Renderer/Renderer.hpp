@@ -42,6 +42,8 @@ namespace Kerberos
 
 		static void ResizeResources(uint32_t width, uint32_t height);
 
+		static void RecompileShaders();
+
 		static glm::vec3 GetLightPositionForShadowMapCalculation();
 		static DepthBias& GetShadowMapDepthBiasSettings();
 		static bool& GetIsPCFEnabledForShadowMap();

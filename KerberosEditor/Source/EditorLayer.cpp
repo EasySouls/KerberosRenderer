@@ -794,6 +794,12 @@ namespace Kerberos
 				{
 					//ScriptEngine::ReloadAssembly();
 				}
+
+				if (ImGui::MenuItem("Recompile shaders", "", nullptr, m_SceneState == SceneState::Edit))
+				{
+					Renderer::RecompileShaders();
+				}
+
 				ImGui::EndMenu();
 			}
 
