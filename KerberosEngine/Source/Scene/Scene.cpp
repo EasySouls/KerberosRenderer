@@ -141,8 +141,8 @@ namespace Kerberos
 			}
 		}
 
-		if (mainCamera)
-		{
+		//if (mainCamera)
+		//{
 			if (m_Is3D)
 			{
 				//Render3DRuntime(mainCamera, mainCameraTransform);
@@ -153,7 +153,7 @@ namespace Kerberos
 			{
 				Render2DRuntime(mainCamera, mainCameraTransform);
 			}
-		}
+		//}
 	}
 
 	Entity Scene::CreateEntity(const std::string& name)

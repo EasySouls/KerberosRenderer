@@ -297,12 +297,12 @@ namespace Kerberos
 		};
 		const std::vector asWrite = {
 			vk::WriteDescriptorSet{
-						.pNext = &asInfo,
-						.dstSet = *s_Data->DescriptorSets[frameIndex].scene,
-						.dstBinding = 7,
-						.dstArrayElement = 0,
-						.descriptorCount = 1,
-						.descriptorType = vk::DescriptorType::eAccelerationStructureKHR,
+				.pNext = &asInfo,
+				.dstSet = *s_Data->DescriptorSets[frameIndex].scene,
+				.dstBinding = 7,
+				.dstArrayElement = 0,
+				.descriptorCount = 1,
+				.descriptorType = vk::DescriptorType::eAccelerationStructureKHR,
 			}
 		};
 		context.GetDevice().updateDescriptorSets(asWrite, {});

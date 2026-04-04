@@ -236,6 +236,8 @@ namespace Kerberos
 
 			HandleMousePicking();
 		}
+
+		m_CameraEntity = m_ActiveScene->GetPrimaryCameraEntity();
 	}
 
 	void EditorLayer::OnEvent(Event& event)
@@ -313,6 +315,12 @@ namespace Kerberos
 
 	void EditorLayer::OnScenePlay()
 	{
+		if (!m_CameraEntity)
+		{
+			m_NotificationManager.AddNotification("Cannot enter Play mode: No primary camera found in the scene!", Notification::Type::Error);
+			return;
+		}
+
 		m_SceneState = SceneState::Play;
 
 		m_RuntimeScene = Scene::Copy(m_EditorScene);
