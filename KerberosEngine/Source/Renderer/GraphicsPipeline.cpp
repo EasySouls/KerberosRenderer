@@ -104,9 +104,15 @@ namespace Kerberos
 		KBR_CORE_ASSERT(m_Pipeline != nullptr, "Pipeline not created yet!");
 		KBR_CORE_ASSERT(m_Specification.Shader, "Shader is null!");
 
-		if (!m_Specification.Shader->Recompile())
+		const auto result = m_Specification.Shader->Recompile();
+		if (!result) 
 		{
 			KBR_CORE_ERROR("Failed to recompile shader for graphics pipeline: {}", m_Specification.Name);
+			return;
+		}
+		if (!*result)
+		{
+			KBR_CORE_INFO("Shader for graphics pipeline '{}' is already up to date. No recompilation needed.", m_Specification.Name);
 			return;
 		}
 

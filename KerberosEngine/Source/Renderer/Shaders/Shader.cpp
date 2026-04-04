@@ -137,13 +137,26 @@ namespace Kerberos
 		Reflect();
 	}
 
-	bool Shader::Recompile() 
+	std::expected<bool, std::string> Shader::Recompile() 
 	{
 		KBR_PROFILE_FUNCTION();
 
 		try 
 		{
-			m_SpirvCode = SlangCompiler::CompileToSpirv(m_Filepath);
+			const auto spirvCode = SlangCompiler::CompileToSpirv(m_Filepath);
+			if (spirvCode.empty()) 
+			{
+				KBR_CORE_ERROR("Recompilation produced empty SPIR-V code for shader: {}", m_Filepath.filename().string());
+				return std::unexpected("Recompilation produced empty SPIR-V code");
+			}
+
+			if (spirvCode == m_SpirvCode)
+			{
+				KBR_CORE_INFO("Shader '{}' is already up to date. No recompilation needed.", m_Filepath.filename().string());
+				return false;
+			}
+
+			m_SpirvCode = spirvCode;
 
 			const vk::ShaderModuleCreateInfo shaderInfo{
 				.codeSize = m_SpirvCode.size() * sizeof(uint32_t),
@@ -164,12 +177,12 @@ namespace Kerberos
 		catch (const CompilationFailedException& e) 
 		{
 			KBR_CORE_ERROR("Shader recompilation failed for '{}': {}", m_Filepath.filename().string(), e.what());
-			return false;
+			return std::unexpected("Shader recompilation failed");
 		} 
 		catch (const std::exception& e) 
 		{
 			KBR_CORE_ERROR("Failed to recompile shader '{}': {}", m_Filepath.filename().string(), e.what());
-			return false;
+			return std::unexpected("Failed to recompile shader");
 		}
 
 		return true;

@@ -5,6 +5,7 @@
 #include <filesystem>
 #include <string>
 #include <vector>
+#include <expected>
 
 namespace Kerberos
 {
@@ -25,7 +26,11 @@ namespace Kerberos
 		Shader(Shader&&) = default;
 		Shader& operator=(Shader&&) = default;
 
-		bool Recompile();
+		/*
+		* Recompiles the shader if the source file has been modified since the last compilation.
+		* Returns true if the shader was successfully recompiled, false if recompilation was not needed, and an error message if recompilation failed.
+		*/
+		std::expected<bool, std::string> Recompile();
 
 		std::vector<vk::PipelineShaderStageCreateInfo> GetPipelineShaderStageCreateInfo() const;
 
