@@ -288,7 +288,7 @@ namespace Kerberos
 		auto& context = VulkanContext::Get();
 		const uint32_t frameIndex = context.GetCurrentFrameIndex();
 
-		s_Data->RayTracingCache.BuildAccelerationStructures(s_Data->PendingRender.Scene);
+		s_Data->RayTracingCache.BuildAccelerationStructures(s_Data->PendingRender.Scene, cmd, frameIndex);
 
 		const auto& tlas = s_Data->RayTracingCache.GetTLAS(frameIndex);
 		const vk::WriteDescriptorSetAccelerationStructureKHR asInfo{
