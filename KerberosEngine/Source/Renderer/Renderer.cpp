@@ -288,24 +288,28 @@ namespace Kerberos
 		auto& context = VulkanContext::Get();
 		const uint32_t frameIndex = context.GetCurrentFrameIndex();
 
-		s_Data->RayTracingCache.BuildAccelerationStructures(s_Data->PendingRender.Scene, cmd, frameIndex);
 
-		const auto& tlas = s_Data->RayTracingCache.GetTLAS(frameIndex);
-		const vk::WriteDescriptorSetAccelerationStructureKHR asInfo{
-			.accelerationStructureCount = 1,
-			.pAccelerationStructures = &tlas
-		};
-		const std::vector asWrite = {
-			vk::WriteDescriptorSet{
-				.pNext = &asInfo,
-				.dstSet = *s_Data->DescriptorSets[frameIndex].scene,
-				.dstBinding = 7,
-				.dstArrayElement = 0,
-				.descriptorCount = 1,
-				.descriptorType = vk::DescriptorType::eAccelerationStructureKHR,
-			}
-		};
-		context.GetDevice().updateDescriptorSets(asWrite, {});
+		if (IsUsingAccelerationStructures())
+		{
+			s_Data->RayTracingCache.BuildAccelerationStructures(s_Data->PendingRender.Scene, cmd, frameIndex);
+
+			const auto& tlas = s_Data->RayTracingCache.GetTLAS(frameIndex);
+			const vk::WriteDescriptorSetAccelerationStructureKHR asInfo{
+				.accelerationStructureCount = 1,
+				.pAccelerationStructures = &tlas
+			};
+			const std::vector asWrite = {
+				vk::WriteDescriptorSet{
+					.pNext = &asInfo,
+					.dstSet = *s_Data->DescriptorSets[frameIndex].scene,
+					.dstBinding = 7,
+					.dstArrayElement = 0,
+					.descriptorCount = 1,
+					.descriptorType = vk::DescriptorType::eAccelerationStructureKHR,
+				}
+			};
+			context.GetDevice().updateDescriptorSets(asWrite, {});
+		}
 
 		ResetQueryPool(cmd, frameIndex);
 
@@ -1928,6 +1932,11 @@ namespace Kerberos
 			s_Data->MousePickingReadback.WriteIndex = (s_Data->MousePickingReadback.WriteIndex + 1) % Renderer::MousePickingReadbackFrameLag;
 			s_Data->MousePickingReadback.RequestPending = false;
 		}
+	}
+
+	bool Renderer::IsUsingAccelerationStructures()
+	{
+		return s_Data->UseRayQueryBasedShadows || s_Data->UseRayQueryBasedSoftShadows;
 	}
 
 	void Renderer::PrepareUniformBuffers()

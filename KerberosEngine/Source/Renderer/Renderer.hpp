@@ -80,6 +80,8 @@ namespace Kerberos
 
 		static void HandleMousePickingReadback(const vk::raii::CommandBuffer& cmd);
 
+		static bool IsUsingAccelerationStructures();
+
 		static void CreateDefaultMaterials();
 		static void CreateResources();
 
