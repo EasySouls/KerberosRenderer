@@ -35,6 +35,7 @@ Entities:
         []
     StaticMeshComponent:
       Mesh: 5556831655075431416
+      Material: 0
       Texture: 0
   - Entity: 1004823327772732650
     TagComponent:
@@ -49,6 +50,7 @@ Entities:
         []
     StaticMeshComponent:
       Mesh: 12640333732108170778
+      Material: 0
       Texture: 0
   - Entity: 44958100548870983
     TagComponent:
@@ -74,6 +76,7 @@ Entities:
       Offset: [0, 0, 0]
     StaticMeshComponent:
       Mesh: 2971773807105207837
+      Material: 0
       Texture: 0
   - Entity: 4943794690679386388
     TagComponent:
@@ -99,6 +102,7 @@ Entities:
       Offset: [0, 3.3, 0]
     StaticMeshComponent:
       Mesh: 5556831655075431416
+      Material: 0
       Texture: 0
   - Entity: 2427611190598499102
     TagComponent:
@@ -113,4 +117,5 @@ Entities:
         []
     StaticMeshComponent:
       Mesh: 18177791179963863543
+      Material: 0
       Texture: 0

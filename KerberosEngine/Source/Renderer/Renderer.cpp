@@ -637,16 +637,18 @@ namespace Kerberos
 						continue;
 
 					// TODO: Remove this once we have a proper material system
-					staticMesh.MeshMaterial = s_Data->MaterialRegistry.Get("White");
+					Ref<Material> material = staticMesh.MeshMaterial;
+					if (material == nullptr)
+						material = s_Data->MaterialRegistry.Get("White");
 
-					UpdatePerObjectUniformBuffer(currentImage, static_cast<uint32_t>(i), transform.GetTransform(), *staticMesh.MeshMaterial, static_cast<uint32_t>(entity));
+					UpdatePerObjectUniformBuffer(currentImage, static_cast<uint32_t>(i), transform.GetTransform(), *material, static_cast<uint32_t>(entity));
 					uint32_t dynamicOffset = static_cast<uint32_t>(i * s_Data->DynamicAlignment);
 
 					cmd.bindDescriptorSets(
 						vk::PipelineBindPoint::eGraphics,
 						*s_Data->PBRPipelineLayout,
 						0,
-						{ s_Data->DescriptorSets[currentImage].scene, staticMesh.MeshMaterial->DescriptorSet },
+						{ s_Data->DescriptorSets[currentImage].scene, material->DescriptorSet },
 						{ dynamicOffset });
 
 					staticMesh.StaticMesh->Draw(cmd);
@@ -932,12 +934,6 @@ namespace Kerberos
 
 			context.SetObjectDebugName(s_Data->ShadowMapSampler, "Shadow Map Sampler");
 		}
-
-		// Create shared pipeline states
-
-		vk::PipelineInputAssemblyStateCreateInfo inputAssembly{ .topology = vk::PrimitiveTopology::eTriangleList };
-
-		vk::PipelineViewportStateCreateInfo viewportState{ .viewportCount = 1, .scissorCount = 1 };
 
 		// Create the shadow map resources
 		{

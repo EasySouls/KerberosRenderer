@@ -142,7 +142,7 @@ namespace Kerberos
 			.Rotation = glm::vec3(0.0f),
 			.Scale = glm::vec3(1.0f),
 			.Mesh = m_Meshes["sphere"],
-			.Material = m_MaterialRegistry.Get("Blue"),
+			.Material = m_MaterialRegistry.Get("Avocado"),
 			.Name = "Sphere"
 		}));
 

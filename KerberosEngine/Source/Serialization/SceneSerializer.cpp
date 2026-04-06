@@ -286,25 +286,12 @@ namespace Kerberos
 			out << YAML::Key << "StaticMeshComponent";
 			out << YAML::BeginMap;
 			const auto& staticMesh = entity.GetComponent<StaticMeshComponent>();
-			out << YAML::Key << "Mesh" << YAML::Value << (staticMesh.StaticMesh ? staticMesh.StaticMesh->GetHandle() : UUID::Invalid());
-			if (auto& mat = staticMesh.MeshMaterial)
-			{
-				//out << YAML::Key << "Material" << YAML::Value << staticMesh.MeshMaterial->GetHandle();
-				/*out << YAML::Key << "Material";
-				out << YAML::BeginMap;
+			const AssetHandle meshHandle = staticMesh.StaticMesh ? staticMesh.StaticMesh->GetHandle() : UUID::Invalid();
+			out << YAML::Key << "Mesh" << YAML::Value << meshHandle;
+			const AssetHandle materialHandle = staticMesh.MeshMaterial ? staticMesh.MeshMaterial->GetHandle() : UUID::Invalid();
+			out << YAML::Key << "Material" << YAML::Value << materialHandle;
 
-				out << YAML::Key << "Ambient" << YAML::Value << mat->Ambient;
-				out << YAML::Key << "Diffuse" << YAML::Value << mat->Diffuse;
-				out << YAML::Key << "Specular" << YAML::Value << mat->Specular;
-				out << YAML::Key << "Shininess" << YAML::Value << mat->Shininess;
-
-				out << YAML::EndMap;*/
-			}
-			else
-			{
-				out << YAML::Key << "Material" << YAML::Value << UUID::Invalid();
-			}
-
+			// TODO: Deprecated - meshes shouldnt have textures, only materials 
 			if (staticMesh.MeshTexture)
 				out << YAML::Key << "Texture" << YAML::Value << staticMesh.MeshTexture->GetHandle();
 			else
@@ -651,22 +638,9 @@ namespace Kerberos
 				{
 					auto& staticMesh = deserializedEntity.AddComponent<StaticMeshComponent>();
 
-					/// Get the material and texture handles
-					/// If they are valid, load the assets, else use default ones
-
-					/*const auto matNode = staticMeshComponent["Material"].as<std::uint64_t>();
-					const AssetHandle materialHandle = UUID(matNode);
+					const AssetHandle materialHandle = AssetHandle(staticMeshComponent["Material"].as<uint64_t>());
 					if (materialHandle.IsValid())
-						staticMesh.MeshMaterial = AssetManager::GetAsset<Material>(materialHandle);*/
-
-					staticMesh.MeshMaterial = CreateRef<Material>();
-					/*if (auto matNode = staticMeshComponent["Material"])
-					{
-						staticMesh.MeshMaterial->Ambient = matNode["Ambient"].as<glm::vec3>();
-						staticMesh.MeshMaterial->Diffuse = matNode["Diffuse"].as<glm::vec3>();
-						staticMesh.MeshMaterial->Specular = matNode["Specular"].as<glm::vec3>();
-						staticMesh.MeshMaterial->Shininess = matNode["Shininess"].as<float>();
-					}*/
+						staticMesh.MeshMaterial = AssetManager::GetAsset<Material>(materialHandle);
 
 					const AssetHandle textureHandle = AssetHandle(staticMeshComponent["Texture"].as<uint64_t>());
 					if (textureHandle.IsValid())

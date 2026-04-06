@@ -185,8 +185,7 @@ namespace Kerberos
 
 		StaticMeshComponent()
 		{
-			// TODO: This creates a brand-new material and mesh every time. We should probably have a default material and mesh in the renderer and use that instead.
-			MeshMaterial = CreateRef<Material>();
+			//MeshMaterial = CreateRef<Material>();
 			//StaticMesh = Mesh::CreateCube(1.0f);
 		}
 
