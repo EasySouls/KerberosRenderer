@@ -633,13 +633,13 @@ namespace Kerberos
 				{
 					auto& transform = meshView.get<TransformComponent>(entity);
 					auto& staticMesh = meshView.get<StaticMeshComponent>(entity);
-					if (!staticMesh.Visible || !staticMesh.StaticMesh || !staticMesh.MeshMaterial)
+					if (!staticMesh.Visible || !staticMesh.StaticMesh /* || !staticMesh.MeshMaterial*/)
 						continue;
 
 					// TODO: Remove this once we have a proper material system
 					Ref<Material> material = staticMesh.MeshMaterial;
 					if (material == nullptr)
-						material = s_Data->MaterialRegistry.Get("White");
+						material = s_Data->MaterialRegistry.Get("DebugPink");
 
 					UpdatePerObjectUniformBuffer(currentImage, static_cast<uint32_t>(i), transform.GetTransform(), *material, static_cast<uint32_t>(entity));
 					uint32_t dynamicOffset = static_cast<uint32_t>(i * s_Data->DynamicAlignment);
@@ -831,6 +831,7 @@ namespace Kerberos
 		s_Data->MaterialRegistry.Add("Red", CreateRef<Material>("Red", glm::vec3(1.0f, 0.0f, 0.0f), 0.1f, 1.0f));
 		s_Data->MaterialRegistry.Add("Blue", CreateRef<Material>("Blue", glm::vec3(0.0f, 0.0f, 1.0f), 0.1f, 1.0f));
 		s_Data->MaterialRegistry.Add("Black", CreateRef<Material>("Black", glm::vec3(0.0f), 0.1f, 1.0f));
+		s_Data->MaterialRegistry.Add("DebugPink", CreateRef<Material>("DebugPink", glm::vec3(1.0f, 0.0f, 1.0f), 1.0f, 0.1f));
 	}
 
 	void Renderer::CreateResources()
