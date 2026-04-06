@@ -1020,6 +1020,41 @@ namespace Kerberos
 				}
 				ImGui::Text("%s", meshLabel.c_str());
 
+				ImGui::Button("Material");
+
+				/// Handle drag and drop for materials
+				if (ImGui::BeginDragDropTarget())
+				{
+					if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload(assetBrowserMaterial))
+					{
+						const AssetHandle handle = *static_cast<AssetHandle*>(payload->Data);
+						if (const AssetType assetType = AssetManager::GetAssetType(handle); assetType != AssetType::Material)
+						{
+							KBR_EDITOR_ERROR("Asset is not a material: {0}", handle);
+							m_NotificationManager.AddNotification("Asset is not a material", Notification::Type::Error);
+							return;
+						}
+						const Ref<Material> material = AssetManager::GetAsset<Material>(handle);
+						staticMesh.MeshMaterial = material;
+					}
+					ImGui::EndDragDropTarget();
+				}
+
+				std::string materialLabel = "None";
+				if (staticMesh.MeshMaterial)
+				{
+					if (AssetManager::IsAssetHandleValid(staticMesh.MeshMaterial->GetHandle()))
+					{
+						const auto& [Type, Filepath] = Project::GetActive()->GetEditorAssetManager()->GetMetadata(staticMesh.MeshMaterial->GetHandle());
+						materialLabel = Filepath.filename().string();
+					}
+					else
+					{
+						materialLabel = "Invalid Material";
+					}
+				}
+				ImGui::Text("%s", materialLabel.c_str());
+
 				ImGui::Separator();
 
 				ImGui::Checkbox("Cast Shadows", &staticMesh.CastShadows);

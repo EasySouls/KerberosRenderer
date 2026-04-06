@@ -288,7 +288,6 @@ namespace Kerberos
 		auto& context = VulkanContext::Get();
 		const uint32_t frameIndex = context.GetCurrentFrameIndex();
 
-
 		if (IsUsingAccelerationStructures())
 		{
 			s_Data->RayTracingCache.BuildAccelerationStructures(s_Data->PendingRender.Scene, cmd, frameIndex);
@@ -552,8 +551,8 @@ namespace Kerberos
 		};
 
 		const vk::Rect2D renderArea{
-				.offset = vk::Offset2D{.x = 0, .y = 0 },
-				.extent = vk::Extent2D{.width = static_cast<uint32_t>(s_Data->OutputSize.x), .height = static_cast<uint32_t>(s_Data->OutputSize.y) }
+			.offset = vk::Offset2D{.x = 0, .y = 0 },
+			.extent = vk::Extent2D{.width = static_cast<uint32_t>(s_Data->OutputSize.x), .height = static_cast<uint32_t>(s_Data->OutputSize.y) }
 		};
 
 		// Render opaque objects

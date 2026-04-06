@@ -117,7 +117,15 @@ namespace Kerberos
 				{
 					if (ImGui::MenuItem("Delete"))
 					{
-						const bool success = FileOperations::Delete((m_AssetsDirectory / item).string().c_str());
+						const char* path = (m_AssetsDirectory / item).string().c_str();
+						if (FileOperations::Delete(path))
+						{
+							m_NotificationManager.AddNotification("Deleted: " + std::string(path), Notification::Type::Info);
+						}
+						else 
+						{
+							m_NotificationManager.AddNotification("Failed to delete: " + std::string(path), Notification::Type::Error);
+						}
 					}
 					ImGui::EndPopup();
 				}
@@ -624,6 +632,11 @@ namespace Kerberos
 			else if (assetType == AssetType::Sound)
 			{
 				ImGui::SetDragDropPayload(assetBrowserAudio, &handle, sizeof(AssetHandle), ImGuiCond_Once);
+				ImGui::Text("%s", filename.string().c_str());
+			}
+			else if (assetType == AssetType::Material)
+			{
+				ImGui::SetDragDropPayload(assetBrowserMaterial, &handle, sizeof(AssetHandle), ImGuiCond_Once);
 				ImGui::Text("%s", filename.string().c_str());
 			}
 
