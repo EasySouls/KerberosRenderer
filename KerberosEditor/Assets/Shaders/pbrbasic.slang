@@ -1,3 +1,5 @@
+import common;
+
 struct VSInput
 {
     float3 Pos;
@@ -16,36 +18,12 @@ struct VSOutput
     float4 FragPos_LightSpace;
 };
 
-struct SceneData
-{
-    float4x4 projection;
-    float4x4 view;
-    float4x4 lightSpaceMatrix;
-    float3 ambientLightColor;
-    float3 camPos;
-};
 [[vk::binding(0, 0)]]
 ConstantBuffer<SceneData> scene;
 
-struct UBOParams {
-	float4 lights[4];
-    float exposure;
-    float gamma;
-};
 [[vk::binding(1, 0)]]
-ConstantBuffer<UBOParams> uboParams;
+ConstantBuffer<GlobalLighting> globalLighting;
 
-struct Material {
-    float3 albedo;
-	float roughness;
-	float metallic;
-};
-
-struct PerObject {
-    float4x4 model;
-    float4x4 worldNormal;
-    Material material;
-};
 [[vk::binding(2, 0)]]
 ConstantBuffer<PerObject> perObject;
 
@@ -219,7 +197,7 @@ float4 fragmentMain(VSOutput input)
     // float3 lightDir = normalize(uboParams.lights[0].xyz - input.FragPos_WorldSpace);
 
     // Currently we are using light 0 only for generating the shadow map
-    float3 lightDir = normalize(uboParams.lights[0].xyz);
+    float3 lightDir = normalize(globalLighting.lights[0].xyz);
     float shadow = ShadowCalculation(lightDir, N, input.FragPos_LightSpace);
 
     float3 F0 = float3(0.04, 0.04, 0.04);
@@ -230,7 +208,7 @@ float4 fragmentMain(VSOutput input)
 	for (int i = 0; i < 4; i++) {
         // For point lights in the future
         // float3 L = normalize(normalize(uboParams.lights[i].xyz) - input.FragPos_WorldSpace);
-        float3 L = normalize(uboParams.lights[i].xyz);
+        float3 L = normalize(globalLighting.lights[i].xyz);
 
         float3 contribution = SpecularContribution(L, V, N, F0, perObject.material);
         if (i == 0) // Only apply shadow to the first light for now
@@ -262,10 +240,10 @@ float4 fragmentMain(VSOutput input)
     float3 color = ambient + Lo;
 
     // Tone mapping
-    color = Uncharted2Tonemap(color * uboParams.exposure);
+    color = Uncharted2Tonemap(color * globalLighting.exposure);
     color = color * (1.0f / Uncharted2Tonemap((11.2f).xxx));
     // Gamma correction
-    color = pow(color, (1.0f / uboParams.gamma).xxx);
+    color = pow(color, (1.0f / globalLighting.gamma).xxx);
 
     return float4(color, 1.0);
 }

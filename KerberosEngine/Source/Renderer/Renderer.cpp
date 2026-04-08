@@ -86,6 +86,7 @@ namespace
 		glm::mat4 lightSpaceMatrix{ 0.f };
 		alignas(16) glm::vec3 ambientLightColor{ 0.1f, 0.1f, 0.1f };
 		alignas(16) glm::vec3 camPos{ 0.f };
+		uint32_t lightCount = 0;
 	};
 
 	struct UniformDataParams
@@ -113,10 +114,15 @@ namespace
 
 	struct UniformBufferObject
 	{
-		std::shared_ptr<UniformBuffer> scene;
-		std::shared_ptr<UniformBuffer> params;
-		std::shared_ptr<UniformBuffer> perObject;
-		std::shared_ptr<UniformBuffer> skybox;
+		Ref<UniformBuffer> scene;
+		Ref<UniformBuffer> params;
+		Ref<UniformBuffer> perObject;
+		Ref<UniformBuffer> skybox;
+	};
+
+	struct StorageBuffers
+	{
+		Ref<StorageBuffer> Lights;
 	};
 
 	struct DescriptorSets
@@ -179,6 +185,7 @@ namespace
 		SkyboxData SkyboxData{};
 
 		std::array<UniformBufferObject, VulkanContext::MaxFramesInFlight> UniformBuffers{};
+		std::array<StorageBuffers, VulkanContext::MaxFramesInFlight> StorageBuffers{};
 
 		std::array<DescriptorSets, VulkanContext::MaxFramesInFlight> DescriptorSets{};
 
@@ -316,11 +323,15 @@ namespace Kerberos
 
         const uint32_t currentImage = frameIndex;
 
-		UpdateLights(currentImage);
+		const std::vector<GPULight> gpuLights = GetLightsFromScene(*s_Data->PendingRender.Scene.get());
+		const uint32_t lightCount = static_cast<uint32_t>(gpuLights.size());
+
+		UpdateLights(currentImage, gpuLights);
 		UpdateSceneUniformBuffers(currentImage,
             s_Data->PendingRender.View,
 			s_Data->PendingRender.Projection,
-			s_Data->PendingRender.CameraPosition);
+			s_Data->PendingRender.CameraPosition,
+			lightCount);
 
 		const Ref<Scene>& scene = s_Data->PendingRender.Scene;
 
@@ -392,21 +403,26 @@ namespace Kerberos
 
 			const auto meshView = scene->m_Registry.view<TransformComponent, StaticMeshComponent>();
 			int i = 0;
-			for (auto entity : meshView)
+			for (const auto entity : meshView)
 			{
 				auto& transform = meshView.get<TransformComponent>(entity);
 				auto& staticMesh = meshView.get<StaticMeshComponent>(entity);
-				if (!staticMesh.Visible || !staticMesh.StaticMesh || !staticMesh.MeshMaterial || staticMesh.MeshMaterial->IsTransparent())
+				if (!staticMesh.Visible || !staticMesh.StaticMesh /* || !staticMesh.MeshMaterial*/)
 					continue;
 
-				UpdatePerObjectUniformBuffer(currentImage, static_cast<uint32_t>(i), transform.GetTransform(), *staticMesh.MeshMaterial, std::numeric_limits<uint32_t>::max());
+				// TODO: Remove this once we have a proper material system
+				Ref<Material> material = staticMesh.MeshMaterial;
+				if (material == nullptr)
+					material = s_Data->MaterialRegistry.Get("DebugPink");
+
+				UpdatePerObjectUniformBuffer(currentImage, static_cast<uint32_t>(i), transform.GetTransform(), *material, static_cast<uint32_t>(entity));
 				uint32_t dynamicOffset = static_cast<uint32_t>(i * s_Data->DynamicAlignment);
 
 				cmd.bindDescriptorSets(
 					vk::PipelineBindPoint::eGraphics,
 					*s_Data->PBRPipelineLayout,
 					0,
-					*s_Data->DescriptorSets[currentImage].scene,
+					{ s_Data->DescriptorSets[currentImage].scene, material->DescriptorSet },
 					{ dynamicOffset });
 
 				staticMesh.StaticMesh->Draw(cmd);
@@ -849,6 +865,7 @@ namespace Kerberos
 		CreateSkyboxResources();
 		
 		PrepareUniformBuffers();
+		PrepareStorageBuffers();
 
 		auto& context = VulkanContext::Get();
 		const auto& device = context.GetDevice();
@@ -880,16 +897,21 @@ namespace Kerberos
 			s_Data->GPUTimestampQueryPools.reserve(context.GetMaxFramesInFlight());
 
             constexpr vk::QueryPoolCreateInfo queryPoolInfo{
-				.flags = vk::QueryPoolCreateFlagBits::eResetKHR,
+				.flags = {}, // vk::QueryPoolCreateFlagBits::eResetKHR,
 				.queryType = vk::QueryType::eTimestamp,
 				.queryCount = static_cast<uint32_t>(GPUTimestampQuery::Count)
 			};
 
-			for (uint32_t i = 0; i < context.GetMaxFramesInFlight(); ++i)
+			context.Submit(VulkanContext::OperationType::Graphics, [&](const vk::raii::CommandBuffer& cmd)
 			{
-				s_Data->GPUTimestampQueryPools.emplace_back(device, queryPoolInfo);
-				context.SetObjectDebugName(s_Data->GPUTimestampQueryPools.back(), "Renderer GPU Timestamp Query Pool[" + std::to_string(i) + "]");
-			}
+				for (uint32_t i = 0; i < context.GetMaxFramesInFlight(); ++i)
+				{
+					s_Data->GPUTimestampQueryPools.emplace_back(device, queryPoolInfo);
+					context.SetObjectDebugName(s_Data->GPUTimestampQueryPools.back(), "Renderer GPU Timestamp Query Pool[" + std::to_string(i) + "]");
+					// Reset query pool at the beginning so that we can immediately start using it without waiting for the first render to reset it
+					cmd.resetQueryPool(s_Data->GPUTimestampQueryPools.back(), 0, static_cast<uint32_t>(GPUTimestampQuery::Count));
+				}
+			});
 		}
 
 		// Create samplers
@@ -1046,11 +1068,6 @@ namespace Kerberos
 			std::vector dynamicStates = {
 				vk::DynamicState::eViewport,
 				vk::DynamicState::eScissor
-			};
-
-			const vk::PipelineDynamicStateCreateInfo dynamicStateInfo{
-				.dynamicStateCount = static_cast<uint32_t>(dynamicStates.size()),
-				.pDynamicStates = dynamicStates.data()
 			};
 
 			const vk::Format colorFormat = context.FindSupportedFormat(
@@ -1727,7 +1744,7 @@ namespace Kerberos
 		cmd.resetQueryPool(s_Data->GPUTimestampQueryPools[frameIndex], 0, static_cast<uint32_t>(GPUTimestampQuery::Count));
 	}
 
-	void Renderer::UpdateLights(const uint32_t currentImage) 
+	void Renderer::UpdateLights(const uint32_t currentImage, const std::vector<GPULight>& sceneLights) 
 	{
 		KBR_CORE_ASSERT(s_Data, "Renderer not initialized!");
 
@@ -1735,29 +1752,23 @@ namespace Kerberos
 		s_Data->UniformDataParams.lights[2] = glm::vec4{ 0.0f };
 
 		std::memcpy(s_Data->UniformBuffers[currentImage].params->GetMappedData(), &s_Data->UniformDataParams, sizeof(UniformDataParams));
+
+		std::memcpy(s_Data->StorageBuffers[currentImage].Lights->GetMappedData(), sceneLights.data(), sceneLights.size() * sizeof(GPULight));
 	}
 
-	void Renderer::UpdateSceneUniformBuffers(const uint32_t currentImage, const Camera* mainCamera) 
+	void Renderer::UpdateSceneUniformBuffers(const uint32_t currentImage, const Camera* mainCamera, const uint32_t lightCount) 
 	{
 		KBR_CORE_ASSERT(s_Data, "Renderer not initialized!");
 
 		const glm::mat4& projection = mainCamera->GetProjectionMatrix();
 		const glm::mat4& view = mainCamera->GetViewMatrix();
+		const glm::vec3 camPos = mainCamera->GetPosition();
 
-		s_Data->SceneUniformData.projection = projection;
-		s_Data->SceneUniformData.view = view;
-		s_Data->SceneUniformData.lightSpaceMatrix = CalculateLightSpaceMatrix();
-		s_Data->SceneUniformData.camPos = mainCamera->GetPosition();
-		std::memcpy(s_Data->UniformBuffers[currentImage].scene->GetMappedData(), &s_Data->SceneUniformData, sizeof(SceneUniformData));
-
-		const glm::mat4 skyboxModel = glm::mat4(glm::mat3(view));
-		s_Data->SkyboxData.model = skyboxModel;
-		s_Data->SkyboxData.projection = projection;
-		std::memcpy(s_Data->UniformBuffers[currentImage].skybox->GetMappedData(), &s_Data->SkyboxData, sizeof(SkyboxData));
+		UpdateSceneUniformBuffers(currentImage, view, projection, camPos, lightCount);
 	}
 
 	void Renderer::UpdateSceneUniformBuffers(const uint32_t currentImage, const glm::mat4& view, const glm::mat4& projection,
-		const glm::vec3& camPos) 
+		const glm::vec3& camPos, const uint32_t lightCount) 
 	{
 		KBR_CORE_ASSERT(s_Data, "Renderer not initialized!");
 
@@ -1765,6 +1776,7 @@ namespace Kerberos
 		s_Data->SceneUniformData.view = view;
 		s_Data->SceneUniformData.lightSpaceMatrix = CalculateLightSpaceMatrix();
 		s_Data->SceneUniformData.camPos = camPos;
+		s_Data->SceneUniformData.lightCount = lightCount;
 		std::memcpy(s_Data->UniformBuffers[currentImage].scene->GetMappedData(), &s_Data->SceneUniformData, sizeof(SceneUniformData));
 
 		const glm::mat4 skyboxModel = glm::mat4(glm::mat3(view));
@@ -1791,7 +1803,47 @@ namespace Kerberos
 		std::memcpy(data, &s_Data->PerObjectData, sizeof(PerObjectData));
 	}
 
-	glm::mat4 Renderer::CalculateLightSpaceMatrix() 
+    std::vector<GPULight> Renderer::GetLightsFromScene(const Scene& scene) 
+	{
+		std::vector<GPULight> sceneLights;
+
+		const auto pointLightView = scene.m_Registry.view<PointLightComponent>();
+		for (const auto entity : pointLightView) {
+			auto& pl = pointLightView.get<PointLightComponent>(entity);
+			if (!pl.IsEnabled) continue;
+
+			GPULight gpuLight{};
+			gpuLight.Type = static_cast<uint32_t>(LightType::Point);
+			gpuLight.Position = pl.Light.Position;
+			gpuLight.Color = pl.Light.Color;
+			gpuLight.Intensity = pl.Light.Intensity;
+			gpuLight.Range = 50.0f; // Calculate based on attenuation parameters
+			sceneLights.push_back(gpuLight);
+		}
+
+		const auto spotLightView = scene.m_Registry.view<SpotLightComponent>();
+		for (const auto entity : spotLightView) {
+			auto& sl = spotLightView.get<SpotLightComponent>(entity);
+			if (!sl.IsEnabled) continue;
+
+			GPULight gpuLight{};
+			gpuLight.Type = static_cast<uint32_t>(LightType::Spot);
+			gpuLight.Position = sl.Light.Position;
+			gpuLight.Direction = sl.Light.Direction;
+			gpuLight.Color = sl.Light.Color;
+			gpuLight.Intensity = sl.Light.Intensity;
+			gpuLight.Range = 50.0f; // Calculate based on attenuation parameters
+			gpuLight.InnerConeCos = glm::cos(sl.Light.CutOffAngleRadians);
+			gpuLight.OuterConeCos = glm::cos(sl.Light.OuterCutOffAngleRadians);
+			sceneLights.push_back(gpuLight);
+		}
+
+		// TODO: Add area light when they are implemented
+
+		return sceneLights;
+    }
+
+    glm::mat4 Renderer::CalculateLightSpaceMatrix() 
 	{
 		KBR_CORE_ASSERT(s_Data, "Renderer not initialized!");
 
@@ -1950,15 +2002,24 @@ namespace Kerberos
 
 		for (auto& [scene, params, perObject, skybox] : s_Data->UniformBuffers)
 		{
-			scene = std::make_shared<UniformBuffer>(sizeof(SceneUniformData));
+			scene = CreateRef<UniformBuffer>(sizeof(SceneUniformData));
 
-			params = std::make_shared<UniformBuffer>(sizeof(UniformDataParams));
+			params = CreateRef<UniformBuffer>(sizeof(UniformDataParams));
 
 			// TODO: Allocate a large enough buffer for a maximum number of objects, and allocate a bigger one if needed.
 			constexpr size_t maxObjects = 1000;
-			perObject = std::make_shared<UniformBuffer>(s_Data->DynamicAlignment * maxObjects);
+			perObject = CreateRef<UniformBuffer>(s_Data->DynamicAlignment * maxObjects);
 
-			skybox = std::make_shared<UniformBuffer>(sizeof(SkyboxData));
+			skybox = CreateRef<UniformBuffer>(sizeof(SkyboxData));
+		}
+	}
+
+	void Renderer::PrepareStorageBuffers()
+	{
+		for (auto& [lights] : s_Data->StorageBuffers)
+		{
+			constexpr uint32_t lightBufferSize = sizeof(GPULight) * MaxLights;
+			lights = CreateRef<StorageBuffer>(lightBufferSize);
 		}
 	}
 
@@ -1983,7 +2044,11 @@ namespace Kerberos
 			vk::DescriptorPoolSize{
 				.type = vk::DescriptorType::eAccelerationStructureKHR,
 				.descriptorCount = 2
-			}
+			},
+			vk::DescriptorPoolSize{
+				.type = vk::DescriptorType::eStorageBuffer,
+				.descriptorCount = 10
+			},
 		};
 
 		vk::DescriptorPoolCreateInfo poolInfo{
@@ -2051,6 +2116,13 @@ namespace Kerberos
 			vk::DescriptorSetLayoutBinding{ // TLAS
 				.binding = 7,
 				.descriptorType = vk::DescriptorType::eAccelerationStructureKHR,
+				.descriptorCount = 1,
+				.stageFlags = vk::ShaderStageFlagBits::eFragment,
+				.pImmutableSamplers = nullptr
+			},
+			vk::DescriptorSetLayoutBinding{ // Light storage buffer
+				.binding = 8,
+				.descriptorType = vk::DescriptorType::eStorageBuffer,
 				.descriptorCount = 1,
 				.stageFlags = vk::ShaderStageFlagBits::eFragment,
 				.pImmutableSamplers = nullptr
@@ -2160,10 +2232,10 @@ namespace Kerberos
 				.range = sizeof(SkyboxData)
 			};
 
-			const auto& tlas = s_Data->RayTracingCache.GetTLAS(i);
-			const vk::WriteDescriptorSetAccelerationStructureKHR asInfo{
-				.accelerationStructureCount = 1,
-				.pAccelerationStructures = &tlas
+			const vk::DescriptorBufferInfo lightStorageBufferInfo{
+				.buffer = *s_Data->StorageBuffers[i].Lights->GetBuffer(),
+				.offset = 0,
+				.range = sizeof(GPULight) * MaxLights
 			};
 
 			const std::vector descriptorWrites = {
@@ -2224,13 +2296,14 @@ namespace Kerberos
 					.pImageInfo = &s_Data->Skybox.PrefilteredCubeTexture->GetDescriptorInfo()
 				},
 				vk::WriteDescriptorSet{
-					.pNext = &asInfo,
 					.dstSet = *s_Data->DescriptorSets[i].scene,
-					.dstBinding = 7,
+					.dstBinding = 8,
 					.dstArrayElement = 0,
 					.descriptorCount = 1,
-					.descriptorType = vk::DescriptorType::eAccelerationStructureKHR,
-				}
+					.descriptorType = vk::DescriptorType::eStorageBuffer,
+					.pBufferInfo = &lightStorageBufferInfo
+				},
+				// The TLAS descriptor will be updated later when the TLAS is built for the first time, since it requires a valid acceleration structure handle.
 			};
 
 			device.updateDescriptorSets(descriptorWrites, {});

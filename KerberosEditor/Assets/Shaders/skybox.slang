@@ -1,3 +1,5 @@
+import common;
+
 struct VSInput
 {
     float3 Position;
@@ -20,13 +22,8 @@ struct SkyboxData
 [[vk::binding(0)]]
 ConstantBuffer<SkyboxData> skyboxData;
 
-struct UBOParams {
-    float4 lights[4];
-	float exposure;
-	float gamma;
-};
 [[vk::binding(1)]]
-ConstantBuffer<UBOParams> uboParams;
+ConstantBuffer<GlobalLighting> globalLighting;
 
 [[vk::binding(4)]]
 SamplerCube samplerEnv;
@@ -59,11 +56,11 @@ float4 fragmentMain(VSOutput input)
     float3 sampleUV = float3(input.UVW.x, -input.UVW.y, input.UVW.z);
     float3 color = samplerEnv.Sample(sampleUV).rgb;
 
-	// Tone mapping
-	color = Uncharted2Tonemap(color * uboParams.exposure);
+    // Tone mapping
+    color = Uncharted2Tonemap(color * globalLighting.exposure);
 	color = color * (1.0f / Uncharted2Tonemap((11.2f).xxx));
-	// Gamma correction
-	color = pow(color, (1.0f / uboParams.gamma).xxx);
+    // Gamma correction
+    color = pow(color, (1.0f / globalLighting.gamma).xxx);
 
 	return float4(color, 1.0);
 }

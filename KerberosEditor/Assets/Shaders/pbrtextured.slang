@@ -1,3 +1,6 @@
+import common;
+import lights;
+
 struct VSInput
 {
     float3 Pos;
@@ -17,38 +20,12 @@ struct VSOutput
     float4 FragPos_LightSpace;
 };
 
-struct SceneData
-{
-    float4x4 projection;
-    float4x4 view;
-    float4x4 lightSpaceMatrix;
-    float3 ambientLightColor;
-    float3 camPos;
-};
 [[vk::binding(0, 0)]]
 ConstantBuffer<SceneData> scene;
 
-struct UBOParams {
-	float4 lights[4];
-    float exposure;
-    float gamma;
-};
 [[vk::binding(1, 0)]]
-ConstantBuffer<UBOParams> uboParams;
+ConstantBuffer<GlobalLighting> globalLighting;
 
-struct Material {
-    float3 albedo;
-	float roughness;
-	float metallic;
-};
-
-struct PerObject {
-    float4x4 model;
-    float4x4 worldNormal;
-    Material material;
-    uint entityID;
-    float3 _Padding;
-};
 [[vk::binding(2, 0)]]
 ConstantBuffer<PerObject> perObject;
 
@@ -70,6 +47,9 @@ SamplerCube prefilteredMapSampler;
 
 [[vk::binding(7, 0)]]
 RaytracingAccelerationStructure accelerationStructure;
+
+[[vk::binding(8, 0)]]
+StructuredBuffer<GPULight> sceneLights;
 
 [[vk::binding(0, 1)]]
 Sampler2D albedoMapSampler;
@@ -265,7 +245,7 @@ PSOutput fragmentMain(VSOutput input)
     // float3 lightDir = normalize(uboParams.lights[0].xyz - input.FragPos_WorldSpace);
 
     // Currently we are using light 0 only for generating the shadow map
-    float3 lightDir = normalize(uboParams.lights[0].xyz);
+    float3 lightDir = normalize(globalLighting.lights[0].xyz);
     float shadow = ShadowCalculation(lightDir, N, input.FragPos_LightSpace);
 
     float3 F0 = float3(0.04, 0.04, 0.04);
@@ -279,14 +259,24 @@ PSOutput fragmentMain(VSOutput input)
 	for (int i = 0; i < 4; i++) {
         // For point lights in the future
         // float3 L = normalize(normalize(uboParams.lights[i].xyz) - input.FragPos_WorldSpace);
-        float3 L = normalize(uboParams.lights[i].xyz);
+        float3 L = normalize(globalLighting.lights[i].xyz);
 
         float3 contribution = SpecularContribution(L, V, N, F0, albedo, metallic, roughness);
         if (i == 0) // Only apply shadow to the first light for now
             contribution *= (1.0 - shadow);
 
         Lo += contribution;
-	};
+    };
+    for (int i = 0; i < scene.lightCount; i++) {
+        GPULight light = sceneLights[i];
+        float3 lightVec = light.position - input.FragPos_WorldSpace;
+        float3 L = normalize(lightVec);
+
+        float3 contrib = SpecularContribution(L, V, N, F0, albedo, metallic, roughness);
+        float3 radiance = CalculateLightColor(sceneLights[i], input.FragPos_WorldSpace);
+
+        Lo += contrib * radiance;
+    }
 
     //float3 sampleN = float3(N.x, -N.y, N.z);
     //float3 sampleR = float3(R.x, -R.y, R.z);
@@ -311,10 +301,10 @@ PSOutput fragmentMain(VSOutput input)
     float3 color = ambient + Lo;
 
     // Tone mapping
-    color = Uncharted2Tonemap(color * uboParams.exposure);
+    color = Uncharted2Tonemap(color * globalLighting.exposure);
     color = color * (1.0f / Uncharted2Tonemap((11.2f).xxx));
     // Gamma correction
-    color = pow(color, (1.0f / uboParams.gamma).xxx);
+    color = pow(color, (1.0f / globalLighting.gamma).xxx);
 
     PSOutput output;
     output.Color = float4(color, 1.0);

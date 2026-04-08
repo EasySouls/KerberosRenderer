@@ -8,10 +8,11 @@
 
 namespace Kerberos 
 {
-	class MaterialRegistry
+	class MaterialRegistry final
 	{
 	public:
 		MaterialRegistry() = default;
+		~MaterialRegistry();
 
 		void Add(const std::string& name, const Material& mat);
 		void Add(const std::string& name, const Ref<Material>& mat);

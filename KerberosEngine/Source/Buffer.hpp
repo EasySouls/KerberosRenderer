@@ -58,4 +58,19 @@ namespace Kerberos
 		vk::raii::DeviceMemory m_BufferMemory = nullptr;
 		void* m_MappedData = nullptr;
 	};
+
+	class StorageBuffer
+	{
+	public:
+		explicit StorageBuffer(vk::DeviceSize bufferSize);
+
+		const vk::raii::Buffer& GetBuffer() const { return m_Buffer; }
+		const vk::raii::DeviceMemory& GetBufferMemory() const { return m_BufferMemory; }
+		void* GetMappedData() const { return m_MappedData; }
+
+	private:
+		vk::raii::Buffer m_Buffer = nullptr;
+		vk::raii::DeviceMemory m_BufferMemory = nullptr;
+		void* m_MappedData = nullptr;
+	};
 }

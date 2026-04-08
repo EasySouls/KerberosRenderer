@@ -1,31 +1,14 @@
+import common;
+
 struct VSInput 
 {
     float3 Pos;
     float3 Normal;
 };
 
-struct SceneData
-{
-    float4x4 projection;
-    float4x4 view;
-    float4x4 lightSpaceMatrix;
-    float3 ambientLightColor;
-    float3 camPos;
-};
 [[vk::binding(0)]]
 ConstantBuffer<SceneData> scene;
 
-struct Material {
-    float3 albedo;
-    float roughness;
-    float metallic;
-};
-
-struct PerObject {
-    float4x4 model;
-    float4x4 worldNormal;
-    Material material;
-};
 [[vk::binding(2)]]
 ConstantBuffer<PerObject> perObject;
 

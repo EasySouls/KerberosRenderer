@@ -130,4 +130,17 @@ UniformBuffer::UniformBuffer(const vk::DeviceSize bufferSize)
 	m_MappedData = m_BufferMemory.mapMemory(0, bufferSize);
 }
 
+StorageBuffer::StorageBuffer(const vk::DeviceSize bufferSize)
+{
+	const vk::raii::Device& device = VulkanContext::Get().GetDevice();
+
+	CreateBuffer(device,
+				 bufferSize,
+				 vk::BufferUsageFlagBits::eStorageBuffer,
+				 vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent,
+				 m_Buffer, m_BufferMemory);
+
+	m_MappedData = m_BufferMemory.mapMemory(0, bufferSize);
+}
+
 }

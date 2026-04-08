@@ -1,8 +1,4 @@
-/* Copyright (c) 2025, Sascha Willems
- *
- * SPDX-License-Identifier: MIT
- *
- */
+import common;
 
 struct VSInput
 {
@@ -22,28 +18,9 @@ struct GSOutput
 	float3 Color;
 };
 
-struct SceneData
-{
-    float4x4 projection;
-    float4x4 view;
-    float4x4 lightSpaceMatrix;
-    float3 ambientLightColor;
-    float3 camPos;
-};
 [[vk::binding(0)]]
 ConstantBuffer<SceneData> scene;
 
-struct Material {
-    float3 albedo;
-    float roughness;
-    float metallic;
-};
-
-struct PerObject {
-    float4x4 model;
-    float4x4 worldNormal;
-    Material material;
-};
 [[vk::binding(2)]]
 ConstantBuffer<PerObject> perObject;
 
@@ -60,7 +37,7 @@ VSOutput vertexMain(VSInput input)
 [maxvertexcount(6)]
 void geometryMain(triangle VSOutput input[3], inout LineStream<GSOutput> outStream)
 {
-    float normalLength = 0.02;
+    float normalLength = 0.05;
     float4x4 viewProj = mul(scene.projection, scene.view);
 
 	for (int i = 0; i < 3; i++)

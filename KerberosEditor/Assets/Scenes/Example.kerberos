@@ -1,81 +1,52 @@
 Scene: Unnamed Scene
 Entities:
-  - Entity: 6203744401923915243
+  - Entity: 12904545083047205477
     TagComponent:
-      Tag: Main Camera
+      Tag: Lights
     TransformComponent:
       Translation: [0, 0, 0]
       Rotation: [0, 0, 0]
       Scale: [1, 1, 1]
-    CameraComponent:
-      Camera:
-        ProjectionType: 0
-        PerspectiveFOV: 0.7853982
-        PerspectiveNear: 0.01
-        PerspectiveFar: 100
-        OrthographicSize: 10
-        OrthographicNear: -1
-        OrthographicFar: 1
-      IsPrimary: true
-      FixedAspectRatio: false
     HierarchyComponent:
       Parent: 0
       Children:
-        []
-  - Entity: 1211823799333201449
+        - 2256719706762566990
+        - 15916556452586618147
+  - Entity: 2256719706762566990
     TagComponent:
-      Tag: Cube
+      Tag: Yellow Point Light
     TransformComponent:
-      Translation: [25.182259, 0, 0]
-      Rotation: [0, -0, 0]
-      Scale: [5, 5, 5]
+      Translation: [-16, 13, 25]
+      Rotation: [0, 0, 0]
+      Scale: [0.5, 0.5, 0.5]
     HierarchyComponent:
-      Parent: 0
+      Parent: 12904545083047205477
       Children:
         []
+    PointLightComponent:
+      Color: [1, 0.92156863, 0.023529412]
+      Position: [-16, 13, 25]
+      Intensity: 5
+      Constant: 1
+      Linear: 0.09
+      Quadratic: 0.032
     StaticMeshComponent:
       Mesh: 5556831655075431416
       Material: 0
       Texture: 0
-  - Entity: 1004823327772732650
+  - Entity: 2427611190598499102
     TagComponent:
-      Tag: Revolver
+      Tag: Dragon
     TransformComponent:
-      Translation: [-6.473844, 15, 0.34905815]
-      Rotation: [-1.4831889, 1.4999994, -4.2130736e-07]
-      Scale: [20, 20.000006, 20.000374]
-    HierarchyComponent:
-      Parent: 0
-      Children:
-        []
-    StaticMeshComponent:
-      Mesh: 12640333732108170778
-      Material: 0
-      Texture: 0
-  - Entity: 44958100548870983
-    TagComponent:
-      Tag: Voyager
-    TransformComponent:
-      Translation: [-16.570549, 11.715181, 0]
-      Rotation: [0, -0, 0]
+      Translation: [0, 0, 10.6]
+      Rotation: [4.8, 0, 3.14]
       Scale: [1, 1, 1]
     HierarchyComponent:
       Parent: 0
       Children:
         []
-    RigidBody3DComponent:
-      Mass: 16.1
-      Type: 1
-      Velocity: [0, 0, 0]
-      AngularVelocity: [0, 0, 0]
-      UseGravity: true
-      Friction: 0.5
-      Restitution: 0.5
-    BoxCollider3DComponent:
-      Size: [2, 2, 2]
-      Offset: [0, 0, 0]
     StaticMeshComponent:
-      Mesh: 2971773807105207837
+      Mesh: 18177791179963863543
       Material: 0
       Texture: 0
   - Entity: 4943794690679386388
@@ -104,18 +75,103 @@ Entities:
       Mesh: 5556831655075431416
       Material: 0
       Texture: 0
-  - Entity: 2427611190598499102
+  - Entity: 44958100548870983
     TagComponent:
-      Tag: Dragon
+      Tag: Voyager
     TransformComponent:
-      Translation: [0, 0, 10.6]
-      Rotation: [4.8, 0, 3.14]
+      Translation: [-20.071, 5.415, 0]
+      Rotation: [0, -0, 0]
       Scale: [1, 1, 1]
     HierarchyComponent:
       Parent: 0
       Children:
         []
+    RigidBody3DComponent:
+      Mass: 16.1
+      Type: 1
+      Velocity: [0, 0, 0]
+      AngularVelocity: [0, 0, 0]
+      UseGravity: true
+      Friction: 0.5
+      Restitution: 0.5
+    BoxCollider3DComponent:
+      Size: [2, 2, 2]
+      Offset: [0, 0, 0]
     StaticMeshComponent:
-      Mesh: 18177791179963863543
+      Mesh: 2971773807105207837
+      Material: 0
+      Texture: 0
+  - Entity: 1004823327772732650
+    TagComponent:
+      Tag: Revolver
+    TransformComponent:
+      Translation: [-6.473844, 15, 0.34905815]
+      Rotation: [-1.4831889, 1.4999994, -4.2130736e-07]
+      Scale: [20, 20.000006, 20.000374]
+    HierarchyComponent:
+      Parent: 0
+      Children:
+        []
+    StaticMeshComponent:
+      Mesh: 12640333732108170778
+      Material: 0
+      Texture: 0
+  - Entity: 1211823799333201449
+    TagComponent:
+      Tag: Cube
+    TransformComponent:
+      Translation: [25.182259, 0, 0]
+      Rotation: [0, -0, 0]
+      Scale: [5, 5, 5]
+    HierarchyComponent:
+      Parent: 0
+      Children:
+        []
+    StaticMeshComponent:
+      Mesh: 5556831655075431416
+      Material: 0
+      Texture: 0
+  - Entity: 6203744401923915243
+    TagComponent:
+      Tag: Main Camera
+    TransformComponent:
+      Translation: [0, 0, 0]
+      Rotation: [0, 0, 0]
+      Scale: [1, 1, 1]
+    CameraComponent:
+      Camera:
+        ProjectionType: 0
+        PerspectiveFOV: 0.7853982
+        PerspectiveNear: 0.01
+        PerspectiveFar: 100
+        OrthographicSize: 10
+        OrthographicNear: -1
+        OrthographicFar: 1
+      IsPrimary: true
+      FixedAspectRatio: false
+    HierarchyComponent:
+      Parent: 0
+      Children:
+        []
+  - Entity: 15916556452586618147
+    TagComponent:
+      Tag: Blue Point Light
+    TransformComponent:
+      Translation: [23, -5, -22]
+      Rotation: [0, 0, 0]
+      Scale: [0.5, 0.5, 0.5]
+    HierarchyComponent:
+      Parent: 12904545083047205477
+      Children:
+        []
+    PointLightComponent:
+      Color: [0, 0.319489, 1]
+      Position: [23, -5, -22]
+      Intensity: 7
+      Constant: 1
+      Linear: 0.09
+      Quadratic: 0.032
+    StaticMeshComponent:
+      Mesh: 5556831655075431416
       Material: 0
       Texture: 0

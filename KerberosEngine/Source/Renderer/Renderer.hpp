@@ -8,6 +8,8 @@
 
 namespace Kerberos
 {
+	struct GPULight;
+
 	struct DepthBias
 	{
 		float ConstantFactor = 1.25f;
@@ -65,12 +67,15 @@ namespace Kerberos
 
 	public:
 		static constexpr uint32_t MousePickingReadbackFrameLag = 3;
+		static constexpr uint32_t MaxLights = 512;
 
 	private:
-		static void UpdateLights(uint32_t currentImage);
-		static void UpdateSceneUniformBuffers(uint32_t currentImage, const Camera* mainCamera);
-		static void UpdateSceneUniformBuffers(uint32_t currentImage, const glm::mat4& view, const glm::mat4& projection, const glm::vec3& camPos);
+		static void UpdateLights(uint32_t currentImage, const std::vector<GPULight>& sceneLights);
+		static void UpdateSceneUniformBuffers(uint32_t currentImage, const Camera* mainCamera, uint32_t lightCount);
+		static void UpdateSceneUniformBuffers(uint32_t currentImage, const glm::mat4& view, const glm::mat4& projection, const glm::vec3& camPos, uint32_t lightCount);
         static void UpdatePerObjectUniformBuffer(uint32_t currentImage, uint32_t objectIndex, const glm::mat4& model, const Material& material, uint32_t entityID);
+
+		static std::vector<GPULight> GetLightsFromScene(const Scene& scene);
 		
 		static void WriteGPUTimestamp(const vk::raii::CommandBuffer& cmd, uint32_t frameIndex, uint32_t index);
 		static void ResolveGPUTimings(uint32_t frameIndex);
@@ -86,6 +91,7 @@ namespace Kerberos
 		static void CreateResources();
 
 		static void PrepareUniformBuffers();
+		static void PrepareStorageBuffers();
 		static void SetupDescriptors();
 
 		static void CreateSkyboxResources();

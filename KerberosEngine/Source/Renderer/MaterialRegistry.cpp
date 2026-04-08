@@ -9,6 +9,11 @@
 
 namespace Kerberos 
 {
+	MaterialRegistry::~MaterialRegistry()
+	{
+		VulkanContext::Get().WaitIdle();
+	}
+
 	void MaterialRegistry::Add(const std::string& name, const Material& mat) 
 	{
 		if (m_Materials.contains(name)) {
