@@ -25,6 +25,7 @@ namespace Kerberos
 	struct GPUTimings
 	{
 		float FrameMilliseconds = 0.0f;
+		float DepthPrePassMilliseconds = 0.0f;
 		float ShadowPassMilliseconds = 0.0f;
 		float OpaquePassMilliseconds = 0.0f;
 		float TransparentPassMilliseconds = 0.0f;

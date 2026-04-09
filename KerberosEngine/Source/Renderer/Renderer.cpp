@@ -143,6 +143,8 @@ namespace
 	enum class GPUTimestampQuery : uint32_t
 	{
 		FrameBegin = 0,
+		DepthPrePassBegin,
+		DepthPrePassEnd,
 		ShadowBegin,
 		ShadowEnd,
 		OpaqueBegin,
@@ -168,6 +170,7 @@ namespace
 		DescriptorSetLayouts DescriptorSetLayouts;
 
 		vk::raii::PipelineLayout PBRPipelineLayout = nullptr;
+		Ref<GraphicsPipeline> DepthPrePassPipeline = nullptr;
 		Ref<GraphicsPipeline> PBROpaquePipeline = nullptr;
 		Ref<GraphicsPipeline> PBROpaquePipelinePCF = nullptr;
 		Ref<GraphicsPipeline> PBRTransparentPipeline = nullptr;
@@ -334,6 +337,107 @@ namespace Kerberos
 			lightCount);
 
 		const Ref<Scene>& scene = s_Data->PendingRender.Scene;
+
+		// Depth Pre-pass
+		{
+			WriteGPUTimestamp(cmd, frameIndex, static_cast<uint32_t>(GPUTimestampQuery::DepthPrePassBegin));
+
+			vk::ImageMemoryBarrier2 barrier = {
+				.srcStageMask = vk::PipelineStageFlagBits2::eEarlyFragmentTests | vk::PipelineStageFlagBits2::eLateFragmentTests,
+				.srcAccessMask = vk::AccessFlagBits2::eDepthStencilAttachmentWrite,
+				.dstStageMask = vk::PipelineStageFlagBits2::eEarlyFragmentTests | vk::PipelineStageFlagBits2::eLateFragmentTests,
+				.dstAccessMask = vk::AccessFlagBits2::eDepthStencilAttachmentWrite,
+				.oldLayout = vk::ImageLayout::eUndefined,
+				.newLayout = vk::ImageLayout::eDepthAttachmentOptimal,
+				.srcQueueFamilyIndex = vk::QueueFamilyIgnored,
+				.dstQueueFamilyIndex = vk::QueueFamilyIgnored,
+				.image = s_Data->DepthImage.Image,
+				.subresourceRange = {
+					.aspectMask = vk::ImageAspectFlagBits::eDepth,
+					.baseMipLevel = 0,
+					.levelCount = 1,
+					.baseArrayLayer = 0,
+					.layerCount = 1
+				}
+			};
+
+			const vk::DependencyInfo dependencyInfo = {
+				.dependencyFlags = {},
+				.imageMemoryBarrierCount = 1,
+				.pImageMemoryBarriers = &barrier
+			};
+
+			cmd.pipelineBarrier2(dependencyInfo);
+
+			vk::RenderingAttachmentInfo depthAttachmentInfo{
+				.imageView = s_Data->DepthImage.ImageView,
+				.imageLayout = vk::ImageLayout::eDepthAttachmentOptimal,
+				.loadOp = vk::AttachmentLoadOp::eClear,
+				.storeOp = vk::AttachmentStoreOp::eStore,
+				.clearValue = vk::ClearDepthStencilValue{.depth = 1.0f, .stencil = 0 }
+			};
+
+			const vk::Viewport viewport{
+				.x = 0.0f,
+				.y = 0.0f,
+				.width = s_Data->OutputSize.x,
+				.height = s_Data->OutputSize.y,
+				.minDepth = 0.0f,
+				.maxDepth = 1.0f
+			};
+
+			const vk::Rect2D renderArea{
+				.offset = vk::Offset2D{.x = 0, .y = 0 },
+				.extent = vk::Extent2D{.width = static_cast<uint32_t>(s_Data->OutputSize.x), .height = static_cast<uint32_t>(s_Data->OutputSize.y) }
+			};
+
+			const vk::RenderingInfo depthPrePassRenderingInfo{
+				.renderArea = renderArea,
+				.layerCount = 1,
+				.colorAttachmentCount = 0,
+				.pColorAttachments = nullptr,
+				.pDepthAttachment = &depthAttachmentInfo
+			};
+
+			cmd.beginRendering(depthPrePassRenderingInfo);
+			cmd.setViewport(0, viewport);
+			cmd.setScissor(0, renderArea);
+
+			cmd.bindPipeline(vk::PipelineBindPoint::eGraphics, *s_Data->DepthPrePassPipeline->GetVulkanPipeline());
+
+			const auto meshView = scene->m_Registry.view<TransformComponent, StaticMeshComponent>();
+			int i = 0;
+			for (const auto entity : meshView)
+			{
+				auto& transform = meshView.get<TransformComponent>(entity);
+				auto& staticMesh = meshView.get<StaticMeshComponent>(entity);
+				if (!staticMesh.Visible || !staticMesh.StaticMesh /* || !staticMesh.MeshMaterial*/)
+					continue;
+
+				// TODO: Remove this once we have a proper material system
+				Ref<Material> material = staticMesh.MeshMaterial;
+				if (material == nullptr)
+					material = s_Data->MaterialRegistry.Get("DebugPink");
+
+				UpdatePerObjectUniformBuffer(currentImage, static_cast<uint32_t>(i), transform.GetTransform(), *material, static_cast<uint32_t>(entity));
+				uint32_t dynamicOffset = static_cast<uint32_t>(i * s_Data->DynamicAlignment);
+
+				cmd.bindDescriptorSets(
+					vk::PipelineBindPoint::eGraphics,
+					*s_Data->PBRPipelineLayout,
+					0,
+					{ s_Data->DescriptorSets[currentImage].scene, material->DescriptorSet },
+					{ dynamicOffset });
+
+				staticMesh.StaticMesh->Draw(cmd);
+
+				++i;
+			}
+
+			cmd.endRendering();
+
+			WriteGPUTimestamp(cmd, frameIndex, static_cast<uint32_t>(GPUTimestampQuery::DepthPrePassEnd));
+		}
 
 		// Render shadow map
        {
@@ -599,9 +703,8 @@ namespace Kerberos
 			vk::RenderingAttachmentInfo depthAttachmentInfo{
 				.imageView = s_Data->DepthImage.ImageView,
 				.imageLayout = vk::ImageLayout::eDepthAttachmentOptimal,
-				.loadOp = vk::AttachmentLoadOp::eClear,
+				.loadOp = vk::AttachmentLoadOp::eLoad,
 				.storeOp = vk::AttachmentStoreOp::eDontCare,
-				.clearValue = vk::ClearDepthStencilValue{.depth = 1.0f, .stencil = 0 }
 			};
 
 			const vk::RenderingInfo renderingInfo{
@@ -1192,6 +1295,28 @@ namespace Kerberos
 			const auto bindingDesc = Vertex::GetBindingDescription();
 			const auto attributeDescs = Vertex::GetAttributeDescriptions();
 
+			Ref<Shader> depthPrepassShader = CreateRef<Shader>("depthprepass", "Depth Pre-Pass");
+
+			GraphicsPipelineSpecification depthPrepassPipelineSpec{};
+			depthPrepassPipelineSpec.Name = "Depth Pre-Pass Pipeline";
+			depthPrepassPipelineSpec.Shader = depthPrepassShader;
+			depthPrepassPipelineSpec.PipelineLayout = *s_Data->PBRPipelineLayout;
+			depthPrepassPipelineSpec.BindingDescription = bindingDesc;
+			depthPrepassPipelineSpec.InputAttributeDescriptions = { attributeDescs.begin(), attributeDescs.end() };
+			depthPrepassPipelineSpec.SampleCount = vk::SampleCountFlagBits::e1;
+			depthPrepassPipelineSpec.CullMode = CullMode::Back;
+			depthPrepassPipelineSpec.EnableDepthClamp = false;
+			depthPrepassPipelineSpec.EnableDepthBias = false;
+			depthPrepassPipelineSpec.EnableDepthTest = true;
+			depthPrepassPipelineSpec.EnableDepthWrite = true;
+			depthPrepassPipelineSpec.DepthTestFunc = DepthTestFunc::LessOrEqual;
+			depthPrepassPipelineSpec.BlendModes = {};
+			depthPrepassPipelineSpec.ColorAttachmentFormats = {};
+			depthPrepassPipelineSpec.DepthAttachmentFormat = depthFormat;
+			depthPrepassPipelineSpec.DynamicStates = dynamicStates;
+
+			s_Data->DepthPrePassPipeline = CreateRef<GraphicsPipeline>(depthPrepassPipelineSpec);
+
 			Ref<Shader> pbrShader = CreateRef<Shader>("pbrtextured", "PBR");
 
 			uint32_t enablePCF = 0;
@@ -1219,7 +1344,7 @@ namespace Kerberos
 			opaquePipelineSpec.EnableDepthBias = false;
 			opaquePipelineSpec.EnableDepthTest = true;
 			opaquePipelineSpec.EnableDepthWrite = true;
-			opaquePipelineSpec.DepthTestFunc = DepthTestFunc::LessOrEqual;
+			opaquePipelineSpec.DepthTestFunc = DepthTestFunc::Equal;
 			opaquePipelineSpec.BlendModes = { BlendMode::None, BlendMode::None };
 			opaquePipelineSpec.ColorAttachmentFormats = { colorFormat, pickingFormat };
 			opaquePipelineSpec.DepthAttachmentFormat = depthFormat;
@@ -1727,6 +1852,7 @@ namespace Kerberos
 		};
 
 		s_Data->LatestGPUTimings.FrameMilliseconds = toMilliseconds(GPUTimestampQuery::FrameBegin, GPUTimestampQuery::FrameEnd);
+		s_Data->LatestGPUTimings.DepthPrePassMilliseconds = toMilliseconds(GPUTimestampQuery::DepthPrePassBegin, GPUTimestampQuery::DepthPrePassEnd);
 		s_Data->LatestGPUTimings.ShadowPassMilliseconds = toMilliseconds(GPUTimestampQuery::ShadowBegin, GPUTimestampQuery::ShadowEnd);
 		s_Data->LatestGPUTimings.OpaquePassMilliseconds = toMilliseconds(GPUTimestampQuery::OpaqueBegin, GPUTimestampQuery::OpaqueEnd);
 		s_Data->LatestGPUTimings.TransparentPassMilliseconds = toMilliseconds(GPUTimestampQuery::TransparentBegin, GPUTimestampQuery::TransparentEnd);

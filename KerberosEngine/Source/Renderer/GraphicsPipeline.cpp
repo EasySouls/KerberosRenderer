@@ -238,6 +238,8 @@ namespace Kerberos
 		};
 
 		m_Pipeline = vk::raii::Pipeline{ device,m_PipelineCache, pipelineCreateInfo };
+
+		context.SetObjectDebugName(m_Pipeline, spec.Name);
 	}
 
 	void GraphicsPipeline::StoreSpecializationData() 

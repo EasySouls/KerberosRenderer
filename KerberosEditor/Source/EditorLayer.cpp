@@ -826,6 +826,7 @@ namespace Kerberos
 		if (gpuTimings.IsValid)
 		{
 			ImGui::Text("GPU Frame: %.3f ms", gpuTimings.FrameMilliseconds);
+			ImGui::Text("GPU Depth Pre-Pass: %.3f ms", gpuTimings.DepthPrePassMilliseconds);
 			ImGui::Text("GPU Shadow: %.3f ms", gpuTimings.ShadowPassMilliseconds);
 			ImGui::Text("GPU Opaque: %.3f ms", gpuTimings.OpaquePassMilliseconds);
 			ImGui::Text("GPU Transparent: %.3f ms", gpuTimings.TransparentPassMilliseconds);
