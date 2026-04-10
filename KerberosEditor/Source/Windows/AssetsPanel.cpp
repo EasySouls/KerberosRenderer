@@ -467,7 +467,7 @@ namespace Kerberos
 			const std::string selectedPath = FileDialog::OpenFile("Textures (*.png;*.jpg;*.jpeg;*.ktx;*.ktx2)\0*.png;*.jpg;*.jpeg;*.ktx;*.ktx2\0");
 			if (!selectedPath.empty())
 			{
-				const std::filesystem::path pathToImport = std::filesystem::relative(selectedPath, Project::GetAssetDirectory());
+				const std::filesystem::path pathToImport = std::filesystem::relative(selectedPath, Project::GetProjectDirectory());
 
 				const Ref<EditorAssetManager> assetManager = Project::GetActive()->GetEditorAssetManager();
 				const AssetHandle handle = assetManager->ImportAsset(pathToImport);
@@ -530,10 +530,11 @@ namespace Kerberos
 				ImGui::Separator();
 				if (ImGui::Button("Save"))
 				{
-					if (MaterialImporter::SaveMaterial(state.Filepath, *state.WorkingCopy))
+					const auto relPath = std::filesystem::relative(state.Filepath, Project::GetProjectDirectory());
+					if (MaterialImporter::SaveMaterial(relPath, *state.WorkingCopy))
 					{
 						const Ref<EditorAssetManager> assetManager = Project::GetActive()->GetEditorAssetManager();
-						const AssetHandle materialHandle = assetManager->ImportAsset(state.Filepath);
+						const AssetHandle materialHandle = assetManager->ImportAsset(relPath);
 						if (materialHandle.IsValid())
 						{
 							if (const Ref<Material> loadedMaterial = AssetManager::GetAsset<Material>(materialHandle))

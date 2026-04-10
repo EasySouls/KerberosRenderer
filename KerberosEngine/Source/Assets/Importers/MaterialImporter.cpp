@@ -53,16 +53,23 @@ namespace Kerberos
 			if (texturePath.empty())
 				return nullptr;
 
-			std::filesystem::path resolvedPath = texturePath;
-			if (resolvedPath.is_relative())
-			{
-				resolvedPath = absolutePath.parent_path() / resolvedPath;
-			}
+			//std::filesystem::path resolvedPath = texturePath;
+			//if (resolvedPath.is_relative())
+			//{
+			//	resolvedPath = absolutePath.parent_path() / resolvedPath;
+			//}
 
-			const AssetHandle textureHandle = assetManager->ImportAsset(resolvedPath);
+			/*const AssetHandle textureHandle = assetManager->ImportAsset(resolvedPath);
 			if (!textureHandle.IsValid())
 			{
 				KBR_CORE_WARN("MaterialImporter::ImportMaterial - Failed to import texture: {}", resolvedPath.string());
+				return nullptr;
+			}*/
+
+			const AssetHandle textureHandle = assetManager->ImportAsset(texturePath);
+			if (!textureHandle.IsValid())
+			{
+				KBR_CORE_WARN("MaterialImporter::ImportMaterial - Failed to import texture: {}", texturePath);
 				return nullptr;
 			}
 
