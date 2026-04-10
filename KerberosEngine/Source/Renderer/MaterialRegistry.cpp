@@ -46,148 +46,23 @@ namespace Kerberos
 		return m_Materials.at(name);
 	}
 
-	void MaterialRegistry::SetupDescriptorSets(const vk::raii::DescriptorSetLayout& setLayout)
+	void MaterialRegistry::SetupDescriptorSets(const vk::DescriptorSetLayout& setLayout)
 	{
-		RecreateDescriptorPoolIfNeeded();
+		m_SetLayout = setLayout;
 
-		const std::array<vk::DescriptorSetLayout, 1> setLayouts = {
-			setLayout
-		};
+		InitPlaceholdersIfNeeded();
 
-		const vk::DescriptorSetAllocateInfo allocInfo{
-			.descriptorPool = m_TextureDescriptorPool,
-			.descriptorSetCount = static_cast<uint32_t>(setLayouts.size()),
-			.pSetLayouts = setLayouts.data()
-		};
-
-		auto& context = VulkanContext::Get();
-		const auto& device = context.GetDevice();
-
-		for (const auto& [name, material]: m_Materials)
+		for (const auto& material : m_Materials | std::views::values)
 		{
-			std::vector<vk::raii::DescriptorSet> descriptorSets = device.allocateDescriptorSets(allocInfo);
-			material->DescriptorSet = std::move(descriptorSets[0]);
-			//material->DescriptorSet = device.allocateDescriptorSets(allocInfo)[0];
-			context.SetObjectDebugName(material->DescriptorSet, std::format("{} Descriptor Set", name));
+			AllocateDescriptorSets(material);
+		}
+	}
 
-			// TODO: This should not be the place where base textures are substituted
-			std::vector< vk::WriteDescriptorSet> descriptorWrites{};
-			if (material->AlbedoTexture != nullptr)
-			{
-				descriptorWrites.push_back(vk::WriteDescriptorSet{
-					.dstSet = material->DescriptorSet,
-					.dstBinding = 0,
-					.dstArrayElement = 0,
-					.descriptorCount = 1,
-					.descriptorType = vk::DescriptorType::eCombinedImageSampler,
-					.pImageInfo = &material->AlbedoTexture->GetDescriptorInfo()
-				});
-			}
-			else
-			{
-				descriptorWrites.push_back(vk::WriteDescriptorSet{
-					.dstSet = material->DescriptorSet,
-					.dstBinding = 0,
-					.dstArrayElement = 0,
-					.descriptorCount = 1,
-					.descriptorType = vk::DescriptorType::eCombinedImageSampler,
-					.pImageInfo = &m_AlbedoPlaceholder->GetDescriptorInfo()
-				});
-			}
-
-			if (material->NormalTexture != nullptr)
-			{
-				descriptorWrites.push_back(vk::WriteDescriptorSet{
-					.dstSet = material->DescriptorSet,
-					.dstBinding = 1,
-					.dstArrayElement = 0,
-					.descriptorCount = 1,
-					.descriptorType = vk::DescriptorType::eCombinedImageSampler,
-					.pImageInfo = &material->NormalTexture->GetDescriptorInfo()
-				});
-			}
-			else 
-			{
-				descriptorWrites.push_back(vk::WriteDescriptorSet{
-					.dstSet = material->DescriptorSet,
-					.dstBinding = 1,
-					.dstArrayElement = 0,
-					.descriptorCount = 1,
-					.descriptorType = vk::DescriptorType::eCombinedImageSampler,
-					.pImageInfo = &m_NormalPlaceholder->GetDescriptorInfo()
-				});
-			}
-
-			if (material->RoughnessTexture != nullptr)
-			{
-				descriptorWrites.push_back(vk::WriteDescriptorSet{
-					.dstSet = material->DescriptorSet,
-					.dstBinding = 2,
-					.dstArrayElement = 0,
-					.descriptorCount = 1,
-					.descriptorType = vk::DescriptorType::eCombinedImageSampler,
-					.pImageInfo = &material->RoughnessTexture->GetDescriptorInfo()
-				});
-			}
-			else
-			{
-				descriptorWrites.push_back(vk::WriteDescriptorSet{
-					.dstSet = material->DescriptorSet,
-					.dstBinding = 2,
-					.dstArrayElement = 0,
-					.descriptorCount = 1,
-					.descriptorType = vk::DescriptorType::eCombinedImageSampler,
-					.pImageInfo = &m_RoughnessPlaceholder->GetDescriptorInfo()
-				});
-			}
-
-			if (material->MetallicTexture != nullptr)
-			{
-				descriptorWrites.push_back(vk::WriteDescriptorSet{
-					.dstSet = material->DescriptorSet,
-					.dstBinding = 3,
-					.dstArrayElement = 0,
-					.descriptorCount = 1,
-					.descriptorType = vk::DescriptorType::eCombinedImageSampler,
-					.pImageInfo = &material->MetallicTexture->GetDescriptorInfo()
-				});
-			}
-			else
-			{
-				descriptorWrites.push_back(vk::WriteDescriptorSet{
-					.dstSet = material->DescriptorSet,
-					.dstBinding = 3,
-					.dstArrayElement = 0,
-					.descriptorCount = 1,
-					.descriptorType = vk::DescriptorType::eCombinedImageSampler,
-					.pImageInfo = &m_MetallicPlaceholder->GetDescriptorInfo()
-				});
-			}
-
-			if (material->AOTexture != nullptr)
-			{
-				descriptorWrites.push_back(vk::WriteDescriptorSet{
-					.dstSet = material->DescriptorSet,
-					.dstBinding = 4,
-					.dstArrayElement = 0,
-					.descriptorCount = 1,
-					.descriptorType = vk::DescriptorType::eCombinedImageSampler,
-					.pImageInfo = &material->AOTexture->GetDescriptorInfo()
-				});
-			}
-			else
-			{
-				descriptorWrites.push_back(vk::WriteDescriptorSet{
-					.dstSet = material->DescriptorSet,
-					.dstBinding = 4,
-					.dstArrayElement = 0,
-					.descriptorCount = 1,
-					.descriptorType = vk::DescriptorType::eCombinedImageSampler,
-					.pImageInfo = &m_AOPlaceholder->GetDescriptorInfo()
-				});
-			}
-
-			device.updateDescriptorSets(descriptorWrites, {});
+	void MaterialRegistry::UpdateDescriptorSetsForMaterials(const std::set<Ref<Material>>& set)
+	{
+		for (const auto& material : set)
+		{
+			AllocateDescriptorSets(material);
 		}
 	}
 
@@ -209,36 +84,105 @@ namespace Kerberos
 		return mat;
 	}
 
-	void MaterialRegistry::RecreateDescriptorPoolIfNeeded() 
+	void MaterialRegistry::AllocateDescriptorSets(const Ref<Material>& material) 
 	{
-		const uint32_t sizeNeeded = static_cast<uint32_t>(m_Materials.size());
-		if (m_PoolSize > sizeNeeded) {
+		if (!material->DescriptorSets.empty()) {
 			return;
 		}
 
 		auto& context = VulkanContext::Get();
 		const auto& device = context.GetDevice();
+		constexpr uint32_t maxFramesInFlight = VulkanContext::MaxFramesInFlight;
 
-		std::vector<vk::DescriptorPoolSize> poolSizes = {
-			vk::DescriptorPoolSize{
-				.type = vk::DescriptorType::eCombinedImageSampler,
-				.descriptorCount = sizeNeeded * m_TexturePerMaterial,
-			}
+		if (m_DescriptorPools.empty() || m_SetsAllocatedInCurrentPool + maxFramesInFlight > maxSetsPerPool) {
+			std::vector<vk::DescriptorPoolSize> poolSizes = {
+				vk::DescriptorPoolSize{
+					.type = vk::DescriptorType::eCombinedImageSampler,
+					.descriptorCount = maxSetsPerPool * m_TexturePerMaterial,
+				}
+			};
+
+			const vk::DescriptorPoolCreateInfo poolInfo{
+				.flags = vk::DescriptorPoolCreateFlagBits::eFreeDescriptorSet,
+				.maxSets = maxSetsPerPool,
+				.poolSizeCount = static_cast<uint32_t>(poolSizes.size()),
+				.pPoolSizes = poolSizes.data()
+			};
+
+			m_DescriptorPools.emplace_back(device, poolInfo);
+			context.SetObjectDebugName(m_DescriptorPools.back(), std::format("Material Registry Descriptor Pool {}", m_DescriptorPools.size()));
+			m_SetsAllocatedInCurrentPool = 0;
+		}
+
+		std::vector<vk::DescriptorSetLayout> setLayouts(maxFramesInFlight, m_SetLayout);
+		const vk::DescriptorSetAllocateInfo allocInfo{
+			.descriptorPool = m_DescriptorPools.back(),
+			.descriptorSetCount = maxFramesInFlight,
+			.pSetLayouts = setLayouts.data()
 		};
 
-		const vk::DescriptorPoolCreateInfo poolInfo{
-			.flags = vk::DescriptorPoolCreateFlagBits::eFreeDescriptorSet,
-			.maxSets = static_cast<uint32_t>(m_Materials.size()),
-			.poolSizeCount = static_cast<uint32_t>(poolSizes.size()),
-			.pPoolSizes = poolSizes.data()
-		};
+		material->DescriptorSets = device.allocateDescriptorSets(allocInfo);
+		m_SetsAllocatedInCurrentPool += maxFramesInFlight;
 
-		m_TextureDescriptorPool = vk::raii::DescriptorPool{ device, poolInfo };
-		context.SetObjectDebugName(m_TextureDescriptorPool, "Material Registry Descriptor Pool");
+		for (uint32_t i = 0; i < maxFramesInFlight; ++i)
+		{
+			context.SetObjectDebugName(material->DescriptorSets[i], std::format("{} Descriptor Set Frame {}", material->name, i));
 
-		m_PoolSize = sizeNeeded;
+			std::vector<vk::WriteDescriptorSet> descriptorWrites;
+			descriptorWrites.reserve(m_TexturePerMaterial);
 
-		// TODO: Do not do this here
+			descriptorWrites.push_back(vk::WriteDescriptorSet{
+				.dstSet = material->DescriptorSets[i],
+				.dstBinding = 0,
+				.dstArrayElement = 0,
+				.descriptorCount = 1,
+				.descriptorType = vk::DescriptorType::eCombinedImageSampler,
+				.pImageInfo = material->AlbedoTexture ? &material->AlbedoTexture->GetDescriptorInfo() : &m_AlbedoPlaceholder->GetDescriptorInfo()
+			});
+
+			descriptorWrites.push_back(vk::WriteDescriptorSet{
+				.dstSet = material->DescriptorSets[i],
+				.dstBinding = 1,
+				.dstArrayElement = 0,
+				.descriptorCount = 1,
+				.descriptorType = vk::DescriptorType::eCombinedImageSampler,
+				.pImageInfo = material->NormalTexture ? &material->NormalTexture->GetDescriptorInfo() : &m_NormalPlaceholder->GetDescriptorInfo()
+			});
+
+			descriptorWrites.push_back(vk::WriteDescriptorSet{
+				.dstSet = material->DescriptorSets[i],
+				.dstBinding = 2,
+				.dstArrayElement = 0,
+				.descriptorCount = 1,
+				.descriptorType = vk::DescriptorType::eCombinedImageSampler,
+				.pImageInfo = material->RoughnessTexture ? &material->RoughnessTexture->GetDescriptorInfo() : &m_RoughnessPlaceholder->GetDescriptorInfo()
+			});
+
+			descriptorWrites.push_back(vk::WriteDescriptorSet{
+				.dstSet = material->DescriptorSets[i],
+				.dstBinding = 3,
+				.dstArrayElement = 0,
+				.descriptorCount = 1,
+				.descriptorType = vk::DescriptorType::eCombinedImageSampler,
+				.pImageInfo = material->MetallicTexture ? &material->MetallicTexture->GetDescriptorInfo() : &m_MetallicPlaceholder->GetDescriptorInfo()
+			});
+
+			descriptorWrites.push_back(vk::WriteDescriptorSet{
+				.dstSet = material->DescriptorSets[i],
+				.dstBinding = 4,
+				.dstArrayElement = 0,
+				.descriptorCount = 1,
+				.descriptorType = vk::DescriptorType::eCombinedImageSampler,
+				.pImageInfo = material->AOTexture ? &material->AOTexture->GetDescriptorInfo() : &m_AOPlaceholder->GetDescriptorInfo()
+			});
+
+			device.updateDescriptorSets(descriptorWrites, {});
+		}
+	}
+
+	void MaterialRegistry::InitPlaceholdersIfNeeded() 
+	{
+		if (m_AlbedoPlaceholder != nullptr) return;
 
 		// White placeholder texture for albedo
 		constexpr std::array<uint8_t, 4> albedoBuffer = { 255, 255, 255, 255 };

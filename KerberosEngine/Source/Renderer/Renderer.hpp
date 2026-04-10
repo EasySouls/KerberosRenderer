@@ -5,6 +5,8 @@
 #include "Vulkan.hpp"
 
 #include <optional>
+#include <vector>
+#include <set>
 
 namespace Kerberos
 {
@@ -30,6 +32,14 @@ namespace Kerberos
 		float OpaquePassMilliseconds = 0.0f;
 		float TransparentPassMilliseconds = 0.0f;
 		bool  IsValid = false;
+	};
+
+	struct RenderObject
+	{
+		glm::mat4 Transform{};
+		Ref<Mesh> Mesh = nullptr;
+		Ref<Material> Material{};
+		uint32_t EntityID = 0;
 	};
 
 	class Renderer
@@ -77,6 +87,7 @@ namespace Kerberos
         static void UpdatePerObjectUniformBuffer(uint32_t currentImage, uint32_t objectIndex, const glm::mat4& model, const Material& material, uint32_t entityID);
 
 		static std::vector<GPULight> GetLightsFromScene(const Scene& scene);
+		static std::pair<std::vector<RenderObject>, std::set<Ref<Material>>> GetRenderObjectsAndUniqueMaterialsFromScene(const Scene& scene);
 		
 		static void WriteGPUTimestamp(const vk::raii::CommandBuffer& cmd, uint32_t frameIndex, uint32_t index);
 		static void ResolveGPUTimings(uint32_t frameIndex);

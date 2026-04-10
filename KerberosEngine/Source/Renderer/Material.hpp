@@ -31,7 +31,7 @@ namespace Kerberos
 		Ref<Texture2D> MetallicTexture = nullptr;
 		Ref<Texture2D> AOTexture = nullptr;
 
-		vk::raii::DescriptorSet DescriptorSet{ nullptr };
+		std::vector<vk::raii::DescriptorSet> DescriptorSets;
 
 		bool IsTransparent() const 
 		{
@@ -80,7 +80,7 @@ namespace Kerberos
 				MetallicTexture = other.MetallicTexture;
 				RoughnessTexture = other.RoughnessTexture;
 				AOTexture = other.AOTexture;
-				// DescriptorSet intentionally not copied
+				// DescriptorSets intentionally not copied
 			}
 			return *this;
 		}

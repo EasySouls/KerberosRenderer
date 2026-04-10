@@ -1,10 +1,13 @@
 #pragma once
 
+#include <set>
+
 #include "Material.hpp"
 #include "Core/Core.hpp"
 
 #include <unordered_map>
 #include <string>
+#include <set>
 
 namespace Kerberos 
 {
@@ -19,7 +22,8 @@ namespace Kerberos
 		const Ref<Material>& AddAndRetrieve(const std::string& name, const Material& mat);
 		const Ref<Material>& AddAndRetrieve(const std::string& name, const Ref<Material>& mat);
 
-		void SetupDescriptorSets(const vk::raii::DescriptorSetLayout& setLayout);
+		void SetupDescriptorSets(const vk::DescriptorSetLayout& setLayout);
+		void UpdateDescriptorSetsForMaterials(const std::set<Ref<Material>>& set);
 
 		const Ref<Material>& Get(const std::string& name) const;
 		Ref<Material>& Get(const std::string& name);
@@ -30,13 +34,17 @@ namespace Kerberos
 		std::unordered_map<std::string, Ref<Material>>::iterator end() { return m_Materials.end(); }
 
 	private:
-		void RecreateDescriptorPoolIfNeeded();
+		void AllocateDescriptorSets(const Ref<Material>& material);
+		void InitPlaceholdersIfNeeded();
 
 	private:
 		std::unordered_map<std::string, Ref<Material>> m_Materials;
 
-		vk::raii::DescriptorPool m_TextureDescriptorPool = nullptr;
-		uint32_t m_PoolSize = 0;
+		std::vector<vk::raii::DescriptorPool> m_DescriptorPools;
+		uint32_t m_SetsAllocatedInCurrentPool = 0;
+		static constexpr uint32_t maxSetsPerPool = 1000;
+
+		vk::DescriptorSetLayout m_SetLayout = nullptr;
 
 		uint32_t m_TexturePerMaterial = 5;
 

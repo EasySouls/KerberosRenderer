@@ -320,6 +320,9 @@ namespace Kerberos
 			context.GetDevice().updateDescriptorSets(asWrite, {});
 		}
 
+		const auto& [renderObjects, uniqueMaterials] = GetRenderObjectsAndUniqueMaterialsFromScene(*s_Data->PendingRender.Scene.get());
+		s_Data->MaterialRegistry.UpdateDescriptorSetsForMaterials(uniqueMaterials);
+
 		ResetQueryPool(cmd, frameIndex);
 
 		WriteGPUTimestamp(cmd, frameIndex, static_cast<uint32_t>(GPUTimestampQuery::FrameBegin));
@@ -426,7 +429,7 @@ namespace Kerberos
 					vk::PipelineBindPoint::eGraphics,
 					*s_Data->PBRPipelineLayout,
 					0,
-					{ s_Data->DescriptorSets[currentImage].scene, material->DescriptorSet },
+					{ s_Data->DescriptorSets[currentImage].scene, material->DescriptorSets[currentImage] },
 					{ dynamicOffset });
 
 				staticMesh.StaticMesh->Draw(cmd);
@@ -526,7 +529,7 @@ namespace Kerberos
 					vk::PipelineBindPoint::eGraphics,
 					*s_Data->PBRPipelineLayout,
 					0,
-					{ s_Data->DescriptorSets[currentImage].scene, material->DescriptorSet },
+					{ s_Data->DescriptorSets[currentImage].scene, material->DescriptorSets[currentImage] },
 					{ dynamicOffset });
 
 				staticMesh.StaticMesh->Draw(cmd);
@@ -746,33 +749,54 @@ namespace Kerberos
 			}
 
 			{
-				const auto meshView = scene->m_Registry.view<TransformComponent, StaticMeshComponent>();
-				int i = 0;
-				for (const auto entity : meshView)
-				{
-					auto& transform = meshView.get<TransformComponent>(entity);
-					auto& staticMesh = meshView.get<StaticMeshComponent>(entity);
-					if (!staticMesh.Visible || !staticMesh.StaticMesh /* || !staticMesh.MeshMaterial*/)
-						continue;
+				//const auto meshView = scene->m_Registry.view<TransformComponent, StaticMeshComponent>();
+				//int i = 0;
+				//for (const auto entity : meshView)
+				//{
+				//	auto& transform = meshView.get<TransformComponent>(entity);
+				//	auto& staticMesh = meshView.get<StaticMeshComponent>(entity);
+				//	if (!staticMesh.Visible || !staticMesh.StaticMesh /* || !staticMesh.MeshMaterial*/)
+				//		continue;
 
-					// TODO: Remove this once we have a proper material system
-					Ref<Material> material = staticMesh.MeshMaterial;
+				//	// TODO: Remove this once we have a proper material system
+				//	Ref<Material> material = staticMesh.MeshMaterial;
+				//	if (material == nullptr)
+				//		material = s_Data->MaterialRegistry.Get("DebugPink");
+
+				//	UpdatePerObjectUniformBuffer(currentImage, static_cast<uint32_t>(i), transform.GetTransform(), *material, static_cast<uint32_t>(entity));
+				//	uint32_t dynamicOffset = static_cast<uint32_t>(i * s_Data->DynamicAlignment);
+
+				//	cmd.bindDescriptorSets(
+				//		vk::PipelineBindPoint::eGraphics,
+				//		*s_Data->PBRPipelineLayout,
+				//		0,
+				//		{ s_Data->DescriptorSets[currentImage].scene, material->DescriptorSets[currentImage] },
+				//		{ dynamicOffset });
+
+				//	staticMesh.StaticMesh->Draw(cmd);
+
+				//	++i;
+				//}
+
+				for (uint32_t i = 0; i < renderObjects.size(); ++i)
+				{
+					const auto& [Transform, Mesh, Material, EntityID] = renderObjects[i];
+
+					Ref<Kerberos::Material> material = Material;
 					if (material == nullptr)
 						material = s_Data->MaterialRegistry.Get("DebugPink");
 
-					UpdatePerObjectUniformBuffer(currentImage, static_cast<uint32_t>(i), transform.GetTransform(), *material, static_cast<uint32_t>(entity));
+					UpdatePerObjectUniformBuffer(currentImage, i, Transform, *material, EntityID);
 					uint32_t dynamicOffset = static_cast<uint32_t>(i * s_Data->DynamicAlignment);
 
 					cmd.bindDescriptorSets(
 						vk::PipelineBindPoint::eGraphics,
 						*s_Data->PBRPipelineLayout,
 						0,
-						{ s_Data->DescriptorSets[currentImage].scene, material->DescriptorSet },
+						{ s_Data->DescriptorSets[currentImage].scene, material->DescriptorSets[currentImage] },
 						{ dynamicOffset });
 
-					staticMesh.StaticMesh->Draw(cmd);
-
-					++i;
+					Mesh->Draw(cmd);
 				}
 			}
 
@@ -874,7 +898,7 @@ namespace Kerberos
 			//			vk::PipelineBindPoint::eGraphics,
 			//			*s_Data->PBRPipelineLayout,
 			//			0,
-			//			{ s_Data->DescriptorSets[currentImage].scene, staticMesh.MeshMaterial->DescriptorSet },
+			//			{ s_Data->DescriptorSets[currentImage].scene, staticMesh.Meshmaterial->DescriptorSets[currentImage] },
 			//			{ dynamicOffset });
 
 			//		staticMesh.StaticMesh->Draw(cmd);
@@ -1663,11 +1687,12 @@ namespace Kerberos
 
 	void Renderer::RecompileShaders() 
 	{
-		const auto& context = VulkanContext::Get();
-		context.WaitIdle();
+		VulkanContext::Get().WaitIdle();
 
 		if (const auto& shadowMapPipeline = s_Data->ShadowMap.Pipeline)
 			shadowMapPipeline->Recompile();
+		if (const auto& depthPrePassPipeline = s_Data->DepthPrePassPipeline)
+			depthPrePassPipeline->Recompile();
 		if (const auto& pbrOpaquePipeline = s_Data->PBROpaquePipeline)
 			pbrOpaquePipeline->Recompile();
 		if (const auto& pbrOpaquePipelinePCF = s_Data->PBROpaquePipelinePCF)
@@ -1967,6 +1992,38 @@ namespace Kerberos
 		// TODO: Add area light when they are implemented
 
 		return sceneLights;
+    }
+
+    std::pair<std::vector<RenderObject>, std::set<Ref<Material>>> Renderer::GetRenderObjectsAndUniqueMaterialsFromScene(
+	    const Scene& scene) 
+	{
+		static uint32_t renderObjectCountFromLastFrame = 0;
+
+		std::vector<RenderObject> renderObjects;
+		std::set<Ref<Material>> uniqueMaterials;
+		renderObjects.reserve(renderObjectCountFromLastFrame);
+
+		const auto meshView = scene.m_Registry.view<TransformComponent, StaticMeshComponent>();
+		for (const auto entity : meshView)
+		{
+			auto& transform = meshView.get<TransformComponent>(entity);
+			auto& staticMesh = meshView.get<StaticMeshComponent>(entity);
+			if (!staticMesh.Visible || !staticMesh.StaticMesh /* || !staticMesh.MeshMaterial*/)
+				continue;
+
+			RenderObject renderObject{};
+			renderObject.Transform = transform.GetTransform();
+			renderObject.Mesh = staticMesh.StaticMesh;
+			renderObject.Material = staticMesh.MeshMaterial;
+			renderObject.EntityID = static_cast<uint32_t>(entity);
+			renderObjects.push_back(renderObject);
+			if (renderObject.Material)
+				uniqueMaterials.insert(renderObject.Material);
+		}
+
+		renderObjectCountFromLastFrame = renderObjects.size();
+
+		return { renderObjects, uniqueMaterials };
     }
 
     glm::mat4 Renderer::CalculateLightSpaceMatrix() 
