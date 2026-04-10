@@ -2277,24 +2277,24 @@ namespace Kerberos
 				.descriptorCount = 1,
 				.stageFlags = vk::ShaderStageFlagBits::eFragment,
 			},
-			//vk::DescriptorSetLayoutBinding{ // Ambient occlusion map
-			//	.binding = 2,
-			//	.descriptorType = vk::DescriptorType::eCombinedImageSampler,
-			//	.descriptorCount = 1,
-			//	.stageFlags = vk::ShaderStageFlagBits::eFragment,
-			//},
-			//vk::DescriptorSetLayoutBinding{ // Metallic map
-			//	.binding = 3,
-			//	.descriptorType = vk::DescriptorType::eCombinedImageSampler,
-			//	.descriptorCount = 1,
-			//	.stageFlags = vk::ShaderStageFlagBits::eFragment,
-			//},
-			//vk::DescriptorSetLayoutBinding{ // Roughness map
-			//	.binding = 4,
-			//	.descriptorType = vk::DescriptorType::eCombinedImageSampler,
-			//	.descriptorCount = 1,
-			//	.stageFlags = vk::ShaderStageFlagBits::eFragment,
-			//},
+			vk::DescriptorSetLayoutBinding{ // Roughness map
+				.binding = 2,
+				.descriptorType = vk::DescriptorType::eCombinedImageSampler,
+				.descriptorCount = 1,
+				.stageFlags = vk::ShaderStageFlagBits::eFragment,
+			},
+			vk::DescriptorSetLayoutBinding{ // Metallic map
+				.binding = 3,
+				.descriptorType = vk::DescriptorType::eCombinedImageSampler,
+				.descriptorCount = 1,
+				.stageFlags = vk::ShaderStageFlagBits::eFragment,
+			},
+			vk::DescriptorSetLayoutBinding{ // Ambient occlusion map
+				.binding = 4,
+				.descriptorType = vk::DescriptorType::eCombinedImageSampler,
+				.descriptorCount = 1,
+				.stageFlags = vk::ShaderStageFlagBits::eFragment,
+			},
 		};
 
 		const vk::DescriptorSetLayoutCreateInfo textureLayoutInfo{
@@ -2311,7 +2311,7 @@ namespace Kerberos
 
 		vk::DescriptorSetAllocateInfo allocInfo{
 			.descriptorPool = *s_Data->DescriptorPool,
-           .descriptorSetCount = static_cast<uint32_t>(s_Data->DescriptorSets.size()),
+			.descriptorSetCount = static_cast<uint32_t>(s_Data->DescriptorSets.size()),
 			.pSetLayouts = sceneSetLayouts.data()
 		};
 

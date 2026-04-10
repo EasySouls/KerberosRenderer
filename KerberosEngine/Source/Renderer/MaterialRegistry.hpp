@@ -43,5 +43,8 @@ namespace Kerberos
 		// TODO: Move from here
 		Ref<Texture2D> m_AlbedoPlaceholder;
 		Ref<Texture2D> m_NormalPlaceholder;
+		Ref<Texture2D> m_RoughnessPlaceholder;
+		Ref<Texture2D> m_MetallicPlaceholder;
+		Ref<Texture2D> m_AOPlaceholder;
 	};
 }

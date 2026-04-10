@@ -118,6 +118,75 @@ namespace Kerberos
 				});
 			}
 
+			if (material->RoughnessTexture != nullptr)
+			{
+				descriptorWrites.push_back(vk::WriteDescriptorSet{
+					.dstSet = material->DescriptorSet,
+					.dstBinding = 2,
+					.dstArrayElement = 0,
+					.descriptorCount = 1,
+					.descriptorType = vk::DescriptorType::eCombinedImageSampler,
+					.pImageInfo = &material->RoughnessTexture->GetDescriptorInfo()
+				});
+			}
+			else
+			{
+				descriptorWrites.push_back(vk::WriteDescriptorSet{
+					.dstSet = material->DescriptorSet,
+					.dstBinding = 2,
+					.dstArrayElement = 0,
+					.descriptorCount = 1,
+					.descriptorType = vk::DescriptorType::eCombinedImageSampler,
+					.pImageInfo = &m_RoughnessPlaceholder->GetDescriptorInfo()
+				});
+			}
+
+			if (material->MetallicTexture != nullptr)
+			{
+				descriptorWrites.push_back(vk::WriteDescriptorSet{
+					.dstSet = material->DescriptorSet,
+					.dstBinding = 3,
+					.dstArrayElement = 0,
+					.descriptorCount = 1,
+					.descriptorType = vk::DescriptorType::eCombinedImageSampler,
+					.pImageInfo = &material->MetallicTexture->GetDescriptorInfo()
+				});
+			}
+			else
+			{
+				descriptorWrites.push_back(vk::WriteDescriptorSet{
+					.dstSet = material->DescriptorSet,
+					.dstBinding = 3,
+					.dstArrayElement = 0,
+					.descriptorCount = 1,
+					.descriptorType = vk::DescriptorType::eCombinedImageSampler,
+					.pImageInfo = &m_MetallicPlaceholder->GetDescriptorInfo()
+				});
+			}
+
+			if (material->AOTexture != nullptr)
+			{
+				descriptorWrites.push_back(vk::WriteDescriptorSet{
+					.dstSet = material->DescriptorSet,
+					.dstBinding = 4,
+					.dstArrayElement = 0,
+					.descriptorCount = 1,
+					.descriptorType = vk::DescriptorType::eCombinedImageSampler,
+					.pImageInfo = &material->AOTexture->GetDescriptorInfo()
+				});
+			}
+			else
+			{
+				descriptorWrites.push_back(vk::WriteDescriptorSet{
+					.dstSet = material->DescriptorSet,
+					.dstBinding = 4,
+					.dstArrayElement = 0,
+					.descriptorCount = 1,
+					.descriptorType = vk::DescriptorType::eCombinedImageSampler,
+					.pImageInfo = &m_AOPlaceholder->GetDescriptorInfo()
+				});
+			}
+
 			device.updateDescriptorSets(descriptorWrites, {});
 		}
 	}
@@ -190,5 +259,34 @@ namespace Kerberos
 		const Buffer normalBufferStruct{ sizeof(uint8_t) * normalBuffer.size() };
 		std::memcpy(normalBufferStruct.Data, normalBuffer.data(), normalBufferStruct.Size);
 		m_NormalPlaceholder = Texture2D::FromBuffer(normalSpec, normalBufferStruct);
+
+		// TODO: Add roughness, metallic and AO placeholders
+		constexpr std::array<uint8_t, 4> roughnessBuffer = { 255, 255, 255, 255 };
+		TextureSpecification roughnessSpec{};
+		roughnessSpec.Width = 1;
+		roughnessSpec.Height = 1;
+		roughnessSpec.Format = ImageFormat::RGBA8; // UNORM
+		const Buffer roughnessBufferStruct{ sizeof(uint8_t) * roughnessBuffer.size() };
+		std::memcpy(roughnessBufferStruct.Data, roughnessBuffer.data(), roughnessBufferStruct.Size);
+		m_RoughnessPlaceholder = Texture2D::FromBuffer(roughnessSpec, roughnessBufferStruct);
+
+		// TODO: Add metallic and AO placeholders
+		constexpr std::array<uint8_t, 4> metallicBuffer = { 255, 255, 255, 255 };
+		TextureSpecification metallicSpec{};
+		metallicSpec.Width = 1;
+		metallicSpec.Height = 1;
+		metallicSpec.Format = ImageFormat::RGBA8; // UNORM
+		const Buffer metallicBufferStruct{ sizeof(uint8_t) * metallicBuffer.size() };
+		std::memcpy(metallicBufferStruct.Data, metallicBuffer.data(), metallicBufferStruct.Size);
+		m_MetallicPlaceholder = Texture2D::FromBuffer(metallicSpec, metallicBufferStruct);
+
+		constexpr std::array<uint8_t, 4> aoBuffer = { 255, 255, 255, 255 };
+		TextureSpecification aoSpec{};
+		aoSpec.Width = 1;
+		aoSpec.Height = 1;
+		aoSpec.Format = ImageFormat::RGBA8; // UNORM
+		const Buffer aoBufferStruct{ sizeof(uint8_t) * aoBuffer.size() };
+		std::memcpy(aoBufferStruct.Data, aoBuffer.data(), aoBufferStruct.Size);
+		m_AOPlaceholder = Texture2D::FromBuffer(aoSpec, aoBufferStruct);
 	}
 }

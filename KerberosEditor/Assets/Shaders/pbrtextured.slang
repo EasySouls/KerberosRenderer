@@ -55,12 +55,12 @@ StructuredBuffer<GPULight> sceneLights;
 Sampler2D albedoMapSampler;
 [[vk::binding(1, 1)]]
 Sampler2D normalMapSampler;
-//[[vk::binding(2, 1)]]
-//Sampler2D aoMapSampler;
-//[[vk::binding(3, 1)]]
-//Sampler2D metallicMapSampler;
-//[[vk::binding(4, 1)]]
-//Sampler2D roughnessMapSampler;
+[[vk::binding(2, 1)]]
+Sampler2D roughnessMapSampler;
+[[vk::binding(3, 1)]]
+Sampler2D metallicMapSampler;
+[[vk::binding(4, 1)]]
+Sampler2D aoMapSampler;
 
 [SpecializationConstant] const int enablePCF = 0;
 
@@ -238,11 +238,11 @@ PSOutput fragmentMain(VSOutput input)
     float3 V = normalize(scene.camPos - input.FragPos_WorldSpace);
     float3 R = reflect(-V, N);
 
-    float metallic = perObject.material.metallic;  // metallicMapSampler.Sample(input.TexCoord).r;
-    float roughness = perObject.material.roughness; // roughnessMapSampler.Sample(input.TexCoord).r;
-
-    // For point lights in the future
-    // float3 lightDir = normalize(uboParams.lights[0].xyz - input.FragPos_WorldSpace);
+    //float metallic = perObject.material.metallic;  
+    //float roughness = perObject.material.roughness; 
+    float metallic = metallicMapSampler.Sample(input.TexCoord).r;
+    float roughness = roughnessMapSampler.Sample(input.TexCoord).r;
+    float ao = aoMapSampler.Sample(input.TexCoord).r;
 
     // Currently we are using light 0 only for generating the shadow map
     float3 lightDir = normalize(globalLighting.lights[0].xyz);
@@ -295,8 +295,8 @@ PSOutput fragmentMain(VSOutput input)
 
     // Ambient part
     float3 kD = 1.0 - F;
-    kD *= 1.0 - perObject.material.metallic;
-    float3 ambient = (kD * diffuse + specular);
+    kD *= 1.0 - metallic;
+    float3 ambient = (kD * diffuse + specular) * ao;
 
     float3 color = ambient + Lo;
 

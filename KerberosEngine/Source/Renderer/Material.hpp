@@ -27,8 +27,8 @@ namespace Kerberos
 
 		Ref<Texture2D> AlbedoTexture = nullptr;
 		Ref<Texture2D> NormalTexture = nullptr;
-		Ref<Texture2D> MetallicTexture = nullptr;
 		Ref<Texture2D> RoughnessTexture = nullptr;
+		Ref<Texture2D> MetallicTexture = nullptr;
 		Ref<Texture2D> AOTexture = nullptr;
 
 		vk::raii::DescriptorSet DescriptorSet{ nullptr };
