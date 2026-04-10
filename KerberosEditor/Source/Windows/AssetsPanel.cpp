@@ -249,6 +249,8 @@ namespace Kerberos
 
 		ImGui::End();
 
+		m_NotificationManager.RenderNotifications();
+
 		RenderMaterialEditors();
 	}
 
@@ -364,13 +366,14 @@ namespace Kerberos
 					material.Params.metallic = 0.0f;
 					material.Params.roughness = 1.0f;
 
-					if (!MaterialImporter::SaveMaterial(materialPath, material))
+					const std::filesystem::path assetPath = std::filesystem::relative(materialPath, Project::GetProjectDirectory());
+					if (!MaterialImporter::SaveMaterial(assetPath, material))
 					{
 						KBR_CORE_ERROR("Could not create material file at path: {0}", materialPathStr);
 					}
 					else
 					{
-						Project::GetActive()->GetEditorAssetManager()->ImportAsset(materialPath);
+						Project::GetActive()->GetEditorAssetManager()->ImportAsset(assetPath);
 					}
 				}
 				else
@@ -429,7 +432,7 @@ namespace Kerberos
 			return;
 		}
 
-		const Ref<Material> material = MaterialImporter::ImportMaterial(absolutePath);
+		const Ref<Material> material = MaterialImporter::ImportMaterial(materialPath);
 		if (!material)
 		{
 			m_NotificationManager.AddNotification("Could not open material: " + absolutePath.string(), Notification::Type::Error);
@@ -464,11 +467,7 @@ namespace Kerberos
 			const std::string selectedPath = FileDialog::OpenFile("Textures (*.png;*.jpg;*.jpeg;*.ktx;*.ktx2)\0*.png;*.jpg;*.jpeg;*.ktx;*.ktx2\0");
 			if (!selectedPath.empty())
 			{
-				std::filesystem::path pathToImport = selectedPath;
-				if (pathToImport.is_relative())
-				{
-					pathToImport = materialFilepath.parent_path() / pathToImport;
-				}
+				const std::filesystem::path pathToImport = std::filesystem::relative(selectedPath, Project::GetAssetDirectory());
 
 				const Ref<EditorAssetManager> assetManager = Project::GetActive()->GetEditorAssetManager();
 				const AssetHandle handle = assetManager->ImportAsset(pathToImport);
@@ -495,8 +494,12 @@ namespace Kerberos
 			bool open = state.Open;
 			const std::string windowTitle = std::string("Material Editor - ") + state.Filepath.filename().string() + "##" + key;
 
+			bool beginWasCalled = false;
+
 			if (open ? ImGui::Begin(windowTitle.c_str(), &open) : false)
 			{
+				beginWasCalled = true;
+
 				char nameBuffer[256];
 				strcpy_s(nameBuffer, sizeof(nameBuffer), state.WorkingCopy->name.c_str());
 				if (ImGui::InputText("Name", nameBuffer, sizeof(nameBuffer)))
@@ -549,7 +552,7 @@ namespace Kerberos
 				}
 			}
 
-			if (open)
+			if (open || beginWasCalled)
 			{
 				ImGui::End();
 			}

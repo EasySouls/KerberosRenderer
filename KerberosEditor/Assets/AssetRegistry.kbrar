@@ -11,6 +11,9 @@ AssetRegistry:
   - Handle: 6728996633782092594
     Type: Model
     Path: Assets\Models\avocado\Avocado.gltf
+  - Handle: 8036360350461290503
+    Type: Material
+    Path: Assets\Materials\white.kbrmat
   - Handle: 12640333732108170778
     Type: Model
     Path: Assets\Models\cerberus\cerberus.gltf

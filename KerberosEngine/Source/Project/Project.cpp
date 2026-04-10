@@ -18,9 +18,10 @@ namespace Kerberos
 		const ProjectSerializer deserializer(projectToLoad);
 		if (deserializer.Deserialize(filepath))
 		{
-			projectToLoad->m_ProjectDirectory = filepath.parent_path();
+			const auto absolutePath = std::filesystem::absolute(filepath);
+			projectToLoad->m_ProjectDirectory = absolutePath.parent_path();
 			s_ActiveProject = projectToLoad;
-			KBR_CORE_INFO("Project is loaded from {}", std::filesystem::absolute(filepath).string());
+			KBR_CORE_INFO("Project is loaded from {}", absolutePath.string());
 
 			/// Initialize the asset manager for the project
 			/// TODO: Load Editor or Runtime Asset Manager based on the project type

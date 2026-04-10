@@ -1,0 +1,9 @@
+Name: white
+Albedo: [1, 1, 1]
+Roughness: 1
+Metallic: 0
+AlbedoTexture: ""
+NormalTexture: ""
+MetallicTexture: ""
+RoughnessTexture: ""
+AOTexture: ""
