@@ -1123,7 +1123,7 @@ namespace Kerberos
 				},
 			 },
 			 {.shaderDrawParameters = true },
-			 {.descriptorIndexing = true, .timelineSemaphore = true, .bufferDeviceAddress = true },
+			 {.descriptorIndexing = true, .descriptorBindingSampledImageUpdateAfterBind = true, .descriptorBindingPartiallyBound = true, .timelineSemaphore = true, .bufferDeviceAddress = true },
 			 {.synchronization2 = true, .dynamicRendering = true },
 			 {.extendedDynamicState = true },
 			 {.accelerationStructure = true },

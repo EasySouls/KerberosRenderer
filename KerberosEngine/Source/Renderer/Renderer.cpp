@@ -2354,7 +2354,19 @@ namespace Kerberos
 			},
 		};
 
+		const std::vector<vk::DescriptorBindingFlags> textureBindingFlags(
+			textureBindings.size(), 
+			vk::DescriptorBindingFlagBits::ePartiallyBound | vk::DescriptorBindingFlagBits::eUpdateAfterBind
+		);
+
+		const vk::DescriptorSetLayoutBindingFlagsCreateInfo textureLayoutBindingFlagsInfo{
+			.bindingCount = static_cast<uint32_t>(textureBindingFlags.size()),
+			.pBindingFlags = textureBindingFlags.data()
+		};
+
 		const vk::DescriptorSetLayoutCreateInfo textureLayoutInfo{
+			.pNext = &textureLayoutBindingFlagsInfo,
+			.flags = vk::DescriptorSetLayoutCreateFlagBits::eUpdateAfterBindPool,
 			.bindingCount = static_cast<uint32_t>(textureBindings.size()),
 			.pBindings = textureBindings.data()
 		};

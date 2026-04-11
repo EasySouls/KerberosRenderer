@@ -167,7 +167,7 @@ namespace Kerberos
 
 		vk::Format FindDepthFormat() const;
 		vk::Extent2D ChooseSwapExtent(const vk::SurfaceCapabilitiesKHR& capabilities) const;
-      static QueueFamilyInfo FindQueueFamilies(const vk::raii::PhysicalDevice& physicalDevice, const vk::raii::SurfaceKHR& surface);
+		static QueueFamilyInfo FindQueueFamilies(const vk::raii::PhysicalDevice& physicalDevice, const vk::raii::SurfaceKHR& surface);
 		static bool HasStencilComponent(vk::Format format);
 		static vk::SampleCountFlagBits GetMaxUsableSampleCount(const vk::raii::PhysicalDevice& physicalDevice);
 		static std::vector<char const*> GetRequiredExtensions();

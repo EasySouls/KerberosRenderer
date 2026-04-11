@@ -63,8 +63,8 @@ namespace Kerberos
 			, name(other.name)
 			, AlbedoTexture(other.AlbedoTexture)
 			, NormalTexture(other.NormalTexture)
-			, MetallicTexture(other.MetallicTexture)
 			, RoughnessTexture(other.RoughnessTexture)
+			, MetallicTexture(other.MetallicTexture)
 			, AOTexture(other.AOTexture)
 		{
 		}
@@ -83,6 +83,18 @@ namespace Kerberos
 				// DescriptorSets intentionally not copied
 			}
 			return *this;
+		}
+
+		bool operator==(const Material& other) const
+		{
+			return Params.albedo == other.Params.albedo &&
+				   Params.roughness == other.Params.roughness &&
+				   Params.metallic == other.Params.metallic &&
+				   AlbedoTexture == other.AlbedoTexture &&
+				   NormalTexture == other.NormalTexture &&
+				   RoughnessTexture == other.RoughnessTexture &&
+				   MetallicTexture == other.MetallicTexture &&
+				   AOTexture == other.AOTexture;
 		}
 
 		AssetType GetType() override { return AssetType::Material; }

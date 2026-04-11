@@ -231,6 +231,29 @@ VSOutput vertexMain(VSInput input)
     return output;
 }
 
+float3 CalculateSunlight(float4 worldPosLightSpace, float3 N, float3 V, float3 F0, float3 albedo, float metallic, float roughness)
+{
+    float3 lightDir = normalize(globalLighting.lights[0].xyz);
+    // TODO: Pass the sun color as parameter
+
+    float shadow = ShadowCalculation(lightDir, N, worldPosLightSpace);
+    float3 contribution = SpecularContribution(lightDir, V, N, F0, albedo, metallic, roughness);
+
+    return contribution * (1.0 - shadow);
+}
+
+float3 CalculateLight(GPULight light, float3 worldPos, float3 N, float3 V, float3 F0, float3 albedo, float metallic, float roughness)
+{
+    float3 lightVec = light.position - worldPos;
+    float3 L = normalize(lightVec);
+
+
+    float3 contrib = SpecularContribution(L, V, N, F0, albedo, metallic, roughness);
+    float3 radiance = CalculateLightColor(light, worldPos);
+
+    return contrib * radiance;
+}
+
 [shader("fragment")]
 PSOutput fragmentMain(VSOutput input)
 {
@@ -244,10 +267,6 @@ PSOutput fragmentMain(VSOutput input)
     float roughness = roughnessMapSampler.Sample(input.TexCoord).r;
     float ao = aoMapSampler.Sample(input.TexCoord).r;
 
-    // Currently we are using light 0 only for generating the shadow map
-    float3 lightDir = normalize(globalLighting.lights[0].xyz);
-    float shadow = ShadowCalculation(lightDir, N, input.FragPos_LightSpace);
-
     float3 F0 = float3(0.04, 0.04, 0.04);
     // Use this when working with srgb textures
     //float3 albedo = pow(albedoMapSampler.Sample(input.TexCoord).rgb * perObject.material.albedo, float3(2.2, 2.2, 2.2));
@@ -256,26 +275,13 @@ PSOutput fragmentMain(VSOutput input)
 
 	// Specular contribution
 	float3 Lo = float3(0.0, 0.0, 0.0);
-	for (int i = 0; i < 4; i++) {
-        // For point lights in the future
-        // float3 L = normalize(normalize(uboParams.lights[i].xyz) - input.FragPos_WorldSpace);
-        float3 L = normalize(globalLighting.lights[i].xyz);
 
-        float3 contribution = SpecularContribution(L, V, N, F0, albedo, metallic, roughness);
-        if (i == 0) // Only apply shadow to the first light for now
-            contribution *= (1.0 - shadow);
+    Lo += CalculateSunlight(input.FragPos_LightSpace, N, V, F0, albedo, metallic, roughness);
 
-        Lo += contribution;
-    };
     for (int i = 0; i < scene.lightCount; i++) {
         GPULight light = sceneLights[i];
-        float3 lightVec = light.position - input.FragPos_WorldSpace;
-        float3 L = normalize(lightVec);
 
-        float3 contrib = SpecularContribution(L, V, N, F0, albedo, metallic, roughness);
-        float3 radiance = CalculateLightColor(sceneLights[i], input.FragPos_WorldSpace);
-
-        Lo += contrib * radiance;
+        Lo += CalculateLight(light, input.FragPos_WorldSpace, N, V, F0, albedo, metallic, roughness);
     }
 
     //float3 sampleN = float3(N.x, -N.y, N.z);

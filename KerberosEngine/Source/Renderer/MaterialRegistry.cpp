@@ -60,6 +60,11 @@ namespace Kerberos
 
 	void MaterialRegistry::UpdateDescriptorSetsForMaterials(const std::set<Ref<Material>>& set)
 	{
+		if (set.empty()) return;
+
+		// Wait for the device to be idle before updating descriptor sets that might be in use by command buffers
+		//VulkanContext::Get().WaitIdle();
+
 		for (const auto& material : set)
 		{
 			AllocateDescriptorSets(material);
@@ -86,47 +91,51 @@ namespace Kerberos
 
 	void MaterialRegistry::AllocateDescriptorSets(const Ref<Material>& material) 
 	{
-		if (!material->DescriptorSets.empty()) {
-			return;
-		}
-
 		auto& context = VulkanContext::Get();
 		const auto& device = context.GetDevice();
 		constexpr uint32_t maxFramesInFlight = VulkanContext::MaxFramesInFlight;
 
-		if (m_DescriptorPools.empty() || m_SetsAllocatedInCurrentPool + maxFramesInFlight > maxSetsPerPool) {
-			std::vector<vk::DescriptorPoolSize> poolSizes = {
-				vk::DescriptorPoolSize{
-					.type = vk::DescriptorType::eCombinedImageSampler,
-					.descriptorCount = maxSetsPerPool * m_TexturePerMaterial,
-				}
+		const bool hasDescriptorSets = !material->DescriptorSets.empty();
+
+		if (!hasDescriptorSets)
+		{
+			if (m_DescriptorPools.empty() || m_SetsAllocatedInCurrentPool + maxFramesInFlight > maxSetsPerPool) {
+				std::vector<vk::DescriptorPoolSize> poolSizes = {
+					vk::DescriptorPoolSize{
+						.type = vk::DescriptorType::eCombinedImageSampler,
+						.descriptorCount = maxSetsPerPool * m_TexturePerMaterial,
+					}
+				};
+
+				const vk::DescriptorPoolCreateInfo poolInfo{
+					.flags = vk::DescriptorPoolCreateFlagBits::eFreeDescriptorSet | vk::DescriptorPoolCreateFlagBits::eUpdateAfterBind,
+					.maxSets = maxSetsPerPool,
+					.poolSizeCount = static_cast<uint32_t>(poolSizes.size()),
+					.pPoolSizes = poolSizes.data()
+				};
+
+				m_DescriptorPools.emplace_back(device, poolInfo);
+				context.SetObjectDebugName(m_DescriptorPools.back(), std::format("Material Registry Descriptor Pool {}", m_DescriptorPools.size()));
+				m_SetsAllocatedInCurrentPool = 0;
+			}
+
+			std::vector<vk::DescriptorSetLayout> setLayouts(maxFramesInFlight, m_SetLayout);
+			const vk::DescriptorSetAllocateInfo allocInfo{
+				.descriptorPool = m_DescriptorPools.back(),
+				.descriptorSetCount = maxFramesInFlight,
+				.pSetLayouts = setLayouts.data()
 			};
 
-			const vk::DescriptorPoolCreateInfo poolInfo{
-				.flags = vk::DescriptorPoolCreateFlagBits::eFreeDescriptorSet,
-				.maxSets = maxSetsPerPool,
-				.poolSizeCount = static_cast<uint32_t>(poolSizes.size()),
-				.pPoolSizes = poolSizes.data()
-			};
-
-			m_DescriptorPools.emplace_back(device, poolInfo);
-			context.SetObjectDebugName(m_DescriptorPools.back(), std::format("Material Registry Descriptor Pool {}", m_DescriptorPools.size()));
-			m_SetsAllocatedInCurrentPool = 0;
+			material->DescriptorSets = device.allocateDescriptorSets(allocInfo);
+			m_SetsAllocatedInCurrentPool += maxFramesInFlight;
 		}
-
-		std::vector<vk::DescriptorSetLayout> setLayouts(maxFramesInFlight, m_SetLayout);
-		const vk::DescriptorSetAllocateInfo allocInfo{
-			.descriptorPool = m_DescriptorPools.back(),
-			.descriptorSetCount = maxFramesInFlight,
-			.pSetLayouts = setLayouts.data()
-		};
-
-		material->DescriptorSets = device.allocateDescriptorSets(allocInfo);
-		m_SetsAllocatedInCurrentPool += maxFramesInFlight;
 
 		for (uint32_t i = 0; i < maxFramesInFlight; ++i)
 		{
-			context.SetObjectDebugName(material->DescriptorSets[i], std::format("{} Descriptor Set Frame {}", material->name, i));
+			if (!hasDescriptorSets)
+			{
+				context.SetObjectDebugName(material->DescriptorSets[i], std::format("{} Descriptor Set Frame {}", material->name, i));
+			}
 
 			std::vector<vk::WriteDescriptorSet> descriptorWrites;
 			descriptorWrites.reserve(m_TexturePerMaterial);
@@ -204,7 +213,6 @@ namespace Kerberos
 		std::memcpy(normalBufferStruct.Data, normalBuffer.data(), normalBufferStruct.Size);
 		m_NormalPlaceholder = Texture2D::FromBuffer(normalSpec, normalBufferStruct);
 
-		// TODO: Add roughness, metallic and AO placeholders
 		constexpr std::array<uint8_t, 4> roughnessBuffer = { 255, 255, 255, 255 };
 		TextureSpecification roughnessSpec{};
 		roughnessSpec.Width = 1;
@@ -214,8 +222,7 @@ namespace Kerberos
 		std::memcpy(roughnessBufferStruct.Data, roughnessBuffer.data(), roughnessBufferStruct.Size);
 		m_RoughnessPlaceholder = Texture2D::FromBuffer(roughnessSpec, roughnessBufferStruct);
 
-		// TODO: Add metallic and AO placeholders
-		constexpr std::array<uint8_t, 4> metallicBuffer = { 255, 255, 255, 255 };
+		constexpr std::array<uint8_t, 4> metallicBuffer = { 0, 0, 0, 255 };
 		TextureSpecification metallicSpec{};
 		metallicSpec.Width = 1;
 		metallicSpec.Height = 1;
