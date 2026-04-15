@@ -17,7 +17,6 @@ struct VSOutput
     float3 Tangent;
     float TangentW;  // glTF tangent handedness (+1 or -1)
     float2 TexCoord : TEXCOORD0;
-    float4 FragPos_LightSpace;
 };
 
 [[vk::binding(0, 0)]]
@@ -183,8 +182,6 @@ VSOutput vertexMain(VSInput input)
 
     output.TexCoord = input.TexCoord;
 
-    output.FragPos_LightSpace = mul(scene.lightSpaceMatrix, float4(output.FragPos_WorldSpace, 1.0));
-
     output.Position = mul(scene.projection, mul(scene.view, worldPos));
     return output;
 }
@@ -266,7 +263,7 @@ float CalculateVisibility(float3 lightDir, float3 worldPos, float3 N, float shad
 
 float3 CalculateSunlight(float3 worldPos, float3 N, float3 V, float3 F0, float3 albedo, float metallic, float roughness)
 {
-    float3 lightDir = normalize(globalLighting.lights[0].xyz);
+    float3 lightDir = normalize(globalLighting.sunLight.xyz);
     // TODO: Pass the sun color as parameter
 
     float visibility = CalculateVisibility(lightDir, worldPos, N, 1e4);

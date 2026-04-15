@@ -12,6 +12,7 @@
 #include "Shaders/Shader.hpp"
 #include "GraphicsPipeline.hpp"
 #include "RayTracingSceneCache.hpp"
+#include "Utils.hpp"
 
 namespace
 {
@@ -19,9 +20,12 @@ namespace
 
 	struct ShadowMap
 	{
+		constexpr static int CascadeCount = 4;
+
 		vk::raii::Image Image = nullptr;
 		vk::raii::DeviceMemory ImageMemory = nullptr;
-		vk::raii::ImageView ImageView = nullptr;
+		vk::raii::ImageView ReadImageView = nullptr;
+		std::array<vk::raii::ImageView, ShadowMap::CascadeCount> WriteImageViews{ nullptr, nullptr, nullptr, nullptr };
 		vk::raii::PipelineLayout PipelineLayout = nullptr;
 		Ref<GraphicsPipeline> Pipeline = nullptr;
 
@@ -83,16 +87,15 @@ namespace
 	{
 		glm::mat4 projection{ 0.f };
 		glm::mat4 view{ 0.f };
-		glm::mat4 lightSpaceMatrix{ 0.f };
-		alignas(16) glm::vec3 ambientLightColor{ 0.1f, 0.1f, 0.1f };
+		glm::mat4 lightSpaceMatrices[ShadowMap::CascadeCount]{ 0.f };
+		glm::vec4 cascadeSplits{ 0.f };
 		alignas(16) glm::vec3 camPos{ 0.f };
 		uint32_t lightCount = 0;
 	};
 
-	struct UniformDataParams
+	struct GlobalLighting
 	{
-		// Direction of the lights
-		alignas(16) std::array<glm::vec4, 4> lights{};
+		alignas(16) glm::vec4 sunLight{ 0.0f, 0.0f, 0.0f, 0.0f };
 		float exposure = 4.5f;
 		float gamma = 2.2f;
 	};
@@ -115,7 +118,7 @@ namespace
 	struct UniformBufferObject
 	{
 		Ref<UniformBuffer> scene;
-		Ref<UniformBuffer> params;
+		Ref<UniformBuffer> globalLighting;
 		Ref<UniformBuffer> perObject;
 		Ref<UniformBuffer> skybox;
 	};
@@ -137,6 +140,7 @@ namespace
 		glm::mat4 View{ 1.0f };
 		glm::mat4 Projection{ 1.0f };
 		glm::vec3 CameraPosition{ 0.0f };
+		std::function<std::vector<glm::mat4>(const glm::vec3& lightDir)> CalculateLightSpaceMatricesFunc;
 		bool IsValid = false;
 	};
 
@@ -183,7 +187,7 @@ namespace
 		vk::raii::Sampler ShadowMapSampler = nullptr;
 
 		SceneUniformData SceneUniformData{};
-		UniformDataParams UniformDataParams{};
+		GlobalLighting GlobalLightingData{};
 		PerObjectData PerObjectData{};
 		SkyboxData SkyboxData{};
 
@@ -234,7 +238,7 @@ namespace Kerberos
 		s_Data = CreateOwner<RendererData>();
 
 		KBR_CORE_INFO("Size of SceneUniformData: {} bytes", sizeof(SceneUniformData));
-		KBR_CORE_INFO("Size of UniformDataParams: {} bytes", sizeof(UniformDataParams));
+		KBR_CORE_INFO("Size of GlobalLighting: {} bytes", sizeof(GlobalLighting));
 		KBR_CORE_INFO("Size of PerObjectData: {} bytes", sizeof(PerObjectData));
 		KBR_CORE_INFO("Size of SkyboxData: {} bytes", sizeof(SkyboxData));
 		KBR_CORE_INFO("Size of material UniformBlock: {} bytes", sizeof(Material::UniformBlock));
@@ -242,7 +246,7 @@ namespace Kerberos
 		CreateDefaultMaterials();
 
 		// Setup initial directional light which we will use to generate the shadow map
-		s_Data->UniformDataParams.lights[0] = glm::vec4(0.0f, 1.0f, 0.0f, 0.0f);
+		s_Data->GlobalLightingData.sunLight = glm::vec4(0.0f, 1.0f, 0.0f, 0.0f);
 
 		CreateResources();
 
@@ -273,11 +277,26 @@ namespace Kerberos
 
 	void Renderer::RenderSceneEditor(const Ref<Scene>& scene, const Camera& camera) 
 	{
-		RenderScene(scene, camera.GetViewMatrix(), camera.GetProjectionMatrix(), camera.GetPosition());
+		RenderScene(scene, 
+					camera.GetViewMatrix(),
+					camera.GetProjectionMatrix(), 
+					camera.GetPosition(),
+					[&camera](const glm::vec3& lightDir) { return camera.GetLightSpaceMatrices(lightDir); });
+	}
+
+	void Renderer::RenderSceneRuntime(const Ref<Scene>& scene, const Camera& mainCamera,
+									  const glm::mat4& mainCameraTransform)
+	{
+		const glm::vec3 camPos = mainCameraTransform[3];
+		RenderScene(scene, 
+					mainCamera.GetViewMatrix(), 
+					mainCamera.GetProjectionMatrix(),
+					camPos, 
+					[&mainCamera](const glm::vec3& lightDir) { return mainCamera.GetLightSpaceMatrices(lightDir); });
 	}
 
 	void Renderer::RenderScene(const Ref<Scene>& scene, const glm::mat4& view, const glm::mat4& projection,
-		const glm::vec3& camPos) 
+		const glm::vec3& camPos, const std::function<std::vector<glm::mat4>(const glm::vec3&)>& calculateLightSpaceMatricesFunc)
 	{
 		KBR_CORE_ASSERT(!s_Data->PendingRender.IsValid, "Scene has already been queued for rendering!");
 
@@ -285,6 +304,7 @@ namespace Kerberos
 		s_Data->PendingRender.View = view;
 		s_Data->PendingRender.Projection = projection;
 		s_Data->PendingRender.CameraPosition = camPos;
+		s_Data->PendingRender.CalculateLightSpaceMatricesFunc = calculateLightSpaceMatricesFunc;
 		s_Data->PendingRender.IsValid = scene != nullptr;
 	}
 
@@ -329,6 +349,9 @@ namespace Kerberos
 
         const uint32_t currentImage = frameIndex;
 
+		const std::vector<glm::mat4> lightSpaceMatrices = s_Data->PendingRender.CalculateLightSpaceMatricesFunc(s_Data->GlobalLightingData.sunLight);
+		constexpr glm::vec4 cascadeSplits = glm::vec4(0.05f, 0.15f, 0.3f, 1.0f); // TODO: Get the real splits
+
 		const std::vector<GPULight> gpuLights = GetLightsFromScene(*s_Data->PendingRender.Scene.get());
 		const uint32_t lightCount = static_cast<uint32_t>(gpuLights.size());
 
@@ -337,6 +360,8 @@ namespace Kerberos
             s_Data->PendingRender.View,
 			s_Data->PendingRender.Projection,
 			s_Data->PendingRender.CameraPosition,
+			lightSpaceMatrices,
+			cascadeSplits,
 			lightCount);
 
 		const Ref<Scene>& scene = s_Data->PendingRender.Scene;
@@ -349,7 +374,7 @@ namespace Kerberos
 				.srcStageMask = vk::PipelineStageFlagBits2::eEarlyFragmentTests | vk::PipelineStageFlagBits2::eLateFragmentTests,
 				.srcAccessMask = vk::AccessFlagBits2::eDepthStencilAttachmentWrite,
 				.dstStageMask = vk::PipelineStageFlagBits2::eEarlyFragmentTests | vk::PipelineStageFlagBits2::eLateFragmentTests,
-				.dstAccessMask = vk::AccessFlagBits2::eDepthStencilAttachmentWrite,
+				.dstAccessMask = vk::AccessFlagBits2::eDepthStencilAttachmentRead | vk::AccessFlagBits2::eDepthStencilAttachmentWrite,
 				.oldLayout = vk::ImageLayout::eUndefined,
 				.newLayout = vk::ImageLayout::eDepthAttachmentOptimal,
 				.srcQueueFamilyIndex = vk::QueueFamilyIgnored,
@@ -443,14 +468,14 @@ namespace Kerberos
 		}
 
 		// Render shadow map
-       {
+	   {
 			WriteGPUTimestamp(cmd, frameIndex, static_cast<uint32_t>(GPUTimestampQuery::ShadowBegin));
 
 			vk::ImageMemoryBarrier2 barrier = {
 			.srcStageMask = vk::PipelineStageFlagBits2::eEarlyFragmentTests | vk::PipelineStageFlagBits2::eLateFragmentTests,
 			.srcAccessMask = vk::AccessFlagBits2::eDepthStencilAttachmentWrite,
 			.dstStageMask = vk::PipelineStageFlagBits2::eEarlyFragmentTests | vk::PipelineStageFlagBits2::eLateFragmentTests,
-			.dstAccessMask = vk::AccessFlagBits2::eDepthStencilAttachmentWrite,
+			.dstAccessMask = vk::AccessFlagBits2::eDepthStencilAttachmentRead | vk::AccessFlagBits2::eDepthStencilAttachmentWrite,
 			.oldLayout = vk::ImageLayout::eUndefined,
 			.newLayout = vk::ImageLayout::eDepthAttachmentOptimal,
 			.srcQueueFamilyIndex = vk::QueueFamilyIgnored,
@@ -461,7 +486,7 @@ namespace Kerberos
 				.baseMipLevel = 0,
 				.levelCount = 1,
 				.baseArrayLayer = 0,
-				.layerCount = 1
+				.layerCount = ShadowMap::CascadeCount
 			}
 			};
 
@@ -474,7 +499,7 @@ namespace Kerberos
 			cmd.pipelineBarrier2(dependencyInfo);
 
 			vk::RenderingAttachmentInfo shadowMapDepthAttachmentInfo{
-				.imageView = s_Data->ShadowMap.ImageView,
+				.imageView = s_Data->ShadowMap.ReadImageView,
 				.imageLayout = vk::ImageLayout::eDepthAttachmentOptimal,
 				.loadOp = vk::AttachmentLoadOp::eClear,
 				.storeOp = vk::AttachmentStoreOp::eStore,
@@ -561,7 +586,7 @@ namespace Kerberos
 				.baseMipLevel = 0,
 				.levelCount = 1,
 				.baseArrayLayer = 0,
-				.layerCount = 1
+				.layerCount = ShadowMap::CascadeCount
 			}
 			};
 			const vk::DependencyInfo dependencyInfo = {
@@ -576,17 +601,18 @@ namespace Kerberos
 		{
 			const vk::PipelineStageFlags2 srcStageMask = s_Data->PickingImageLayout == vk::ImageLayout::eTransferSrcOptimal
 				? vk::PipelineStageFlagBits2::eTransfer
-				: vk::PipelineStageFlagBits2::eTopOfPipe;
+				: vk::PipelineStageFlagBits2::eColorAttachmentOutput;
 			const vk::AccessFlags2 srcAccessMask = s_Data->PickingImageLayout == vk::ImageLayout::eTransferSrcOptimal
 				? vk::AccessFlagBits2::eTransferRead
-				: vk::AccessFlags2{};
+				: vk::AccessFlagBits2::eColorAttachmentWrite;
 
 			vk::ImageMemoryBarrier2 barrier = {
 				.srcStageMask = srcStageMask,
 				.srcAccessMask = srcAccessMask,
 				.dstStageMask = vk::PipelineStageFlagBits2::eColorAttachmentOutput,
 				.dstAccessMask = vk::AccessFlagBits2::eColorAttachmentWrite,
-                .oldLayout = vk::ImageLayout::eUndefined, //s_Data->PickingImageLayout,
+				.oldLayout = vk::ImageLayout::eUndefined,
+				//.oldLayout = s_Data->PickingImageLayout == vk::ImageLayout::eUndefined ? vk::ImageLayout::eUndefined : s_Data->PickingImageLayout,
 				.newLayout = vk::ImageLayout::eColorAttachmentOptimal,
 				.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
 				.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
@@ -611,8 +637,8 @@ namespace Kerberos
 		// Transition color image layout for color attachment
 		{
 			vk::ImageMemoryBarrier2 barrier = {
-			.srcStageMask = vk::PipelineStageFlagBits2::eFragmentShader,
-			.srcAccessMask = vk::AccessFlagBits2::eShaderRead,
+			.srcStageMask = vk::PipelineStageFlagBits2::eColorAttachmentOutput,
+			.srcAccessMask = vk::AccessFlagBits2::eColorAttachmentWrite,
 			.dstStageMask = vk::PipelineStageFlagBits2::eColorAttachmentOutput,
 			.dstAccessMask = vk::AccessFlagBits2::eColorAttachmentWrite,
 			.oldLayout = vk::ImageLayout::eShaderReadOnlyOptimal,
@@ -639,11 +665,11 @@ namespace Kerberos
 		// Transition depth image to depth attachment optimal
 		{
 			vk::ImageMemoryBarrier2 barrier = {
-			.srcStageMask = vk::PipelineStageFlagBits2::eFragmentShader,
-			.srcAccessMask = vk::AccessFlagBits2::eShaderRead,
+			.srcStageMask = vk::PipelineStageFlagBits2::eEarlyFragmentTests | vk::PipelineStageFlagBits2::eLateFragmentTests,
+			.srcAccessMask = vk::AccessFlagBits2::eDepthStencilAttachmentWrite,
 			.dstStageMask = vk::PipelineStageFlagBits2::eEarlyFragmentTests | vk::PipelineStageFlagBits2::eLateFragmentTests,
-			.dstAccessMask = vk::AccessFlagBits2::eDepthStencilAttachmentWrite,
-			.oldLayout = vk::ImageLayout::eUndefined,
+			.dstAccessMask = vk::AccessFlagBits2::eDepthStencilAttachmentRead | vk::AccessFlagBits2::eDepthStencilAttachmentWrite,
+			.oldLayout = vk::ImageLayout::eDepthAttachmentOptimal,
 			.newLayout = vk::ImageLayout::eDepthAttachmentOptimal,
 			.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
 			.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
@@ -810,10 +836,14 @@ namespace Kerberos
 				{
 					auto& transform = meshView.get<TransformComponent>(entity);
 					auto& meshComp = meshView.get<StaticMeshComponent>(entity);
-					if (!meshComp.Visible || !meshComp.StaticMesh || !meshComp.MeshMaterial)
+					if (!meshComp.Visible || !meshComp.StaticMesh /* || !meshComp.MeshMaterial*/)
 						continue;
 
-					UpdatePerObjectUniformBuffer(currentImage, static_cast<uint32_t>(i), transform.GetTransform(), *meshComp.MeshMaterial, std::numeric_limits<uint32_t>::max());
+					Ref<Material> material = meshComp.MeshMaterial;
+					if (material == nullptr)
+						material = s_Data->MaterialRegistry.Get("DebugPink");
+
+					UpdatePerObjectUniformBuffer(currentImage, static_cast<uint32_t>(i), transform.GetTransform(), *material, std::numeric_limits<uint32_t>::max());
 					uint32_t dynamicOffset = static_cast<uint32_t>(i * s_Data->DynamicAlignment);
 
 					cmd.bindDescriptorSets(
@@ -952,13 +982,6 @@ namespace Kerberos
 		ResolveGPUTimings(frameIndex);
 	}
 
-	void Renderer::RenderSceneRuntime(const Ref<Scene>& scene, const Camera& mainCamera,
-	                                  const glm::mat4& mainCameraTransform) 
-	{
-		const glm::vec3 camPos = mainCameraTransform[3];
-		RenderScene(scene, mainCamera.GetProjectionMatrix(), mainCamera.GetViewMatrix(), camPos);
-	}
-
 	void Renderer::CreateDefaultMaterials() 
 	{
 		KBR_CORE_ASSERT(s_Data, "Renderer not initialized!");
@@ -1073,8 +1096,8 @@ namespace Kerberos
 				.addressModeW = vk::SamplerAddressMode::eClampToBorder,
 				.mipLodBias = 0.0f,
 				.anisotropyEnable = vk::False,
-				.compareEnable = vk::False,
-				.compareOp = vk::CompareOp::eAlways,
+				.compareEnable = vk::True,
+				.compareOp = vk::CompareOp::eLess,//eLessOrEqual,
 				.minLod = 0.0f,
 				.maxLod = 1.0f,
 				.borderColor = vk::BorderColor::eFloatOpaqueWhite,
@@ -1096,17 +1119,32 @@ namespace Kerberos
 
 			constexpr uint32_t shadowMapMipLevels = 1;
 
-			CreateImage(device,
-						s_Data->ShadowMap.Size,
-						s_Data->ShadowMap.Size,
-						shadowMapMipLevels,
-						vk::SampleCountFlagBits::e1,
-						shadowMapFormat,
-						vk::ImageTiling::eOptimal,
-						vk::ImageUsageFlagBits::eDepthStencilAttachment | vk::ImageUsageFlagBits::eSampled,
-						vk::MemoryPropertyFlagBits::eDeviceLocal,
-						s_Data->ShadowMap.Image,
-						s_Data->ShadowMap.ImageMemory);
+			vk::ImageCreateInfo imageInfo{
+				//.flags = vk::ImageCreateFlagBits::e2DArrayCompatible,
+				.imageType = vk::ImageType::e2D,
+				.format = shadowMapFormat,
+				.extent = {
+					.width = s_Data->ShadowMap.Size,
+					.height = s_Data->ShadowMap.Size,
+					.depth = 1
+				},
+				.mipLevels = shadowMapMipLevels,
+				.arrayLayers = ShadowMap::CascadeCount,
+				.samples = vk::SampleCountFlagBits::e1,
+				.tiling = vk::ImageTiling::eOptimal,
+				.usage = vk::ImageUsageFlagBits::eDepthStencilAttachment | vk::ImageUsageFlagBits::eSampled,
+			};
+
+			s_Data->ShadowMap.Image = vk::raii::Image(device, imageInfo);
+
+			const vk::MemoryRequirements memRequirements = s_Data->ShadowMap.Image.getMemoryRequirements();
+			const vk::MemoryAllocateInfo allocInfo{
+				.allocationSize = memRequirements.size,
+				.memoryTypeIndex = FindMemoryType(memRequirements.memoryTypeBits, vk::MemoryPropertyFlagBits::eDeviceLocal)
+			};
+
+			s_Data->ShadowMap.ImageMemory = vk::raii::DeviceMemory(device, allocInfo);
+			s_Data->ShadowMap.Image.bindMemory(*s_Data->ShadowMap.ImageMemory, 0);
 
 			context.SetObjectDebugName(reinterpret_cast<uint64_t>(static_cast<VkImage>(*s_Data->ShadowMap.Image)),
 									   vk::ObjectType::eImage,
@@ -1115,15 +1153,40 @@ namespace Kerberos
 									   vk::ObjectType::eDeviceMemory,
 									   "Shadow Map Image Memory");
 
-			s_Data->ShadowMap.ImageView = CreateImageView(device,
-												   s_Data->ShadowMap.Image,
-												   shadowMapFormat,
-												   vk::ImageAspectFlagBits::eDepth,
-												   shadowMapMipLevels);
+			const vk::ImageViewCreateInfo readViewInfo{
+				.image = *s_Data->ShadowMap.Image,
+				.viewType = vk::ImageViewType::e2DArray,
+				.format = shadowMapFormat,
+				.subresourceRange = {
+					.aspectMask = vk::ImageAspectFlagBits::eDepth,
+					.baseMipLevel = 0,
+					.levelCount = shadowMapMipLevels,
+					.baseArrayLayer = 0,
+					.layerCount = ShadowMap::CascadeCount
+				}
+			};
 
-			context.SetObjectDebugName(reinterpret_cast<uint64_t>(static_cast<VkImageView>(*s_Data->ShadowMap.ImageView)),
-									   vk::ObjectType::eImageView,
-									   "Shadow Map Image View");
+			s_Data->ShadowMap.ReadImageView = vk::raii::ImageView(device, readViewInfo);
+
+			context.SetObjectDebugName(s_Data->ShadowMap.ReadImageView,"Shadow Map Image View");
+
+			for (uint32_t i = 0; i < ShadowMap::CascadeCount; ++i)
+			{
+				const vk::ImageViewCreateInfo attachmentViewInfo{
+					.image = *s_Data->ShadowMap.Image,
+					.viewType = vk::ImageViewType::e2D,
+					.format = shadowMapFormat,
+					.subresourceRange = {
+						.aspectMask = vk::ImageAspectFlagBits::eDepth,
+						.baseMipLevel = 0,
+						.levelCount = shadowMapMipLevels,
+						.baseArrayLayer = i,
+						.layerCount = 1
+					}
+				};
+				s_Data->ShadowMap.WriteImageViews[i] = vk::raii::ImageView(device, attachmentViewInfo);
+				context.SetObjectDebugName(s_Data->ShadowMap.WriteImageViews[i],"Shadow Map Write Image View [" + std::to_string(i) + "]");
+			}
 
 			// We do this here, because the descriptors will use the shadow map image view,
 			// but has to happen before we create the pipeline
@@ -1149,7 +1212,8 @@ namespace Kerberos
 									   "Shadow Map Pipeline Layout");
 
 			// Create shader for shadow mapping
-			Ref<Shader> shadowMapShader = CreateRef<Shader>("shadowmap", "ShadowMap");
+			//Ref<Shader> shadowMapShader = CreateRef<Shader>("shadowmap", "ShadowMap");
+			Ref<Shader> shadowMapShader = CreateRef<Shader>("shadowmap_csm", "ShadowMapCSM");
 
 			/*constexpr vk::VertexInputBindingDescription bindingDescription = { 0, sizeof(glm::vec3), vk::VertexInputRate::eVertex };
 			constexpr std::array attributeDescriptions = {
@@ -1497,7 +1561,7 @@ namespace Kerberos
 									   vk::ObjectType::eDescriptorSet,
 									   "Color Output Descriptor Set for ImGui");
 
-			s_Data->ShadowMapDescriptorSet = VulkanContext::GenerateImGuiDescriptorSet(s_Data->ColorSampler, s_Data->ShadowMap.ImageView);
+			s_Data->ShadowMapDescriptorSet = VulkanContext::GenerateImGuiDescriptorSet(s_Data->ColorSampler, s_Data->ShadowMap.ReadImageView);
 			context.SetObjectDebugName(reinterpret_cast<uint64_t>(static_cast<VkDescriptorSet>(s_Data->ShadowMapDescriptorSet)),
 									   vk::ObjectType::eDescriptorSet,
 									   "Shadow Map Descriptor Set for ImGui");
@@ -1762,14 +1826,14 @@ namespace Kerberos
 	{
 		KBR_CORE_ASSERT(s_Data, "Renderer not initialized!");
 
-		return s_Data->UniformDataParams.gamma;
+		return s_Data->GlobalLightingData.gamma;
 	}
 
 	float& Renderer::GetExposure()
 	{
 		KBR_CORE_ASSERT(s_Data, "Renderer not initialized!");
 
-		return s_Data->UniformDataParams.exposure;
+		return s_Data->GlobalLightingData.exposure;
 	}
 
 	glm::vec2 Renderer::GetOutputImageSize() 
@@ -1899,15 +1963,13 @@ namespace Kerberos
 	{
 		KBR_CORE_ASSERT(s_Data, "Renderer not initialized!");
 
-		s_Data->UniformDataParams.lights[1] = glm::vec4{ 0.0f };
-		s_Data->UniformDataParams.lights[2] = glm::vec4{ 0.0f };
-
-		std::memcpy(s_Data->UniformBuffers[currentImage].params->GetMappedData(), &s_Data->UniformDataParams, sizeof(UniformDataParams));
+		std::memcpy(s_Data->UniformBuffers[currentImage].globalLighting->GetMappedData(), &s_Data->GlobalLightingData, sizeof(GlobalLighting));
 
 		std::memcpy(s_Data->StorageBuffers[currentImage].Lights->GetMappedData(), sceneLights.data(), sceneLights.size() * sizeof(GPULight));
 	}
 
-	void Renderer::UpdateSceneUniformBuffers(const uint32_t currentImage, const Camera* mainCamera, const uint32_t lightCount) 
+	void Renderer::UpdateSceneUniformBuffers(const uint32_t currentImage, const Camera* mainCamera, const std::vector<glm::mat4>& lightSpaceMatrices,
+											 const glm::vec4& cascadeSplits, const uint32_t lightCount)
 	{
 		KBR_CORE_ASSERT(s_Data, "Renderer not initialized!");
 
@@ -1915,19 +1977,31 @@ namespace Kerberos
 		const glm::mat4& view = mainCamera->GetViewMatrix();
 		const glm::vec3 camPos = mainCamera->GetPosition();
 
-		UpdateSceneUniformBuffers(currentImage, view, projection, camPos, lightCount);
+		UpdateSceneUniformBuffers(currentImage, view, projection, camPos, lightSpaceMatrices, cascadeSplits, lightCount);
 	}
 
 	void Renderer::UpdateSceneUniformBuffers(const uint32_t currentImage, const glm::mat4& view, const glm::mat4& projection,
-		const glm::vec3& camPos, const uint32_t lightCount) 
+												const glm::vec3& camPos, const std::vector<glm::mat4>& lightSpaceMatrices,
+												const glm::vec4& cascadeSplits, const uint32_t lightCount)
 	{
 		KBR_CORE_ASSERT(s_Data, "Renderer not initialized!");
 
 		s_Data->SceneUniformData.projection = projection;
 		s_Data->SceneUniformData.view = view;
-		s_Data->SceneUniformData.lightSpaceMatrix = CalculateLightSpaceMatrix();
 		s_Data->SceneUniformData.camPos = camPos;
+		s_Data->SceneUniformData.cascadeSplits = cascadeSplits;
 		s_Data->SceneUniformData.lightCount = lightCount;
+
+		for (size_t i = 0; i < s_Data->SceneUniformData.lightSpaceMatrices->length(); ++i)
+		{
+			s_Data->SceneUniformData.lightSpaceMatrices[i] = lightSpaceMatrices[i];
+		}
+
+		if (s_Data->SceneUniformData.lightSpaceMatrices->length() != lightSpaceMatrices.size())
+		{
+			KBR_CORE_ERROR("Number of light space matrices exceeds the maximum supported count of {}", s_Data->SceneUniformData.lightSpaceMatrices->length());
+		}
+
 		std::memcpy(s_Data->UniformBuffers[currentImage].scene->GetMappedData(), &s_Data->SceneUniformData, sizeof(SceneUniformData));
 
 		const glm::mat4 skyboxModel = glm::mat4(glm::mat3(view));
@@ -2044,7 +2118,7 @@ namespace Kerberos
 			? glm::normalize(lightDirRaw)
 			: glm::vec3(0.0f, 1.0f, 0.0f);*/
 
-		const glm::vec3 lightDir = glm::normalize(glm::vec3(s_Data->UniformDataParams.lights[0]));
+		const glm::vec3 lightDir = glm::normalize(glm::vec3(s_Data->GlobalLightingData.sunLight));
 
 		const glm::vec3 lightPos = sceneCenter + lightDir * lightDistance;
 		s_Data->ShadowMap.LightPosForCalculation = lightPos;
@@ -2183,11 +2257,11 @@ namespace Kerberos
 			s_Data->DynamicAlignment = (s_Data->DynamicAlignment + s_Data->MinUniformBufferOffsetAlignment - 1) & ~(s_Data->MinUniformBufferOffsetAlignment - 1);
 		}
 
-		for (auto& [scene, params, perObject, skybox] : s_Data->UniformBuffers)
+		for (auto& [scene, globalLighting, perObject, skybox] : s_Data->UniformBuffers)
 		{
 			scene = CreateRef<UniformBuffer>(sizeof(SceneUniformData));
 
-			params = CreateRef<UniformBuffer>(sizeof(UniformDataParams));
+			globalLighting = CreateRef<UniformBuffer>(sizeof(GlobalLighting));
 
 			// TODO: Allocate a large enough buffer for a maximum number of objects, and allocate a bigger one if needed.
 			constexpr size_t maxObjects = 1000;
@@ -2398,9 +2472,9 @@ namespace Kerberos
 			};
 
 			const vk::DescriptorBufferInfo paramsBufferInfo{
-				.buffer = *s_Data->UniformBuffers[i].params->GetBuffer(),
+				.buffer = *s_Data->UniformBuffers[i].globalLighting->GetBuffer(),
 				.offset = 0,
-				.range = sizeof(UniformDataParams)
+				.range = sizeof(GlobalLighting)
 			};
 
 			const vk::DescriptorBufferInfo perObjectBufferInfo{
@@ -2411,7 +2485,7 @@ namespace Kerberos
 
 			const vk::DescriptorImageInfo shadowMapImageInfo{
 				.sampler = *s_Data->ShadowMapSampler,
-				.imageView = *s_Data->ShadowMap.ImageView,
+				.imageView = *s_Data->ShadowMap.ReadImageView,
 				.imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal
 			};
 

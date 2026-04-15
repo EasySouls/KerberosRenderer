@@ -881,7 +881,8 @@ namespace Kerberos
 
 		// Display shadow map
 		ImGui::Text("Shadow Map");
-		const auto shadowMapImage = Renderer::GetShadowMapDepthImageID();
+		// TODO: Add dropdown to select shadow cascade to visualize
+		/*const auto shadowMapImage = Renderer::GetShadowMapDepthImageID();
 		ImGui::Image(shadowMapImage, ImVec2(256.0f, 256.0f));
 
 		const glm::vec3 lightPosForShadowMapCalculation = Renderer::GetLightPositionForShadowMapCalculation();
@@ -889,7 +890,7 @@ namespace Kerberos
 		ImGui::Text("(%.2f, %.2f, %.2f)",
 					lightPosForShadowMapCalculation.x,
 					lightPosForShadowMapCalculation.y,
-					lightPosForShadowMapCalculation.z);
+					lightPosForShadowMapCalculation.z);*/
 
 		ImGui::Text("Depth Bias");
 		auto& [ConstantFactor, SlopeFactor, Clamp] = Renderer::GetShadowMapDepthBiasSettings();

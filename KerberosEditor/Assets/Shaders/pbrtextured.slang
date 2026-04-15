@@ -17,7 +17,7 @@ struct VSOutput
     float3 Tangent;
     float TangentW;  // glTF tangent handedness (+1 or -1)
     float2 TexCoord : TEXCOORD0;
-    float4 FragPos_LightSpace;
+    float ViewSpaceZ;
 };
 
 [[vk::binding(0, 0)]]
@@ -36,7 +36,7 @@ struct PSOutput
 };
 
 [[vk::binding(3, 0)]]
-Sampler2D shadowMap;
+Sampler2DArrayShadow shadowMap;
 
 [[vk::binding(4, 0)]]
 SamplerCube samplerIrradiance;
@@ -127,6 +127,7 @@ float3 SpecularContribution(float3 L, float3 V, float3 N, float3 F0, float3 albe
     float dotNH = clamp(dot(N, H), 0.0, 1.0);
     float dotNV = clamp(dot(N, V), 0.0, 1.0);
     float dotNL = clamp(dot(N, L), 0.0, 1.0);
+    float dotHV = clamp(dot(H, V), 0.0, 1.0);
 
     // Light color fixed
     float3 lightColor = float3(1.0, 1.0, 1.0);
@@ -139,7 +140,7 @@ float3 SpecularContribution(float3 L, float3 V, float3 N, float3 F0, float3 albe
         // G = Geometric shadowing term (Microfacets shadowing)
         float G = G_SchlicksmithGGX(dotNL, dotNV, roughness);
         // F = Fresnel factor (Reflectance depending on angle of incidence)
-        float3 F = F_Schlick(dotNV, F0);
+        float3 F = F_Schlick(dotHV, F0);
         float3 spec = D * F * G / (4.0 * dotNL * dotNV + 0.001);
         float3 kD = (float3(1.0, 1.0, 1.0) - F) * (1.0 - metallic);
         color += (kD * albedo / PI + spec) * dotNL;
@@ -148,44 +149,60 @@ float3 SpecularContribution(float3 L, float3 V, float3 N, float3 F0, float3 albe
     return color;
 }
 
-float ShadowCalculation(float3 lightDir, float3 normal, float4 fragPosLightSpace)
+float ShadowCalculation(float3 lightDir, float3 normal, float3 fragPosWorldSpace, float viewSpaceZ)
 {
+    // 1. Determine which cascade to use based on View Space Z
+    // We use abs() because viewSpaceZ is typically negative in right-handed projections
+    float depth = abs(viewSpaceZ);
+    uint cascadeIndex = 0;
+
+    for (uint i = 0; i < 3; ++i)
+    {
+        if (depth > scene.cascadeSplits[i])
+        {
+            cascadeIndex = i + 1;
+        }
+    }
+
+    // 2. Transform the world position to light space using the correct cascade matrix
+    float4 fragPosLightSpace = mul(scene.lightSpaceMatrices[cascadeIndex], float4(fragPosWorldSpace, 1.0));
+
     // Perform perspective divide
     float3 projCoords = fragPosLightSpace.xyz / fragPosLightSpace.w;
 
-    // Transform to [0,1] range
+    // Transform to [0,1] range (Vulkan specific UV mapping)
     float2 shadowUV = projCoords.xy * 0.5 + 0.5;
 
-    float closestDepth = shadowMap.Sample(shadowUV).r;
-    float currentDepth = projCoords.z;
+    // Keep the shadow at 0.0 when outside the frustum bounds
+    if (projCoords.z > 1.0 || shadowUV.x < 0.0 || shadowUV.x > 1.0 || shadowUV.y < 0.0 || shadowUV.y > 1.0)
+        return 0.0;
 
-    // Hardware-based depth bias is enabled
-    //float bias = max(0.005 * (1.0 - dot(normal, lightDir)), 0.0005);
+    float currentDepth = projCoords.z;
     float shadow = 0.0;
+
     if (enablePCF == 1) {
         // Percentage-closer filtering (PCF)
-        uint width, height;
-        shadowMap.GetDimensions(width, height);
+        uint width, height, elements;
+        // GetDimensions for an array returns width, height, AND array elements
+        shadowMap.GetDimensions(width, height, elements);
         float2 texelSize = 1.0 / float2(width, height);
 
         for (int x = -1; x <= 1; ++x)
         {
-            for(int y = -1; y <= 1; ++y)
+            for (int y = -1; y <= 1; ++y)
             {
-                float pcfDepth = shadowMap.Sample(shadowUV + float2(x, y) * texelSize).r;
-                //shadow += currentDepth - bias > pcfDepth ? 1.0 : 0.0;
+                float2 offsetUV = shadowUV + float2(x, y) * texelSize;
+
+                // Sample the array: the 3rd component of the coordinate is the cascadeIndex
+                float pcfDepth = shadowMap.Sample(float3(offsetUV, cascadeIndex)).r;
                 shadow += currentDepth > pcfDepth ? 1.0 : 0.0;
             }
         }
         shadow /= 9.0;
     } else {
-        //shadow = currentDepth - bias > closestDepth ? 1.0 : 0.0;
+        float closestDepth = shadowMap.Sample(float3(shadowUV, cascadeIndex)).r;
         shadow = currentDepth > closestDepth ? 1.0 : 0.0;
     }
-
-    // Keep the shadow at 0.0 when outside the far plane of the light's orthographic frustum.
-    if (currentDepth > 1.0 || shadowUV.x < 0.0 || shadowUV.x > 1.0 || shadowUV.y < 0.0 || shadowUV.y > 1.0)
-        shadow = 0.0;
 
     return shadow;
 }
@@ -225,18 +242,18 @@ VSOutput vertexMain(VSInput input)
 
     output.TexCoord = input.TexCoord;
 
-    output.FragPos_LightSpace = mul(scene.lightSpaceMatrix, float4(output.FragPos_WorldSpace, 1.0));
+    output.ViewSpaceZ = mul(scene.view, worldPos).z;
 
     output.Position = mul(scene.projection, mul(scene.view, worldPos));
     return output;
 }
 
-float3 CalculateSunlight(float4 worldPosLightSpace, float3 N, float3 V, float3 F0, float3 albedo, float metallic, float roughness)
+float3 CalculateSunlight(float3 fragPosWorldSpace, float viewSpaceZ, float3 N, float3 V, float3 F0, float3 albedo, float metallic, float roughness)
 {
-    float3 lightDir = normalize(globalLighting.lights[0].xyz);
+    float3 lightDir = normalize(globalLighting.sunLight.xyz);
     // TODO: Pass the sun color as parameter
 
-    float shadow = ShadowCalculation(lightDir, N, worldPosLightSpace);
+    float shadow = ShadowCalculation(lightDir, N, fragPosWorldSpace, viewSpaceZ);
     float3 contribution = SpecularContribution(lightDir, V, N, F0, albedo, metallic, roughness);
 
     return contribution * (1.0 - shadow);
@@ -246,7 +263,6 @@ float3 CalculateLight(GPULight light, float3 worldPos, float3 N, float3 V, float
 {
     float3 lightVec = light.position - worldPos;
     float3 L = normalize(lightVec);
-
 
     float3 contrib = SpecularContribution(L, V, N, F0, albedo, metallic, roughness);
     float3 radiance = CalculateLightColor(light, worldPos);
@@ -276,7 +292,7 @@ PSOutput fragmentMain(VSOutput input)
 	// Specular contribution
 	float3 Lo = float3(0.0, 0.0, 0.0);
 
-    Lo += CalculateSunlight(input.FragPos_LightSpace, N, V, F0, albedo, metallic, roughness);
+    Lo += CalculateSunlight(input.FragPos_WorldSpace, input.ViewSpaceZ, N, V, F0, albedo, metallic, roughness);
 
     for (int i = 0; i < scene.lightCount; i++) {
         GPULight light = sceneLights[i];

@@ -35,6 +35,8 @@ namespace Kerberos
 		const glm::mat4& GetProjectionMatrix(Handedness handedness = Handedness::Right) const override;
 		glm::mat4 GetViewProjectionMatrix(Handedness handedness = Handedness::Right) const override;
 
+		std::vector<glm::mat4> GetLightSpaceMatrices(const glm::vec3& lightDir) const override;
+
 		glm::vec3 GetUp() const override;
 		glm::vec3 GetRight() const override;
 		glm::vec3 GetForward() const override;
@@ -52,6 +54,8 @@ namespace Kerberos
 		bool OnMouseButtonPressed(const MouseButtonPressedEvent& event);
 		bool OnMouseButtonReleased(const MouseButtonReleasedEvent& event);
 		bool OnMouseMoved(const MouseMovedEvent& event);
+
+		glm::mat4 GetLightSpaceMatrix(float nearPlane, float farPlane, const glm::vec3& lightDir) const;
 
 	private:
 		glm::vec3 m_Position{ 0.0f, 0.0f, 0.0f };

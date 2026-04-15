@@ -57,4 +57,9 @@ namespace Kerberos
 			m_Projection = glm::perspective(m_PerspectiveFov, m_AspectRatio, m_PerspectiveNear, m_PerspectiveFar);
 		}
 	}
+
+	void SceneCamera::RecalculateView()
+	{
+		
+	}
 }

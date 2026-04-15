@@ -36,6 +36,8 @@ namespace Kerberos
 		const glm::mat4& GetProjectionMatrix(Handedness handedness = Handedness::Right) const override;
 		glm::mat4 GetViewProjectionMatrix(Handedness handedness = Handedness::Right) const override;
 
+		std::vector<glm::mat4> GetLightSpaceMatrices(const glm::vec3& lightDir) const override;
+
 		glm::vec3 GetUp() const override;
 		glm::vec3 GetRight() const override;
 		glm::vec3 GetForward() const override;
@@ -61,6 +63,8 @@ namespace Kerberos
 		float GetZoomSpeed() const;
 
 		void OnMouseScrolled(const MouseScrolledEvent& mouseScrolled);
+
+		glm::mat4 GetLightSpaceMatrix(float nearPlane, float farPlane, const glm::vec3& lightDir) const;
 
 	private:
 		float m_Fov = 45.0f;

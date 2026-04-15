@@ -5,6 +5,7 @@
 #include "Vulkan.hpp"
 
 #include <optional>
+#include <functional>
 #include <vector>
 #include <set>
 
@@ -49,8 +50,11 @@ namespace Kerberos
 		static void Shutdown();
 
 		static void RenderSceneEditor(const Ref<Scene>& scene, const Camera& camera);
-		static void RenderScene(const Ref<Scene>& scene, const glm::mat4& view, const glm::mat4& projection, const glm::vec3& camPos);
 		static void RenderSceneRuntime(const Ref<Scene>& scene, const Camera& mainCamera, const glm::mat4& mainCameraTransform);
+		static void RenderScene(const Ref<Scene>& scene,
+								const glm::mat4& view, const glm::mat4& projection,
+								const glm::vec3& camPos,
+								const std::function<std::vector<glm::mat4>(const glm::vec3&)>& calculateLightSpaceMatricesFunc);
 		static void RecordQueuedSceneRender(const vk::raii::CommandBuffer& cmd);
 
 		static void ResizeResources(uint32_t width, uint32_t height);
@@ -82,8 +86,21 @@ namespace Kerberos
 
 	private:
 		static void UpdateLights(uint32_t currentImage, const std::vector<GPULight>& sceneLights);
-		static void UpdateSceneUniformBuffers(uint32_t currentImage, const Camera* mainCamera, uint32_t lightCount);
-		static void UpdateSceneUniformBuffers(uint32_t currentImage, const glm::mat4& view, const glm::mat4& projection, const glm::vec3& camPos, uint32_t lightCount);
+
+		static void UpdateSceneUniformBuffers(uint32_t currentImage, 
+											  const Camera* mainCamera, 
+											  const std::vector<glm::mat4>& lightSpaceMatrices,
+											  const glm::vec4& cascadeSplits,
+											  uint32_t lightCount);
+
+		static void UpdateSceneUniformBuffers(uint32_t currentImage, 
+											  const glm::mat4& view, 
+											  const glm::mat4& projection, 
+											  const glm::vec3& camPos,
+											  const std::vector<glm::mat4>& lightSpaceMatrices,
+											  const glm::vec4& cascadeSplits,
+											  uint32_t lightCount);
+
         static void UpdatePerObjectUniformBuffer(uint32_t currentImage, uint32_t objectIndex, const glm::mat4& model, const Material& material, uint32_t entityID);
 
 		static std::vector<GPULight> GetLightsFromScene(const Scene& scene);

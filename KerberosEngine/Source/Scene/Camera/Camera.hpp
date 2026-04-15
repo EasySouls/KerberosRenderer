@@ -47,6 +47,8 @@ namespace Kerberos
 		virtual const glm::mat4& GetProjectionMatrix(Handedness handedness = Handedness::Right) const = 0;
 		virtual glm::mat4 GetViewProjectionMatrix(Handedness handedness = Handedness::Right) const = 0;
 
+		virtual std::vector<glm::mat4> GetLightSpaceMatrices(const glm::vec3& lightDir) const = 0;
+
 		virtual glm::vec3 GetUp() const = 0;
 		virtual glm::vec3 GetRight() const = 0;
 		virtual glm::vec3 GetForward() const = 0;

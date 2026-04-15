@@ -5,5 +5,5 @@ Metallic: 0
 AlbedoTexture: Assets/Models/cerberus/albedo.ktx2
 NormalTexture: Assets/Models/cerberus/normal.ktx2
 MetallicTexture: Assets/Models/cerberus/metallic.ktx2
-RoughnessTexture: ""
+RoughnessTexture: Assets/Models/cerberus/roughness.ktx2
 AOTexture: Assets/Models/cerberus/ao.ktx2

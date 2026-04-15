@@ -27,6 +27,18 @@ float CalculateLightAttenuation(GPULight light, float3 worldPos) {
         return 0.0;
     }
     return 1.0 - (distance / light.range);
+
+    //float distanceSqr = dot(light.position - worldPos, light.position - worldPos);
+
+    //// Inverse square falloff
+    //float attenuation = 1.0 / (distanceSqr + 0.0001);
+
+    //// Windowing function to smoothly fade out at light.range
+    //float distance = sqrt(distanceSqr);
+    //float falloff = clamp(1.0 - pow(distance / light.range, 4.0), 0.0, 1.0);
+
+    //// Apply windowing to the inverse-square attenuation
+    //return attenuation * (falloff * falloff);
 }
 
 float CalculateSpotlightAttenuation(GPULight light, float3 worldPos) {
