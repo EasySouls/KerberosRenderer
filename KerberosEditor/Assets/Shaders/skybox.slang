@@ -19,13 +19,13 @@ struct SkyboxData
 	float4x4 model;
 };
 
-[[vk::binding(0)]]
+[[vk::binding(0, 0)]]
 ConstantBuffer<SkyboxData> skyboxData;
 
-[[vk::binding(1)]]
+[[vk::binding(1, 0)]]
 ConstantBuffer<GlobalLighting> globalLighting;
 
-[[vk::binding(4)]]
+[[vk::binding(4, 0)]]
 SamplerCube samplerEnv;
 
 // From http://filmicworlds.com/blog/filmic-tonemapping-operators/
