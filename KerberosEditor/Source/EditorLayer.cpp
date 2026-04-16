@@ -881,11 +881,12 @@ namespace Kerberos
 
 		// Display shadow map
 		ImGui::Text("Shadow Map");
-		// TODO: Add dropdown to select shadow cascade to visualize
-		/*const auto shadowMapImage = Renderer::GetShadowMapDepthImageID();
+		static int shadowMapCascadeIndex = 0;
+		ImGui::DragInt("Shadow Map Cascade Index", &shadowMapCascadeIndex, 1.0f, 0, static_cast<int>(Renderer::GetShadowMapCascadeCount()) - 1);
+		const auto shadowMapImage = Renderer::GetShadowMapDepthImageID(shadowMapCascadeIndex);
 		ImGui::Image(shadowMapImage, ImVec2(256.0f, 256.0f));
 
-		const glm::vec3 lightPosForShadowMapCalculation = Renderer::GetLightPositionForShadowMapCalculation();
+		/*const glm::vec3 lightPosForShadowMapCalculation = Renderer::GetLightPositionForShadowMapCalculation();
 		ImGui::Text("Light position for shadow map calculation:");
 		ImGui::Text("(%.2f, %.2f, %.2f)",
 					lightPosForShadowMapCalculation.x,

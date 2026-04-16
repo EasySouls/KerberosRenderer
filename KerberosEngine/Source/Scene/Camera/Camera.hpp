@@ -12,6 +12,8 @@
 #include <glm/gtx/quaternion.hpp>
 
 #include <memory>
+#include <functional>
+#include <utility>
 
 namespace Kerberos
 {
@@ -47,7 +49,7 @@ namespace Kerberos
 		virtual const glm::mat4& GetProjectionMatrix(Handedness handedness = Handedness::Right) const = 0;
 		virtual glm::mat4 GetViewProjectionMatrix(Handedness handedness = Handedness::Right) const = 0;
 
-		virtual std::vector<glm::mat4> GetLightSpaceMatrices(const glm::vec3& lightDir) const = 0;
+		virtual std::pair<std::vector<glm::mat4>, glm::vec4> GetLightSpaceMatrices(const glm::vec3& lightDir, const std::function<glm::vec4(float)>& getCascadeSplits) const = 0;
 
 		virtual glm::vec3 GetUp() const = 0;
 		virtual glm::vec3 GetRight() const = 0;

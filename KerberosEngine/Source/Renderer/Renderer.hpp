@@ -54,7 +54,7 @@ namespace Kerberos
 		static void RenderScene(const Ref<Scene>& scene,
 								const glm::mat4& view, const glm::mat4& projection,
 								const glm::vec3& camPos,
-								const std::function<std::vector<glm::mat4>(const glm::vec3&)>& calculateLightSpaceMatricesFunc);
+								const std::function<std::pair<std::vector<glm::mat4>, glm::vec4>(const glm::vec3&, const std::function<glm::vec4(float)>&)>& calculateLightSpaceMatricesFunc);
 		static void RecordQueuedSceneRender(const vk::raii::CommandBuffer& cmd);
 
 		static void ResizeResources(uint32_t width, uint32_t height);
@@ -70,11 +70,12 @@ namespace Kerberos
 		static bool& GetUseRayQueryBasedSoftShadows();
 		static float& GetGamma();
 		static float& GetExposure();
+		static uint32_t GetShadowMapCascadeCount();
 
 		static glm::vec2 GetOutputImageSize();
 
 		static uint64_t GetCompositedOutputImageID();
-		static uint64_t GetShadowMapDepthImageID();
+		static uint64_t GetShadowMapDepthImageID(uint32_t index);
 		static void RequestMousePickingPixel(uint32_t x, uint32_t y);
 		static std::optional<uint32_t> GetMousePickingEntityID();
         static bool ConsumePendingMousePickingTimelineSignal(vk::Semaphore& semaphore, uint64_t& value);

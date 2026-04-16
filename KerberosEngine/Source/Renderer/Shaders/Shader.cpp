@@ -257,6 +257,42 @@ namespace Kerberos
 			KBR_CORE_INFO("      Name: {0}, Set: {1}, Binding: {2}, Count: {3}", resource.name, set, binding, descriptorCount);
 		}
 
+		KBR_CORE_INFO("    Images: {0}", resources.separate_images.size());
+		for (const auto& resource : resources.separate_images) {
+			uint32_t set = compiler.get_decoration(resource.id, spv::DecorationDescriptorSet);
+			uint32_t binding = compiler.get_decoration(resource.id, spv::DecorationBinding);
+			uint32_t descriptorCount = 1;
+
+			// Check if it's an array of textures (e.g., `sampler2D textures[4]`)
+			const spirv_cross::SPIRType& type = compiler.get_type(resource.base_type_id);
+			if (!type.array.empty()) {
+				descriptorCount = type.array[0]; // Assuming 1D array for simplicity
+				if (descriptorCount == 0) // Unsized array (e.g., `sampler2D textures[]`)
+					//descriptorCount = VulkanContext::Get().GetCapabilities().maxSamplerAllocationCount; // Or some max you define
+					descriptorCount = 1; // Default to 1 if unsized
+			}
+
+			KBR_CORE_INFO("      Name: {0}, Set: {1}, Binding: {2}, Count: {3}", resource.name, set, binding, descriptorCount);
+		}
+
+		KBR_CORE_INFO("    Samplers: {0}", resources.separate_samplers.size());
+		for (const auto& resource : resources.separate_samplers) {
+			uint32_t set = compiler.get_decoration(resource.id, spv::DecorationDescriptorSet);
+			uint32_t binding = compiler.get_decoration(resource.id, spv::DecorationBinding);
+			uint32_t descriptorCount = 1;
+
+			// Check if it's an array of textures (e.g., `sampler2D textures[4]`)
+			const spirv_cross::SPIRType& type = compiler.get_type(resource.base_type_id);
+			if (!type.array.empty()) {
+				descriptorCount = type.array[0]; // Assuming 1D array for simplicity
+				if (descriptorCount == 0) // Unsized array (e.g., `sampler2D textures[]`)
+					//descriptorCount = VulkanContext::Get().GetCapabilities().maxSamplerAllocationCount; // Or some max you define
+					descriptorCount = 1; // Default to 1 if unsized
+			}
+
+			KBR_CORE_INFO("      Name: {0}, Set: {1}, Binding: {2}, Count: {3}", resource.name, set, binding, descriptorCount);
+		}
+
 		KBR_CORE_INFO("    Storage Buffers: {0}", resources.storage_buffers.size());
 		for (const auto& resource : resources.storage_buffers) {
 			const auto& bufferType = compiler.get_type(resource.base_type_id);
@@ -272,8 +308,13 @@ namespace Kerberos
 			uint32_t set = compiler.get_decoration(resource.id, spv::DecorationDescriptorSet);
 			uint32_t binding = compiler.get_decoration(resource.id, spv::DecorationBinding);
 			const spirv_cross::SPIRType& type = compiler.get_type(resource.base_type_id);
-
-			KBR_CORE_INFO("      Name: {0}, Set: {1}, Binding: {2}", resource.name, set, binding);
+			switch (type.image.dim) {
+				case spv::Dim1D:   KBR_CORE_INFO("      Name: {0}, Set: {1}, Binding: {2}, Type: 1D Image", resource.name, set, binding); break;
+				case spv::Dim2D:   KBR_CORE_INFO("      Name: {0}, Set: {1}, Binding: {2}, Type: 2D Image", resource.name, set, binding); break;
+				case spv::Dim3D:   KBR_CORE_INFO("      Name: {0}, Set: {1}, Binding: {2}, Type: 3D Image", resource.name, set, binding); break;
+				case spv::DimCube: KBR_CORE_INFO("      Name: {0}, Set: {1}, Binding: {2}, Type: Cube Image", resource.name, set, binding); break;
+				default:           KBR_CORE_INFO("      Name: {0}, Set: {1}, Binding: {2}, Type: Unknown Image", resource.name, set, binding); break;
+			}
 		}
 
 		KBR_CORE_INFO("    Push Constant Buffers: {0}", resources.push_constant_buffers.size());
@@ -289,6 +330,13 @@ namespace Kerberos
 			// For now, we assume the 'stage' passed to Reflect applies.
 
 			KBR_CORE_INFO("      Name: {0}, Offset: {1}, Size: {2}", resource.name, offset, size);
+		}
+
+		KBR_CORE_INFO("    Acceleration Structures: {0}", resources.acceleration_structures.size());
+		for (const auto& resource : resources.acceleration_structures) {
+			uint32_t set = compiler.get_decoration(resource.id, spv::DecorationDescriptorSet);
+			uint32_t binding = compiler.get_decoration(resource.id, spv::DecorationBinding);
+			KBR_CORE_INFO("      Name: {0}, Set: {1}, Binding: {2}", resource.name, set, binding);
 		}
 	}
 }

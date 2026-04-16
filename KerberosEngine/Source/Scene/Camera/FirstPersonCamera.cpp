@@ -152,27 +152,29 @@ namespace Kerberos
 		return m_ProjectionMatrixLH * m_ViewMatrixLH;
 	}
 
-	std::vector<glm::mat4> FirstPersonCamera::GetLightSpaceMatrices(const glm::vec3& lightDir) const
+	std::pair<std::vector<glm::mat4>, glm::vec4> FirstPersonCamera::GetLightSpaceMatrices(const glm::vec3& lightDir,
+																					 const std::function<glm::vec4(float)>& getCascadeSplits) const
 	{
-		const std::vector shadowCascadeLevels = { /*m_FarClip / 50.0f,*/ m_FarClip / 25.0f, m_FarClip / 10.0f, m_FarClip / 2.0f };
+		const glm::vec4 cascadeSplits = getCascadeSplits(m_FarClip);
 
 		std::vector<glm::mat4> matrices;
-		for (size_t i = 0; i < shadowCascadeLevels.size() + 1; ++i)
+		for (size_t i = 0; i < 3 + 1; ++i)
 		{
 			if (i == 0)
 			{
-				matrices.push_back(GetLightSpaceMatrix(m_NearClip, shadowCascadeLevels[i], lightDir));
+				matrices.push_back(GetLightSpaceMatrix(m_NearClip, cascadeSplits[i], lightDir));
 			}
-			else if (i < shadowCascadeLevels.size())
+			else if (i < 3)
 			{
-				matrices.push_back(GetLightSpaceMatrix(shadowCascadeLevels[i - 1], shadowCascadeLevels[i], lightDir));
+				matrices.push_back(GetLightSpaceMatrix(cascadeSplits[i - 1], cascadeSplits[i], lightDir));
 			}
 			else
 			{
-				matrices.push_back(GetLightSpaceMatrix(shadowCascadeLevels[i - 1], m_FarClip, lightDir));
+				matrices.push_back(GetLightSpaceMatrix(cascadeSplits[i - 1], m_FarClip, lightDir));
 			}
 		}
-		return matrices;
+
+		return { matrices, cascadeSplits };
 	}
 
 	glm::vec3 FirstPersonCamera::GetUp() const
@@ -295,9 +297,9 @@ namespace Kerberos
 
 	glm::mat4 FirstPersonCamera::GetLightSpaceMatrix(const float nearPlane, const float farPlane, const glm::vec3& lightDir) const
 	{
-		const auto proj = glm::perspective(
-			glm::radians(m_Fov), m_AspectRatio, nearPlane,
-			farPlane);
+		const glm::mat4 proj = glm::perspective(
+			glm::radians(m_Fov), m_AspectRatio, nearPlane, farPlane);
+
 		const auto corners = GetFrustumCornersWorldSpace(proj, GetViewMatrix());
 
 		glm::vec3 center = glm::vec3(0, 0, 0);
@@ -307,7 +309,13 @@ namespace Kerberos
 		}
 		center /= corners.size();
 
-		const auto lightView = glm::lookAt(center + lightDir, center, glm::vec3(0.0f, 1.0f, 0.0f));
+		glm::vec3 lightUp = glm::vec3(0.0f, 1.0f, 0.0f);
+		if (glm::abs(glm::dot(lightDir, lightUp)) > 0.99f)
+		{
+			lightUp = glm::vec3(1.0f, 0.0f, 0.0f);
+		}
+
+		const auto lightView = glm::lookAt(center + lightDir, center, lightUp);
 
 		float minX = std::numeric_limits<float>::max();
 		float maxX = std::numeric_limits<float>::lowest();
@@ -344,6 +352,10 @@ namespace Kerberos
 		{
 			maxZ *= zMult;
 		}
+
+		// Add a slight offset to prevent negative near plane bounding issues if scene bounds are close to near clip
+		minZ = std::min(minZ, -100.0f);
+		maxZ = std::max(maxZ, 100.0f);
 
 		const glm::mat4 lightProjection = glm::ortho(minX, maxX, minY, maxY, minZ, maxZ);
 		return lightProjection * lightView;

@@ -36,7 +36,7 @@ namespace Kerberos
 		const glm::mat4& GetProjectionMatrix(Handedness handedness = Handedness::Right) const override;
 		glm::mat4 GetViewProjectionMatrix(Handedness handedness = Handedness::Right) const override;
 
-		std::vector<glm::mat4> GetLightSpaceMatrices(const glm::vec3& lightDir) const override;
+		std::pair<std::vector<glm::mat4>, glm::vec4> GetLightSpaceMatrices(const glm::vec3& lightDir, const std::function<glm::vec4(float)>& getCascadeSplits) const override;
 
 		glm::vec3 GetUp() const override;
 		glm::vec3 GetRight() const override;

@@ -140,7 +140,7 @@ namespace
 		glm::mat4 View{ 1.0f };
 		glm::mat4 Projection{ 1.0f };
 		glm::vec3 CameraPosition{ 0.0f };
-		std::function<std::vector<glm::mat4>(const glm::vec3& lightDir)> CalculateLightSpaceMatricesFunc;
+		std::function<std::pair<std::vector<glm::mat4>, glm::vec4>(const glm::vec3&, const std::function<glm::vec4(float)>&)> CalculateLightSpaceMatricesFunc;
 		bool IsValid = false;
 	};
 
@@ -201,7 +201,7 @@ namespace
 		uint64_t DynamicAlignment = 0;
 
 		vk::DescriptorSet ColorOutputDescriptorSet = nullptr;
-		vk::DescriptorSet ShadowMapDescriptorSet = nullptr;
+		std::array<vk::DescriptorSet, ShadowMap::CascadeCount> ShadowMapDescriptorSet = { nullptr };
 
 		PendingSceneRender PendingRender{};
 
@@ -260,7 +260,10 @@ namespace Kerberos
 		VulkanContext::Get().WaitIdle();
 
 		VulkanContext::DestroyImGuiDescriptorSet(s_Data->ColorOutputDescriptorSet);
-		VulkanContext::DestroyImGuiDescriptorSet(s_Data->ShadowMapDescriptorSet);
+		for (auto& descriptorSet : s_Data->ShadowMapDescriptorSet)
+		{
+			VulkanContext::DestroyImGuiDescriptorSet(descriptorSet);
+		}
 
 		for (auto& slot : s_Data->MousePickingReadback.Slots)
 		{
@@ -281,7 +284,7 @@ namespace Kerberos
 					camera.GetViewMatrix(),
 					camera.GetProjectionMatrix(), 
 					camera.GetPosition(),
-					[&camera](const glm::vec3& lightDir) { return camera.GetLightSpaceMatrices(lightDir); });
+					[&camera](const glm::vec3& lightDir, const std::function<glm::vec4(float)>& getCascadeSplits) { return camera.GetLightSpaceMatrices(lightDir, getCascadeSplits); });
 	}
 
 	void Renderer::RenderSceneRuntime(const Ref<Scene>& scene, const Camera& mainCamera,
@@ -292,11 +295,11 @@ namespace Kerberos
 					mainCamera.GetViewMatrix(), 
 					mainCamera.GetProjectionMatrix(),
 					camPos, 
-					[&mainCamera](const glm::vec3& lightDir) { return mainCamera.GetLightSpaceMatrices(lightDir); });
+					[&mainCamera](const glm::vec3& lightDir, const std::function<glm::vec4(float)>& getCascadeSplits) { return mainCamera.GetLightSpaceMatrices(lightDir, getCascadeSplits); });
 	}
 
 	void Renderer::RenderScene(const Ref<Scene>& scene, const glm::mat4& view, const glm::mat4& projection,
-		const glm::vec3& camPos, const std::function<std::vector<glm::mat4>(const glm::vec3&)>& calculateLightSpaceMatricesFunc)
+		const glm::vec3& camPos, const std::function<std::pair<std::vector<glm::mat4>, glm::vec4>(const glm::vec3&, const std::function<glm::vec4(float)>&)>& calculateLightSpaceMatricesFunc)
 	{
 		KBR_CORE_ASSERT(!s_Data->PendingRender.IsValid, "Scene has already been queued for rendering!");
 
@@ -349,8 +352,12 @@ namespace Kerberos
 
         const uint32_t currentImage = frameIndex;
 
-		const std::vector<glm::mat4> lightSpaceMatrices = s_Data->PendingRender.CalculateLightSpaceMatricesFunc(s_Data->GlobalLightingData.sunLight);
-		constexpr glm::vec4 cascadeSplits = glm::vec4(0.05f, 0.15f, 0.3f, 1.0f); // TODO: Get the real splits
+		const auto getCascadeSplits = [](const float farPlane) -> glm::vec4
+		{
+			return { farPlane / 25.0f, farPlane / 10.0f, farPlane / 2.0f, farPlane };
+		};
+
+		const auto [lightSpaceMatrices, cascadeSplits] = s_Data->PendingRender.CalculateLightSpaceMatricesFunc(s_Data->GlobalLightingData.sunLight, getCascadeSplits);
 
 		const std::vector<GPULight> gpuLights = GetLightsFromScene(*s_Data->PendingRender.Scene.get());
 		const uint32_t lightCount = static_cast<uint32_t>(gpuLights.size());
@@ -498,71 +505,75 @@ namespace Kerberos
 
 			cmd.pipelineBarrier2(dependencyInfo);
 
-			vk::RenderingAttachmentInfo shadowMapDepthAttachmentInfo{
-				.imageView = s_Data->ShadowMap.ReadImageView,
-				.imageLayout = vk::ImageLayout::eDepthAttachmentOptimal,
-				.loadOp = vk::AttachmentLoadOp::eClear,
-				.storeOp = vk::AttachmentStoreOp::eStore,
-				.clearValue = vk::ClearDepthStencilValue{.depth = 1.0f, .stencil = 0 }
-			};
+			cmd.bindPipeline(vk::PipelineBindPoint::eGraphics, *s_Data->ShadowMap.Pipeline->GetVulkanPipeline());
+			cmd.setDepthBias(s_Data->DepthBias.ConstantFactor, s_Data->DepthBias.Clamp, s_Data->DepthBias.SlopeFactor);
 
 			const vk::Rect2D renderArea{
 				.offset = vk::Offset2D{.x = 0, .y = 0 },
 				.extent = vk::Extent2D{.width = s_Data->ShadowMap.Size, .height = s_Data->ShadowMap.Size }
 			};
 
-			const vk::RenderingInfo shadowMapRenderingInfo{
-				.renderArea = renderArea,
-				.layerCount = 1,
-				.colorAttachmentCount = 0,
-				.pColorAttachments = nullptr,
-				.pDepthAttachment = &shadowMapDepthAttachmentInfo
-			};
-
-			cmd.beginRendering(shadowMapRenderingInfo);
-			cmd.setViewport(0, vk::Viewport{
-								.x = 0.0f, .y = 0.0f,
-								.width = static_cast<float>(s_Data->ShadowMap.Size),
-								.height = static_cast<float>(s_Data->ShadowMap.Size),
-								.minDepth = 0.0f,
-								.maxDepth = 1.0f
-							});
-			cmd.setScissor(0, renderArea);
-
-			cmd.bindPipeline(vk::PipelineBindPoint::eGraphics, *s_Data->ShadowMap.Pipeline->GetVulkanPipeline());
-
-			cmd.setDepthBias(s_Data->DepthBias.ConstantFactor, s_Data->DepthBias.Clamp, s_Data->DepthBias.SlopeFactor);
-
-			const auto meshView = scene->m_Registry.view<TransformComponent, StaticMeshComponent>();
-			int i = 0;
-			for (const auto entity : meshView)
+			for (uint32_t cascadeIndex = 0; cascadeIndex < ShadowMap::CascadeCount; ++cascadeIndex)
 			{
-				auto& transform = meshView.get<TransformComponent>(entity);
-				auto& staticMesh = meshView.get<StaticMeshComponent>(entity);
-				if (!staticMesh.Visible || !staticMesh.StaticMesh /* || !staticMesh.MeshMaterial*/)
-					continue;
+				vk::RenderingAttachmentInfo shadowMapDepthAttachmentInfo{
+				.imageView = s_Data->ShadowMap.WriteImageViews[cascadeIndex],
+				.imageLayout = vk::ImageLayout::eDepthAttachmentOptimal,
+				.loadOp = vk::AttachmentLoadOp::eClear,
+				.storeOp = vk::AttachmentStoreOp::eStore,
+				.clearValue = vk::ClearDepthStencilValue{.depth = 1.0f, .stencil = 0 }
+				};
 
-				// TODO: Remove this once we have a proper material system
-				Ref<Material> material = staticMesh.MeshMaterial;
-				if (material == nullptr)
-					material = s_Data->MaterialRegistry.Get("DebugPink");
+				const vk::RenderingInfo shadowMapRenderingInfo{
+					.renderArea = renderArea,
+					.layerCount = 1,
+					.colorAttachmentCount = 0,
+					.pColorAttachments = nullptr,
+					.pDepthAttachment = &shadowMapDepthAttachmentInfo
+				};
 
-				UpdatePerObjectUniformBuffer(currentImage, static_cast<uint32_t>(i), transform.GetTransform(), *material, static_cast<uint32_t>(entity));
-				uint32_t dynamicOffset = static_cast<uint32_t>(i * s_Data->DynamicAlignment);
+				cmd.beginRendering(shadowMapRenderingInfo);
+				cmd.setViewport(0, vk::Viewport{
+									.x = 0.0f, .y = 0.0f,
+									.width = static_cast<float>(s_Data->ShadowMap.Size),
+									.height = static_cast<float>(s_Data->ShadowMap.Size),
+									.minDepth = 0.0f,
+									.maxDepth = 1.0f
+								});
+				cmd.setScissor(0, renderArea);
 
-				cmd.bindDescriptorSets(
-					vk::PipelineBindPoint::eGraphics,
-					*s_Data->PBRPipelineLayout,
-					0,
-					{ s_Data->DescriptorSets[currentImage].scene, material->DescriptorSets[currentImage] },
-					{ dynamicOffset });
+				cmd.pushConstants<uint32_t>(*s_Data->ShadowMap.PipelineLayout, vk::ShaderStageFlagBits::eVertex, 0, { cascadeIndex });
 
-				staticMesh.StaticMesh->Draw(cmd);
+				const auto meshView = scene->m_Registry.view<TransformComponent, StaticMeshComponent>();
+				uint32_t i = 0;
+				for (const auto entity : meshView)
+				{
+					auto& transform = meshView.get<TransformComponent>(entity);
+					auto& staticMesh = meshView.get<StaticMeshComponent>(entity);
+					if (!staticMesh.Visible || !staticMesh.StaticMesh /* || !staticMesh.MeshMaterial*/)
+						continue;
 
-				++i;
+					// TODO: Remove this once we have a proper material system
+					Ref<Material> material = staticMesh.MeshMaterial;
+					if (material == nullptr)
+						material = s_Data->MaterialRegistry.Get("DebugPink");
+
+					UpdatePerObjectUniformBuffer(currentImage, static_cast<uint32_t>(i), transform.GetTransform(), *material, static_cast<uint32_t>(entity));
+					uint32_t dynamicOffset = static_cast<uint32_t>(i * s_Data->DynamicAlignment);
+
+					cmd.bindDescriptorSets(
+						vk::PipelineBindPoint::eGraphics,
+						*s_Data->ShadowMap.PipelineLayout,
+						0,
+						{ s_Data->DescriptorSets[currentImage].scene },
+						{ dynamicOffset });
+
+					staticMesh.StaticMesh->Draw(cmd);
+
+					++i;
+				}
+
+				cmd.endRendering();
 			}
-
-			cmd.endRendering();
 
 			WriteGPUTimestamp(cmd, frameIndex, static_cast<uint32_t>(GPUTimestampQuery::ShadowEnd));
 
@@ -1198,12 +1209,17 @@ namespace Kerberos
 										  vk::ImageLayout::eDepthStencilAttachmentOptimal,
 										  shadowMapMipLevels);*/
 
+			constexpr vk::PushConstantRange pushConstantRange{
+				.stageFlags = vk::ShaderStageFlagBits::eVertex,
+				.offset = 0,
+				.size = sizeof(uint32_t)
+			};
 
 			vk::PipelineLayoutCreateInfo pipelineLayoutInfo{
 				.setLayoutCount = 1,
 				.pSetLayouts = &*s_Data->DescriptorSetLayouts.scene,
-				.pushConstantRangeCount = 0,
-				.pPushConstantRanges = nullptr
+				.pushConstantRangeCount = 1,
+				.pPushConstantRanges = &pushConstantRange
 			};
 
 			s_Data->ShadowMap.PipelineLayout = vk::raii::PipelineLayout{ device, pipelineLayoutInfo };
@@ -1561,10 +1577,13 @@ namespace Kerberos
 									   vk::ObjectType::eDescriptorSet,
 									   "Color Output Descriptor Set for ImGui");
 
-			s_Data->ShadowMapDescriptorSet = VulkanContext::GenerateImGuiDescriptorSet(s_Data->ColorSampler, s_Data->ShadowMap.ReadImageView);
-			context.SetObjectDebugName(reinterpret_cast<uint64_t>(static_cast<VkDescriptorSet>(s_Data->ShadowMapDescriptorSet)),
-									   vk::ObjectType::eDescriptorSet,
-									   "Shadow Map Descriptor Set for ImGui");
+			for (uint32_t i = 0; i < ShadowMap::CascadeCount; ++i)
+			{
+				s_Data->ShadowMapDescriptorSet[i] = VulkanContext::GenerateImGuiDescriptorSet(s_Data->ColorSampler, s_Data->ShadowMap.WriteImageViews[i]);
+				context.SetObjectDebugName(reinterpret_cast<uint64_t>(static_cast<VkDescriptorSet>(s_Data->ShadowMapDescriptorSet[i])),
+										   vk::ObjectType::eDescriptorSet,
+										   "Shadow Map Descriptor Set for ImGui");
+			}
 		}
 
 		for (uint32_t i = 0; i < Renderer::MousePickingReadbackFrameLag; ++i)
@@ -1836,6 +1855,11 @@ namespace Kerberos
 		return s_Data->GlobalLightingData.exposure;
 	}
 
+	uint32_t Renderer::GetShadowMapCascadeCount() 
+	{
+		return ShadowMap::CascadeCount;
+	}
+
 	glm::vec2 Renderer::GetOutputImageSize() 
 	{
 		KBR_CORE_ASSERT(s_Data, "Renderer not initialized!");
@@ -1850,11 +1874,12 @@ namespace Kerberos
 		return reinterpret_cast<uint64_t>(static_cast<VkDescriptorSet>(s_Data->ColorOutputDescriptorSet));
 	}
 
-	uint64_t Renderer::GetShadowMapDepthImageID() 
+	uint64_t Renderer::GetShadowMapDepthImageID(uint32_t index) 
 	{
-		KBR_CORE_ASSERT(s_Data->ShadowMapDescriptorSet, "ImGui descriptor set is not created for shadow map depth image!");
+		KBR_CORE_ASSERT(index < s_Data->ShadowMapDescriptorSet.size(), "Out of bounds index for shadow map depth image!");
+		KBR_CORE_ASSERT(s_Data->ShadowMapDescriptorSet[index], std::format("ImGui descriptor set is not created for shadow map depth image {}!", index));
 
-		return reinterpret_cast<uint64_t>(static_cast<VkDescriptorSet>(s_Data->ShadowMapDescriptorSet));
+		return reinterpret_cast<uint64_t>(static_cast<VkDescriptorSet>(s_Data->ShadowMapDescriptorSet[index]));
 	}
 
 	void Renderer::RequestMousePickingPixel(const uint32_t x, const uint32_t y)
