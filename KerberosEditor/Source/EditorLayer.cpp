@@ -882,7 +882,7 @@ namespace Kerberos
 		// Display shadow map
 		ImGui::Text("Shadow Map");
 		static int shadowMapCascadeIndex = 0;
-		ImGui::DragInt("Shadow Map Cascade Index", &shadowMapCascadeIndex, 1.0f, 0, static_cast<int>(Renderer::GetShadowMapCascadeCount()) - 1);
+		ImGui::DragInt("Shadow Map Cascade Index", &shadowMapCascadeIndex, 0.1f, 0, static_cast<int>(Renderer::GetShadowMapCascadeCount()) - 1);
 		const auto shadowMapImage = Renderer::GetShadowMapDepthImageID(shadowMapCascadeIndex);
 		ImGui::Image(shadowMapImage, ImVec2(256.0f, 256.0f));
 

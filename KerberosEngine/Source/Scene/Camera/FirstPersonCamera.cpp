@@ -7,6 +7,7 @@
 #include "Events/MouseButtonPressedEvent.hpp"
 #include "Events/MouseButtonReleasedEvent.hpp"
 #include "Input/InputSystem.hpp"
+#include "Renderer/Renderer.hpp"
 
 namespace Kerberos
 {
@@ -356,6 +357,16 @@ namespace Kerberos
 		// Add a slight offset to prevent negative near plane bounding issues if scene bounds are close to near clip
 		minZ = std::min(minZ, -100.0f);
 		maxZ = std::max(maxZ, 100.0f);
+
+		// Apply texel snapping
+		const float orthoWidth = maxX - minX;
+		const uint32_t shadowMapResolution = Renderer::GetShadowMapResolution();
+		const float worldUnitsPerTexel = orthoWidth / static_cast<float>(shadowMapResolution);
+
+		minX = std::floor(minX / worldUnitsPerTexel) * worldUnitsPerTexel;
+		maxX = std::floor(maxX / worldUnitsPerTexel) * worldUnitsPerTexel;
+		minY = std::floor(minY / worldUnitsPerTexel) * worldUnitsPerTexel;
+		maxY = std::floor(maxY / worldUnitsPerTexel) * worldUnitsPerTexel;
 
 		const glm::mat4 lightProjection = glm::ortho(minX, maxX, minY, maxY, minZ, maxZ);
 		return lightProjection * lightView;

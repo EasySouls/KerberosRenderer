@@ -864,6 +864,30 @@ namespace Kerberos
 		return m_EnableShadowMapping && dlc && dlc->IsEnabled && dlc->CastShadows;
 	}
 
+	DirectionalLight Scene::GetSunlight() const 
+	{
+		// Default sunlight pointing upwards, in case there is no directional light in the scene
+		DirectionalLight sunlight{ .Direction = glm::vec3(0.0f, -1.0f, 0.0f) };
+		const auto sunView = m_Registry.view<DirectionalLightComponent, TransformComponent>();
+		bool found = false;
+		for (const auto entity : sunView)
+		{
+			auto [light, transform] = sunView.get<DirectionalLightComponent, TransformComponent>(entity);
+			if (light.IsEnabled)
+			{
+				if (found)
+				{
+					KBR_CORE_WARN("Multiple directional lights found in the scene. Using the first one found as sunlight.");
+					break;
+				}
+
+				sunlight = light.Light;
+				found = true;
+			}
+		}
+		return sunlight;
+	}
+
 	Entity Scene::GetPrimaryCameraEntity()
 	{
 		const auto view = m_Registry.view<CameraComponent>();

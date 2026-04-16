@@ -352,6 +352,9 @@ namespace Kerberos
 
         const uint32_t currentImage = frameIndex;
 
+		const DirectionalLight sunlight = s_Data->PendingRender.Scene->GetSunlight();
+		s_Data->GlobalLightingData.sunLight = glm::vec4(sunlight.Direction, sunlight.Intensity);
+
 		const auto getCascadeSplits = [](const float farPlane) -> glm::vec4
 		{
 			return { farPlane / 25.0f, farPlane / 10.0f, farPlane / 2.0f, farPlane };
@@ -1858,6 +1861,11 @@ namespace Kerberos
 	uint32_t Renderer::GetShadowMapCascadeCount() 
 	{
 		return ShadowMap::CascadeCount;
+	}
+
+	uint32_t Renderer::GetShadowMapResolution() 
+	{
+		return s_Data->ShadowMap.Size;
 	}
 
 	glm::vec2 Renderer::GetOutputImageSize() 

@@ -75,6 +75,8 @@ namespace Kerberos
 		void SetIs3D(const bool is3D) { m_Is3D = is3D; }
 		void SetEnableShadowMapping(const bool enable) { m_EnableShadowMapping = enable; }
 
+		DirectionalLight GetSunlight() const;
+
 		Entity GetPrimaryCameraEntity();
 		void CalculateEntityTransforms();
 		void CalculateEntityTransform(const Entity& entity);

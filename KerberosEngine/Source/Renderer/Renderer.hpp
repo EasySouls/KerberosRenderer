@@ -71,6 +71,7 @@ namespace Kerberos
 		static float& GetGamma();
 		static float& GetExposure();
 		static uint32_t GetShadowMapCascadeCount();
+		static uint32_t GetShadowMapResolution();
 
 		static glm::vec2 GetOutputImageSize();
 
