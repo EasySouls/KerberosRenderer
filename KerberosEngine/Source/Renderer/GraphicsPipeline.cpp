@@ -237,6 +237,13 @@ namespace Kerberos
 			.renderPass = nullptr
 		};
 
+		constexpr vk::PipelineCacheCreateInfo pipelineCacheCreateInfo{
+			.flags = vk::PipelineCacheCreateFlags(),
+			.initialDataSize = 0,
+			.pInitialData = nullptr
+		};
+		m_PipelineCache = vk::raii::PipelineCache{ device, pipelineCacheCreateInfo };
+
 		m_Pipeline = vk::raii::Pipeline{ device,m_PipelineCache, pipelineCreateInfo };
 
 		context.SetObjectDebugName(m_Pipeline, spec.Name);
