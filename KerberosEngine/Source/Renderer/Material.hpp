@@ -17,13 +17,13 @@ namespace Kerberos
 		// Parameter block used as uniform buffer block
 		struct UniformBlock
 		{
-			glm::vec3 albedo;
-			float roughness;
-			float metallic;
+			glm::vec3 AlbedoFactor{ 1.0f, 1.0f, 1.0f };
+			float RoughnessFactor{ 1.0f };
+			float MetallicFactor{ 0.0f };
 		};
 		UniformBlock Params{};
 
-		std::string name;
+		std::string Name;
 
 		Ref<Texture2D> AlbedoTexture = nullptr;
 		Ref<Texture2D> NormalTexture = nullptr;
@@ -35,32 +35,32 @@ namespace Kerberos
 
 		bool IsTransparent() const 
 		{
-			//return Params.albedo.a < 1.0f;
+			//return Params.AlbedoFactor.a < 1.0f;
 			return false;
 		}
 
 		Material() = default;
 
 		Material(std::string n, const glm::vec3 c, const float r, const float m)
-			: name(std::move(n))
+			: Name(std::move(n))
 		{
-			Params.roughness = r;
-			Params.metallic = m;
-			Params.albedo = c;
+			Params.RoughnessFactor = r;
+			Params.MetallicFactor = m;
+			Params.AlbedoFactor = c;
 		}
 
 		Material(std::string name, const glm::vec3 c, const float r, const float m,
 				 const std::shared_ptr<Texture2D>& albedoTex, const std::shared_ptr<Texture2D>& normalTex)
-			: name(std::move(name)), AlbedoTexture(albedoTex), NormalTexture(normalTex)
+			: Name(std::move(name)), AlbedoTexture(albedoTex), NormalTexture(normalTex)
 		{
-			Params.roughness = r;
-			Params.metallic = m;
-			Params.albedo = c;
+			Params.RoughnessFactor = r;
+			Params.MetallicFactor = m;
+			Params.AlbedoFactor = c;
 		}
 
 		Material(const Material& other)
 			: Params(other.Params)
-			, name(other.name)
+			, Name(other.Name)
 			, AlbedoTexture(other.AlbedoTexture)
 			, NormalTexture(other.NormalTexture)
 			, RoughnessTexture(other.RoughnessTexture)
@@ -74,7 +74,7 @@ namespace Kerberos
 			if (this != &other)
 			{
 				Params = other.Params;
-				name = other.name;
+				Name = other.Name;
 				AlbedoTexture = other.AlbedoTexture;
 				NormalTexture = other.NormalTexture;
 				MetallicTexture = other.MetallicTexture;
@@ -87,9 +87,9 @@ namespace Kerberos
 
 		bool operator==(const Material& other) const
 		{
-			return Params.albedo == other.Params.albedo &&
-				   Params.roughness == other.Params.roughness &&
-				   Params.metallic == other.Params.metallic &&
+			return Params.AlbedoFactor == other.Params.AlbedoFactor &&
+				   Params.RoughnessFactor == other.Params.RoughnessFactor &&
+				   Params.MetallicFactor == other.Params.MetallicFactor &&
 				   AlbedoTexture == other.AlbedoTexture &&
 				   NormalTexture == other.NormalTexture &&
 				   RoughnessTexture == other.RoughnessTexture &&

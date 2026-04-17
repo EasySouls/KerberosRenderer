@@ -849,7 +849,7 @@ namespace Kerberos
 
 		ImGui::Separator();
 
-		std::string activeGizmoTypeString = GetActiveGizmoTypeString();
+		const std::string activeGizmoTypeString = GetActiveGizmoTypeString();
 		ImGui::Text("Gizmo Type: %s", activeGizmoTypeString.c_str());
 		ImGui::Text("Viewport size: %.2f x %.2f", m_ViewportSize.x, m_ViewportSize.y);
 		ImGui::Text("Viewport Focused: %s", m_ViewportFocused ? "Yes" : "No");

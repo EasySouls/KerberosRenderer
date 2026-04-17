@@ -45,8 +45,8 @@ namespace Kerberos
 		const Ref<EditorAssetManager> assetManager = Project::GetActive()->GetEditorAssetManager();
 
 		Material material;
-		material.name = name;
-		material.Params = { .albedo = albedo, .roughness = roughness, .metallic = metallic };
+		material.Name = name;
+		material.Params = { .AlbedoFactor = albedo, .RoughnessFactor = roughness, .MetallicFactor = metallic };
 
 		auto loadTexture = [&](const std::string& texturePath) -> Ref<Texture2D>
 		{
@@ -110,10 +110,10 @@ namespace Kerberos
 
 		YAML::Emitter out;
 		out << YAML::BeginMap;
-		out << YAML::Key << "Name" << YAML::Value << material.name;
-		out << YAML::Key << "Albedo" << YAML::Value << material.Params.albedo;
-		out << YAML::Key << "Roughness" << YAML::Value << material.Params.roughness;
-		out << YAML::Key << "Metallic" << YAML::Value << material.Params.metallic;
+		out << YAML::Key << "Name" << YAML::Value << material.Name;
+		out << YAML::Key << "Albedo" << YAML::Value << material.Params.AlbedoFactor;
+		out << YAML::Key << "Roughness" << YAML::Value << material.Params.RoughnessFactor;
+		out << YAML::Key << "Metallic" << YAML::Value << material.Params.MetallicFactor;
 		out << YAML::Key << "AlbedoTexture" << YAML::Value << texturePathFor(material.AlbedoTexture);
 		out << YAML::Key << "NormalTexture" << YAML::Value << texturePathFor(material.NormalTexture);
 		out << YAML::Key << "MetallicTexture" << YAML::Value << texturePathFor(material.MetallicTexture);

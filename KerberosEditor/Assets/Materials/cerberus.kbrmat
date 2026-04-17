@@ -1,7 +1,7 @@
 Name: cerberus
 Albedo: [1, 1, 1]
 Roughness: 1
-Metallic: 0
+Metallic: 1
 AlbedoTexture: Assets/Models/cerberus/albedo.ktx2
 NormalTexture: Assets/Models/cerberus/normal.ktx2
 MetallicTexture: Assets/Models/cerberus/metallic.ktx2

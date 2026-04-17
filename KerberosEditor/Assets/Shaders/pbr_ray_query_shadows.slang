@@ -295,14 +295,18 @@ PSOutput fragmentMain(VSOutput input)
 
     // float metallic = perObject.material.metallic;
     // float roughness = perObject.material.roughness;
-    float metallic = metallicMapSampler.Sample(input.TexCoord).r;
-    float roughness = roughnessMapSampler.Sample(input.TexCoord).r;
+    float metallicTex = metallicMapSampler.Sample(input.TexCoord).r;
+    float metallic = clamp(metallicTex * perObject.material.metallic, 0.0, 1.0);
+    float roughnessTex = roughnessMapSampler.Sample(input.TexCoord).r;
+    float roughness = clamp(roughnessTex * perObject.material.roughness, 0.0, 1.0);
     float ao = aoMapSampler.Sample(input.TexCoord).r;
 
-    float3 F0 = float3(0.04, 0.04, 0.04);
     // Use this when working with srgb textures
-    //float3 albedo = pow(albedoMapSampler.Sample(input.TexCoord).rgb * perObject.material.albedo, float3(2.2, 2.2, 2.2));
-    float3 albedo = albedoMapSampler.Sample(input.TexCoord).rgb * perObject.material.albedo;
+    // float3 albedo = pow(albedoMapSampler.Sample(input.TexCoord).rgb * perObject.material.albedo, float3(2.2, 2.2, 2.2));
+    float3 albedoTex = albedoMapSampler.Sample(input.TexCoord).rgb;
+    float3 albedo = albedoTex * perObject.material.albedo;
+
+    float3 F0 = float3(0.04, 0.04, 0.04);
     F0 = lerp(F0, albedo, metallic);
 
 	// Specular contribution

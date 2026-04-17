@@ -134,7 +134,7 @@ namespace Kerberos
 		{
 			if (!hasDescriptorSets)
 			{
-				context.SetObjectDebugName(material->DescriptorSets[i], std::format("{} Descriptor Set Frame {}", material->name, i));
+				context.SetObjectDebugName(material->DescriptorSets[i], std::format("{} Descriptor Set Frame {}", material->Name, i));
 			}
 
 			std::vector<vk::WriteDescriptorSet> descriptorWrites;

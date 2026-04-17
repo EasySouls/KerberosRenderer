@@ -363,10 +363,10 @@ namespace Kerberos
 				if (!materialPathStr.empty())
 				{
 					Material material;
-					material.name = materialPath.stem().string();
-					material.Params.albedo = glm::vec3(1.0f);
-					material.Params.metallic = 0.0f;
-					material.Params.roughness = 1.0f;
+					material.Name = materialPath.stem().string();
+					material.Params.AlbedoFactor = glm::vec3(1.0f);
+					material.Params.MetallicFactor = 0.0f;
+					material.Params.RoughnessFactor = 1.0f;
 
 					const std::filesystem::path assetPath = std::filesystem::relative(materialPath, Project::GetProjectDirectory());
 					if (!MaterialImporter::SaveMaterial(assetPath, material))
@@ -512,15 +512,15 @@ namespace Kerberos
 				beginWasCalled = true;
 
 				char nameBuffer[256];
-				strcpy_s(nameBuffer, sizeof(nameBuffer), state.WorkingCopy->name.c_str());
+				strcpy_s(nameBuffer, sizeof(nameBuffer), state.WorkingCopy->Name.c_str());
 				if (ImGui::InputText("Name", nameBuffer, sizeof(nameBuffer)))
 				{
-					state.WorkingCopy->name = nameBuffer;
+					state.WorkingCopy->Name = nameBuffer;
 				}
 
-				ImGui::ColorEdit3("Albedo", &state.WorkingCopy->Params.albedo[0]);
-				ImGui::DragFloat("Roughness", &state.WorkingCopy->Params.roughness, 0.01f, 0.0f, 1.0f);
-				ImGui::DragFloat("Metallic", &state.WorkingCopy->Params.metallic, 0.01f, 0.0f, 1.0f);
+				ImGui::ColorEdit3("Albedo", &state.WorkingCopy->Params.AlbedoFactor[0]);
+				ImGui::DragFloat("Roughness", &state.WorkingCopy->Params.RoughnessFactor, 0.01f, 0.0f, 1.0f);
+				ImGui::DragFloat("Metallic", &state.WorkingCopy->Params.MetallicFactor, 0.01f, 0.0f, 1.0f);
 
 				ImGui::Separator();
 				ImGui::Text("Preview Mesh");

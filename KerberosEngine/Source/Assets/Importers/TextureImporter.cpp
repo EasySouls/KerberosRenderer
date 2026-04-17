@@ -10,13 +10,14 @@
 #include <algorithm>
 namespace 
 {
-	const std::unordered_set<std::string> SupportedExtensions = { ".png", ".jpg", ".jpeg", ".ktx", ".ktx2" };
 
 	bool IsExtensionSupported(const std::filesystem::path& filepath)
 	{
+		const static std::unordered_set<std::string> supportedExtensions = { ".png", ".jpg", ".jpeg", ".ktx", ".ktx2" };
+
 		std::string extension = filepath.extension().string();
 		std::ranges::transform(extension, extension.begin(), ::tolower);
-		return SupportedExtensions.contains(extension);
+		return supportedExtensions.contains(extension);
 	}
 }
 
