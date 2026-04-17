@@ -118,6 +118,7 @@ namespace Kerberos
 		vk::PhysicalDeviceMemoryProperties2 GetMemoryProperties() const;
 		vk::FormatProperties2 GetFormatProperties(vk::Format format) const;
 		vk::SampleCountFlagBits GetMaxMSAASamples() const;
+		float GetMaxAnisotropy() const;
 		const QueueFamilyInfo& GetQueueFamilyInfo() const { return m_QueueFamilyInfo; }
 
 		static vk::DescriptorSet GenerateImGuiDescriptorSet(const vk::raii::Sampler& sampler,

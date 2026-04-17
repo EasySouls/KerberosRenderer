@@ -716,6 +716,11 @@ namespace Kerberos
 		return m_MaxMSAASamples;
 	}
 
+	float VulkanContext::GetMaxAnisotropy() const 
+	{
+		return m_PhysicalDevice.getProperties2().properties.limits.maxSamplerAnisotropy;
+	}
+
 	void VulkanContext::FramebufferResized(uint32_t width, uint32_t height)
 	{
 		m_FramebufferResized = true;

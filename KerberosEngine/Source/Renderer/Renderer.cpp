@@ -1080,7 +1080,7 @@ namespace Kerberos
 
 		// Create samplers
 		{
-			vk::SamplerCreateInfo samplerInfo{
+			const vk::SamplerCreateInfo samplerInfo{
 				.magFilter = vk::Filter::eLinear,
 				.minFilter = vk::Filter::eLinear,
 				.mipmapMode = vk::SamplerMipmapMode::eLinear,
@@ -1089,7 +1089,7 @@ namespace Kerberos
 				.addressModeW = vk::SamplerAddressMode::eRepeat,
 				.mipLodBias = 0.0f,
 				.anisotropyEnable = vk::True,
-				.maxAnisotropy = 16.0f,
+				.maxAnisotropy = context.GetMaxAnisotropy(),
 				.compareEnable = vk::False,
 				.compareOp = vk::CompareOp::eAlways,
 				.minLod = 0.0f,
@@ -1101,7 +1101,7 @@ namespace Kerberos
 
 			context.SetObjectDebugName(s_Data->ColorSampler, "Color Texture Sampler");
 
-			vk::SamplerCreateInfo shadowSamplerInfo{
+			const vk::SamplerCreateInfo shadowSamplerInfo{
 				.magFilter = vk::Filter::eLinear,
 				.minFilter = vk::Filter::eLinear,
 				.mipmapMode = vk::SamplerMipmapMode::eLinear,
@@ -1109,9 +1109,10 @@ namespace Kerberos
 				.addressModeV = vk::SamplerAddressMode::eClampToBorder,
 				.addressModeW = vk::SamplerAddressMode::eClampToBorder,
 				.mipLodBias = 0.0f,
-				.anisotropyEnable = vk::False,
+				.anisotropyEnable = vk::True,
+				.maxAnisotropy = context.GetMaxAnisotropy(),
 				.compareEnable = vk::True,
-				.compareOp = vk::CompareOp::eLess,//eLessOrEqual,
+				.compareOp = vk::CompareOp::eGreaterOrEqual,//eLessOrEqual,
 				.minLod = 0.0f,
 				.maxLod = 1.0f,
 				.borderColor = vk::BorderColor::eFloatOpaqueWhite,

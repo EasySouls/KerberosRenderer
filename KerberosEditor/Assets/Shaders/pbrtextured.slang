@@ -163,8 +163,15 @@ float ShadowCalculation(float3 lightDir, float3 normal, float3 fragPosWorldSpace
         }
     }
 
+    uint width, height, elements;
+    shadowMap.GetDimensions(width, height, elements);
+    float2 texelSize = 1.0 / float2(width, height);
+
+    // Normal offset bias
+    float3 shadowOffset = normal * (texelSize.x * 5.0);
+
     // Transform the world position to light space using the correct cascade matrix
-    float4 fragPosLightSpace = mul(scene.lightSpaceMatrices[cascadeIndex], float4(fragPosWorldSpace, 1.0));
+    float4 fragPosLightSpace = mul(scene.lightSpaceMatrices[cascadeIndex], float4(fragPosWorldSpace + shadowOffset, 1.0));
 
     // Perform perspective divide
     float3 projCoords = fragPosLightSpace.xyz / fragPosLightSpace.w;
@@ -173,34 +180,30 @@ float ShadowCalculation(float3 lightDir, float3 normal, float3 fragPosWorldSpace
     float2 shadowUV = projCoords.xy * 0.5 + 0.5;
 
     // Keep the shadow at 0.0 when outside the frustum bounds
-    if (projCoords.z > 1.0 || shadowUV.x < 0.0 || shadowUV.x > 1.0 || shadowUV.y < 0.0 || shadowUV.y > 1.0)
-        return 0.0;
+    //if (projCoords.z > 1.0 || shadowUV.x < 0.0 || shadowUV.x > 1.0 || shadowUV.y < 0.0 || shadowUV.y > 1.0)
+    //    return 0.0;
 
-    float currentDepth = projCoords.z;
+    const float bias = 0.0001;
+    const float currentDepth = projCoords.z - bias;
     float shadow = 0.0;
 
     if (enablePCF == 1) {
-        // Percentage-closer filtering (PCF)
-        uint width, height, elements;
-        shadowMap.GetDimensions(width, height, elements);
-        float2 texelSize = 1.0 / float2(width, height);
-
         for (int x = -1; x <= 1; ++x)
         {
             for (int y = -1; y <= 1; ++y)
             {
                 float2 offsetUV = shadowUV + float2(x, y) * texelSize;
 
-                //float pcfDepth = shadowMap.SampleCmp(float3(shadowUV, cascadeIndex), currentDepth);
-                float pcfDepth = shadowMap.Sample(float3(offsetUV, cascadeIndex)).r;
-                shadow += currentDepth > pcfDepth ? 1.0 : 0.0;
+                //float pcfDepth = shadowMap.Sample(float3(offsetUV, cascadeIndex)).r;
+                //shadow += currentDepth > pcfDepth ? 1.0 : 0.0;
+                shadow += shadowMap.SampleCmp(float3(offsetUV, cascadeIndex), currentDepth);
             }
         }
         shadow /= 9.0;
     } else {
-        //float closestDepth = shadowMap.SampleCmp(float3(shadowUV, cascadeIndex), currentDepth);
-        float closestDepth = shadowMap.Sample(float3(shadowUV, cascadeIndex)).r;
-        shadow = currentDepth > closestDepth ? 1.0 : 0.0;
+        shadow = shadowMap.SampleCmp(float3(shadowUV, cascadeIndex), currentDepth);
+        //float closestDepth = shadowMap.Sample(float3(shadowUV, cascadeIndex)).r;
+        //shadow = currentDepth > closestDepth ? 1.0 : 0.0;
     }
 
     return shadow;
