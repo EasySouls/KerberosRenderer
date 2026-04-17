@@ -4,11 +4,10 @@
 #include "Renderer/Textures/TextureCube.hpp"
 #include "Assets/Importers/TextureImporter.hpp"
 #include "ImportUtils.hpp"
+#include "Utils/KtxConversion.hpp"
 
 #include <yaml-cpp/yaml.h>
 #include <stb_image.h>
-
-#include <format>
 
 namespace Kerberos
 {
@@ -44,9 +43,15 @@ namespace Kerberos
 
 			if (NeedsConvertingToKTX2(texPath))
 			{
-				const std::string command = std::format("ktx2ktx2 -b {}", texPath.string());
-				int res = system(command.c_str());
-				KBR_CORE_ASSERT(res == 0, "CubemapImporter::ImportCubemap - failed to convert KTX file to KTX2 format using command: {}", command);
+				const Process::ProcessResult result = KtxConversion::ConvertKtxToKtx2(texPath);
+				KBR_CORE_ASSERT(
+					result.Succeeded,
+					"CubemapImporter::ImportCubemap - failed to convert KTX to KTX2 for file: {} (started: {}, exit code: {}, error code: {}, error: {})",
+					texPath.string(),
+					result.Started,
+					result.ExitCode,
+					result.ErrorCode,
+					result.ErrorMessage);
 			}
 
 			const Ref<TextureCube> cubemapTexture = CreateRef<TextureCube>(texPath);

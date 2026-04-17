@@ -4,6 +4,7 @@
 #include <ktx.h>
 
 #include "Utils.hpp"
+#include "Utils/KtxConversion.hpp"
 #include "VulkanContext.hpp"
 
 namespace Kerberos
@@ -176,9 +177,15 @@ namespace Kerberos
 
 			if (!std::filesystem::exists(newFilePath))
 			{
-				const std::string command = std::format("ktx2ktx2 -b {}", filepath.string());
-				int res = system(command.c_str());
-				KBR_CORE_ASSERT(res == 0, "Texture2D::Texture2D - failed to convert KTX file to KTX2 format using command: {}", command);
+				const Process::ProcessResult result = KtxConversion::ConvertKtxToKtx2(filepath);
+				KBR_CORE_ASSERT(
+					result.Succeeded,
+					"Texture2D::Texture2D - failed to convert KTX to KTX2 for file: {} (started: {}, exit code: {}, error code: {}, error: {})",
+					filepath.string(),
+					result.Started,
+					result.ExitCode,
+					result.ErrorCode,
+					result.ErrorMessage);
 			}
 			
 			ktxResult result = LoadKTXFile(newFilePath, &ktxTex);

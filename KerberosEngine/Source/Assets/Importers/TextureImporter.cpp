@@ -2,13 +2,12 @@
 #include "TextureImporter.hpp"
 #include "Renderer/Textures/Texture2D.hpp"
 #include "ImportUtils.hpp"
+#include "Utils/KtxConversion.hpp"
 
 #include <stb_image.h>
 
 #include <unordered_set>
 #include <algorithm>
-#include <format>
-
 namespace 
 {
 	const std::unordered_set<std::string> SupportedExtensions = { ".png", ".jpg", ".jpeg", ".ktx", ".ktx2" };
@@ -44,10 +43,21 @@ namespace Kerberos
 		{
 			if (NeedsConvertingToKTX2(filepath))
 			{
-				// TODO: Check if it is already converted, not in the ctor of Texture2D
-				const std::string command = std::format("ktx2ktx2 -f -b {}", filepath.string());
-				const int res = system(command.c_str());
-				KBR_CORE_ASSERT(res == 0, "TextureImporter::ImportTexture - failed to convert KTX file to KTX2 format using command: {}", command);
+				auto ktx2Filepath = filepath;
+				ktx2Filepath.replace_extension(".ktx2");
+
+				if (!std::filesystem::exists(ktx2Filepath))
+				{
+					const Process::ProcessResult result = KtxConversion::ConvertKtxToKtx2(filepath, true);
+					KBR_CORE_ASSERT(
+						result.Succeeded,
+						"TextureImporter::ImportTexture - failed to convert KTX to KTX2 for file: {} (started: {}, exit code: {}, error code: {}, error: {})",
+						filepath.string(),
+						result.Started,
+						result.ExitCode,
+						result.ErrorCode,
+						result.ErrorMessage);
+				}
 			}
 
 			const Ref<Texture2D> texture = CreateRef<Texture2D>(filepath);
@@ -57,16 +67,14 @@ namespace Kerberos
 
 			return texture;
 		}
-		else
-		{
-			auto [spec, buffer] = LoadTextureData(filepath, true);
-			auto texture = CreateRef<Texture2D>(spec, buffer);
 
-			const std::string name = filepath.filename().string();
-			//texture->SetDebugName(name);
+		auto [spec, buffer] = LoadTextureData(filepath, true);
+		auto texture = CreateRef<Texture2D>(spec, buffer);
 
-			return texture;
-		}
+		const std::string name = filepath.filename().string();
+		//texture->SetDebugName(name);
+
+		return texture;
 	}
 
 	std::pair<TextureSpecification, Buffer> TextureImporter::LoadTextureData(const std::filesystem::path& filepath, const bool flip, const int desiredChannels)

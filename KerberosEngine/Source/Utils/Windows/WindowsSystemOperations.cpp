@@ -1,3 +1,4 @@
+#ifdef KBR_PLATFORM_WINDOWS
 #include "kbrpch.hpp"
 #include "Utils/SystemOperations.hpp"
 
@@ -7,6 +8,7 @@
 #include <GLFW/glfw3native.h>
 
 #include "Application.hpp"
+
 
 namespace Kerberos
 {
@@ -134,3 +136,5 @@ namespace Kerberos
 		return false;
 	}
 }
+
+#endif
