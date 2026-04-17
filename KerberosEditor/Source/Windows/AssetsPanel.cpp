@@ -35,7 +35,8 @@ namespace Kerberos
 	{
 		ImGui::Begin("Assets");
 
-		const auto& relativeDir = std::filesystem::relative(m_CurrentDirectory, m_AssetsDirectory);
+		//const auto& relativeDir = std::filesystem::relative(m_CurrentDirectory, m_AssetsDirectory);
+		const auto& relativeDir = GetRelativePath(m_CurrentDirectory);
 		const std::string title = relativeDir.string() == "." ? "Assets" : "Assets" + std::string(1, std::filesystem::path::preferred_separator) + relativeDir.string();
 		ImGui::Text("Current Directory: %s", title.data());
 
@@ -158,7 +159,8 @@ namespace Kerberos
 			for (const auto& entry : std::filesystem::directory_iterator(m_CurrentDirectory))
 			{
 				const std::filesystem::path& path = entry.path();
-				const auto& relativePath = std::filesystem::relative(path, m_AssetsDirectory);
+				//const auto& relativePath = std::filesystem::relative(path, m_AssetsDirectory);
+				const auto& relativePath = GetRelativePath(path);
 				const std::string fileName = relativePath.filename().string();
 
 				ImGui::PushID(path.string().c_str());
@@ -484,6 +486,15 @@ namespace Kerberos
 		{
 			texture = nullptr;
 		}
+	}
+
+	std::filesystem::path AssetsPanel::GetRelativePath(const std::filesystem::path& absolutePath) 
+	{
+		if (!m_RelativePathCache.contains(absolutePath))
+		{
+			m_RelativePathCache[absolutePath] = std::filesystem::relative(absolutePath, m_AssetsDirectory);
+		}
+		return m_RelativePathCache[absolutePath];
 	}
 
 	void AssetsPanel::RenderMaterialEditors()

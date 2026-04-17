@@ -62,6 +62,8 @@ namespace Kerberos
 		void RenderMaterialEditors();
 		static void DrawMaterialTextureField(const char* label, const std::filesystem::path& materialFilepath, Ref<Texture2D>& texture);
 
+		std::filesystem::path GetRelativePath(const std::filesystem::path& absolutePath);
+
 		enum class MaterialPreviewMesh : uint8_t
 		{
 			Cube = 0,
@@ -109,6 +111,8 @@ namespace Kerberos
 		Mode m_Mode = Mode::Filesystem;
 
 		std::unordered_map<std::string, MaterialEditorState> m_OpenMaterialEditors;
+
+		std::unordered_map<std::filesystem::path, std::filesystem::path> m_RelativePathCache;
 
 		NotificationManager m_NotificationManager;
 	};
