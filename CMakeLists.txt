@@ -28,6 +28,7 @@ target_compile_options(KerberosBuildSettings INTERFACE
 )
 
 add_subdirectory(KerberosEngine)
+add_subdirectory(KerberosScriptCoreLib)
 add_subdirectory(KerberosEditor)
 
 set_property(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} PROPERTY VS_STARTUP_PROJECT KerberosEditor)

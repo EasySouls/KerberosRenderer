@@ -152,6 +152,23 @@ Entities:
       Parent: 0
       Children:
         []
+    ScriptComponent:
+      ClassName: Kerberos.Source.Kerberos.Player
+      ScriptFields:
+        - Name: Speed
+          Type: Float
+          Data: 2.1
+    RigidBody3DComponent:
+      Mass: 1
+      Type: 1
+      Velocity: [0, 0, 0]
+      AngularVelocity: [0, 0, 0]
+      UseGravity: true
+      Friction: 0.5
+      Restitution: 0.5
+    BoxCollider3DComponent:
+      Size: [1, 1, 1]
+      Offset: [0, 0, 0]
     StaticMeshComponent:
       Mesh: 18177791179963863543
       Material: 8036360350461290503

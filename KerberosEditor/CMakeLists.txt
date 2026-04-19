@@ -20,9 +20,17 @@ target_link_libraries(KerberosEditor PRIVATE
     KerberosEngine
     KerberosBuildSettings
 )
+add_dependencies(KerberosEditor KerberosScriptCoreLibBuild)
 
 if(WIN32)
     target_compile_definitions(KerberosEditor PRIVATE KBR_PLATFORM_WINDOWS)
+
+    add_custom_command(TARGET KerberosEditor POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            "$<IF:$<CONFIG:Debug>,${CMAKE_SOURCE_DIR}/KerberosEngine/ThirdParty/dotnet/lib/Debug/nethost.dll,${CMAKE_SOURCE_DIR}/KerberosEngine/ThirdParty/dotnet/lib/Release/nethost.dll>"
+            "$<TARGET_FILE_DIR:KerberosEditor>/nethost.dll"
+        VERBATIM
+    )
 endif()
 
 set_target_properties(KerberosEditor PROPERTIES FOLDER "KerberosEditor")

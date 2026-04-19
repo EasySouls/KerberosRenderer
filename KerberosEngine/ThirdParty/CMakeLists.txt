@@ -146,9 +146,22 @@ target_include_directories(filewatch INTERFACE
     ${CMAKE_CURRENT_SOURCE_DIR}/filewatch
 )
 
+# dotnet
+add_library(dotnet INTERFACE)
+target_include_directories(dotnet INTERFACE
+    ${CMAKE_CURRENT_SOURCE_DIR}/dotnet/include
+)
+target_link_libraries(dotnet INTERFACE
+    $<$<CONFIG:Debug>:${CMAKE_CURRENT_SOURCE_DIR}/dotnet/lib/Debug/nethost.lib>
+    $<$<CONFIG:Release>:${CMAKE_CURRENT_SOURCE_DIR}/dotnet/lib/Release/nethost.lib>
+    $<$<CONFIG:RelWithDebInfo>:${CMAKE_CURRENT_SOURCE_DIR}/dotnet/lib/Release/nethost.lib>
+    $<$<CONFIG:MinSizeRel>:${CMAKE_CURRENT_SOURCE_DIR}/dotnet/lib/Release/nethost.lib>
+    $<$<CONFIG:Dist>:${CMAKE_CURRENT_SOURCE_DIR}/dotnet/lib/Release/nethost.lib>
+)
+
 set_target_properties(
     glfw imgui yaml-cpp msdf-atlas-gen freetype ktx
     ImGuizmo assimp Jolt tinygltf stb spdlog glm
-    filewatch EnTT
+    filewatch EnTT dotnet
     PROPERTIES FOLDER "KerberosEngine/ThirdParty"
 )

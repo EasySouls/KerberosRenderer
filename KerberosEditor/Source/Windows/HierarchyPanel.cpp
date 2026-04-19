@@ -10,9 +10,9 @@
 #include "Assets/Importers/TextureImporter.hpp"
 #include "Assets/AssetManager.hpp"
 #include "Events/KeyPressedEvent.hpp"
-//#include "Scripting/ScriptEngine.hpp"
-//#include "Scripting/ScriptInstance.hpp"
-//#include "Scripting/ScriptClass.hpp"
+#include "Scripting/ScriptEngine.hpp"
+#include "Scripting/ScriptInstance.hpp"
+#include "Scripting/ScriptClass.hpp"
 
 #include <glm/gtc/type_ptr.hpp>
 #include <imgui/imgui.h>
@@ -566,7 +566,7 @@ namespace Kerberos
 			}
 		}
 
-		/*if (entity.HasComponent<ScriptComponent>())
+		if (entity.HasComponent<ScriptComponent>())
 		{
 			ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(6, 6));
 			const bool opened = ImGui::TreeNodeEx(reinterpret_cast<const void*>(typeid(ScriptComponent).hash_code()), treeNodeFlags, "Script");
@@ -633,12 +633,52 @@ namespace Kerberos
 						const auto& fields = scriptInstance->GetScriptClass()->GetSerializedFields();
 						for (const auto& [name, scriptField] : fields)
 						{
-							if (scriptField.Type == ScriptFieldType::Int)
+							if (scriptField.Type == ScriptFieldType::Short)
+							{
+								short value = scriptInstance->GetFieldValue<short>(name);
+								if (ImGui::InputScalar(name.c_str(), ImGuiDataType_S16, &value))
+								{
+									scriptInstance->SetFieldValue<short>(name, value);
+								}
+							}
+							else if (scriptField.Type == ScriptFieldType::Int)
 							{
 								int value = scriptInstance->GetFieldValue<int>(name);
 								if (ImGui::InputInt(name.c_str(), &value))
 								{
 									scriptInstance->SetFieldValue<int>(name, value);
+								}
+							}
+							else if (scriptField.Type == ScriptFieldType::Long)
+							{
+								int64_t value = scriptInstance->GetFieldValue<int64_t>(name);
+								if (ImGui::InputScalar(name.c_str(), ImGuiDataType_S64, &value))
+								{
+									scriptInstance->SetFieldValue<int64_t>(name, value);
+								}
+							}
+							else if (scriptField.Type == ScriptFieldType::UShort)
+							{
+								uint16_t value = scriptInstance->GetFieldValue<uint16_t>(name);
+								if (ImGui::InputScalar(name.c_str(), ImGuiDataType_U16, &value))
+								{
+									scriptInstance->SetFieldValue<uint16_t>(name, value);
+								}
+							}
+							else if (scriptField.Type == ScriptFieldType::UInt)
+							{
+								uint32_t value = scriptInstance->GetFieldValue<uint32_t>(name);
+								if (ImGui::InputScalar(name.c_str(), ImGuiDataType_U32, &value))
+								{
+									scriptInstance->SetFieldValue<uint32_t>(name, value);
+								}
+							}
+							else if (scriptField.Type == ScriptFieldType::ULong)
+							{
+								uint64_t value = scriptInstance->GetFieldValue<uint64_t>(name);
+								if (ImGui::InputScalar(name.c_str(), ImGuiDataType_U64, &value))
+								{
+									scriptInstance->SetFieldValue<uint64_t>(name, value);
 								}
 							}
 							else if (scriptField.Type == ScriptFieldType::Float)
@@ -647,6 +687,14 @@ namespace Kerberos
 								if (ImGui::DragFloat(name.c_str(), &value, 0.1f))
 								{
 									scriptInstance->SetFieldValue<float>(name, value);
+								}
+							}
+							else if (scriptField.Type == ScriptFieldType::Double)
+							{
+								double value = scriptInstance->GetFieldValue<double>(name);
+								if (ImGui::DragScalar(name.c_str(), ImGuiDataType_Double, &value, 0.1f))
+								{
+									scriptInstance->SetFieldValue<double>(name, value);
 								}
 							}
 							else if (scriptField.Type == ScriptFieldType::Bool)
@@ -686,7 +734,7 @@ namespace Kerberos
 							else if (scriptField.Type == ScriptFieldType::Vec4)
 							{
 								glm::vec4 value = scriptInstance->GetFieldValue<glm::vec4>(name);
-								if (ImGui::DragFloat3(name.c_str(), glm::value_ptr(value), 0.1f))
+								if (ImGui::DragFloat4(name.c_str(), glm::value_ptr(value), 0.1f))
 								{
 									scriptInstance->SetFieldValue<glm::vec4>(name, value);
 								}
@@ -701,18 +749,57 @@ namespace Kerberos
 					{
 						/// The scene is not running, show the initializer fields for the script,
 						/// which then will be applied to the script when the scene starts.
-
-						const auto& fields = ScriptEngine::GetScriptFieldInitializerMap(entity);
-						for (const auto& [fieldName, fieldInitializer] : fields)
+						auto& fields = ScriptEngine::GetScriptFieldInitializerMap(entity);
+						for (auto& [fieldName, fieldInitializer] : fields)
 						{
 							const auto& scriptField = fieldInitializer.Field;
 
-							if (scriptField.Type == ScriptFieldType::Int)
+							if (scriptField.Type == ScriptFieldType::Short)
+							{
+								short value = fieldInitializer.GetValue<short>();
+								if (ImGui::InputScalar(fieldName.c_str(), ImGuiDataType_S16, &value))
+								{
+									fieldInitializer.SetValue<short>(value);
+								}
+							}
+							else if (scriptField.Type == ScriptFieldType::Int)
 							{
 								int value = fieldInitializer.GetValue<int>();
 								if (ImGui::InputInt(fieldName.c_str(), &value))
 								{
 									fieldInitializer.SetValue<int>(value);
+								}
+							}
+							else if (scriptField.Type == ScriptFieldType::Long)
+							{
+								int64_t value = fieldInitializer.GetValue<int64_t>();
+								if (ImGui::InputScalar(fieldName.c_str(), ImGuiDataType_S64, &value))
+								{
+									fieldInitializer.SetValue<int64_t>(value);
+								}
+							}
+							if (scriptField.Type == ScriptFieldType::UShort)
+							{
+								uint16_t value = fieldInitializer.GetValue<uint16_t>();
+								if (ImGui::InputScalar(fieldName.c_str(), ImGuiDataType_U16, &value))
+								{
+									fieldInitializer.SetValue<uint16_t>(value);
+								}
+							}
+							else if (scriptField.Type == ScriptFieldType::UInt)
+							{
+								uint32_t value = fieldInitializer.GetValue<uint32_t>();
+								if (ImGui::InputScalar(fieldName.c_str(), ImGuiDataType_U32, &value))
+								{
+									fieldInitializer.SetValue<uint32_t>(value);
+								}
+							}
+							else if (scriptField.Type == ScriptFieldType::ULong)
+							{
+								uint64_t value = fieldInitializer.GetValue<uint64_t>();
+								if (ImGui::InputScalar(fieldName.c_str(), ImGuiDataType_U64, &value))
+								{
+									fieldInitializer.SetValue<uint64_t>(value);
 								}
 							}
 							else if (scriptField.Type == ScriptFieldType::Float)
@@ -721,6 +808,14 @@ namespace Kerberos
 								if (ImGui::DragFloat(fieldName.c_str(), &value, 0.1f))
 								{
 									fieldInitializer.SetValue<float>(value);
+								}
+							}
+							else if (scriptField.Type == ScriptFieldType::Double)
+							{
+								double value = fieldInitializer.GetValue<double>();
+								if (ImGui::DragScalar(fieldName.c_str(), ImGuiDataType_Double, &value, 0.1f))
+								{
+									fieldInitializer.SetValue<double>(value);
 								}
 							}
 							else if (scriptField.Type == ScriptFieldType::Bool)
@@ -785,7 +880,7 @@ namespace Kerberos
 			{
 				entity.RemoveComponent<ScriptComponent>();
 			}
-		}*/
+		}
 
 		if (entity.HasComponent<SpriteRendererComponent>())
 		{

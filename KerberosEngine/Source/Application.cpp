@@ -12,6 +12,7 @@
 #include "Events/WindowClosedEvent.hpp"
 #include "Events/WindowResizedEvent.hpp"
 #include "Renderer/Renderer.hpp"
+#include "Scripting/ScriptEngine.hpp"
 #include "Logging/Log.hpp"
 
 #include <GLFW/glfw3.h>
@@ -202,6 +203,7 @@ namespace Kerberos
 		m_VulkanContext = CreateOwner<VulkanContext>(m_Window);
 
 		Renderer::Init();
+		ScriptEngine::Init();
 	}
 
 	Application::~Application()
@@ -212,6 +214,7 @@ namespace Kerberos
 		}
 
 		Renderer::Shutdown();
+		ScriptEngine::Shutdown();
 
 		Project::ReleaseActiveProjectResources();
 
@@ -283,7 +286,7 @@ namespace Kerberos
 		m_MainThreadQueue.push(fn);
 	}
 
-	void Application::BlockEvents(bool shouldBlock)
+	void Application::BlockEvents(const bool shouldBlock)
 	{
 		m_BlockEvents = shouldBlock;
 	}

@@ -6,9 +6,9 @@
 #include "Scene/Components/PhysicsComponents.hpp"
 #include "Scene/Components/AudioComponents.hpp"
 #include "Assets/AssetManager.hpp"
-//#include "Scripting/ScriptEngine.hpp"
-//#include "Scripting/ScriptUtils.hpp"
-//#include "Scripting/ScriptClass.hpp"
+#include "Scripting/ScriptEngine.hpp"
+#include "Scripting/ScriptUtils.hpp"
+#include "Scripting/ScriptClass.hpp"
 #include "SerializationUtils.hpp"
 
 #include <yaml-cpp/yaml.h>
@@ -98,7 +98,7 @@ namespace Kerberos
 			out << YAML::EndMap;
 		}
 
-		/*if (entity.HasComponent<ScriptComponent>())
+		if (entity.HasComponent<ScriptComponent>())
 		{
 			out << YAML::Key << "ScriptComponent";
 			out << YAML::BeginMap;
@@ -176,7 +176,7 @@ namespace Kerberos
 			out << YAML::EndSeq;
 
 			out << YAML::EndMap;
-		}*/
+		}
 
 		if (entity.HasComponent<NativeScriptComponent>())
 		{
@@ -479,7 +479,7 @@ namespace Kerberos
 					}
 				}
 
-				/*if (auto scriptComponent = entity["ScriptComponent"])
+				if (auto scriptComponent = entity["ScriptComponent"])
 				{
 					auto& script = deserializedEntity.AddComponent<ScriptComponent>();
 					script.ClassName = scriptComponent["ClassName"].as<std::string>();
@@ -548,7 +548,7 @@ namespace Kerberos
 							scriptFieldInitializers[name] = initializer;
 						}
 					}
-				}*/
+				}
 
 				if (auto nativeScriptComponent = entity["NativeScriptComponent"])
 				{

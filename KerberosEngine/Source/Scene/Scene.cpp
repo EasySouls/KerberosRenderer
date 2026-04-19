@@ -16,8 +16,8 @@
 #include "Application.hpp"
 #include "Assets/AssetManager.hpp"
 #include "Renderer/Renderer.hpp"
+#include "Scripting/ScriptEngine.hpp"
 //#include "Renderer/RenderCommand.h"
-//#include "Scripting/ScriptEngine.hpp"
 
 #define USE_MAP_FOR_UUID 1
 
@@ -27,26 +27,6 @@ namespace Kerberos
 		: m_PhysicsSystem(new JoltPhysicsSystem())
 	{
 		m_Registry = entt::basic_registry();
-
-		/*m_ShadowMapFramebuffer = Framebuffer::Create(FramebufferSpecification{
-			.Width = 1024,
-			.Height = 1024,
-			.Attachments = {
-				{FramebufferTextureFormat::DEPTH24}
-			}
-													 });
-		m_ShadowMapFramebuffer->SetDebugName("ShadowMapFramebuffer");
-
-		m_EditorFramebuffer = Framebuffer::Create(FramebufferSpecification{
-			.Width = 1280,
-			.Height = 720,
-			.Attachments = {
-				{FramebufferTextureFormat::RGBA8},
-				{FramebufferTextureFormat::RED_INTEGER},
-				{FramebufferTextureFormat::DEPTH24STENCIL8}
-			}
-												  });
-		m_EditorFramebuffer->SetDebugName("EditorFramebuffer");*/
 	}
 
 	Scene::~Scene()
@@ -60,14 +40,14 @@ namespace Kerberos
 		KBR_PROFILE_FUNCTION();
 
 		m_PhysicsSystem->Initialize(shared_from_this());
+		m_PhysicsSystem->Update(0.0f); // Sync physics bodies with transforms before scripts run for the first time
 
-		//ScriptEngine::OnRuntimeStart(shared_from_this());
+		ScriptEngine::OnRuntimeStart(shared_from_this());
 
 		/// Instantiate all scripts
-
 		m_Registry.view<ScriptComponent>().each([this](auto enttId, ScriptComponent& script) {
 			const Entity entity{ enttId, this };
-			//ScriptEngine::OnCreateEntity(entity);
+			ScriptEngine::OnCreateEntity(entity);
 		});
 	}
 
@@ -75,7 +55,7 @@ namespace Kerberos
 	{
 		m_PhysicsSystem->Cleanup();
 
-		//ScriptEngine::OnRuntimeStop();
+		ScriptEngine::OnRuntimeStop();
 	}
 
 	void Scene::OnSimulationStart()
@@ -836,7 +816,7 @@ namespace Kerberos
 			m_Registry.view<ScriptComponent>().each([this, ts](auto id, [[maybe_unused]] const ScriptComponent& script)
 			{
 				const Entity entity{ id, this };
-				//ScriptEngine::OnUpdateEntity(entity, ts);
+				ScriptEngine::OnUpdateEntity(entity, ts);
 			});
 		}
 	}

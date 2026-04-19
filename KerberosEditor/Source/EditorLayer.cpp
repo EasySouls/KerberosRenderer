@@ -18,11 +18,13 @@
 #include "Serialization/SceneSerializer.hpp"
 #include "Input/KeyCodes.hpp"
 #include "Logging/Log.hpp"
+#include "Scripting/ScriptEngine.hpp"
 
 #include <glm/gtc/matrix_inverse.hpp>
 #include <glm/gtc/type_ptr.hpp>
 #include <imgui/imgui.h>
 #include <limits>
+
 
 namespace Kerberos
 {
@@ -800,7 +802,7 @@ namespace Kerberos
 			{
 				if (ImGui::MenuItem("Reload C# assemblies", "", nullptr, m_SceneState == SceneState::Edit))
 				{
-					//ScriptEngine::ReloadAssembly();
+					ScriptEngine::ReloadAssembly();
 				}
 
 				if (ImGui::MenuItem("Recompile shaders", "", nullptr, m_SceneState == SceneState::Edit))
