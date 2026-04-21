@@ -6,5 +6,10 @@ namespace Kerberos.Source.Kerberos.Core
         {
             return InternalCalls.Input_IsKeyDown(keycode);
         }
+
+        public static bool IsMouseButtonDown(MouseButton button)
+        {
+            return InternalCalls.Input_IsMouseButtonDown(button);
+        }
     }
 }

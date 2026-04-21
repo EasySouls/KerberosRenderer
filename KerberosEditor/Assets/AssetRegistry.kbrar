@@ -1,4 +1,10 @@
 AssetRegistry:
+  - Handle: 115472114555992723
+    Type: Texture2D
+    Path: Assets\Textures\rocks_color_rgba.ktx2
+  - Handle: 926753587182379847
+    Type: Texture2D
+    Path: Assets\Textures\rocks_normal_height_rgba.ktx2
   - Handle: 1854418276753847419
     Type: Texture2D
     Path: Assets\Models\cerberus\albedo.ktx2
@@ -26,6 +32,9 @@ AssetRegistry:
   - Handle: 8036360350461290503
     Type: Material
     Path: Assets\Materials\white.kbrmat
+  - Handle: 8165452178448060093
+    Type: Material
+    Path: Assets\Materials\rock.kbrmat
   - Handle: 9862963687860094857
     Type: Texture2D
     Path: Assets\Models\cerberus\normal.ktx2

@@ -29,7 +29,9 @@ namespace Kerberos
 	{
 		void* NativeLog;
 		void* Entity_HasComponent;
+		void* Entity_AddComponent;
 		void* Entity_FindEntityByName;
+		void* Entity_Instantiate;
 
 		void* TransformComponent_GetTranslation;
 		void* TransformComponent_SetTranslation;
@@ -51,6 +53,7 @@ namespace Kerberos
 		void* TextComponent_GetFontPath;
 
 		void* Input_IsKeyDown;
+		void* Input_IsMouseButtonDown;
 
 		void* AudioSource2DComponent_Play;
 		void* AudioSource2DComponent_Stop;
@@ -96,6 +99,64 @@ namespace Kerberos
 		return 0;
 	}
 
+	static auto AddComponentTypeByName(const std::string& qualifiedTypeName) -> std::function<void(Entity)>
+	{
+		const std::string typeName = qualifiedTypeName.substr(qualifiedTypeName.find_last_of('.') + 1);
+
+		if (typeName == "SpriteRendererComponent")
+			return [](Entity entity) { return entity.AddComponent<SpriteRendererComponent>(); };
+		if (typeName == "CameraComponent")
+			return [](Entity entity) { return entity.AddComponent<CameraComponent>(); };
+		if (typeName == "StaticMeshComponent")
+			return [](Entity entity) { return entity.AddComponent<StaticMeshComponent>(); };
+		if (typeName == "DirectionalLightComponent")
+			return [](Entity entity) { return entity.AddComponent<DirectionalLightComponent>(); };
+		if (typeName == "PointLightComponent")
+			return [](Entity entity) { return entity.AddComponent<PointLightComponent>(); };
+		if (typeName == "SpotLightComponent")
+			return [](Entity entity) { return entity.AddComponent<SpotLightComponent>(); };
+		if (typeName == "EnvironmentComponent")
+			return [](Entity entity) { return entity.AddComponent<EnvironmentComponent>(); };
+		if (typeName == "TextComponent")
+			return [](Entity entity) { return entity.AddComponent<TextComponent>(); };
+		if (typeName == "RigidBody3DComponent")
+			return [](Entity entity) { return entity.AddComponent<RigidBody3DComponent>(); };
+		if (typeName == "BoxCollider3DComponent")
+			return [](Entity entity) { return entity.AddComponent<BoxCollider3DComponent>(); };
+		if (typeName == "SphereCollider3DComponent")
+			return [](Entity entity) { return entity.AddComponent<SphereCollider3DComponent>(); };
+		if (typeName == "CapsuleCollider3DComponent")
+			return [](Entity entity) { return entity.AddComponent<CapsuleCollider3DComponent>(); };
+		if (typeName == "MeshCollider3DComponent")
+			return [](Entity entity) { return entity.AddComponent<MeshCollider3DComponent>(); };
+		if (typeName == "AudioSource2DComponent")
+			return [](Entity entity) { return entity.AddComponent<AudioSource2DComponent>(); };
+		if (typeName == "AudioSource3DComponent")
+			return [](Entity entity) { return entity.AddComponent<AudioSource3DComponent>(); };
+		if (typeName == "AudioListenerComponent")
+			return [](Entity entity) { return entity.AddComponent<AudioListenerComponent>(); };
+
+		KBR_CORE_ASSERT(false, "Unknown component type: {0}", typeName);
+		return nullptr;
+	}
+
+	static void Entity_AddComponent(const uint64_t entityID, const char* componentTypeName)
+	{
+		if (!componentTypeName)
+			return;
+
+		if (const std::shared_ptr<Scene> scene = ScriptEngine::GetSceneContext().lock())
+		{
+			const Entity entity = scene->GetEntityByUUID(UUID(entityID));
+			const std::string typeName(componentTypeName);
+
+			if (const auto addComponentFunc = AddComponentTypeByName(typeName))
+			{
+				addComponentFunc(entity);
+			}
+		}
+	}
+
 	static uint64_t Entity_FindEntityByName(const char* name)
 	{
 		if (!name)
@@ -109,6 +170,17 @@ namespace Kerberos
 			{
 				return entity.GetUUID();
 			}
+		}
+		return UUID::Invalid();
+	}
+
+	static uint64_t Entity_Instantiate(const char* name)
+	{
+		const std::string nameStr = name ? std::string(name) : "Entity";
+		if (const std::shared_ptr<Scene> scene = ScriptEngine::GetSceneContext().lock())
+		{
+			const Entity entity = scene->CreateEntity(nameStr);
+			return entity.GetUUID();
 		}
 		return UUID::Invalid();
 	}
@@ -412,6 +484,11 @@ namespace Kerberos
 		return Input::IsKeyPressed(static_cast<KeyCode>(key)) ? 1 : 0;
 	}
 
+	static uint8_t Input_IsMouseButtonDown(const int button)
+	{
+		return Input::IsMouseButtonPressed(static_cast<MouseButtonCode>(button)) ? 1 : 0;
+	}
+
 	// ====================================================================
 	// Component Registration
 	// ====================================================================
@@ -438,7 +515,9 @@ namespace Kerberos
 
 		callbackTable.NativeLog = reinterpret_cast<void*>(&NativeLog);
 		callbackTable.Entity_HasComponent = reinterpret_cast<void*>(&Entity_HasComponent);
+		callbackTable.Entity_AddComponent = reinterpret_cast<void*>(&Entity_AddComponent);
 		callbackTable.Entity_FindEntityByName = reinterpret_cast<void*>(&Entity_FindEntityByName);
+		callbackTable.Entity_Instantiate = reinterpret_cast<void*>(&Entity_Instantiate);
 
 		callbackTable.TransformComponent_GetTranslation = reinterpret_cast<void*>(&TransformComponent_GetTranslation);
 		callbackTable.TransformComponent_SetTranslation = reinterpret_cast<void*>(&TransformComponent_SetTranslation);
@@ -460,6 +539,7 @@ namespace Kerberos
 		callbackTable.TextComponent_GetFontPath = reinterpret_cast<void*>(&TextComponent_GetFontPath);
 
 		callbackTable.Input_IsKeyDown = reinterpret_cast<void*>(&Input_IsKeyDown);
+		callbackTable.Input_IsMouseButtonDown = reinterpret_cast<void*>(&Input_IsMouseButtonDown);
 
 		callbackTable.AudioSource2DComponent_Play = reinterpret_cast<void*>(&AudioSource2DComponent_Play);
 		callbackTable.AudioSource2DComponent_Stop = reinterpret_cast<void*>(&AudioSource2DComponent_Stop);

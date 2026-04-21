@@ -7,6 +7,8 @@ namespace Kerberos.Source.Kerberos
     public class Player : Entity
     {
         public float Speed = 5.0f;
+        public float ShootingCooldownTime = 2.0f;
+        private float _shootingCooldownTimer = 0.0f;
 
         private TransformComponent _transformComponent;
         private RigidBody3DComponent _rigidbody3DComponent;
@@ -44,6 +46,8 @@ namespace Kerberos.Source.Kerberos
 
         protected override void OnUpdate(float deltaTime)
         {
+            HandleShooting(deltaTime);
+
             Vector3 velocity = Vector3.Zero;
 
             if (Input.IsKeyDown(KeyCode.A))
@@ -84,6 +88,22 @@ namespace Kerberos.Source.Kerberos
                 _audioSource2DComponent.Stop();
                 _isPlayingAudio = false;
             }
+        }
+
+        private void HandleShooting(float deltaTime)
+        {
+            _shootingCooldownTimer -= deltaTime;
+            if (Input.IsMouseButtonDown(MouseButton.Left) && _shootingCooldownTimer <= 0.0f)
+            {
+                Shoot();
+                _shootingCooldownTimer = ShootingCooldownTime;
+            }
+        }
+
+        private void Shoot()
+        {
+            Entity bulletEntity = Instantiate("bullet");
+            bulletEntity.AddComponent<RigidBody3DComponent>();
         }
 
         private void ApplyVelocity(Vector3 velocity, float deltaTime)

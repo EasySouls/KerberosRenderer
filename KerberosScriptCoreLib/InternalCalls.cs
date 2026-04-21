@@ -22,7 +22,13 @@ namespace Kerberos.Source
         internal delegate byte EntityHasComponentFn(ulong entityID, IntPtr componentTypeName);
 
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        internal delegate byte EntityAddComponentFn(ulong entityID, IntPtr componentTypeName);
+
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
         internal delegate ulong EntityFindByNameFn(IntPtr name);
+
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        internal delegate ulong EntityInstantiateFn(IntPtr name);
 
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
         internal delegate void TransformGetVec3Fn(ulong entityID, out Vector3 value);
@@ -58,6 +64,9 @@ namespace Kerberos.Source
         internal delegate byte IsKeyDownFn(int keyCode);
 
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        internal delegate byte IsMouseButtonDownFn(int mouseCode);
+
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
         internal delegate void EntityActionFn(ulong entityID);
 
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
@@ -72,7 +81,9 @@ namespace Kerberos.Source
 
         private static NativeLogFn? s_NativeLog;
         private static EntityHasComponentFn? s_EntityHasComponent;
+        private static EntityAddComponentFn? s_EntityAddComponent;
         private static EntityFindByNameFn? s_EntityFindByName;
+        private static EntityInstantiateFn? s_EntityInstantiate;
 
         private static TransformGetVec3Fn? s_TransformGetTranslation;
         private static TransformSetVec3Fn? s_TransformSetTranslation;
@@ -94,6 +105,7 @@ namespace Kerberos.Source
         private static GetStringFn? s_TextComponentGetFontPath;
 
         private static IsKeyDownFn? s_InputIsKeyDown;
+        private static IsMouseButtonDownFn? s_InputIsMouseButtonDown;
 
         private static EntityActionFn? s_AudioSource2DPlay;
         private static EntityActionFn? s_AudioSource2DStop;
@@ -130,7 +142,9 @@ namespace Kerberos.Source
 
             s_NativeLog = Marshal.GetDelegateForFunctionPointer<NativeLogFn>(ReadNext());
             s_EntityHasComponent = Marshal.GetDelegateForFunctionPointer<EntityHasComponentFn>(ReadNext());
+            s_EntityAddComponent = Marshal.GetDelegateForFunctionPointer<EntityAddComponentFn>(ReadNext());
             s_EntityFindByName = Marshal.GetDelegateForFunctionPointer<EntityFindByNameFn>(ReadNext());
+            s_EntityInstantiate = Marshal.GetDelegateForFunctionPointer<EntityInstantiateFn>(ReadNext());
 
             s_TransformGetTranslation = Marshal.GetDelegateForFunctionPointer<TransformGetVec3Fn>(ReadNext());
             s_TransformSetTranslation = Marshal.GetDelegateForFunctionPointer<TransformSetVec3Fn>(ReadNext());
@@ -152,6 +166,7 @@ namespace Kerberos.Source
             s_TextComponentGetFontPath = Marshal.GetDelegateForFunctionPointer<GetStringFn>(ReadNext());
 
             s_InputIsKeyDown = Marshal.GetDelegateForFunctionPointer<IsKeyDownFn>(ReadNext());
+            s_InputIsMouseButtonDown = Marshal.GetDelegateForFunctionPointer<IsMouseButtonDownFn>(ReadNext());
 
             s_AudioSource2DPlay = Marshal.GetDelegateForFunctionPointer<EntityActionFn>(ReadNext());
             s_AudioSource2DStop = Marshal.GetDelegateForFunctionPointer<EntityActionFn>(ReadNext());
@@ -169,7 +184,7 @@ namespace Kerberos.Source
         }
 
         // ====================================================================
-        // Public API (called by C# scripts - same signatures as before)
+        // Public API (called by C# scripts)
         // ====================================================================
 
         internal static void NativeLog(string message)
@@ -186,6 +201,13 @@ namespace Kerberos.Source
             finally { Marshal.FreeHGlobal(ptr); }
         }
 
+        internal static void Entity_AddComponent(ulong id, Type componentType)
+        {
+            IntPtr ptr = Marshal.StringToHGlobalAnsi(componentType.FullName ?? componentType.Name);
+            try { s_EntityAddComponent?.Invoke(id, ptr); }
+            finally { Marshal.FreeHGlobal(ptr); }
+        }
+
         internal static ulong Entity_FindEntityByName(string name)
         {
             IntPtr ptr = Marshal.StringToHGlobalAnsi(name);
@@ -196,6 +218,13 @@ namespace Kerberos.Source
         internal static object? Entity_GetScriptInstance(ulong entityID)
         {
             return ScriptGlue.GetInstance(entityID);
+        }
+
+        internal static ulong Entity_Instantiate(string name)
+        {
+            IntPtr ptr = Marshal.StringToHGlobalAnsi(name);
+            try { return s_EntityInstantiate?.Invoke(ptr) ?? 0; }
+            finally { Marshal.FreeHGlobal(ptr); }
         }
 
         // ----------------------------- TransformComponent -----------------------------
@@ -299,6 +328,11 @@ namespace Kerberos.Source
         internal static bool Input_IsKeyDown(KeyCode key)
         {
             return s_InputIsKeyDown?.Invoke((int)key) != 0;
+        }
+
+        internal static bool Input_IsMouseButtonDown(MouseButton mouseCode)
+        {
+            return s_InputIsMouseButtonDown?.Invoke((int)mouseCode) != 0;
         }
 
         // ------------------------- AudioSource2DComponent --------------------------

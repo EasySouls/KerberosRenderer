@@ -47,6 +47,14 @@ namespace Kerberos.Source.Kerberos.Scene
             return component;
         }
 
+        public void AddComponent<T>() where T : Component, new()
+        {
+            if (HasComponent<T>())
+                throw new InvalidOperationException($"Entity already has a component of type {typeof(T).Name}");
+
+            InternalCalls.Entity_AddComponent(ID, typeof(T));
+        }
+
         protected static Entity? FindEntityByName(string name)
         {
             ulong entityID = InternalCalls.Entity_FindEntityByName(name);
@@ -59,6 +67,12 @@ namespace Kerberos.Source.Kerberos.Scene
                               ?? throw new ArgumentNullException(nameof(ID));
 
             return (instance as T)!;
+        }
+
+        protected static Entity Instantiate(string name)
+        {
+            ulong entityID = InternalCalls.Entity_Instantiate(name);
+            return new Entity(entityID);
         }
     }
 }
