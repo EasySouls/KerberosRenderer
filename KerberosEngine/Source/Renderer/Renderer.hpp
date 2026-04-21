@@ -12,6 +12,7 @@
 namespace Kerberos
 {
 	struct GPULight;
+	struct LineVertex;
 
 	struct DepthBias
 	{
@@ -65,6 +66,7 @@ namespace Kerberos
 		static DepthBias& GetShadowMapDepthBiasSettings();
 		static bool& GetIsPCFEnabledForShadowMap();
 		static bool& GetDisplayDebugNormals();
+		static bool& GetDisplayPhysicsColliders();
 		static bool& GetDisplaySkybox();
 		static bool& GetUseRayQueryBasedShadows();
 		static bool& GetUseRayQueryBasedSoftShadows();
@@ -103,10 +105,11 @@ namespace Kerberos
 											  const glm::vec4& cascadeSplits,
 											  uint32_t lightCount);
 
-        static void UpdatePerObjectUniformBuffer(uint32_t currentImage, uint32_t objectIndex, const glm::mat4& model, const Material& material, uint32_t entityID);
+		static void UpdatePerObjectUniformBuffer(uint32_t currentImage, uint32_t objectIndex, const glm::mat4& model, const Material& material, uint32_t entityID);
 
 		static std::vector<GPULight> GetLightsFromScene(const Scene& scene);
 		static std::pair<std::vector<RenderObject>, std::set<Ref<Material>>> GetRenderObjectsAndUniqueMaterialsFromScene(const Scene& scene);
+		static std::vector<LineVertex> GetColliderLineVerticesFromScene(const Scene& scene);
 		
 		static void WriteGPUTimestamp(const vk::raii::CommandBuffer& cmd, uint32_t frameIndex, uint32_t index);
 		static void ResolveGPUTimings(uint32_t frameIndex);

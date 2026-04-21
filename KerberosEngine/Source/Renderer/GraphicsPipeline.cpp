@@ -8,6 +8,19 @@
 
 namespace 
 {
+	vk::PrimitiveTopology GetVkPrimitiveTopology(const Kerberos::PrimitiveTopology topology)
+	{
+		using namespace Kerberos;
+
+		if (topology == PrimitiveTopology::TriangleList)
+			return vk::PrimitiveTopology::eTriangleList;
+		if (topology == PrimitiveTopology::LineList)
+			return vk::PrimitiveTopology::eLineList;
+
+		KBR_CORE_ASSERT(false, "Unknown primitive topology!");
+		return vk::PrimitiveTopology::eTriangleList;
+	}
+
 	vk::CullModeFlags GetVkCullMode(const Kerberos::CullMode cullMode)
 	{
 		using namespace Kerberos;
@@ -196,7 +209,7 @@ namespace Kerberos
 			.pDynamicStates = spec.DynamicStates.data()
 		};
 
-		constexpr vk::PipelineInputAssemblyStateCreateInfo inputAssembly{ .topology = vk::PrimitiveTopology::eTriangleList };
+		const vk::PipelineInputAssemblyStateCreateInfo inputAssembly{ .topology = GetVkPrimitiveTopology(spec.Topology) };
 
 		constexpr vk::PipelineViewportStateCreateInfo viewportState{ .viewportCount = 1, .scissorCount = 1 };
 

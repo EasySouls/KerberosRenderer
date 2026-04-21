@@ -84,6 +84,25 @@ namespace Kerberos
 			return Position == other.Position && Color == other.Color && TexCoord == other.TexCoord && EntityID == other.EntityID;
 		}
 	};
+
+	struct LineVertex
+	{
+		glm::vec3 Position{ 0.0f };
+		glm::vec3 Color{ 0.0f, 1.0f, 0.0f };
+
+		static vk::VertexInputBindingDescription GetBindingDescription()
+		{
+			return { 0, sizeof(LineVertex), vk::VertexInputRate::eVertex };
+		}
+
+		static std::array<vk::VertexInputAttributeDescription, 2> GetAttributeDescriptions()
+		{
+			return {
+				vk::VertexInputAttributeDescription(0, 0, vk::Format::eR32G32B32Sfloat, offsetof(LineVertex, Position)),
+				vk::VertexInputAttributeDescription(1, 0, vk::Format::eR32G32B32Sfloat, offsetof(LineVertex, Color))
+			};
+		}
+	};
 }
 
 template<>
@@ -121,6 +140,23 @@ struct std::hash<Kerberos::TextVertex>
 		combine(v.Position);
 		combine(v.Color);
 		combine(v.TexCoord);
+		return seed;
+	}
+};
+
+template<>
+struct std::hash<Kerberos::LineVertex>
+{
+	size_t operator()(const Kerberos::LineVertex& v) const noexcept
+	{
+		size_t seed = 0;
+		const auto combine = [&seed]<typename T>(const T & value)
+		{
+			seed ^= std::hash<std::decay_t<T>>{}(value)
+				+0x9e3779b9 + (seed << 6) + (seed >> 2);
+		};
+		combine(v.Position);
+		combine(v.Color);
 		return seed;
 	}
 };

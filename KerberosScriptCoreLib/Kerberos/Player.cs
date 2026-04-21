@@ -13,7 +13,7 @@ namespace Kerberos.Source.Kerberos
         private AudioSource2DComponent _audioSource2DComponent;
         private Camera _mainCamera;
 
-        // Implement OnXButtonClicked methods for 
+        // Implement OnXButtonClicked methods
         private bool _isPlayingAudio = false;
 
         internal Player() : base()

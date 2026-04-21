@@ -913,6 +913,7 @@ namespace Kerberos
 		ImGui::Text("Settings");
 		ImGui::Checkbox("Display Skybox", &Renderer::GetDisplaySkybox());
 		ImGui::Checkbox("Display normals", &Renderer::GetDisplayDebugNormals());
+		ImGui::Checkbox("Display physics colliders", &Renderer::GetDisplayPhysicsColliders());
 
 		bool& useRayQueryBasedShadows = Renderer::GetUseRayQueryBasedShadows();
 		ImGui::Checkbox("Ray query based shadows", &useRayQueryBasedShadows);

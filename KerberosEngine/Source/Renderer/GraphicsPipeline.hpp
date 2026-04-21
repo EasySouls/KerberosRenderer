@@ -42,6 +42,12 @@ namespace Kerberos
 		AlphaBlend = 2
 	};
 
+	enum class PrimitiveTopology : uint8_t
+	{
+		TriangleList = 0,
+		LineList = 1
+	};
+
 	struct GraphicsPipelineSpecification
 	{
 		std::string Name;
@@ -62,6 +68,7 @@ namespace Kerberos
 		bool EnableDepthWrite = true;
 		bool EnableDepthTest = true;
 		DepthTestFunc DepthTestFunc = DepthTestFunc::LessOrEqual;
+		PrimitiveTopology Topology = PrimitiveTopology::TriangleList;
 
 		std::vector<BlendMode> BlendModes;
 		std::vector<vk::Format> ColorAttachmentFormats;
