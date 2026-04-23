@@ -12,6 +12,16 @@
       "generator": "Visual Studio 18 2026",
       "architecture": "x64",
       "binaryDir": "build/vs2026"
+    },
+    {
+      "name": "vs2026-asan",
+      "inherits": "vs2026",
+      "binaryDir": "build/vs2026-asan",
+      "cacheVariables": {
+        "KBR_ENABLE_ASAN": "ON",
+        "KBR_ENABLE_FUZZING": "OFF",
+        "KBR_ENABLE_THIRDPARTY_INSTRUMENTATION": "OFF"
+      }
     }
   ]
 }

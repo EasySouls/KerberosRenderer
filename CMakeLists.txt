@@ -6,6 +6,11 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 set_property(GLOBAL PROPERTY USE_FOLDERS ON)
 
+# Instrumentation options
+option(KBR_ENABLE_ASAN "Enable AddressSanitizer for Kerberos targets." OFF)
+option(KBR_ENABLE_FUZZING "Enable libFuzzer instrumentation (-fsanitize=fuzzer-no-link) for Kerberos targets (Clang only)." OFF)
+option(KBR_ENABLE_THIRDPARTY_INSTRUMENTATION "Enable selected sanitizer/fuzz instrumentation for third-party targets too." OFF)
+
 # Disable Basis Universal SSE support to avoid C++23 implicit-move
 # incompatibility in cppspmd_sse.h (rvalue-ref return binding to lvalue-ref).
 set(BASISU_SSE OFF CACHE BOOL "Compile with SSE support so applications can choose to use it." FORCE)

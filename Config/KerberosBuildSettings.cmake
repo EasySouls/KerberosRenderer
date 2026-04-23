@@ -24,3 +24,26 @@ target_compile_definitions(KerberosBuildSettings INTERFACE
     $<$<CONFIG:Release>:KBR_RELEASE>
     $<$<CONFIG:RelWithDebInfo>:KBR_RELEASE>
 )
+
+# Sanitizers / fuzzing instrumentation for Kerberos targets only
+if(KBR_ENABLE_ASAN)
+    target_compile_options(KerberosBuildSettings INTERFACE
+        $<$<CXX_COMPILER_ID:MSVC>:/fsanitize=address>
+        $<$<OR:$<CXX_COMPILER_ID:Clang>,$<CXX_COMPILER_ID:GNU>>:-fsanitize=address -fno-omit-frame-pointer>
+    )
+    target_link_options(KerberosBuildSettings INTERFACE
+        $<$<CXX_COMPILER_ID:MSVC>:/fsanitize=address>
+        $<$<OR:$<CXX_COMPILER_ID:Clang>,$<CXX_COMPILER_ID:GNU>>:-fsanitize=address -fno-omit-frame-pointer>
+    )
+endif()
+
+if(KBR_ENABLE_FUZZING)
+    if(CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
+        # Keep normal app/link behavior by enabling instrumentation without
+        # linking libFuzzer's main entrypoint.
+        target_compile_options(KerberosBuildSettings INTERFACE -fsanitize=fuzzer-no-link)
+        target_link_options(KerberosBuildSettings INTERFACE -fsanitize=fuzzer-no-link)
+    else()
+        message(WARNING "KBR_ENABLE_FUZZING is ON, but this project only enables fuzzing instrumentation with Clang.")
+    endif()
+endif()

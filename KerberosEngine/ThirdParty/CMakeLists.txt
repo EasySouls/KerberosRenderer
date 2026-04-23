@@ -1,5 +1,30 @@
 set(BUILD_TESTING OFF CACHE BOOL "" FORCE)
 
+# Optional instrumentation for third-party libraries.
+# This is intentionally directory-scoped so it propagates into each vendor
+# subdirectory without patching upstream CMake files.
+if(KBR_ENABLE_THIRDPARTY_INSTRUMENTATION)
+    if(KBR_ENABLE_ASAN)
+        add_compile_options(
+            $<$<CXX_COMPILER_ID:MSVC>:/fsanitize=address>
+            $<$<OR:$<CXX_COMPILER_ID:Clang>,$<CXX_COMPILER_ID:GNU>>:-fsanitize=address -fno-omit-frame-pointer>
+        )
+        add_link_options(
+            $<$<CXX_COMPILER_ID:MSVC>:/fsanitize=address>
+            $<$<OR:$<CXX_COMPILER_ID:Clang>,$<CXX_COMPILER_ID:GNU>>:-fsanitize=address -fno-omit-frame-pointer>
+        )
+    endif()
+
+    if(KBR_ENABLE_FUZZING)
+        if(CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
+            add_compile_options(-fsanitize=fuzzer-no-link)
+            add_link_options(-fsanitize=fuzzer-no-link)
+        else()
+            message(WARNING "KBR_ENABLE_FUZZING is ON, but third-party fuzzing instrumentation is only enabled with Clang.")
+        endif()
+    endif()
+endif()
+
 # GLFW
 set(GLFW_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
 set(GLFW_BUILD_TESTS OFF CACHE BOOL "" FORCE)
