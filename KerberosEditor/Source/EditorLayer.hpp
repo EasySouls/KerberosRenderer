@@ -53,6 +53,7 @@ namespace Kerberos
 		void OpenProject(const std::filesystem::path& filepath);
 		[[nodiscard]] bool OpenProject();
 
+		bool CanSaveScene();
 		void SaveScene();
 		void SaveSceneAs();
 
