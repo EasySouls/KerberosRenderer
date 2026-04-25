@@ -469,6 +469,18 @@ namespace Kerberos
 
 	void EditorLayer::SaveScene()
 	{
+		if (!m_ActiveScene)
+		{
+			m_NotificationManager.AddNotification("No active scene to save!", Notification::Type::Error);
+			return;
+		}
+
+		if (m_SceneState == SceneState::Play)
+		{
+			m_NotificationManager.AddNotification("Cannot save scene while in Play mode!", Notification::Type::Error);
+			return;
+		}
+
 		// TODO: Store the current scene path in the project and save to that path instead of hardcoding it here
 		const std::filesystem::path scenePath = "assets/scenes/Example.kerberos";
 
@@ -482,6 +494,18 @@ namespace Kerberos
 
 	void EditorLayer::SaveSceneAs()
 	{
+		if (!m_ActiveScene)
+		{
+			m_NotificationManager.AddNotification("No active scene to save!", Notification::Type::Error);
+			return;
+		}
+
+		if (m_SceneState == SceneState::Play)
+		{
+			m_NotificationManager.AddNotification("Cannot save scene while in Play mode!", Notification::Type::Error);
+			return;
+		}
+
 		const std::string filepath = FileDialog::SaveFile("Kerberos Scene (*.kerberos)\0*.kerberos\0");
 		if (filepath.empty())
 			return;
