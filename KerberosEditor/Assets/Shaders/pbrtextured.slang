@@ -15,7 +15,7 @@ struct VSOutput
     float3 FragPos_WorldSpace;
     float3 Normal;
     float3 Tangent;
-    float TangentW;  // glTF tangent handedness (+1 or -1)
+    float3 Bitangent;
     float2 TexCoord : TEXCOORD0;
     float ViewSpaceZ;
 };
@@ -211,16 +211,9 @@ float ShadowCalculation(float3 lightDir, float3 normal, float3 fragPosWorldSpace
 
 float3 CalculateNormal(VSOutput input)
 {
+    float3 T = normalize(input.Tangent);
+    float3 B = normalize(input.Bitangent);
     float3 N = normalize(input.Normal);
-    float3 T = input.Tangent;
-
-    if (dot(T, T) < 1e-6)
-        return N;
-
-    // Re-orthogonalize (Gram-Schmidt)
-    T = normalize(T - N * dot(N, T));
-
-    float3 B = cross(N, T) * input.TangentW;
 
     float3x3 TBN = float3x3(T, B, N);
 
@@ -238,9 +231,17 @@ VSOutput vertexMain(VSInput input)
     output.FragPos_WorldSpace = worldPos.xyz;
 
     float3x3 normalMatrix = (float3x3)perObject.worldNormal;
-    output.Normal = mul(normalMatrix, input.Normal);
-    output.Tangent = mul(normalMatrix, input.Tangent.xyz);
-    output.TangentW = input.Tangent.w;
+
+    float3 N = normalize(mul(normalMatrix, input.Normal));
+    float3 T = normalize(mul(normalMatrix, input.Tangent.xyz));
+
+    T = normalize(T - N * dot(N, T));
+
+    float3 B = cross(N, T) * input.Tangent.w;
+
+    output.Normal = N;
+    output.Tangent = T;
+    output.Bitangent = B;
 
     output.TexCoord = input.TexCoord;
 

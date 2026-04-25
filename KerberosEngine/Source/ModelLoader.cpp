@@ -10,6 +10,76 @@
 
 namespace Kerberos
 {
+	static void GenerateTangentsForVertices(std::vector<Vertex>& vertices, const std::vector<uint32_t>& indices)
+	{
+		const size_t vertexCount = vertices.size();
+
+		std::vector<glm::vec3> tan1(vertexCount, glm::vec3(0.0f));
+		std::vector<glm::vec3> tan2(vertexCount, glm::vec3(0.0f));
+
+		for (size_t i = 0; i < indices.size(); i += 3)
+		{
+			uint32_t i0 = indices[i];
+			uint32_t i1 = indices[i + 1];
+			uint32_t i2 = indices[i + 2];
+
+			const Vertex& v0 = vertices[i0];
+			const Vertex& v1 = vertices[i1];
+			const Vertex& v2 = vertices[i2];
+
+			const glm::vec3 edge1 = v1.Position - v0.Position;
+			const glm::vec3 edge2 = v2.Position - v0.Position;
+			const glm::vec2 deltaUV1 = v1.TexCoord - v0.TexCoord;
+			const glm::vec2 deltaUV2 = v2.TexCoord - v0.TexCoord;
+
+			const float det = (deltaUV1.x * deltaUV2.y - deltaUV2.x * deltaUV1.y);
+			const float f = (det == 0.0f) ? 0.0f : 1.0f / det;
+
+			glm::vec3 tangent{};
+			tangent.x = f * (deltaUV2.y * edge1.x - deltaUV1.y * edge2.x);
+			tangent.y = f * (deltaUV2.y * edge1.y - deltaUV1.y * edge2.y);
+			tangent.z = f * (deltaUV2.y * edge1.z - deltaUV1.y * edge2.z);
+
+			glm::vec3 bitangent;
+			bitangent.x = f * (-deltaUV2.x * edge1.x + deltaUV1.x * edge2.x);
+			bitangent.y = f * (-deltaUV2.x * edge1.y + deltaUV1.x * edge2.y);
+			bitangent.z = f * (-deltaUV2.x * edge1.z + deltaUV1.x * edge2.z);
+
+			// Accumulate the tangents for each vertex of the triangle
+			tan1[i0] += tangent;
+			tan1[i1] += tangent;
+			tan1[i2] += tangent;
+
+			tan2[i0] += bitangent;
+			tan2[i1] += bitangent;
+			tan2[i2] += bitangent;
+		}
+
+		// Orthogonalize and normalize the accumulated tangents
+		for (size_t i = 0; i < vertexCount; ++i) {
+			const glm::vec3& n = vertices[i].Normal;
+			const glm::vec3& t = tan1[i];
+
+			// Gram-Schmidt orthogonalization
+			glm::vec3 orthogonalizedTangent = glm::normalize(t - n * glm::dot(n, t));
+
+			// Fallback for degenerate tangents
+			if (glm::any(glm::isnan(orthogonalizedTangent)) || glm::length(orthogonalizedTangent) < 0.0001f) {
+				glm::vec3 c1 = glm::cross(n, glm::vec3(0.0f, 0.0f, 1.0f));
+				glm::vec3 c2 = glm::cross(n, glm::vec3(0.0f, 1.0f, 0.0f));
+				orthogonalizedTangent = glm::normalize(glm::length(c1) > glm::length(c2) ? c1 : c2);
+			}
+
+			// Calculate handedness (sign of the W component)
+			// If the cross product of Normal and Tangent points in the opposite direction 
+			// of the accumulated Bitangent, we must flip the bitangent in the shader.
+			float handedness = (glm::dot(glm::cross(n, t), tan2[i]) < 0.0f) ? -1.0f : 1.0f;
+
+			// Store final vec4 tangent
+			vertices[i].Tangent = glm::vec4(orthogonalizedTangent, handedness);
+		}
+	}
+
 	Mesh ModelLoader::LoadModel(const std::filesystem::path& path, GLTFLoadingFlags flags)
 	{
 		tinygltf::Model model;
@@ -56,6 +126,9 @@ namespace Kerberos
         // Process all meshes in the model
         std::unordered_map<Vertex, uint32_t> uniqueVertices{};
 
+		// TODO: Currently this is a per-model flag, we should support per-primitive or per-mesh flags in the future
+		bool hasTangents = false;
+
         for (const auto& mesh : model.meshes) 
         {
             for (const auto& primitive : mesh.primitives) 
@@ -101,7 +174,7 @@ namespace Kerberos
                     texCoordBuffer = &model.buffers[texCoordBufferView->buffer];
                 }
 
-				bool hasTangents = primitive.attributes.contains("TANGENT");
+				hasTangents = primitive.attributes.contains("TANGENT");
 				const tinygltf::Accessor* tangentAccessor = nullptr;
 				const tinygltf::BufferView* tangentBufferView = nullptr;
 				const tinygltf::Buffer* tangentBuffer = nullptr;
@@ -239,6 +312,11 @@ namespace Kerberos
 			{
 				vertex.Normal = glm::normalize(vertex.Normal);
 			}
+		}
+
+		if (!hasTangents)
+		{
+			GenerateTangentsForVertices(vertices, indices);
 		}
 
 		const std::string name = path.stem().string();
