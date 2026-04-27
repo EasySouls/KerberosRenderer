@@ -205,8 +205,17 @@ namespace Kerberos
 		if (translation)
 		{
 			const std::weak_ptr<Scene>& scene = ScriptEngine::GetSceneContext();
-			glm::vec3& currentTranslation = scene.lock()->GetEntityByUUID(UUID(entityID)).GetComponent<TransformComponent>().Translation;
+			const auto& ownedScene = scene.lock();
+			if (!ownedScene)
+			{
+				KBR_CORE_ERROR("Failed to set translation for entity ID: {}. Scene context is not valid.", entityID);
+				return;
+			}
+
+			const Entity entity = ownedScene->GetEntityByUUID(UUID(entityID));
+			glm::vec3& currentTranslation = entity.GetComponent<TransformComponent>().Translation;
 			currentTranslation = *translation;
+			ownedScene->CalculateEntityTransform(entity);
 		}
 	}
 
@@ -224,9 +233,18 @@ namespace Kerberos
 	{
 		if (rotation)
 		{
-			const std::weak_ptr<Scene>& scene = ScriptEngine::GetSceneContext();
-			glm::vec3& currentRotation = scene.lock()->GetEntityByUUID(UUID(entityID)).GetComponent<TransformComponent>().Rotation;
+			const WeakRef<Scene>& scene = ScriptEngine::GetSceneContext();
+			const auto& ownedScene = scene.lock();
+			if (!ownedScene)
+			{
+				KBR_CORE_ERROR("Failed to set rotation for entity ID: {}. Scene context is not valid.", entityID);
+				return;
+			}
+
+			const Entity entity = ownedScene->GetEntityByUUID(UUID(entityID));
+			glm::vec3& currentRotation = entity.GetComponent<TransformComponent>().Rotation;
 			currentRotation = *rotation;
+			ownedScene->CalculateEntityTransform(entity);
 		}
 	}
 
@@ -244,9 +262,18 @@ namespace Kerberos
 	{
 		if (scale)
 		{
-			const std::weak_ptr<Scene>& scene = ScriptEngine::GetSceneContext();
-			glm::vec3& currentScale = scene.lock()->GetEntityByUUID(UUID(entityID)).GetComponent<TransformComponent>().Scale;
+			const WeakRef<Scene>& scene = ScriptEngine::GetSceneContext();
+			const auto& ownedScene = scene.lock();
+			if (!ownedScene)
+			{
+				KBR_CORE_ERROR("Failed to set scale for entity ID: {}. Scene context is not valid.", entityID);
+				return;
+			}
+
+			const Entity entity = ownedScene->GetEntityByUUID(UUID(entityID));
+			glm::vec3& currentScale = entity.GetComponent<TransformComponent>().Scale;
 			currentScale = *scale;
+			ownedScene->CalculateEntityTransform(entity);
 		}
 	}
 

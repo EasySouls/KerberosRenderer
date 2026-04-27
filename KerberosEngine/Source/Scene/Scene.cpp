@@ -904,7 +904,12 @@ namespace Kerberos
 
 	void Scene::CalculateEntityTransform(const Entity& entity)
 	{
-		UpdateChildTransforms(entity, glm::mat4(1.0f));
+		const UUID parentUUID = entity.GetComponent<HierarchyComponent>().Parent;
+		const glm::mat4 parentTransform = parentUUID.IsValid() 
+			? GetEntityByUUID(parentUUID).GetComponent<TransformComponent>().WorldTransform 
+			: glm::mat4(1.0f);
+
+		UpdateChildTransforms(entity, parentTransform);
 	}
 
 	Entity Scene::FindEntityByName(const std::string_view name)
