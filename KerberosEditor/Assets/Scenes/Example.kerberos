@@ -50,7 +50,13 @@ Entities:
       ScriptFields:
         - Name: Speed
           Type: Float
-          Data: 2.1
+          Data: 1
+        - Name: ShootingCooldownTime
+          Type: Float
+          Data: 1
+        - Name: BulletMesh
+          Type: MeshRef
+          Data: 5556831655075431416
     RigidBody3DComponent:
       Mass: 1
       Type: 1

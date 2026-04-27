@@ -65,11 +65,46 @@ namespace Kerberos.Source.Kerberos.Scene
         }
     }
 
+    public class StaticMeshComponent : Component
+    {
+        public MeshRef Mesh
+        {
+            get
+            {
+                InternalCalls.StaticMeshComponent_GetMesh(Entity.GetID(), out MeshRef mesh);
+                return mesh;
+            }
+            set => InternalCalls.StaticMeshComponent_SetMesh(Entity.GetID(), value);
+        }
+    }
+
     public class RigidBody3DComponent : Component
     {
+        public Vector3 Velocity
+        {
+            get
+            {
+                InternalCalls.Rigidbody3DComponent_GetVelocity(Entity.GetID(), out Vector3 velocity);
+                return velocity;
+            }
+            set => InternalCalls.Rigidbody3DComponent_SetVelocity(Entity.GetID(), ref value);
+        }
+
         public void ApplyImpulse(Vector3 impulse) => InternalCalls.Rigidbody3DComponent_ApplyImpulse(Entity.GetID(), ref impulse);
 
         public void ApplyImpulse(Vector3 impulse, Vector3 point) => InternalCalls.Rigidbody3DComponent_ApplyImpulseAtPoint(Entity.GetID(), ref impulse, ref point);
+    }
+
+    public class BoxCollider3DComponent : Component
+    {
+    }
+
+    public class SphereCollider3DComponent : Component
+    {
+    }
+
+    public class CapsuleCollider3DComponent : Component
+    {
     }
 
     public class TextComponent : Component

@@ -184,37 +184,37 @@ namespace Kerberos
 		{
 			if (ImGui::MenuItem("Camera"))
 			{
-				entity.AddComponent<CameraComponent>();
+				AddComponentWithCheck<CameraComponent>(entity);
 				ImGui::CloseCurrentPopup();
 			}
 
 			if (ImGui::MenuItem("Script"))
 			{
-				entity.AddComponent<ScriptComponent>();
+				AddComponentWithCheck<ScriptComponent>(entity);
 				ImGui::CloseCurrentPopup();
 			}
 
 			if (ImGui::MenuItem("Sprite Renderer"))
 			{
-				entity.AddComponent<SpriteRendererComponent>();
+				AddComponentWithCheck<SpriteRendererComponent>(entity);
 				ImGui::CloseCurrentPopup();
 			}
 
 			if (ImGui::MenuItem("Directional Light"))
 			{
-				entity.AddComponent<DirectionalLightComponent>();
+				AddComponentWithCheck<DirectionalLightComponent>(entity);
 				ImGui::CloseCurrentPopup();
 			}
 
 			if (ImGui::MenuItem("Point Light"))
 			{
-				entity.AddComponent<PointLightComponent>();
+				AddComponentWithCheck<PointLightComponent>(entity);
 				ImGui::CloseCurrentPopup();
 			}
 
 			if (ImGui::MenuItem("Static Mesh"))
 			{
-				entity.AddComponent<StaticMeshComponent>();
+				AddComponentWithCheck<StaticMeshComponent>(entity);
 				ImGui::CloseCurrentPopup();
 			}
 
@@ -223,31 +223,31 @@ namespace Kerberos
 
 				if (ImGui::MenuItem("Rigidbody3D"))
 				{
-					entity.AddComponent<RigidBody3DComponent>();
+					AddComponentWithCheck<RigidBody3DComponent>(entity);
 					ImGui::CloseCurrentPopup();
 				}
 
 				if (ImGui::MenuItem("Box Collider 3D"))
 				{
-					entity.AddComponent<BoxCollider3DComponent>();
+					AddComponentWithCheck<BoxCollider3DComponent>(entity);
 					ImGui::CloseCurrentPopup();
 				}
 
 				if (ImGui::MenuItem("Sphere Collider 3D"))
 				{
-					entity.AddComponent<SphereCollider3DComponent>();
+					AddComponentWithCheck<SphereCollider3DComponent>(entity);
 					ImGui::CloseCurrentPopup();
 				}
 
 				if (ImGui::MenuItem("Capsule Collider 3D"))
 				{
-					entity.AddComponent<CapsuleCollider3DComponent>();
+					AddComponentWithCheck<CapsuleCollider3DComponent>(entity);
 					ImGui::CloseCurrentPopup();
 				}
 
 				if (ImGui::MenuItem("Mesh Collider 3D"))
 				{
-					entity.AddComponent<MeshCollider3DComponent>();
+					AddComponentWithCheck<MeshCollider3DComponent>(entity);
 					ImGui::CloseCurrentPopup();
 				}
 
@@ -256,13 +256,13 @@ namespace Kerberos
 
 			if (ImGui::MenuItem("Environment"))
 			{
-				entity.AddComponent<EnvironmentComponent>();
+				AddComponentWithCheck<EnvironmentComponent>(entity);
 				ImGui::CloseCurrentPopup();
 			}
 
 			if (ImGui::MenuItem("Text"))
 			{
-				entity.AddComponent<TextComponent>();
+				AddComponentWithCheck<TextComponent>(entity);
 				ImGui::CloseCurrentPopup();
 			}
 
@@ -270,19 +270,19 @@ namespace Kerberos
 			{
 				if (ImGui::MenuItem("Audio Source 2D"))
 				{
-					entity.AddComponent<AudioSource2DComponent>();
+					AddComponentWithCheck<AudioSource2DComponent>(entity);
 					ImGui::CloseCurrentPopup();
 				}
 
 				if (ImGui::MenuItem("Audio Source 3D"))
 				{
-					entity.AddComponent<AudioSource3DComponent>();
+					AddComponentWithCheck<AudioSource3DComponent>(entity);
 					ImGui::CloseCurrentPopup();
 				}
 
 				if (ImGui::MenuItem("Audio Listener"))
 				{
-					entity.AddComponent<AudioListenerComponent>();
+					AddComponentWithCheck<AudioListenerComponent>(entity);
 					ImGui::CloseCurrentPopup();
 				}
 
@@ -739,6 +739,86 @@ namespace Kerberos
 									scriptInstance->SetFieldValue<glm::vec4>(name, value);
 								}
 							}
+							else if (scriptField.Type == ScriptFieldType::MaterialRef)
+							{
+								/*Ref<Material> value = scriptInstance->GetFieldValue<Ref<Material>>(name);
+								if (ImGui::Button("Select Material"))
+								{
+									ImGui::OpenPopup((name + "MaterialSelector").c_str());
+								}
+								if (ImGui::BeginPopup((name + "MaterialSelector").c_str()))
+								{
+									const auto& materials = AssetManager::GetAssetsByType<Material>();
+									for (const auto& [id, material] : materials)
+									{
+										if (ImGui::Selectable(material->GetName().c_str()))
+										{
+											scriptInstance->SetFieldValue<Ref<Material>>(name, material);
+											ImGui::CloseCurrentPopup();
+										}
+									}
+									ImGui::EndPopup();
+								}*/
+								const uint64_t value = scriptInstance->GetFieldValue<uint64_t>(name);
+								std::string materialLabel = "No material selected";
+								if (value != UUID::Invalid())
+								{
+									const Ref<Material> material = AssetManager::GetAsset<Material>(UUID(value));
+									const auto& [Type, Filepath] = Project::GetActive()->GetEditorAssetManager()->GetMetadata(material->GetHandle());
+									materialLabel = Filepath.filename().string();
+								}
+								ImGui::Text("%s: %s", name.c_str(), materialLabel.c_str());
+
+								if (ImGui::BeginDragDropTarget())
+								{
+									if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload(assetBrowserMaterial))
+									{
+										const AssetHandle handle = *static_cast<AssetHandle*>(payload->Data);
+										if (const AssetType assetType = AssetManager::GetAssetType(handle); assetType != AssetType::Material)
+										{
+											KBR_EDITOR_ERROR("Asset is not a material: {0}", handle);
+											m_NotificationManager.AddNotification("Asset is not a material", Notification::Type::Error);
+											ImGui::EndDragDropTarget();
+
+											return;
+										}
+										const Ref<Material> newMaterial = AssetManager::GetAsset<Material>(handle);
+										scriptInstance->SetFieldValue<uint64_t>(name, newMaterial->GetHandle());
+									}
+									ImGui::EndDragDropTarget();
+								}
+							}
+							else if (scriptField.Type == ScriptFieldType::MeshRef)
+							{
+								const uint64_t value = scriptInstance->GetFieldValue<uint64_t>(name);
+								std::string meshLabel = "No mesh selected";
+								if (value != UUID::Invalid())
+								{
+									const Ref<Mesh> mesh = AssetManager::GetAsset<Mesh>(UUID(value));
+									const auto& [Type, Filepath] = Project::GetActive()->GetEditorAssetManager()->GetMetadata(mesh->GetHandle());
+									meshLabel = Filepath.filename().string();
+								}
+								ImGui::Text("%s: %s", name.c_str(), meshLabel.c_str());
+
+								if (ImGui::BeginDragDropTarget())
+								{
+									if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload(assetBrowserMesh))
+									{
+										const AssetHandle handle = *static_cast<AssetHandle*>(payload->Data);
+										if (const AssetType assetType = AssetManager::GetAssetType(handle); assetType != AssetType::Mesh && assetType != AssetType::Model)
+										{
+											KBR_EDITOR_ERROR("Asset is not a mesh or model: {0}", handle);
+											m_NotificationManager.AddNotification("Asset is not a mesh or model", Notification::Type::Error);
+											ImGui::EndDragDropTarget();
+
+											return;
+										}
+										const Ref<Mesh> newMesh = AssetManager::GetAsset<Mesh>(handle);
+										scriptInstance->SetFieldValue<uint64_t>(name, newMesh->GetHandle());
+									}
+									ImGui::EndDragDropTarget();
+								}
+							}
 							else
 							{
 								ImGui::Text("Unsupported field type");
@@ -858,6 +938,86 @@ namespace Kerberos
 								if (ImGui::DragFloat4(fieldName.c_str(), glm::value_ptr(value), 0.1f))
 								{
 									fieldInitializer.SetValue<glm::vec4>(value);
+								}
+							}
+							else if (scriptField.Type == ScriptFieldType::MaterialRef)
+							{
+								/*Ref<Material> value = scriptInstance->GetFieldValue<Ref<Material>>(name);
+								if (ImGui::Button("Select Material"))
+								{
+									ImGui::OpenPopup((name + "MaterialSelector").c_str());
+								}
+								if (ImGui::BeginPopup((name + "MaterialSelector").c_str()))
+								{
+									const auto& materials = AssetManager::GetAssetsByType<Material>();
+									for (const auto& [id, material] : materials)
+									{
+										if (ImGui::Selectable(material->GetName().c_str()))
+										{
+											scriptInstance->SetFieldValue<Ref<Material>>(name, material);
+											ImGui::CloseCurrentPopup();
+										}
+									}
+									ImGui::EndPopup();
+								}*/
+								const uint64_t value = fieldInitializer.GetValue<uint64_t>();
+								std::string materialLabel = "No material selected";
+								if (value != UUID::Invalid())
+								{
+									const Ref<Material> material = AssetManager::GetAsset<Material>(UUID(value));
+									const auto& [Type, Filepath] = Project::GetActive()->GetEditorAssetManager()->GetMetadata(material->GetHandle());
+									materialLabel = Filepath.filename().string();
+								}
+								ImGui::Text("%s: %s", fieldName.c_str(), materialLabel.c_str());
+
+								if (ImGui::BeginDragDropTarget())
+								{
+									if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload(assetBrowserMaterial))
+									{
+										const AssetHandle handle = *static_cast<AssetHandle*>(payload->Data);
+										if (const AssetType assetType = AssetManager::GetAssetType(handle); assetType != AssetType::Material)
+										{
+											KBR_EDITOR_ERROR("Asset is not a material: {0}", handle);
+											m_NotificationManager.AddNotification("Asset is not a material", Notification::Type::Error);
+											ImGui::EndDragDropTarget();
+
+											return;
+										}
+										const Ref<Material> newMaterial = AssetManager::GetAsset<Material>(handle);
+										fieldInitializer.SetValue(newMaterial->GetHandle());
+									}
+									ImGui::EndDragDropTarget();
+								}
+							}
+							else if (scriptField.Type == ScriptFieldType::MeshRef)
+							{
+								const uint64_t value = fieldInitializer.GetValue<uint64_t>();
+								std::string meshLabel = "No mesh selected";
+								if (value != UUID::Invalid())
+								{
+									const Ref<Mesh> mesh = AssetManager::GetAsset<Mesh>(UUID(value));
+									const auto& [Type, Filepath] = Project::GetActive()->GetEditorAssetManager()->GetMetadata(mesh->GetHandle());
+									meshLabel = Filepath.filename().string();
+								}
+								ImGui::Text("%s: %s", fieldName.c_str(), meshLabel.c_str());
+
+								if (ImGui::BeginDragDropTarget())
+								{
+									if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload(assetBrowserMesh))
+									{
+										const AssetHandle handle = *static_cast<AssetHandle*>(payload->Data);
+										if (const AssetType assetType = AssetManager::GetAssetType(handle); assetType != AssetType::Mesh && assetType != AssetType::Model)
+										{
+											KBR_EDITOR_ERROR("Asset is not a mesh or model: {0}", handle);
+											m_NotificationManager.AddNotification("Asset is not a mesh or model", Notification::Type::Error);
+											ImGui::EndDragDropTarget();
+
+											return;
+										}
+										const Ref<Mesh> newMesh = AssetManager::GetAsset<Mesh>(handle);
+										fieldInitializer.SetValue(newMesh->GetHandle());
+									}
+									ImGui::EndDragDropTarget();
 								}
 							}
 							else

@@ -10,6 +10,8 @@ namespace Kerberos.Source.Kerberos
         public float ShootingCooldownTime = 2.0f;
         private float _shootingCooldownTimer = 0.0f;
 
+        public MeshRef BulletMesh;
+
         private TransformComponent _transformComponent;
         private RigidBody3DComponent _rigidbody3DComponent;
         private AudioSource2DComponent _audioSource2DComponent;
@@ -103,7 +105,19 @@ namespace Kerberos.Source.Kerberos
         private void Shoot()
         {
             Entity bulletEntity = Instantiate("bullet");
+            bulletEntity.AddComponent<BoxCollider3DComponent>();
             bulletEntity.AddComponent<RigidBody3DComponent>();
+            bulletEntity.AddComponent<StaticMeshComponent>();
+            bulletEntity.GetComponent<StaticMeshComponent>().Mesh = BulletMesh;
+
+            Vector3 playerPos = Translation;
+            Console.WriteLine($"Player position when shooting: {playerPos.X}, {playerPos.Y}, {playerPos.Z}");
+            Vector3 bulletPosition = playerPos + new Vector3(0, 0, 3); // Spawn in front of the player
+            Console.WriteLine($"Bullet starting position: {bulletPosition.X}, {bulletPosition.Y}, {bulletPosition.Z}");
+            bulletEntity.Translation = bulletPosition;
+
+            Vector3 bulletVelocity = new Vector3(0, 0, 100); // Shoot forward
+            bulletEntity.GetComponent<RigidBody3DComponent>().Velocity = bulletVelocity;
         }
 
         private void ApplyVelocity(Vector3 velocity, float deltaTime)

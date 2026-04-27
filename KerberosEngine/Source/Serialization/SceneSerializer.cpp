@@ -167,6 +167,15 @@ namespace Kerberos
 							case ScriptFieldType::AssetHandle:
 								out << YAML::Key << "Data" << YAML::Value << field.GetValue<uint8_t>();
 								break;
+							case ScriptFieldType::MaterialRef:
+								out << YAML::Key << "Data" << YAML::Value << field.GetValue<uint64_t>();
+								break;
+							case ScriptFieldType::MeshRef:
+								out << YAML::Key << "Data" << YAML::Value << field.GetValue<uint64_t>();
+								break;
+							case ScriptFieldType::TextureRef:
+								out << YAML::Key << "Data" << YAML::Value << field.GetValue<uint64_t>();
+								break;
 						}
 						out << YAML::EndMap;
 					}
@@ -542,6 +551,15 @@ namespace Kerberos
 									break;
 								case ScriptFieldType::AssetHandle:
 									initializer.SetValue<uint8_t>(field["Data"].as<uint8_t>());
+									break;
+								case ScriptFieldType::MaterialRef:
+									initializer.SetValue<uint64_t>(field["Data"].as<uint64_t>());
+									break;
+								case ScriptFieldType::MeshRef:
+									initializer.SetValue<uint64_t>(field["Data"].as<uint64_t>());
+									break;
+								case ScriptFieldType::TextureRef:
+									initializer.SetValue<uint64_t>(field["Data"].as<uint64_t>());
 									break;
 							}
 

@@ -40,6 +40,11 @@ namespace Kerberos
 		void* TransformComponent_GetScale;
 		void* TransformComponent_SetScale;
 
+		void* StaticMeshComponent_GetMesh;
+		void* StaticMeshComponent_SetMesh;
+
+		void* Rigidbody3DComponent_GetVelocity;
+		void* Rigidbody3DComponent_SetVelocity;
 		void* Rigidbody3DComponent_ApplyImpulse;
 		void* Rigidbody3DComponent_ApplyImpulseAtPoint;
 
@@ -242,6 +247,56 @@ namespace Kerberos
 			const std::weak_ptr<Scene>& scene = ScriptEngine::GetSceneContext();
 			glm::vec3& currentScale = scene.lock()->GetEntityByUUID(UUID(entityID)).GetComponent<TransformComponent>().Scale;
 			currentScale = *scale;
+		}
+	}
+
+	static void StaticMeshComponent_GetMesh(const uint64_t entityID, uint64_t* outMesh)
+	{
+		const std::weak_ptr<Scene>& scene = ScriptEngine::GetSceneContext();
+		const Ref<Scene> currentScene = scene.lock();
+		const Entity entity = currentScene->GetEntityByUUID(UUID(entityID));
+
+		KBR_CORE_ASSERT(entity.HasComponent<StaticMeshComponent>(), "Entity doesn't have a StaticMeshComponent.");
+
+		const StaticMeshComponent& staticMeshComponent = entity.GetComponent<StaticMeshComponent>();
+		*outMesh = staticMeshComponent.StaticMesh->GetHandle();
+	}
+
+	static void StaticMeshComponent_SetMesh(const uint64_t entityID, const uint64_t meshRef)
+	{
+		const std::weak_ptr<Scene>& scene = ScriptEngine::GetSceneContext();
+		const Ref<Scene> currentScene = scene.lock();
+		const Entity entity = currentScene->GetEntityByUUID(UUID(entityID));
+
+		KBR_CORE_ASSERT(entity.HasComponent<StaticMeshComponent>(), "Entity doesn't have a StaticMeshComponent.");
+		// TODO: when using asset handles for assets, simply set it, maybe check if correct
+
+		StaticMeshComponent& staticMeshComponent = entity.GetComponent<StaticMeshComponent>();
+		const Ref<Mesh> mesh = AssetManager::GetAsset<Mesh>(AssetHandle(meshRef));
+		if (!mesh)
+		{
+			KBR_CORE_WARN("Failed to set static mesh for entity ID: {}, mesh asset ID: {}", entityID, meshRef);
+		}
+		staticMeshComponent.StaticMesh = mesh;
+	}
+
+	static void Rigidbody3DComponent_GetVelocity(const uint64_t entityID, glm::vec3* outVelocity)
+	{
+		const std::weak_ptr<Scene>& scene = ScriptEngine::GetSceneContext();
+		if (outVelocity)
+		{
+			const glm::vec3 velocity = scene.lock()->GetEntityByUUID(UUID(entityID)).GetComponent<RigidBody3DComponent>().Velocity;
+			*outVelocity = velocity;
+		}
+	}
+
+	static void Rigidbody3DComponent_SetVelocity(const uint64_t entityID, const glm::vec3* velocity)
+	{
+		if (velocity)
+		{
+			const std::weak_ptr<Scene>& scene = ScriptEngine::GetSceneContext();
+			glm::vec3& currentVelocity = scene.lock()->GetEntityByUUID(UUID(entityID)).GetComponent<RigidBody3DComponent>().Velocity;
+			currentVelocity = *velocity;
 		}
 	}
 
@@ -504,6 +559,7 @@ namespace Kerberos
 		/// Register component types for HasComponent checks
 		RegisterComponent<TransformComponent>("Kerberos.Source.Kerberos.Scene.TransformComponent");
 		RegisterComponent<TagComponent>("Kerberos.Source.Kerberos.Scene.TagComponent");
+		RegisterComponent<StaticMeshComponent>("Kerberos.Source.Kerberos.Scene.StaticMeshComponent");
 		RegisterComponent<RigidBody3DComponent>("Kerberos.Source.Kerberos.Scene.RigidBody3DComponent");
 		RegisterComponent<TextComponent>("Kerberos.Source.Kerberos.Scene.TextComponent");
 		RegisterComponent<AudioSource2DComponent>("Kerberos.Source.Kerberos.Scene.AudioSource2DComponent");
@@ -526,6 +582,11 @@ namespace Kerberos
 		callbackTable.TransformComponent_GetScale = reinterpret_cast<void*>(&TransformComponent_GetScale);
 		callbackTable.TransformComponent_SetScale = reinterpret_cast<void*>(&TransformComponent_SetScale);
 
+		callbackTable.StaticMeshComponent_GetMesh = reinterpret_cast<void*>(&StaticMeshComponent_GetMesh);
+		callbackTable.StaticMeshComponent_SetMesh = reinterpret_cast<void*>(&StaticMeshComponent_SetMesh);
+
+		callbackTable.Rigidbody3DComponent_GetVelocity = reinterpret_cast<void*>(&Rigidbody3DComponent_GetVelocity);
+		callbackTable.Rigidbody3DComponent_SetVelocity = reinterpret_cast<void*>(&Rigidbody3DComponent_SetVelocity);
 		callbackTable.Rigidbody3DComponent_ApplyImpulse = reinterpret_cast<void*>(&Rigidbody3DComponent_ApplyImpulse);
 		callbackTable.Rigidbody3DComponent_ApplyImpulseAtPoint = reinterpret_cast<void*>(&Rigidbody3DComponent_ApplyImpulseAtPoint);
 

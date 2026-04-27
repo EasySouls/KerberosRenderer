@@ -216,7 +216,10 @@ namespace Kerberos
 		for (const auto e : view)
 		{
 			auto& transform = view.get<TransformComponent>(e);
-			const auto& rigidBody = view.get<RigidBody3DComponent>(e);
+			auto& rigidBody = view.get<RigidBody3DComponent>(e);
+
+			if (rigidBody.Type == RigidBody3DComponent::BodyType::Static) 
+				continue;
 
 			if (rigidBody.RuntimeBody)
 			{
@@ -226,6 +229,12 @@ namespace Kerberos
 				const JPH::Vec3 offset = m_ColliderOffsets.at(entity.GetUUID());
 
 				Physics::Utils::ApplyJoltTransformToEntity(transform.WorldTransform, *body, offset, entity.GetComponent<TransformComponent>());
+
+				// Sync velocity for access by other systems
+				JPH::Vec3 vel = body->GetLinearVelocity();
+				JPH::Vec3 angVel =	body->GetAngularVelocity();
+				rigidBody.Velocity = glm::vec3(vel.GetX(), vel.GetY(), vel.GetZ());
+				rigidBody.AngularVelocity = glm::vec3(angVel.GetX(), angVel.GetY(), angVel.GetZ());
 			}
 		}
 
@@ -306,8 +315,10 @@ namespace Kerberos
 		JPH::BodyInterface& bodyInterface = m_JoltSystem->GetBodyInterface();
 		JPH::Body* body = bodyInterface.CreateBody(bodySettings);
 		rigidBody.RuntimeBody = body;
-		//rigidBody.bodyID = body->GetID();
-		//bodyInterface.AddBody(body->GetID(), rigidBody.isActive ? JPH::EActivation::Activate : JPH::EActivation::DontActivate);
+		// Set starting velocity
+		bodyInterface.SetLinearVelocity(body->GetID(), JPH::Vec3(rigidBody.Velocity.x, rigidBody.Velocity.y, rigidBody.Velocity.z));
+		bodyInterface.SetAngularVelocity(body->GetID(), JPH::Vec3(rigidBody.AngularVelocity.x, rigidBody.AngularVelocity.y, rigidBody.AngularVelocity.z));
+
 		bodyInterface.AddBody(body->GetID(), JPH::EActivation::Activate);
 
 		rigidBody.IsDirty = false;

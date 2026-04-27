@@ -31,10 +31,16 @@ namespace Kerberos.Source
         internal delegate ulong EntityInstantiateFn(IntPtr name);
 
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
-        internal delegate void TransformGetVec3Fn(ulong entityID, out Vector3 value);
+        internal delegate void GetVec3Fn(ulong entityID, out Vector3 value);
 
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
-        internal delegate void TransformSetVec3Fn(ulong entityID, ref Vector3 value);
+        internal delegate void SetVec3Fn(ulong entityID, ref Vector3 value);
+
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        internal delegate void StaticMeshGetMeshFn(ulong entityID, out MeshRef mesh);
+
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        internal delegate void StaticMeshSetMeshFn(ulong entityID, MeshRef mesh);
 
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
         internal delegate void Rigidbody3DApplyImpulseFn(ulong entityID, ref Vector3 impulse);
@@ -85,12 +91,18 @@ namespace Kerberos.Source
         private static EntityFindByNameFn? s_EntityFindByName;
         private static EntityInstantiateFn? s_EntityInstantiate;
 
-        private static TransformGetVec3Fn? s_TransformGetTranslation;
-        private static TransformSetVec3Fn? s_TransformSetTranslation;
-        private static TransformGetVec3Fn? s_TransformGetRotation;
-        private static TransformSetVec3Fn? s_TransformSetRotation;
-        private static TransformGetVec3Fn? s_TransformGetScale;
-        private static TransformSetVec3Fn? s_TransformSetScale;
+        private static GetVec3Fn? s_TransformGetTranslation;
+        private static SetVec3Fn? s_TransformSetTranslation;
+        private static GetVec3Fn? s_TransformGetRotation;
+        private static SetVec3Fn? s_TransformSetRotation;
+        private static GetVec3Fn? s_TransformGetScale;
+        private static SetVec3Fn? s_TransformSetScale;
+
+        private static StaticMeshGetMeshFn? s_StaticMeshGetMesh;
+        private static StaticMeshSetMeshFn? s_StaticMeshSetMesh;
+
+        private static GetVec3Fn? s_RigidbodyGetVelocity;
+        private static SetVec3Fn? s_RigidbodySetVelocity;
 
         private static Rigidbody3DApplyImpulseFn? s_Rigidbody3DApplyImpulse;
         private static Rigidbody3DApplyImpulseAtPointFn? s_Rigidbody3DApplyImpulseAtPoint;
@@ -146,13 +158,18 @@ namespace Kerberos.Source
             s_EntityFindByName = Marshal.GetDelegateForFunctionPointer<EntityFindByNameFn>(ReadNext());
             s_EntityInstantiate = Marshal.GetDelegateForFunctionPointer<EntityInstantiateFn>(ReadNext());
 
-            s_TransformGetTranslation = Marshal.GetDelegateForFunctionPointer<TransformGetVec3Fn>(ReadNext());
-            s_TransformSetTranslation = Marshal.GetDelegateForFunctionPointer<TransformSetVec3Fn>(ReadNext());
-            s_TransformGetRotation = Marshal.GetDelegateForFunctionPointer<TransformGetVec3Fn>(ReadNext());
-            s_TransformSetRotation = Marshal.GetDelegateForFunctionPointer<TransformSetVec3Fn>(ReadNext());
-            s_TransformGetScale = Marshal.GetDelegateForFunctionPointer<TransformGetVec3Fn>(ReadNext());
-            s_TransformSetScale = Marshal.GetDelegateForFunctionPointer<TransformSetVec3Fn>(ReadNext());
+            s_TransformGetTranslation = Marshal.GetDelegateForFunctionPointer<GetVec3Fn>(ReadNext());
+            s_TransformSetTranslation = Marshal.GetDelegateForFunctionPointer<SetVec3Fn>(ReadNext());
+            s_TransformGetRotation = Marshal.GetDelegateForFunctionPointer<GetVec3Fn>(ReadNext());
+            s_TransformSetRotation = Marshal.GetDelegateForFunctionPointer<SetVec3Fn>(ReadNext());
+            s_TransformGetScale = Marshal.GetDelegateForFunctionPointer<GetVec3Fn>(ReadNext());
+            s_TransformSetScale = Marshal.GetDelegateForFunctionPointer<SetVec3Fn>(ReadNext());
 
+            s_StaticMeshGetMesh = Marshal.GetDelegateForFunctionPointer<StaticMeshGetMeshFn>(ReadNext());
+            s_StaticMeshSetMesh = Marshal.GetDelegateForFunctionPointer<StaticMeshSetMeshFn>(ReadNext());
+
+            s_RigidbodyGetVelocity = Marshal.GetDelegateForFunctionPointer<GetVec3Fn>(ReadNext());
+            s_RigidbodySetVelocity = Marshal.GetDelegateForFunctionPointer<SetVec3Fn>(ReadNext());
             s_Rigidbody3DApplyImpulse = Marshal.GetDelegateForFunctionPointer<Rigidbody3DApplyImpulseFn>(ReadNext());
             s_Rigidbody3DApplyImpulseAtPoint = Marshal.GetDelegateForFunctionPointer<Rigidbody3DApplyImpulseAtPointFn>(ReadNext());
 
@@ -262,7 +279,31 @@ namespace Kerberos.Source
             s_TransformSetScale?.Invoke(entityID, ref scale);
         }
 
+        // ----------------------------- StaticMeshComponent ------------------------------
+
+        internal static void StaticMeshComponent_GetMesh(ulong entityID, out MeshRef mesh)
+        {
+            mesh = default;
+            s_StaticMeshGetMesh?.Invoke(entityID, out mesh);
+        }
+
+        internal static void StaticMeshComponent_SetMesh(ulong entityID, MeshRef mesh)
+        {
+            s_StaticMeshSetMesh?.Invoke(entityID, mesh);
+        }
+
         // ----------------------------- Rigidbody3DComponent -----------------------------
+
+        internal static void Rigidbody3DComponent_GetVelocity(ulong entityID, out Vector3 velocity)
+        {
+            velocity = default;
+            s_RigidbodyGetVelocity?.Invoke(entityID, out velocity);
+        }
+
+        internal static void Rigidbody3DComponent_SetVelocity(ulong entityID, ref Vector3 velocity)
+        {
+            s_RigidbodySetVelocity?.Invoke(entityID, ref velocity);
+        }
 
         internal static void Rigidbody3DComponent_ApplyImpulse(ulong entityID, ref Vector3 impulse)
         {

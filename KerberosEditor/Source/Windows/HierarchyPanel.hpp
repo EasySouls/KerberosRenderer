@@ -35,6 +35,18 @@ namespace Kerberos
 
 		bool OnKeyPressed(const KeyPressedEvent& event);
 
+		template<typename T>
+		void AddComponentWithCheck(Entity entity)
+		{
+			if (entity.HasComponent<T>())
+			{
+				m_NotificationManager.AddNotification("Entity already has a " + std::string(typeid(T).name()) + " component!", Notification::Type::Warning);
+				return;
+			}
+
+			entity.AddComponent<T>();
+		}
+
 	private:
 		Ref<Scene> m_Context;
 

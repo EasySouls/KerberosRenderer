@@ -29,6 +29,9 @@ namespace Kerberos
 		Vec3,
 		Vec4,
 
+		MaterialRef,
+		MeshRef,
+		TextureRef,
 		AssetHandle
 	};
 

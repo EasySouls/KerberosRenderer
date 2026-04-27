@@ -11,24 +11,27 @@ using namespace std::literals;
 namespace Kerberos
 {
 	static std::unordered_map<std::string, ScriptFieldType> s_ScriptFieldTypeMap = {
-		{ "System.Int16",								ScriptFieldType::Short },
-		{ "System.Int32",								ScriptFieldType::Int },
-		{ "System.Int64",								ScriptFieldType::Long },
+		{ "System.Int16",									ScriptFieldType::Short },
+		{ "System.Int32",									ScriptFieldType::Int },
+		{ "System.Int64",									ScriptFieldType::Long },
 		{ "System.UInt16",								ScriptFieldType::UShort },
 		{ "System.UInt32",								ScriptFieldType::UInt },
 		{ "System.UInt64",								ScriptFieldType::ULong },
 		{ "System.Single",								ScriptFieldType::Float },
 		{ "System.Double",								ScriptFieldType::Double },
 		{ "System.Boolean",								ScriptFieldType::Bool },
-		{ "System.Char",								ScriptFieldType::Char },
-		{ "System.Byte",								ScriptFieldType::Byte },
+		{ "System.Char",									ScriptFieldType::Char },
+		{ "System.Byte",									ScriptFieldType::Byte },
 		{ "System.String",								ScriptFieldType::String },
 
 		{ "Kerberos.Source.Kerberos.Core.Vector2",		ScriptFieldType::Vec2 },
 		{ "Kerberos.Source.Kerberos.Core.Vector3",		ScriptFieldType::Vec3 },
 		{ "Kerberos.Source.Kerberos.Core.Vector4",		ScriptFieldType::Vec4 },
 
-		{ "Kerberos.Source.Kerberos.Core.AssetHandle",	ScriptFieldType::AssetHandle }
+		{ "Kerberos.Source.Kerberos.Core.MaterialRef",	ScriptFieldType::MaterialRef },
+		{ "Kerberos.Source.Kerberos.Core.MeshRef",		ScriptFieldType::MeshRef },
+		{ "Kerberos.Source.Kerberos.Core.TextureRef",		ScriptFieldType::TextureRef },
+		{ "Kerberos.Source.Kerberos.Core.AssetHandle",	ScriptFieldType::AssetHandle },
 	};
 
 	ScriptFieldType ScriptUtils::DotNetTypeToScriptFieldType(const std::string& typeName)
@@ -59,6 +62,9 @@ namespace Kerberos
 			case ScriptFieldType::Vec2:			return "Vector2"sv;
 			case ScriptFieldType::Vec3:			return "Vector3"sv;
 			case ScriptFieldType::Vec4:			return "Vector4"sv;
+			case ScriptFieldType::MaterialRef:	return "MaterialRef"sv;
+			case ScriptFieldType::MeshRef:		return "MeshRef"sv;
+			case ScriptFieldType::TextureRef:	return "TextureRef"sv;
 			case ScriptFieldType::AssetHandle:	return "AssetHandle"sv;
 		}
 
@@ -83,6 +89,9 @@ namespace Kerberos
 		if (type == "Vector2"sv)		return ScriptFieldType::Vec2;
 		if (type == "Vector3"sv)		return ScriptFieldType::Vec3;
 		if (type == "Vector4"sv)		return ScriptFieldType::Vec4;
+		if (type == "MaterialRef"sv)	return ScriptFieldType::MaterialRef;
+		if (type == "MeshRef"sv)		return ScriptFieldType::MeshRef;
+		if (type == "TextureRef"sv)	return ScriptFieldType::TextureRef;
 		if (type == "AssetHandle"sv)	return ScriptFieldType::AssetHandle;
 
 		KBR_CORE_ASSERT(false, "Unknown script field type!");

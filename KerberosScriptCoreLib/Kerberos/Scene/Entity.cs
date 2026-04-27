@@ -28,7 +28,7 @@ namespace Kerberos.Source.Kerberos.Scene
                 InternalCalls.TransformComponent_GetTranslation(ID, out Vector3 translation);
                 return translation;
             }
-            protected set => InternalCalls.TransformComponent_SetTranslation(ID, ref value);
+            set => InternalCalls.TransformComponent_SetTranslation(ID, ref value);
         }
 
         public ulong GetID() => ID;
@@ -38,7 +38,7 @@ namespace Kerberos.Source.Kerberos.Scene
             return InternalCalls.Entity_HasComponent(ID, typeof(T));
         }
 
-        protected T GetComponent<T>() where T : Component, new()
+        public T GetComponent<T>() where T : Component, new()
         {
             if (!HasComponent<T>())
                 throw new ArgumentNullException(nameof(T));
