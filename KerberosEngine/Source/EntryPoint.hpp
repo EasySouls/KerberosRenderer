@@ -2,6 +2,7 @@
 
 #include "Application.hpp"
 #include "Debug/Instrumentor.hpp"
+#include "Logging/CrashHandler.hpp"
 
 namespace Kerberos
 {
@@ -14,8 +15,7 @@ namespace Kerberos
 int main(const int argc, char** argv)
 {
 	Kerberos::Log::Init();
-	KBR_CORE_INFO("Core logger initialized");
-	//KBR_INFO("Client logger initialized");
+	Kerberos::CrashHandler::Init();
 
 	KBR_PROFILE_BEGIN_SESSION("Startup", "KerberosRenderer_StartupProfile.json");
 	const auto app = Kerberos::CreateApplication({ .Count = argc, .Args = argv });

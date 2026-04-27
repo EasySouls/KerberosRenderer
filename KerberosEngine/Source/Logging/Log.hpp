@@ -80,6 +80,15 @@ namespace Kerberos
 			SetEditorLogLevel(level);
 		}
 
+		/*
+		* Flushes every logger.
+		*/
+		static void Flush()
+		{
+			s_CoreLogger->flush();
+			s_EditorLogger->flush();
+		}
+
 	private:
 		static std::unique_ptr<spdlog::logger> s_CoreLogger;
 		static std::unique_ptr<spdlog::logger> s_EditorLogger;
