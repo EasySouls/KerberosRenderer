@@ -124,7 +124,7 @@ namespace Kerberos::Process
 		PROCESS_INFORMATION processInfo{};
 
 		const BOOL created = CreateProcessA(
-			executablePath.c_str(),
+			nullptr,
 			commandLine.data(),
 			nullptr,
 			nullptr,

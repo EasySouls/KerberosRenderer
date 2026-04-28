@@ -1,0 +1,9 @@
+Name: avocado
+Albedo: [1, 1, 1]
+Roughness: 0.77
+Metallic: 0
+AlbedoTexture: Assets/Models/avocado/Avocado_baseColor.ktx2
+NormalTexture: Assets/Models/avocado/Avocado_normal.ktx2
+MetallicTexture: ""
+RoughnessTexture: ""
+AOTexture: ""

@@ -49,6 +49,7 @@ namespace Kerberos
 
 				if (!std::filesystem::exists(ktx2Filepath))
 				{
+					const auto currentDir = std::filesystem::current_path();
 					const Process::ProcessResult result = KtxConversion::ConvertKtxToKtx2(filepath, true);
 					KBR_CORE_ASSERT(
 						result.Succeeded,
@@ -59,6 +60,9 @@ namespace Kerberos
 						result.ErrorCode,
 						result.ErrorMessage);
 				}
+
+				const Ref<Texture2D> texture = CreateRef<Texture2D>(ktx2Filepath);
+				return texture;
 			}
 
 			const Ref<Texture2D> texture = CreateRef<Texture2D>(filepath);

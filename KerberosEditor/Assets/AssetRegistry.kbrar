@@ -8,15 +8,24 @@ AssetRegistry:
   - Handle: 1854418276753847419
     Type: Texture2D
     Path: Assets\Models\cerberus\albedo.ktx2
+  - Handle: 1896423241257672216
+    Type: Material
+    Path: Assets\Materials\avocado.kbrmat
   - Handle: 2971773807105207837
     Type: Model
     Path: Assets\Models\voyager.gltf
+  - Handle: 2975941018568995082
+    Type: Model
+    Path: Assets\Models\armor\armor.gltf
   - Handle: 2995231662383101662
     Type: Texture2D
     Path: Assets\Textures\lavaplanet_rgba.ktx
   - Handle: 3148316396032555593
     Type: Material
     Path: Assets\Materials\ground.kbrmat
+  - Handle: 3288158668636871687
+    Type: Texture2D
+    Path: Assets\Models\armor\normalmap_rgba.ktx2
   - Handle: 3420994376372366335
     Type: Material
     Path: Assets\Materials\cerberus.kbrmat
@@ -35,12 +44,24 @@ AssetRegistry:
   - Handle: 8165452178448060093
     Type: Material
     Path: Assets\Materials\rock.kbrmat
+  - Handle: 8912166731112440424
+    Type: Material
+    Path: Assets\Materials\armor.kbrmat
+  - Handle: 9108541160281777125
+    Type: Texture2D
+    Path: Assets\Models\avocado\Avocado_baseColor.ktx2
   - Handle: 9862963687860094857
     Type: Texture2D
     Path: Assets\Models\cerberus\normal.ktx2
+  - Handle: 10385886156252848361
+    Type: Texture2D
+    Path: Assets\Models\armor\colormap_rgba.ktx2
   - Handle: 10941221693871244172
     Type: Material
     Path: Assets\Models\cerberus\ground.kbrmat
+  - Handle: 11110766416391397672
+    Type: Texture2D
+    Path: Assets\Models\avocado\Avocado_normal.ktx2
   - Handle: 11976243570351608760
     Type: Texture2D
     Path: Assets\Models\cerberus\metallic.ktx2

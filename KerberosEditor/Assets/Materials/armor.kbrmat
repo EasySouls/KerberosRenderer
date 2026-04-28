@@ -1,0 +1,9 @@
+Name: armor
+Albedo: [1, 1, 1]
+Roughness: 1
+Metallic: 0
+AlbedoTexture: Assets/Models/armor/colormap_rgba.ktx2
+NormalTexture: Assets/Models/armor/normalmap_rgba.ktx2
+MetallicTexture: ""
+RoughnessTexture: ""
+AOTexture: ""
