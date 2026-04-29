@@ -5,6 +5,7 @@
 
 #include "Windows/AssetsPanel.hpp"
 #include "Windows/HierarchyPanel.hpp"
+#include "Windows/ConsolePanel.hpp"
 
 #include "Renderer/Mesh.hpp"
 #include "Renderer/Textures/Texture2D.hpp"
@@ -89,6 +90,7 @@ namespace Kerberos
 
 		HierarchyPanel m_HierarchyPanel;
 		Owner<AssetsPanel> m_AssetsPanel;
+		ConsolePanel m_ConsolePanel;
 
 		NotificationManager m_NotificationManager;
 

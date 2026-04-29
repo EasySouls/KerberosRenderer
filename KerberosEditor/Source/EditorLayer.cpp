@@ -248,6 +248,7 @@ namespace Kerberos
 
 		m_HierarchyPanel.OnEvent(event);
 		m_AssetsPanel->OnEvent(event);
+		m_ConsolePanel.OnEvent(event);
 
 		EventDispatcher dispatcher(event);
 		dispatcher.Dispatch<KeyPressedEvent>(KBR_BIND_FN(EditorLayer::OnKeyPressed));
@@ -298,6 +299,7 @@ namespace Kerberos
 
 		m_HierarchyPanel.OnImGuiRender();
 		m_AssetsPanel->OnImGuiRender();
+		m_ConsolePanel.OnImGuiRender();
 
 		DrawViewport();
 

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Core/UUID.hpp"
+#include "EditorSink.hpp"
 
 #include <spdlog/spdlog.h>
 #include <spdlog/fmt/ostr.h>
@@ -33,6 +34,8 @@ namespace Kerberos
 
 		static std::unique_ptr<spdlog::logger>& GetCoreLogger() { return s_CoreLogger; }
 		static std::unique_ptr<spdlog::logger>& GetEditorLogger() { return s_EditorLogger; }
+
+		static std::shared_ptr<EditorSinkMultithreaded>& GetEditorSink() { return s_EditorSink; }
 
 
 		/**
@@ -92,6 +95,8 @@ namespace Kerberos
 	private:
 		static std::unique_ptr<spdlog::logger> s_CoreLogger;
 		static std::unique_ptr<spdlog::logger> s_EditorLogger;
+
+		static std::shared_ptr<EditorSinkMultithreaded> s_EditorSink;
 	};
 }
 
