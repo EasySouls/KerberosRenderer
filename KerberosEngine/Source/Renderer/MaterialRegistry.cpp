@@ -12,6 +12,9 @@ namespace Kerberos
 	MaterialRegistry::~MaterialRegistry()
 	{
 		VulkanContext::Get().WaitIdle();
+
+		m_Materials.clear();
+		m_DescriptorPools.clear();
 	}
 
 	void MaterialRegistry::Add(const std::string& name, const Material& mat) 

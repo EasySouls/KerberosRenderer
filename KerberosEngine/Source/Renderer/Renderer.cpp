@@ -1945,7 +1945,7 @@ namespace Kerberos
 			s_Data->PBRRayQueryShadowsPipeline = CreateRef<GraphicsPipeline>(opaquePipelineSpec);
 
 			enableRayQuerySoftShadows = 1;
-			opaquePipelineSpec.Name = "PBR Ray Query Soft hadows Pipeline";
+			opaquePipelineSpec.Name = "PBR Ray Query Soft Shadows Pipeline";
 			s_Data->PBRRayQuerySoftShadowsPipeline = CreateRef<GraphicsPipeline>(opaquePipelineSpec);
 
 			Ref<Shader> normalDebugShader = CreateRef<Shader>("normaldebug", "NormalDebug");
@@ -2097,9 +2097,9 @@ namespace Kerberos
 			s_Data->CompositePipeline = CreateRef<GraphicsPipeline>(compositePipelineSpec);
 		}
 
-		// Transition composite image to shader read layout
+		// Transition composite and color output images to shader read layout
 		{
-			vk::ImageMemoryBarrier2 barrier = {
+			const vk::ImageMemoryBarrier2 compositeImageBarrier = {
 				.srcStageMask = vk::PipelineStageFlagBits2::eTopOfPipe,
 				.srcAccessMask = {},
 				.dstStageMask = vk::PipelineStageFlagBits2::eFragmentShader,
@@ -2117,16 +2117,35 @@ namespace Kerberos
 					.layerCount = 1
 				}
 			};
+			const vk::ImageMemoryBarrier2 colorOutputImageBarrier = {
+				.srcStageMask = vk::PipelineStageFlagBits2::eTopOfPipe,
+				.srcAccessMask = {},
+				.dstStageMask = vk::PipelineStageFlagBits2::eFragmentShader,
+				.dstAccessMask = vk::AccessFlagBits2::eShaderRead,
+				.oldLayout = vk::ImageLayout::eUndefined,
+				.newLayout = vk::ImageLayout::eShaderReadOnlyOptimal,
+				.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+				.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+				.image = s_Data->ColorImage.Image,
+				.subresourceRange = {
+					.aspectMask = vk::ImageAspectFlagBits::eColor,
+					.baseMipLevel = 0,
+					.levelCount = 1,
+					.baseArrayLayer = 0,
+					.layerCount = 1
+				}
+			};
+			const std::array barriers = { compositeImageBarrier, colorOutputImageBarrier };
 			const vk::DependencyInfo dependencyInfo = {
 				.dependencyFlags = {},
-				.imageMemoryBarrierCount = 1,
-				.pImageMemoryBarriers = &barrier
+				.imageMemoryBarrierCount = barriers.size(),
+				.pImageMemoryBarriers = barriers.data()
 			};
 
 			const auto cmd = context.BeginSingleTimeCommands();
 			context.SetObjectDebugName(reinterpret_cast<uint64_t>(static_cast<VkCommandBuffer>(*cmd)),
 									   vk::ObjectType::eCommandBuffer,
-									   "EditorLayer Single Time Command Buffer for Composite Image Layout Transition");
+									   "EditorLayer Single Time Command Buffer for Composite/Color Image Layout Transition");
 			cmd.pipelineBarrier2(dependencyInfo);
 			context.EndSingleTimeCommands(cmd);
 		}
@@ -2334,9 +2353,9 @@ namespace Kerberos
 			}
 		}
 
-		// Transition composite image to shader read layout
+		// Transition composite adn color output image to shader read layout
 		{
-			vk::ImageMemoryBarrier2 barrier = {
+			const vk::ImageMemoryBarrier2 compositeImageBarrier = {
 				.srcStageMask = vk::PipelineStageFlagBits2::eTopOfPipe,
 				.srcAccessMask = {},
 				.dstStageMask = vk::PipelineStageFlagBits2::eFragmentShader,
@@ -2354,10 +2373,29 @@ namespace Kerberos
 					.layerCount = 1
 				}
 			};
+			const vk::ImageMemoryBarrier2 colorOutputImageBarrier = {
+				.srcStageMask = vk::PipelineStageFlagBits2::eTopOfPipe,
+				.srcAccessMask = {},
+				.dstStageMask = vk::PipelineStageFlagBits2::eFragmentShader,
+				.dstAccessMask = vk::AccessFlagBits2::eShaderRead,
+				.oldLayout = vk::ImageLayout::eUndefined,
+				.newLayout = vk::ImageLayout::eShaderReadOnlyOptimal,
+				.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+				.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+				.image = s_Data->ColorImage.Image,
+				.subresourceRange = {
+					.aspectMask = vk::ImageAspectFlagBits::eColor,
+					.baseMipLevel = 0,
+					.levelCount = 1,
+					.baseArrayLayer = 0,
+					.layerCount = 1
+				}
+			};
+			const std::array barriers = { compositeImageBarrier, colorOutputImageBarrier };
 			const vk::DependencyInfo dependencyInfo = {
 				.dependencyFlags = {},
-				.imageMemoryBarrierCount = 1,
-				.pImageMemoryBarriers = &barrier
+				.imageMemoryBarrierCount = barriers.size(),
+				.pImageMemoryBarriers = barriers.data()
 			};
 			const auto cmd = context.BeginSingleTimeCommands();
 			context.SetObjectDebugName(reinterpret_cast<uint64_t>(static_cast<VkCommandBuffer>(*cmd)),

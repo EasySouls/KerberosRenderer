@@ -193,6 +193,7 @@ namespace Kerberos
 		m_Device.resetFences(*m_InFlightFences[m_FrameIndex]);
 
 		m_CommandBuffers[m_FrameIndex].reset();
+		SetObjectDebugName(m_CommandBuffers[m_FrameIndex], "Render CommandBuffer " + std::to_string(m_FrameIndex));
 		RecordCommandBuffer(m_CurrentImageIndex);
 
 		vk::PipelineStageFlags waitDestinationStageMask(vk::PipelineStageFlagBits::eColorAttachmentOutput);
