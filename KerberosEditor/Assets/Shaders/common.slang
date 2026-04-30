@@ -12,7 +12,7 @@ public struct SceneData
 
 public struct Material 
 {
-    public float3 albedo;
+    public float4 albedo;
     public float roughness;
     public float metallic;
 };

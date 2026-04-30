@@ -131,6 +131,7 @@ namespace
 		vk::raii::DeviceMemory ImageMemory = nullptr;
 		vk::raii::ImageView ReadImageView = nullptr;
 		std::array<vk::raii::ImageView, ShadowMap::CascadeCount> WriteImageViews{ nullptr, nullptr, nullptr, nullptr };
+		vk::Format Format = vk::Format::eUndefined;
 		vk::raii::PipelineLayout PipelineLayout = nullptr;
 		Ref<GraphicsPipeline> Pipeline = nullptr;
 
@@ -159,6 +160,7 @@ namespace
 		vk::raii::Image Image = nullptr;
 		vk::raii::DeviceMemory ImageMemory = nullptr;
 		vk::raii::ImageView ImageView = nullptr;
+		vk::Format Format = vk::Format::eUndefined;
 	};
 
 	struct PickingReadbackSlot
@@ -186,6 +188,7 @@ namespace
 	{
 		vk::raii::DescriptorSetLayout scene = nullptr;
 		vk::raii::DescriptorSetLayout textures = nullptr;
+		vk::raii::DescriptorSetLayout composite = nullptr;
 	};
 
 	struct SceneUniformData
@@ -220,6 +223,14 @@ namespace
 		glm::mat4 model{ 0.f };
 	};
 
+	struct WBOITData
+	{
+		ImageData AccumulationImage;
+		ImageData RevealageImage;
+		ImageData DistortionImage;
+		Ref<GraphicsPipeline> MainPipeline = nullptr;
+	};
+
 	struct UniformBufferObject
 	{
 		Ref<UniformBuffer> scene;
@@ -237,6 +248,7 @@ namespace
 	{
 		vk::raii::DescriptorSet scene = nullptr;
 		vk::raii::DescriptorSet skybox = nullptr;
+		vk::raii::DescriptorSet composite = nullptr;
 	};
 
 	struct PendingSceneRender
@@ -277,8 +289,10 @@ namespace
 		DepthBias DepthBias;
 		ShadowMap ShadowMap;
 		Skybox Skybox;
+		WBOITData Transparency;
 		ImageData ColorImage;
 		ImageData DepthImage;
+		ImageData CompositeImage;
 		ImageData PickingImage;
 		vk::ImageLayout PickingImageLayout = vk::ImageLayout::eUndefined;
 
@@ -289,15 +303,19 @@ namespace
 		Ref<GraphicsPipeline> DepthPrePassPipeline = nullptr;
 		Ref<GraphicsPipeline> PBROpaquePipeline = nullptr;
 		Ref<GraphicsPipeline> PBROpaquePipelinePCF = nullptr;
-		Ref<GraphicsPipeline> PBRTransparentPipeline = nullptr;
 		Ref<GraphicsPipeline> SkyboxPipeline = nullptr;
 		Ref<GraphicsPipeline> NormalDebugPipeline = nullptr;
 		Ref<GraphicsPipeline> ColliderLinesPipeline = nullptr;
 		Ref<GraphicsPipeline> PBRRayQueryShadowsPipeline = nullptr;
 		Ref<GraphicsPipeline> PBRRayQuerySoftShadowsPipeline = nullptr;
 
+		vk::raii::PipelineLayout CompositePipelineLayout = nullptr;
+		Ref<GraphicsPipeline> CompositePipeline = nullptr;
+
 		vk::raii::Sampler ColorSampler = nullptr;
 		vk::raii::Sampler ShadowMapSampler = nullptr;
+		vk::raii::Sampler PointSampler = nullptr;
+		vk::raii::Sampler LinearSampler = nullptr;
 
 		SceneUniformData SceneUniformData{};
 		GlobalLighting GlobalLightingData{};
@@ -584,6 +602,9 @@ namespace Kerberos
 				if (material == nullptr)
 					material = s_Data->MaterialRegistry.Get("DebugPink");
 
+				if (material->IsTransparent())
+					continue;
+
 				UpdatePerObjectUniformBuffer(currentImage, static_cast<uint32_t>(i), transform.GetTransform(), *material, static_cast<uint32_t>(entity));
 				uint32_t dynamicOffset = static_cast<uint32_t>(i * s_Data->DynamicAlignment);
 
@@ -686,6 +707,9 @@ namespace Kerberos
 					Ref<Material> material = staticMesh.MeshMaterial;
 					if (material == nullptr)
 						material = s_Data->MaterialRegistry.Get("DebugPink");
+
+					if (material->IsTransparent())
+						continue;
 
 					UpdatePerObjectUniformBuffer(currentImage, static_cast<uint32_t>(i), transform.GetTransform(), *material, static_cast<uint32_t>(entity));
 					uint32_t dynamicOffset = static_cast<uint32_t>(i * s_Data->DynamicAlignment);
@@ -874,7 +898,7 @@ namespace Kerberos
 				.imageView = s_Data->DepthImage.ImageView,
 				.imageLayout = vk::ImageLayout::eDepthAttachmentOptimal,
 				.loadOp = vk::AttachmentLoadOp::eLoad,
-				.storeOp = vk::AttachmentStoreOp::eDontCare,
+				.storeOp = vk::AttachmentStoreOp::eStore,
 			};
 
 			const vk::RenderingInfo renderingInfo{
@@ -953,6 +977,9 @@ namespace Kerberos
 					if (material == nullptr)
 						material = s_Data->MaterialRegistry.Get("DebugPink");
 
+					if (material->IsTransparent())
+						continue;
+
 					UpdatePerObjectUniformBuffer(currentImage, i, Transform, *material, EntityID);
 					uint32_t dynamicOffset = static_cast<uint32_t>(i * s_Data->DynamicAlignment);
 
@@ -1007,27 +1034,76 @@ namespace Kerberos
 			KBR_CORE_TRACE("Opaque pass done!");
 		}
 
+		// Transfer accumulation, revealage and distortion images to color attachment optimal for they will be render targets
+		{
+			std::array<vk::ImageMemoryBarrier2, 3> barriers;
+			for (size_t i = 0; i < barriers.size(); ++i)
+			{
+				barriers[i] = {
+					.srcStageMask = vk::PipelineStageFlagBits2::eFragmentShader,
+					.srcAccessMask = vk::AccessFlagBits2::eShaderRead,
+
+					.dstStageMask = vk::PipelineStageFlagBits2::eColorAttachmentOutput,
+					.dstAccessMask = vk::AccessFlagBits2::eColorAttachmentWrite,
+
+					.oldLayout = vk::ImageLayout::eUndefined,
+					.newLayout = vk::ImageLayout::eColorAttachmentOptimal,
+
+					.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+					.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+					.image = (i == 0) ? s_Data->Transparency.AccumulationImage.Image :
+							 (i == 1) ? s_Data->Transparency.RevealageImage.Image :
+										s_Data->Transparency.DistortionImage.Image,
+					.subresourceRange = {
+						.aspectMask = vk::ImageAspectFlagBits::eColor,
+						.baseMipLevel = 0,
+						.levelCount = 1,
+						.baseArrayLayer = 0,
+						.layerCount = 1
+					}
+				};
+			}
+
+			const vk::DependencyInfo dependencyInfo = {
+				.dependencyFlags = {},
+				.imageMemoryBarrierCount = static_cast<uint32_t>(barriers.size()),
+				.pImageMemoryBarriers = barriers.data()
+			};
+			cmd.pipelineBarrier2(dependencyInfo);
+		}
+
 		// Render transparent objects
        {
 			WriteGPUTimestamp(cmd, frameIndex, static_cast<uint32_t>(GPUTimestampQuery::TransparentBegin));
 
-			vk::RenderingAttachmentInfo colorAttachmentInfo{
-				.imageView = s_Data->ColorImage.ImageView,
+			vk::RenderingAttachmentInfo accumulationAttachmentInfo{
+				.imageView = s_Data->Transparency.AccumulationImage.ImageView,
 				.imageLayout = vk::ImageLayout::eColorAttachmentOptimal,
-				.loadOp = vk::AttachmentLoadOp::eLoad,
+				.loadOp = vk::AttachmentLoadOp::eClear,
 				.storeOp = vk::AttachmentStoreOp::eStore,
+				.clearValue = vk::ClearColorValue{ std::array{0.0f, 0.0f, 0.0f, 0.0f} }
 			};
 
-			vk::RenderingAttachmentInfo pickingAttachmentInfo{
-				.imageView = s_Data->PickingImage.ImageView,
+			vk::RenderingAttachmentInfo revealageAttachmentInfo{
+				.imageView = s_Data->Transparency.RevealageImage.ImageView,
 				.imageLayout = vk::ImageLayout::eColorAttachmentOptimal,
-				.loadOp = vk::AttachmentLoadOp::eLoad,
+				.loadOp = vk::AttachmentLoadOp::eClear,
 				.storeOp = vk::AttachmentStoreOp::eStore,
+				.clearValue = vk::ClearColorValue{ std::array{1.0f, 1.0f, 1.0f, 1.0f} }
 			};
 
-			const std::array<vk::RenderingAttachmentInfo, 2> colorAttachments = {
-				colorAttachmentInfo,
-				pickingAttachmentInfo
+			vk::RenderingAttachmentInfo distortionAttachmentInfo{
+				.imageView = s_Data->Transparency.DistortionImage.ImageView,
+				.imageLayout = vk::ImageLayout::eColorAttachmentOptimal,
+				.loadOp = vk::AttachmentLoadOp::eClear,
+				.storeOp = vk::AttachmentStoreOp::eStore,
+				.clearValue = vk::ClearColorValue{ std::array{0.0f, 0.0f, 0.0f, 0.0f} }
+			};
+
+			const std::array<vk::RenderingAttachmentInfo, 3> colorAttachments = {
+				accumulationAttachmentInfo,
+				revealageAttachmentInfo,
+				distortionAttachmentInfo
 			};
 
 			vk::RenderingAttachmentInfo depthAttachmentInfo{
@@ -1051,32 +1127,31 @@ namespace Kerberos
 
 			cmd.setScissor(0, renderArea);
 
-			s_Data->PBRTransparentPipeline->Bind(cmd);
+			s_Data->Transparency.MainPipeline->Bind(cmd);
 
-			//{
-			//	const auto meshView = scene->m_Registry.view<TransformComponent, StaticMeshComponent>();
-			//	int i = 0;
-			//	for (const auto entity : meshView)
-			//	{
-			//		auto& [transform, staticMesh] = meshView.get<TransformComponent, StaticMeshComponent>(entity);
-			//		if (!staticMesh.Visible || !staticMesh.StaticMesh || !staticMesh.MeshMaterial || !staticMesh.MeshMaterial->IsTransparent())
-			//			continue;
+			for (uint32_t i = 0; i < renderObjects.size(); ++i)
+			{
+				const auto& [Transform, Mesh, Material, EntityID] = renderObjects[i];
 
-			//		UpdatePerObjectUniformBuffer(currentImage, static_cast<uint32_t>(i), transform.GetTransform(), *staticMesh.MeshMaterial);
-			//		uint32_t dynamicOffset = static_cast<uint32_t>(i * s_Data->DynamicAlignment);
+				Ref<Kerberos::Material> material = Material;
+				if (material == nullptr)
+					material = s_Data->MaterialRegistry.Get("DebugPink");
 
-			//		cmd.bindDescriptorSets(
-			//			vk::PipelineBindPoint::eGraphics,
-			//			*s_Data->PBRPipelineLayout,
-			//			0,
-			//			{ s_Data->DescriptorSets[currentImage].scene, staticMesh.Meshmaterial->DescriptorSets[currentImage] },
-			//			{ dynamicOffset });
+				if (!material->IsTransparent())
+					continue;
 
-			//		staticMesh.StaticMesh->Draw(cmd);
+				UpdatePerObjectUniformBuffer(currentImage, i, Transform, *material, EntityID);
+				uint32_t dynamicOffset = static_cast<uint32_t>(i * s_Data->DynamicAlignment);
 
-			//		++i;
-			//	}
-			//}
+				cmd.bindDescriptorSets(
+					vk::PipelineBindPoint::eGraphics,
+					*s_Data->PBRPipelineLayout,
+					0,
+					{ s_Data->DescriptorSets[currentImage].scene, material->DescriptorSets[currentImage] },
+					{ dynamicOffset });
+
+				Mesh->Draw(cmd);
+			}
 
 			cmd.endRendering();
 
@@ -1134,9 +1209,130 @@ namespace Kerberos
 			}
 		}
 
+		// Transition all images needed for the composite pass to shader read optimal (color, depth, accumulation, revealage, distortion)
+		// and transition composite image to color attachment optimal
+		{
+			std::array<vk::ImageMemoryBarrier2, 6> barriers;
+			std::array<vk::ImageLayout, 6> oldLayouts = {
+				vk::ImageLayout::eColorAttachmentOptimal, // Color image
+				vk::ImageLayout::eDepthAttachmentOptimal, // Depth image
+				vk::ImageLayout::eColorAttachmentOptimal, // Accumulation image
+				vk::ImageLayout::eColorAttachmentOptimal, // Revealage image
+				vk::ImageLayout::eColorAttachmentOptimal,  // Distortion image
+				vk::ImageLayout::eShaderReadOnlyOptimal   // Composite image
+			};
+			std::array<vk::ImageLayout, 6> newLayouts = {
+				vk::ImageLayout::eShaderReadOnlyOptimal, // Color image
+				vk::ImageLayout::eShaderReadOnlyOptimal, // Depth image
+				vk::ImageLayout::eShaderReadOnlyOptimal, // Accumulation image
+				vk::ImageLayout::eShaderReadOnlyOptimal, // Revealage image
+				vk::ImageLayout::eShaderReadOnlyOptimal,  // Distortion image
+				vk::ImageLayout::eColorAttachmentOptimal   // Composite image
+			};
+			std::array<vk::AccessFlags2, 6> srcAccessMasks = {
+				vk::AccessFlagBits2::eColorAttachmentWrite, // Color image
+				vk::AccessFlagBits2::eDepthStencilAttachmentWrite, // Depth image
+				vk::AccessFlagBits2::eColorAttachmentWrite, // Accumulation image
+				vk::AccessFlagBits2::eColorAttachmentWrite, // Revealage image
+				vk::AccessFlagBits2::eColorAttachmentWrite,  // Distortion image
+				vk::AccessFlagBits2::eColorAttachmentWrite   // Composite image
+			};
+			std::array<vk::PipelineStageFlags2, 6> srcStageMasks = {
+				vk::PipelineStageFlagBits2::eColorAttachmentOutput, // Color image
+				vk::PipelineStageFlagBits2::eEarlyFragmentTests | vk::PipelineStageFlagBits2::eLateFragmentTests, // Depth image
+				vk::PipelineStageFlagBits2::eColorAttachmentOutput, // Accumulation image
+				vk::PipelineStageFlagBits2::eColorAttachmentOutput, // Revealage image
+				vk::PipelineStageFlagBits2::eColorAttachmentOutput,  // Distortion image
+				vk::PipelineStageFlagBits2::eColorAttachmentOutput   // Composite image
+			};
+			std::array<vk::AccessFlags2, 6> dstAccessMasks = {
+				vk::AccessFlagBits2::eShaderRead, // Color image
+				vk::AccessFlagBits2::eDepthStencilAttachmentRead, // Depth image
+				vk::AccessFlagBits2::eShaderRead, // Accumulation image
+				vk::AccessFlagBits2::eShaderRead, // Revealage image
+				vk::AccessFlagBits2::eShaderRead,  // Distortion image
+				vk::AccessFlagBits2::eShaderRead   // Composite image
+			};
+			std::array<vk::Image, 6> images = {
+				*s_Data->ColorImage.Image,
+				*s_Data->DepthImage.Image,
+				*s_Data->Transparency.AccumulationImage.Image,
+				*s_Data->Transparency.RevealageImage.Image,
+				*s_Data->Transparency.DistortionImage.Image,
+				*s_Data->CompositeImage.Image
+			};
+
+			for (size_t i = 0; i < barriers.size(); ++i)
+			{
+				barriers[i] = {
+					.srcStageMask = srcStageMasks[i],
+					.srcAccessMask = srcAccessMasks[i],
+					.dstStageMask = vk::PipelineStageFlagBits2::eFragmentShader,
+					.dstAccessMask = dstAccessMasks[i],
+					.oldLayout = oldLayouts[i],
+					.newLayout = newLayouts[i],
+					.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+					.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+					.image = images[i],
+					.subresourceRange = {
+						.aspectMask = i == 1 ? vk::ImageAspectFlagBits::eDepth : vk::ImageAspectFlagBits::eColor,
+						.baseMipLevel = 0,
+						.levelCount = 1,
+						.baseArrayLayer = 0,
+						.layerCount = 1
+					}
+				};
+			}
+
+			const vk::DependencyInfo dependencyInfo = {
+				.dependencyFlags = {},
+				.imageMemoryBarrierCount = static_cast<uint32_t>(barriers.size()),
+				.pImageMemoryBarriers = barriers.data()
+			};
+			cmd.pipelineBarrier2(dependencyInfo);
+		}
+
+		// Resolve transparency
+		{
+			//WriteGPUTimestamp(cmd, frameIndex, static_cast<uint32_t>(GPUTimestampQuery::TransparencyResolveBegin));
+
+			vk::RenderingAttachmentInfo colorAttachmentInfo{
+				.imageView = s_Data->CompositeImage.ImageView,
+				.imageLayout = vk::ImageLayout::eColorAttachmentOptimal,
+				.loadOp = vk::AttachmentLoadOp::eClear,
+				.storeOp = vk::AttachmentStoreOp::eStore,
+				.clearValue = vk::ClearColorValue{ std::array{0.0f, 0.0f, 0.0f, 1.0f} }
+			};
+			const vk::RenderingInfo renderingInfo{
+				.renderArea = renderArea,
+				.layerCount = 1,
+				.colorAttachmentCount = 1,
+				.pColorAttachments = &colorAttachmentInfo,
+				.pDepthAttachment = nullptr
+			};
+			cmd.beginRendering(renderingInfo);
+			cmd.setViewport(0, viewport);
+			cmd.setScissor(0, renderArea);
+
+			s_Data->CompositePipeline->Bind(cmd);
+			cmd.bindDescriptorSets(
+				vk::PipelineBindPoint::eGraphics,
+				*s_Data->CompositePipelineLayout,
+				0,
+				*s_Data->DescriptorSets[currentImage].composite,
+				{});
+			cmd.draw(3, 1, 0, 0);
+
+			cmd.endRendering();
+
+			//WriteGPUTimestamp(cmd, frameIndex, static_cast<uint32_t>(GPUTimestampQuery::TransparencyResolveEnd));
+
+			KBR_CORE_TRACE("Transparency resolve pass done!");
+		}
+
 		HandleMousePickingReadback(cmd);
 
-		// Transition color image layout for shader read in ImGui
+		// Transition composite image layout for shader read in ImGui
 		{
 			vk::ImageMemoryBarrier2 barrier = {
 			.srcStageMask = vk::PipelineStageFlagBits2::eColorAttachmentOutput,
@@ -1147,7 +1343,7 @@ namespace Kerberos
 			.newLayout = vk::ImageLayout::eShaderReadOnlyOptimal,
 			.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
 			.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-			.image = s_Data->ColorImage.Image,
+			.image = s_Data->CompositeImage.Image,
 			.subresourceRange = {
 				.aspectMask = vk::ImageAspectFlagBits::eColor,
 				.baseMipLevel = 0,
@@ -1163,7 +1359,7 @@ namespace Kerberos
 			};
 			cmd.pipelineBarrier2(dependencyInfo);
 
-			KBR_CORE_TRACE("Color image transitioned for ImGui!");
+			KBR_CORE_TRACE("Composite image transitioned for ImGui!");
 		}
 
 		WriteGPUTimestamp(cmd, frameIndex, static_cast<uint32_t>(GPUTimestampQuery::FrameEnd));
@@ -1172,22 +1368,23 @@ namespace Kerberos
 		ResolveGPUTimings(frameIndex);
 	}
 
-	void Renderer::CreateDefaultMaterials() 
+	void Renderer::CreateDefaultMaterials()
 	{
 		KBR_CORE_ASSERT(s_Data, "Renderer not initialized!");
 
-		s_Data->MaterialRegistry.Add("Gold", CreateRef<Material>("Gold", glm::vec3(1.0f, 0.765557f, 0.336057f), 0.1f, 1.0f));
-		s_Data->MaterialRegistry.Add("Copper", CreateRef<Material>("Copper", glm::vec3(0.955008f, 0.637427f, 0.538163f), 0.1f, 1.0f));
-		s_Data->MaterialRegistry.Add("Chromium", CreateRef<Material>("Chromium", glm::vec3(0.549585f, 0.556114f, 0.554256f), 0.1f, 1.0f));
-		s_Data->MaterialRegistry.Add("Nickel", CreateRef<Material>("Nickel", glm::vec3(0.659777f, 0.608679f, 0.525649f), 0.1f, 1.0f));
-		s_Data->MaterialRegistry.Add("Titanium", CreateRef<Material>("Titanium", glm::vec3(0.541931f, 0.496791f, 0.449419f), 0.1f, 1.0f));
-		s_Data->MaterialRegistry.Add("Cobalt", CreateRef<Material>("Cobalt", glm::vec3(0.662124f, 0.654864f, 0.633732f), 0.1f, 1.0f));
-		s_Data->MaterialRegistry.Add("Platinum", CreateRef<Material>("Platinum", glm::vec3(0.672411f, 0.637331f, 0.585456f), 0.1f, 1.0f));
-		s_Data->MaterialRegistry.Add("White", CreateRef<Material>("White", glm::vec3(1.0f), 1.0f, 0.0f));
-		s_Data->MaterialRegistry.Add("Red", CreateRef<Material>("Red", glm::vec3(1.0f, 0.0f, 0.0f), 0.1f, 1.0f));
-		s_Data->MaterialRegistry.Add("Blue", CreateRef<Material>("Blue", glm::vec3(0.0f, 0.0f, 1.0f), 0.1f, 1.0f));
-		s_Data->MaterialRegistry.Add("Black", CreateRef<Material>("Black", glm::vec3(0.0f), 0.1f, 1.0f));
-		s_Data->MaterialRegistry.Add("DebugPink", CreateRef<Material>("DebugPink", glm::vec3(1.0f, 0.0f, 1.0f), 1.0f, 0.1f));
+		s_Data->MaterialRegistry.Add("Gold", CreateRef<Material>("Gold", glm::vec4(1.0f, 0.765557f, 0.336057f, 1.0f), 0.1f, 1.0f));
+		s_Data->MaterialRegistry.Add("Copper", CreateRef<Material>("Copper", glm::vec4(0.955008f, 0.637427f, 0.538163f, 1.0f), 0.1f, 1.0f));
+		s_Data->MaterialRegistry.Add("Chromium", CreateRef<Material>("Chromium", glm::vec4(0.549585f, 0.556114f, 0.554256f, 1.0f), 0.1f, 1.0f));
+		s_Data->MaterialRegistry.Add("Nickel", CreateRef<Material>("Nickel", glm::vec4(0.659777f, 0.608679f, 0.525649f, 1.0f), 0.1f, 1.0f));
+		s_Data->MaterialRegistry.Add("Titanium", CreateRef<Material>("Titanium", glm::vec4(0.541931f, 0.496791f, 0.449419f, 1.0f), 0.1f, 1.0f));
+		s_Data->MaterialRegistry.Add("Cobalt", CreateRef<Material>("Cobalt", glm::vec4(0.662124f, 0.654864f, 0.633732f, 1.0f), 0.1f, 1.0f));
+		s_Data->MaterialRegistry.Add("Platinum", CreateRef<Material>("Platinum", glm::vec4(0.672411f, 0.637331f, 0.585456f, 1.0f), 0.1f, 1.0f));
+		s_Data->MaterialRegistry.Add("White", CreateRef<Material>("White", glm::vec4(1.0f, 1.0f, 1.0f, 1.0f), 1.0f, 0.0f));
+		s_Data->MaterialRegistry.Add("Red", CreateRef<Material>("Red", glm::vec4(1.0f, 0.0f, 0.0f, 1.0f), 0.1f, 1.0f));
+		s_Data->MaterialRegistry.Add("Blue", CreateRef<Material>("Blue", glm::vec4(0.0f, 0.0f, 1.0f, 1.0f), 0.1f, 1.0f));
+		s_Data->MaterialRegistry.Add("Black", CreateRef<Material>("Black", glm::vec4(0.0f, 0.0f, 0.0f, 1.0f), 0.1f, 1.0f));
+		s_Data->MaterialRegistry.Add("DebugPink", CreateRef<Material>("DebugPink", glm::vec4(1.0f, 0.0f, 1.0f, 1.0f), 1.0f, 0.1f));
+		s_Data->MaterialRegistry.Add("Water", CreateRef<Material>("Water", glm::vec4(0.0f, 0.0f, 1.0f, 0.5f), 1.0f, 0.1f));
 	}
 
 	void Renderer::CreateResources()
@@ -1200,7 +1397,7 @@ namespace Kerberos
 			vk::Format::eR16G16B16A16Sfloat,
 			vk::ImageUsageFlagBits::eSampled
 		);*/
-		s_Data->Skybox.SkyboxTexture = TextureCube::FromFile("Assets/Textures/hdr/pisa_cube.ktx");
+		s_Data->Skybox.SkyboxTexture = TextureCube::FromFile("Assets/Textures/hdr/pisa_cube.ktx2");
 
 		CreateSkyboxResources();
 		
@@ -1309,12 +1506,54 @@ namespace Kerberos
 			s_Data->ShadowMapSampler = vk::raii::Sampler{ device, shadowSamplerInfo };
 
 			context.SetObjectDebugName(s_Data->ShadowMapSampler, "Shadow Map Sampler");
+
+			const vk::SamplerCreateInfo linearSamplerInfo{
+				.magFilter = vk::Filter::eLinear,
+				.minFilter = vk::Filter::eLinear,
+				.mipmapMode = vk::SamplerMipmapMode::eLinear,
+				.addressModeU = vk::SamplerAddressMode::eClampToEdge,
+				.addressModeV = vk::SamplerAddressMode::eClampToEdge,
+				.addressModeW = vk::SamplerAddressMode::eClampToEdge,
+				.mipLodBias = 0.0f,
+				.anisotropyEnable = vk::False,
+				.maxAnisotropy = context.GetMaxAnisotropy(),
+				.compareEnable = vk::False,
+				.compareOp = vk::CompareOp::eAlways,
+				.minLod = 0.0f,
+				.maxLod = 0.0f,
+				.borderColor = vk::BorderColor::eIntOpaqueBlack,
+				.unnormalizedCoordinates = vk::False
+			};
+			s_Data->LinearSampler = vk::raii::Sampler{ device, linearSamplerInfo };
+
+			context.SetObjectDebugName(s_Data->LinearSampler, "Linear Sampler");
+
+			const vk::SamplerCreateInfo pointSamplerInfo{
+				.magFilter = vk::Filter::eNearest,
+				.minFilter = vk::Filter::eNearest,
+				.mipmapMode = vk::SamplerMipmapMode::eNearest,
+				.addressModeU = vk::SamplerAddressMode::eClampToEdge,
+				.addressModeV = vk::SamplerAddressMode::eClampToEdge,
+				.addressModeW = vk::SamplerAddressMode::eClampToEdge,
+				.mipLodBias = 0.0f,
+				.anisotropyEnable = vk::False,
+				.maxAnisotropy = context.GetMaxAnisotropy(),
+				.compareEnable = vk::False,
+				.compareOp = vk::CompareOp::eAlways,
+				.minLod = 0.0f,
+				.maxLod = 0.0f,
+				.borderColor = vk::BorderColor::eIntOpaqueBlack,
+				.unnormalizedCoordinates = vk::False
+			};
+			s_Data->PointSampler = vk::raii::Sampler{ device, pointSamplerInfo };
+
+			context.SetObjectDebugName(s_Data->PointSampler, "Point Sampler");
 		}
 
 		// Create the shadow map resources
 		{
 			// Create shadow map image
-			const vk::Format shadowMapFormat = context.FindSupportedFormat(
+			s_Data->ShadowMap.Format = context.FindSupportedFormat(
 				{ vk::Format::eD32Sfloat },
 				vk::ImageTiling::eOptimal,
 				vk::FormatFeatureFlagBits::eDepthStencilAttachment | vk::FormatFeatureFlagBits::eSampledImage
@@ -1325,7 +1564,7 @@ namespace Kerberos
 			vk::ImageCreateInfo imageInfo{
 				//.flags = vk::ImageCreateFlagBits::e2DArrayCompatible,
 				.imageType = vk::ImageType::e2D,
-				.format = shadowMapFormat,
+				.format = s_Data->ShadowMap.Format,
 				.extent = {
 					.width = s_Data->ShadowMap.Size,
 					.height = s_Data->ShadowMap.Size,
@@ -1359,7 +1598,7 @@ namespace Kerberos
 			const vk::ImageViewCreateInfo readViewInfo{
 				.image = *s_Data->ShadowMap.Image,
 				.viewType = vk::ImageViewType::e2DArray,
-				.format = shadowMapFormat,
+				.format = s_Data->ShadowMap.Format,
 				.subresourceRange = {
 					.aspectMask = vk::ImageAspectFlagBits::eDepth,
 					.baseMipLevel = 0,
@@ -1378,7 +1617,7 @@ namespace Kerberos
 				const vk::ImageViewCreateInfo attachmentViewInfo{
 					.image = *s_Data->ShadowMap.Image,
 					.viewType = vk::ImageViewType::e2D,
-					.format = shadowMapFormat,
+					.format = s_Data->ShadowMap.Format,
 					.subresourceRange = {
 						.aspectMask = vk::ImageAspectFlagBits::eDepth,
 						.baseMipLevel = 0,
@@ -1456,28 +1695,35 @@ namespace Kerberos
 			shadowPipelineSpec.EnableDepthTest = true;
 			shadowPipelineSpec.EnableDepthWrite = true;
 			shadowPipelineSpec.DepthTestFunc = DepthTestFunc::LessOrEqual;
-			shadowPipelineSpec.DepthAttachmentFormat = shadowMapFormat;
+			shadowPipelineSpec.DepthAttachmentFormat = s_Data->ShadowMap.Format;
 			shadowPipelineSpec.DynamicStates = shadowMapDynamicState;
 
 			s_Data->ShadowMap.Pipeline = CreateRef<GraphicsPipeline>(shadowPipelineSpec);
 		}
 
-		// Create the opaque and transparent pipeline resources
-		{
-			std::vector dynamicStates = {
-				vk::DynamicState::eViewport,
-				vk::DynamicState::eScissor
-			};
+		std::vector commonDynamicStates = {
+			vk::DynamicState::eViewport,
+			vk::DynamicState::eScissor
+		};
 
-			const vk::Format colorFormat = context.FindSupportedFormat(
+		// Create the opaque pipeline resources
+		{
+			s_Data->ColorImage.Format = context.FindSupportedFormat(
 				{ vk::Format::eR32G32B32A32Sfloat, vk::Format::eR32G32B32A32Uint },
 				vk::ImageTiling::eOptimal,
 				vk::FormatFeatureFlagBits::eColorAttachment | vk::FormatFeatureFlagBits::eColorAttachmentBlend | vk::FormatFeatureFlagBits::eSampledImage
 			);
-			const vk::Format pickingFormat = context.FindSupportedFormat(
+			s_Data->PickingImage.Format = context.FindSupportedFormat(
 				{ vk::Format::eR32Uint },
 				vk::ImageTiling::eOptimal,
 				vk::FormatFeatureFlagBits::eColorAttachment | vk::FormatFeatureFlagBits::eTransferSrc
+			);
+
+			// TODO: Check format
+			s_Data->CompositeImage.Format = context.FindSupportedFormat(
+				{ vk::Format::eR32G32B32A32Sfloat, vk::Format::eR32G32B32A32Uint },
+				vk::ImageTiling::eOptimal,
+				vk::FormatFeatureFlagBits::eColorAttachment | vk::FormatFeatureFlagBits::eSampledImage
 			);
 
 			constexpr uint32_t initialImageWidth = 1920;
@@ -1489,7 +1735,32 @@ namespace Kerberos
 						initialImageHeight,
 						mipLevels,
 						vk::SampleCountFlagBits::e1,
-						colorFormat,
+						s_Data->CompositeImage.Format,
+						vk::ImageTiling::eOptimal,
+						vk::ImageUsageFlagBits::eColorAttachment | vk::ImageUsageFlagBits::eSampled,
+						vk::MemoryPropertyFlagBits::eDeviceLocal,
+						s_Data->CompositeImage.Image,
+						s_Data->CompositeImage.ImageMemory);
+
+			context.SetObjectDebugName(reinterpret_cast<uint64_t>(static_cast<VkImage>(*s_Data->CompositeImage.Image)),
+									   vk::ObjectType::eImage,
+									   "CompositeImage Image");
+
+			context.SetObjectDebugName(reinterpret_cast<uint64_t>(static_cast<VkDeviceMemory>(*s_Data->CompositeImage.ImageMemory)),
+									   vk::ObjectType::eDeviceMemory,
+									   "CompositeImage Image Memory");
+
+			s_Data->CompositeImage.ImageView = CreateImageView(device, s_Data->CompositeImage.Image, s_Data->CompositeImage.Format, vk::ImageAspectFlagBits::eColor, mipLevels);
+			context.SetObjectDebugName(reinterpret_cast<uint64_t>(static_cast<VkImageView>(*s_Data->CompositeImage.ImageView)),
+									   vk::ObjectType::eImageView,
+									   "CompositeImage Image View");
+
+			CreateImage(device,
+						initialImageWidth,
+						initialImageHeight,
+						mipLevels,
+						vk::SampleCountFlagBits::e1,
+						s_Data->ColorImage.Format,
 						vk::ImageTiling::eOptimal,
 						vk::ImageUsageFlagBits::eColorAttachment | vk::ImageUsageFlagBits::eSampled,
 						vk::MemoryPropertyFlagBits::eDeviceLocal,
@@ -1504,7 +1775,7 @@ namespace Kerberos
 									   vk::ObjectType::eDeviceMemory,
 									   "Color Attachment Image Memory");
 
-			s_Data->ColorImage.ImageView = CreateImageView(device, s_Data->ColorImage.Image, colorFormat, vk::ImageAspectFlagBits::eColor, mipLevels);
+			s_Data->ColorImage.ImageView = CreateImageView(device, s_Data->ColorImage.Image, s_Data->ColorImage.Format, vk::ImageAspectFlagBits::eColor, mipLevels);
 
 			context.SetObjectDebugName(reinterpret_cast<uint64_t>(static_cast<VkImageView>(*s_Data->ColorImage.ImageView)),
 									   vk::ObjectType::eImageView,
@@ -1515,7 +1786,7 @@ namespace Kerberos
 						initialImageHeight,
 						mipLevels,
 						vk::SampleCountFlagBits::e1,
-						pickingFormat,
+						s_Data->PickingImage.Format,
 						vk::ImageTiling::eOptimal,
 						vk::ImageUsageFlagBits::eColorAttachment | vk::ImageUsageFlagBits::eTransferSrc,
 						vk::MemoryPropertyFlagBits::eDeviceLocal,
@@ -1530,17 +1801,17 @@ namespace Kerberos
 									   vk::ObjectType::eDeviceMemory,
 									   "Picking Attachment Image Memory");
 
-			s_Data->PickingImage.ImageView = CreateImageView(device, s_Data->PickingImage.Image, pickingFormat, vk::ImageAspectFlagBits::eColor, mipLevels);
+			s_Data->PickingImage.ImageView = CreateImageView(device, s_Data->PickingImage.Image, s_Data->PickingImage.Format, vk::ImageAspectFlagBits::eColor, mipLevels);
 
 			context.SetObjectDebugName(reinterpret_cast<uint64_t>(static_cast<VkImageView>(*s_Data->PickingImage.ImageView)),
 									   vk::ObjectType::eImageView,
 									   "Picking Attachment Image View");
 			s_Data->PickingImageLayout = vk::ImageLayout::eUndefined;
 
-			const vk::Format depthFormat = context.FindSupportedFormat(
+			s_Data->DepthImage.Format = context.FindSupportedFormat(
 				{ vk::Format::eD32Sfloat },
 				vk::ImageTiling::eOptimal,
-				vk::FormatFeatureFlagBits::eDepthStencilAttachment
+				vk::FormatFeatureFlagBits::eDepthStencilAttachment | vk::FormatFeatureFlagBits::eSampledImage
 			);
 
 			CreateImage(
@@ -1549,9 +1820,9 @@ namespace Kerberos
 				initialImageHeight,
 				mipLevels,
 				vk::SampleCountFlagBits::e1,
-				depthFormat,
+				s_Data->DepthImage.Format,
 				vk::ImageTiling::eOptimal,
-				vk::ImageUsageFlagBits::eDepthStencilAttachment,
+				vk::ImageUsageFlagBits::eDepthStencilAttachment | vk::ImageUsageFlagBits::eSampled,
 				vk::MemoryPropertyFlagBits::eDeviceLocal,
 				s_Data->DepthImage.Image,
 				s_Data->DepthImage.ImageMemory);
@@ -1564,7 +1835,7 @@ namespace Kerberos
 									   vk::ObjectType::eDeviceMemory,
 									   "Depth Attachment Image Memory");
 
-			s_Data->DepthImage.ImageView = CreateImageView(device, s_Data->DepthImage.Image, depthFormat, vk::ImageAspectFlagBits::eDepth, mipLevels);
+			s_Data->DepthImage.ImageView = CreateImageView(device, s_Data->DepthImage.Image, s_Data->DepthImage.Format, vk::ImageAspectFlagBits::eDepth, mipLevels);
 
 			context.SetObjectDebugName(reinterpret_cast<uint64_t>(static_cast<VkImageView>(*s_Data->DepthImage.ImageView)),
 									   vk::ObjectType::eImageView,
@@ -1608,8 +1879,8 @@ namespace Kerberos
 			depthPrepassPipelineSpec.DepthTestFunc = DepthTestFunc::LessOrEqual;
 			depthPrepassPipelineSpec.BlendModes = {};
 			depthPrepassPipelineSpec.ColorAttachmentFormats = {};
-			depthPrepassPipelineSpec.DepthAttachmentFormat = depthFormat;
-			depthPrepassPipelineSpec.DynamicStates = dynamicStates;
+			depthPrepassPipelineSpec.DepthAttachmentFormat = s_Data->DepthImage.Format;
+			depthPrepassPipelineSpec.DynamicStates = commonDynamicStates;
 
 			s_Data->DepthPrePassPipeline = CreateRef<GraphicsPipeline>(depthPrepassPipelineSpec);
 
@@ -1642,9 +1913,9 @@ namespace Kerberos
 			opaquePipelineSpec.EnableDepthWrite = true;
 			opaquePipelineSpec.DepthTestFunc = DepthTestFunc::Equal;
 			opaquePipelineSpec.BlendModes = { BlendMode::None, BlendMode::None };
-			opaquePipelineSpec.ColorAttachmentFormats = { colorFormat, pickingFormat };
-			opaquePipelineSpec.DepthAttachmentFormat = depthFormat;
-			opaquePipelineSpec.DynamicStates = dynamicStates;
+			opaquePipelineSpec.ColorAttachmentFormats = { s_Data->ColorImage.Format, s_Data->PickingImage.Format };
+			opaquePipelineSpec.DepthAttachmentFormat = s_Data->DepthImage.Format;
+			opaquePipelineSpec.DynamicStates = commonDynamicStates;
 			opaquePipelineSpec.SpecializationMapEntries = { { vk::ShaderStageFlagBits::eFragment, specializationInfo } };
 
 			s_Data->PBROpaquePipeline = CreateRef<GraphicsPipeline>(opaquePipelineSpec);
@@ -1703,30 +1974,11 @@ namespace Kerberos
 			colliderPipelineSpec.DepthTestFunc = DepthTestFunc::LessOrEqual;
 			colliderPipelineSpec.Topology = PrimitiveTopology::LineList;
 			colliderPipelineSpec.BlendModes = { BlendMode::None };
-			colliderPipelineSpec.ColorAttachmentFormats = { colorFormat };
-			colliderPipelineSpec.DepthAttachmentFormat = depthFormat;
-			colliderPipelineSpec.DynamicStates = dynamicStates;
+			colliderPipelineSpec.ColorAttachmentFormats = { s_Data->ColorImage.Format };
+			colliderPipelineSpec.DepthAttachmentFormat = s_Data->DepthImage.Format;
+			colliderPipelineSpec.DynamicStates = commonDynamicStates;
 			s_Data->ColliderLinesPipeline = CreateRef<GraphicsPipeline>(colliderPipelineSpec);
-
-			GraphicsPipelineSpecification transparentPipelineSpec{};
-			transparentPipelineSpec.Name = "PBR Transparent Pipeline";
-			transparentPipelineSpec.Shader = pbrShader;
-			transparentPipelineSpec.PipelineLayout = *s_Data->PBRPipelineLayout;
-			transparentPipelineSpec.BindingDescription = bindingDesc;
-			transparentPipelineSpec.InputAttributeDescriptions = { attributeDescs.begin(), attributeDescs.end() };
-			transparentPipelineSpec.SampleCount = vk::SampleCountFlagBits::e1;
-			transparentPipelineSpec.CullMode = CullMode::None;
-			transparentPipelineSpec.EnableDepthClamp = false;
-			transparentPipelineSpec.EnableDepthBias = false;
-			transparentPipelineSpec.EnableDepthTest = true;
-			transparentPipelineSpec.EnableDepthWrite = false;
-			transparentPipelineSpec.DepthTestFunc = DepthTestFunc::Less;
-			transparentPipelineSpec.BlendModes = { BlendMode::AlphaBlend, BlendMode::None };
-			transparentPipelineSpec.ColorAttachmentFormats = { colorFormat, pickingFormat };
-			transparentPipelineSpec.DepthAttachmentFormat = depthFormat;
-			transparentPipelineSpec.DynamicStates = dynamicStates;
-
-			s_Data->PBRTransparentPipeline = CreateRef<GraphicsPipeline>(transparentPipelineSpec);
+			
 
 			Ref<Shader> skyboxShader = CreateRef<Shader>("skybox", "Skybox");
 
@@ -1744,14 +1996,108 @@ namespace Kerberos
 			skyboxPipelineSpec.EnableDepthWrite = false;
 			skyboxPipelineSpec.DepthTestFunc = DepthTestFunc::LessOrEqual;
 			skyboxPipelineSpec.BlendModes = { BlendMode::None, BlendMode::None };
-			skyboxPipelineSpec.ColorAttachmentFormats = { colorFormat, pickingFormat };
-			skyboxPipelineSpec.DepthAttachmentFormat = depthFormat;
-			skyboxPipelineSpec.DynamicStates = dynamicStates;
+			skyboxPipelineSpec.ColorAttachmentFormats = { s_Data->ColorImage.Format, s_Data->PickingImage.Format };
+			skyboxPipelineSpec.DepthAttachmentFormat = s_Data->DepthImage.Format;
+			skyboxPipelineSpec.DynamicStates = commonDynamicStates;
 
 			s_Data->SkyboxPipeline = CreateRef<GraphicsPipeline>(skyboxPipelineSpec);
 		}
 
-		// Transition color image to shader read layout
+		// Create transparent pipeline resources
+		{
+			s_Data->Transparency.AccumulationImage.Format = context.FindSupportedFormat(
+				{ vk::Format::eR16G16B16A16Sfloat },
+				vk::ImageTiling::eOptimal,
+				vk::FormatFeatureFlagBits::eColorAttachment | vk::FormatFeatureFlagBits::eColorAttachmentBlend | vk::FormatFeatureFlagBits::eSampledImage
+			);
+
+			s_Data->Transparency.RevealageImage.Format = context.FindSupportedFormat(
+				{ vk::Format::eR16Unorm, vk::Format::eR8Unorm },
+				vk::ImageTiling::eOptimal,
+				vk::FormatFeatureFlagBits::eColorAttachment | vk::FormatFeatureFlagBits::eColorAttachmentBlend | vk::FormatFeatureFlagBits::eSampledImage
+			);
+
+			s_Data->Transparency.DistortionImage.Format = context.FindSupportedFormat(
+				{ vk::Format::eR16G16Sfloat },
+				vk::ImageTiling::eOptimal,
+				vk::FormatFeatureFlagBits::eColorAttachment | vk::FormatFeatureFlagBits::eColorAttachmentBlend | vk::FormatFeatureFlagBits::eSampledImage
+			);
+
+			constexpr uint32_t initialImageWidth = 1920;
+			constexpr uint32_t initialImageHeight = 1080;
+
+			CreateTransparencyResources(initialImageWidth, initialImageHeight);
+
+			const auto bindingDesc = Vertex::GetBindingDescription();
+			const auto attributeDescs = Vertex::GetAttributeDescriptions();
+
+			Ref<Shader> wboitShader = CreateRef<Shader>("transparent", "Weighted-Blended OIT");
+
+			GraphicsPipelineSpecification transparentPipelineSpec{};
+			transparentPipelineSpec.Name = "PBR Transparent Pipeline";
+			transparentPipelineSpec.Shader = wboitShader;
+			transparentPipelineSpec.PipelineLayout = *s_Data->PBRPipelineLayout;
+			transparentPipelineSpec.BindingDescription = bindingDesc;
+			transparentPipelineSpec.InputAttributeDescriptions = { attributeDescs.begin(), attributeDescs.end() };
+			transparentPipelineSpec.SampleCount = vk::SampleCountFlagBits::e1;
+			transparentPipelineSpec.CullMode = CullMode::None;
+			transparentPipelineSpec.EnableDepthClamp = false;
+			transparentPipelineSpec.EnableDepthBias = false;
+			transparentPipelineSpec.EnableDepthTest = true;
+			transparentPipelineSpec.EnableDepthWrite = false;
+			transparentPipelineSpec.DepthTestFunc = DepthTestFunc::Less;
+			transparentPipelineSpec.BlendModes = { BlendMode::Additive, BlendMode::Multiplicative, BlendMode::Additive };
+			transparentPipelineSpec.ColorAttachmentFormats = { 
+				s_Data->Transparency.AccumulationImage.Format, 
+				s_Data->Transparency.RevealageImage.Format,
+				s_Data->Transparency.DistortionImage.Format
+			};
+			transparentPipelineSpec.DepthAttachmentFormat = s_Data->DepthImage.Format;
+			transparentPipelineSpec.DynamicStates = commonDynamicStates;
+
+			s_Data->Transparency.MainPipeline = CreateRef<GraphicsPipeline>(transparentPipelineSpec);
+		}
+
+		SetupTransparencyDescriptors();
+
+		// Create composite pipeline resources
+		{
+			const std::array setLayouts = {
+				*s_Data->DescriptorSetLayouts.composite
+			};
+
+			vk::PipelineLayoutCreateInfo compositePipelineLayoutInfo{
+				.setLayoutCount = static_cast<uint32_t>(setLayouts.size()),
+				.pSetLayouts = setLayouts.data(),
+				.pushConstantRangeCount = 0,
+				.pPushConstantRanges = nullptr
+			};
+
+			s_Data->CompositePipelineLayout = vk::raii::PipelineLayout{ device, compositePipelineLayoutInfo };
+
+			Ref<Shader> compositeShader = CreateRef<Shader>("transparency_resolve", "Composite");
+
+			GraphicsPipelineSpecification compositePipelineSpec{};
+			compositePipelineSpec.Name = "Composite Pipeline";
+			compositePipelineSpec.Shader = compositeShader;
+			compositePipelineSpec.PipelineLayout = *s_Data->CompositePipelineLayout;
+			compositePipelineSpec.BindingDescription = {};
+			compositePipelineSpec.InputAttributeDescriptions = {};
+			compositePipelineSpec.SampleCount = vk::SampleCountFlagBits::e1;
+			compositePipelineSpec.CullMode = CullMode::None;
+			compositePipelineSpec.EnableDepthClamp = false;
+			compositePipelineSpec.EnableDepthBias = false;
+			compositePipelineSpec.EnableDepthTest = false;
+			compositePipelineSpec.EnableDepthWrite = false;
+			compositePipelineSpec.BlendModes = { BlendMode::None };
+			compositePipelineSpec.ColorAttachmentFormats = { s_Data->CompositeImage.Format };
+			compositePipelineSpec.DepthAttachmentFormat = std::nullopt;
+			compositePipelineSpec.DynamicStates = commonDynamicStates;
+
+			s_Data->CompositePipeline = CreateRef<GraphicsPipeline>(compositePipelineSpec);
+		}
+
+		// Transition composite image to shader read layout
 		{
 			vk::ImageMemoryBarrier2 barrier = {
 				.srcStageMask = vk::PipelineStageFlagBits2::eTopOfPipe,
@@ -1762,7 +2108,7 @@ namespace Kerberos
 				.newLayout = vk::ImageLayout::eShaderReadOnlyOptimal,
 				.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
 				.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-				.image = s_Data->ColorImage.Image,
+				.image = s_Data->CompositeImage.Image,
 				.subresourceRange = {
 					.aspectMask = vk::ImageAspectFlagBits::eColor,
 					.baseMipLevel = 0,
@@ -1780,14 +2126,14 @@ namespace Kerberos
 			const auto cmd = context.BeginSingleTimeCommands();
 			context.SetObjectDebugName(reinterpret_cast<uint64_t>(static_cast<VkCommandBuffer>(*cmd)),
 									   vk::ObjectType::eCommandBuffer,
-									   "EditorLayer Single Time Command Buffer for Color Image Layout Transition");
+									   "EditorLayer Single Time Command Buffer for Composite Image Layout Transition");
 			cmd.pipelineBarrier2(dependencyInfo);
 			context.EndSingleTimeCommands(cmd);
 		}
 
 		// Create descriptor set for the output image for ImGui rendering
 		{
-			s_Data->ColorOutputDescriptorSet = VulkanContext::GenerateImGuiDescriptorSet(s_Data->ColorSampler, s_Data->ColorImage.ImageView);
+			s_Data->ColorOutputDescriptorSet = VulkanContext::GenerateImGuiDescriptorSet(s_Data->LinearSampler, s_Data->CompositeImage.ImageView);
 
 			context.SetObjectDebugName(reinterpret_cast<uint64_t>(static_cast<VkDescriptorSet>(s_Data->ColorOutputDescriptorSet)),
 									   vk::ObjectType::eDescriptorSet,
@@ -1828,16 +2174,6 @@ namespace Kerberos
 		const auto& device = context.GetDevice();
 
 		constexpr uint32_t mipLevels = 1;
-		const vk::Format colorFormat = context.FindSupportedFormat(
-			{ vk::Format::eR32G32B32A32Sfloat, vk::Format::eR32G32B32A32Uint },
-			vk::ImageTiling::eOptimal,
-			vk::FormatFeatureFlagBits::eColorAttachment | vk::FormatFeatureFlagBits::eColorAttachmentBlend | vk::FormatFeatureFlagBits::eSampledImage
-		);
-		const vk::Format pickingFormat = context.FindSupportedFormat(
-			{ vk::Format::eR32Uint },
-			vk::ImageTiling::eOptimal,
-			vk::FormatFeatureFlagBits::eColorAttachment | vk::FormatFeatureFlagBits::eTransferSrc
-		);
 
 		device.waitIdle();
 
@@ -1853,14 +2189,49 @@ namespace Kerberos
 		s_Data->DepthImage.ImageView.clear();
 		s_Data->DepthImage.Image.clear();
 		s_Data->DepthImage.ImageMemory.clear();
+		s_Data->Transparency.AccumulationImage.ImageView.clear();
+		s_Data->Transparency.AccumulationImage.Image.clear();
+		s_Data->Transparency.AccumulationImage.ImageMemory.clear();
+		s_Data->Transparency.RevealageImage.ImageView.clear();
+		s_Data->Transparency.RevealageImage.Image.clear();
+		s_Data->Transparency.RevealageImage.ImageMemory.clear();
+		s_Data->CompositeImage.ImageView.clear();
+		s_Data->CompositeImage.Image.clear();
+		s_Data->CompositeImage.ImageMemory.clear();
 
 		// Recreate resources with new size
+
 		CreateImage(device,
 					width,
 					height,
 					mipLevels,
 					vk::SampleCountFlagBits::e1,
-					colorFormat,
+					s_Data->CompositeImage.Format,
+					vk::ImageTiling::eOptimal,
+					vk::ImageUsageFlagBits::eColorAttachment | vk::ImageUsageFlagBits::eSampled,
+					vk::MemoryPropertyFlagBits::eDeviceLocal,
+					s_Data->CompositeImage.Image,
+					s_Data->CompositeImage.ImageMemory);
+
+		context.SetObjectDebugName(reinterpret_cast<uint64_t>(static_cast<VkImage>(*s_Data->CompositeImage.Image)),
+								   vk::ObjectType::eImage,
+								   "CompositeImage Image");
+
+		context.SetObjectDebugName(reinterpret_cast<uint64_t>(static_cast<VkDeviceMemory>(*s_Data->CompositeImage.ImageMemory)),
+								   vk::ObjectType::eDeviceMemory,
+								   "CompositeImage Image Memory");
+
+		s_Data->CompositeImage.ImageView = CreateImageView(device, s_Data->CompositeImage.Image, s_Data->CompositeImage.Format, vk::ImageAspectFlagBits::eColor, mipLevels);
+		context.SetObjectDebugName(reinterpret_cast<uint64_t>(static_cast<VkImageView>(*s_Data->CompositeImage.ImageView)),
+								   vk::ObjectType::eImageView,
+								   "CompositeImage Image View");
+
+		CreateImage(device,
+					width,
+					height,
+					mipLevels,
+					vk::SampleCountFlagBits::e1,
+					s_Data->ColorImage.Format,
 					vk::ImageTiling::eOptimal,
 					vk::ImageUsageFlagBits::eColorAttachment | vk::ImageUsageFlagBits::eSampled,
 					vk::MemoryPropertyFlagBits::eDeviceLocal,
@@ -1875,7 +2246,7 @@ namespace Kerberos
 								   vk::ObjectType::eDeviceMemory,
 								   "Color Attachment Image Memory");
 
-		s_Data->ColorImage.ImageView = CreateImageView(device, s_Data->ColorImage.Image, colorFormat, vk::ImageAspectFlagBits::eColor, mipLevels);
+		s_Data->ColorImage.ImageView = CreateImageView(device, s_Data->ColorImage.Image, s_Data->ColorImage.Format, vk::ImageAspectFlagBits::eColor, mipLevels);
 		context.SetObjectDebugName(reinterpret_cast<uint64_t>(static_cast<VkImageView>(*s_Data->ColorImage.ImageView)),
 								   vk::ObjectType::eImageView,
 								   "Color Attachment Image View");
@@ -1885,7 +2256,7 @@ namespace Kerberos
 					height,
 					mipLevels,
 					vk::SampleCountFlagBits::e1,
-					pickingFormat,
+					s_Data->PickingImage.Format,
 					vk::ImageTiling::eOptimal,
 					vk::ImageUsageFlagBits::eColorAttachment | vk::ImageUsageFlagBits::eTransferSrc,
 					vk::MemoryPropertyFlagBits::eDeviceLocal,
@@ -1900,16 +2271,10 @@ namespace Kerberos
 								   vk::ObjectType::eDeviceMemory,
 								   "Picking Attachment Image Memory");
 
-		s_Data->PickingImage.ImageView = CreateImageView(device, s_Data->PickingImage.Image, pickingFormat, vk::ImageAspectFlagBits::eColor, mipLevels);
+		s_Data->PickingImage.ImageView = CreateImageView(device, s_Data->PickingImage.Image, s_Data->PickingImage.Format, vk::ImageAspectFlagBits::eColor, mipLevels);
 		context.SetObjectDebugName(reinterpret_cast<uint64_t>(static_cast<VkImageView>(*s_Data->PickingImage.ImageView)),
 								   vk::ObjectType::eImageView,
 								   "Picking Attachment Image View");
-
-		const vk::Format depthFormat = context.FindSupportedFormat(
-			{ vk::Format::eD32Sfloat },
-			vk::ImageTiling::eOptimal,
-			vk::FormatFeatureFlagBits::eDepthStencilAttachment
-		);
 
 		CreateImage(
 			device,
@@ -1917,9 +2282,9 @@ namespace Kerberos
 			height,
 			mipLevels,
 			vk::SampleCountFlagBits::e1,
-			depthFormat,
+			s_Data->DepthImage.Format,
 			vk::ImageTiling::eOptimal,
-			vk::ImageUsageFlagBits::eDepthStencilAttachment,
+			vk::ImageUsageFlagBits::eDepthStencilAttachment | vk::ImageUsageFlagBits::eSampled,
 			vk::MemoryPropertyFlagBits::eDeviceLocal,
 			s_Data->DepthImage.Image,
 			s_Data->DepthImage.ImageMemory);
@@ -1932,13 +2297,44 @@ namespace Kerberos
 								   vk::ObjectType::eDeviceMemory,
 								   "Depth Attachment Image Memory");
 
-		s_Data->DepthImage.ImageView = CreateImageView(device, s_Data->DepthImage.Image, depthFormat, vk::ImageAspectFlagBits::eDepth, mipLevels);
+		s_Data->DepthImage.ImageView = CreateImageView(device, s_Data->DepthImage.Image, s_Data->DepthImage.Format, vk::ImageAspectFlagBits::eDepth, mipLevels);
 
 		context.SetObjectDebugName(reinterpret_cast<uint64_t>(static_cast<VkImageView>(*s_Data->DepthImage.ImageView)),
 								   vk::ObjectType::eImageView,
 								   "Depth Attachment Image View");
 
-		// Transition color image to shader read layout
+		CreateTransparencyResources(width, height);
+
+		// Update the composite descriptor sets to point to the new images
+		{
+			std::array<vk::DescriptorImageInfo, 5> imageInfos;
+
+			imageInfos[0] = { s_Data->LinearSampler, s_Data->ColorImage.ImageView,  vk::ImageLayout::eShaderReadOnlyOptimal };
+			imageInfos[1] = { s_Data->PointSampler,  s_Data->DepthImage.ImageView,  vk::ImageLayout::eShaderReadOnlyOptimal };
+			imageInfos[2] = { s_Data->PointSampler,  s_Data->Transparency.AccumulationImage.ImageView, vk::ImageLayout::eShaderReadOnlyOptimal };
+			imageInfos[3] = { s_Data->PointSampler,  s_Data->Transparency.RevealageImage.ImageView,    vk::ImageLayout::eShaderReadOnlyOptimal };
+			imageInfos[4] = { s_Data->LinearSampler, s_Data->Transparency.DistortionImage.ImageView,   vk::ImageLayout::eShaderReadOnlyOptimal };
+
+			for (size_t frameIndex = 0; frameIndex < VulkanContext::MaxFramesInFlight; frameIndex++) 
+			{
+				std::array<vk::WriteDescriptorSet, 5> descriptorWrites;
+				for (size_t i = 0; i < 5; i++) {
+					descriptorWrites[i] = {
+						.dstSet = s_Data->DescriptorSets[frameIndex].composite,
+						.dstBinding = static_cast<uint32_t>(i),
+						.dstArrayElement = 0,
+						.descriptorCount = 1,
+						.descriptorType = vk::DescriptorType::eCombinedImageSampler,
+						.pImageInfo = &imageInfos[i]
+					};
+				}
+
+				// Overwrite the old bindings with the new ones
+				device.updateDescriptorSets(descriptorWrites, nullptr);
+			}
+		}
+
+		// Transition composite image to shader read layout
 		{
 			vk::ImageMemoryBarrier2 barrier = {
 				.srcStageMask = vk::PipelineStageFlagBits2::eTopOfPipe,
@@ -1949,7 +2345,7 @@ namespace Kerberos
 				.newLayout = vk::ImageLayout::eShaderReadOnlyOptimal,
 				.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
 				.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-				.image = s_Data->ColorImage.Image,
+				.image = s_Data->CompositeImage.Image,
 				.subresourceRange = {
 					.aspectMask = vk::ImageAspectFlagBits::eColor,
 					.baseMipLevel = 0,
@@ -1966,16 +2362,16 @@ namespace Kerberos
 			const auto cmd = context.BeginSingleTimeCommands();
 			context.SetObjectDebugName(reinterpret_cast<uint64_t>(static_cast<VkCommandBuffer>(*cmd)),
 									   vk::ObjectType::eCommandBuffer,
-									   "EditorLayer Single Time Command Buffer for Color Image Layout Transition");
+									   "EditorLayer Single Time Command Buffer for Composite Image Layout Transition");
 			cmd.pipelineBarrier2(dependencyInfo);
 			context.EndSingleTimeCommands(cmd);
 		}
 
 		// Recreate descriptor set for the output image for ImGui rendering
 		{
-			KBR_CORE_ASSERT(s_Data->ColorSampler != nullptr && s_Data->ColorImage.ImageView != nullptr, "Sampler and image view has to be initialized to create an ImGui descriptor set");
+			KBR_CORE_ASSERT(s_Data->LinearSampler != nullptr && s_Data->CompositeImage.ImageView != nullptr, "Sampler and image view has to be initialized to create an ImGui descriptor set");
 
-			s_Data->ColorOutputDescriptorSet = VulkanContext::GenerateImGuiDescriptorSet(s_Data->ColorSampler, s_Data->ColorImage.ImageView);
+			s_Data->ColorOutputDescriptorSet = VulkanContext::GenerateImGuiDescriptorSet(s_Data->LinearSampler, s_Data->CompositeImage.ImageView);
 			context.SetObjectDebugName(reinterpret_cast<uint64_t>(static_cast<VkDescriptorSet>(s_Data->ColorOutputDescriptorSet)),
 									   vk::ObjectType::eDescriptorSet,
 									   "Color Output Descriptor Set for ImGui");
@@ -2004,10 +2400,12 @@ namespace Kerberos
 			normalDebugPipeline->Recompile();
 		if (const auto& colliderLinesPipeline = s_Data->ColliderLinesPipeline)
 			colliderLinesPipeline->Recompile();
-		if (const auto& transparentPipeline = s_Data->PBRTransparentPipeline)
+		if (const auto& transparentPipeline = s_Data->Transparency.MainPipeline)
 			transparentPipeline->Recompile();
 		if (const auto& skyboxPipeline = s_Data->SkyboxPipeline)
 			skyboxPipeline->Recompile();
+		if (const auto& compositePipeline = s_Data->CompositePipeline)
+			compositePipeline->Recompile();
 	}
 
 	glm::vec3 Renderer::GetLightPositionForShadowMapCalculation() 
@@ -2771,7 +3169,7 @@ namespace Kerberos
 		s_Data->DescriptorSetLayouts.textures = vk::raii::DescriptorSetLayout{ device, textureLayoutInfo };
 		context.SetObjectDebugName(s_Data->DescriptorSetLayouts.textures, "Texture Descriptor Set Layout");
 
-     const std::vector<vk::DescriptorSetLayout> sceneSetLayouts(
+		const std::vector<vk::DescriptorSetLayout> sceneSetLayouts(
 			s_Data->DescriptorSets.size(),
 			*s_Data->DescriptorSetLayouts.scene);
 
@@ -2957,5 +3355,279 @@ namespace Kerberos
 
 		SkyboxUtils::GenerateIrradianceCube(*s_Data->Skybox.IrradianceCubeTexture, s_Data->Skybox.SkyboxTexture->descriptor, *s_Data->Skybox.SkyboxMesh);
 		SkyboxUtils::GeneratePrefilteredEnvMap(*s_Data->Skybox.PrefilteredCubeTexture, s_Data->Skybox.SkyboxTexture->descriptor, *s_Data->Skybox.SkyboxMesh);
+	}
+
+	void Renderer::CreateTransparencyResources(const uint32_t width, const uint32_t height)
+	{
+		KBR_CORE_ASSERT(s_Data->Transparency.AccumulationImage.Format != vk::Format::eUndefined, "Accumulation format has to be set before creating transparency resources");
+		KBR_CORE_ASSERT(s_Data->Transparency.RevealageImage.Format != vk::Format::eUndefined, "Revealage format has to be set before creating transparency resources");
+		KBR_CORE_ASSERT(s_Data->Transparency.DistortionImage.Format != vk::Format::eUndefined, "Distortion format has to be set before creating transparency resources");
+
+		auto& context = VulkanContext::Get();
+		const auto& device = context.GetDevice();
+
+		constexpr uint32_t mipLevels = 1;
+
+		// Accumulation
+
+		CreateImage(device,
+					width,
+					height,
+					mipLevels,
+					vk::SampleCountFlagBits::e1,
+					s_Data->Transparency.AccumulationImage.Format,
+					vk::ImageTiling::eOptimal,
+					vk::ImageUsageFlagBits::eColorAttachment | vk::ImageUsageFlagBits::eSampled,
+					vk::MemoryPropertyFlagBits::eDeviceLocal,
+					s_Data->Transparency.AccumulationImage.Image,
+					s_Data->Transparency.AccumulationImage.ImageMemory);
+
+		context.SetObjectDebugName(reinterpret_cast<uint64_t>(static_cast<VkImage>(*s_Data->Transparency.AccumulationImage.Image)),
+								   vk::ObjectType::eImage,
+								   "Accumulation Image");
+
+		context.SetObjectDebugName(reinterpret_cast<uint64_t>(static_cast<VkDeviceMemory>(*s_Data->Transparency.AccumulationImage.ImageMemory)),
+								   vk::ObjectType::eDeviceMemory,
+								   "Accumulation Image Memory");
+
+		s_Data->Transparency.AccumulationImage.ImageView = CreateImageView(device,
+																		   s_Data->Transparency.AccumulationImage.Image,
+																		   s_Data->Transparency.AccumulationImage.Format,
+																		   vk::ImageAspectFlagBits::eColor, mipLevels);
+
+		context.SetObjectDebugName(reinterpret_cast<uint64_t>(static_cast<VkImageView>(*s_Data->Transparency.AccumulationImage.ImageView)),
+								   vk::ObjectType::eImageView,
+								   "Accumulation Image View");
+
+		// Revealage
+
+		CreateImage(device,
+					width,
+					height,
+					mipLevels,
+					vk::SampleCountFlagBits::e1,
+					s_Data->Transparency.RevealageImage.Format,
+					vk::ImageTiling::eOptimal,
+					vk::ImageUsageFlagBits::eColorAttachment | vk::ImageUsageFlagBits::eSampled,
+					vk::MemoryPropertyFlagBits::eDeviceLocal,
+					s_Data->Transparency.RevealageImage.Image,
+					s_Data->Transparency.RevealageImage.ImageMemory);
+
+		context.SetObjectDebugName(reinterpret_cast<uint64_t>(static_cast<VkImage>(*s_Data->Transparency.RevealageImage.Image)),
+								   vk::ObjectType::eImage,
+								   "Revealage Image");
+
+		context.SetObjectDebugName(reinterpret_cast<uint64_t>(static_cast<VkDeviceMemory>(*s_Data->Transparency.RevealageImage.ImageMemory)),
+								   vk::ObjectType::eDeviceMemory,
+								   "Revealage Image Memory");
+
+		s_Data->Transparency.RevealageImage.ImageView = CreateImageView(device,
+																		s_Data->Transparency.RevealageImage.Image,
+																		s_Data->Transparency.RevealageImage.Format,
+																		vk::ImageAspectFlagBits::eColor, mipLevels);
+
+		context.SetObjectDebugName(reinterpret_cast<uint64_t>(static_cast<VkImageView>(*s_Data->Transparency.RevealageImage.ImageView)),
+								   vk::ObjectType::eImageView,
+								   "Revealage Image View");
+
+		// Distortion
+
+		CreateImage(device,
+					width,
+					height,
+					mipLevels,
+					vk::SampleCountFlagBits::e1,
+					s_Data->Transparency.DistortionImage.Format,
+					vk::ImageTiling::eOptimal,
+					vk::ImageUsageFlagBits::eColorAttachment | vk::ImageUsageFlagBits::eSampled,
+					vk::MemoryPropertyFlagBits::eDeviceLocal,
+					s_Data->Transparency.DistortionImage.Image,
+					s_Data->Transparency.DistortionImage.ImageMemory);
+
+		context.SetObjectDebugName(reinterpret_cast<uint64_t>(static_cast<VkImage>(*s_Data->Transparency.DistortionImage.Image)),
+								   vk::ObjectType::eImage,
+								   "Distortion Image");
+
+		context.SetObjectDebugName(reinterpret_cast<uint64_t>(static_cast<VkDeviceMemory>(*s_Data->Transparency.DistortionImage.ImageMemory)),
+								   vk::ObjectType::eDeviceMemory,
+								   "Distortion Image Memory");
+
+		s_Data->Transparency.DistortionImage.ImageView = CreateImageView(device,
+																		s_Data->Transparency.DistortionImage.Image,
+																		s_Data->Transparency.DistortionImage.Format,
+																		vk::ImageAspectFlagBits::eColor, mipLevels);
+
+		context.SetObjectDebugName(reinterpret_cast<uint64_t>(static_cast<VkImageView>(*s_Data->Transparency.DistortionImage.ImageView)),
+								   vk::ObjectType::eImageView,
+								   "Distortion Image View");
+	}
+
+	void Renderer::SetupTransparencyDescriptors() 
+	{
+		KBR_CORE_ASSERT(s_Data->DescriptorPool != nullptr, "Descriptor pool has to be created before setting up transparency descriptors");
+		
+		auto& context = VulkanContext::Get();
+		const auto& device = context.GetDevice();
+
+		std::vector<vk::DescriptorSetLayoutBinding> bindings = {
+			vk::DescriptorSetLayoutBinding{ // Opaque color
+				.binding = 0,
+				.descriptorType = vk::DescriptorType::eCombinedImageSampler,
+				.descriptorCount = 1,
+				.stageFlags = vk::ShaderStageFlagBits::eFragment,
+				.pImmutableSamplers = nullptr
+			},
+			vk::DescriptorSetLayoutBinding{ // Opaque depth
+				.binding = 1,
+				.descriptorType = vk::DescriptorType::eCombinedImageSampler,
+				.descriptorCount = 1,
+				.stageFlags = vk::ShaderStageFlagBits::eFragment,
+				.pImmutableSamplers = nullptr
+			},
+			vk::DescriptorSetLayoutBinding{ // Accumulation
+				.binding = 2,
+				.descriptorType = vk::DescriptorType::eCombinedImageSampler,
+				.descriptorCount = 1,
+				.stageFlags = vk::ShaderStageFlagBits::eFragment,
+				.pImmutableSamplers = nullptr
+			},
+			vk::DescriptorSetLayoutBinding{ // Revealage
+				.binding = 3,
+				.descriptorType = vk::DescriptorType::eCombinedImageSampler,
+				.descriptorCount = 1,
+				.stageFlags = vk::ShaderStageFlagBits::eFragment,
+				.pImmutableSamplers = nullptr
+			},
+			vk::DescriptorSetLayoutBinding{ // Distortion
+				.binding = 4,
+				.descriptorType = vk::DescriptorType::eCombinedImageSampler,
+				.descriptorCount = 1,
+				.stageFlags = vk::ShaderStageFlagBits::eFragment,
+				.pImmutableSamplers = nullptr
+			},
+			vk::DescriptorSetLayoutBinding{ // Global lighting data
+				.binding = 5,
+				.descriptorType = vk::DescriptorType::eUniformBuffer,
+				.descriptorCount = 1,
+				.stageFlags = vk::ShaderStageFlagBits::eFragment,
+				.pImmutableSamplers = nullptr
+			},
+		};
+
+		const vk::DescriptorSetLayoutCreateInfo layoutInfo{
+			.bindingCount = static_cast<uint32_t>(bindings.size()),
+			.pBindings = bindings.data()
+		};
+
+		s_Data->DescriptorSetLayouts.composite = vk::raii::DescriptorSetLayout{ device, layoutInfo };
+		context.SetObjectDebugName(s_Data->DescriptorSetLayouts.composite, "Composite Descriptor Set Layout");
+
+
+		const std::vector<vk::DescriptorSetLayout> compositeSetLayouts(
+			s_Data->DescriptorSets.size(),
+			*s_Data->DescriptorSetLayouts.composite);
+
+		const vk::DescriptorSetAllocateInfo allocInfo{
+			.descriptorPool = *s_Data->DescriptorPool,
+			.descriptorSetCount = static_cast<uint32_t>(s_Data->DescriptorSets.size()),
+			.pSetLayouts = compositeSetLayouts.data()
+		};
+
+		std::vector<vk::raii::DescriptorSet> compositeDescriptorSets = device.allocateDescriptorSets(allocInfo);
+
+		for (uint32_t i = 0; i < VulkanContext::MaxFramesInFlight; i++)
+		{
+			s_Data->DescriptorSets[i].composite = std::move(compositeDescriptorSets[i]);
+			context.SetObjectDebugName(s_Data->DescriptorSets[i].composite, "Composite Descriptor Set[" + std::to_string(i) + "]");
+
+			const vk::DescriptorImageInfo opaqueColorImageInfo{
+				.sampler = *s_Data->LinearSampler,
+				.imageView = *s_Data->ColorImage.ImageView,
+				.imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal
+			};
+
+			const vk::DescriptorImageInfo opaqueDepthImageInfo{
+				.sampler = *s_Data->PointSampler,
+				.imageView = *s_Data->DepthImage.ImageView,
+				.imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal
+			};
+
+			const vk::DescriptorImageInfo accumulationImageInfo{
+				.sampler = *s_Data->PointSampler,
+				.imageView = *s_Data->Transparency.AccumulationImage.ImageView,
+				.imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal
+			};
+
+			const vk::DescriptorImageInfo revealageImageInfo{
+				.sampler = *s_Data->PointSampler,
+				.imageView = *s_Data->Transparency.RevealageImage.ImageView,
+				.imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal
+			};
+
+			const vk::DescriptorImageInfo distortionImageInfo{
+				.sampler = *s_Data->LinearSampler,
+				.imageView = *s_Data->Transparency.DistortionImage.ImageView,
+				.imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal
+			};
+
+			const vk::DescriptorBufferInfo globalLightingBufferInfo{
+				.buffer = *s_Data->UniformBuffers[i].globalLighting->GetBuffer(),
+				.offset = 0,
+				.range = sizeof(GlobalLighting)
+			};
+
+			const std::vector descriptorWrites = {
+				vk::WriteDescriptorSet{
+					.dstSet = *s_Data->DescriptorSets[i].composite,
+					.dstBinding = 0,
+					.dstArrayElement = 0,
+					.descriptorCount = 1,
+					.descriptorType = vk::DescriptorType::eCombinedImageSampler,
+					.pImageInfo = &opaqueColorImageInfo
+				},
+				vk::WriteDescriptorSet{
+					.dstSet = *s_Data->DescriptorSets[i].composite,
+					.dstBinding = 1,
+					.dstArrayElement = 0,
+					.descriptorCount = 1,
+					.descriptorType = vk::DescriptorType::eCombinedImageSampler,
+					.pImageInfo = &opaqueDepthImageInfo
+				},
+				vk::WriteDescriptorSet{
+					.dstSet = *s_Data->DescriptorSets[i].composite,
+					.dstBinding = 2,
+					.dstArrayElement = 0,
+					.descriptorCount = 1,
+					.descriptorType = vk::DescriptorType::eCombinedImageSampler,
+					.pImageInfo = &accumulationImageInfo
+				},
+				vk::WriteDescriptorSet{
+					.dstSet = *s_Data->DescriptorSets[i].composite,
+					.dstBinding = 3,
+					.dstArrayElement = 0,
+					.descriptorCount = 1,
+					.descriptorType = vk::DescriptorType::eCombinedImageSampler,
+					.pImageInfo = &revealageImageInfo
+				},
+				vk::WriteDescriptorSet{
+					.dstSet = *s_Data->DescriptorSets[i].composite,
+					.dstBinding = 4,
+					.dstArrayElement = 0,
+					.descriptorCount = 1,
+					.descriptorType = vk::DescriptorType::eCombinedImageSampler,
+					.pImageInfo = &distortionImageInfo
+				},
+				vk::WriteDescriptorSet{
+					.dstSet = *s_Data->DescriptorSets[i].composite,
+					.dstBinding = 5,
+					.dstArrayElement = 0,
+					.descriptorCount = 1,
+					.descriptorType = vk::DescriptorType::eUniformBuffer,
+					.pBufferInfo = &globalLightingBufferInfo
+				}
+			};
+
+			device.updateDescriptorSets(descriptorWrites, {});
+		}
 	}
 }

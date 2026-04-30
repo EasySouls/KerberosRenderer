@@ -47,6 +47,7 @@ VSOutput vertexMain(VSInput input)
     VSOutput output;
     output.UVW = input.Position;
     output.Pos = mul(skyboxData.projection, mul(skyboxData.model, float4(input.Position.xyz, 1.0)));
+    output.Pos.z = output.Pos.w; // Set depth to far plane
     return output;
 }
 
@@ -56,11 +57,11 @@ float4 fragmentMain(VSOutput input)
     float3 sampleUV = float3(input.UVW.x, -input.UVW.y, input.UVW.z);
     float3 color = samplerEnv.Sample(sampleUV).rgb;
 
-    // Tone mapping
-    color = Uncharted2Tonemap(color * globalLighting.exposure);
-	color = color * (1.0f / Uncharted2Tonemap((11.2f).xxx));
-    // Gamma correction
-    color = pow(color, (1.0f / globalLighting.gamma).xxx);
+ //   // Tone mapping
+ //   color = Uncharted2Tonemap(color * globalLighting.exposure);
+	//color = color * (1.0f / Uncharted2Tonemap((11.2f).xxx));
+ //   // Gamma correction
+ //   color = pow(color, (1.0f / globalLighting.gamma).xxx);
 
 	return float4(color, 1.0);
 }

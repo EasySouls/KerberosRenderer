@@ -116,10 +116,10 @@ namespace Kerberos
 
 		KBR_CORE_INFO("Loaded {} texture(s)!", m_Textures.size());
 
-		const auto& avocadoMaterial = m_MaterialRegistry.AddAndRetrieve("Avocado", std::make_shared<Material>("Avocado", glm::vec3(1.0f), 0.9f, 0.03f, m_Textures[0], m_Textures[1]));
-		const auto& stoneFloorMaterial = m_MaterialRegistry.AddAndRetrieve("Stone Floor", std::make_shared<Material>("Stone Floor", glm::vec3(1.0f), 0.8f, 0.05f, m_Textures[2], m_Textures[3]));
-		const auto& stoneFloor2Material = m_MaterialRegistry.AddAndRetrieve("Stone Floor 2", std::make_shared<Material>("Stone Floor 2", glm::vec3(0.4, 0.15f, 0.0f), 1.0f, 0.0f, m_Textures[4], m_Textures[5]));
-		const auto& cerberusMaterial = m_MaterialRegistry.AddAndRetrieve("Cerberus", std::make_shared<Material>("Cerberus", glm::vec3(1.0f), 1.0f, 0.0f, m_Textures[6], m_Textures[7]));
+		const auto& avocadoMaterial = m_MaterialRegistry.AddAndRetrieve("Avocado", std::make_shared<Material>("Avocado", glm::vec4(1.0f, 1.0f, 1.0f, 1.0f), 0.9f, 0.03f, m_Textures[0], m_Textures[1]));
+		const auto& stoneFloorMaterial = m_MaterialRegistry.AddAndRetrieve("Stone Floor", std::make_shared<Material>("Stone Floor", glm::vec4(1.0f, 1.0f, 1.0f, 1.0f), 0.8f, 0.05f, m_Textures[2], m_Textures[3]));
+		const auto& stoneFloor2Material = m_MaterialRegistry.AddAndRetrieve("Stone Floor 2", std::make_shared<Material>("Stone Floor 2", glm::vec4(0.4f, 0.15f, 0.0f, 1.0f), 1.0f, 0.0f, m_Textures[4], m_Textures[5]));
+		const auto& cerberusMaterial = m_MaterialRegistry.AddAndRetrieve("Cerberus", std::make_shared<Material>("Cerberus", glm::vec4(1.0f, 1.0f, 1.0f, 1.0f), 1.0f, 0.0f, m_Textures[6], m_Textures[7]));
 
 		m_SceneNodes.push_back(CreateOwner<Node>(Node{
 			.Position = glm::vec3(6.0f, 9.5f, 0.0f),

@@ -364,7 +364,7 @@ namespace Kerberos
 				{
 					Material material;
 					material.Name = materialPath.stem().string();
-					material.Params.AlbedoFactor = glm::vec3(1.0f);
+					material.Params.AlbedoFactor = glm::vec4(1.0f, 1.0f, 1.0f, 1.0f);
 					material.Params.MetallicFactor = 0.0f;
 					material.Params.RoughnessFactor = 1.0f;
 
@@ -518,7 +518,7 @@ namespace Kerberos
 					state.WorkingCopy->Name = nameBuffer;
 				}
 
-				ImGui::ColorEdit3("Albedo", &state.WorkingCopy->Params.AlbedoFactor[0]);
+				ImGui::ColorEdit4("Albedo", &state.WorkingCopy->Params.AlbedoFactor[0]);
 				ImGui::DragFloat("Roughness", &state.WorkingCopy->Params.RoughnessFactor, 0.01f, 0.0f, 1.0f);
 				ImGui::DragFloat("Metallic", &state.WorkingCopy->Params.MetallicFactor, 0.01f, 0.0f, 1.0f);
 

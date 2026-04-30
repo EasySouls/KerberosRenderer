@@ -17,7 +17,7 @@ namespace Kerberos
 		// Parameter block used as uniform buffer block
 		struct UniformBlock
 		{
-			glm::vec3 AlbedoFactor{ 1.0f, 1.0f, 1.0f };
+			glm::vec4 AlbedoFactor{ 1.0f, 1.0f, 1.0f, 1.0f };
 			float RoughnessFactor{ 1.0f };
 			float MetallicFactor{ 0.0f };
 		};
@@ -35,13 +35,12 @@ namespace Kerberos
 
 		bool IsTransparent() const 
 		{
-			//return Params.AlbedoFactor.a < 1.0f;
-			return false;
+			return Params.AlbedoFactor.a < 1.0f;
 		}
 
 		Material() = default;
 
-		Material(std::string n, const glm::vec3 c, const float r, const float m)
+		Material(std::string n, const glm::vec4 c, const float r, const float m)
 			: Name(std::move(n))
 		{
 			Params.RoughnessFactor = r;
@@ -49,7 +48,7 @@ namespace Kerberos
 			Params.AlbedoFactor = c;
 		}
 
-		Material(std::string name, const glm::vec3 c, const float r, const float m,
+		Material(std::string name, const glm::vec4 c, const float r, const float m,
 				 const std::shared_ptr<Texture2D>& albedoTex, const std::shared_ptr<Texture2D>& normalTex)
 			: Name(std::move(name)), AlbedoTexture(albedoTex), NormalTexture(normalTex)
 		{

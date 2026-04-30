@@ -116,7 +116,7 @@ float3 SpecularContribution(float3 L, float3 V, float3 N, float3 F0, Material ma
         float3 F = F_Schlick(dotNV, F0);
         float3 spec = D * F * G / (4.0 * dotNL * dotNV + 0.001);
         float3 kD = (float3(1.0, 1.0, 1.0) - F) * (1.0 - material.metallic);
-        color += (kD * material.albedo / PI + spec) * dotNL;
+        color += (kD * material.albedo.rgb / PI + spec) * dotNL;
     }
 
     return color;
@@ -198,7 +198,7 @@ float4 fragmentMain(VSOutput input)
     float shadow = ShadowCalculation(lightDir, N, input.FragPos_LightSpace);
 
     float3 F0 = float3(0.04, 0.04, 0.04);
-    F0 = lerp(F0, perObject.material.albedo, perObject.material.metallic);
+    F0 = lerp(F0, perObject.material.albedo.rgb, perObject.material.metallic);
 
 	// Specular contribution
 	float3 Lo = float3(0.0, 0.0, 0.0);
@@ -222,7 +222,7 @@ float4 fragmentMain(VSOutput input)
     float3 irradiance = samplerIrradiance.Sample(sampleN).rgb;
 
     // Diffuse based on irradiance
-    float3 diffuse = irradiance * perObject.material.albedo;
+    float3 diffuse = irradiance * perObject.material.albedo.rgb;
 
     float3 F = F_SchlickR(max(dot(N, V), 0.0), F0, perObject.material.roughness);
 

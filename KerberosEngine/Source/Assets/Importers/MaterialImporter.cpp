@@ -32,7 +32,7 @@ namespace Kerberos
 		}
 
         const std::string name = node["Name"].as<std::string>(filepath.stem().string());
-		const glm::vec3 albedo = node["Albedo"].as<glm::vec3>(glm::vec3(1.0f));
+		const glm::vec4 albedo = node["Albedo"].as<glm::vec4>(glm::vec4(1.0f, 1.0f, 1.0f, 1.0f));
 		const float roughness = node["Roughness"].as<float>(1.0f);
 		const float metallic = node["Metallic"].as<float>(0.0f);
 

@@ -291,7 +291,7 @@ PSOutput fragmentMain(VSOutput input)
     // Use this when working with srgb textures
     // float3 albedo = pow(albedoMapSampler.Sample(input.TexCoord).rgb * perObject.material.albedo, float3(2.2, 2.2, 2.2));
     float3 albedoTex = albedoMapSampler.Sample(input.TexCoord).rgb;
-    float3 albedo = albedoTex * perObject.material.albedo;
+    float3 albedo = albedoTex * perObject.material.albedo.rgb;
 
     float3 F0 = float3(0.04, 0.04, 0.04);
     F0 = lerp(F0, albedo, metallic);
@@ -329,11 +329,11 @@ PSOutput fragmentMain(VSOutput input)
 
     float3 color = ambient + Lo;
 
-    // Tone mapping
-    color = Uncharted2Tonemap(color * globalLighting.exposure);
-    color = color * (1.0f / Uncharted2Tonemap((11.2f).xxx));
-    // Gamma correction
-    color = pow(color, (1.0f / globalLighting.gamma).xxx);
+    //// Tone mapping
+    //color = Uncharted2Tonemap(color * globalLighting.exposure);
+    //color = color * (1.0f / Uncharted2Tonemap((11.2f).xxx));
+    //// Gamma correction
+    //color = pow(color, (1.0f / globalLighting.gamma).xxx);
 
     PSOutput output;
     output.Color = float4(color, 1.0);

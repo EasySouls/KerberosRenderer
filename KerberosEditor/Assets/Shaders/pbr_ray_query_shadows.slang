@@ -305,7 +305,7 @@ PSOutput fragmentMain(VSOutput input)
     // Use this when working with srgb textures
     // float3 albedo = pow(albedoMapSampler.Sample(input.TexCoord).rgb * perObject.material.albedo, float3(2.2, 2.2, 2.2));
     float3 albedoTex = albedoMapSampler.Sample(input.TexCoord).rgb;
-    float3 albedo = albedoTex * perObject.material.albedo;
+    float3 albedo = albedoTex * perObject.material.albedo.rgb;
 
     float3 F0 = float3(0.04, 0.04, 0.04);
     F0 = lerp(F0, albedo, metallic);

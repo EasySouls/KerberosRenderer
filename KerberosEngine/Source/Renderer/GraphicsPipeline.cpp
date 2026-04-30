@@ -68,11 +68,11 @@ namespace
 
 	constexpr vk::PipelineColorBlendAttachmentState additiveBlendAttachment{
 		.blendEnable = vk::True,
-		.srcColorBlendFactor = vk::BlendFactor::eSrcAlpha,
+		.srcColorBlendFactor = vk::BlendFactor::eOne,
 		.dstColorBlendFactor = vk::BlendFactor::eOne,
 		.colorBlendOp = vk::BlendOp::eAdd,
 		.srcAlphaBlendFactor = vk::BlendFactor::eOne,
-		.dstAlphaBlendFactor = vk::BlendFactor::eZero,
+		.dstAlphaBlendFactor = vk::BlendFactor::eOne,
 		.alphaBlendOp = vk::BlendOp::eAdd,
 		.colorWriteMask = vk::ColorComponentFlagBits::eR | vk::ColorComponentFlagBits::eG | vk::ColorComponentFlagBits::eB | vk::ColorComponentFlagBits::eA
 	};
@@ -88,11 +88,23 @@ namespace
 		.colorWriteMask = vk::ColorComponentFlagBits::eR | vk::ColorComponentFlagBits::eG | vk::ColorComponentFlagBits::eB | vk::ColorComponentFlagBits::eA
 	};
 
+	constexpr vk::PipelineColorBlendAttachmentState multiplicativeBlendAttachment{
+		.blendEnable = vk::True,
+		.srcColorBlendFactor = vk::BlendFactor::eZero,
+		.dstColorBlendFactor = vk::BlendFactor::eOneMinusSrcColor,
+		.colorBlendOp = vk::BlendOp::eAdd,
+		.srcAlphaBlendFactor = vk::BlendFactor::eZero,
+		.dstAlphaBlendFactor = vk::BlendFactor::eOneMinusSrcAlpha,
+		.alphaBlendOp = vk::BlendOp::eAdd,
+		.colorWriteMask = vk::ColorComponentFlagBits::eR | vk::ColorComponentFlagBits::eG | vk::ColorComponentFlagBits::eB | vk::ColorComponentFlagBits::eA
+	};
+
 	std::map<Kerberos::BlendMode, vk::PipelineColorBlendAttachmentState> s_BlendModeToVkBlendState
 	{
 		{ Kerberos::BlendMode::None, noBlendAttachment },
 		{ Kerberos::BlendMode::Additive, additiveBlendAttachment },
-		{ Kerberos::BlendMode::AlphaBlend, alphaBlendAttachment }
+		{ Kerberos::BlendMode::AlphaBlend, alphaBlendAttachment },
+		{ Kerberos::BlendMode::Multiplicative, multiplicativeBlendAttachment },
 	};
 }
 

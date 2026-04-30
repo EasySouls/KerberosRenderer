@@ -1,5 +1,5 @@
 Name: cerberus
-Albedo: [1, 1, 1]
+Albedo: [1, 1, 1, 1]
 Roughness: 1
 Metallic: 1
 AlbedoTexture: Assets/Models/cerberus/albedo.ktx2
