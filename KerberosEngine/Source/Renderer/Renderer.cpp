@@ -1247,11 +1247,19 @@ namespace Kerberos
 			};
 			std::array<vk::AccessFlags2, 6> dstAccessMasks = {
 				vk::AccessFlagBits2::eShaderRead, // Color image
-				vk::AccessFlagBits2::eDepthStencilAttachmentRead, // Depth image
+				vk::AccessFlagBits2::eShaderRead, // Depth image
 				vk::AccessFlagBits2::eShaderRead, // Accumulation image
 				vk::AccessFlagBits2::eShaderRead, // Revealage image
 				vk::AccessFlagBits2::eShaderRead,  // Distortion image
-				vk::AccessFlagBits2::eShaderRead   // Composite image
+				vk::AccessFlagBits2::eColorAttachmentWrite   // Composite image
+			};
+			std::array<vk::PipelineStageFlags2, 6> dstStageMasks = {
+				vk::PipelineStageFlagBits2::eFragmentShader, // Color image
+				vk::PipelineStageFlagBits2::eFragmentShader, // Depth image
+				vk::PipelineStageFlagBits2::eFragmentShader, // Accumulation image
+				vk::PipelineStageFlagBits2::eFragmentShader, // Revealage image
+				vk::PipelineStageFlagBits2::eFragmentShader,  // Distortion image
+				vk::PipelineStageFlagBits2::eColorAttachmentOutput   // Composite image
 			};
 			std::array<vk::Image, 6> images = {
 				*s_Data->ColorImage.Image,
@@ -1267,7 +1275,7 @@ namespace Kerberos
 				barriers[i] = {
 					.srcStageMask = srcStageMasks[i],
 					.srcAccessMask = srcAccessMasks[i],
-					.dstStageMask = vk::PipelineStageFlagBits2::eFragmentShader,
+					.dstStageMask = dstStageMasks[i],
 					.dstAccessMask = dstAccessMasks[i],
 					.oldLayout = oldLayouts[i],
 					.newLayout = newLayouts[i],
