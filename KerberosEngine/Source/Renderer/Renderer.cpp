@@ -377,6 +377,9 @@ namespace
 
 		bool UseRayQueryBasedShadows = false;
 		bool UseRayQueryBasedSoftShadows = false;
+		bool UseGTAO = true;
+		vk::ImageLayout GTAOImageLayout = vk::ImageLayout::eUndefined;
+		bool PreviousUseGTAO = true;
 	};
 
 }
@@ -773,16 +776,169 @@ namespace Kerberos
 
 		// GTAO compute pass
 		{
-			// Transition GTAO output image to storage image from sampled image for compute shader write
-			// Transition normal and depth images to shader read optimal layout
+			const auto getSrcStageAccessForLayout = [](const vk::ImageLayout layout) -> std::pair<vk::PipelineStageFlags2, vk::AccessFlags2>
 			{
-				const vk::ImageMemoryBarrier2 aoBarrier{
-					.srcStageMask = vk::PipelineStageFlagBits2::eFragmentShader,
-					.srcAccessMask = vk::AccessFlagBits2::eShaderRead,
-					.dstStageMask = vk::PipelineStageFlagBits2::eComputeShader,
-					.dstAccessMask = vk::AccessFlagBits2::eShaderStorageWrite,
-					.oldLayout = vk::ImageLayout::eUndefined,
-					.newLayout = vk::ImageLayout::eGeneral,
+				switch (layout)
+				{
+					case vk::ImageLayout::eShaderReadOnlyOptimal:
+						return { vk::PipelineStageFlagBits2::eFragmentShader, vk::AccessFlagBits2::eShaderRead };
+					case vk::ImageLayout::eGeneral:
+						return { vk::PipelineStageFlagBits2::eComputeShader, vk::AccessFlagBits2::eShaderStorageWrite };
+					case vk::ImageLayout::eTransferDstOptimal:
+						return { vk::PipelineStageFlagBits2::eTransfer, vk::AccessFlagBits2::eTransferWrite };
+					case vk::ImageLayout::eUndefined:
+					default:
+						return { vk::PipelineStageFlagBits2::eTopOfPipe, {} };
+				}
+			};
+
+			if (s_Data->UseGTAO)
+			{
+				// Transition GTAO output image to storage image from sampled image for compute shader write
+				// Transition normal and depth images to shader read optimal layout
+				{
+					const auto [aoSrcStageMask, aoSrcAccessMask] = getSrcStageAccessForLayout(s_Data->GTAOImageLayout);
+					const vk::ImageMemoryBarrier2 aoBarrier{
+						.srcStageMask = aoSrcStageMask,
+						.srcAccessMask = aoSrcAccessMask,
+						.dstStageMask = vk::PipelineStageFlagBits2::eComputeShader,
+						.dstAccessMask = vk::AccessFlagBits2::eShaderStorageWrite,
+						.oldLayout = s_Data->GTAOImageLayout,
+						.newLayout = vk::ImageLayout::eGeneral,
+						.srcQueueFamilyIndex = vk::QueueFamilyIgnored,
+						.dstQueueFamilyIndex = vk::QueueFamilyIgnored,
+						.image = s_Data->GTAOImage.Image,
+						.subresourceRange = {
+							.aspectMask = vk::ImageAspectFlagBits::eColor,
+							.baseMipLevel = 0,
+							.levelCount = 1,
+							.baseArrayLayer = 0,
+							.layerCount = 1
+						}
+					};
+
+					const vk::ImageMemoryBarrier2 normalTextureBarrier{
+						.srcStageMask = vk::PipelineStageFlagBits2::eColorAttachmentOutput | vk::PipelineStageFlagBits2::eLateFragmentTests,
+						.srcAccessMask = vk::AccessFlagBits2::eColorAttachmentWrite,
+						.dstStageMask = vk::PipelineStageFlagBits2::eComputeShader,
+						.dstAccessMask = vk::AccessFlagBits2::eShaderRead,
+						.oldLayout = vk::ImageLayout::eColorAttachmentOptimal,
+						.newLayout = vk::ImageLayout::eShaderReadOnlyOptimal,
+						.srcQueueFamilyIndex = vk::QueueFamilyIgnored,
+						.dstQueueFamilyIndex = vk::QueueFamilyIgnored,
+						.image = s_Data->NormalImage.Image,
+						.subresourceRange = {
+							.aspectMask = vk::ImageAspectFlagBits::eColor,
+							.baseMipLevel = 0,
+							.levelCount = 1,
+							.baseArrayLayer = 0,
+							.layerCount = 1
+						}
+					};
+
+					const vk::ImageMemoryBarrier2 depthBarrier{
+						.srcStageMask = vk::PipelineStageFlagBits2::eLateFragmentTests,
+						.srcAccessMask = vk::AccessFlagBits2::eDepthStencilAttachmentWrite,
+						.dstStageMask = vk::PipelineStageFlagBits2::eComputeShader,
+						.dstAccessMask = vk::AccessFlagBits2::eShaderRead,
+						.oldLayout = vk::ImageLayout::eDepthStencilAttachmentOptimal,
+						.newLayout = vk::ImageLayout::eShaderReadOnlyOptimal,
+						.srcQueueFamilyIndex = vk::QueueFamilyIgnored,
+						.dstQueueFamilyIndex = vk::QueueFamilyIgnored,
+						.image = s_Data->DepthImage.Image,
+						.subresourceRange = {
+							.aspectMask = vk::ImageAspectFlagBits::eDepth,
+							.baseMipLevel = 0,
+							.levelCount = 1,
+							.baseArrayLayer = 0,
+							.layerCount = 1
+						}
+					};
+
+					const std::array barriers = { aoBarrier, normalTextureBarrier, depthBarrier };
+
+					const vk::DependencyInfo dependencyInfo = {
+						.dependencyFlags = {},
+						.imageMemoryBarrierCount = barriers.size(),
+						.pImageMemoryBarriers = barriers.data()
+					};
+
+					cmd.pipelineBarrier2(dependencyInfo);
+				}
+
+				cmd.bindPipeline(vk::PipelineBindPoint::eCompute, *s_Data->GTAOPipeline->GetVulkanPipeline());
+				cmd.bindDescriptorSets(vk::PipelineBindPoint::eCompute, *s_Data->GTAOPipelineLayout, 0, { s_Data->DescriptorSets[currentImage].gtao }, {});
+
+				const uint32_t groupX = (static_cast<uint32_t>(s_Data->OutputSize.x) + 7) / 8;
+				const uint32_t groupY = (static_cast<uint32_t>(s_Data->OutputSize.y) + 7) / 8;
+
+				cmd.dispatch(groupX, groupY, 1);
+
+				// Transition ao image from storage image to sampled image
+				// and transition depth image back to depth attachment
+				{
+					const vk::ImageMemoryBarrier2 aoBarrier{
+						.srcStageMask = vk::PipelineStageFlagBits2::eComputeShader,
+						.srcAccessMask = vk::AccessFlagBits2::eShaderStorageWrite,
+						.dstStageMask = vk::PipelineStageFlagBits2::eFragmentShader,
+						.dstAccessMask = vk::AccessFlagBits2::eShaderRead,
+						.oldLayout = vk::ImageLayout::eGeneral,
+						.newLayout = vk::ImageLayout::eShaderReadOnlyOptimal,
+						.srcQueueFamilyIndex = vk::QueueFamilyIgnored,
+						.dstQueueFamilyIndex = vk::QueueFamilyIgnored,
+						.image = s_Data->GTAOImage.Image,
+						.subresourceRange = {
+							.aspectMask = vk::ImageAspectFlagBits::eColor,
+							.baseMipLevel = 0,
+							.levelCount = 1,
+							.baseArrayLayer = 0,
+							.layerCount = 1
+						}
+					};
+
+					const vk::ImageMemoryBarrier2 depthBarrier{
+						.srcStageMask = vk::PipelineStageFlagBits2::eComputeShader,
+						.srcAccessMask = vk::AccessFlagBits2::eShaderRead,
+						.dstStageMask = vk::PipelineStageFlagBits2::eEarlyFragmentTests | vk::PipelineStageFlagBits2::eLateFragmentTests,
+						.dstAccessMask = vk::AccessFlagBits2::eDepthStencilAttachmentRead | vk::AccessFlagBits2::eDepthStencilAttachmentWrite,
+						.oldLayout = vk::ImageLayout::eShaderReadOnlyOptimal,
+						.newLayout = vk::ImageLayout::eDepthStencilAttachmentOptimal,
+						.srcQueueFamilyIndex = vk::QueueFamilyIgnored,
+						.dstQueueFamilyIndex = vk::QueueFamilyIgnored,
+						.image = s_Data->DepthImage.Image,
+						.subresourceRange = {
+							.aspectMask = vk::ImageAspectFlagBits::eDepth,
+							.baseMipLevel = 0,
+							.levelCount = 1,
+							.baseArrayLayer = 0,
+							.layerCount = 1
+						}
+					};
+
+					const std::array barriers = { aoBarrier, depthBarrier };
+
+					const vk::DependencyInfo dependencyInfo = {
+						.dependencyFlags = {},
+						.imageMemoryBarrierCount = barriers.size(),
+						.pImageMemoryBarriers = barriers.data()
+					};
+
+					cmd.pipelineBarrier2(dependencyInfo);
+				}
+
+				s_Data->GTAOImageLayout = vk::ImageLayout::eShaderReadOnlyOptimal;
+			}
+			else if (s_Data->PreviousUseGTAO || s_Data->GTAOImageLayout == vk::ImageLayout::eUndefined)
+			{
+				// GTAO disabled: clear once to neutral AO (1.0) so PBR keeps full ambient lighting.
+				const auto [aoSrcStageMask, aoSrcAccessMask] = getSrcStageAccessForLayout(s_Data->GTAOImageLayout);
+				const vk::ImageMemoryBarrier2 toTransferBarrier{
+					.srcStageMask = aoSrcStageMask,
+					.srcAccessMask = aoSrcAccessMask,
+					.dstStageMask = vk::PipelineStageFlagBits2::eTransfer,
+					.dstAccessMask = vk::AccessFlagBits2::eTransferWrite,
+					.oldLayout = s_Data->GTAOImageLayout,
+					.newLayout = vk::ImageLayout::eTransferDstOptimal,
 					.srcQueueFamilyIndex = vk::QueueFamilyIgnored,
 					.dstQueueFamilyIndex = vk::QueueFamilyIgnored,
 					.image = s_Data->GTAOImage.Image,
@@ -794,18 +950,16 @@ namespace Kerberos
 						.layerCount = 1
 					}
 				};
+				const vk::DependencyInfo toTransferDependencyInfo{
+					.dependencyFlags = {},
+					.imageMemoryBarrierCount = 1,
+					.pImageMemoryBarriers = &toTransferBarrier
+				};
+				cmd.pipelineBarrier2(toTransferDependencyInfo);
 
-				const vk::ImageMemoryBarrier2 normalTextureBarrier{
-					.srcStageMask = vk::PipelineStageFlagBits2::eColorAttachmentOutput | vk::PipelineStageFlagBits2::eLateFragmentTests,
-					.srcAccessMask = vk::AccessFlagBits2::eColorAttachmentWrite,
-					.dstStageMask = vk::PipelineStageFlagBits2::eComputeShader,
-					.dstAccessMask = vk::AccessFlagBits2::eShaderRead,
-					.oldLayout = vk::ImageLayout::eColorAttachmentOptimal,
-					.newLayout = vk::ImageLayout::eShaderReadOnlyOptimal,
-					.srcQueueFamilyIndex = vk::QueueFamilyIgnored,
-					.dstQueueFamilyIndex = vk::QueueFamilyIgnored,
-					.image = s_Data->NormalImage.Image,
-					.subresourceRange = {
+				const vk::ClearColorValue clearNoAO{ std::array<float, 4>{ 1.0f, 0.0f, 0.0f, 0.0f } };
+				const std::array clearRanges = {
+					vk::ImageSubresourceRange{
 						.aspectMask = vk::ImageAspectFlagBits::eColor,
 						.baseMipLevel = 0,
 						.levelCount = 1,
@@ -813,54 +967,14 @@ namespace Kerberos
 						.layerCount = 1
 					}
 				};
+				cmd.clearColorImage(*s_Data->GTAOImage.Image, vk::ImageLayout::eTransferDstOptimal, clearNoAO, clearRanges);
 
-				const vk::ImageMemoryBarrier2 depthBarrier{
-					.srcStageMask = vk::PipelineStageFlagBits2::eLateFragmentTests,
-					.srcAccessMask = vk::AccessFlagBits2::eDepthStencilAttachmentWrite,
-					.dstStageMask = vk::PipelineStageFlagBits2::eComputeShader,
-					.dstAccessMask = vk::AccessFlagBits2::eShaderRead,
-					.oldLayout = vk::ImageLayout::eDepthStencilAttachmentOptimal,
-					.newLayout = vk::ImageLayout::eShaderReadOnlyOptimal,
-					.srcQueueFamilyIndex = vk::QueueFamilyIgnored,
-					.dstQueueFamilyIndex = vk::QueueFamilyIgnored,
-					.image = s_Data->DepthImage.Image,
-					.subresourceRange = {
-						.aspectMask = vk::ImageAspectFlagBits::eDepth,
-						.baseMipLevel = 0,
-						.levelCount = 1,
-						.baseArrayLayer = 0,
-						.layerCount = 1
-					}
-				};
-
-				const std::array barriers = { aoBarrier, normalTextureBarrier, depthBarrier };
-
-				const vk::DependencyInfo dependencyInfo = {
-					.dependencyFlags = {},
-					.imageMemoryBarrierCount = barriers.size(),
-					.pImageMemoryBarriers = barriers.data()
-				};
-
-				cmd.pipelineBarrier2(dependencyInfo);
-			}
-
-			cmd.bindPipeline(vk::PipelineBindPoint::eCompute, *s_Data->GTAOPipeline->GetVulkanPipeline());
-			cmd.bindDescriptorSets(vk::PipelineBindPoint::eCompute, *s_Data->GTAOPipelineLayout, 0, { s_Data->DescriptorSets[currentImage].gtao}, {});
-		
-			const uint32_t groupX = (static_cast<uint32_t>(s_Data->OutputSize.x) + 7) / 8;
-			const uint32_t groupY = (static_cast<uint32_t>(s_Data->OutputSize.y) + 7) / 8;
-
-			cmd.dispatch(groupX, groupY, 1);
-
-			// Transition ao image from storage image to sampled image
-			// and transition depth image back to depth attachment
-			{
-				const vk::ImageMemoryBarrier2 aoBarrier{
-					.srcStageMask = vk::PipelineStageFlagBits2::eComputeShader,
-					.srcAccessMask = vk::AccessFlagBits2::eShaderStorageWrite,
+				const vk::ImageMemoryBarrier2 toShaderReadBarrier{
+					.srcStageMask = vk::PipelineStageFlagBits2::eTransfer,
+					.srcAccessMask = vk::AccessFlagBits2::eTransferWrite,
 					.dstStageMask = vk::PipelineStageFlagBits2::eFragmentShader,
 					.dstAccessMask = vk::AccessFlagBits2::eShaderRead,
-					.oldLayout = vk::ImageLayout::eGeneral,
+					.oldLayout = vk::ImageLayout::eTransferDstOptimal,
 					.newLayout = vk::ImageLayout::eShaderReadOnlyOptimal,
 					.srcQueueFamilyIndex = vk::QueueFamilyIgnored,
 					.dstQueueFamilyIndex = vk::QueueFamilyIgnored,
@@ -873,36 +987,17 @@ namespace Kerberos
 						.layerCount = 1
 					}
 				};
-
-				const vk::ImageMemoryBarrier2 depthBarrier{
-					.srcStageMask = vk::PipelineStageFlagBits2::eComputeShader,
-					.srcAccessMask = vk::AccessFlagBits2::eShaderRead,
-					.dstStageMask = vk::PipelineStageFlagBits2::eEarlyFragmentTests | vk::PipelineStageFlagBits2::eLateFragmentTests,
-					.dstAccessMask = vk::AccessFlagBits2::eDepthStencilAttachmentRead | vk::AccessFlagBits2::eDepthStencilAttachmentWrite,
-					.oldLayout = vk::ImageLayout::eShaderReadOnlyOptimal,
-					.newLayout = vk::ImageLayout::eDepthStencilAttachmentOptimal,
-					.srcQueueFamilyIndex = vk::QueueFamilyIgnored,
-					.dstQueueFamilyIndex = vk::QueueFamilyIgnored,
-					.image = s_Data->DepthImage.Image,
-					.subresourceRange = {
-						.aspectMask = vk::ImageAspectFlagBits::eDepth,
-						.baseMipLevel = 0,
-						.levelCount = 1,
-						.baseArrayLayer = 0,
-						.layerCount = 1
-					}
-				};
-
-				const std::array barriers = { aoBarrier, depthBarrier };
-
-				const vk::DependencyInfo dependencyInfo = {
+				const vk::DependencyInfo toShaderReadDependencyInfo{
 					.dependencyFlags = {},
-					.imageMemoryBarrierCount = barriers.size(),
-					.pImageMemoryBarriers = barriers.data()
+					.imageMemoryBarrierCount = 1,
+					.pImageMemoryBarriers = &toShaderReadBarrier
 				};
+				cmd.pipelineBarrier2(toShaderReadDependencyInfo);
 
-				cmd.pipelineBarrier2(dependencyInfo);
+				s_Data->GTAOImageLayout = vk::ImageLayout::eShaderReadOnlyOptimal;
 			}
+
+			s_Data->PreviousUseGTAO = s_Data->UseGTAO;
 		}
 
 		// Transition shadow map image layout for shader read
@@ -2898,6 +2993,13 @@ namespace Kerberos
 		return s_Data->UseRayQueryBasedSoftShadows;
 	}
 
+	bool& Renderer::GetUseGTAO()
+	{
+		KBR_CORE_ASSERT(s_Data, "Renderer not initialized!");
+
+		return s_Data->UseGTAO;
+	}
+
 	float& Renderer::GetGamma() 
 	{
 		KBR_CORE_ASSERT(s_Data, "Renderer not initialized!");
@@ -4132,6 +4234,7 @@ namespace Kerberos
 													  s_Data->GTAOImage.Format,vk::ImageAspectFlagBits::eColor,
 													  mipLevels);
 		context.SetObjectDebugName(s_Data->GTAOImage.ImageView,"GTAO Image View");
+		s_Data->GTAOImageLayout = vk::ImageLayout::eUndefined;
 	}
 
 	void Renderer::SetupGTAODescriptors()

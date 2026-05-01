@@ -959,6 +959,8 @@ namespace Kerberos
 			ImGui::Checkbox("Enable PCF", &Renderer::GetIsPCFEnabledForShadowMap());
 		}
 
+		ImGui::Checkbox("Use GTAO", &Renderer::GetUseGTAO());
+
 		ImGui::Separator();
 
 		const auto memoryBudgetInfo = VulkanContext::Get().GetMemoryBudgetInfo();
