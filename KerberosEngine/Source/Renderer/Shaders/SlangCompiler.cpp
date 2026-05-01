@@ -65,7 +65,7 @@ namespace Kerberos
 		});
 #ifdef KBR_DEBUG
 		compilerOptions.push_back({ .name = CompilerOptionName::VulkanEmitReflection, .value = { .intValue0 = 1 } });
-		//compilerOptions.push_back({ .name = CompilerOptionName::DebugInformation, .value = { .intValue0 = SLANG_DEBUG_INFO_LEVEL_MAXIMAL } });
+		compilerOptions.push_back({ .name = CompilerOptionName::DebugInformation, .value = { .intValue0 = SLANG_DEBUG_INFO_LEVEL_MAXIMAL } });
 #endif
 		/*compilerOptions.push_back({ .name = CompilerOptionName::Capability, .value = {
 			.kind = CompilerOptionValueKind::String,

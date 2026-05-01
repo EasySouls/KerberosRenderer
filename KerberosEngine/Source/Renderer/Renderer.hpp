@@ -131,5 +131,7 @@ namespace Kerberos
 		static void CreateSkyboxResources();
 		static void CreateTransparencyResources(uint32_t width, uint32_t height);
 		static void SetupTransparencyDescriptors();
+		static void CreateGTAOImage(uint32_t width, uint32_t height);
+		static void SetupGTAODescriptors();
 	};
 }

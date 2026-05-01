@@ -8,6 +8,7 @@ public struct SceneData
     public float4 cascadeSplits;
     public float3 camPos;
     public uint lightCount;
+    public float2 viewportSize;
 };
 
 public struct Material 

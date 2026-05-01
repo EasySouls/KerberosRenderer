@@ -8,6 +8,7 @@
 #include "VulkanContext.hpp"
 #include "Shaders/Shader.hpp"
 #include "GraphicsPipeline.hpp"
+#include "ComputePipeline.hpp"
 #include "RayTracingSceneCache.hpp"
 #include "Utils.hpp"
 #include "Scene/Components/PhysicsComponents.hpp"
@@ -189,6 +190,7 @@ namespace
 		vk::raii::DescriptorSetLayout scene = nullptr;
 		vk::raii::DescriptorSetLayout textures = nullptr;
 		vk::raii::DescriptorSetLayout composite = nullptr;
+		vk::raii::DescriptorSetLayout gtao = nullptr;
 	};
 
 	struct SceneUniformData
@@ -199,6 +201,7 @@ namespace
 		glm::vec4 cascadeSplits{ 0.f };
 		alignas(16) glm::vec3 camPos{ 0.f };
 		uint32_t lightCount = 0;
+		glm::vec2 viewportSize{ 0.0f, 0.0f };
 	};
 
 	struct GlobalLighting
@@ -231,12 +234,25 @@ namespace
 		Ref<GraphicsPipeline> MainPipeline = nullptr;
 	};
 
+	struct GTAOConstants
+	{
+		glm::mat4 projectionMatrix;
+		glm::mat4 invProjectionMatrix;
+		glm::vec2 viewportSize;
+		float radius;         // World space radius of AO
+		float falloff;        // Distance falloff
+		float sampleCount;    // Steps per direction (usually 4-8)
+		float directionCount; // Number of directions (usually 2-4)
+		float temporalIndex;  // For jittering over time
+	};
+
 	struct UniformBufferObject
 	{
 		Ref<UniformBuffer> scene;
 		Ref<UniformBuffer> globalLighting;
 		Ref<UniformBuffer> perObject;
 		Ref<UniformBuffer> skybox;
+		Ref<UniformBuffer> gtao;
 	};
 
 	struct StorageBuffers
@@ -249,6 +265,7 @@ namespace
 		vk::raii::DescriptorSet scene = nullptr;
 		vk::raii::DescriptorSet skybox = nullptr;
 		vk::raii::DescriptorSet composite = nullptr;
+		vk::raii::DescriptorSet gtao = nullptr;
 	};
 
 	struct PendingSceneRender
@@ -292,8 +309,10 @@ namespace
 		WBOITData Transparency;
 		ImageData ColorImage;
 		ImageData DepthImage;
+		ImageData NormalImage;
 		ImageData CompositeImage;
 		ImageData PickingImage;
+		ImageData GTAOImage;
 		vk::ImageLayout PickingImageLayout = vk::ImageLayout::eUndefined;
 
 		vk::raii::DescriptorPool DescriptorPool = nullptr;
@@ -312,6 +331,9 @@ namespace
 		vk::raii::PipelineLayout CompositePipelineLayout = nullptr;
 		Ref<GraphicsPipeline> CompositePipeline = nullptr;
 
+		vk::raii::PipelineLayout GTAOPipelineLayout = nullptr;
+		Ref<ComputePipeline> GTAOPipeline = nullptr;
+
 		vk::raii::Sampler ColorSampler = nullptr;
 		vk::raii::Sampler ShadowMapSampler = nullptr;
 		vk::raii::Sampler PointSampler = nullptr;
@@ -321,6 +343,7 @@ namespace
 		GlobalLighting GlobalLightingData{};
 		PerObjectData PerObjectData{};
 		SkyboxData SkyboxData{};
+		GTAOConstants GTAOData{};
 
 		std::array<UniformBufferObject, VulkanContext::MaxFramesInFlight> UniformBuffers{};
 		std::array<StorageBuffers, VulkanContext::MaxFramesInFlight> StorageBuffers{};
@@ -374,6 +397,7 @@ namespace Kerberos
 		KBR_CORE_INFO("Size of GlobalLighting: {} bytes", sizeof(GlobalLighting));
 		KBR_CORE_INFO("Size of PerObjectData: {} bytes", sizeof(PerObjectData));
 		KBR_CORE_INFO("Size of SkyboxData: {} bytes", sizeof(SkyboxData));
+		KBR_CORE_INFO("Size of GTAOConstants: {} bytes", sizeof(GTAOConstants));
 		KBR_CORE_INFO("Size of material UniformBlock: {} bytes", sizeof(Material::UniformBlock));
 
 		CreateDefaultMaterials();
@@ -525,7 +549,7 @@ namespace Kerberos
 		{
 			WriteGPUTimestamp(cmd, frameIndex, static_cast<uint32_t>(GPUTimestampQuery::DepthPrePassBegin));
 
-			vk::ImageMemoryBarrier2 barrier = {
+			const vk::ImageMemoryBarrier2 depthBarrier = {
 				.srcStageMask = vk::PipelineStageFlagBits2::eEarlyFragmentTests | vk::PipelineStageFlagBits2::eLateFragmentTests,
 				.srcAccessMask = vk::AccessFlagBits2::eDepthStencilAttachmentWrite,
 				.dstStageMask = vk::PipelineStageFlagBits2::eEarlyFragmentTests | vk::PipelineStageFlagBits2::eLateFragmentTests,
@@ -544,10 +568,31 @@ namespace Kerberos
 				}
 			};
 
+			const vk::ImageMemoryBarrier2 normalBarrier = {
+				.srcStageMask = vk::PipelineStageFlagBits2::eColorAttachmentOutput,
+				.srcAccessMask = vk::AccessFlagBits2::eColorAttachmentWrite,
+				.dstStageMask = vk::PipelineStageFlagBits2::eColorAttachmentOutput,
+				.dstAccessMask = vk::AccessFlagBits2::eColorAttachmentRead | vk::AccessFlagBits2::eColorAttachmentWrite,
+				.oldLayout = vk::ImageLayout::eUndefined,
+				.newLayout = vk::ImageLayout::eColorAttachmentOptimal,
+				.srcQueueFamilyIndex = vk::QueueFamilyIgnored,
+				.dstQueueFamilyIndex = vk::QueueFamilyIgnored,
+				.image = s_Data->NormalImage.Image,
+				.subresourceRange = {
+					.aspectMask = vk::ImageAspectFlagBits::eColor,
+					.baseMipLevel = 0,
+					.levelCount = 1,
+					.baseArrayLayer = 0,
+					.layerCount = 1
+				}
+			};
+
+			const std::array barriers = { depthBarrier, normalBarrier };
+
 			const vk::DependencyInfo dependencyInfo = {
 				.dependencyFlags = {},
-				.imageMemoryBarrierCount = 1,
-				.pImageMemoryBarriers = &barrier
+				.imageMemoryBarrierCount = barriers.size(),
+				.pImageMemoryBarriers = barriers.data()
 			};
 
 			cmd.pipelineBarrier2(dependencyInfo);
@@ -558,6 +603,14 @@ namespace Kerberos
 				.loadOp = vk::AttachmentLoadOp::eClear,
 				.storeOp = vk::AttachmentStoreOp::eStore,
 				.clearValue = vk::ClearDepthStencilValue{.depth = 1.0f, .stencil = 0 }
+			};
+
+			vk::RenderingAttachmentInfo normalAttachmentInfo{
+				.imageView = s_Data->NormalImage.ImageView,
+				.imageLayout = vk::ImageLayout::eColorAttachmentOptimal,
+				.loadOp = vk::AttachmentLoadOp::eClear,
+				.storeOp = vk::AttachmentStoreOp::eStore,
+				.clearValue = vk::ClearColorValue{ std::array{0.5f, 0.5f, 1.0f, 1.0f} }
 			};
 
 			const vk::Viewport viewport{
@@ -577,8 +630,8 @@ namespace Kerberos
 			const vk::RenderingInfo depthPrePassRenderingInfo{
 				.renderArea = renderArea,
 				.layerCount = 1,
-				.colorAttachmentCount = 0,
-				.pColorAttachments = nullptr,
+				.colorAttachmentCount = 1,
+				.pColorAttachments = &normalAttachmentInfo,
 				.pDepthAttachment = &depthAttachmentInfo
 			};
 
@@ -588,24 +641,18 @@ namespace Kerberos
 
 			cmd.bindPipeline(vk::PipelineBindPoint::eGraphics, *s_Data->DepthPrePassPipeline->GetVulkanPipeline());
 
-			const auto meshView = scene->m_Registry.view<TransformComponent, StaticMeshComponent>();
-			int i = 0;
-			for (const auto entity : meshView)
+			for (uint32_t i = 0; i < renderObjects.size(); ++i)
 			{
-				auto& transform = meshView.get<TransformComponent>(entity);
-				auto& staticMesh = meshView.get<StaticMeshComponent>(entity);
-				if (!staticMesh.Visible || !staticMesh.StaticMesh /* || !staticMesh.MeshMaterial*/)
-					continue;
+				const auto& [Transform, Mesh, Material, EntityID] = renderObjects[i];
 
-				// TODO: Remove this once we have a proper material system
-				Ref<Material> material = staticMesh.MeshMaterial;
+				Ref<Kerberos::Material> material = Material;
 				if (material == nullptr)
 					material = s_Data->MaterialRegistry.Get("DebugPink");
 
 				if (material->IsTransparent())
 					continue;
 
-				UpdatePerObjectUniformBuffer(currentImage, static_cast<uint32_t>(i), transform.GetTransform(), *material, static_cast<uint32_t>(entity));
+				UpdatePerObjectUniformBuffer(currentImage, i, Transform, *material, EntityID);
 				uint32_t dynamicOffset = static_cast<uint32_t>(i * s_Data->DynamicAlignment);
 
 				cmd.bindDescriptorSets(
@@ -615,9 +662,7 @@ namespace Kerberos
 					{ s_Data->DescriptorSets[currentImage].scene, material->DescriptorSets[currentImage] },
 					{ dynamicOffset });
 
-				staticMesh.StaticMesh->Draw(cmd);
-
-				++i;
+				Mesh->Draw(cmd);
 			}
 
 			cmd.endRendering();
@@ -630,22 +675,22 @@ namespace Kerberos
 			WriteGPUTimestamp(cmd, frameIndex, static_cast<uint32_t>(GPUTimestampQuery::ShadowBegin));
 
 			vk::ImageMemoryBarrier2 barrier = {
-			.srcStageMask = vk::PipelineStageFlagBits2::eEarlyFragmentTests | vk::PipelineStageFlagBits2::eLateFragmentTests,
-			.srcAccessMask = vk::AccessFlagBits2::eDepthStencilAttachmentWrite,
-			.dstStageMask = vk::PipelineStageFlagBits2::eEarlyFragmentTests | vk::PipelineStageFlagBits2::eLateFragmentTests,
-			.dstAccessMask = vk::AccessFlagBits2::eDepthStencilAttachmentRead | vk::AccessFlagBits2::eDepthStencilAttachmentWrite,
-			.oldLayout = vk::ImageLayout::eUndefined,
-			.newLayout = vk::ImageLayout::eDepthAttachmentOptimal,
-			.srcQueueFamilyIndex = vk::QueueFamilyIgnored,
-			.dstQueueFamilyIndex = vk::QueueFamilyIgnored,
-			.image = s_Data->ShadowMap.Image,
-			.subresourceRange = {
-				.aspectMask = vk::ImageAspectFlagBits::eDepth,
-				.baseMipLevel = 0,
-				.levelCount = 1,
-				.baseArrayLayer = 0,
-				.layerCount = ShadowMap::CascadeCount
-			}
+				.srcStageMask = vk::PipelineStageFlagBits2::eEarlyFragmentTests | vk::PipelineStageFlagBits2::eLateFragmentTests,
+				.srcAccessMask = vk::AccessFlagBits2::eDepthStencilAttachmentWrite,
+				.dstStageMask = vk::PipelineStageFlagBits2::eEarlyFragmentTests | vk::PipelineStageFlagBits2::eLateFragmentTests,
+				.dstAccessMask = vk::AccessFlagBits2::eDepthStencilAttachmentRead | vk::AccessFlagBits2::eDepthStencilAttachmentWrite,
+				.oldLayout = vk::ImageLayout::eUndefined,
+				.newLayout = vk::ImageLayout::eDepthAttachmentOptimal,
+				.srcQueueFamilyIndex = vk::QueueFamilyIgnored,
+				.dstQueueFamilyIndex = vk::QueueFamilyIgnored,
+				.image = s_Data->ShadowMap.Image,
+				.subresourceRange = {
+					.aspectMask = vk::ImageAspectFlagBits::eDepth,
+					.baseMipLevel = 0,
+					.levelCount = 1,
+					.baseArrayLayer = 0,
+					.layerCount = ShadowMap::CascadeCount
+				}
 			};
 
 			const vk::DependencyInfo dependencyInfo = {
@@ -694,24 +739,18 @@ namespace Kerberos
 
 				cmd.pushConstants<uint32_t>(*s_Data->ShadowMap.PipelineLayout, vk::ShaderStageFlagBits::eVertex, 0, { cascadeIndex });
 
-				const auto meshView = scene->m_Registry.view<TransformComponent, StaticMeshComponent>();
-				uint32_t i = 0;
-				for (const auto entity : meshView)
+				for (uint32_t i = 0; i < renderObjects.size(); ++i)
 				{
-					auto& transform = meshView.get<TransformComponent>(entity);
-					auto& staticMesh = meshView.get<StaticMeshComponent>(entity);
-					if (!staticMesh.Visible || !staticMesh.StaticMesh /* || !staticMesh.MeshMaterial*/)
-						continue;
+					const auto& [Transform, Mesh, Material, EntityID] = renderObjects[i];
 
-					// TODO: Remove this once we have a proper material system
-					Ref<Material> material = staticMesh.MeshMaterial;
+					Ref<Kerberos::Material> material = Material;
 					if (material == nullptr)
 						material = s_Data->MaterialRegistry.Get("DebugPink");
 
 					if (material->IsTransparent())
 						continue;
 
-					UpdatePerObjectUniformBuffer(currentImage, static_cast<uint32_t>(i), transform.GetTransform(), *material, static_cast<uint32_t>(entity));
+					UpdatePerObjectUniformBuffer(currentImage, i, Transform, *material, EntityID);
 					uint32_t dynamicOffset = static_cast<uint32_t>(i * s_Data->DynamicAlignment);
 
 					cmd.bindDescriptorSets(
@@ -721,17 +760,149 @@ namespace Kerberos
 						{ s_Data->DescriptorSets[currentImage].scene },
 						{ dynamicOffset });
 
-					staticMesh.StaticMesh->Draw(cmd);
-
-					++i;
+					Mesh->Draw(cmd);
 				}
-
+				
 				cmd.endRendering();
 			}
 
 			WriteGPUTimestamp(cmd, frameIndex, static_cast<uint32_t>(GPUTimestampQuery::ShadowEnd));
 
 			KBR_CORE_TRACE("Shadow pass done!");
+		}
+
+		// GTAO compute pass
+		{
+			// Transition GTAO output image to storage image from sampled image for compute shader write
+			// Transition normal and depth images to shader read optimal layout
+			{
+				const vk::ImageMemoryBarrier2 aoBarrier{
+					.srcStageMask = vk::PipelineStageFlagBits2::eFragmentShader,
+					.srcAccessMask = vk::AccessFlagBits2::eShaderRead,
+					.dstStageMask = vk::PipelineStageFlagBits2::eComputeShader,
+					.dstAccessMask = vk::AccessFlagBits2::eShaderStorageWrite,
+					.oldLayout = vk::ImageLayout::eUndefined,
+					.newLayout = vk::ImageLayout::eGeneral,
+					.srcQueueFamilyIndex = vk::QueueFamilyIgnored,
+					.dstQueueFamilyIndex = vk::QueueFamilyIgnored,
+					.image = s_Data->GTAOImage.Image,
+					.subresourceRange = {
+						.aspectMask = vk::ImageAspectFlagBits::eColor,
+						.baseMipLevel = 0,
+						.levelCount = 1,
+						.baseArrayLayer = 0,
+						.layerCount = 1
+					}
+				};
+
+				const vk::ImageMemoryBarrier2 normalTextureBarrier{
+					.srcStageMask = vk::PipelineStageFlagBits2::eColorAttachmentOutput | vk::PipelineStageFlagBits2::eLateFragmentTests,
+					.srcAccessMask = vk::AccessFlagBits2::eColorAttachmentWrite,
+					.dstStageMask = vk::PipelineStageFlagBits2::eComputeShader,
+					.dstAccessMask = vk::AccessFlagBits2::eShaderRead,
+					.oldLayout = vk::ImageLayout::eColorAttachmentOptimal,
+					.newLayout = vk::ImageLayout::eShaderReadOnlyOptimal,
+					.srcQueueFamilyIndex = vk::QueueFamilyIgnored,
+					.dstQueueFamilyIndex = vk::QueueFamilyIgnored,
+					.image = s_Data->NormalImage.Image,
+					.subresourceRange = {
+						.aspectMask = vk::ImageAspectFlagBits::eColor,
+						.baseMipLevel = 0,
+						.levelCount = 1,
+						.baseArrayLayer = 0,
+						.layerCount = 1
+					}
+				};
+
+				const vk::ImageMemoryBarrier2 depthBarrier{
+					.srcStageMask = vk::PipelineStageFlagBits2::eLateFragmentTests,
+					.srcAccessMask = vk::AccessFlagBits2::eDepthStencilAttachmentWrite,
+					.dstStageMask = vk::PipelineStageFlagBits2::eComputeShader,
+					.dstAccessMask = vk::AccessFlagBits2::eShaderRead,
+					.oldLayout = vk::ImageLayout::eDepthStencilAttachmentOptimal,
+					.newLayout = vk::ImageLayout::eShaderReadOnlyOptimal,
+					.srcQueueFamilyIndex = vk::QueueFamilyIgnored,
+					.dstQueueFamilyIndex = vk::QueueFamilyIgnored,
+					.image = s_Data->DepthImage.Image,
+					.subresourceRange = {
+						.aspectMask = vk::ImageAspectFlagBits::eDepth,
+						.baseMipLevel = 0,
+						.levelCount = 1,
+						.baseArrayLayer = 0,
+						.layerCount = 1
+					}
+				};
+
+				const std::array barriers = { aoBarrier, normalTextureBarrier, depthBarrier };
+
+				const vk::DependencyInfo dependencyInfo = {
+					.dependencyFlags = {},
+					.imageMemoryBarrierCount = barriers.size(),
+					.pImageMemoryBarriers = barriers.data()
+				};
+
+				cmd.pipelineBarrier2(dependencyInfo);
+			}
+
+			cmd.bindPipeline(vk::PipelineBindPoint::eCompute, *s_Data->GTAOPipeline->GetVulkanPipeline());
+			cmd.bindDescriptorSets(vk::PipelineBindPoint::eCompute, *s_Data->GTAOPipelineLayout, 0, { s_Data->DescriptorSets[currentImage].gtao}, {});
+		
+			const uint32_t groupX = (static_cast<uint32_t>(s_Data->OutputSize.x) + 7) / 8;
+			const uint32_t groupY = (static_cast<uint32_t>(s_Data->OutputSize.y) + 7) / 8;
+
+			cmd.dispatch(groupX, groupY, 1);
+
+			// Transition ao image from storage image to sampled image
+			// and transition depth image back to depth attachment
+			{
+				const vk::ImageMemoryBarrier2 aoBarrier{
+					.srcStageMask = vk::PipelineStageFlagBits2::eComputeShader,
+					.srcAccessMask = vk::AccessFlagBits2::eShaderStorageWrite,
+					.dstStageMask = vk::PipelineStageFlagBits2::eFragmentShader,
+					.dstAccessMask = vk::AccessFlagBits2::eShaderRead,
+					.oldLayout = vk::ImageLayout::eGeneral,
+					.newLayout = vk::ImageLayout::eShaderReadOnlyOptimal,
+					.srcQueueFamilyIndex = vk::QueueFamilyIgnored,
+					.dstQueueFamilyIndex = vk::QueueFamilyIgnored,
+					.image = s_Data->GTAOImage.Image,
+					.subresourceRange = {
+						.aspectMask = vk::ImageAspectFlagBits::eColor,
+						.baseMipLevel = 0,
+						.levelCount = 1,
+						.baseArrayLayer = 0,
+						.layerCount = 1
+					}
+				};
+
+				const vk::ImageMemoryBarrier2 depthBarrier{
+					.srcStageMask = vk::PipelineStageFlagBits2::eComputeShader,
+					.srcAccessMask = vk::AccessFlagBits2::eShaderRead,
+					.dstStageMask = vk::PipelineStageFlagBits2::eEarlyFragmentTests | vk::PipelineStageFlagBits2::eLateFragmentTests,
+					.dstAccessMask = vk::AccessFlagBits2::eDepthStencilAttachmentRead | vk::AccessFlagBits2::eDepthStencilAttachmentWrite,
+					.oldLayout = vk::ImageLayout::eShaderReadOnlyOptimal,
+					.newLayout = vk::ImageLayout::eDepthStencilAttachmentOptimal,
+					.srcQueueFamilyIndex = vk::QueueFamilyIgnored,
+					.dstQueueFamilyIndex = vk::QueueFamilyIgnored,
+					.image = s_Data->DepthImage.Image,
+					.subresourceRange = {
+						.aspectMask = vk::ImageAspectFlagBits::eDepth,
+						.baseMipLevel = 0,
+						.levelCount = 1,
+						.baseArrayLayer = 0,
+						.layerCount = 1
+					}
+				};
+
+				const std::array barriers = { aoBarrier, depthBarrier };
+
+				const vk::DependencyInfo dependencyInfo = {
+					.dependencyFlags = {},
+					.imageMemoryBarrierCount = barriers.size(),
+					.pImageMemoryBarriers = barriers.data()
+				};
+
+				cmd.pipelineBarrier2(dependencyInfo);
+			}
 		}
 
 		// Transition shadow map image layout for shader read
@@ -1558,6 +1729,81 @@ namespace Kerberos
 			context.SetObjectDebugName(s_Data->PointSampler, "Point Sampler");
 		}
 
+		// Setup resources for GTAO
+		{
+			// Create storage image for gtao data
+			s_Data->GTAOImage.Format = context.FindSupportedFormat(
+				{ vk::Format::eR8Unorm },
+				vk::ImageTiling::eOptimal,
+				vk::FormatFeatureFlagBits::eStorageImage | vk::FormatFeatureFlagBits::eSampledImage
+			);
+
+			constexpr uint32_t gtaoImageWidth = 512;
+			constexpr uint32_t gtaoImageHeight = 512;
+
+			CreateGTAOImage(gtaoImageWidth, gtaoImageHeight);
+
+			std::vector<vk::DescriptorSetLayoutBinding> bindings = {
+			vk::DescriptorSetLayoutBinding{ // Constants uniform buffer
+				.binding = 0,
+				.descriptorType = vk::DescriptorType::eUniformBuffer,
+				.descriptorCount = 1,
+				.stageFlags = vk::ShaderStageFlagBits::eCompute,
+				.pImmutableSamplers = nullptr
+			},
+			vk::DescriptorSetLayoutBinding{ // Depth texture
+				.binding = 1,
+				.descriptorType = vk::DescriptorType::eCombinedImageSampler,
+				.descriptorCount = 1,
+				.stageFlags = vk::ShaderStageFlagBits::eCompute,
+				.pImmutableSamplers = nullptr
+			},
+			vk::DescriptorSetLayoutBinding{ // Normal texture
+				.binding = 2,
+				.descriptorType = vk::DescriptorType::eCombinedImageSampler,
+				.descriptorCount = 1,
+				.stageFlags = vk::ShaderStageFlagBits::eCompute,
+				.pImmutableSamplers = nullptr
+			},
+			vk::DescriptorSetLayoutBinding{ // AO storage image
+				.binding = 3,
+				.descriptorType = vk::DescriptorType::eStorageImage,
+				.descriptorCount = 1,
+				.stageFlags = vk::ShaderStageFlagBits::eCompute,
+				.pImmutableSamplers = nullptr
+			},
+			};
+
+			const vk::DescriptorSetLayoutCreateInfo layoutInfo{
+				.bindingCount = static_cast<uint32_t>(bindings.size()),
+				.pBindings = bindings.data()
+			};
+
+			s_Data->DescriptorSetLayouts.gtao = vk::raii::DescriptorSetLayout{ device, layoutInfo };
+			context.SetObjectDebugName(s_Data->DescriptorSetLayouts.gtao, "GTAO Descriptor Set Layout");
+
+			const std::array setLayouts = {
+				*s_Data->DescriptorSetLayouts.gtao
+			};
+
+			vk::PipelineLayoutCreateInfo gtaoPipelineLayoutInfo{
+				.setLayoutCount = static_cast<uint32_t>(setLayouts.size()),
+				.pSetLayouts = setLayouts.data(),
+				.pushConstantRangeCount = 0,
+				.pPushConstantRanges = nullptr
+			};
+
+			s_Data->GTAOPipelineLayout = vk::raii::PipelineLayout{ device, gtaoPipelineLayoutInfo };
+			context.SetObjectDebugName(s_Data->GTAOPipelineLayout, "GTAO Pipeline Layout");
+
+			ComputePipelineSpecification gtaoPipelineSpec{};
+			gtaoPipelineSpec.Name = "GTAO Pipeline";
+			gtaoPipelineSpec.Shader = CreateRef<Shader>("gtao", "GTAO");
+			gtaoPipelineSpec.PipelineLayout = *s_Data->GTAOPipelineLayout;
+
+			s_Data->GTAOPipeline = CreateRef<ComputePipeline>(gtaoPipelineSpec);
+		}
+
 		// Create the shadow map resources
 		{
 			// Create shadow map image
@@ -1849,6 +2095,35 @@ namespace Kerberos
 									   vk::ObjectType::eImageView,
 									   "Depth Attachment Image View");
 
+			s_Data->NormalImage.Format = context.FindSupportedFormat(
+				{ vk::Format::eA2B10G10R10UnormPack32 },
+				vk::ImageTiling::eOptimal,
+				vk::FormatFeatureFlagBits::eColorAttachment | vk::FormatFeatureFlagBits::eSampledImage
+			);
+
+			CreateImage(
+				device,
+				initialImageWidth,
+				initialImageHeight,
+				mipLevels,
+				vk::SampleCountFlagBits::e1,
+				s_Data->NormalImage.Format,
+				vk::ImageTiling::eOptimal,
+				vk::ImageUsageFlagBits::eColorAttachment | vk::ImageUsageFlagBits::eSampled,
+				vk::MemoryPropertyFlagBits::eDeviceLocal,
+				s_Data->NormalImage.Image,
+				s_Data->NormalImage.ImageMemory);
+
+			context.SetObjectDebugName(s_Data->NormalImage.Image,"Normal Attachment Image");
+			context.SetObjectDebugName(s_Data->NormalImage.ImageMemory,"Normal Attachment Image Memory");
+
+			s_Data->NormalImage.ImageView = CreateImageView(device, s_Data->NormalImage.Image, s_Data->NormalImage.Format, vk::ImageAspectFlagBits::eColor, mipLevels);
+
+			context.SetObjectDebugName(s_Data->NormalImage.ImageView,"Normal Attachment Image View");
+
+			// This is called here, since the normal and depth image has to be valid for the descriptor writes
+			SetupGTAODescriptors();
+
 			const std::array<vk::DescriptorSetLayout, 2> setLayouts = {
 				s_Data->DescriptorSetLayouts.scene,
 				s_Data->DescriptorSetLayouts.textures
@@ -1885,8 +2160,8 @@ namespace Kerberos
 			depthPrepassPipelineSpec.EnableDepthTest = true;
 			depthPrepassPipelineSpec.EnableDepthWrite = true;
 			depthPrepassPipelineSpec.DepthTestFunc = DepthTestFunc::LessOrEqual;
-			depthPrepassPipelineSpec.BlendModes = {};
-			depthPrepassPipelineSpec.ColorAttachmentFormats = {};
+			depthPrepassPipelineSpec.BlendModes = { BlendMode::None };
+			depthPrepassPipelineSpec.ColorAttachmentFormats = { s_Data->NormalImage.Format };
 			depthPrepassPipelineSpec.DepthAttachmentFormat = s_Data->DepthImage.Format;
 			depthPrepassPipelineSpec.DynamicStates = commonDynamicStates;
 
@@ -2082,6 +2357,7 @@ namespace Kerberos
 			};
 
 			s_Data->CompositePipelineLayout = vk::raii::PipelineLayout{ device, compositePipelineLayoutInfo };
+			context.SetObjectDebugName(s_Data->CompositePipelineLayout, "Composite Pipeline Layout");
 
 			Ref<Shader> compositeShader = CreateRef<Shader>("transparency_resolve", "Composite");
 
@@ -2225,6 +2501,12 @@ namespace Kerberos
 		s_Data->CompositeImage.ImageView.clear();
 		s_Data->CompositeImage.Image.clear();
 		s_Data->CompositeImage.ImageMemory.clear();
+		s_Data->NormalImage.ImageView.clear();
+		s_Data->NormalImage.Image.clear();
+		s_Data->NormalImage.ImageMemory.clear();
+		s_Data->GTAOImage.ImageView.clear();
+		s_Data->GTAOImage.Image.clear();
+		s_Data->GTAOImage.ImageMemory.clear();
 
 		// Recreate resources with new size
 
@@ -2330,17 +2612,44 @@ namespace Kerberos
 								   vk::ObjectType::eImageView,
 								   "Depth Attachment Image View");
 
+		CreateImage(
+			device,
+			width,
+			height,
+			mipLevels,
+			vk::SampleCountFlagBits::e1,
+			s_Data->NormalImage.Format,
+			vk::ImageTiling::eOptimal,
+			vk::ImageUsageFlagBits::eColorAttachment | vk::ImageUsageFlagBits::eSampled,
+			vk::MemoryPropertyFlagBits::eDeviceLocal,
+			s_Data->NormalImage.Image,
+			s_Data->NormalImage.ImageMemory);
+
+		context.SetObjectDebugName(s_Data->NormalImage.Image, "Normal Attachment Image");
+		context.SetObjectDebugName(s_Data->NormalImage.ImageMemory, "Normal Attachment Image Memory");
+
+		s_Data->NormalImage.ImageView = CreateImageView(device, s_Data->NormalImage.Image, s_Data->NormalImage.Format, vk::ImageAspectFlagBits::eColor, mipLevels);
+
+		context.SetObjectDebugName(s_Data->NormalImage.ImageView, "Normal Attachment Image View");
+
 		CreateTransparencyResources(width, height);
+
+		CreateGTAOImage(width, height);
 
 		// Update the composite descriptor sets to point to the new images
 		{
 			std::array<vk::DescriptorImageInfo, 5> imageInfos;
 
-			imageInfos[0] = { s_Data->LinearSampler, s_Data->ColorImage.ImageView,  vk::ImageLayout::eShaderReadOnlyOptimal };
-			imageInfos[1] = { s_Data->PointSampler,  s_Data->DepthImage.ImageView,  vk::ImageLayout::eShaderReadOnlyOptimal };
-			imageInfos[2] = { s_Data->PointSampler,  s_Data->Transparency.AccumulationImage.ImageView, vk::ImageLayout::eShaderReadOnlyOptimal };
-			imageInfos[3] = { s_Data->PointSampler,  s_Data->Transparency.RevealageImage.ImageView,    vk::ImageLayout::eShaderReadOnlyOptimal };
-			imageInfos[4] = { s_Data->LinearSampler, s_Data->Transparency.DistortionImage.ImageView,   vk::ImageLayout::eShaderReadOnlyOptimal };
+			imageInfos[0] = {.sampler = s_Data->LinearSampler, .imageView = s_Data->ColorImage.ImageView,
+				.imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal };
+			imageInfos[1] = {.sampler = s_Data->PointSampler, .imageView = s_Data->DepthImage.ImageView,
+				.imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal };
+			imageInfos[2] = {.sampler = s_Data->PointSampler, .imageView = s_Data->Transparency.AccumulationImage.ImageView,
+				.imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal };
+			imageInfos[3] = {.sampler = s_Data->PointSampler, .imageView = s_Data->Transparency.RevealageImage.ImageView,
+				.imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal };
+			imageInfos[4] = {.sampler = s_Data->LinearSampler, .imageView = s_Data->Transparency.DistortionImage.ImageView,
+				.imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal };
 
 			for (size_t frameIndex = 0; frameIndex < VulkanContext::MaxFramesInFlight; frameIndex++) 
 			{
@@ -2361,7 +2670,84 @@ namespace Kerberos
 			}
 		}
 
-		// Transition composite adn color output image to shader read layout
+		// Update the gtao descriptor sets to point to the new images
+		{
+			const vk::DescriptorImageInfo depthImageInfo = {
+				.sampler = s_Data->PointSampler,
+				.imageView = s_Data->DepthImage.ImageView,
+				.imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal
+			};
+			const vk::DescriptorImageInfo normalImageInfo = { 
+				.sampler = s_Data->LinearSampler, 
+				.imageView = s_Data->NormalImage.ImageView, 
+				.imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal
+			};
+			const vk::DescriptorImageInfo aoImageInfo = {
+				.sampler = s_Data->LinearSampler,
+				.imageView = s_Data->GTAOImage.ImageView,
+				.imageLayout = vk::ImageLayout::eGeneral
+			};
+
+			for (size_t frameIndex = 0; frameIndex < VulkanContext::MaxFramesInFlight; frameIndex++)
+			{
+				std::array<vk::WriteDescriptorSet, 3> descriptorWrites;
+
+				descriptorWrites[0] = {
+					.dstSet = s_Data->DescriptorSets[frameIndex].gtao,
+					.dstBinding = 1,
+					.dstArrayElement = 0,
+					.descriptorCount = 1,
+					.descriptorType = vk::DescriptorType::eCombinedImageSampler,
+					.pImageInfo = &depthImageInfo
+				};
+				descriptorWrites[1] = {
+					.dstSet = s_Data->DescriptorSets[frameIndex].gtao,
+					.dstBinding = 2,
+					.dstArrayElement = 0,
+					.descriptorCount = 1,
+					.descriptorType = vk::DescriptorType::eCombinedImageSampler,
+					.pImageInfo = &normalImageInfo
+				};
+				descriptorWrites[2] = {
+					.dstSet = s_Data->DescriptorSets[frameIndex].gtao,
+					.dstBinding = 3,
+					.dstArrayElement = 0,
+					.descriptorCount = 1,
+					.descriptorType = vk::DescriptorType::eStorageImage,
+					.pImageInfo = &aoImageInfo
+				};
+
+				// Overwrite the old bindings with the new ones
+				device.updateDescriptorSets(descriptorWrites, nullptr);
+			}
+		}
+
+		// Update the AO texture in the PBR descriptor sets
+		{
+			const vk::DescriptorImageInfo aoImageInfo = {
+				.sampler = s_Data->LinearSampler,
+				.imageView = s_Data->GTAOImage.ImageView,
+				.imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal
+			};
+
+			for (size_t frameIndex = 0; frameIndex < VulkanContext::MaxFramesInFlight; frameIndex++)
+			{
+				const std::array descriptorWrites = {
+					vk::WriteDescriptorSet{
+							.dstSet = *s_Data->DescriptorSets[frameIndex].scene,
+							.dstBinding = 9,
+							.dstArrayElement = 0,
+							.descriptorCount = 1,
+							.descriptorType = vk::DescriptorType::eCombinedImageSampler,
+							.pImageInfo = &aoImageInfo
+					},
+				};
+
+				device.updateDescriptorSets(descriptorWrites, nullptr);
+			}
+		}
+
+		// Transition composite and color output image to shader read layout
 		{
 			const vk::ImageMemoryBarrier2 compositeImageBarrier = {
 				.srcStageMask = vk::PipelineStageFlagBits2::eTopOfPipe,
@@ -2452,6 +2838,8 @@ namespace Kerberos
 			skyboxPipeline->Recompile();
 		if (const auto& compositePipeline = s_Data->CompositePipeline)
 			compositePipeline->Recompile();
+		if (const auto& gtaoPipeline = s_Data->GTAOPipeline)
+			gtaoPipeline->Recompile();
 	}
 
 	glm::vec3 Renderer::GetLightPositionForShadowMapCalculation() 
@@ -2690,6 +3078,7 @@ namespace Kerberos
 		s_Data->SceneUniformData.camPos = camPos;
 		s_Data->SceneUniformData.cascadeSplits = cascadeSplits;
 		s_Data->SceneUniformData.lightCount = lightCount;
+		s_Data->SceneUniformData.viewportSize = s_Data->OutputSize;
 
 		for (size_t i = 0; i < s_Data->SceneUniformData.lightSpaceMatrices->length(); ++i)
 		{
@@ -2707,6 +3096,16 @@ namespace Kerberos
 		s_Data->SkyboxData.model = skyboxModel;
 		s_Data->SkyboxData.projection = projection;
 		std::memcpy(s_Data->UniformBuffers[currentImage].skybox->GetMappedData(), &s_Data->SkyboxData, sizeof(SkyboxData));
+
+		s_Data->GTAOData.projectionMatrix = projection;
+		s_Data->GTAOData.invProjectionMatrix = glm::inverse(projection);
+		s_Data->GTAOData.viewportSize = s_Data->OutputSize;
+		s_Data->GTAOData.radius = 3.0f;
+		s_Data->GTAOData.falloff = 1.0f;
+		s_Data->GTAOData.sampleCount = 6.0f;
+		s_Data->GTAOData.directionCount = 3.0f;
+		s_Data->GTAOData.temporalIndex = 0.0f;//static_cast<float>(currentImage);
+		std::memcpy(s_Data->UniformBuffers[currentImage].gtao->GetMappedData(), &s_Data->GTAOData, sizeof(GTAOConstants));
 	}
 
     void Renderer::UpdatePerObjectUniformBuffer(const uint32_t currentImage, const uint32_t objectIndex, const glm::mat4& model,
@@ -3024,7 +3423,7 @@ namespace Kerberos
 			s_Data->DynamicAlignment = (s_Data->DynamicAlignment + s_Data->MinUniformBufferOffsetAlignment - 1) & ~(s_Data->MinUniformBufferOffsetAlignment - 1);
 		}
 
-		for (auto& [scene, globalLighting, perObject, skybox] : s_Data->UniformBuffers)
+		for (auto& [scene, globalLighting, perObject, skybox, gtao] : s_Data->UniformBuffers)
 		{
 			scene = CreateRef<UniformBuffer>(sizeof(SceneUniformData));
 
@@ -3035,6 +3434,8 @@ namespace Kerberos
 			perObject = CreateRef<UniformBuffer>(s_Data->DynamicAlignment * maxObjects);
 
 			skybox = CreateRef<UniformBuffer>(sizeof(SkyboxData));
+
+			gtao = CreateRef<UniformBuffer>(sizeof(GTAOConstants));
 		}
 	}
 
@@ -3071,6 +3472,10 @@ namespace Kerberos
 			},
 			vk::DescriptorPoolSize{
 				.type = vk::DescriptorType::eStorageBuffer,
+				.descriptorCount = 10
+			},
+			vk::DescriptorPoolSize{
+				.type = vk::DescriptorType::eStorageImage,
 				.descriptorCount = 10
 			},
 		};
@@ -3147,6 +3552,13 @@ namespace Kerberos
 			vk::DescriptorSetLayoutBinding{ // Light storage buffer
 				.binding = 8,
 				.descriptorType = vk::DescriptorType::eStorageBuffer,
+				.descriptorCount = 1,
+				.stageFlags = vk::ShaderStageFlagBits::eFragment,
+				.pImmutableSamplers = nullptr
+			},
+			vk::DescriptorSetLayoutBinding{ // Global AO texture
+				.binding = 9,
+				.descriptorType = vk::DescriptorType::eCombinedImageSampler,
 				.descriptorCount = 1,
 				.stageFlags = vk::ShaderStageFlagBits::eFragment,
 				.pImmutableSamplers = nullptr
@@ -3274,6 +3686,12 @@ namespace Kerberos
 				.range = sizeof(GPULight) * MaxLights
 			};
 
+			const vk::DescriptorImageInfo globalAOImageInfo{
+				.sampler = *s_Data->LinearSampler,
+				.imageView = *s_Data->GTAOImage.ImageView,
+				.imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal
+			};
+
 			const std::vector descriptorWrites = {
 				vk::WriteDescriptorSet{
 					.dstSet = *s_Data->DescriptorSets[i].scene,
@@ -3338,6 +3756,14 @@ namespace Kerberos
 					.descriptorCount = 1,
 					.descriptorType = vk::DescriptorType::eStorageBuffer,
 					.pBufferInfo = &lightStorageBufferInfo
+				},
+				vk::WriteDescriptorSet{
+					.dstSet = *s_Data->DescriptorSets[i].scene,
+					.dstBinding = 9,
+					.dstArrayElement = 0,
+					.descriptorCount = 1,
+					.descriptorType = vk::DescriptorType::eCombinedImageSampler,
+					.pImageInfo = &globalAOImageInfo
 				},
 				// The TLAS descriptor will be updated later when the TLAS is built for the first time, since it requires a valid acceleration structure handle.
 			};
@@ -3670,6 +4096,125 @@ namespace Kerberos
 					.descriptorCount = 1,
 					.descriptorType = vk::DescriptorType::eUniformBuffer,
 					.pBufferInfo = &globalLightingBufferInfo
+				}
+			};
+
+			device.updateDescriptorSets(descriptorWrites, {});
+		}
+	}
+
+	void Renderer::CreateGTAOImage(const uint32_t width, const uint32_t height) 
+	{
+		KBR_CORE_ASSERT(s_Data->GTAOImage.Format != vk::Format::eUndefined, "GTAO image format has to be set before creating GTAO image!");
+
+		auto& context = VulkanContext::Get();
+		const auto& device = context.GetDevice();
+
+		constexpr uint32_t mipLevels = 1;
+
+		CreateImage(device,
+					width,
+					height,
+					mipLevels,
+					vk::SampleCountFlagBits::e1,
+					s_Data->GTAOImage.Format,
+					vk::ImageTiling::eOptimal,
+					vk::ImageUsageFlagBits::eStorage | vk::ImageUsageFlagBits::eSampled,
+					vk::MemoryPropertyFlagBits::eDeviceLocal,
+					s_Data->GTAOImage.Image,
+					s_Data->GTAOImage.ImageMemory);
+
+		context.SetObjectDebugName(s_Data->GTAOImage.Image,"GTAO Image");
+		context.SetObjectDebugName(s_Data->GTAOImage.ImageMemory,"GTAO Image Memory");
+
+		s_Data->GTAOImage.ImageView = CreateImageView(device,
+													  s_Data->GTAOImage.Image,
+													  s_Data->GTAOImage.Format,vk::ImageAspectFlagBits::eColor,
+													  mipLevels);
+		context.SetObjectDebugName(s_Data->GTAOImage.ImageView,"GTAO Image View");
+	}
+
+	void Renderer::SetupGTAODescriptors()
+	{
+		KBR_CORE_ASSERT(s_Data->DescriptorPool != nullptr, "Descriptor pool has to be created before setting up GTAO descriptors");
+		KBR_CORE_ASSERT(s_Data->DescriptorSetLayouts.gtao != nullptr, "GTAO descriptor set layout has to be created before setting up GTAO descriptors");
+
+		auto& context = VulkanContext::Get();
+		const auto& device = context.GetDevice();
+
+		const std::vector<vk::DescriptorSetLayout> gtaoSetLayouts(
+			s_Data->DescriptorSets.size(),
+			*s_Data->DescriptorSetLayouts.gtao);
+
+		const vk::DescriptorSetAllocateInfo allocInfo{
+			.descriptorPool = *s_Data->DescriptorPool,
+			.descriptorSetCount = static_cast<uint32_t>(s_Data->DescriptorSets.size()),
+			.pSetLayouts = gtaoSetLayouts.data()
+		};
+
+		std::vector<vk::raii::DescriptorSet> gtaoDescriptorSets = device.allocateDescriptorSets(allocInfo);
+
+		for (uint32_t i = 0; i < VulkanContext::MaxFramesInFlight; i++)
+		{
+			s_Data->DescriptorSets[i].gtao = std::move(gtaoDescriptorSets[i]);
+			context.SetObjectDebugName(s_Data->DescriptorSets[i].gtao, "GTAO Descriptor Set[" + std::to_string(i) + "]");
+
+			const vk::DescriptorBufferInfo gtaoConstantsBufferInfo{
+				.buffer = *s_Data->UniformBuffers[i].gtao->GetBuffer(),
+				.offset = 0,
+				.range = sizeof(GTAOConstants)
+			};
+
+			const vk::DescriptorImageInfo opaqueDepthImageInfo{
+				.sampler = *s_Data->PointSampler,
+				.imageView = *s_Data->DepthImage.ImageView,
+				.imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal
+			};
+
+			const vk::DescriptorImageInfo normalTextureImageInfo{
+				.sampler = *s_Data->PointSampler,
+				.imageView = *s_Data->NormalImage.ImageView,
+				.imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal
+			};
+
+			const vk::DescriptorImageInfo gtaoStorageImageInfo{
+				.sampler = *s_Data->PointSampler,
+				.imageView = *s_Data->GTAOImage.ImageView,
+				.imageLayout = vk::ImageLayout::eGeneral
+			};
+
+			const std::vector descriptorWrites = {
+				vk::WriteDescriptorSet{
+					.dstSet = *s_Data->DescriptorSets[i].gtao,
+					.dstBinding = 0,
+					.dstArrayElement = 0,
+					.descriptorCount = 1,
+					.descriptorType = vk::DescriptorType::eUniformBuffer,
+					.pBufferInfo = &gtaoConstantsBufferInfo
+				},
+				vk::WriteDescriptorSet{
+					.dstSet = *s_Data->DescriptorSets[i].gtao,
+					.dstBinding = 1,
+					.dstArrayElement = 0,
+					.descriptorCount = 1,
+					.descriptorType = vk::DescriptorType::eCombinedImageSampler,
+					.pImageInfo = &opaqueDepthImageInfo
+				},
+				vk::WriteDescriptorSet{
+					.dstSet = *s_Data->DescriptorSets[i].gtao,
+					.dstBinding = 2,
+					.dstArrayElement = 0,
+					.descriptorCount = 1,
+					.descriptorType = vk::DescriptorType::eCombinedImageSampler,
+					.pImageInfo = &normalTextureImageInfo
+				},
+				vk::WriteDescriptorSet{
+					.dstSet = *s_Data->DescriptorSets[i].gtao,
+					.dstBinding = 3,
+					.dstArrayElement = 0,
+					.descriptorCount = 1,
+					.descriptorType = vk::DescriptorType::eStorageImage,
+					.pImageInfo = &gtaoStorageImageInfo
 				}
 			};
 

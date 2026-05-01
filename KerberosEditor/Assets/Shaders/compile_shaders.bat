@@ -22,5 +22,8 @@ if not exist "%SLANGC%" (
 "%SLANGC%" normaldebug.slang -target spirv -profile spirv_1_6 -emit-spirv-directly -fvk-use-entrypoint-name -entry vertexMain -entry geometryMain -entry fragmentMain -o ../Cache/Shaders/normaldebug.spv
 "%SLANGC%" pbr_ray_query_shadows.slang -target spirv -profile spirv_1_6 -emit-spirv-directly -fvk-use-entrypoint-name -entry vertexMain -entry fragmentMain -o ../Cache/Shaders/pbr_ray_query_shadows.spv
 "%SLANGC%" collider_lines.slang -target spirv -profile spirv_1_6 -emit-spirv-directly -fvk-use-entrypoint-name -entry vertexMain -entry fragmentMain -o ../Cache/Shaders/collider_lines.spv
+"%SLANGC%" transparent.slang -target spirv -profile spirv_1_6 -emit-spirv-directly -fvk-use-entrypoint-name -entry vertexMain -entry fragmentMain -o ../Cache/Shaders/transparent.spv
+"%SLANGC%" transparency_resolve.slang -target spirv -profile spirv_1_6 -emit-spirv-directly -fvk-use-entrypoint-name -entry vertexMain -entry fragmentMain -o ../Cache/Shaders/transparency_resolve.spv
+"%SLANGC%" gtao.slang -target spirv -profile spirv_1_6 -emit-spirv-directly -fvk-use-entrypoint-name -entry computeMain -o ../Cache/Shaders/gtao.spv
 
 PAUSE

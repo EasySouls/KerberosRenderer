@@ -343,11 +343,11 @@ PSOutput fragmentMain(VSOutput input)
 
     float3 color = ambient + Lo;
 
-    // Tone mapping
-    color = Uncharted2Tonemap(color * globalLighting.exposure);
-    color = color * (1.0f / Uncharted2Tonemap((11.2f).xxx));
-    // Gamma correction
-    color = pow(color, (1.0f / globalLighting.gamma).xxx);
+    //// Tone mapping
+    //color = Uncharted2Tonemap(color * globalLighting.exposure);
+    //color = color * (1.0f / Uncharted2Tonemap((11.2f).xxx));
+    //// Gamma correction
+    //color = pow(color, (1.0f / globalLighting.gamma).xxx);
 
     PSOutput output;
     output.Color = float4(color.xyz, 1.0);

@@ -51,6 +51,9 @@ RaytracingAccelerationStructure accelerationStructure;
 [[vk::binding(8, 0)]]
 StructuredBuffer<GPULight> sceneLights;
 
+[[vk::binding(9, 0)]]
+Sampler2D<float> globalAoTexture;
+
 [[vk::binding(0, 1)]]
 Sampler2D albedoMapSampler;
 [[vk::binding(1, 1)]]
@@ -286,7 +289,11 @@ PSOutput fragmentMain(VSOutput input)
     float metallic = clamp(metallicTex * perObject.material.metallic, 0.0, 1.0);
     float roughnessTex = roughnessMapSampler.Sample(input.TexCoord).r;
     float roughness = clamp(roughnessTex * perObject.material.roughness, 0.0, 1.0);
-    float ao = aoMapSampler.Sample(input.TexCoord).r;
+
+    float2 screenUV = input.Position.xy / scene.viewportSize;
+    float globalAO = globalAoTexture.Sample(screenUV).r;
+    float materialAO = aoMapSampler.Sample(input.TexCoord).r;
+    float ao = globalAO * materialAO;
 
     // Use this when working with srgb textures
     // float3 albedo = pow(albedoMapSampler.Sample(input.TexCoord).rgb * perObject.material.albedo, float3(2.2, 2.2, 2.2));
