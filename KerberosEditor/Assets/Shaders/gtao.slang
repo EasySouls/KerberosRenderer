@@ -42,18 +42,23 @@ float ComputeGTAO(float2 uv, float3 viewPos, float3 viewNormal)
 {
     float3 viewV = normalize(-viewPos); // Vector to camera
     float occlusion = 0.0;
+    int directionCount = max(1, (int)cb.directionCount);
+    int sampleCount = max(1, (int)cb.sampleCount);
 
     // Use a simple hash or blue noise to rotate directions
     float rotation = cb.temporalIndex * 0.618;
 
     // This converts world-space meters into UV-space 0..1 units
-    // cb.projectionMatrix[0][0] is the focal length
-    float2 radiusUV = (cb.radius * float2(cb.projectionMatrix[0][0], cb.projectionMatrix[1][1])) / -viewPos.z;
+    // projectionMatrix[0][0]/[1][1] are focal lengths in clip space.
+    float2 focalLength = abs(float2(cb.projectionMatrix[0][0], cb.projectionMatrix[1][1]));
+    float viewDepth = max(-viewPos.z, 1e-4);
+    float2 radiusUV = 0.5 * (cb.radius * focalLength) / viewDepth;
+    float falloff2 = max(cb.falloff * cb.falloff, 1e-6);
 
-    for (int d = 0; d < (int)cb.directionCount; ++d)
+    for (int d = 0; d < directionCount; ++d)
     {
         // 1. Determine the search direction in screen space
-        float angle = (float(d) + rotation) * (3.14159 / cb.directionCount);
+        float angle = (float(d) + rotation) * (3.14159 / directionCount);
         float2 dir = float2(cos(angle), sin(angle));
 
         // Horizon angles (initialized to cosine of the hemisphere)
@@ -61,28 +66,36 @@ float ComputeGTAO(float2 uv, float3 viewPos, float3 viewNormal)
         float h2 = -1.0;
 
         // 2. March in two opposite directions along the line
-        for (int s = 1; s <= (int)cb.sampleCount; ++s)
+        for (int s = 1; s <= sampleCount; ++s)
         {
-            // Convert world radius to screen-space radius (in pixels)
-            // cb.projectionMatrix[0][0] is the focal length (fx)
-            float pixelRadius = (cb.radius * cb.projectionMatrix[0][0] * cb.viewportSize.x) / -viewPos.z;
-            float2 offset = dir * (float(s) / cb.sampleCount) * radiusUV;
+            float2 offset = dir * (float(s) / sampleCount) * radiusUV;
+            float2 uv1 = uv + offset;
+            float2 uv2 = uv - offset;
+
+            // Skip out-of-screen taps to avoid edge-clamp streaking/block artifacts.
+            if (uv1.x <= 0.0 || uv1.x >= 1.0 || uv1.y <= 0.0 || uv1.y >= 1.0)
+                continue;
+            if (uv2.x <= 0.0 || uv2.x >= 1.0 || uv2.y <= 0.0 || uv2.y >= 1.0)
+                continue;
 
             // Sample neighbors
-            float3 p1 = GetViewPos(uv + offset / cb.viewportSize);
-            float3 p2 = GetViewPos(uv - offset / cb.viewportSize);
+            float3 p1 = GetViewPos(uv1);
+            float3 p2 = GetViewPos(uv2);
 
             float3 v1 = p1 - viewPos;
             float3 v2 = p2 - viewPos;
 
-            // Calculate elevation angle (clamped by distance falloff)
             float d2_1 = dot(v1, v1);
             float d2_2 = dot(v2, v2);
+            float lenInv1 = rsqrt(max(d2_1, 1e-6));
+            float lenInv2 = rsqrt(max(d2_2, 1e-6));
+            float3 nV1 = v1 * lenInv1;
+            float3 nV2 = v2 * lenInv2;
 
-            // Horizon 1
-            h1 = max(h1, dot(viewV, normalize(v1)));
-            // Horizon 2
-            h2 = max(h2, dot(viewV, normalize(v2)));
+            if (d2_1 <= falloff2)
+                h1 = max(h1, dot(viewV, nV1));
+            if (d2_2 <= falloff2)
+                h2 = max(h2, dot(viewV, nV2));
         }
 
         // 3. Convert horizons to actual occlusion using the surface normal
@@ -102,7 +115,7 @@ float ComputeGTAO(float2 uv, float3 viewPos, float3 viewNormal)
         occlusion += (cos(n) + 2.0 * sin(h2) * sin(h2 - n) - cos(2.0 * h2 - n)) / 4.0;
     }
 
-    return saturate(occlusion / cb.directionCount);
+    return saturate(occlusion / directionCount);
 }
 
 [shader("compute")]
@@ -111,7 +124,7 @@ void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
     float2 uv = (float2(dispatchThreadID.xy) + 0.5) / cb.viewportSize;
 
-    if (uv.x > 1.0 || uv.y > 1.0) return;
+    if (uv.x >= 1.0 || uv.y >= 1.0) return;
 
     float3 viewPos = GetViewPos(uv);
 

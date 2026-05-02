@@ -3202,11 +3202,11 @@ namespace Kerberos
 		s_Data->GTAOData.projectionMatrix = projection;
 		s_Data->GTAOData.invProjectionMatrix = glm::inverse(projection);
 		s_Data->GTAOData.viewportSize = s_Data->OutputSize;
-		s_Data->GTAOData.radius = 3.0f;
+		s_Data->GTAOData.radius = 0.35f;
 		s_Data->GTAOData.falloff = 1.0f;
-		s_Data->GTAOData.sampleCount = 6.0f;
-		s_Data->GTAOData.directionCount = 3.0f;
-		s_Data->GTAOData.temporalIndex = 0.0f;//static_cast<float>(currentImage);
+		s_Data->GTAOData.sampleCount = 8.0f;
+		s_Data->GTAOData.directionCount = 4.0f;
+		s_Data->GTAOData.temporalIndex = static_cast<float>(currentImage);
 		std::memcpy(s_Data->UniformBuffers[currentImage].gtao->GetMappedData(), &s_Data->GTAOData, sizeof(GTAOConstants));
 	}
 
