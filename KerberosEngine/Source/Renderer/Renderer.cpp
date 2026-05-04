@@ -4221,7 +4221,7 @@ namespace Kerberos
 					vk::SampleCountFlagBits::e1,
 					s_Data->GTAOImage.Format,
 					vk::ImageTiling::eOptimal,
-					vk::ImageUsageFlagBits::eStorage | vk::ImageUsageFlagBits::eSampled,
+					vk::ImageUsageFlagBits::eStorage | vk::ImageUsageFlagBits::eSampled | vk::ImageUsageFlagBits::eTransferDst,
 					vk::MemoryPropertyFlagBits::eDeviceLocal,
 					s_Data->GTAOImage.Image,
 					s_Data->GTAOImage.ImageMemory);

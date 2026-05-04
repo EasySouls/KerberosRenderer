@@ -1,5 +1,7 @@
 import common;
 import lights;
+import pbr_helpers;
+import ao;
 
 struct VSInput
 {
@@ -69,49 +71,6 @@ Sampler2D aoMapSampler;
 
 static const float PI = 3.14159265359;
 
-// From http://filmicgames.com/archives/75
-float3 Uncharted2Tonemap(float3 x)
-{
-    float A = 0.15;
-    float B = 0.50;
-    float C = 0.10;
-    float D = 0.20;
-    float E = 0.02;
-    float F = 0.30;
-    return ((x * (A * x + C * B) + D * E) / (x * (A * x + B) + D * F)) - E / F;
-}
-
-// Normal Distribution function --------------------------------------
-float D_GGX(float dotNH, float roughness)
-{
-	float alpha = roughness * roughness;
-	float alpha2 = alpha * alpha;
-	float denom = dotNH * dotNH * (alpha2 - 1.0) + 1.0;
-	return (alpha2)/(PI * denom*denom);
-}
-
-// Geometric Shadowing function --------------------------------------
-float G_SchlicksmithGGX(float dotNL, float dotNV, float roughness)
-{
-	float r = (roughness + 1.0);
-	float k = (r*r) / 8.0;
-	float GL = dotNL / (dotNL * (1.0 - k) + k);
-	float GV = dotNV / (dotNV * (1.0 - k) + k);
-	return GL * GV;
-}
-
-// Fresnel function ----------------------------------------------------
-float3 F_Schlick(float cosTheta, float3 F0)
-{
-    return F0 + (1.0 - F0) * pow(1.0 - cosTheta, 5.0);
-}
-float3 F_SchlickR(float cosTheta, float3 F0, float roughness)
-{
-    return F0 + (max((1.0 - roughness).xxx, F0) - F0) * pow(1.0 - cosTheta, 5.0);
-}
-
-// Specular BRDF composition --------------------------------------------
-
 float3 prefilteredReflection(float3 R, float roughness)
 {
     const float MAX_REFLECTION_LOD = 9.0; // todo: param/const
@@ -121,35 +80,6 @@ float3 prefilteredReflection(float3 R, float roughness)
     float3 a = prefilteredMapSampler.SampleLevel(R, lodf).rgb;
     float3 b = prefilteredMapSampler.SampleLevel(R, lodc).rgb;
     return lerp(a, b, lod - lodf);
-}
-
-float3 SpecularContribution(float3 L, float3 V, float3 N, float3 F0, float3 albedo, float metallic, float roughness)
-{
-    // Precalculate vectors and dot products
-    float3 H = normalize(V + L);
-    float dotNH = clamp(dot(N, H), 0.0, 1.0);
-    float dotNV = clamp(dot(N, V), 0.0, 1.0);
-    float dotNL = clamp(dot(N, L), 0.0, 1.0);
-    float dotHV = clamp(dot(H, V), 0.0, 1.0);
-
-    // Light color fixed
-    float3 lightColor = float3(1.0, 1.0, 1.0);
-
-    float3 color = float3(0.0, 0.0, 0.0);
-
-    if (dotNL > 0.0) {
-        // D = Normal distribution (Distribution of the microfacets)
-        float D = D_GGX(dotNH, roughness);
-        // G = Geometric shadowing term (Microfacets shadowing)
-        float G = G_SchlicksmithGGX(dotNL, dotNV, roughness);
-        // F = Fresnel factor (Reflectance depending on angle of incidence)
-        float3 F = F_Schlick(dotHV, F0);
-        float3 spec = D * F * G / (4.0 * dotNL * dotNV + 0.001);
-        float3 kD = (float3(1.0, 1.0, 1.0) - F) * (1.0 - metallic);
-        color += (kD * albedo / PI + spec) * dotNL;
-    }
-
-    return color;
 }
 
 float ShadowCalculation(float3 lightDir, float3 normal, float3 fragPosWorldSpace, float viewSpaceZ)
@@ -254,26 +184,28 @@ VSOutput vertexMain(VSInput input)
     return output;
 }
 
-float3 CalculateSunlight(float3 fragPosWorldSpace, float viewSpaceZ, float3 N, float3 V, float3 F0, float3 albedo, float metallic, float roughness)
+LightResult CalculateSunlight(float3 fragPosWorldSpace, float viewSpaceZ, float3 N, float3 V, float3 F0, float3 albedo, float metallic, float roughness)
 {
     float3 lightDir = normalize(globalLighting.sunLight.xyz);
-    // TODO: Pass the sun color as parameter
 
     float shadow = ShadowCalculation(lightDir, N, fragPosWorldSpace, viewSpaceZ);
-    float3 contribution = SpecularContribution(lightDir, V, N, F0, albedo, metallic, roughness);
 
-    return contribution * (1.0 - shadow);
+    LightResult sunResult = GetDirectLight(lightDir, V, N, F0, albedo, metallic, roughness);
+    sunResult.diffuse = sunResult.diffuse * (1.0 - shadow);
+    sunResult.specular = sunResult.specular * (1.0 - shadow);
+    return sunResult;
 }
 
-float3 CalculateLight(GPULight light, float3 worldPos, float3 N, float3 V, float3 F0, float3 albedo, float metallic, float roughness)
+LightResult CalculateLight(GPULight light, float3 worldPos, float3 N, float3 V, float3 F0, float3 albedo, float metallic, float roughness)
 {
     float3 lightVec = light.position - worldPos;
     float3 L = normalize(lightVec);
 
-    float3 contrib = SpecularContribution(L, V, N, F0, albedo, metallic, roughness);
     float3 radiance = CalculateLightColor(light, worldPos);
-
-    return contrib * radiance;
+    LightResult res = GetDirectLight(L, V, N, F0, albedo, metallic, roughness);
+    res.diffuse = res.diffuse * radiance;
+    res.specular = res.specular * radiance;
+    return res;
 }
 
 [shader("fragment")]
@@ -283,8 +215,6 @@ PSOutput fragmentMain(VSOutput input)
     float3 V = normalize(scene.camPos - input.FragPos_WorldSpace);
     float3 R = reflect(-V, N);
 
-    //float metallic = perObject.material.metallic;  
-    //float roughness = perObject.material.roughness;
     float metallicTex = metallicMapSampler.Sample(input.TexCoord).r;
     float metallic = clamp(metallicTex * perObject.material.metallic, 0.0, 1.0);
     float roughnessTex = roughnessMapSampler.Sample(input.TexCoord).r;
@@ -306,33 +236,43 @@ PSOutput fragmentMain(VSOutput input)
 	// Specular contribution
 	float3 Lo = float3(0.0, 0.0, 0.0);
 
-    Lo += CalculateSunlight(input.FragPos_WorldSpace, input.ViewSpaceZ, N, V, F0, albedo, metallic, roughness);
+    float3 totalDiffuse = float3(0.0);
+    float3 totalSpecular = float3(0.0);
+
+    LightResult sunResult =  CalculateSunlight(input.FragPos_WorldSpace, input.ViewSpaceZ, N, V, F0, albedo, metallic, roughness);
+    totalDiffuse += sunResult.diffuse;
+    totalSpecular += sunResult.specular;
 
     for (int i = 0; i < scene.lightCount; i++) {
         GPULight light = sceneLights[i];
 
-        Lo += CalculateLight(light, input.FragPos_WorldSpace, N, V, F0, albedo, metallic, roughness);
+        LightResult lightResult = CalculateLight(light, input.FragPos_WorldSpace, N, V, F0, albedo, metallic, roughness);
+        totalDiffuse += lightResult.diffuse;
+        totalSpecular += lightResult.specular;
     }
+
+    Lo = totalDiffuse + totalSpecular;
 
     //float3 sampleN = float3(N.x, -N.y, N.z);
     //float3 sampleR = float3(R.x, -R.y, R.z);
 
+    float3 coloredAO = GTAOMultiBounce(ao, albedo);
+
+    // IBL
     float2 brdf = samplerBRDFLUT.Sample(float2(max(dot(N, V), 0.0), roughness)).rg;
     float3 reflection = prefilteredReflection(R, roughness).rgb;
     float3 irradiance = samplerIrradiance.Sample(N).rgb;
 
-    // Diffuse based on irradiance
-    float3 diffuse = irradiance * albedo;
-
+    // Diffuse indirect
     float3 F = F_SchlickR(max(dot(N, V), 0.0), F0, roughness);
+    float3 kD = (1.0 - F) * (1.0 - metallic);
+    float3 indirectDiffuse = irradiance * albedo * kD * coloredAO;
 
-    // Specular reflectance
-    float3 specular = reflection * (F * brdf.x + brdf.y);
+    // Specular indirect
+    float specularOcclusion = GetSpecularOcclusion(max(dot(N, V), 0.0), ao, roughness);
+    float3 indirectSpecular = reflection * (F * brdf.x + brdf.y) * specularOcclusion;
 
-    // Ambient part
-    float3 kD = 1.0 - F;
-    kD *= 1.0 - metallic;
-    float3 ambient = (kD * diffuse + specular) * ao;
+    float3 ambient = (kD * indirectDiffuse + indirectSpecular) * ao;
 
     float3 color = ambient + Lo;
 
