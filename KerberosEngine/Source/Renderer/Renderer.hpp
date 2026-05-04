@@ -44,6 +44,13 @@ namespace Kerberos
 		uint32_t EntityID = 0;
 	};
 
+	enum class AntiAliasingMode
+	{
+		None = 0,
+		FXAA = 1,
+		TAA = 2
+	};
+
 	class Renderer
 	{
 	public:
@@ -75,6 +82,7 @@ namespace Kerberos
 		static float& GetExposure();
 		static uint32_t GetShadowMapCascadeCount();
 		static uint32_t GetShadowMapResolution();
+		static AntiAliasingMode& GetAntiAliasingMode();
 
 		static glm::vec2 GetOutputImageSize();
 
@@ -134,5 +142,7 @@ namespace Kerberos
 		static void SetupTransparencyDescriptors();
 		static void CreateGTAOImage(uint32_t width, uint32_t height);
 		static void SetupGTAODescriptors();
+		static void CreateFXAAImage(uint32_t width, uint32_t height);
+		static void SetupFXAADescriptors();
 	};
 }

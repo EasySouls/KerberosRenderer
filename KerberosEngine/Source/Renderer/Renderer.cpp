@@ -191,6 +191,7 @@ namespace
 		vk::raii::DescriptorSetLayout textures = nullptr;
 		vk::raii::DescriptorSetLayout composite = nullptr;
 		vk::raii::DescriptorSetLayout gtao = nullptr;
+		vk::raii::DescriptorSetLayout fxaa = nullptr;
 	};
 
 	struct SceneUniformData
@@ -246,6 +247,11 @@ namespace
 		float temporalIndex;  // For jittering over time
 	};
 
+	struct FXAAPushConstants
+	{
+		glm::vec2 inverseViewportSize{ 0.0f, 0.0f };
+	};
+
 	struct UniformBufferObject
 	{
 		Ref<UniformBuffer> scene;
@@ -266,6 +272,7 @@ namespace
 		vk::raii::DescriptorSet skybox = nullptr;
 		vk::raii::DescriptorSet composite = nullptr;
 		vk::raii::DescriptorSet gtao = nullptr;
+		vk::raii::DescriptorSet fxaa = nullptr;
 	};
 
 	struct PendingSceneRender
@@ -310,6 +317,7 @@ namespace
 		ImageData ColorImage;
 		ImageData DepthImage;
 		ImageData NormalImage;
+		ImageData ResolveImage;
 		ImageData CompositeImage;
 		ImageData PickingImage;
 		ImageData GTAOImage;
@@ -328,11 +336,14 @@ namespace
 		Ref<GraphicsPipeline> PBRRayQueryShadowsPipeline = nullptr;
 		Ref<GraphicsPipeline> PBRRayQuerySoftShadowsPipeline = nullptr;
 
+		vk::raii::PipelineLayout GTAOPipelineLayout = nullptr;
+		Ref<ComputePipeline> GTAOPipeline = nullptr;
+
 		vk::raii::PipelineLayout CompositePipelineLayout = nullptr;
 		Ref<GraphicsPipeline> CompositePipeline = nullptr;
 
-		vk::raii::PipelineLayout GTAOPipelineLayout = nullptr;
-		Ref<ComputePipeline> GTAOPipeline = nullptr;
+		vk::raii::PipelineLayout FXAAPipelineLayout = nullptr;
+		Ref<GraphicsPipeline> FXAAPipeline = nullptr;
 
 		vk::raii::Sampler ColorSampler = nullptr;
 		vk::raii::Sampler ShadowMapSampler = nullptr;
@@ -380,6 +391,8 @@ namespace
 		bool UseGTAO = true;
 		vk::ImageLayout GTAOImageLayout = vk::ImageLayout::eUndefined;
 		bool PreviousUseGTAO = true;
+
+		AntiAliasingMode AntiAliasingMode = AntiAliasingMode::FXAA;
 	};
 
 }
@@ -1475,8 +1488,8 @@ namespace Kerberos
 			}
 		}
 
-		// Transition all images needed for the composite pass to shader read optimal (color, depth, accumulation, revealage, distortion)
-		// and transition composite image to color attachment optimal
+		// Transition all images needed for the resolve pass to shader read optimal (color, depth, accumulation, revealage, distortion)
+		// and transition resolve image to color attachment optimal
 		{
 			std::array<vk::ImageMemoryBarrier2, 6> barriers;
 			std::array<vk::ImageLayout, 6> oldLayouts = {
@@ -1485,7 +1498,7 @@ namespace Kerberos
 				vk::ImageLayout::eColorAttachmentOptimal, // Accumulation image
 				vk::ImageLayout::eColorAttachmentOptimal, // Revealage image
 				vk::ImageLayout::eColorAttachmentOptimal,  // Distortion image
-				vk::ImageLayout::eShaderReadOnlyOptimal   // Composite image
+				vk::ImageLayout::eShaderReadOnlyOptimal   // Resolve image
 			};
 			std::array<vk::ImageLayout, 6> newLayouts = {
 				vk::ImageLayout::eShaderReadOnlyOptimal, // Color image
@@ -1493,7 +1506,7 @@ namespace Kerberos
 				vk::ImageLayout::eShaderReadOnlyOptimal, // Accumulation image
 				vk::ImageLayout::eShaderReadOnlyOptimal, // Revealage image
 				vk::ImageLayout::eShaderReadOnlyOptimal,  // Distortion image
-				vk::ImageLayout::eColorAttachmentOptimal   // Composite image
+				vk::ImageLayout::eColorAttachmentOptimal   // Resolve image
 			};
 			std::array<vk::AccessFlags2, 6> srcAccessMasks = {
 				vk::AccessFlagBits2::eColorAttachmentWrite, // Color image
@@ -1501,7 +1514,7 @@ namespace Kerberos
 				vk::AccessFlagBits2::eColorAttachmentWrite, // Accumulation image
 				vk::AccessFlagBits2::eColorAttachmentWrite, // Revealage image
 				vk::AccessFlagBits2::eColorAttachmentWrite,  // Distortion image
-				vk::AccessFlagBits2::eColorAttachmentWrite   // Composite image
+				vk::AccessFlagBits2::eColorAttachmentWrite   // Resolve image
 			};
 			std::array<vk::PipelineStageFlags2, 6> srcStageMasks = {
 				vk::PipelineStageFlagBits2::eColorAttachmentOutput, // Color image
@@ -1509,7 +1522,7 @@ namespace Kerberos
 				vk::PipelineStageFlagBits2::eColorAttachmentOutput, // Accumulation image
 				vk::PipelineStageFlagBits2::eColorAttachmentOutput, // Revealage image
 				vk::PipelineStageFlagBits2::eColorAttachmentOutput,  // Distortion image
-				vk::PipelineStageFlagBits2::eColorAttachmentOutput   // Composite image
+				vk::PipelineStageFlagBits2::eColorAttachmentOutput   // Resolve image
 			};
 			std::array<vk::AccessFlags2, 6> dstAccessMasks = {
 				vk::AccessFlagBits2::eShaderRead, // Color image
@@ -1517,7 +1530,7 @@ namespace Kerberos
 				vk::AccessFlagBits2::eShaderRead, // Accumulation image
 				vk::AccessFlagBits2::eShaderRead, // Revealage image
 				vk::AccessFlagBits2::eShaderRead,  // Distortion image
-				vk::AccessFlagBits2::eColorAttachmentWrite   // Composite image
+				vk::AccessFlagBits2::eColorAttachmentWrite   // Resolve image
 			};
 			std::array<vk::PipelineStageFlags2, 6> dstStageMasks = {
 				vk::PipelineStageFlagBits2::eFragmentShader, // Color image
@@ -1525,7 +1538,7 @@ namespace Kerberos
 				vk::PipelineStageFlagBits2::eFragmentShader, // Accumulation image
 				vk::PipelineStageFlagBits2::eFragmentShader, // Revealage image
 				vk::PipelineStageFlagBits2::eFragmentShader,  // Distortion image
-				vk::PipelineStageFlagBits2::eColorAttachmentOutput   // Composite image
+				vk::PipelineStageFlagBits2::eColorAttachmentOutput   // Resolve image
 			};
 			std::array<vk::Image, 6> images = {
 				*s_Data->ColorImage.Image,
@@ -1533,7 +1546,7 @@ namespace Kerberos
 				*s_Data->Transparency.AccumulationImage.Image,
 				*s_Data->Transparency.RevealageImage.Image,
 				*s_Data->Transparency.DistortionImage.Image,
-				*s_Data->CompositeImage.Image
+				*s_Data->ResolveImage.Image
 			};
 
 			for (size_t i = 0; i < barriers.size(); ++i)
@@ -1571,7 +1584,7 @@ namespace Kerberos
 			//WriteGPUTimestamp(cmd, frameIndex, static_cast<uint32_t>(GPUTimestampQuery::TransparencyResolveBegin));
 
 			vk::RenderingAttachmentInfo colorAttachmentInfo{
-				.imageView = s_Data->CompositeImage.ImageView,
+				.imageView = s_Data->ResolveImage.ImageView,
 				.imageLayout = vk::ImageLayout::eColorAttachmentOptimal,
 				.loadOp = vk::AttachmentLoadOp::eClear,
 				.storeOp = vk::AttachmentStoreOp::eStore,
@@ -1604,6 +1617,96 @@ namespace Kerberos
 			KBR_CORE_TRACE("Transparency resolve pass done!");
 		}
 
+		// FXAA
+		{
+			// Transfer resolve image from color attachment optimal to shader read optimal for FXAA sampling
+			// and transition composite image to color attachment optimal for it will be the render target
+			{
+				const vk::ImageMemoryBarrier2 sceneColorBarrier = {
+					.srcStageMask = vk::PipelineStageFlagBits2::eColorAttachmentOutput,
+					.srcAccessMask = vk::AccessFlagBits2::eColorAttachmentWrite,
+					.dstStageMask = vk::PipelineStageFlagBits2::eFragmentShader,
+					.dstAccessMask = vk::AccessFlagBits2::eShaderRead,
+					.oldLayout = vk::ImageLayout::eColorAttachmentOptimal,
+					.newLayout = vk::ImageLayout::eShaderReadOnlyOptimal,
+					.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+					.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+					.image = s_Data->ResolveImage.Image,
+					.subresourceRange = {
+						.aspectMask = vk::ImageAspectFlagBits::eColor,
+						.baseMipLevel = 0,
+						.levelCount = 1,
+						.baseArrayLayer = 0,
+						.layerCount = 1
+					}
+				};
+
+				const vk::ImageMemoryBarrier2 compositeImageBarrier = {
+					.srcStageMask = vk::PipelineStageFlagBits2::eFragmentShader,
+					.srcAccessMask = vk::AccessFlagBits2::eShaderRead,
+					.dstStageMask = vk::PipelineStageFlagBits2::eColorAttachmentOutput,
+					.dstAccessMask = vk::AccessFlagBits2::eColorAttachmentWrite,
+					.oldLayout = vk::ImageLayout::eShaderReadOnlyOptimal,
+					.newLayout = vk::ImageLayout::eColorAttachmentOptimal,
+					.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+					.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+					.image = s_Data->CompositeImage.Image,
+					.subresourceRange = {
+						.aspectMask = vk::ImageAspectFlagBits::eColor,
+						.baseMipLevel = 0,
+						.levelCount = 1,
+						.baseArrayLayer = 0,
+						.layerCount = 1
+					}
+				};
+
+				const std::array barriers = { sceneColorBarrier, compositeImageBarrier };
+
+				const vk::DependencyInfo dependencyInfo = {
+					.dependencyFlags = {},
+					.imageMemoryBarrierCount = barriers.size(),
+					.pImageMemoryBarriers = barriers.data()
+				};
+
+				cmd.pipelineBarrier2(dependencyInfo);
+			}
+
+			vk::RenderingAttachmentInfo colorAttachmentInfo{
+				.imageView = s_Data->CompositeImage.ImageView,
+				.imageLayout = vk::ImageLayout::eColorAttachmentOptimal,
+				.loadOp = vk::AttachmentLoadOp::eClear,
+				.storeOp = vk::AttachmentStoreOp::eStore,
+				.clearValue = vk::ClearColorValue{ std::array{0.0f, 0.0f, 0.0f, 1.0f} }
+			};
+			const vk::RenderingInfo renderingInfo{
+				.renderArea = renderArea,
+				.layerCount = 1,
+				.colorAttachmentCount = 1,
+				.pColorAttachments = &colorAttachmentInfo,
+				.pDepthAttachment = nullptr
+			};
+			cmd.beginRendering(renderingInfo);
+			cmd.setViewport(0, viewport);
+			cmd.setScissor(0, renderArea);
+
+			s_Data->FXAAPipeline->Bind(cmd);
+
+			cmd.bindDescriptorSets(
+				vk::PipelineBindPoint::eGraphics,
+				*s_Data->FXAAPipelineLayout,
+				0,
+				*s_Data->DescriptorSets[currentImage].fxaa,
+				{});
+
+			FXAAPushConstants pushConstants;
+			pushConstants.inverseViewportSize = glm::vec2(1.0f) / s_Data->OutputSize;
+			cmd.pushConstants<FXAAPushConstants>(*s_Data->FXAAPipelineLayout, vk::ShaderStageFlagBits::eFragment, 0, { pushConstants });
+
+			cmd.draw(3, 1, 0, 0);
+
+			cmd.endRendering();
+		}
+
 		HandleMousePickingReadback(cmd);
 
 		// Transition composite image layout for shader read in ImGui
@@ -1633,7 +1736,7 @@ namespace Kerberos
 			};
 			cmd.pipelineBarrier2(dependencyInfo);
 
-			KBR_CORE_TRACE("Composite image transitioned for ImGui!");
+			KBR_CORE_TRACE("Resolve image transitioned for ImGui!");
 		}
 
 		WriteGPUTimestamp(cmd, frameIndex, static_cast<uint32_t>(GPUTimestampQuery::FrameEnd));
@@ -2069,7 +2172,7 @@ namespace Kerberos
 			);
 
 			// TODO: Check format
-			s_Data->CompositeImage.Format = context.FindSupportedFormat(
+			s_Data->ResolveImage.Format = context.FindSupportedFormat(
 				{ vk::Format::eR32G32B32A32Sfloat, vk::Format::eR32G32B32A32Uint },
 				vk::ImageTiling::eOptimal,
 				vk::FormatFeatureFlagBits::eColorAttachment | vk::FormatFeatureFlagBits::eSampledImage
@@ -2084,25 +2187,25 @@ namespace Kerberos
 						initialImageHeight,
 						mipLevels,
 						vk::SampleCountFlagBits::e1,
-						s_Data->CompositeImage.Format,
+						s_Data->ResolveImage.Format,
 						vk::ImageTiling::eOptimal,
 						vk::ImageUsageFlagBits::eColorAttachment | vk::ImageUsageFlagBits::eSampled,
 						vk::MemoryPropertyFlagBits::eDeviceLocal,
-						s_Data->CompositeImage.Image,
-						s_Data->CompositeImage.ImageMemory);
+						s_Data->ResolveImage.Image,
+						s_Data->ResolveImage.ImageMemory);
 
-			context.SetObjectDebugName(reinterpret_cast<uint64_t>(static_cast<VkImage>(*s_Data->CompositeImage.Image)),
+			context.SetObjectDebugName(reinterpret_cast<uint64_t>(static_cast<VkImage>(*s_Data->ResolveImage.Image)),
 									   vk::ObjectType::eImage,
-									   "CompositeImage Image");
+									   "Resolve Image");
 
-			context.SetObjectDebugName(reinterpret_cast<uint64_t>(static_cast<VkDeviceMemory>(*s_Data->CompositeImage.ImageMemory)),
+			context.SetObjectDebugName(reinterpret_cast<uint64_t>(static_cast<VkDeviceMemory>(*s_Data->ResolveImage.ImageMemory)),
 									   vk::ObjectType::eDeviceMemory,
-									   "CompositeImage Image Memory");
+									   "Resolve Image Memory");
 
-			s_Data->CompositeImage.ImageView = CreateImageView(device, s_Data->CompositeImage.Image, s_Data->CompositeImage.Format, vk::ImageAspectFlagBits::eColor, mipLevels);
-			context.SetObjectDebugName(reinterpret_cast<uint64_t>(static_cast<VkImageView>(*s_Data->CompositeImage.ImageView)),
+			s_Data->ResolveImage.ImageView = CreateImageView(device, s_Data->ResolveImage.Image, s_Data->ResolveImage.Format, vk::ImageAspectFlagBits::eColor, mipLevels);
+			context.SetObjectDebugName(reinterpret_cast<uint64_t>(static_cast<VkImageView>(*s_Data->ResolveImage.ImageView)),
 									   vk::ObjectType::eImageView,
-									   "CompositeImage Image View");
+									   "Resolve Image View");
 
 			CreateImage(device,
 						initialImageWidth,
@@ -2469,11 +2572,95 @@ namespace Kerberos
 			compositePipelineSpec.EnableDepthTest = false;
 			compositePipelineSpec.EnableDepthWrite = false;
 			compositePipelineSpec.BlendModes = { BlendMode::None };
-			compositePipelineSpec.ColorAttachmentFormats = { s_Data->CompositeImage.Format };
+			compositePipelineSpec.ColorAttachmentFormats = { s_Data->ResolveImage.Format };
 			compositePipelineSpec.DepthAttachmentFormat = std::nullopt;
 			compositePipelineSpec.DynamicStates = commonDynamicStates;
 
 			s_Data->CompositePipeline = CreateRef<GraphicsPipeline>(compositePipelineSpec);
+		}
+
+		// Create fxaa pipeline resources
+		{
+			constexpr uint32_t initialImageWidth = 1920;
+			constexpr uint32_t initialImageHeight = 1080;
+
+			std::vector<vk::DescriptorSetLayoutBinding> bindings = {
+			vk::DescriptorSetLayoutBinding{ // Scene color with Luma
+				.binding = 0,
+				.descriptorType = vk::DescriptorType::eSampledImage,
+				.descriptorCount = 1,
+				.stageFlags = vk::ShaderStageFlagBits::eFragment,
+				.pImmutableSamplers = nullptr
+			},
+			vk::DescriptorSetLayoutBinding{ // Linear sampler
+				.binding = 1,
+				.descriptorType = vk::DescriptorType::eSampler,
+				.descriptorCount = 1,
+				.stageFlags = vk::ShaderStageFlagBits::eFragment,
+				.pImmutableSamplers = nullptr
+			},
+			};
+
+			const vk::DescriptorSetLayoutCreateInfo layoutInfo{
+				.bindingCount = static_cast<uint32_t>(bindings.size()),
+				.pBindings = bindings.data()
+			};
+
+			s_Data->DescriptorSetLayouts.fxaa = vk::raii::DescriptorSetLayout{ device, layoutInfo };
+			context.SetObjectDebugName(s_Data->DescriptorSetLayouts.fxaa, "FXAA Descriptor Set Layout");
+
+			const std::array setLayouts = {
+				*s_Data->DescriptorSetLayouts.fxaa
+			};
+
+			constexpr vk::PushConstantRange fxaaPushConstantRange{
+				.stageFlags = vk::ShaderStageFlagBits::eFragment,
+				.offset = 0,
+				.size = sizeof(FXAAPushConstants)
+			};
+
+			vk::PipelineLayoutCreateInfo fxaaPipelineLayoutInfo{
+				.setLayoutCount = static_cast<uint32_t>(setLayouts.size()),
+				.pSetLayouts = setLayouts.data(),
+				.pushConstantRangeCount = 1,
+				.pPushConstantRanges = &fxaaPushConstantRange
+			};
+
+			s_Data->FXAAPipelineLayout = vk::raii::PipelineLayout{ device, fxaaPipelineLayoutInfo };
+			context.SetObjectDebugName(s_Data->FXAAPipelineLayout, "FXAA Pipeline Layout");
+
+			s_Data->CompositeImage.Format = context.FindSupportedFormat(
+				{ vk::Format::eR32G32B32A32Sfloat, vk::Format::eR32G32B32A32Uint },
+				vk::ImageTiling::eOptimal,
+				vk::FormatFeatureFlagBits::eColorAttachment | vk::FormatFeatureFlagBits::eSampledImage
+			);
+
+			// Sanity check
+			KBR_CORE_ASSERT(s_Data->CompositeImage.Format == s_Data->ResolveImage.Format, "FXAA composite image format does not match resolve image format!");
+
+			CreateFXAAImage(initialImageWidth, initialImageHeight);
+			SetupFXAADescriptors();
+
+			Ref<Shader> fxaaShader = CreateRef<Shader>("fxaa", "FXAA");
+
+			GraphicsPipelineSpecification fxaaPipelineSpec{};
+			fxaaPipelineSpec.Name = "FXAA Pipeline";
+			fxaaPipelineSpec.Shader = fxaaShader;
+			fxaaPipelineSpec.PipelineLayout = *s_Data->FXAAPipelineLayout;
+			fxaaPipelineSpec.BindingDescription = {};
+			fxaaPipelineSpec.InputAttributeDescriptions = {};
+			fxaaPipelineSpec.SampleCount = vk::SampleCountFlagBits::e1;
+			fxaaPipelineSpec.CullMode = CullMode::None;
+			fxaaPipelineSpec.EnableDepthClamp = false;
+			fxaaPipelineSpec.EnableDepthBias = false;
+			fxaaPipelineSpec.EnableDepthTest = false;
+			fxaaPipelineSpec.EnableDepthWrite = false;
+			fxaaPipelineSpec.BlendModes = { BlendMode::None };
+			fxaaPipelineSpec.ColorAttachmentFormats = { s_Data->CompositeImage.Format };
+			fxaaPipelineSpec.DepthAttachmentFormat = std::nullopt;
+			fxaaPipelineSpec.DynamicStates = commonDynamicStates;
+
+			s_Data->FXAAPipeline = CreateRef<GraphicsPipeline>(fxaaPipelineSpec);
 		}
 
 		// Transition composite and color output images to shader read layout
@@ -2487,7 +2674,7 @@ namespace Kerberos
 				.newLayout = vk::ImageLayout::eShaderReadOnlyOptimal,
 				.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
 				.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-				.image = s_Data->CompositeImage.Image,
+				.image = s_Data->ResolveImage.Image,
 				.subresourceRange = {
 					.aspectMask = vk::ImageAspectFlagBits::eColor,
 					.baseMipLevel = 0,
@@ -2593,6 +2780,9 @@ namespace Kerberos
 		s_Data->Transparency.RevealageImage.ImageView.clear();
 		s_Data->Transparency.RevealageImage.Image.clear();
 		s_Data->Transparency.RevealageImage.ImageMemory.clear();
+		s_Data->ResolveImage.ImageView.clear();
+		s_Data->ResolveImage.Image.clear();
+		s_Data->ResolveImage.ImageMemory.clear();
 		s_Data->CompositeImage.ImageView.clear();
 		s_Data->CompositeImage.Image.clear();
 		s_Data->CompositeImage.ImageMemory.clear();
@@ -2605,30 +2795,26 @@ namespace Kerberos
 
 		// Recreate resources with new size
 
+		CreateFXAAImage(width, height);
+
 		CreateImage(device,
 					width,
 					height,
 					mipLevels,
 					vk::SampleCountFlagBits::e1,
-					s_Data->CompositeImage.Format,
+					s_Data->ResolveImage.Format,
 					vk::ImageTiling::eOptimal,
 					vk::ImageUsageFlagBits::eColorAttachment | vk::ImageUsageFlagBits::eSampled,
 					vk::MemoryPropertyFlagBits::eDeviceLocal,
-					s_Data->CompositeImage.Image,
-					s_Data->CompositeImage.ImageMemory);
+					s_Data->ResolveImage.Image,
+					s_Data->ResolveImage.ImageMemory);
 
-		context.SetObjectDebugName(reinterpret_cast<uint64_t>(static_cast<VkImage>(*s_Data->CompositeImage.Image)),
-								   vk::ObjectType::eImage,
-								   "CompositeImage Image");
+		context.SetObjectDebugName(s_Data->ResolveImage.Image, "Resolve Image");
 
-		context.SetObjectDebugName(reinterpret_cast<uint64_t>(static_cast<VkDeviceMemory>(*s_Data->CompositeImage.ImageMemory)),
-								   vk::ObjectType::eDeviceMemory,
-								   "CompositeImage Image Memory");
+		context.SetObjectDebugName(s_Data->ResolveImage.ImageMemory, "Resolve Image Memory");
 
-		s_Data->CompositeImage.ImageView = CreateImageView(device, s_Data->CompositeImage.Image, s_Data->CompositeImage.Format, vk::ImageAspectFlagBits::eColor, mipLevels);
-		context.SetObjectDebugName(reinterpret_cast<uint64_t>(static_cast<VkImageView>(*s_Data->CompositeImage.ImageView)),
-								   vk::ObjectType::eImageView,
-								   "CompositeImage Image View");
+		s_Data->ResolveImage.ImageView = CreateImageView(device, s_Data->ResolveImage.Image, s_Data->ResolveImage.Format, vk::ImageAspectFlagBits::eColor, mipLevels);
+		context.SetObjectDebugName(s_Data->ResolveImage.ImageView,"Resolve Image View");
 
 		CreateImage(device,
 					width,
@@ -2842,6 +3028,31 @@ namespace Kerberos
 			}
 		}
 
+		// Update the FXAA descriptor set to use the resized color image, in this case the resolved image
+		{
+			const vk::DescriptorImageInfo sceneColorWithLumaImageInfo = {
+				.sampler = nullptr,
+				.imageView = s_Data->ResolveImage.ImageView,
+				.imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal
+			};
+
+			for (size_t frameIndex = 0; frameIndex < VulkanContext::MaxFramesInFlight; frameIndex++)
+			{
+				const std::array descriptorWrites = {
+					vk::WriteDescriptorSet{
+							.dstSet = *s_Data->DescriptorSets[frameIndex].fxaa,
+							.dstBinding = 0,
+							.dstArrayElement = 0,
+							.descriptorCount = 1,
+							.descriptorType = vk::DescriptorType::eSampledImage,
+							.pImageInfo = &sceneColorWithLumaImageInfo
+					},
+				};
+
+				device.updateDescriptorSets(descriptorWrites, nullptr);
+			}
+		}
+
 		// Transition composite and color output image to shader read layout
 		{
 			const vk::ImageMemoryBarrier2 compositeImageBarrier = {
@@ -3022,6 +3233,11 @@ namespace Kerberos
 	uint32_t Renderer::GetShadowMapResolution() 
 	{
 		return s_Data->ShadowMap.Size;
+	}
+
+	AntiAliasingMode& Renderer::GetAntiAliasingMode()
+	{
+		return s_Data->AntiAliasingMode;
 	}
 
 	glm::vec2 Renderer::GetOutputImageSize() 
@@ -3578,6 +3794,14 @@ namespace Kerberos
 			},
 			vk::DescriptorPoolSize{
 				.type = vk::DescriptorType::eStorageImage,
+				.descriptorCount = 10
+			},
+			vk::DescriptorPoolSize{
+				.type = vk::DescriptorType::eSampledImage,
+				.descriptorCount = 20
+			},
+			vk::DescriptorPoolSize{
+				.type = vk::DescriptorType::eSampler,
 				.descriptorCount = 10
 			},
 		};
@@ -4319,6 +4543,97 @@ namespace Kerberos
 					.descriptorType = vk::DescriptorType::eStorageImage,
 					.pImageInfo = &gtaoStorageImageInfo
 				}
+			};
+
+			device.updateDescriptorSets(descriptorWrites, {});
+		}
+	}
+
+	void Renderer::CreateFXAAImage(const uint32_t width, const uint32_t height) 
+	{
+		KBR_CORE_ASSERT(s_Data->CompositeImage.Format != vk::Format::eUndefined, "Composite image format has to be set before creating composite image!");
+
+		auto& context = VulkanContext::Get();
+		const auto& device = context.GetDevice();
+
+		constexpr uint32_t mipLevels = 1;
+
+		CreateImage(device,
+					width,
+					height,
+					mipLevels,
+					vk::SampleCountFlagBits::e1,
+					s_Data->CompositeImage.Format,
+					vk::ImageTiling::eOptimal,
+					vk::ImageUsageFlagBits::eColorAttachment | vk::ImageUsageFlagBits::eSampled,
+					vk::MemoryPropertyFlagBits::eDeviceLocal,
+					s_Data->CompositeImage.Image,
+					s_Data->CompositeImage.ImageMemory);
+
+		context.SetObjectDebugName(s_Data->CompositeImage.Image, "Composite Image");
+		context.SetObjectDebugName(s_Data->CompositeImage.ImageMemory, "Composite Image Memory");
+
+		s_Data->CompositeImage.ImageView = CreateImageView(device,
+													  s_Data->CompositeImage.Image,
+													  s_Data->CompositeImage.Format, vk::ImageAspectFlagBits::eColor,
+													  mipLevels);
+		context.SetObjectDebugName(s_Data->CompositeImage.ImageView, "Composite Image View");
+	}
+
+	void Renderer::SetupFXAADescriptors() 
+	{
+		KBR_CORE_ASSERT(s_Data->DescriptorPool != nullptr, "Descriptor pool has to be created before setting up FXAA descriptors");
+		KBR_CORE_ASSERT(s_Data->DescriptorSetLayouts.fxaa != nullptr, "FXAA descriptor set layout has to be created before setting up FXAA descriptors");
+
+		auto& context = VulkanContext::Get();
+		const auto& device = context.GetDevice();
+
+		const std::vector<vk::DescriptorSetLayout> fxaaSetLayouts(
+			s_Data->DescriptorSets.size(),
+			*s_Data->DescriptorSetLayouts.fxaa);
+
+		const vk::DescriptorSetAllocateInfo allocInfo{
+			.descriptorPool = *s_Data->DescriptorPool,
+			.descriptorSetCount = static_cast<uint32_t>(s_Data->DescriptorSets.size()),
+			.pSetLayouts = fxaaSetLayouts.data()
+		};
+
+		std::vector<vk::raii::DescriptorSet> fxaaDescriptorSets = device.allocateDescriptorSets(allocInfo);
+
+		for (uint32_t i = 0; i < VulkanContext::MaxFramesInFlight; i++)
+		{
+			s_Data->DescriptorSets[i].fxaa = std::move(fxaaDescriptorSets[i]);
+			context.SetObjectDebugName(s_Data->DescriptorSets[i].fxaa, "FXAA Descriptor Set[" + std::to_string(i) + "]");
+
+			const vk::DescriptorImageInfo sceneColorWithLumaImageInfo{
+				.sampler = nullptr,
+				.imageView = *s_Data->ResolveImage.ImageView,
+				.imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal
+			};
+
+			const vk::DescriptorImageInfo linearSamplerInfo{
+				.sampler = *s_Data->LinearSampler,
+				.imageView = nullptr,
+				.imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal
+			};
+
+			const std::vector descriptorWrites = {
+				vk::WriteDescriptorSet{
+					.dstSet = *s_Data->DescriptorSets[i].fxaa,
+					.dstBinding = 0,
+					.dstArrayElement = 0,
+					.descriptorCount = 1,
+					.descriptorType = vk::DescriptorType::eSampledImage,
+					.pImageInfo = &sceneColorWithLumaImageInfo
+				},
+				vk::WriteDescriptorSet{
+					.dstSet = *s_Data->DescriptorSets[i].fxaa,
+					.dstBinding = 1,
+					.dstArrayElement = 0,
+					.descriptorCount = 1,
+					.descriptorType = vk::DescriptorType::eSampler,
+					.pImageInfo = &linearSamplerInfo
+				},
 			};
 
 			device.updateDescriptorSets(descriptorWrites, {});

@@ -84,5 +84,8 @@ float4 resolveMain(VSOutput input) : SV_Target
     //// Gamma correction
     finalColor = pow(finalColor, (1.0f / globalLighting.gamma).xxx);
 
-    return float4(finalColor, 1.0f);
+    // Calculate Luma (perceptual brightness) for FXAA
+    float luma = dot(finalColor, float3(0.299, 0.587, 0.114));
+
+    return float4(finalColor, luma);
 }
