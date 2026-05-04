@@ -171,6 +171,65 @@ float2 Hammersley2D(int i, int N)
     return float2(u, v);
 }
 
+// --- RTAO Helper Functions ---
+
+[SpecializationConstant] const int rtaoSampleCount = 16;
+static const float rtaoRadius = 3;
+
+// Interleaved Gradient Noise for per-pixel randomness to avoid banding
+float InterleavedGradientNoise(float2 pixelPos)
+{
+    return frac(52.9829189 * frac(dot(pixelPos, float2(0.06711056, 0.00583715))));
+}
+
+// Generate Tangent and Bitangent vectors from a Normal
+void CreateONB(float3 n, out float3 t, out float3 b)
+{
+    float3 up = abs(n.z) < 0.999 ? float3(0.0, 0.0, 1.0) : float3(1.0, 0.0, 0.0);
+    t = normalize(cross(up, n));
+    b = cross(n, t);
+}
+
+// Map a 2D sequence point to a 3D cosine-weighted hemisphere direction
+float3 CosineSampleHemisphere(float2 u, float angleOffset)
+{
+    float phi = 2.0 * PI * u.x + angleOffset;
+    float cosTheta = sqrt(1.0 - u.y);
+    float sinTheta = sqrt(u.y);
+    return float3(cos(phi) * sinTheta, sin(phi) * sinTheta, cosTheta);
+}
+
+float CalculateRTAO(float3 worldPos, float3 N, float2 pixelPos)
+{
+    if (rtaoSampleCount <= 0) return 1.0;
+
+    float3 t, b;
+    CreateONB(N, t, b);
+
+    // Get a random angle offset based on the screen pixel coordinate
+    float noise = InterleavedGradientNoise(pixelPos);
+    float angleOffset = 2.0 * PI * noise;
+
+    float occlusionAcc = 0.0;
+
+    for (int i = 0; i < rtaoSampleCount; i++) {
+        // Get low-discrepancy 2D point
+        float2 xi = Hammersley2D(i, rtaoSampleCount);
+
+        // Convert to hemisphere vector
+        float3 dirLocal = CosineSampleHemisphere(xi, angleOffset);
+
+        // Transform local vector to world space aligned with the normal
+        float3 dirWorld = normalize(t * dirLocal.x + b * dirLocal.y + N * dirLocal.z);
+
+        if (IsInShadow_RayQuery(worldPos + N * RASTER_SHADOW_EPS, dirWorld, RASTER_SHADOW_EPS, rtaoRadius)) {
+            occlusionAcc += 1.0;
+        }
+    }
+
+    return 1.0 - (occlusionAcc / (float)rtaoSampleCount);
+}
+
 float CalculateVisibility(float3 lightDir, float3 worldPos, float3 N, float shadowTMax)
 {
     float finalVisibility = 0.0;
@@ -238,7 +297,8 @@ PSOutput fragmentMain(VSOutput input)
     float2 screenUV = input.Position.xy / scene.viewportSize;
     float globalAO = globalAoTexture.Sample(screenUV).r;
     float materialAO = aoMapSampler.Sample(input.TexCoord).r;
-    float ao = globalAO * materialAO;
+    float rtao = CalculateRTAO(input.FragPos_WorldSpace, N, input.Position.xy);
+    float ao = rtao * materialAO;
 
     // Use this when working with srgb textures
     // float3 albedo = pow(albedoMapSampler.Sample(input.TexCoord).rgb * perObject.material.albedo, float3(2.2, 2.2, 2.2));
