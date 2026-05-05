@@ -1,5 +1,6 @@
 Name: white
 Albedo: [1, 1, 1, 1]
+Emissive: [0, 0, 0]
 Roughness: 0
 Metallic: 0
 AlbedoTexture: ""
@@ -7,3 +8,4 @@ NormalTexture: ""
 MetallicTexture: ""
 RoughnessTexture: ""
 AOTexture: ""
+EmissiveTexture: ""

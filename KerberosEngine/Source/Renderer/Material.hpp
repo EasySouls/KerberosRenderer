@@ -18,6 +18,7 @@ namespace Kerberos
 		struct UniformBlock
 		{
 			glm::vec4 AlbedoFactor{ 1.0f, 1.0f, 1.0f, 1.0f };
+			glm::vec3 EmissiveFactor{ 0.0f };
 			float RoughnessFactor{ 1.0f };
 			float MetallicFactor{ 0.0f };
 		};
@@ -30,6 +31,7 @@ namespace Kerberos
 		Ref<Texture2D> RoughnessTexture = nullptr;
 		Ref<Texture2D> MetallicTexture = nullptr;
 		Ref<Texture2D> AOTexture = nullptr;
+		Ref<Texture2D> EmissiveTexture = nullptr;
 
 		std::vector<vk::raii::DescriptorSet> DescriptorSets;
 
@@ -46,6 +48,7 @@ namespace Kerberos
 			Params.RoughnessFactor = r;
 			Params.MetallicFactor = m;
 			Params.AlbedoFactor = c;
+			Params.EmissiveFactor = glm::vec3(0.0f);
 		}
 
 		Material(std::string name, const glm::vec4 c, const float r, const float m,
@@ -55,6 +58,7 @@ namespace Kerberos
 			Params.RoughnessFactor = r;
 			Params.MetallicFactor = m;
 			Params.AlbedoFactor = c;
+			Params.EmissiveFactor = glm::vec3(0.0f);
 		}
 
 		Material(const Material& other)
@@ -65,6 +69,7 @@ namespace Kerberos
 			, RoughnessTexture(other.RoughnessTexture)
 			, MetallicTexture(other.MetallicTexture)
 			, AOTexture(other.AOTexture)
+			, EmissiveTexture(other.EmissiveTexture)
 		{
 		}
 
@@ -79,6 +84,7 @@ namespace Kerberos
 				MetallicTexture = other.MetallicTexture;
 				RoughnessTexture = other.RoughnessTexture;
 				AOTexture = other.AOTexture;
+				EmissiveTexture = other.EmissiveTexture;
 				// DescriptorSets intentionally not copied
 			}
 			return *this;
@@ -93,7 +99,8 @@ namespace Kerberos
 				   NormalTexture == other.NormalTexture &&
 				   RoughnessTexture == other.RoughnessTexture &&
 				   MetallicTexture == other.MetallicTexture &&
-				   AOTexture == other.AOTexture;
+				   AOTexture == other.AOTexture &&
+				   EmissiveTexture == other.EmissiveTexture;
 		}
 
 		AssetType GetType() override { return AssetType::Material; }

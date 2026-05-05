@@ -3987,6 +3987,12 @@ namespace Kerberos
 				.descriptorCount = 1,
 				.stageFlags = vk::ShaderStageFlagBits::eFragment,
 			},
+			vk::DescriptorSetLayoutBinding{ // Emissive map
+				.binding = 5,
+				.descriptorType = vk::DescriptorType::eCombinedImageSampler,
+				.descriptorCount = 1,
+				.stageFlags = vk::ShaderStageFlagBits::eFragment,
+			},
 		};
 
 		const std::vector<vk::DescriptorBindingFlags> textureBindingFlags(

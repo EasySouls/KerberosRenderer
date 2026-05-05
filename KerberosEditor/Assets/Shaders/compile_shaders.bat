@@ -25,5 +25,6 @@ if not exist "%SLANGC%" (
 "%SLANGC%" transparent.slang -target spirv -profile spirv_1_6 -emit-spirv-directly -fvk-use-entrypoint-name -entry vertexMain -entry fragmentMain -o ../Cache/Shaders/transparent.spv
 "%SLANGC%" transparency_resolve.slang -target spirv -profile spirv_1_6 -emit-spirv-directly -fvk-use-entrypoint-name -entry vertexMain -entry fragmentMain -o ../Cache/Shaders/transparency_resolve.spv
 "%SLANGC%" gtao.slang -target spirv -profile spirv_1_6 -emit-spirv-directly -fvk-use-entrypoint-name -entry computeMain -o ../Cache/Shaders/gtao.spv
+"%SLANGC%" fxaa.slang -target spirv -profile spirv_1_6 -emit-spirv-directly -fvk-use-entrypoint-name -entry computeMain -o ../Cache/Shaders/fxaa.spv
 
 PAUSE

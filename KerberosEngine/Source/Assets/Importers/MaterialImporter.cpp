@@ -33,6 +33,7 @@ namespace Kerberos
 
         const std::string name = node["Name"].as<std::string>(filepath.stem().string());
 		const glm::vec4 albedo = node["Albedo"].as<glm::vec4>(glm::vec4(1.0f, 1.0f, 1.0f, 1.0f));
+		const glm::vec4 emissive = node["Emissive"].as<glm::vec4>(glm::vec4(0.0f, 0.0f, 0.0f, 1.0f));
 		const float roughness = node["Roughness"].as<float>(1.0f);
 		const float metallic = node["Metallic"].as<float>(0.0f);
 
@@ -41,12 +42,12 @@ namespace Kerberos
 		const std::string metallicTexPath = node["MetallicTexture"].as<std::string>("");
 		const std::string roughnessTexPath = node["RoughnessTexture"].as<std::string>("");
 		const std::string aoTexPath = node["AOTexture"].as<std::string>("");
-
+		const std::string emissiveTexPath = node["EmissiveTexture"].as<std::string>("");
 		const Ref<EditorAssetManager> assetManager = Project::GetActive()->GetEditorAssetManager();
 
 		Material material;
 		material.Name = name;
-		material.Params = { .AlbedoFactor = albedo, .RoughnessFactor = roughness, .MetallicFactor = metallic };
+		material.Params = { .AlbedoFactor = albedo, .EmissiveFactor = emissive, .RoughnessFactor = roughness, .MetallicFactor = metallic };
 
 		auto loadTexture = [&](const std::string& texturePath) -> Ref<Texture2D>
 		{
@@ -81,7 +82,7 @@ namespace Kerberos
 		material.MetallicTexture = loadTexture(metallicTexPath);
 		material.RoughnessTexture = loadTexture(roughnessTexPath);
 		material.AOTexture = loadTexture(aoTexPath);
-
+		material.EmissiveTexture = loadTexture(emissiveTexPath);
 		return CreateRef<Material>(material);
 	}
 
@@ -112,6 +113,7 @@ namespace Kerberos
 		out << YAML::BeginMap;
 		out << YAML::Key << "Name" << YAML::Value << material.Name;
 		out << YAML::Key << "Albedo" << YAML::Value << material.Params.AlbedoFactor;
+		out << YAML::Key << "Emissive" << YAML::Value << material.Params.EmissiveFactor;
 		out << YAML::Key << "Roughness" << YAML::Value << material.Params.RoughnessFactor;
 		out << YAML::Key << "Metallic" << YAML::Value << material.Params.MetallicFactor;
 		out << YAML::Key << "AlbedoTexture" << YAML::Value << texturePathFor(material.AlbedoTexture);
@@ -119,6 +121,7 @@ namespace Kerberos
 		out << YAML::Key << "MetallicTexture" << YAML::Value << texturePathFor(material.MetallicTexture);
 		out << YAML::Key << "RoughnessTexture" << YAML::Value << texturePathFor(material.RoughnessTexture);
 		out << YAML::Key << "AOTexture" << YAML::Value << texturePathFor(material.AOTexture);
+		out << YAML::Key << "EmissiveTexture" << YAML::Value << texturePathFor(material.EmissiveTexture);
 		out << YAML::EndMap;
 
 		std::ofstream file(filepath);

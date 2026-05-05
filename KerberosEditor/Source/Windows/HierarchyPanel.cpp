@@ -1156,8 +1156,8 @@ namespace Kerberos
 				ImGui::Checkbox("Enabled", &pointLight.IsEnabled);
 				ImGui::ColorEdit3("Color", &pointLight.Light.Color[0]);
 				DrawVec3Control("Position", pointLight.Light.Position);
-				ImGui::DragFloat("Intensity", &pointLight.Light.Intensity, 0.01f, 0.0f);
-				ImGui::DragFloat("Radius", &pointLight.Light.Radius, 0.01f, 0.0f);
+				ImGui::DragFloat("Intensity", &pointLight.Light.Intensity, 1.0f, 0.0f);
+				ImGui::DragFloat("Radius", &pointLight.Light.Radius, 1.0f, 0.0f);
 
 				ImGui::TreePop();
 			}
@@ -1195,7 +1195,7 @@ namespace Kerberos
 			{
 				auto& spotlight = entity.GetComponent<SpotLightComponent>();
 				ImGui::ColorEdit3("Color", &spotlight.Light.Color[0]);
-				ImGui::DragFloat("Intensity", &spotlight.Light.Intensity, 0.01f, 0.0f, 10.0f);
+				ImGui::DragFloat("Intensity", &spotlight.Light.Intensity, 1.0f, 0.0f, 10.0f);
 				DrawVec3Control("Position", spotlight.Light.Position);
 				ImGui::DragFloat("Inner Cone Cosine Radians", &spotlight.Light.CutOffAngleRadians, 0.01f, 0.0f);
 				ImGui::DragFloat("Outer Cone Cosine Radians", &spotlight.Light.OuterCutOffAngleRadians, 0.01f, 0.0f);

@@ -188,6 +188,15 @@ namespace Kerberos
 				.pImageInfo = material->AOTexture ? &material->AOTexture->GetDescriptorInfo() : &m_AOPlaceholder->GetDescriptorInfo()
 			});
 
+			descriptorWrites.push_back(vk::WriteDescriptorSet{
+				.dstSet = material->DescriptorSets[i],
+				.dstBinding = 5,
+				.dstArrayElement = 0,
+				.descriptorCount = 1,
+				.descriptorType = vk::DescriptorType::eCombinedImageSampler,
+				.pImageInfo = material->EmissiveTexture ? &material->EmissiveTexture->GetDescriptorInfo() : &m_EmissivePlaceholder->GetDescriptorInfo()
+			});
+
 			device.updateDescriptorSets(descriptorWrites, {});
 		}
 	}
@@ -242,5 +251,14 @@ namespace Kerberos
 		const Buffer aoBufferStruct{ sizeof(uint8_t) * aoBuffer.size() };
 		std::memcpy(aoBufferStruct.Data, aoBuffer.data(), aoBufferStruct.Size);
 		m_AOPlaceholder = Texture2D::FromBuffer(aoSpec, aoBufferStruct);
+
+		constexpr std::array<uint8_t, 4> emissiveBuffer = { 255, 255, 255, 255 };
+		TextureSpecification emissiveSpec{};
+		emissiveSpec.Width = 1;
+		emissiveSpec.Height = 1;
+		emissiveSpec.Format = ImageFormat::RGBA8;
+		const Buffer emissiveBufferStruct{ sizeof(uint8_t) * emissiveBuffer.size() };
+		std::memcpy(emissiveBufferStruct.Data, emissiveBuffer.data(), emissiveBufferStruct.Size);
+		m_EmissivePlaceholder = Texture2D::FromBuffer(emissiveSpec, emissiveBufferStruct);
 	}
 }

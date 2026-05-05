@@ -54,5 +54,6 @@ namespace Kerberos
 		Ref<Texture2D> m_RoughnessPlaceholder;
 		Ref<Texture2D> m_MetallicPlaceholder;
 		Ref<Texture2D> m_AOPlaceholder;
+		Ref<Texture2D> m_EmissivePlaceholder;
 	};
 }
