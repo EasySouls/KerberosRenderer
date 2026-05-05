@@ -961,6 +961,13 @@ namespace Kerberos
 
 		ImGui::Checkbox("Use GTAO", &Renderer::GetUseGTAO());
 
+		AntiAliasingMode& aaMode = Renderer::GetAntiAliasingMode();
+		const char* aaModeItems[] = { "None", "FXAA", "TAA" };
+		if (ImGui::Combo("Anti-aliasing mode", reinterpret_cast<int*>(&aaMode), aaModeItems, IM_ARRAYSIZE(aaModeItems)))
+		{
+			Renderer::GetAntiAliasingMode() = static_cast<AntiAliasingMode>(aaMode);
+		}
+
 		ImGui::Separator();
 
 		const auto memoryBudgetInfo = VulkanContext::Get().GetMemoryBudgetInfo();

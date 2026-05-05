@@ -119,6 +119,8 @@ namespace Kerberos
 		static std::vector<GPULight> GetLightsFromScene(const Scene& scene);
 		static std::pair<std::vector<RenderObject>, std::set<Ref<Material>>> GetRenderObjectsAndUniqueMaterialsFromScene(const Scene& scene);
 		static std::vector<LineVertex> GetColliderLineVerticesFromScene(const Scene& scene);
+
+		static void ApplyPostProcessing(const vk::raii::CommandBuffer& cmd, uint32_t currentImage);
 		
 		static void WriteGPUTimestamp(const vk::raii::CommandBuffer& cmd, uint32_t frameIndex, uint32_t index);
 		static void ResolveGPUTimings(uint32_t frameIndex);

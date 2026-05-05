@@ -344,6 +344,7 @@ namespace
 
 		vk::raii::PipelineLayout FXAAPipelineLayout = nullptr;
 		Ref<GraphicsPipeline> FXAAPipeline = nullptr;
+		Ref<GraphicsPipeline> NoopPostProcessPipeline = nullptr;
 
 		vk::raii::Sampler ColorSampler = nullptr;
 		vk::raii::Sampler ShadowMapSampler = nullptr;
@@ -1617,95 +1618,7 @@ namespace Kerberos
 			KBR_CORE_TRACE("Transparency resolve pass done!");
 		}
 
-		// FXAA
-		{
-			// Transfer resolve image from color attachment optimal to shader read optimal for FXAA sampling
-			// and transition composite image to color attachment optimal for it will be the render target
-			{
-				const vk::ImageMemoryBarrier2 sceneColorBarrier = {
-					.srcStageMask = vk::PipelineStageFlagBits2::eColorAttachmentOutput,
-					.srcAccessMask = vk::AccessFlagBits2::eColorAttachmentWrite,
-					.dstStageMask = vk::PipelineStageFlagBits2::eFragmentShader,
-					.dstAccessMask = vk::AccessFlagBits2::eShaderRead,
-					.oldLayout = vk::ImageLayout::eColorAttachmentOptimal,
-					.newLayout = vk::ImageLayout::eShaderReadOnlyOptimal,
-					.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-					.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-					.image = s_Data->ResolveImage.Image,
-					.subresourceRange = {
-						.aspectMask = vk::ImageAspectFlagBits::eColor,
-						.baseMipLevel = 0,
-						.levelCount = 1,
-						.baseArrayLayer = 0,
-						.layerCount = 1
-					}
-				};
-
-				const vk::ImageMemoryBarrier2 compositeImageBarrier = {
-					.srcStageMask = vk::PipelineStageFlagBits2::eFragmentShader,
-					.srcAccessMask = vk::AccessFlagBits2::eShaderRead,
-					.dstStageMask = vk::PipelineStageFlagBits2::eColorAttachmentOutput,
-					.dstAccessMask = vk::AccessFlagBits2::eColorAttachmentWrite,
-					.oldLayout = vk::ImageLayout::eShaderReadOnlyOptimal,
-					.newLayout = vk::ImageLayout::eColorAttachmentOptimal,
-					.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-					.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-					.image = s_Data->CompositeImage.Image,
-					.subresourceRange = {
-						.aspectMask = vk::ImageAspectFlagBits::eColor,
-						.baseMipLevel = 0,
-						.levelCount = 1,
-						.baseArrayLayer = 0,
-						.layerCount = 1
-					}
-				};
-
-				const std::array barriers = { sceneColorBarrier, compositeImageBarrier };
-
-				const vk::DependencyInfo dependencyInfo = {
-					.dependencyFlags = {},
-					.imageMemoryBarrierCount = barriers.size(),
-					.pImageMemoryBarriers = barriers.data()
-				};
-
-				cmd.pipelineBarrier2(dependencyInfo);
-			}
-
-			vk::RenderingAttachmentInfo colorAttachmentInfo{
-				.imageView = s_Data->CompositeImage.ImageView,
-				.imageLayout = vk::ImageLayout::eColorAttachmentOptimal,
-				.loadOp = vk::AttachmentLoadOp::eClear,
-				.storeOp = vk::AttachmentStoreOp::eStore,
-				.clearValue = vk::ClearColorValue{ std::array{0.0f, 0.0f, 0.0f, 1.0f} }
-			};
-			const vk::RenderingInfo renderingInfo{
-				.renderArea = renderArea,
-				.layerCount = 1,
-				.colorAttachmentCount = 1,
-				.pColorAttachments = &colorAttachmentInfo,
-				.pDepthAttachment = nullptr
-			};
-			cmd.beginRendering(renderingInfo);
-			cmd.setViewport(0, viewport);
-			cmd.setScissor(0, renderArea);
-
-			s_Data->FXAAPipeline->Bind(cmd);
-
-			cmd.bindDescriptorSets(
-				vk::PipelineBindPoint::eGraphics,
-				*s_Data->FXAAPipelineLayout,
-				0,
-				*s_Data->DescriptorSets[currentImage].fxaa,
-				{});
-
-			FXAAPushConstants pushConstants;
-			pushConstants.inverseViewportSize = glm::vec2(1.0f) / s_Data->OutputSize;
-			cmd.pushConstants<FXAAPushConstants>(*s_Data->FXAAPipelineLayout, vk::ShaderStageFlagBits::eFragment, 0, { pushConstants });
-
-			cmd.draw(3, 1, 0, 0);
-
-			cmd.endRendering();
-		}
+		ApplyPostProcessing(cmd, currentImage);
 
 		HandleMousePickingReadback(cmd);
 
@@ -2661,6 +2574,27 @@ namespace Kerberos
 			fxaaPipelineSpec.DynamicStates = commonDynamicStates;
 
 			s_Data->FXAAPipeline = CreateRef<GraphicsPipeline>(fxaaPipelineSpec);
+
+			Ref<Shader> noopPostProcessShader = CreateRef<Shader>("noop_post_process", "No-op Post Process");
+
+			GraphicsPipelineSpecification noopPostProcessPipelineSpec{};
+			noopPostProcessPipelineSpec.Name = "No-op Post Process Pipeline";
+			noopPostProcessPipelineSpec.Shader = noopPostProcessShader;
+			noopPostProcessPipelineSpec.PipelineLayout = *s_Data->FXAAPipelineLayout;
+			noopPostProcessPipelineSpec.BindingDescription = {};
+			noopPostProcessPipelineSpec.InputAttributeDescriptions = {};
+			noopPostProcessPipelineSpec.SampleCount = vk::SampleCountFlagBits::e1;
+			noopPostProcessPipelineSpec.CullMode = CullMode::None;
+			noopPostProcessPipelineSpec.EnableDepthClamp = false;
+			noopPostProcessPipelineSpec.EnableDepthBias = false;
+			noopPostProcessPipelineSpec.EnableDepthTest = false;
+			noopPostProcessPipelineSpec.EnableDepthWrite = false;
+			noopPostProcessPipelineSpec.BlendModes = { BlendMode::None };
+			noopPostProcessPipelineSpec.ColorAttachmentFormats = { s_Data->CompositeImage.Format };
+			noopPostProcessPipelineSpec.DepthAttachmentFormat = std::nullopt;
+			noopPostProcessPipelineSpec.DynamicStates = commonDynamicStates;
+
+			s_Data->NoopPostProcessPipeline = CreateRef<GraphicsPipeline>(noopPostProcessPipelineSpec);
 		}
 
 		// Transition composite and color output images to shader read layout
@@ -3584,7 +3518,129 @@ namespace Kerberos
 		return vertices;
 	}
 
-    glm::mat4 Renderer::CalculateLightSpaceMatrix() 
+	void Renderer::ApplyPostProcessing(const vk::raii::CommandBuffer& cmd, uint32_t currentImage)
+	{
+		// Transfer resolve image from color attachment optimal to shader read optimal for post process sampling
+		// and transition composite image to color attachment optimal for it will be the render target
+		{
+			const vk::ImageMemoryBarrier2 sceneColorBarrier = {
+				.srcStageMask = vk::PipelineStageFlagBits2::eColorAttachmentOutput,
+				.srcAccessMask = vk::AccessFlagBits2::eColorAttachmentWrite,
+				.dstStageMask = vk::PipelineStageFlagBits2::eFragmentShader,
+				.dstAccessMask = vk::AccessFlagBits2::eShaderRead,
+				.oldLayout = vk::ImageLayout::eColorAttachmentOptimal,
+				.newLayout = vk::ImageLayout::eShaderReadOnlyOptimal,
+				.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+				.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+				.image = s_Data->ResolveImage.Image,
+				.subresourceRange = {
+					.aspectMask = vk::ImageAspectFlagBits::eColor,
+					.baseMipLevel = 0,
+					.levelCount = 1,
+					.baseArrayLayer = 0,
+					.layerCount = 1
+				}
+			};
+
+			const vk::ImageMemoryBarrier2 compositeImageBarrier = {
+				.srcStageMask = vk::PipelineStageFlagBits2::eFragmentShader,
+				.srcAccessMask = vk::AccessFlagBits2::eShaderRead,
+				.dstStageMask = vk::PipelineStageFlagBits2::eColorAttachmentOutput,
+				.dstAccessMask = vk::AccessFlagBits2::eColorAttachmentWrite,
+				.oldLayout = vk::ImageLayout::eShaderReadOnlyOptimal,
+				.newLayout = vk::ImageLayout::eColorAttachmentOptimal,
+				.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+				.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+				.image = s_Data->CompositeImage.Image,
+				.subresourceRange = {
+					.aspectMask = vk::ImageAspectFlagBits::eColor,
+					.baseMipLevel = 0,
+					.levelCount = 1,
+					.baseArrayLayer = 0,
+					.layerCount = 1
+				}
+			};
+
+			const std::array barriers = { sceneColorBarrier, compositeImageBarrier };
+
+			const vk::DependencyInfo dependencyInfo = {
+				.dependencyFlags = {},
+				.imageMemoryBarrierCount = barriers.size(),
+				.pImageMemoryBarriers = barriers.data()
+			};
+
+			cmd.pipelineBarrier2(dependencyInfo);
+		}
+
+		const vk::Rect2D renderArea{
+			.offset = vk::Offset2D{ 0, 0 },
+			.extent = vk::Extent2D{ static_cast<uint32_t>(s_Data->OutputSize.x), static_cast<uint32_t>(s_Data->OutputSize.y) }
+		};
+
+		const vk::Viewport viewport{
+			.x = 0.0f,
+			.y = 0.0f,
+			.width = s_Data->OutputSize.x,
+			.height = s_Data->OutputSize.y,
+			.minDepth = 0.0f,
+			.maxDepth = 1.0f
+		};
+
+		vk::RenderingAttachmentInfo colorAttachmentInfo{
+			.imageView = s_Data->CompositeImage.ImageView,
+			.imageLayout = vk::ImageLayout::eColorAttachmentOptimal,
+			.loadOp = vk::AttachmentLoadOp::eClear,
+			.storeOp = vk::AttachmentStoreOp::eStore,
+			.clearValue = vk::ClearColorValue{ std::array{0.0f, 0.0f, 0.0f, 1.0f} }
+		};
+		const vk::RenderingInfo renderingInfo{
+			.renderArea = renderArea,
+			.layerCount = 1,
+			.colorAttachmentCount = 1,
+			.pColorAttachments = &colorAttachmentInfo,
+			.pDepthAttachment = nullptr
+		};
+		cmd.beginRendering(renderingInfo);
+		cmd.setViewport(0, viewport);
+		cmd.setScissor(0, renderArea);
+
+		if (s_Data->AntiAliasingMode == AntiAliasingMode::None)
+		{
+			s_Data->NoopPostProcessPipeline->Bind(cmd);
+
+			cmd.bindDescriptorSets(
+				vk::PipelineBindPoint::eGraphics,
+				*s_Data->FXAAPipelineLayout,
+				0,
+				*s_Data->DescriptorSets[currentImage].fxaa,
+				{});
+		}
+		else if (s_Data->AntiAliasingMode == AntiAliasingMode::FXAA)
+		{
+			s_Data->FXAAPipeline->Bind(cmd);
+
+			cmd.bindDescriptorSets(
+				vk::PipelineBindPoint::eGraphics,
+				*s_Data->FXAAPipelineLayout,
+				0,
+				*s_Data->DescriptorSets[currentImage].fxaa,
+				{});
+
+			FXAAPushConstants pushConstants;
+			pushConstants.inverseViewportSize = glm::vec2(1.0f) / s_Data->OutputSize;
+			cmd.pushConstants<FXAAPushConstants>(*s_Data->FXAAPipelineLayout, vk::ShaderStageFlagBits::eFragment, 0, { pushConstants });
+		}
+		else if (s_Data->AntiAliasingMode == AntiAliasingMode::TAA)
+		{
+
+		}
+
+		cmd.draw(3, 1, 0, 0);
+
+		cmd.endRendering();
+	}
+
+	glm::mat4 Renderer::CalculateLightSpaceMatrix() 
 	{
 		KBR_CORE_ASSERT(s_Data, "Renderer not initialized!");
 
