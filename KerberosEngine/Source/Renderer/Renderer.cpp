@@ -3392,7 +3392,7 @@ namespace Kerberos
 			gpuLight.Position = pl.Light.Position;
 			gpuLight.Color = pl.Light.Color;
 			gpuLight.Intensity = pl.Light.Intensity;
-			gpuLight.Range = 50.0f; // Calculate based on attenuation parameters
+			gpuLight.Range = pl.Light.Radius;
 			sceneLights.push_back(gpuLight);
 		}
 
@@ -3407,7 +3407,7 @@ namespace Kerberos
 			gpuLight.Direction = sl.Light.Direction;
 			gpuLight.Color = sl.Light.Color;
 			gpuLight.Intensity = sl.Light.Intensity;
-			gpuLight.Range = 50.0f; // Calculate based on attenuation parameters
+			gpuLight.Range = sl.Light.Radius;
 			gpuLight.InnerConeCos = glm::cos(sl.Light.CutOffAngleRadians);
 			gpuLight.OuterConeCos = glm::cos(sl.Light.OuterCutOffAngleRadians);
 			sceneLights.push_back(gpuLight);

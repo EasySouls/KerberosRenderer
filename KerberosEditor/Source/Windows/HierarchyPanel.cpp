@@ -1156,11 +1156,8 @@ namespace Kerberos
 				ImGui::Checkbox("Enabled", &pointLight.IsEnabled);
 				ImGui::ColorEdit3("Color", &pointLight.Light.Color[0]);
 				DrawVec3Control("Position", pointLight.Light.Position);
-				ImGui::DragFloat("Intensity", &pointLight.Light.Intensity, 0.01f, 0.0f, 10.0f);
-				ImGui::Text("Attenuation factors");
-				ImGui::DragFloat("Constant", &pointLight.Light.Constant, 0.01f, 0.0f, 1.0f);
-				ImGui::DragFloat("Linear", &pointLight.Light.Linear, 0.01f, 0.0f, 1.0f);
-				ImGui::DragFloat("Quadratic", &pointLight.Light.Quadratic, 0.01f, 0.0f, 1.0f);
+				ImGui::DragFloat("Intensity", &pointLight.Light.Intensity, 0.01f, 0.0f);
+				ImGui::DragFloat("Radius", &pointLight.Light.Radius, 0.01f, 0.0f);
 
 				ImGui::TreePop();
 			}
@@ -1184,7 +1181,7 @@ namespace Kerberos
 			bool componentDeleted = false;
 			if (ImGui::BeginPopup("ComponentSettings"))
 			{
-				ImGui::Text("Directional Light Settings");
+				ImGui::Text("Spotlight Settings");
 				ImGui::Separator();
 				if (ImGui::MenuItem("Remove Component"))
 				{
@@ -1200,6 +1197,8 @@ namespace Kerberos
 				ImGui::ColorEdit3("Color", &spotlight.Light.Color[0]);
 				ImGui::DragFloat("Intensity", &spotlight.Light.Intensity, 0.01f, 0.0f, 10.0f);
 				DrawVec3Control("Position", spotlight.Light.Position);
+				ImGui::DragFloat("Inner Cone Cosine Radians", &spotlight.Light.CutOffAngleRadians, 0.01f, 0.0f);
+				ImGui::DragFloat("Outer Cone Cosine Radians", &spotlight.Light.OuterCutOffAngleRadians, 0.01f, 0.0f);
 				ImGui::Checkbox("Enabled", &spotlight.IsEnabled);
 
 				ImGui::TreePop();

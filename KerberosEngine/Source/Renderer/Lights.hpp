@@ -18,12 +18,8 @@ namespace Kerberos
         alignas(16) glm::vec3 Position = glm::vec3(0.0f);
 
         alignas(16) glm::vec3 Color = glm::vec3(1.0f);
-        alignas(4) float Intensity = 1.0f;
-
-        /// Attenuation factors
-        alignas(4) float Constant = 1.0f;
-        alignas(4) float Linear = 0.09f;
-        alignas(4) float Quadratic = 0.032f;
+        alignas(4) float Intensity = 500.0f; // In candelas
+        alignas(4) float Radius = 50.0f;
     };
 
     struct alignas(16) SpotLight : PointLight

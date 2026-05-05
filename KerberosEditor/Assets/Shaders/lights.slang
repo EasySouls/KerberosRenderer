@@ -21,27 +21,29 @@ static uint LightType_Point = 0;
 static uint LightType_Spot = 1;
 static uint LightType_Area = 2;
 
-float CalculateLightAttenuation(GPULight light, float3 worldPos) {
-    float distance = length(light.position - worldPos);
-    if (distance > light.range) {
-        return 0.0;
-    }
-    return 1.0 - (distance / light.range);
+float CalculateLightAttenuation(GPULight light, float3 worldPos) 
+{
+    //float distance = length(light.position - worldPos);
+    //if (distance > light.range) {
+    //    return 0.0;
+    //}
+    //return 1.0 - (distance / light.range);
 
-    //float distanceSqr = dot(light.position - worldPos, light.position - worldPos);
+    float distanceSqr = dot(light.position - worldPos, light.position - worldPos);
 
-    //// Inverse square falloff
-    //float attenuation = 1.0 / (distanceSqr + 0.0001);
+    // Inverse square falloff
+    float attenuation = 1.0 / (distanceSqr + 0.0001);
 
-    //// Windowing function to smoothly fade out at light.range
-    //float distance = sqrt(distanceSqr);
-    //float falloff = clamp(1.0 - pow(distance / light.range, 4.0), 0.0, 1.0);
+    // Windowing function to smoothly fade out at light.range
+    float distance = sqrt(distanceSqr);
+    float falloff = clamp(1.0 - pow(distance / light.range, 4.0), 0.0, 1.0);
 
-    //// Apply windowing to the inverse-square attenuation
-    //return attenuation * (falloff * falloff);
+    // Apply windowing to the inverse-square attenuation
+    return attenuation * (falloff * falloff);
 }
 
-float CalculateSpotlightAttenuation(GPULight light, float3 worldPos) {
+float CalculateSpotlightAttenuation(GPULight light, float3 worldPos) 
+{
     float3 lightToPoint = normalize(worldPos - light.position);
     float cosTheta = dot(light.direction, lightToPoint);
     if (cosTheta < light.outerConeCos) {
@@ -54,18 +56,24 @@ float CalculateSpotlightAttenuation(GPULight light, float3 worldPos) {
     }
 }
 
-float CalculateLightContribution(GPULight light, float3 worldPos) {
-    float attenuation = CalculateLightAttenuation(light, worldPos);
+float CalculateLightContribution(GPULight light, float3 worldPos)
+{
+    float attenuation = 0.0;
+    if (light.type == LightType_Spot) {
+        attenuation *= CalculateSpotlightAttenuation(light, worldPos);
+    } else {
+        attenuation = CalculateLightAttenuation(light, worldPos);
+    }
+
     if (attenuation <= 0.0) {
         return 0.0;
     }
-    if (light.type == LightType_Spot) {
-        attenuation *= CalculateSpotlightAttenuation(light, worldPos);
-    }
+    
     return attenuation * light.intensity;
 }
 
-public float3 CalculateLightColor(GPULight light, float3 worldPos) {
+public float3 CalculateLightColor(GPULight light, float3 worldPos) 
+{
     float contribution = CalculateLightContribution(light, worldPos);
     return light.color * contribution;
 }

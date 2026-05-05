@@ -225,8 +225,6 @@ PSOutput fragmentMain(VSOutput input)
     float materialAO = aoMapSampler.Sample(input.TexCoord).r;
     float ao = globalAO * materialAO;
 
-    // Use this when working with srgb textures
-    // float3 albedo = pow(albedoMapSampler.Sample(input.TexCoord).rgb * perObject.material.albedo, float3(2.2, 2.2, 2.2));
     float3 albedoTex = albedoMapSampler.Sample(input.TexCoord).rgb;
     float3 albedo = albedoTex * perObject.material.albedo.rgb;
 
@@ -270,9 +268,9 @@ PSOutput fragmentMain(VSOutput input)
 
     // Specular indirect
     float specularOcclusion = GetSpecularOcclusion(max(dot(N, V), 0.0), ao, roughness);
-    float3 indirectSpecular = reflection * (F * brdf.x + brdf.y) * specularOcclusion;
+    float3 indirectSpecular = reflection * (F0 * brdf.x + brdf.y) * specularOcclusion;
 
-    float3 ambient = (kD * indirectDiffuse + indirectSpecular) * ao;
+    float3 ambient = indirectDiffuse + indirectSpecular;
 
     float3 color = ambient + Lo;
 

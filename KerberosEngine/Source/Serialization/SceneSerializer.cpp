@@ -211,9 +211,7 @@ namespace Kerberos
 			out << YAML::Key << "Color" << YAML::Value << pointLight.Light.Color;
 			out << YAML::Key << "Position" << YAML::Value << pointLight.Light.Position;
 			out << YAML::Key << "Intensity" << YAML::Value << pointLight.Light.Intensity;
-			out << YAML::Key << "Constant" << YAML::Value << pointLight.Light.Constant;
-			out << YAML::Key << "Linear" << YAML::Value << pointLight.Light.Linear;
-			out << YAML::Key << "Quadratic" << YAML::Value << pointLight.Light.Quadratic;
+			out << YAML::Key << "Radius" << YAML::Value << pointLight.Light.Radius;
 			out << YAML::EndMap;
 		}
 
@@ -226,9 +224,7 @@ namespace Kerberos
 			out << YAML::Key << "Position" << YAML::Value << spotLight.Light.Position;
 			out << YAML::Key << "Direction" << YAML::Value << spotLight.Light.Direction;
 			out << YAML::Key << "Intensity" << YAML::Value << spotLight.Light.Intensity;
-			out << YAML::Key << "Constant" << YAML::Value << spotLight.Light.Constant;
-			out << YAML::Key << "Linear" << YAML::Value << spotLight.Light.Linear;
-			out << YAML::Key << "Quadratic" << YAML::Value << spotLight.Light.Quadratic;
+			out << YAML::Key << "Radius" << YAML::Value << spotLight.Light.Radius;
 			out << YAML::Key << "CutOffAngleRadians" << YAML::Value << spotLight.Light.CutOffAngleRadians;
 			out << YAML::Key << "OuterCutOffAngleRadians" << YAML::Value << spotLight.Light.OuterCutOffAngleRadians;
 			out << YAML::EndMap;
@@ -588,9 +584,7 @@ namespace Kerberos
 					pointLight.Light.Color = pointLightComponent["Color"].as<glm::vec3>();
 					pointLight.Light.Position = pointLightComponent["Position"].as<glm::vec3>();
 					pointLight.Light.Intensity = pointLightComponent["Intensity"].as<float>();
-					pointLight.Light.Constant = pointLightComponent["Constant"].as<float>();
-					pointLight.Light.Linear = pointLightComponent["Linear"].as<float>();
-					pointLight.Light.Quadratic = pointLightComponent["Quadratic"].as<float>();
+					pointLight.Light.Radius = pointLightComponent["Radius"].as<float>();
 				}
 
 				if (auto spotLightComponent = entity["SpotLightComponent"])
@@ -600,9 +594,7 @@ namespace Kerberos
 					spotLight.Light.Position = spotLightComponent["Position"].as<glm::vec3>();
 					spotLight.Light.Direction = spotLightComponent["Direction"].as<glm::vec3>();
 					spotLight.Light.Intensity = spotLightComponent["Intensity"].as<float>();
-					spotLight.Light.Constant = spotLightComponent["Constant"].as<float>();
-					spotLight.Light.Linear = spotLightComponent["Linear"].as<float>();
-					spotLight.Light.Quadratic = spotLightComponent["Quadratic"].as<float>();
+					spotLight.Light.Radius = spotLightComponent["Radius"].as<float>();
 					spotLight.Light.CutOffAngleRadians = spotLightComponent["CutOffAngleRadians"].as<float>();
 					spotLight.Light.OuterCutOffAngleRadians = spotLightComponent["OuterCutOffAngleRadians"].as<float>();
 				}
