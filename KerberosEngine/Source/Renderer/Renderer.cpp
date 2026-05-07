@@ -10,6 +10,7 @@
 #include "GraphicsPipeline.hpp"
 #include "ComputePipeline.hpp"
 #include "RayTracingSceneCache.hpp"
+#include "ColliderDebugHelpers.hpp"
 #include "Utils.hpp"
 #include "Scene/Components/PhysicsComponents.hpp"
 
@@ -23,8 +24,6 @@
 namespace
 {
 	using namespace Kerberos;
-	constexpr glm::vec3 ColliderDebugColor(0.0f, 1.0f, 0.0f);
-	constexpr uint32_t ColliderDebugMaxVertices = 65536;
 
 	glm::mat4 GetWorldTransformWithoutScale(const TransformComponent& transform)
 	{
@@ -43,85 +42,6 @@ namespace
 		rotationMatrix[2] = glm::vec4(rotation[2], 0.0f);
 		rotationMatrix[3] = glm::vec4(position, 1.0f);
 		return rotationMatrix;
-	}
-
-	LineVertex MakeLineVertex(const glm::vec3& position)
-	{
-		return { .Position = position, .Color = ColliderDebugColor };
-	}
-
-	void AddLine(std::vector<LineVertex>& vertices, const glm::vec3& a, const glm::vec3& b)
-	{
-		vertices.push_back(MakeLineVertex(a));
-		vertices.push_back(MakeLineVertex(b));
-	}
-
-	void AddBoxLines(std::vector<LineVertex>& vertices, const glm::mat4& transform, const glm::vec3& halfExtents)
-	{
-		const std::array<glm::vec3, 8> corners = {
-			glm::vec3(-halfExtents.x, -halfExtents.y, -halfExtents.z), glm::vec3(halfExtents.x, -halfExtents.y, -halfExtents.z),
-			glm::vec3(halfExtents.x, halfExtents.y, -halfExtents.z),   glm::vec3(-halfExtents.x, halfExtents.y, -halfExtents.z),
-			glm::vec3(-halfExtents.x, -halfExtents.y, halfExtents.z),  glm::vec3(halfExtents.x, -halfExtents.y, halfExtents.z),
-			glm::vec3(halfExtents.x, halfExtents.y, halfExtents.z),    glm::vec3(-halfExtents.x, halfExtents.y, halfExtents.z)
-		};
-		std::array<glm::vec3, 8> worldCorners{};
-		for (uint32_t i = 0; i < corners.size(); ++i)
-		{
-			worldCorners[i] = glm::vec3(transform * glm::vec4(corners[i], 1.0f));
-		}
-
-		constexpr std::array<std::pair<uint32_t, uint32_t>, 12> edges = {
-			std::pair{0, 1}, std::pair{1, 2}, std::pair{2, 3}, std::pair{3, 0},
-			std::pair{4, 5}, std::pair{5, 6}, std::pair{6, 7}, std::pair{7, 4},
-			std::pair{0, 4}, std::pair{1, 5}, std::pair{2, 6}, std::pair{3, 7}
-		};
-		for (const auto& [a, b] : edges)
-		{
-			AddLine(vertices, worldCorners[a], worldCorners[b]);
-		}
-	}
-
-	void AddCircleLines(std::vector<LineVertex>& vertices, const glm::mat4& transform, const int axisA, const int axisB, const float radius, const uint32_t segments = 32)
-	{
-		glm::vec3 previous(0.0f);
-		bool hasPrevious = false;
-
-		for (uint32_t i = 0; i <= segments; ++i)
-		{
-			constexpr float twoPi = std::numbers::pi_v<float> * 2.0f;
-			const float t = static_cast<float>(i) / static_cast<float>(segments);
-			const float angle = twoPi * t;
-			glm::vec3 local(0.0f);
-			local[axisA] = std::cos(angle) * radius;
-			local[axisB] = std::sin(angle) * radius;
-			const glm::vec3 current = glm::vec3(transform * glm::vec4(local, 1.0f));
-			if (hasPrevious)
-			{
-				AddLine(vertices, previous, current);
-			}
-			previous = current;
-			hasPrevious = true;
-		}
-	}
-
-	void AddCapsuleLines(std::vector<LineVertex>& vertices, const glm::mat4& transform, const float radius, const float halfHeight)
-	{
-		const glm::mat4 topCenter = transform * glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, halfHeight, 0.0f));
-		const glm::mat4 bottomCenter = transform * glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, -halfHeight, 0.0f));
-
-		AddCircleLines(vertices, topCenter, 0, 2, radius);
-		AddCircleLines(vertices, bottomCenter, 0, 2, radius);
-
-		const std::array<glm::vec3, 4> sidePoints = {
-			glm::vec3(radius, 0.0f, 0.0f), glm::vec3(-radius, 0.0f, 0.0f),
-			glm::vec3(0.0f, 0.0f, radius), glm::vec3(0.0f, 0.0f, -radius)
-		};
-		for (const glm::vec3& point : sidePoints)
-		{
-			const glm::vec3 top = glm::vec3(topCenter * glm::vec4(point, 1.0f));
-			const glm::vec3 bottom = glm::vec3(bottomCenter * glm::vec4(point, 1.0f));
-			AddLine(vertices, top, bottom);
-		}
 	}
 
 	struct ShadowMap
@@ -1442,7 +1362,7 @@ namespace Kerberos
 
 		if (s_Data->DisplayPhysicsColliders && !colliderLineVertices.empty())
 		{
-			constexpr uint32_t maxVertexCount = ColliderDebugMaxVertices;
+			constexpr uint32_t maxVertexCount = ColliderDebugHelpers::ColliderDebugMaxVertices;
 			const uint32_t vertexCount = std::min<uint32_t>(static_cast<uint32_t>(colliderLineVertices.size()), maxVertexCount);
 			if (vertexCount > 0)
 			{
@@ -1697,7 +1617,7 @@ namespace Kerberos
 		auto& context = VulkanContext::Get();
 		const auto& device = context.GetDevice();
 
-		constexpr vk::DeviceSize colliderLineBufferSize = sizeof(LineVertex) * ColliderDebugMaxVertices;
+		constexpr vk::DeviceSize colliderLineBufferSize = sizeof(LineVertex) * ColliderDebugHelpers::ColliderDebugMaxVertices;
 		for (auto& [Buffer, Memory, MappedData] : s_Data->ColliderLineBuffers)
 		{
 			CreateBuffer(device,
@@ -3461,7 +3381,7 @@ namespace Kerberos
 			const auto& transform = boxView.get<TransformComponent>(entity);
 			const auto& collider = boxView.get<BoxCollider3DComponent>(entity);
 			const glm::mat4 base = GetWorldTransformWithoutScale(transform) * glm::translate(glm::mat4(1.0f), collider.Offset);
-			AddBoxLines(vertices, base, collider.Size);
+			ColliderDebugHelpers::AddBoxLines(vertices, base, collider.Size);
 		}
 
 		const auto sphereView = scene.m_Registry.view<TransformComponent, SphereCollider3DComponent>();
@@ -3470,9 +3390,9 @@ namespace Kerberos
 			const auto& transform = sphereView.get<TransformComponent>(entity);
 			const auto& collider = sphereView.get<SphereCollider3DComponent>(entity);
 			const glm::mat4 base = GetWorldTransformWithoutScale(transform) * glm::translate(glm::mat4(1.0f), collider.Offset);
-			AddCircleLines(vertices, base, 0, 1, collider.Radius);
-			AddCircleLines(vertices, base, 1, 2, collider.Radius);
-			AddCircleLines(vertices, base, 2, 0, collider.Radius);
+			ColliderDebugHelpers::AddCircleLines(vertices, base, 0, 1, collider.Radius);
+			ColliderDebugHelpers::AddCircleLines(vertices, base, 1, 2, collider.Radius);
+			ColliderDebugHelpers::AddCircleLines(vertices, base, 2, 0, collider.Radius);
 		}
 
 		const auto capsuleView = scene.m_Registry.view<TransformComponent, CapsuleCollider3DComponent>();
@@ -3481,7 +3401,7 @@ namespace Kerberos
 			const auto& transform = capsuleView.get<TransformComponent>(entity);
 			const auto& collider = capsuleView.get<CapsuleCollider3DComponent>(entity);
 			const glm::mat4 base = GetWorldTransformWithoutScale(transform) * glm::translate(glm::mat4(1.0f), collider.Offset);
-			AddCapsuleLines(vertices, base, collider.Radius, collider.Height * 0.5f);
+			ColliderDebugHelpers::AddCapsuleLines(vertices, base, collider.Radius, collider.Height * 0.5f);
 		}
 
 		const auto meshColliderView = scene.m_Registry.view<TransformComponent, MeshCollider3DComponent>();
@@ -3512,7 +3432,7 @@ namespace Kerberos
 
 			const glm::mat4 base = GetWorldTransformWithoutScale(transform)
 				* glm::translate(glm::mat4(1.0f), collider.Offset + center);
-			AddBoxLines(vertices, base, halfExtents);
+			ColliderDebugHelpers::AddBoxLines(vertices, base, halfExtents);
 		}
 
 		return vertices;
