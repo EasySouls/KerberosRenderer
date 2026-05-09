@@ -1582,12 +1582,34 @@ namespace Kerberos
 		io.ConfigDpiScaleFonts = true;          // [Experimental] Automatically overwrite style.FontScaleDpi in Begin() when Monitor DPI changes. This will scale fonts but _NOT_ scale sizes/padding for now.
 		io.ConfigDpiScaleViewports = true;      // [Experimental] Scale Dear ImGui and Platform Windows when Monitor DPI changes.
 
-
 		if (io.ConfigFlags & ImGuiConfigFlags_ViewportsEnable)
 		{
 			style.WindowRounding = 0.0f;
 			style.Colors[ImGuiCol_WindowBg].w = 1.0f;
 		}
+
+		// Rounding
+		style.WindowRounding = 5.0f; // Soften window corners
+		style.FrameRounding = 4.0f; // Soften text boxes, buttons, etc.
+		style.ScrollbarRounding = 12.0f;
+		style.GrabRounding = 4.0f; // Sliders
+
+		// Padding and Spacing
+		style.WindowPadding = ImVec2(10.0f, 10.0f);
+		style.FramePadding = ImVec2(8.0f, 6.0f); // Taller, wider buttons/inputs
+		style.ItemSpacing = ImVec2(8.0f, 8.0f);
+		style.ItemInnerSpacing = ImVec2(6.0f, 6.0f);
+
+		// Borders
+		style.WindowBorderSize = 0.0f; // Remove thick window borders
+		style.FrameBorderSize = 0.0f;
+
+		ImVec4* colors = style.Colors;
+		colors[ImGuiCol_WindowBg] = ImVec4(0.0f, 0.0f, 0.0f, 0.00f);
+		colors[ImGuiCol_Button] = ImVec4(0.10f, 0.125f, 0.15f, 1.00f);
+		colors[ImGuiCol_ButtonHovered] = ImVec4(0.30f, 0.35f, 0.40f, 1.00f);
+		colors[ImGuiCol_ButtonActive] = ImVec4(0.40f, 0.45f, 0.50f, 1.00f);
+		colors[ImGuiCol_FrameBg] = ImVec4(0.15f, 0.18f, 0.20f, 1.00f);
 
 		ImGui_ImplGlfw_InitForVulkan(m_Window, true);
 
@@ -1627,10 +1649,19 @@ namespace Kerberos
 		initInfo.CheckVkResultFn = CheckVkResult;
 		ImGui_ImplVulkan_Init(&initInfo);
 
-		io.Fonts->AddFontFromFileTTF("Assets/Fonts/Inter/Inter_18pt-Italic.ttf", 18.0f);
-		io.Fonts->AddFontFromFileTTF("Assets/Fonts/Inter/Inter_18pt-Bold.ttf", 18.0f);
-		io.Fonts->AddFontFromFileTTF("Assets/Fonts/Inter/Inter_18pt-SemiBold.ttf", 18.0f);
-		ImFont* interRegular = io.Fonts->AddFontFromFileTTF("Assets/Fonts/Inter/Inter_18pt-Regular.ttf", 18.0f);
+		ImFontConfig fontConfig;
+		fontConfig.OversampleH = 2;
+		fontConfig.OversampleV = 2;
+
+		static constexpr float baseFontSize = 14.0f;
+		const float scaledFontSize = baseFontSize * mainScale;
+
+		io.Fonts->AddFontFromFileTTF("Assets/Fonts/Inter/Inter_18pt-Italic.ttf", scaledFontSize, &fontConfig);
+		io.Fonts->AddFontFromFileTTF("Assets/Fonts/Inter/Inter_18pt-Bold.ttf", scaledFontSize, &fontConfig);
+		io.Fonts->AddFontFromFileTTF("Assets/Fonts/Inter/Inter_18pt-SemiBold.ttf", scaledFontSize, &fontConfig);
+		io.Fonts->AddFontFromFileTTF("Assets/Fonts/Inter/Inter_18pt-Regular.ttf", scaledFontSize, &fontConfig);
+		ImFont* interRegular = io.Fonts->AddFontFromFileTTF("Assets/Fonts/Inter/Inter_18pt-Regular.ttf", baseFontSize, &fontConfig);
+
 		KBR_CORE_ASSERT(interRegular != nullptr, "Failed to load font!");
 		io.FontDefault = interRegular;
 	}

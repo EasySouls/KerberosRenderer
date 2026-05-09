@@ -68,8 +68,8 @@ namespace Kerberos
 			RefreshAssetTree();
 		}
 
-		static float padding = 10.0f;
-		static float thumbnailSize = 96.0f;
+		static float padding = 16.0f;
+		static float thumbnailSize = 64.0f;
 		static float cellSize = thumbnailSize + padding;
 
 		const float panelWidth = ImGui::GetContentRegionAvail().x;
