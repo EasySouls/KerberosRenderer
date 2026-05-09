@@ -977,6 +977,19 @@ namespace Kerberos
 
 		ImGui::DragFloat("Bloom Intensity", &Renderer::GetBloomIntensity(), 0.01f, 0.0f, 1.0f);
 
+		BloomMode& bloomMode = Renderer::GetBloomMode();
+		const char* bloomModeItems[] = { "Legacy", "Bright-pass prefilter" };
+		if (ImGui::Combo("Bloom mode", reinterpret_cast<int*>(&bloomMode), bloomModeItems, IM_ARRAYSIZE(bloomModeItems)))
+		{
+			Renderer::GetBloomMode() = static_cast<BloomMode>(bloomMode);
+		}
+
+		if (Renderer::GetBloomMode() == BloomMode::BrightPassPrefilter)
+		{
+			ImGui::DragFloat("Bloom Threshold", &Renderer::GetBloomThreshold(), 0.01f, 0.0f, 20.0f);
+			ImGui::DragFloat("Bloom Knee", &Renderer::GetBloomKnee(), 0.005f, 0.0f, 5.0f);
+		}
+
 		ImGui::Separator();
 
 		const auto memoryBudgetInfo = VulkanContext::Get().GetMemoryBudgetInfo();

@@ -59,6 +59,12 @@ namespace Kerberos
 		ACES = 2
 	};
 
+	enum class BloomMode
+	{
+		Legacy = 0,
+		BrightPassPrefilter = 1
+	};
+
 	class Renderer
 	{
 	public:
@@ -94,6 +100,9 @@ namespace Kerberos
 		static uint32_t GetBloomMipLevels();
 		static void SetBloomMipLevels(uint32_t levels);
 		static float& GetBloomIntensity();
+		static BloomMode& GetBloomMode();
+		static float& GetBloomThreshold();
+		static float& GetBloomKnee();
 		static TonemappingOperator& GetTonemappingOperator();
 
 		static glm::vec2 GetOutputImageSize();

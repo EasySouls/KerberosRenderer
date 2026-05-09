@@ -183,12 +183,15 @@ namespace
 		std::vector<glm::vec2> MipSizes{};
 		vk::Format Format = vk::Format::eUndefined;
 
-		constexpr static uint32_t MaxMipLevels = 7;
-		constexpr static uint32_t DefaultMipLevels = 5;
+		constexpr static uint32_t MaxMipLevels = 10;
+		constexpr static uint32_t DefaultMipLevels = 7;
 		uint32_t MipLevels = DefaultMipLevels;
 
 		float FilterRadius = 1.0f;
-		float Intensity = 0.05f;
+		float Intensity = 1.0f;
+		BloomMode Mode = BloomMode::BrightPassPrefilter;
+		float Threshold = 1.0f;
+		float Knee = 0.1f;
 
 		vk::raii::PipelineLayout DownsamplePipelineLayout = nullptr;
 		Ref<ComputePipeline> DownsamplePipeline = nullptr;
@@ -198,6 +201,9 @@ namespace
 		struct DownsamplePushConstants
 		{
 			glm::vec2 srcTexelSize{ 0.0f, 0.0f };
+			float threshold = 0.0f;
+			float knee = 0.0f;
+			uint32_t enablePrefilter = 0;
 		};
 
 		struct UpsamplePushConstants
@@ -355,7 +361,7 @@ namespace
 		bool PreviousUseGTAO = true;
 
 		AntiAliasingMode AntiAliasingMode = AntiAliasingMode::FXAA;
-		TonemappingOperator TonemappingOperator = TonemappingOperator::Uncharted;
+		TonemappingOperator TonemappingOperator = TonemappingOperator::ACES;
 	};
 
 }
@@ -2680,7 +2686,25 @@ namespace Kerberos
 					.layerCount = 1
 				}
 			};
-			const std::array barriers = { resolveImageBarrier, compositeImageBarrier, colorOutputImageBarrier };
+			const vk::ImageMemoryBarrier2 bloomImageBarrier = {
+				.srcStageMask = vk::PipelineStageFlagBits2::eTopOfPipe,
+				.srcAccessMask = {},
+				.dstStageMask = vk::PipelineStageFlagBits2::eComputeShader | vk::PipelineStageFlagBits2::eFragmentShader,
+				.dstAccessMask = vk::AccessFlagBits2::eShaderRead,
+				.oldLayout = vk::ImageLayout::eUndefined,
+				.newLayout = vk::ImageLayout::eShaderReadOnlyOptimal,
+				.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+				.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+				.image = s_Data->Bloom.Image,
+				.subresourceRange = {
+					.aspectMask = vk::ImageAspectFlagBits::eColor,
+					.baseMipLevel = 0,
+					.levelCount = s_Data->Bloom.MipLevels,
+					.baseArrayLayer = 0,
+					.layerCount = 1
+				}
+			};
+			const std::array barriers = { resolveImageBarrier, compositeImageBarrier, colorOutputImageBarrier, bloomImageBarrier };
 			const vk::DependencyInfo dependencyInfo = {
 				.dependencyFlags = {},
 				.imageMemoryBarrierCount = barriers.size(),
@@ -3106,7 +3130,25 @@ namespace Kerberos
 					.layerCount = 1
 				}
 			};
-			const std::array barriers = { resolveImageBarrier, compositeImageBarrier, colorOutputImageBarrier };
+			const vk::ImageMemoryBarrier2 bloomImageBarrier = {
+				.srcStageMask = vk::PipelineStageFlagBits2::eTopOfPipe,
+				.srcAccessMask = {},
+				.dstStageMask = vk::PipelineStageFlagBits2::eComputeShader | vk::PipelineStageFlagBits2::eFragmentShader,
+				.dstAccessMask = vk::AccessFlagBits2::eShaderRead,
+				.oldLayout = vk::ImageLayout::eUndefined,
+				.newLayout = vk::ImageLayout::eShaderReadOnlyOptimal,
+				.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+				.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+				.image = s_Data->Bloom.Image,
+				.subresourceRange = {
+					.aspectMask = vk::ImageAspectFlagBits::eColor,
+					.baseMipLevel = 0,
+					.levelCount = s_Data->Bloom.MipLevels,
+					.baseArrayLayer = 0,
+					.layerCount = 1
+				}
+			};
+			const std::array barriers = { resolveImageBarrier, compositeImageBarrier, colorOutputImageBarrier, bloomImageBarrier };
 			const vk::DependencyInfo dependencyInfo = {
 				.dependencyFlags = {},
 				.imageMemoryBarrierCount = barriers.size(),
@@ -3283,6 +3325,27 @@ namespace Kerberos
 		KBR_CORE_ASSERT(s_Data, "Renderer not initialized!");
 
 		return s_Data->Bloom.Intensity;
+	}
+
+	BloomMode& Renderer::GetBloomMode()
+	{
+		KBR_CORE_ASSERT(s_Data, "Renderer not initialized!");
+
+		return s_Data->Bloom.Mode;
+	}
+
+	float& Renderer::GetBloomThreshold()
+	{
+		KBR_CORE_ASSERT(s_Data, "Renderer not initialized!");
+
+		return s_Data->Bloom.Threshold;
+	}
+
+	float& Renderer::GetBloomKnee()
+	{
+		KBR_CORE_ASSERT(s_Data, "Renderer not initialized!");
+
+		return s_Data->Bloom.Knee;
 	}
 
 	TonemappingOperator& Renderer::GetTonemappingOperator() 
@@ -3788,11 +3851,11 @@ namespace Kerberos
 			};
 
 			const vk::ImageMemoryBarrier2 bloomBarrier = {
-				.srcStageMask = vk::PipelineStageFlagBits2::eTopOfPipe,
-				.srcAccessMask = {},
+				.srcStageMask = vk::PipelineStageFlagBits2::eFragmentShader,
+				.srcAccessMask = vk::AccessFlagBits2::eShaderRead,
 				.dstStageMask = vk::PipelineStageFlagBits2::eComputeShader,
-				.dstAccessMask = vk::AccessFlagBits2::eShaderStorageWrite,
-				.oldLayout = vk::ImageLayout::eUndefined,
+				.dstAccessMask = vk::AccessFlagBits2::eShaderRead | vk::AccessFlagBits2::eShaderStorageWrite,
+				.oldLayout = vk::ImageLayout::eShaderReadOnlyOptimal,
 				.newLayout = vk::ImageLayout::eGeneral,
 				.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
 				.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
@@ -3837,6 +3900,9 @@ namespace Kerberos
 
 			BloomData::DownsamplePushConstants pushConstants;
 			pushConstants.srcTexelSize = 1.0f / s_Data->OutputSize;
+			pushConstants.enablePrefilter = (s_Data->Bloom.Mode == BloomMode::BrightPassPrefilter) ? 1u : 0u;
+			pushConstants.threshold = std::max(s_Data->Bloom.Threshold, 0.0f);
+			pushConstants.knee = std::clamp(s_Data->Bloom.Knee, 0.0f, pushConstants.threshold + 1.0f);
 			cmd.pushConstants<BloomData::DownsamplePushConstants>(*s_Data->Bloom.DownsamplePipelineLayout, vk::ShaderStageFlagBits::eCompute, 0, { pushConstants });
 
 			const uint32_t groupX = (static_cast<uint32_t>(s_Data->Bloom.MipSizes[0].x) + groupSize - 1) / groupSize;
@@ -3855,6 +3921,9 @@ namespace Kerberos
 
 			BloomData::DownsamplePushConstants pushConstants;
 			pushConstants.srcTexelSize = 1.0f / s_Data->Bloom.MipSizes[mip];
+			pushConstants.enablePrefilter = 0u;
+			pushConstants.threshold = 0.0f;
+			pushConstants.knee = 0.0f;
 			cmd.pushConstants<BloomData::DownsamplePushConstants>(*s_Data->Bloom.DownsamplePipelineLayout, vk::ShaderStageFlagBits::eCompute, 0, { pushConstants });
 
 			const uint32_t groupX = (static_cast<uint32_t>(s_Data->Bloom.MipSizes[mip + 1].x) + groupSize - 1) / groupSize;

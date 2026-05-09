@@ -8,7 +8,25 @@ RWTexture2D<float4> dstTexture;
 cbuffer PushConstants 
 {
     float2 srcTexelSize; // 1.0 / srcResolution
+    float threshold;
+    float knee;
+    uint enablePrefilter;
 };
+
+float ComputePrefilter(float3 color, float bloomThreshold, float bloomKnee)
+{
+    float brightness = max(color.r, max(color.g, color.b));
+    float safeBrightness = max(brightness, 1e-5);
+
+    float safeKnee = max(bloomKnee, 1e-5);
+    float kneeStart = bloomThreshold - safeKnee;
+    float soft = saturate((brightness - kneeStart) / (2.0 * safeKnee));
+    soft = soft * soft * safeKnee;
+
+    float hard = max(brightness - bloomThreshold, 0.0);
+    float contribution = max(hard, soft) / safeBrightness;
+    return contribution;
+}
 
 [shader("compute")]
 [numthreads(8, 8, 1)]
@@ -45,6 +63,11 @@ void computeMain(uint3 threadId : SV_DispatchThreadID)
     color += (a + c + g + i) * 0.03125;
     color += (b + d + f + h) * 0.0625;
     color += (j + k + l + m) * 0.125;
+
+    if (enablePrefilter != 0)
+    {
+        color *= ComputePrefilter(color, threshold, knee);
+    }
 
     // Optional: Max clamp here to prevent infinite brightness (fireflies)
     // color = min(color, float3(1000.0));

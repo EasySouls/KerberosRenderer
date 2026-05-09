@@ -240,7 +240,7 @@ namespace Kerberos
 		std::memcpy(roughnessBufferStruct.Data, roughnessBuffer.data(), roughnessBufferStruct.Size);
 		m_RoughnessPlaceholder = Texture2D::FromBuffer(roughnessSpec, roughnessBufferStruct);
 
-		constexpr std::array<uint8_t, 4> metallicBuffer = { 0, 0, 0, 255 };
+		constexpr std::array<uint8_t, 4> metallicBuffer = { 255, 255, 255, 255 };
 		TextureSpecification metallicSpec{};
 		metallicSpec.Width = 1;
 		metallicSpec.Height = 1;

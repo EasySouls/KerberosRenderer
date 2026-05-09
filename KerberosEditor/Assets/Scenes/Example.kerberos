@@ -1,38 +1,8 @@
 Scene: Unnamed Scene
 Entities:
-  - Entity: 15955380022833623681
+  - Entity: 12904545083047205477
     TagComponent:
-      Tag: Avocado
-    TransformComponent:
-      Translation: [26.2, 8.1, 0]
-      Rotation: [0, 0, 0]
-      Scale: [50, 50, 50]
-    HierarchyComponent:
-      Parent: 0
-      Children:
-        []
-    StaticMeshComponent:
-      Mesh: 6728996633782092594
-      Material: 1896423241257672216
-      Texture: 0
-  - Entity: 11566809134058114666
-    TagComponent:
-      Tag: Armor
-    TransformComponent:
-      Translation: [-36, 0, 0]
-      Rotation: [1.5, 3.2, 0]
-      Scale: [0.2, 0.2, 0.2]
-    HierarchyComponent:
-      Parent: 0
-      Children:
-        []
-    StaticMeshComponent:
-      Mesh: 2975941018568995082
-      Material: 8912166731112440424
-      Texture: 0
-  - Entity: 2367564886165330739
-    TagComponent:
-      Tag: Sun
+      Tag: Lights
     TransformComponent:
       Translation: [0, 0, 0]
       Rotation: [0, 0, 0]
@@ -40,16 +10,13 @@ Entities:
     HierarchyComponent:
       Parent: 0
       Children:
-        []
-    DirectionalLightComponent:
-      Color: [1, 1, 1]
-      Direction: [0.4, 1.3, -0.3]
-      Intensity: 1
-  - Entity: 15916556452586618147
+        - 2256719706762566990
+        - 15916556452586618147
+  - Entity: 2256719706762566990
     TagComponent:
-      Tag: Blue Point Light
+      Tag: Yellow Point Light
     TransformComponent:
-      Translation: [20.8, -5, -22]
+      Translation: [-19.8, 13, 25]
       Rotation: [0, 0, 0]
       Scale: [0.5, 0.5, 0.5]
     HierarchyComponent:
@@ -57,79 +24,39 @@ Entities:
       Children:
         []
     PointLightComponent:
-      Color: [0, 0.319489, 1]
-      Position: [23, -5, -22]
-      Intensity: 800
-      Radius: 500
+      Color: [1, 0.92156863, 0.023529412]
+      Position: [-16, 13, 25]
+      Intensity: 500
+      Radius: 300
     StaticMeshComponent:
       Mesh: 5556831655075431416
       Material: 0
       Texture: 0
-  - Entity: 6203744401923915243
+  - Entity: 2427611190598499102
     TagComponent:
-      Tag: Main Camera
+      Tag: Dragon
     TransformComponent:
-      Translation: [0, 0, 0]
-      Rotation: [0, 0, 0]
-      Scale: [1, 1, 1]
-    CameraComponent:
-      Camera:
-        ProjectionType: 0
-        PerspectiveFOV: 0.7853982
-        PerspectiveNear: 0.01
-        PerspectiveFar: 100
-        OrthographicSize: 10
-        OrthographicNear: -1
-        OrthographicFar: 1
-      IsPrimary: true
-      FixedAspectRatio: false
-    HierarchyComponent:
-      Parent: 0
-      Children:
-        []
-  - Entity: 1211823799333201449
-    TagComponent:
-      Tag: Cube
-    TransformComponent:
-      Translation: [25.182259, -7.1, 0]
-      Rotation: [0, -0, 0]
-      Scale: [5, 5, 5]
-    HierarchyComponent:
-      Parent: 0
-      Children:
-        []
-    StaticMeshComponent:
-      Mesh: 5556831655075431416
-      Material: 3148316396032555593
-      Texture: 0
-  - Entity: 1004823327772732650
-    TagComponent:
-      Tag: Revolver
-    TransformComponent:
-      Translation: [-6.473844, 15, 0.34905815]
-      Rotation: [-1.4831889, 1.4999994, -4.2130736e-07]
-      Scale: [20, 20.000006, 20.000374]
-    HierarchyComponent:
-      Parent: 0
-      Children:
-        []
-    StaticMeshComponent:
-      Mesh: 12640333732108170778
-      Material: 3420994376372366335
-      Texture: 0
-  - Entity: 44958100548870983
-    TagComponent:
-      Tag: Voyager
-    TransformComponent:
-      Translation: [-20.071, 5.415, 0]
-      Rotation: [0, -0, 0]
+      Translation: [0, 0, 10.6]
+      Rotation: [4.8, 0, 3.14]
       Scale: [1, 1, 1]
     HierarchyComponent:
       Parent: 0
       Children:
         []
+    ScriptComponent:
+      ClassName: Kerberos.Source.Kerberos.Player
+      ScriptFields:
+        - Name: Speed
+          Type: Float
+          Data: 1
+        - Name: ShootingCooldownTime
+          Type: Float
+          Data: 1
+        - Name: BulletMesh
+          Type: MeshRef
+          Data: 5556831655075431416
     RigidBody3DComponent:
-      Mass: 16.1
+      Mass: 1
       Type: 1
       Velocity: [0, 0, 0]
       AngularVelocity: [0, 0, 0]
@@ -137,11 +64,11 @@ Entities:
       Friction: 0.5
       Restitution: 0.5
     BoxCollider3DComponent:
-      Size: [3.5, 3.1, 4]
-      Offset: [0, -1.3, 0]
+      Size: [7.4, 1.2, 4.8]
+      Offset: [0, 0, -4.2]
     StaticMeshComponent:
-      Mesh: 2971773807105207837
-      Material: 0
+      Mesh: 18177791179963863543
+      Material: 8036360350461290503
       Texture: 0
   - Entity: 4943794690679386388
     TagComponent:
@@ -169,31 +96,19 @@ Entities:
       Mesh: 5556831655075431416
       Material: 8036360350461290503
       Texture: 0
-  - Entity: 2427611190598499102
+  - Entity: 44958100548870983
     TagComponent:
-      Tag: Dragon
+      Tag: Voyager
     TransformComponent:
-      Translation: [0, 0, 10.6]
-      Rotation: [4.8, 0, 3.14]
+      Translation: [-20.071, 5.415, 0]
+      Rotation: [0, -0, 0]
       Scale: [1, 1, 1]
     HierarchyComponent:
       Parent: 0
       Children:
         []
-    ScriptComponent:
-      ClassName: Kerberos.Source.Kerberos.Player
-      ScriptFields:
-        - Name: BulletMesh
-          Type: MeshRef
-          Data: 5556831655075431416
-        - Name: ShootingCooldownTime
-          Type: Float
-          Data: 1
-        - Name: Speed
-          Type: Float
-          Data: 1
     RigidBody3DComponent:
-      Mass: 1
+      Mass: 16.1
       Type: 1
       Velocity: [0, 0, 0]
       AngularVelocity: [0, 0, 0]
@@ -201,17 +116,69 @@ Entities:
       Friction: 0.5
       Restitution: 0.5
     BoxCollider3DComponent:
-      Size: [7.4, 1.2, 4.8]
-      Offset: [0, 0, -4.2]
+      Size: [3.5, 3.1, 4]
+      Offset: [0, -1.3, 0]
     StaticMeshComponent:
-      Mesh: 18177791179963863543
-      Material: 8036360350461290503
+      Mesh: 2971773807105207837
+      Material: 0
       Texture: 0
-  - Entity: 2256719706762566990
+  - Entity: 1004823327772732650
     TagComponent:
-      Tag: Yellow Point Light
+      Tag: Revolver
     TransformComponent:
-      Translation: [-19.8, 13, 25]
+      Translation: [-6.473844, 15, 0.34905815]
+      Rotation: [-1.4831889, 1.4999994, -4.2130736e-07]
+      Scale: [20, 20.000006, 20.000374]
+    HierarchyComponent:
+      Parent: 0
+      Children:
+        []
+    StaticMeshComponent:
+      Mesh: 12640333732108170778
+      Material: 3420994376372366335
+      Texture: 0
+  - Entity: 1211823799333201449
+    TagComponent:
+      Tag: Cube
+    TransformComponent:
+      Translation: [25.182259, -7.1, 0]
+      Rotation: [0, -0, 0]
+      Scale: [5, 5, 5]
+    HierarchyComponent:
+      Parent: 0
+      Children:
+        []
+    StaticMeshComponent:
+      Mesh: 5556831655075431416
+      Material: 3148316396032555593
+      Texture: 0
+  - Entity: 6203744401923915243
+    TagComponent:
+      Tag: Main Camera
+    TransformComponent:
+      Translation: [0, 0, 0]
+      Rotation: [0, 0, 0]
+      Scale: [1, 1, 1]
+    CameraComponent:
+      Camera:
+        ProjectionType: 0
+        PerspectiveFOV: 0.7853982
+        PerspectiveNear: 0.01
+        PerspectiveFar: 100
+        OrthographicSize: 10
+        OrthographicNear: -1
+        OrthographicFar: 1
+      IsPrimary: true
+      FixedAspectRatio: false
+    HierarchyComponent:
+      Parent: 0
+      Children:
+        []
+  - Entity: 15916556452586618147
+    TagComponent:
+      Tag: Blue Point Light
+    TransformComponent:
+      Translation: [20.8, -5, -22]
       Rotation: [0, 0, 0]
       Scale: [0.5, 0.5, 0.5]
     HierarchyComponent:
@@ -219,17 +186,17 @@ Entities:
       Children:
         []
     PointLightComponent:
-      Color: [1, 0.92156863, 0.023529412]
-      Position: [-16, 13, 25]
+      Color: [0, 0.319489, 1]
+      Position: [23, -5, -22]
       Intensity: 500
-      Radius: 300
+      Radius: 500
     StaticMeshComponent:
       Mesh: 5556831655075431416
       Material: 0
       Texture: 0
-  - Entity: 12904545083047205477
+  - Entity: 2367564886165330739
     TagComponent:
-      Tag: Lights
+      Tag: Sun
     TransformComponent:
       Translation: [0, 0, 0]
       Rotation: [0, 0, 0]
@@ -237,5 +204,38 @@ Entities:
     HierarchyComponent:
       Parent: 0
       Children:
-        - 2256719706762566990
-        - 15916556452586618147
+        []
+    DirectionalLightComponent:
+      Color: [1, 1, 1]
+      Direction: [0.4, 1.3, -0.3]
+      Intensity: 1
+  - Entity: 11566809134058114666
+    TagComponent:
+      Tag: Armor
+    TransformComponent:
+      Translation: [-36, 0, 0]
+      Rotation: [1.5, 3.2, 0]
+      Scale: [0.2, 0.2, 0.2]
+    HierarchyComponent:
+      Parent: 0
+      Children:
+        []
+    StaticMeshComponent:
+      Mesh: 2975941018568995082
+      Material: 8912166731112440424
+      Texture: 0
+  - Entity: 15955380022833623681
+    TagComponent:
+      Tag: Avocado
+    TransformComponent:
+      Translation: [26.2, 8.1, 0]
+      Rotation: [0, 0, 0]
+      Scale: [50, 50, 50]
+    HierarchyComponent:
+      Parent: 0
+      Children:
+        []
+    StaticMeshComponent:
+      Mesh: 6728996633782092594
+      Material: 1896423241257672216
+      Texture: 0
