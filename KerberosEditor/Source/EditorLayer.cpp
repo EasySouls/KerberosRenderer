@@ -969,7 +969,7 @@ namespace Kerberos
 		}
 
 		TonemappingOperator& tonemappingOperator = Renderer::GetTonemappingOperator();
-		const char* tonemappingOperatorItems[] = { "Uncharted 2", "Reinhard", "ACES" };
+		const char* tonemappingOperatorItems[] = { "Uncharted 2", "Reinhard", "ACES", "ACES Fitted" };
 		if (ImGui::Combo("Tonemapping operator", reinterpret_cast<int*>(&tonemappingOperator), tonemappingOperatorItems, IM_ARRAYSIZE(tonemappingOperatorItems)))
 		{
 			Renderer::GetTonemappingOperator() = static_cast<TonemappingOperator>(tonemappingOperator);

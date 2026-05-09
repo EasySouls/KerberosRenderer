@@ -56,7 +56,8 @@ namespace Kerberos
 	{
 		Uncharted = 0,
 		Reinhard = 1,
-		ACES = 2
+		ACES = 2,
+		ACESFitted = 3
 	};
 
 	enum class BloomMode

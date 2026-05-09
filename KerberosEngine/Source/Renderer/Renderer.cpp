@@ -129,7 +129,7 @@ namespace
 	struct GlobalLighting
 	{
 		alignas(16) glm::vec4 sunLight{ 0.0f, 0.0f, 0.0f, 0.0f };
-		float exposure = 4.5f;
+		float exposure = 1.0f;
 		float gamma = 2.2f;
 	};
 

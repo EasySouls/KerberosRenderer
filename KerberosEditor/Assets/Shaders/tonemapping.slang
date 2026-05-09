@@ -28,6 +28,50 @@ float3 ReinhardTonemap(float3 color)
     return color / (color + 1.0f);
 }
 
+float3 ACESFittedTonemap(float3 color, float exposure, float3 white)
+{
+    const float A = 0.0245786f;
+    const float B = 0.000090537f;
+    const float C = 0.983729f;
+    const float D = 0.432951f;
+    const float E = 0.238081f;
+
+    const float3x3 rgb_to_rrt = float3x3(
+		float3(0.59719f, 0.35458f, 0.04823f),
+		float3(0.07600f, 0.90834f, 0.01566f),
+        float3(0.02840f, 0.13383f, 0.83777f)
+	);
+
+    const float3x3 odt_to_rgb = float3x3(
+		float3(1.60475f, -0.53108f, -0.07367f),
+		float3(-0.10208f, 1.10813f, -0.00605f),
+        float3(-0.00327f, -0.07276f, 1.07602f)
+	);
+
+    // Apply exposure
+    color *= exposure;
+    white *= exposure;
+
+    // ACES input transform
+    color = mul(rgb_to_rrt, color);
+
+    // RRT + ODT fit
+    float3 color_tonemapped =
+		(color * (color + A) - B) /
+		(color * (C * color + D) + E);
+
+    // Output transform
+    color_tonemapped = mul(odt_to_rgb, color_tonemapped);
+
+    // White normalization
+
+    float3 white_tonemapped =
+		(white * (white + A) - B) /
+		(white * (C * white + D) + E);
+
+    return color_tonemapped / white_tonemapped;
+}
+
 public float3 ApplyGammaCorrection(float3 color, float gamma)
 {
     return pow(color, (1.0f / gamma).xxx);
@@ -36,6 +80,7 @@ public float3 ApplyGammaCorrection(float3 color, float gamma)
 const static float TonemapUncharted = 0;
 const static float TonemapReinhard = 1;
 const static float TonemapACES = 2;
+const static float TonemapACESFitted = 3;
 
 public float3 ApplyToneMapping(float3 color, float exposure, float tonemapOperator)
 {
@@ -49,6 +94,9 @@ public float3 ApplyToneMapping(float3 color, float exposure, float tonemapOperat
     }
     else if (tonemapOperator == TonemapACES) {
         tonemapped = ACESFilmicTonemap(color * exposure);
+    }
+    else if (tonemapOperator == TonemapACESFitted) {
+        tonemapped = ACESFittedTonemap(color, exposure, float3(1.0f, 1.0f, 1.0f));
     }
     return tonemapped;
 }
