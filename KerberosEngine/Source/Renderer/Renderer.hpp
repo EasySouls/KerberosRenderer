@@ -104,6 +104,7 @@ namespace Kerberos
 		static BloomMode& GetBloomMode();
 		static float& GetBloomThreshold();
 		static float& GetBloomKnee();
+		static float& GetBloomMaxBrightness();
 		static TonemappingOperator& GetTonemappingOperator();
 
 		static glm::vec2 GetOutputImageSize();

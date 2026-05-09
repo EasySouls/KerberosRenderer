@@ -52,7 +52,7 @@ float4 resolveMain(VSOutput input) : SV_Target
         distortedUV = uv;
     }
 
-    float3 background = texOpaqueColor.Sample(distortedUV).rgb;
+    float4 background = texOpaqueColor.Sample(distortedUV);
 
     // Suppress potential overflow/infinite artifacts
     if (isinf(max(max(accum.r, accum.g), accum.b))) {
@@ -61,10 +61,8 @@ float4 resolveMain(VSOutput input) : SV_Target
 
     float3 transparentColor = accum.rgb / max(accum.a, 0.00001f);
 
-    float3 sceneColor = transparentColor + (background * revealage);
+    float3 sceneColor = transparentColor + (background.rgb * revealage);
+    float bloomMask = background.a;
 
-    // Calculate Luma (perceptual brightness) for FXAA
-    float luma = dot(sceneColor, float3(0.299, 0.587, 0.114));
-
-    return float4(sceneColor, luma);
+    return float4(sceneColor, bloomMask);
 }

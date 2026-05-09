@@ -172,7 +172,7 @@ namespace
 	{
 		glm::vec2 inverseViewportSize{ 0.0f, 0.0f };
 		float bloomIntensity = 0.05f;
-		float tonemapOperator = 0.0f; // 0 = Uncharted, 1 = Reinhard, 2 = ACES
+		float tonemapOperator = 0.0f; // 0 = Uncharted, 1 = Reinhard, 2 = ACES Filmic, 3 = ACES Fitted
 	};
 
 	struct BloomData
@@ -192,6 +192,7 @@ namespace
 		BloomMode Mode = BloomMode::BrightPassPrefilter;
 		float Threshold = 1.0f;
 		float Knee = 0.1f;
+		float MaxBrightness = 20.0f;
 
 		vk::raii::PipelineLayout DownsamplePipelineLayout = nullptr;
 		Ref<ComputePipeline> DownsamplePipeline = nullptr;
@@ -204,6 +205,8 @@ namespace
 			float threshold = 0.0f;
 			float knee = 0.0f;
 			uint32_t enablePrefilter = 0;
+			uint32_t isExtract = 0;
+			float maxBrightness = 0.0f;
 		};
 
 		struct UpsamplePushConstants
@@ -3348,6 +3351,13 @@ namespace Kerberos
 		return s_Data->Bloom.Knee;
 	}
 
+	float& Renderer::GetBloomMaxBrightness() 
+	{
+		KBR_CORE_ASSERT(s_Data, "Renderer not initialized!");
+
+		return s_Data->Bloom.MaxBrightness;
+	}
+
 	TonemappingOperator& Renderer::GetTonemappingOperator() 
 	{
 		KBR_CORE_ASSERT(s_Data, "Renderer not initialized!");
@@ -3903,6 +3913,8 @@ namespace Kerberos
 			pushConstants.enablePrefilter = (s_Data->Bloom.Mode == BloomMode::BrightPassPrefilter) ? 1u : 0u;
 			pushConstants.threshold = std::max(s_Data->Bloom.Threshold, 0.0f);
 			pushConstants.knee = std::clamp(s_Data->Bloom.Knee, 0.0f, pushConstants.threshold + 1.0f);
+			pushConstants.isExtract = 1;
+			pushConstants.maxBrightness = s_Data->Bloom.MaxBrightness;
 			cmd.pushConstants<BloomData::DownsamplePushConstants>(*s_Data->Bloom.DownsamplePipelineLayout, vk::ShaderStageFlagBits::eCompute, 0, { pushConstants });
 
 			const uint32_t groupX = (static_cast<uint32_t>(s_Data->Bloom.MipSizes[0].x) + groupSize - 1) / groupSize;
@@ -3924,6 +3936,7 @@ namespace Kerberos
 			pushConstants.enablePrefilter = 0u;
 			pushConstants.threshold = 0.0f;
 			pushConstants.knee = 0.0f;
+			pushConstants.isExtract = 0;
 			cmd.pushConstants<BloomData::DownsamplePushConstants>(*s_Data->Bloom.DownsamplePipelineLayout, vk::ShaderStageFlagBits::eCompute, 0, { pushConstants });
 
 			const uint32_t groupX = (static_cast<uint32_t>(s_Data->Bloom.MipSizes[mip + 1].x) + groupSize - 1) / groupSize;

@@ -77,6 +77,9 @@ AssetRegistry:
   - Handle: 15732811219696105851
     Type: Texture2D
     Path: Assets\Textures\stonefloor02_normal_rgba.ktx2
+  - Handle: 16678733153879101124
+    Type: Texture2D
+    Path: Assets\Textures\colored_glass_rgba.ktx2
   - Handle: 17603742072307990361
     Type: Texture2D
     Path: Assets\Models\cerberus\ao.ktx2

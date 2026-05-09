@@ -63,5 +63,6 @@ float4 fragmentMain(VSOutput input)
  //   // Gamma correction
  //   color = pow(color, (1.0f / globalLighting.gamma).xxx);
 
-	return float4(color, 1.0);
+    float bloomMask = 0.0;
+	return float4(color, bloomMask);
 }

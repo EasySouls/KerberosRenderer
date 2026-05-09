@@ -39,6 +39,18 @@ VSOutput vertexMain(uint vertexID : SV_VertexID)
     return output;
 }
 
+// Helper function to calculate LDR Luma from an HDR texture
+float SampleLuma(float2 uv)
+{
+    float3 hdrColor = sceneColorTex.SampleLevel(linearSampler, uv, 0.0).rgb;
+
+    // Fast Reinhard Tonemap just for edge detection (compresses HDR to 0-1)
+    float3 ldrColor = hdrColor / (1.0 + hdrColor);
+
+    // Calculate Perceptual Luma
+    return dot(ldrColor, float3(0.299, 0.587, 0.114));
+}
+
 static const float FXAA_EDGE_THRESHOLD_MIN = 0.0833;
 static const float FXAA_EDGE_THRESHOLD = 0.166;
 static const float FXAA_SUBPIX_CAP = 0.75;
@@ -52,12 +64,12 @@ float3 ApplyFXAA(float2 uv)
     float2 texelSize = pc.inverseScreenSize;
     // Sample center and 4 direct neighbors
     float4 colorCenter = sceneColorTex.SampleLevel(linearSampler, uv, 0.0);
-    float lumaM = colorCenter.a; // Luma must be pre-calculated in alpha
+    float lumaM = SampleLuma(uv);
 
-    float lumaS = sceneColorTex.SampleLevel(linearSampler, uv + float2(0.0, 1.0) * texelSize, 0.0).a;
-    float lumaN = sceneColorTex.SampleLevel(linearSampler, uv + float2(0.0, -1.0) * texelSize, 0.0).a;
-    float lumaE = sceneColorTex.SampleLevel(linearSampler, uv + float2(1.0, 0.0) * texelSize, 0.0).a;
-    float lumaW = sceneColorTex.SampleLevel(linearSampler, uv + float2(-1.0, 0.0) * texelSize, 0.0).a;
+    float lumaS = SampleLuma(uv + float2(0.0, 1.0) * texelSize);
+    float lumaN = SampleLuma(uv + float2(0.0, -1.0) * texelSize);
+    float lumaE = SampleLuma(uv + float2(1.0, 0.0) * texelSize);
+    float lumaW = SampleLuma(uv + float2(-1.0, 0.0) * texelSize);
     // Find contrast (max - min luma)
     float maxLuma = max(lumaM, max(max(lumaN, lumaS), max(lumaE, lumaW)));
     float minLuma = min(lumaM, min(min(lumaN, lumaS), min(lumaE, lumaW)));
@@ -69,10 +81,10 @@ float3 ApplyFXAA(float2 uv)
     }
 
     // Sample diagonals to determine edge direction
-    float lumaNW = sceneColorTex.SampleLevel(linearSampler, uv + float2(-1.0, -1.0) * texelSize, 0.0).a;
-    float lumaNE = sceneColorTex.SampleLevel(linearSampler, uv + float2(1.0, -1.0) * texelSize, 0.0).a;
-    float lumaSW = sceneColorTex.SampleLevel(linearSampler, uv + float2(-1.0, 1.0) * texelSize, 0.0).a;
-    float lumaSE = sceneColorTex.SampleLevel(linearSampler, uv + float2(1.0, 1.0) * texelSize, 0.0).a;
+    float lumaNW = SampleLuma(uv + float2(-1.0, -1.0) * texelSize);
+    float lumaNE = SampleLuma(uv + float2(1.0, -1.0) * texelSize);
+    float lumaSW = SampleLuma(uv + float2(-1.0, 1.0) * texelSize);
+    float lumaSE = SampleLuma(uv + float2(1.0, 1.0) * texelSize);
 
     // Calculate vertical and horizontal edge presence
     float edgeHorz = 
@@ -118,8 +130,8 @@ float3 ApplyFXAA(float2 uv)
     float2 uv1 = currentUv - offset;
     float2 uv2 = currentUv + offset;
 
-    float lumaEnd1 = sceneColorTex.SampleLevel(linearSampler, uv1, 0.0).a - lumaLocalAverage;
-    float lumaEnd2 = sceneColorTex.SampleLevel(linearSampler, uv2, 0.0).a - lumaLocalAverage;
+    float lumaEnd1 = SampleLuma(uv1) - lumaLocalAverage;
+    float lumaEnd2 = SampleLuma(uv2) - lumaLocalAverage;
 
     bool reached1 = abs(lumaEnd1) >= gradientScaled;
     bool reached2 = abs(lumaEnd2) >= gradientScaled;
@@ -130,12 +142,12 @@ float3 ApplyFXAA(float2 uv)
     [unroll]
     for (int i = 2; i < FXAA_ITERATIONS; i++) {
         if (!reached1) {
-            lumaEnd1 = sceneColorTex.SampleLevel(linearSampler, uv1, 0.0).a - lumaLocalAverage;
+            lumaEnd1 = SampleLuma(uv1) - lumaLocalAverage;
             if (abs(lumaEnd1) >= gradientScaled) reached1 = true;
             else uv1 -= offset * SEARCH_STEPS[i];
         }
         if (!reached2) {
-            lumaEnd2 = sceneColorTex.SampleLevel(linearSampler, uv2, 0.0).a - lumaLocalAverage;
+            lumaEnd2 = SampleLuma(uv2) - lumaLocalAverage;
             if (abs(lumaEnd2) >= gradientScaled) reached2 = true;
             else uv2 += offset * SEARCH_STEPS[i];
         }
