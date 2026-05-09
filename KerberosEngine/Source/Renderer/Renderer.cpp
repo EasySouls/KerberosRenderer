@@ -112,6 +112,7 @@ namespace
 		vk::raii::DescriptorSetLayout composite = nullptr;
 		vk::raii::DescriptorSetLayout gtao = nullptr;
 		vk::raii::DescriptorSetLayout fxaa = nullptr;
+		vk::raii::DescriptorSetLayout bloom = nullptr;
 	};
 
 	struct SceneUniformData
@@ -170,6 +171,43 @@ namespace
 	struct FXAAPushConstants
 	{
 		glm::vec2 inverseViewportSize{ 0.0f, 0.0f };
+		float bloomIntensity = 0.05f;
+		float tonemapOperator = 0.0f; // 0 = Uncharted, 1 = Reinhard, 2 = ACES
+	};
+
+	struct BloomData
+	{
+		vk::raii::Image Image = nullptr;
+		vk::raii::DeviceMemory ImageMemory = nullptr;
+		std::vector<vk::raii::ImageView> ImageViews{};
+		std::vector<glm::vec2> MipSizes{};
+		vk::Format Format = vk::Format::eUndefined;
+
+		constexpr static uint32_t MaxMipLevels = 7;
+		constexpr static uint32_t DefaultMipLevels = 5;
+		uint32_t MipLevels = DefaultMipLevels;
+
+		float FilterRadius = 1.0f;
+		float Intensity = 0.05f;
+
+		vk::raii::PipelineLayout DownsamplePipelineLayout = nullptr;
+		Ref<ComputePipeline> DownsamplePipeline = nullptr;
+		vk::raii::PipelineLayout UpsamplePipelineLayout = nullptr;
+		Ref<ComputePipeline> UpsamplePipeline = nullptr;
+
+		struct DownsamplePushConstants
+		{
+			glm::vec2 srcTexelSize{ 0.0f, 0.0f };
+		};
+
+		struct UpsamplePushConstants
+		{
+			float filterRadius = 1.0f;
+		};
+
+		vk::raii::DescriptorSet ExtractSet = nullptr;
+		std::vector<vk::raii::DescriptorSet> DownsampleSets;
+		std::vector<vk::raii::DescriptorSet> UpsampleSets;
 	};
 
 	struct UniformBufferObject
@@ -190,7 +228,7 @@ namespace
 	{
 		vk::raii::DescriptorSet scene = nullptr;
 		vk::raii::DescriptorSet skybox = nullptr;
-		vk::raii::DescriptorSet composite = nullptr;
+		vk::raii::DescriptorSet resolve = nullptr;
 		vk::raii::DescriptorSet gtao = nullptr;
 		vk::raii::DescriptorSet fxaa = nullptr;
 	};
@@ -230,10 +268,13 @@ namespace
 		};
 
 		MaterialRegistry MaterialRegistry;
+
 		DepthBias DepthBias;
 		ShadowMap ShadowMap;
 		Skybox Skybox;
 		WBOITData Transparency;
+		BloomData Bloom;
+
 		ImageData ColorImage;
 		ImageData DepthImage;
 		ImageData NormalImage;
@@ -259,8 +300,8 @@ namespace
 		vk::raii::PipelineLayout GTAOPipelineLayout = nullptr;
 		Ref<ComputePipeline> GTAOPipeline = nullptr;
 
-		vk::raii::PipelineLayout CompositePipelineLayout = nullptr;
-		Ref<GraphicsPipeline> CompositePipeline = nullptr;
+		vk::raii::PipelineLayout TransparencyResolvePipelineLayout = nullptr;
+		Ref<GraphicsPipeline> TransparencyResolvePipeline = nullptr;
 
 		vk::raii::PipelineLayout FXAAPipelineLayout = nullptr;
 		Ref<GraphicsPipeline> FXAAPipeline = nullptr;
@@ -314,6 +355,7 @@ namespace
 		bool PreviousUseGTAO = true;
 
 		AntiAliasingMode AntiAliasingMode = AntiAliasingMode::FXAA;
+		TonemappingOperator TonemappingOperator = TonemappingOperator::Uncharted;
 	};
 
 }
@@ -322,6 +364,28 @@ namespace Kerberos
 {
 
 	static Owner<RendererData> s_Data = nullptr;
+
+	void Renderer::BeginRenderPassDebugLabel(const vk::raii::CommandBuffer& cmd, const std::string_view labelName)
+	{
+#ifdef KBR_DEBUG
+		const vk::DebugUtilsLabelEXT labelInfo{
+			.pLabelName = labelName.data()
+		};
+		cmd.beginDebugUtilsLabelEXT(labelInfo);
+#else
+		(void)cmd;
+		(void)labelName;
+#endif
+	}
+
+	void Renderer::EndRenderPassDebugLabel(const vk::raii::CommandBuffer& cmd)
+	{
+#ifdef KBR_DEBUG
+		cmd.endDebugUtilsLabelEXT();
+#else
+		(void)cmd;
+#endif
+	}
 
 	void Renderer::Init()
 	{
@@ -572,6 +636,7 @@ namespace Kerberos
 				.pDepthAttachment = &depthAttachmentInfo
 			};
 
+			BeginRenderPassDebugLabel(cmd, "Depth Pre-Pass");
 			cmd.beginRendering(depthPrePassRenderingInfo);
 			cmd.setViewport(0, viewport);
 			cmd.setScissor(0, renderArea);
@@ -603,6 +668,7 @@ namespace Kerberos
 			}
 
 			cmd.endRendering();
+			EndRenderPassDebugLabel(cmd);
 
 			WriteGPUTimestamp(cmd, frameIndex, static_cast<uint32_t>(GPUTimestampQuery::DepthPrePassEnd));
 		}
@@ -646,6 +712,12 @@ namespace Kerberos
 				.extent = vk::Extent2D{.width = s_Data->ShadowMap.Size, .height = s_Data->ShadowMap.Size }
 			};
 
+			static constexpr std::array<std::string_view, ShadowMap::CascadeCount> ShadowCascadePassLabels = {
+				"Shadow Pass (Cascade 0)",
+				"Shadow Pass (Cascade 1)",
+				"Shadow Pass (Cascade 2)",
+				"Shadow Pass (Cascade 3)"
+			};
 			for (uint32_t cascadeIndex = 0; cascadeIndex < ShadowMap::CascadeCount; ++cascadeIndex)
 			{
 				vk::RenderingAttachmentInfo shadowMapDepthAttachmentInfo{
@@ -664,6 +736,7 @@ namespace Kerberos
 					.pDepthAttachment = &shadowMapDepthAttachmentInfo
 				};
 
+				BeginRenderPassDebugLabel(cmd, ShadowCascadePassLabels[cascadeIndex]);
 				cmd.beginRendering(shadowMapRenderingInfo);
 				cmd.setViewport(0, vk::Viewport{
 									.x = 0.0f, .y = 0.0f,
@@ -701,6 +774,7 @@ namespace Kerberos
 				}
 				
 				cmd.endRendering();
+				EndRenderPassDebugLabel(cmd);
 			}
 
 			WriteGPUTimestamp(cmd, frameIndex, static_cast<uint32_t>(GPUTimestampQuery::ShadowEnd));
@@ -800,6 +874,8 @@ namespace Kerberos
 					cmd.pipelineBarrier2(dependencyInfo);
 				}
 
+				BeginRenderPassDebugLabel(cmd, "GTAO Compute Pass");
+
 				cmd.bindPipeline(vk::PipelineBindPoint::eCompute, *s_Data->GTAOPipeline->GetVulkanPipeline());
 				cmd.bindDescriptorSets(vk::PipelineBindPoint::eCompute, *s_Data->GTAOPipelineLayout, 0, { s_Data->DescriptorSets[currentImage].gtao }, {});
 
@@ -807,6 +883,8 @@ namespace Kerberos
 				const uint32_t groupY = (static_cast<uint32_t>(s_Data->OutputSize.y) + 7) / 8;
 
 				cmd.dispatch(groupX, groupY, 1);
+
+				EndRenderPassDebugLabel(cmd);
 
 				// Transition ao image from storage image to sampled image
 				// and transition depth image back to depth attachment
@@ -1109,6 +1187,7 @@ namespace Kerberos
 				.pDepthAttachment = &depthAttachmentInfo
 			};
 
+			BeginRenderPassDebugLabel(cmd, "Opaque Pass");
 			cmd.beginRendering(renderingInfo);
 
 			cmd.setViewport(0, viewport);
@@ -1228,6 +1307,7 @@ namespace Kerberos
 			}
 
 			cmd.endRendering();
+			EndRenderPassDebugLabel(cmd);
 
 			WriteGPUTimestamp(cmd, frameIndex, static_cast<uint32_t>(GPUTimestampQuery::OpaqueEnd));
 
@@ -1321,6 +1401,7 @@ namespace Kerberos
 				.pDepthAttachment = &depthAttachmentInfo
 			};
 
+			BeginRenderPassDebugLabel(cmd, "Transparent Pass");
 			cmd.beginRendering(renderingInfo);
 
 			cmd.setViewport(0, viewport);
@@ -1354,6 +1435,7 @@ namespace Kerberos
 			}
 
 			cmd.endRendering();
+			EndRenderPassDebugLabel(cmd);
 
 			WriteGPUTimestamp(cmd, frameIndex, static_cast<uint32_t>(GPUTimestampQuery::TransparentEnd));
 
@@ -1391,6 +1473,7 @@ namespace Kerberos
 					.pDepthAttachment = &depthAttachmentInfo
 				};
 
+				BeginRenderPassDebugLabel(cmd, "Collider Debug Pass");
 				cmd.beginRendering(renderingInfo);
 				cmd.setViewport(0, viewport);
 				cmd.setScissor(0, renderArea);
@@ -1406,6 +1489,7 @@ namespace Kerberos
 				cmd.draw(vertexCount, 1, 0, 0);
 
 				cmd.endRendering();
+				EndRenderPassDebugLabel(cmd);
 			}
 		}
 
@@ -1518,25 +1602,29 @@ namespace Kerberos
 				.pColorAttachments = &colorAttachmentInfo,
 				.pDepthAttachment = nullptr
 			};
+			BeginRenderPassDebugLabel(cmd, "Transparency Resolve Pass");
 			cmd.beginRendering(renderingInfo);
 			cmd.setViewport(0, viewport);
 			cmd.setScissor(0, renderArea);
 
-			s_Data->CompositePipeline->Bind(cmd);
+			s_Data->TransparencyResolvePipeline->Bind(cmd);
 			cmd.bindDescriptorSets(
 				vk::PipelineBindPoint::eGraphics,
-				*s_Data->CompositePipelineLayout,
+				*s_Data->TransparencyResolvePipelineLayout,
 				0,
-				*s_Data->DescriptorSets[currentImage].composite,
+				*s_Data->DescriptorSets[currentImage].resolve,
 				{});
 			cmd.draw(3, 1, 0, 0);
 
 			cmd.endRendering();
+			EndRenderPassDebugLabel(cmd);
 
 			//WriteGPUTimestamp(cmd, frameIndex, static_cast<uint32_t>(GPUTimestampQuery::TransparencyResolveEnd));
 
 			KBR_CORE_TRACE("Transparency resolve pass done!");
 		}
+
+		ApplyBloom(cmd, currentImage);
 
 		ApplyPostProcessing(cmd, currentImage);
 
@@ -1994,7 +2082,7 @@ namespace Kerberos
 		// Create the opaque pipeline resources
 		{
 			s_Data->ColorImage.Format = context.FindSupportedFormat(
-				{ vk::Format::eR32G32B32A32Sfloat, vk::Format::eR32G32B32A32Uint },
+				{ vk::Format::eR16G16B16A16Sfloat, vk::Format::eR32G32B32A32Sfloat },
 				vk::ImageTiling::eOptimal,
 				vk::FormatFeatureFlagBits::eColorAttachment | vk::FormatFeatureFlagBits::eColorAttachmentBlend | vk::FormatFeatureFlagBits::eSampledImage
 			);
@@ -2004,9 +2092,8 @@ namespace Kerberos
 				vk::FormatFeatureFlagBits::eColorAttachment | vk::FormatFeatureFlagBits::eTransferSrc
 			);
 
-			// TODO: Check format
 			s_Data->ResolveImage.Format = context.FindSupportedFormat(
-				{ vk::Format::eR32G32B32A32Sfloat, vk::Format::eR32G32B32A32Uint },
+				{ vk::Format::eR16G16B16A16Sfloat, vk::Format::eR32G32B32A32Sfloat },
 				vk::ImageTiling::eOptimal,
 				vk::FormatFeatureFlagBits::eColorAttachment | vk::FormatFeatureFlagBits::eSampledImage
 			);
@@ -2372,7 +2459,13 @@ namespace Kerberos
 			s_Data->Transparency.MainPipeline = CreateRef<GraphicsPipeline>(transparentPipelineSpec);
 		}
 
+		// Has to be created before setting up transparency descriptors, since currently the resolve pass does the tonemapping
+		CreateBloomResources(static_cast<uint32_t>(s_Data->OutputSize.x), static_cast<uint32_t>(s_Data->OutputSize.y));
+
 		SetupTransparencyDescriptors();
+
+		SetupBloomDescriptors();
+
 
 		// Create composite pipeline resources
 		{
@@ -2387,15 +2480,15 @@ namespace Kerberos
 				.pPushConstantRanges = nullptr
 			};
 
-			s_Data->CompositePipelineLayout = vk::raii::PipelineLayout{ device, compositePipelineLayoutInfo };
-			context.SetObjectDebugName(s_Data->CompositePipelineLayout, "Composite Pipeline Layout");
+			s_Data->TransparencyResolvePipelineLayout = vk::raii::PipelineLayout{ device, compositePipelineLayoutInfo };
+			context.SetObjectDebugName(s_Data->TransparencyResolvePipelineLayout, "Transparency Resolve Pipeline Layout");
 
-			Ref<Shader> compositeShader = CreateRef<Shader>("transparency_resolve", "Composite");
+			Ref<Shader> compositeShader = CreateRef<Shader>("transparency_resolve", "Transparency Resolve");
 
 			GraphicsPipelineSpecification compositePipelineSpec{};
-			compositePipelineSpec.Name = "Composite Pipeline";
+			compositePipelineSpec.Name = "Transparency Resolve Pipeline";
 			compositePipelineSpec.Shader = compositeShader;
-			compositePipelineSpec.PipelineLayout = *s_Data->CompositePipelineLayout;
+			compositePipelineSpec.PipelineLayout = *s_Data->TransparencyResolvePipelineLayout;
 			compositePipelineSpec.BindingDescription = {};
 			compositePipelineSpec.InputAttributeDescriptions = {};
 			compositePipelineSpec.SampleCount = vk::SampleCountFlagBits::e1;
@@ -2409,7 +2502,7 @@ namespace Kerberos
 			compositePipelineSpec.DepthAttachmentFormat = std::nullopt;
 			compositePipelineSpec.DynamicStates = commonDynamicStates;
 
-			s_Data->CompositePipeline = CreateRef<GraphicsPipeline>(compositePipelineSpec);
+			s_Data->TransparencyResolvePipeline = CreateRef<GraphicsPipeline>(compositePipelineSpec);
 		}
 
 		// Create fxaa pipeline resources
@@ -2418,20 +2511,34 @@ namespace Kerberos
 			constexpr uint32_t initialImageHeight = 1080;
 
 			std::vector<vk::DescriptorSetLayoutBinding> bindings = {
-			vk::DescriptorSetLayoutBinding{ // Scene color with Luma
-				.binding = 0,
-				.descriptorType = vk::DescriptorType::eSampledImage,
-				.descriptorCount = 1,
-				.stageFlags = vk::ShaderStageFlagBits::eFragment,
-				.pImmutableSamplers = nullptr
-			},
-			vk::DescriptorSetLayoutBinding{ // Linear sampler
-				.binding = 1,
-				.descriptorType = vk::DescriptorType::eSampler,
-				.descriptorCount = 1,
-				.stageFlags = vk::ShaderStageFlagBits::eFragment,
-				.pImmutableSamplers = nullptr
-			},
+				vk::DescriptorSetLayoutBinding{ // Scene color with Luma
+					.binding = 0,
+					.descriptorType = vk::DescriptorType::eSampledImage,
+					.descriptorCount = 1,
+					.stageFlags = vk::ShaderStageFlagBits::eFragment,
+					.pImmutableSamplers = nullptr
+				},
+				vk::DescriptorSetLayoutBinding{ // Linear sampler
+					.binding = 1,
+					.descriptorType = vk::DescriptorType::eSampler,
+					.descriptorCount = 1,
+					.stageFlags = vk::ShaderStageFlagBits::eFragment,
+					.pImmutableSamplers = nullptr
+				},
+				vk::DescriptorSetLayoutBinding{ // Bloom texture
+					.binding = 2,
+					.descriptorType = vk::DescriptorType::eCombinedImageSampler,
+					.descriptorCount = 1,
+					.stageFlags = vk::ShaderStageFlagBits::eFragment,
+					.pImmutableSamplers = nullptr
+				},
+				vk::DescriptorSetLayoutBinding{ // Global lighting buffer
+					.binding = 3,
+					.descriptorType = vk::DescriptorType::eUniformBuffer,
+					.descriptorCount = 1,
+					.stageFlags = vk::ShaderStageFlagBits::eFragment,
+					.pImmutableSamplers = nullptr
+				},
 			};
 
 			const vk::DescriptorSetLayoutCreateInfo layoutInfo{
@@ -2463,7 +2570,7 @@ namespace Kerberos
 			context.SetObjectDebugName(s_Data->FXAAPipelineLayout, "FXAA Pipeline Layout");
 
 			s_Data->CompositeImage.Format = context.FindSupportedFormat(
-				{ vk::Format::eR32G32B32A32Sfloat, vk::Format::eR32G32B32A32Uint },
+				{ vk::Format::eR16G16B16A16Sfloat, vk::Format::eR32G32B32A32Sfloat },
 				vk::ImageTiling::eOptimal,
 				vk::FormatFeatureFlagBits::eColorAttachment | vk::FormatFeatureFlagBits::eSampledImage
 			);
@@ -2517,9 +2624,9 @@ namespace Kerberos
 			s_Data->NoopPostProcessPipeline = CreateRef<GraphicsPipeline>(noopPostProcessPipelineSpec);
 		}
 
-		// Transition composite and color output images to shader read layout
+		// Transition sampled post-process inputs to shader read layout
 		{
-			const vk::ImageMemoryBarrier2 compositeImageBarrier = {
+			const vk::ImageMemoryBarrier2 resolveImageBarrier = {
 				.srcStageMask = vk::PipelineStageFlagBits2::eTopOfPipe,
 				.srcAccessMask = {},
 				.dstStageMask = vk::PipelineStageFlagBits2::eFragmentShader,
@@ -2529,6 +2636,24 @@ namespace Kerberos
 				.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
 				.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
 				.image = s_Data->ResolveImage.Image,
+				.subresourceRange = {
+					.aspectMask = vk::ImageAspectFlagBits::eColor,
+					.baseMipLevel = 0,
+					.levelCount = 1,
+					.baseArrayLayer = 0,
+					.layerCount = 1
+				}
+			};
+			const vk::ImageMemoryBarrier2 compositeImageBarrier = {
+				.srcStageMask = vk::PipelineStageFlagBits2::eTopOfPipe,
+				.srcAccessMask = {},
+				.dstStageMask = vk::PipelineStageFlagBits2::eFragmentShader,
+				.dstAccessMask = vk::AccessFlagBits2::eShaderRead,
+				.oldLayout = vk::ImageLayout::eUndefined,
+				.newLayout = vk::ImageLayout::eShaderReadOnlyOptimal,
+				.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+				.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+				.image = s_Data->CompositeImage.Image,
 				.subresourceRange = {
 					.aspectMask = vk::ImageAspectFlagBits::eColor,
 					.baseMipLevel = 0,
@@ -2555,7 +2680,7 @@ namespace Kerberos
 					.layerCount = 1
 				}
 			};
-			const std::array barriers = { compositeImageBarrier, colorOutputImageBarrier };
+			const std::array barriers = { resolveImageBarrier, compositeImageBarrier, colorOutputImageBarrier };
 			const vk::DependencyInfo dependencyInfo = {
 				.dependencyFlags = {},
 				.imageMemoryBarrierCount = barriers.size(),
@@ -2650,6 +2775,8 @@ namespace Kerberos
 		// Recreate resources with new size
 
 		CreateFXAAImage(width, height);
+
+		CreateBloomImage(width, height);
 
 		CreateImage(device,
 					width,
@@ -2771,7 +2898,9 @@ namespace Kerberos
 
 		CreateGTAOImage(width, height);
 
-		// Update the composite descriptor sets to point to the new images
+		SetupBloomDescriptors();
+
+		// Update the transparency resolve descriptor sets to point to the new images
 		{
 			std::array<vk::DescriptorImageInfo, 5> imageInfos;
 
@@ -2791,7 +2920,7 @@ namespace Kerberos
 				std::array<vk::WriteDescriptorSet, 5> descriptorWrites;
 				for (size_t i = 0; i < 5; i++) {
 					descriptorWrites[i] = {
-						.dstSet = s_Data->DescriptorSets[frameIndex].composite,
+						.dstSet = s_Data->DescriptorSets[frameIndex].resolve,
 						.dstBinding = static_cast<uint32_t>(i),
 						.dstArrayElement = 0,
 						.descriptorCount = 1,
@@ -2890,6 +3019,12 @@ namespace Kerberos
 				.imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal
 			};
 
+			const vk::DescriptorImageInfo bloomImageInfo = {
+				.sampler = s_Data->LinearSampler,
+				.imageView = s_Data->Bloom.ImageViews[0],
+				.imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal
+			};
+
 			for (size_t frameIndex = 0; frameIndex < VulkanContext::MaxFramesInFlight; frameIndex++)
 			{
 				const std::array descriptorWrites = {
@@ -2901,14 +3036,40 @@ namespace Kerberos
 							.descriptorType = vk::DescriptorType::eSampledImage,
 							.pImageInfo = &sceneColorWithLumaImageInfo
 					},
+					vk::WriteDescriptorSet{
+							.dstSet = *s_Data->DescriptorSets[frameIndex].fxaa,
+							.dstBinding = 2,
+							.dstArrayElement = 0,
+							.descriptorCount = 1,
+							.descriptorType = vk::DescriptorType::eCombinedImageSampler,
+							.pImageInfo = &bloomImageInfo
+					}
 				};
 
 				device.updateDescriptorSets(descriptorWrites, nullptr);
 			}
 		}
 
-		// Transition composite and color output image to shader read layout
+		// Transition sampled post-process inputs to shader read layout
 		{
+			const vk::ImageMemoryBarrier2 resolveImageBarrier = {
+				.srcStageMask = vk::PipelineStageFlagBits2::eTopOfPipe,
+				.srcAccessMask = {},
+				.dstStageMask = vk::PipelineStageFlagBits2::eFragmentShader,
+				.dstAccessMask = vk::AccessFlagBits2::eShaderRead,
+				.oldLayout = vk::ImageLayout::eUndefined,
+				.newLayout = vk::ImageLayout::eShaderReadOnlyOptimal,
+				.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+				.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+				.image = s_Data->ResolveImage.Image,
+				.subresourceRange = {
+					.aspectMask = vk::ImageAspectFlagBits::eColor,
+					.baseMipLevel = 0,
+					.levelCount = 1,
+					.baseArrayLayer = 0,
+					.layerCount = 1
+				}
+			};
 			const vk::ImageMemoryBarrier2 compositeImageBarrier = {
 				.srcStageMask = vk::PipelineStageFlagBits2::eTopOfPipe,
 				.srcAccessMask = {},
@@ -2945,7 +3106,7 @@ namespace Kerberos
 					.layerCount = 1
 				}
 			};
-			const std::array barriers = { compositeImageBarrier, colorOutputImageBarrier };
+			const std::array barriers = { resolveImageBarrier, compositeImageBarrier, colorOutputImageBarrier };
 			const vk::DependencyInfo dependencyInfo = {
 				.dependencyFlags = {},
 				.imageMemoryBarrierCount = barriers.size(),
@@ -2996,10 +3157,18 @@ namespace Kerberos
 			transparentPipeline->Recompile();
 		if (const auto& skyboxPipeline = s_Data->SkyboxPipeline)
 			skyboxPipeline->Recompile();
-		if (const auto& compositePipeline = s_Data->CompositePipeline)
+		if (const auto& compositePipeline = s_Data->TransparencyResolvePipeline)
 			compositePipeline->Recompile();
 		if (const auto& gtaoPipeline = s_Data->GTAOPipeline)
 			gtaoPipeline->Recompile();
+		if (const auto& fxaaPipeline = s_Data->FXAAPipeline)
+			fxaaPipeline->Recompile();
+		if (const auto& noopPostProcessPipeline = s_Data->NoopPostProcessPipeline)
+			noopPostProcessPipeline->Recompile();
+		if (const auto& bloomDownsamplePipeline = s_Data->Bloom.DownsamplePipeline)
+			bloomDownsamplePipeline->Recompile();
+		if (const auto& bloomUpsamplePipeline = s_Data->Bloom.UpsamplePipeline)
+			bloomUpsamplePipeline->Recompile();
 	}
 
 	glm::vec3 Renderer::GetLightPositionForShadowMapCalculation() 
@@ -3092,6 +3261,35 @@ namespace Kerberos
 	AntiAliasingMode& Renderer::GetAntiAliasingMode()
 	{
 		return s_Data->AntiAliasingMode;
+	}
+
+	uint32_t Renderer::GetBloomMipLevels() 
+	{
+		return s_Data->Bloom.MipLevels;
+	}
+
+	void Renderer::SetBloomMipLevels(uint32_t levels) 
+	{
+		if (levels > BloomData::MaxMipLevels)
+		{
+			KBR_CORE_WARN("Attempted to set bloom mip levels to {}, which exceeds the maximum of {}. Clamping to maximum.", levels, BloomData::MaxMipLevels);
+			levels = BloomData::MaxMipLevels;
+		}
+		s_Data->Bloom.MipLevels = levels;
+	}
+
+	float& Renderer::GetBloomIntensity() 
+	{
+		KBR_CORE_ASSERT(s_Data, "Renderer not initialized!");
+
+		return s_Data->Bloom.Intensity;
+	}
+
+	TonemappingOperator& Renderer::GetTonemappingOperator() 
+	{
+		KBR_CORE_ASSERT(s_Data, "Renderer not initialized!");
+
+		return s_Data->TonemappingOperator;
 	}
 
 	glm::vec2 Renderer::GetOutputImageSize() 
@@ -3444,11 +3642,17 @@ namespace Kerberos
 		// and transition composite image to color attachment optimal for it will be the render target
 		{
 			const vk::ImageMemoryBarrier2 sceneColorBarrier = {
-				.srcStageMask = vk::PipelineStageFlagBits2::eColorAttachmentOutput,
+				/*.srcStageMask = vk::PipelineStageFlagBits2::eColorAttachmentOutput,
 				.srcAccessMask = vk::AccessFlagBits2::eColorAttachmentWrite,
 				.dstStageMask = vk::PipelineStageFlagBits2::eFragmentShader,
 				.dstAccessMask = vk::AccessFlagBits2::eShaderRead,
 				.oldLayout = vk::ImageLayout::eColorAttachmentOptimal,
+				.newLayout = vk::ImageLayout::eShaderReadOnlyOptimal,*/
+				.srcStageMask = vk::PipelineStageFlagBits2::eComputeShader,
+				.srcAccessMask = vk::AccessFlagBits2::eShaderRead,
+				.dstStageMask = vk::PipelineStageFlagBits2::eFragmentShader,
+				.dstAccessMask = vk::AccessFlagBits2::eShaderRead,
+				.oldLayout = vk::ImageLayout::eShaderReadOnlyOptimal,
 				.newLayout = vk::ImageLayout::eShaderReadOnlyOptimal,
 				.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
 				.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
@@ -3520,9 +3724,15 @@ namespace Kerberos
 			.pColorAttachments = &colorAttachmentInfo,
 			.pDepthAttachment = nullptr
 		};
+		BeginRenderPassDebugLabel(cmd, "Post Processing Pass");
 		cmd.beginRendering(renderingInfo);
 		cmd.setViewport(0, viewport);
 		cmd.setScissor(0, renderArea);
+
+		FXAAPushConstants pushConstants;
+		pushConstants.inverseViewportSize = glm::vec2(1.0f) / s_Data->OutputSize;
+		pushConstants.tonemapOperator = static_cast<float>(s_Data->TonemappingOperator);
+		pushConstants.bloomIntensity = s_Data->Bloom.Intensity;
 
 		if (s_Data->AntiAliasingMode == AntiAliasingMode::None)
 		{
@@ -3534,6 +3744,8 @@ namespace Kerberos
 				0,
 				*s_Data->DescriptorSets[currentImage].fxaa,
 				{});
+
+			cmd.pushConstants<FXAAPushConstants>(*s_Data->FXAAPipelineLayout, vk::ShaderStageFlagBits::eFragment, 0, { pushConstants });
 		}
 		else if (s_Data->AntiAliasingMode == AntiAliasingMode::FXAA)
 		{
@@ -3546,8 +3758,6 @@ namespace Kerberos
 				*s_Data->DescriptorSets[currentImage].fxaa,
 				{});
 
-			FXAAPushConstants pushConstants;
-			pushConstants.inverseViewportSize = glm::vec2(1.0f) / s_Data->OutputSize;
 			cmd.pushConstants<FXAAPushConstants>(*s_Data->FXAAPipelineLayout, vk::ShaderStageFlagBits::eFragment, 0, { pushConstants });
 		}
 		else if (s_Data->AntiAliasingMode == AntiAliasingMode::TAA)
@@ -3558,6 +3768,143 @@ namespace Kerberos
 		cmd.draw(3, 1, 0, 0);
 
 		cmd.endRendering();
+		EndRenderPassDebugLabel(cmd);
+	}
+
+	void Renderer::ApplyBloom(const vk::raii::CommandBuffer& cmd, const uint32_t currentImage)
+	{
+		{
+			const vk::ImageMemoryBarrier2 resolveBarrier = {
+				.srcStageMask = vk::PipelineStageFlagBits2::eColorAttachmentOutput,
+				.srcAccessMask = vk::AccessFlagBits2::eColorAttachmentWrite,
+				.dstStageMask = vk::PipelineStageFlagBits2::eComputeShader,
+				.dstAccessMask = vk::AccessFlagBits2::eShaderRead,
+				.oldLayout = vk::ImageLayout::eColorAttachmentOptimal,
+				.newLayout = vk::ImageLayout::eShaderReadOnlyOptimal,
+				.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+				.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+				.image = *s_Data->ResolveImage.Image,
+				.subresourceRange = { vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1 }
+			};
+
+			const vk::ImageMemoryBarrier2 bloomBarrier = {
+				.srcStageMask = vk::PipelineStageFlagBits2::eTopOfPipe,
+				.srcAccessMask = {},
+				.dstStageMask = vk::PipelineStageFlagBits2::eComputeShader,
+				.dstAccessMask = vk::AccessFlagBits2::eShaderStorageWrite,
+				.oldLayout = vk::ImageLayout::eUndefined,
+				.newLayout = vk::ImageLayout::eGeneral,
+				.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+				.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+				.image = *s_Data->Bloom.Image,
+				.subresourceRange = { vk::ImageAspectFlagBits::eColor, 0, s_Data->Bloom.MipLevels, 0, 1 }
+			};
+
+			const std::array initialBarriers = { resolveBarrier, bloomBarrier };
+			const vk::DependencyInfo initialDependencyInfo = {
+				.dependencyFlags = {},
+				.imageMemoryBarrierCount = static_cast<uint32_t>(initialBarriers.size()),
+				.pImageMemoryBarriers = initialBarriers.data()
+			};
+			cmd.pipelineBarrier2(initialDependencyInfo);
+		}
+
+		auto computeBarrier = [&]() {
+			constexpr vk::MemoryBarrier2 memoryBarrier = {
+				.srcStageMask = vk::PipelineStageFlagBits2::eComputeShader,
+				.srcAccessMask = vk::AccessFlagBits2::eShaderStorageWrite,
+				.dstStageMask = vk::PipelineStageFlagBits2::eComputeShader,
+				.dstAccessMask = vk::AccessFlagBits2::eShaderRead | vk::AccessFlagBits2::eShaderStorageWrite
+			};
+			vk::DependencyInfo depInfo = {
+				.dependencyFlags = {},
+				.memoryBarrierCount = 1,
+				.pMemoryBarriers = &memoryBarrier
+			};
+			cmd.pipelineBarrier2(depInfo);
+		};
+
+
+		constexpr uint32_t groupSize = 8;
+		const uint32_t mipCount = s_Data->Bloom.MipLevels;
+
+		BeginRenderPassDebugLabel(cmd, "Bloom Downsample Pass");
+
+		s_Data->Bloom.DownsamplePipeline->Bind(cmd);
+		{
+			// Main Image and Bloom Mip 0
+			cmd.bindDescriptorSets(vk::PipelineBindPoint::eCompute, *s_Data->Bloom.DownsamplePipelineLayout, 0, { s_Data->Bloom.ExtractSet }, {});
+
+			BloomData::DownsamplePushConstants pushConstants;
+			pushConstants.srcTexelSize = 1.0f / s_Data->OutputSize;
+			cmd.pushConstants<BloomData::DownsamplePushConstants>(*s_Data->Bloom.DownsamplePipelineLayout, vk::ShaderStageFlagBits::eCompute, 0, { pushConstants });
+
+			const uint32_t groupX = (static_cast<uint32_t>(s_Data->Bloom.MipSizes[0].x) + groupSize - 1) / groupSize;
+			const uint32_t groupY = (static_cast<uint32_t>(s_Data->Bloom.MipSizes[0].y) + groupSize - 1) / groupSize;
+
+			cmd.dispatch(groupX, groupY, 1);
+		}
+
+
+		for (uint32_t mip = 0; mip < mipCount - 1; ++mip)
+		{
+			computeBarrier();
+
+			// BloomMipView[i]_SRV, BloomMipView[i+1]_UAV
+			cmd.bindDescriptorSets(vk::PipelineBindPoint::eCompute, *s_Data->Bloom.DownsamplePipelineLayout, 0, { s_Data->Bloom.DownsampleSets[mip]}, {});
+
+			BloomData::DownsamplePushConstants pushConstants;
+			pushConstants.srcTexelSize = 1.0f / s_Data->Bloom.MipSizes[mip];
+			cmd.pushConstants<BloomData::DownsamplePushConstants>(*s_Data->Bloom.DownsamplePipelineLayout, vk::ShaderStageFlagBits::eCompute, 0, { pushConstants });
+
+			const uint32_t groupX = (static_cast<uint32_t>(s_Data->Bloom.MipSizes[mip + 1].x) + groupSize - 1) / groupSize;
+			const uint32_t groupY = (static_cast<uint32_t>(s_Data->Bloom.MipSizes[mip + 1].y) + groupSize - 1) / groupSize;
+			cmd.dispatch(groupX, groupY, 1);
+		}
+
+		EndRenderPassDebugLabel(cmd);
+
+		BeginRenderPassDebugLabel(cmd, "Bloom Upsample Pass");
+
+		s_Data->Bloom.UpsamplePipeline->Bind(cmd);
+
+		BloomData::UpsamplePushConstants pushConstants;
+		pushConstants.filterRadius = s_Data->Bloom.FilterRadius;
+
+		for (uint32_t mip = mipCount - 1; mip > 0; --mip)
+		{
+			computeBarrier();
+
+			// BloomMipView[i]_SRV, BloomMipView[i-1]_UAV
+			cmd.bindDescriptorSets(vk::PipelineBindPoint::eCompute, *s_Data->Bloom.UpsamplePipelineLayout, 0, { s_Data->Bloom.UpsampleSets[mip - 1] }, {});
+			
+			cmd.pushConstants<BloomData::UpsamplePushConstants>(*s_Data->Bloom.UpsamplePipelineLayout, vk::ShaderStageFlagBits::eCompute, 0, { pushConstants });
+
+			const uint32_t groupX = (static_cast<uint32_t>(s_Data->Bloom.MipSizes[mip - 1].x) + groupSize - 1) / groupSize;
+			const uint32_t groupY = (static_cast<uint32_t>(s_Data->Bloom.MipSizes[mip - 1].y) + groupSize - 1) / groupSize;
+			cmd.dispatch(groupX, groupY, 1);
+		}
+
+		EndRenderPassDebugLabel(cmd);
+
+		const vk::ImageMemoryBarrier2 bloomFinalBarrier = {
+			.srcStageMask = vk::PipelineStageFlagBits2::eComputeShader,
+			.srcAccessMask = vk::AccessFlagBits2::eShaderStorageWrite,
+			.dstStageMask = vk::PipelineStageFlagBits2::eFragmentShader,
+			.dstAccessMask = vk::AccessFlagBits2::eShaderRead,
+			.oldLayout = vk::ImageLayout::eGeneral,
+			.newLayout = vk::ImageLayout::eShaderReadOnlyOptimal,
+			.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+			.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+			.image = *s_Data->Bloom.Image,
+			.subresourceRange = { vk::ImageAspectFlagBits::eColor, 0, s_Data->Bloom.MipLevels, 0, 1 }
+		};
+		const vk::DependencyInfo finalDependencyInfo = {
+			.dependencyFlags = {},
+			.imageMemoryBarrierCount = 1,
+			.pImageMemoryBarriers = &bloomFinalBarrier
+		};
+		cmd.pipelineBarrier2(finalDependencyInfo);
 	}
 
 	glm::mat4 Renderer::CalculateLightSpaceMatrix() 
@@ -3758,7 +4105,7 @@ namespace Kerberos
 			},
 			vk::DescriptorPoolSize{
 				.type = vk::DescriptorType::eCombinedImageSampler,
-				.descriptorCount = 20
+				.descriptorCount = 100
 			},
 			vk::DescriptorPoolSize{
 				.type = vk::DescriptorType::eAccelerationStructureKHR,
@@ -3770,7 +4117,7 @@ namespace Kerberos
 			},
 			vk::DescriptorPoolSize{
 				.type = vk::DescriptorType::eStorageImage,
-				.descriptorCount = 10
+				.descriptorCount = 20
 			},
 			vk::DescriptorPoolSize{
 				.type = vk::DescriptorType::eSampledImage,
@@ -3784,7 +4131,7 @@ namespace Kerberos
 
 		vk::DescriptorPoolCreateInfo poolInfo{
 			.flags = vk::DescriptorPoolCreateFlagBits::eFreeDescriptorSet,
-			.maxSets = 10,
+			.maxSets = 200,
 			.poolSizeCount = static_cast<uint32_t>(poolSizes.size()),
 			.pPoolSizes = poolSizes.data()
 		};
@@ -4317,8 +4664,8 @@ namespace Kerberos
 
 		for (uint32_t i = 0; i < VulkanContext::MaxFramesInFlight; i++)
 		{
-			s_Data->DescriptorSets[i].composite = std::move(compositeDescriptorSets[i]);
-			context.SetObjectDebugName(s_Data->DescriptorSets[i].composite, "Composite Descriptor Set[" + std::to_string(i) + "]");
+			s_Data->DescriptorSets[i].resolve = std::move(compositeDescriptorSets[i]);
+			context.SetObjectDebugName(s_Data->DescriptorSets[i].resolve, "Composite Descriptor Set[" + std::to_string(i) + "]");
 
 			const vk::DescriptorImageInfo opaqueColorImageInfo{
 				.sampler = *s_Data->LinearSampler,
@@ -4350,15 +4697,9 @@ namespace Kerberos
 				.imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal
 			};
 
-			const vk::DescriptorBufferInfo globalLightingBufferInfo{
-				.buffer = *s_Data->UniformBuffers[i].globalLighting->GetBuffer(),
-				.offset = 0,
-				.range = sizeof(GlobalLighting)
-			};
-
 			const std::vector descriptorWrites = {
 				vk::WriteDescriptorSet{
-					.dstSet = *s_Data->DescriptorSets[i].composite,
+					.dstSet = *s_Data->DescriptorSets[i].resolve,
 					.dstBinding = 0,
 					.dstArrayElement = 0,
 					.descriptorCount = 1,
@@ -4366,7 +4707,7 @@ namespace Kerberos
 					.pImageInfo = &opaqueColorImageInfo
 				},
 				vk::WriteDescriptorSet{
-					.dstSet = *s_Data->DescriptorSets[i].composite,
+					.dstSet = *s_Data->DescriptorSets[i].resolve,
 					.dstBinding = 1,
 					.dstArrayElement = 0,
 					.descriptorCount = 1,
@@ -4374,7 +4715,7 @@ namespace Kerberos
 					.pImageInfo = &opaqueDepthImageInfo
 				},
 				vk::WriteDescriptorSet{
-					.dstSet = *s_Data->DescriptorSets[i].composite,
+					.dstSet = *s_Data->DescriptorSets[i].resolve,
 					.dstBinding = 2,
 					.dstArrayElement = 0,
 					.descriptorCount = 1,
@@ -4382,7 +4723,7 @@ namespace Kerberos
 					.pImageInfo = &accumulationImageInfo
 				},
 				vk::WriteDescriptorSet{
-					.dstSet = *s_Data->DescriptorSets[i].composite,
+					.dstSet = *s_Data->DescriptorSets[i].resolve,
 					.dstBinding = 3,
 					.dstArrayElement = 0,
 					.descriptorCount = 1,
@@ -4390,21 +4731,13 @@ namespace Kerberos
 					.pImageInfo = &revealageImageInfo
 				},
 				vk::WriteDescriptorSet{
-					.dstSet = *s_Data->DescriptorSets[i].composite,
+					.dstSet = *s_Data->DescriptorSets[i].resolve,
 					.dstBinding = 4,
 					.dstArrayElement = 0,
 					.descriptorCount = 1,
 					.descriptorType = vk::DescriptorType::eCombinedImageSampler,
 					.pImageInfo = &distortionImageInfo
 				},
-				vk::WriteDescriptorSet{
-					.dstSet = *s_Data->DescriptorSets[i].composite,
-					.dstBinding = 5,
-					.dstArrayElement = 0,
-					.descriptorCount = 1,
-					.descriptorType = vk::DescriptorType::eUniformBuffer,
-					.pBufferInfo = &globalLightingBufferInfo
-				}
 			};
 
 			device.updateDescriptorSets(descriptorWrites, {});
@@ -4599,6 +4932,18 @@ namespace Kerberos
 				.imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal
 			};
 
+			const vk::DescriptorImageInfo bloomTextureInfo{
+				.sampler = *s_Data->LinearSampler,
+				.imageView = *s_Data->Bloom.ImageViews[0],
+				.imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal
+			};
+
+			const vk::DescriptorBufferInfo globalLightingBufferInfo{
+				.buffer = *s_Data->UniformBuffers[i].globalLighting->GetBuffer(),
+				.offset = 0,
+				.range = sizeof(GlobalLighting)
+			};
+
 			const std::vector descriptorWrites = {
 				vk::WriteDescriptorSet{
 					.dstSet = *s_Data->DescriptorSets[i].fxaa,
@@ -4616,9 +4961,276 @@ namespace Kerberos
 					.descriptorType = vk::DescriptorType::eSampler,
 					.pImageInfo = &linearSamplerInfo
 				},
+				vk::WriteDescriptorSet{
+					.dstSet = *s_Data->DescriptorSets[i].fxaa,
+					.dstBinding = 2,
+					.dstArrayElement = 0,
+					.descriptorCount = 1,
+					.descriptorType = vk::DescriptorType::eCombinedImageSampler,
+					.pImageInfo = &bloomTextureInfo
+				},
+				vk::WriteDescriptorSet{
+					.dstSet = *s_Data->DescriptorSets[i].fxaa,
+					.dstBinding = 3,
+					.dstArrayElement = 0,
+					.descriptorCount = 1,
+					.descriptorType = vk::DescriptorType::eUniformBuffer,
+					.pBufferInfo = &globalLightingBufferInfo
+				}
 			};
 
 			device.updateDescriptorSets(descriptorWrites, {});
 		}
+	}
+
+	void Renderer::CreateBloomImage(const uint32_t width, const uint32_t height)
+	{
+		KBR_CORE_ASSERT(s_Data->Bloom.Format != vk::Format::eUndefined, "Bloom image format has to be set before creating bloom resources!");
+
+		const uint32_t bloomWidth = width / 2;
+		const uint32_t bloomHeight = height / 2;
+		const uint32_t mipLevels = s_Data->Bloom.MipLevels;
+
+		auto& context = VulkanContext::Get();
+		const auto& device = context.GetDevice();
+
+		CreateImage(device,
+					bloomWidth,
+					bloomHeight,
+					mipLevels,
+					vk::SampleCountFlagBits::e1,
+					s_Data->Bloom.Format,
+					vk::ImageTiling::eOptimal,
+					vk::ImageUsageFlagBits::eColorAttachment | vk::ImageUsageFlagBits::eSampled | vk::ImageUsageFlagBits::eTransferDst | vk::ImageUsageFlagBits::eStorage,
+					vk::MemoryPropertyFlagBits::eDeviceLocal,
+					s_Data->Bloom.Image,
+					s_Data->Bloom.ImageMemory);
+
+		context.SetObjectDebugName(s_Data->Bloom.Image, "Bloom Image");
+		context.SetObjectDebugName(s_Data->Bloom.ImageMemory, "Bloom Image Memory");
+
+		s_Data->Bloom.MipSizes.clear();
+		s_Data->Bloom.MipSizes.reserve(mipLevels);
+
+		s_Data->Bloom.ImageViews.clear();
+		s_Data->Bloom.ImageViews.reserve(mipLevels);
+
+		for (uint32_t i = 0; i < mipLevels; i++)
+		{
+			const uint32_t mipWidth = bloomWidth >> i;
+			const uint32_t mipHeight = bloomHeight >> i;
+
+			s_Data->Bloom.MipSizes.emplace_back(mipWidth, mipHeight);
+
+			const vk::ImageViewCreateInfo viewInfo{
+				.flags = {},
+				.image = *s_Data->Bloom.Image,
+				.viewType = vk::ImageViewType::e2D,
+				.format = s_Data->Bloom.Format,
+				.subresourceRange = {
+					.aspectMask = vk::ImageAspectFlagBits::eColor,
+					.baseMipLevel = i,
+					.levelCount = 1,
+					.baseArrayLayer = 0,
+					.layerCount = 1
+				}
+			};
+			s_Data->Bloom.ImageViews.push_back(device.createImageView(viewInfo));
+			context.SetObjectDebugName(s_Data->Bloom.ImageViews.back(), "Bloom Image View[" + std::to_string(i) + "]");
+		}
+	}
+
+	void Renderer::SetupBloomDescriptors()
+	{
+		auto& context = VulkanContext::Get();
+		const auto& device = context.GetDevice();
+		const uint32_t mipCount = s_Data->Bloom.MipLevels;
+
+		// 1. Allocate Descriptor Sets (if they don't exist yet)
+		if (s_Data->Bloom.ExtractSet == nullptr)
+		{
+			const vk::DescriptorSetAllocateInfo extractAllocInfo{
+				.descriptorPool = *s_Data->DescriptorPool,
+				.descriptorSetCount = 1,
+				.pSetLayouts = &*s_Data->DescriptorSetLayouts.bloom
+			};
+			// Allocate 1 set for the initial extract pass
+			s_Data->Bloom.ExtractSet = std::move(device.allocateDescriptorSets(extractAllocInfo).front());
+
+			std::vector<vk::DescriptorSetLayout> mipLayouts(mipCount - 1, *s_Data->DescriptorSetLayouts.bloom);
+			const vk::DescriptorSetAllocateInfo mipAllocInfo{
+				.descriptorPool = *s_Data->DescriptorPool,
+				.descriptorSetCount = mipCount - 1,
+				.pSetLayouts = mipLayouts.data()
+			};
+
+			// Allocate sets for going down and coming back up the mip chain
+			s_Data->Bloom.DownsampleSets = device.allocateDescriptorSets(mipAllocInfo);
+			s_Data->Bloom.UpsampleSets = device.allocateDescriptorSets(mipAllocInfo);
+		}
+
+		std::vector<vk::WriteDescriptorSet> writes;
+
+		// We must keep these structs alive in memory until updateDescriptorSets is called!
+		std::vector<vk::DescriptorImageInfo> imageInfos;
+		imageInfos.reserve(2 + (mipCount - 1) * 4);
+
+		// 2. Write Extract Set (Resolve Image -> Bloom Mip 0)
+		imageInfos.push_back({ *s_Data->LinearSampler, *s_Data->ResolveImage.ImageView, vk::ImageLayout::eShaderReadOnlyOptimal });
+		imageInfos.push_back({ *s_Data->LinearSampler, *s_Data->Bloom.ImageViews[0], vk::ImageLayout::eGeneral });
+
+		writes.push_back(vk::WriteDescriptorSet{
+			.dstSet = *s_Data->Bloom.ExtractSet,
+			.dstBinding = 0,
+			.dstArrayElement = 0,
+			.descriptorCount = 1,
+			.descriptorType = vk::DescriptorType::eCombinedImageSampler,
+			.pImageInfo = &imageInfos[0]
+		});
+		writes.push_back(vk::WriteDescriptorSet{
+			.dstSet = *s_Data->Bloom.ExtractSet,
+			.dstBinding = 1,
+			.dstArrayElement = 0,
+			.descriptorCount = 1,
+			.descriptorType = vk::DescriptorType::eStorageImage,
+			.pImageInfo = &imageInfos[1]
+		});
+
+		// 3. Write Downsample and Upsample Sets
+		for (uint32_t i = 0; i < mipCount - 1; i++)
+		{
+			uint32_t baseIdx = imageInfos.size();
+
+			// Downsample: Reads Mip i, Writes Mip i+1
+			imageInfos.push_back({ *s_Data->LinearSampler, *s_Data->Bloom.ImageViews[i], vk::ImageLayout::eGeneral });
+			imageInfos.push_back({ *s_Data->LinearSampler, *s_Data->Bloom.ImageViews[i + 1], vk::ImageLayout::eGeneral });
+			writes.push_back(vk::WriteDescriptorSet{
+				.dstSet = *s_Data->Bloom.DownsampleSets[i],
+				.dstBinding = 0,
+				.dstArrayElement = 0,
+				.descriptorCount = 1,
+				.descriptorType = vk::DescriptorType::eCombinedImageSampler,
+				.pImageInfo = &imageInfos[baseIdx]
+			});
+			writes.push_back(vk::WriteDescriptorSet{
+				.dstSet = *s_Data->Bloom.DownsampleSets[i],
+				.dstBinding = 1,
+				.dstArrayElement = 0,
+				.descriptorCount = 1,
+				.descriptorType = vk::DescriptorType::eStorageImage,
+				.pImageInfo = &imageInfos[baseIdx + 1]
+			});
+
+			// Upsample: Reads Mip i+1, Writes Mip i
+			imageInfos.push_back({ *s_Data->LinearSampler, *s_Data->Bloom.ImageViews[i + 1], vk::ImageLayout::eGeneral });
+			imageInfos.push_back({ *s_Data->LinearSampler, *s_Data->Bloom.ImageViews[i], vk::ImageLayout::eGeneral });
+			writes.push_back(vk::WriteDescriptorSet{
+				.dstSet = *s_Data->Bloom.UpsampleSets[i],
+				.dstBinding = 0,
+				.dstArrayElement = 0,
+				.descriptorCount = 1,
+				.descriptorType = vk::DescriptorType::eCombinedImageSampler,
+				.pImageInfo = &imageInfos[baseIdx + 2]
+			});
+			writes.push_back(vk::WriteDescriptorSet{
+				.dstSet = *s_Data->Bloom.UpsampleSets[i],
+				.dstBinding = 1,
+				.dstArrayElement = 0,
+				.descriptorCount = 1,
+				.descriptorType = vk::DescriptorType::eStorageImage,
+				.pImageInfo = &imageInfos[baseIdx + 3]
+			});
+		}
+
+		device.updateDescriptorSets(writes, {});
+	}
+
+	void Renderer::CreateBloomResources(const uint32_t width, const uint32_t height) 
+	{
+		auto& context = VulkanContext::Get();
+		const auto& device = context.GetDevice();
+
+		s_Data->Bloom.Format = context.FindSupportedFormat(
+			{ vk::Format::eR16G16B16A16Sfloat },
+			vk::ImageTiling::eOptimal,
+			vk::FormatFeatureFlagBits::eStorageImage | vk::FormatFeatureFlagBits::eSampledImage
+		);
+
+		CreateBloomImage(width, height);
+
+		std::vector<vk::DescriptorSetLayoutBinding> bindings = {
+			vk::DescriptorSetLayoutBinding{ // Source
+				.binding = 0,
+				.descriptorType = vk::DescriptorType::eCombinedImageSampler,
+				.descriptorCount = 1,
+				.stageFlags = vk::ShaderStageFlagBits::eCompute,
+				.pImmutableSamplers = nullptr
+			},
+			vk::DescriptorSetLayoutBinding{ // Destination
+				.binding = 1,
+				.descriptorType = vk::DescriptorType::eStorageImage,
+				.descriptorCount = 1,
+				.stageFlags = vk::ShaderStageFlagBits::eCompute,
+				.pImmutableSamplers = nullptr
+			},
+		};
+
+		const vk::DescriptorSetLayoutCreateInfo layoutInfo{
+			.bindingCount = static_cast<uint32_t>(bindings.size()),
+			.pBindings = bindings.data()
+		};
+
+		s_Data->DescriptorSetLayouts.bloom = vk::raii::DescriptorSetLayout{ device, layoutInfo };
+		context.SetObjectDebugName(s_Data->DescriptorSetLayouts.bloom, "Bloom Descriptor Set Layout");
+
+		const std::array setLayouts = {
+			*s_Data->DescriptorSetLayouts.bloom
+		};
+
+		constexpr vk::PushConstantRange downsamplePushConstantRange{
+			.stageFlags = vk::ShaderStageFlagBits::eCompute,
+			.offset = 0,
+			.size = sizeof(BloomData::DownsamplePushConstants)
+		};
+
+		const vk::PipelineLayoutCreateInfo bloomDowsamplePipelineLayoutInfo{
+			.setLayoutCount = static_cast<uint32_t>(setLayouts.size()),
+			.pSetLayouts = setLayouts.data(),
+			.pushConstantRangeCount = 1,
+			.pPushConstantRanges = &downsamplePushConstantRange
+		};
+
+		s_Data->Bloom.DownsamplePipelineLayout = vk::raii::PipelineLayout{ device, bloomDowsamplePipelineLayoutInfo };
+		context.SetObjectDebugName(s_Data->Bloom.DownsamplePipelineLayout, "Bloom Downsample Pipeline Layout");
+
+		ComputePipelineSpecification bloomDownsamplePipelineSpec{};
+		bloomDownsamplePipelineSpec.Name = "Bloom Downsample Pipeline";
+		bloomDownsamplePipelineSpec.Shader = CreateRef<Shader>("bloom_downsample", "Bloom Downsample");
+		bloomDownsamplePipelineSpec.PipelineLayout = *s_Data->Bloom.DownsamplePipelineLayout;
+
+		s_Data->Bloom.DownsamplePipeline = CreateRef<ComputePipeline>(bloomDownsamplePipelineSpec);
+
+		constexpr vk::PushConstantRange upsamplePushConstantRange{
+			.stageFlags = vk::ShaderStageFlagBits::eCompute,
+			.offset = 0,
+			.size = sizeof(BloomData::UpsamplePushConstants)
+		};
+
+		const vk::PipelineLayoutCreateInfo bloomUpsamplePipelineLayoutInfo{
+			.setLayoutCount = static_cast<uint32_t>(setLayouts.size()),
+			.pSetLayouts = setLayouts.data(),
+			.pushConstantRangeCount = 1,
+			.pPushConstantRanges = &upsamplePushConstantRange
+		};
+
+		s_Data->Bloom.UpsamplePipelineLayout = vk::raii::PipelineLayout{ device, bloomUpsamplePipelineLayoutInfo };
+		context.SetObjectDebugName(s_Data->Bloom.UpsamplePipelineLayout, "Bloom Upsample Pipeline Layout");
+
+		ComputePipelineSpecification bloomUpsamplePipelineSpec{};
+		bloomUpsamplePipelineSpec.Name = "Bloom Upsample Pipeline";
+		bloomUpsamplePipelineSpec.Shader = CreateRef<Shader>("bloom_upsample", "Bloom Upsample");
+		bloomUpsamplePipelineSpec.PipelineLayout = *s_Data->Bloom.UpsamplePipelineLayout;
+
+		s_Data->Bloom.UpsamplePipeline = CreateRef<ComputePipeline>(bloomUpsamplePipelineSpec);
 	}
 }

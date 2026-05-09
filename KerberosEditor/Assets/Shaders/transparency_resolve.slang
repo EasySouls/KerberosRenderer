@@ -21,21 +21,6 @@ Sampler2D<float> texRevealage   : register(t3);
 [[vk::binding(4, 0)]] 
 Sampler2D<float2> texDistortion : register(t4);
 
-[[vk::binding(5, 0)]]
-ConstantBuffer<GlobalLighting> globalLighting : register(b1);
-
-// From http://filmicworlds.com/blog/filmic-tonemapping-operators/
-float3 Uncharted2Tonemap(float3 color)
-{
-    float A = 0.15;
-    float B = 0.50;
-    float C = 0.10;
-    float D = 0.20;
-    float E = 0.02;
-    float F = 0.30;
-    float W = 11.2;
-    return ((color * (A * color + C * B) + D * E) / (color * (A * color + B) + D * F)) - E / F;
-}
 
 [shader("vertex")]
 VSOutput vertexMain(uint vertexID: SV_VertexID) 
@@ -76,16 +61,10 @@ float4 resolveMain(VSOutput input) : SV_Target
 
     float3 transparentColor = accum.rgb / max(accum.a, 0.00001f);
 
-    float3 finalColor = transparentColor + (background * revealage);
-
-    //// Tone mapping
-    finalColor = Uncharted2Tonemap(finalColor * globalLighting.exposure);
-    finalColor = finalColor * (1.0f / Uncharted2Tonemap((11.2f).xxx));
-    //// Gamma correction
-    finalColor = pow(finalColor, (1.0f / globalLighting.gamma).xxx);
+    float3 sceneColor = transparentColor + (background * revealage);
 
     // Calculate Luma (perceptual brightness) for FXAA
-    float luma = dot(finalColor, float3(0.299, 0.587, 0.114));
+    float luma = dot(sceneColor, float3(0.299, 0.587, 0.114));
 
-    return float4(finalColor, luma);
+    return float4(sceneColor, luma);
 }

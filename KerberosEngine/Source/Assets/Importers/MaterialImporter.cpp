@@ -33,9 +33,10 @@ namespace Kerberos
 
         const std::string name = node["Name"].as<std::string>(filepath.stem().string());
 		const glm::vec4 albedo = node["Albedo"].as<glm::vec4>(glm::vec4(1.0f, 1.0f, 1.0f, 1.0f));
-		const glm::vec4 emissive = node["Emissive"].as<glm::vec4>(glm::vec4(0.0f, 0.0f, 0.0f, 1.0f));
 		const float roughness = node["Roughness"].as<float>(1.0f);
 		const float metallic = node["Metallic"].as<float>(0.0f);
+		const glm::vec3 emissiveColor = node["EmissiveColor"].as<glm::vec3>(glm::vec3(0.0f, 0.0f, 0.0f));
+		const float emissiveIntensity = node["EmissiveIntensity"].as<float>(0.0f);
 
 		const std::string albedoTexPath = node["AlbedoTexture"].as<std::string>("");
 		const std::string normalTexPath = node["NormalTexture"].as<std::string>("");
@@ -47,7 +48,14 @@ namespace Kerberos
 
 		Material material;
 		material.Name = name;
-		material.Params = { .AlbedoFactor = albedo, .EmissiveFactor = emissive, .RoughnessFactor = roughness, .MetallicFactor = metallic };
+		material.EmissiveColor = emissiveColor;
+		material.EmissiveIntensity = emissiveIntensity;
+		material.Params = { 
+			.AlbedoFactor = albedo, 
+			.Emissive = emissiveColor * emissiveIntensity, 
+			.RoughnessFactor = roughness, 
+			.MetallicFactor = metallic 
+		};
 
 		auto loadTexture = [&](const std::string& texturePath) -> Ref<Texture2D>
 		{
@@ -113,9 +121,10 @@ namespace Kerberos
 		out << YAML::BeginMap;
 		out << YAML::Key << "Name" << YAML::Value << material.Name;
 		out << YAML::Key << "Albedo" << YAML::Value << material.Params.AlbedoFactor;
-		out << YAML::Key << "Emissive" << YAML::Value << material.Params.EmissiveFactor;
 		out << YAML::Key << "Roughness" << YAML::Value << material.Params.RoughnessFactor;
 		out << YAML::Key << "Metallic" << YAML::Value << material.Params.MetallicFactor;
+		out << YAML::Key << "EmissiveColor" << YAML::Value << material.EmissiveColor;
+		out << YAML::Key << "EmissiveIntensity" << YAML::Value << material.EmissiveIntensity;
 		out << YAML::Key << "AlbedoTexture" << YAML::Value << texturePathFor(material.AlbedoTexture);
 		out << YAML::Key << "NormalTexture" << YAML::Value << texturePathFor(material.NormalTexture);
 		out << YAML::Key << "MetallicTexture" << YAML::Value << texturePathFor(material.MetallicTexture);

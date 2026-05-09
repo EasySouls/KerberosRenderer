@@ -968,6 +968,15 @@ namespace Kerberos
 			Renderer::GetAntiAliasingMode() = static_cast<AntiAliasingMode>(aaMode);
 		}
 
+		TonemappingOperator& tonemappingOperator = Renderer::GetTonemappingOperator();
+		const char* tonemappingOperatorItems[] = { "Uncharted 2", "Reinhard", "ACES" };
+		if (ImGui::Combo("Tonemapping operator", reinterpret_cast<int*>(&tonemappingOperator), tonemappingOperatorItems, IM_ARRAYSIZE(tonemappingOperatorItems)))
+		{
+			Renderer::GetTonemappingOperator() = static_cast<TonemappingOperator>(tonemappingOperator);
+		}
+
+		ImGui::DragFloat("Bloom Intensity", &Renderer::GetBloomIntensity(), 0.01f, 0.0f, 1.0f);
+
 		ImGui::Separator();
 
 		const auto memoryBudgetInfo = VulkanContext::Get().GetMemoryBudgetInfo();

@@ -8,6 +8,7 @@
 #include <functional>
 #include <vector>
 #include <set>
+#include <string_view>
 
 namespace Kerberos
 {
@@ -51,6 +52,13 @@ namespace Kerberos
 		TAA = 2
 	};
 
+	enum class TonemappingOperator
+	{
+		Uncharted = 0,
+		Reinhard = 1,
+		ACES = 2
+	};
+
 	class Renderer
 	{
 	public:
@@ -83,6 +91,10 @@ namespace Kerberos
 		static uint32_t GetShadowMapCascadeCount();
 		static uint32_t GetShadowMapResolution();
 		static AntiAliasingMode& GetAntiAliasingMode();
+		static uint32_t GetBloomMipLevels();
+		static void SetBloomMipLevels(uint32_t levels);
+		static float& GetBloomIntensity();
+		static TonemappingOperator& GetTonemappingOperator();
 
 		static glm::vec2 GetOutputImageSize();
 
@@ -121,6 +133,7 @@ namespace Kerberos
 		static std::vector<LineVertex> GetColliderLineVerticesFromScene(const Scene& scene);
 
 		static void ApplyPostProcessing(const vk::raii::CommandBuffer& cmd, uint32_t currentImage);
+		static void ApplyBloom(const vk::raii::CommandBuffer& cmd, uint32_t currentImage);
 		
 		static void WriteGPUTimestamp(const vk::raii::CommandBuffer& cmd, uint32_t frameIndex, uint32_t index);
 		static void ResolveGPUTimings(uint32_t frameIndex);
@@ -131,6 +144,8 @@ namespace Kerberos
 		static void HandleMousePickingReadback(const vk::raii::CommandBuffer& cmd);
 
 		static bool IsUsingAccelerationStructures();
+		static void BeginRenderPassDebugLabel(const vk::raii::CommandBuffer& cmd, std::string_view labelName);
+		static void EndRenderPassDebugLabel(const vk::raii::CommandBuffer& cmd);
 
 		static void CreateDefaultMaterials();
 		static void CreateResources();
@@ -146,5 +161,9 @@ namespace Kerberos
 		static void SetupGTAODescriptors();
 		static void CreateFXAAImage(uint32_t width, uint32_t height);
 		static void SetupFXAADescriptors();
+
+		static void CreateBloomImage(uint32_t width, uint32_t height);
+		static void SetupBloomDescriptors();
+		static void CreateBloomResources(uint32_t width, uint32_t height);
 	};
 }

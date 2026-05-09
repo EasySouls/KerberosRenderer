@@ -68,6 +68,12 @@ namespace Kerberos
 		// Wait for the device to be idle before updating descriptor sets that might be in use by command buffers
 		//VulkanContext::Get().WaitIdle();
 
+		for (auto& material : set)
+		{
+			// TODO: This can happen on value changes not in every frame
+			material->Params.Emissive = material->EmissiveColor * material->EmissiveIntensity;
+		}
+
 		for (const auto& material : set)
 		{
 			AllocateDescriptorSets(material);

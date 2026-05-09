@@ -1107,7 +1107,7 @@ namespace Kerberos
 			{
 				auto& directionalLight = entity.GetComponent<DirectionalLightComponent>();
 				ImGui::ColorEdit3("Color", &directionalLight.Light.Color[0]);
-				if (ImGui::DragFloat("Intensity", &directionalLight.Light.Intensity, 0.01f, 0.0f, 10.0f))
+				if (ImGui::DragFloat("Intensity", &directionalLight.Light.Intensity, 1.0f, 0.0f))
 				{
 					directionalLight.NeedsUpdate = true;
 				}

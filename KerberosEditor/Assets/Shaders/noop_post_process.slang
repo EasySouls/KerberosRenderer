@@ -1,5 +1,21 @@
+import common;
+import tonemapping;
+
 [[vk::binding(0, 0)]] Texture2D<float4> sceneColorTex;
 [[vk::binding(1, 0)]] SamplerState linearSampler;
+
+[[vk::binding(2, 0)]] Sampler2D<float4> bloomSampler;
+
+[[vk::binding(3, 0)]]
+ConstantBuffer<GlobalLighting> globalLighting;
+
+struct PushConstants {
+    float2 inverseScreenSize;
+    float bloomIntensity;
+    float tonemapOperator;
+};
+[[vk::push_constant]]
+PushConstants pc;
 
 struct VSOutput {
     float4 position : SV_Position;
@@ -20,6 +36,15 @@ VSOutput vertexMain(uint vertexID: SV_VertexID)
 [shader("fragment")]
 float4 fragmentMain(VSOutput input) : SV_Target
 {
-    float4 sceneColor = sceneColorTex.Sample(linearSampler, input.uv);
-    return float4(sceneColor.rgb, 1.0);
+    float2 uv = input.uv;
+
+    float3 sceneColor = sceneColorTex.Sample(linearSampler, uv).rgb;
+    float3 bloomColor = bloomSampler.Sample(uv).rgb;
+
+    float3 finalHDR = sceneColor + (bloomColor * pc.bloomIntensity);
+
+    float3 ldrColor = ApplyToneMapping(finalHDR, globalLighting.exposure, pc.tonemapOperator);
+    ldrColor = ApplyGammaCorrection(ldrColor, globalLighting.gamma);
+
+    return float4(ldrColor, 1.0);
 }

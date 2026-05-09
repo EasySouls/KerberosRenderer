@@ -1,8 +1,9 @@
 Name: cerberus
 Albedo: [1, 1, 1, 1]
-Emissive: [0, 0, 0]
 Roughness: 1
 Metallic: 1
+EmissiveColor: [0, 0, 0]
+EmissiveIntensity: 0
 AlbedoTexture: Assets/Models/cerberus/albedo.ktx2
 NormalTexture: Assets/Models/cerberus/normal.ktx2
 MetallicTexture: Assets/Models/cerberus/metallic.ktx2

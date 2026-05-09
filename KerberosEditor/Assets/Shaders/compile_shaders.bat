@@ -23,8 +23,11 @@ if not exist "%SLANGC%" (
 "%SLANGC%" pbr_ray_query_shadows.slang -target spirv -profile spirv_1_6 -emit-spirv-directly -fvk-use-entrypoint-name -entry vertexMain -entry fragmentMain -o ../Cache/Shaders/pbr_ray_query_shadows.spv
 "%SLANGC%" collider_lines.slang -target spirv -profile spirv_1_6 -emit-spirv-directly -fvk-use-entrypoint-name -entry vertexMain -entry fragmentMain -o ../Cache/Shaders/collider_lines.spv
 "%SLANGC%" transparent.slang -target spirv -profile spirv_1_6 -emit-spirv-directly -fvk-use-entrypoint-name -entry vertexMain -entry fragmentMain -o ../Cache/Shaders/transparent.spv
-"%SLANGC%" transparency_resolve.slang -target spirv -profile spirv_1_6 -emit-spirv-directly -fvk-use-entrypoint-name -entry vertexMain -entry fragmentMain -o ../Cache/Shaders/transparency_resolve.spv
+"%SLANGC%" transparency_resolve.slang -target spirv -profile spirv_1_6 -emit-spirv-directly -fvk-use-entrypoint-name -entry vertexMain -entry resolveMain -o ../Cache/Shaders/transparency_resolve.spv
 "%SLANGC%" gtao.slang -target spirv -profile spirv_1_6 -emit-spirv-directly -fvk-use-entrypoint-name -entry computeMain -o ../Cache/Shaders/gtao.spv
-"%SLANGC%" fxaa.slang -target spirv -profile spirv_1_6 -emit-spirv-directly -fvk-use-entrypoint-name -entry computeMain -o ../Cache/Shaders/fxaa.spv
+"%SLANGC%" fxaa.slang -target spirv -profile spirv_1_6 -emit-spirv-directly -fvk-use-entrypoint-name -entry vertexMain -entry fragmentMain -o ../Cache/Shaders/fxaa.spv
+"%SLANGC%" noop_post_process.slang -target spirv -profile spirv_1_6 -emit-spirv-directly -fvk-use-entrypoint-name -entry vertexMain -entry fragmentMain -o ../Cache/Shaders/noop_post_process.spv
+"%SLANGC%" bloom_downsample.slang -target spirv -profile spirv_1_6 -emit-spirv-directly -fvk-use-entrypoint-name -entry computeMain -o ../Cache/Shaders/bloom_downsample.spv
+"%SLANGC%" bloom_upsample.slang -target spirv -profile spirv_1_6 -emit-spirv-directly -fvk-use-entrypoint-name -entry computeMain -o ../Cache/Shaders/bloom_upsample.spv
 
 PAUSE

@@ -521,7 +521,11 @@ namespace Kerberos
 				ImGui::ColorEdit4("Albedo", &state.WorkingCopy->Params.AlbedoFactor[0]);
 				ImGui::DragFloat("Roughness", &state.WorkingCopy->Params.RoughnessFactor, 0.01f, 0.0f, 1.0f);
 				ImGui::DragFloat("Metallic", &state.WorkingCopy->Params.MetallicFactor, 0.01f, 0.0f, 1.0f);
-				ImGui::ColorEdit3("Emissive", &state.WorkingCopy->Params.EmissiveFactor[0]);
+				ImGui::ColorEdit3("Emissive Color", &state.WorkingCopy->EmissiveColor[0]);
+				ImGui::DragFloat("Emissive Intensity", &state.WorkingCopy->EmissiveIntensity, 1.0f, 0.0f, 1000.0f);
+				state.WorkingCopy->Params.Emissive = state.WorkingCopy->EmissiveColor * state.WorkingCopy->EmissiveIntensity;
+				const auto& emissive = state.WorkingCopy->Params.Emissive;
+				ImGui::Text("Emissive: (%.3f, %.3f, %.3f)", emissive.x, emissive.y, emissive.z);
 
 				ImGui::Separator();
 				ImGui::Text("Preview Mesh");

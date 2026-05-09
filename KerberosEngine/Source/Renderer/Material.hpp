@@ -18,13 +18,16 @@ namespace Kerberos
 		struct UniformBlock
 		{
 			glm::vec4 AlbedoFactor{ 1.0f, 1.0f, 1.0f, 1.0f };
-			glm::vec3 EmissiveFactor{ 0.0f };
+			glm::vec3 Emissive{ 0.0f };
 			float RoughnessFactor{ 1.0f };
 			float MetallicFactor{ 0.0f };
 		};
 		UniformBlock Params{};
 
 		std::string Name;
+
+		glm::vec3 EmissiveColor{ 0.0f };
+		float EmissiveIntensity{ 0.0f };
 
 		Ref<Texture2D> AlbedoTexture = nullptr;
 		Ref<Texture2D> NormalTexture = nullptr;
@@ -48,7 +51,7 @@ namespace Kerberos
 			Params.RoughnessFactor = r;
 			Params.MetallicFactor = m;
 			Params.AlbedoFactor = c;
-			Params.EmissiveFactor = glm::vec3(0.0f);
+			Params.Emissive = glm::vec3(0.0f);
 		}
 
 		Material(std::string name, const glm::vec4 c, const float r, const float m,
@@ -58,12 +61,14 @@ namespace Kerberos
 			Params.RoughnessFactor = r;
 			Params.MetallicFactor = m;
 			Params.AlbedoFactor = c;
-			Params.EmissiveFactor = glm::vec3(0.0f);
+			Params.Emissive = glm::vec3(0.0f);
 		}
 
 		Material(const Material& other)
 			: Params(other.Params)
 			, Name(other.Name)
+			, EmissiveColor(other.EmissiveColor)
+			, EmissiveIntensity(other.EmissiveIntensity)
 			, AlbedoTexture(other.AlbedoTexture)
 			, NormalTexture(other.NormalTexture)
 			, RoughnessTexture(other.RoughnessTexture)
@@ -79,6 +84,8 @@ namespace Kerberos
 			{
 				Params = other.Params;
 				Name = other.Name;
+				EmissiveColor = other.EmissiveColor;
+				EmissiveIntensity = other.EmissiveIntensity;
 				AlbedoTexture = other.AlbedoTexture;
 				NormalTexture = other.NormalTexture;
 				MetallicTexture = other.MetallicTexture;
@@ -93,8 +100,11 @@ namespace Kerberos
 		bool operator==(const Material& other) const
 		{
 			return Params.AlbedoFactor == other.Params.AlbedoFactor &&
+				   Params.Emissive == other.Params.Emissive &&
 				   Params.RoughnessFactor == other.Params.RoughnessFactor &&
 				   Params.MetallicFactor == other.Params.MetallicFactor &&
+				   EmissiveColor == other.EmissiveColor &&
+				   EmissiveIntensity == other.EmissiveIntensity &&
 				   AlbedoTexture == other.AlbedoTexture &&
 				   NormalTexture == other.NormalTexture &&
 				   RoughnessTexture == other.RoughnessTexture &&

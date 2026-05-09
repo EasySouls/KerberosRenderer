@@ -1,3 +1,6 @@
+import common;
+import tonemapping;
+
 // ============================================================================
 // FXAA 3.11 Shader in Slang
 // ============================================================================
@@ -7,8 +10,15 @@
 [[vk::binding(0, 0)]] Texture2D<float4> sceneColorTex;
 [[vk::binding(1, 0)]] SamplerState linearSampler;
 
+[[vk::binding(2, 0)]] Sampler2D<float4> bloomSampler;
+
+[[vk::binding(3, 0)]]
+ConstantBuffer<GlobalLighting> globalLighting;
+
 struct PushConstants {
     float2 inverseScreenSize;
+    float bloomIntensity;
+    float tonemapOperator;
 };
 [[vk::push_constant]] 
 PushConstants pc;
@@ -37,56 +47,51 @@ static const int FXAA_ITERATIONS = 12;
 // Edge search step sizes
 static const float SEARCH_STEPS[12] = { 1.0, 1.0, 1.0, 1.0, 1.0, 1.5, 2.0, 2.0, 2.0, 2.0, 4.0, 8.0 };
 
-[shader("fragment")]
-float4 fragmentMain(VSOutput input) : SV_Target 
+float3 ApplyFXAA(float2 uv)
 {
-    float2 uv = input.uv;
     float2 texelSize = pc.inverseScreenSize;
-
     // Sample center and 4 direct neighbors
     float4 colorCenter = sceneColorTex.SampleLevel(linearSampler, uv, 0.0);
-    float lumaM  = colorCenter.a; // Luma must be pre-calculated in alpha
-    
-    float lumaS  = sceneColorTex.SampleLevel(linearSampler, uv + float2( 0.0,  1.0) * texelSize, 0.0).a;
-    float lumaN  = sceneColorTex.SampleLevel(linearSampler, uv + float2( 0.0, -1.0) * texelSize, 0.0).a;
-    float lumaE  = sceneColorTex.SampleLevel(linearSampler, uv + float2( 1.0,  0.0) * texelSize, 0.0).a;
-    float lumaW  = sceneColorTex.SampleLevel(linearSampler, uv + float2(-1.0,  0.0) * texelSize, 0.0).a;
+    float lumaM = colorCenter.a; // Luma must be pre-calculated in alpha
 
+    float lumaS = sceneColorTex.SampleLevel(linearSampler, uv + float2(0.0, 1.0) * texelSize, 0.0).a;
+    float lumaN = sceneColorTex.SampleLevel(linearSampler, uv + float2(0.0, -1.0) * texelSize, 0.0).a;
+    float lumaE = sceneColorTex.SampleLevel(linearSampler, uv + float2(1.0, 0.0) * texelSize, 0.0).a;
+    float lumaW = sceneColorTex.SampleLevel(linearSampler, uv + float2(-1.0, 0.0) * texelSize, 0.0).a;
     // Find contrast (max - min luma)
     float maxLuma = max(lumaM, max(max(lumaN, lumaS), max(lumaE, lumaW)));
     float minLuma = min(lumaM, min(min(lumaN, lumaS), min(lumaE, lumaW)));
     float contrast = maxLuma - minLuma;
-
     // Early Exit: If contrast is too low, it's not an edge. Just return the pixel.
     float threshold = max(FXAA_EDGE_THRESHOLD_MIN, maxLuma * FXAA_EDGE_THRESHOLD);
     if (contrast < threshold) {
-        return float4(colorCenter.rgb, 1.0);
+        return colorCenter.rgb;
     }
 
     // Sample diagonals to determine edge direction
     float lumaNW = sceneColorTex.SampleLevel(linearSampler, uv + float2(-1.0, -1.0) * texelSize, 0.0).a;
-    float lumaNE = sceneColorTex.SampleLevel(linearSampler, uv + float2( 1.0, -1.0) * texelSize, 0.0).a;
-    float lumaSW = sceneColorTex.SampleLevel(linearSampler, uv + float2(-1.0,  1.0) * texelSize, 0.0).a;
-    float lumaSE = sceneColorTex.SampleLevel(linearSampler, uv + float2( 1.0,  1.0) * texelSize, 0.0).a;
+    float lumaNE = sceneColorTex.SampleLevel(linearSampler, uv + float2(1.0, -1.0) * texelSize, 0.0).a;
+    float lumaSW = sceneColorTex.SampleLevel(linearSampler, uv + float2(-1.0, 1.0) * texelSize, 0.0).a;
+    float lumaSE = sceneColorTex.SampleLevel(linearSampler, uv + float2(1.0, 1.0) * texelSize, 0.0).a;
 
     // Calculate vertical and horizontal edge presence
     float edgeHorz = 
         abs((0.25 * lumaNW) + (-0.5 * lumaN) + (0.25 * lumaNE)) +
-        abs((0.50 * lumaW ) + (-1.0 * lumaM) + (0.50 * lumaE )) +
-        abs((0.25 * lumaSW) + (-0.5 * lumaS) + (0.25 * lumaSE));
-        
+                     abs((0.50 * lumaW) + (-1.0 * lumaM) + (0.50 * lumaE)) +
+                     abs((0.25 * lumaSW) + (-0.5 * lumaS) + (0.25 * lumaSE));
+
     float edgeVert = 
         abs((0.25 * lumaNW) + (-0.5 * lumaW) + (0.25 * lumaSW)) +
-        abs((0.50 * lumaN ) + (-1.0 * lumaM) + (0.50 * lumaS )) +
-        abs((0.25 * lumaNE) + (-0.5 * lumaE) + (0.25 * lumaSE));
-        
+                     abs((0.50 * lumaN) + (-1.0 * lumaM) + (0.50 * lumaS)) +
+                     abs((0.25 * lumaNE) + (-0.5 * lumaE) + (0.25 * lumaSE));
+
     bool isHorizontal = (edgeHorz >= edgeVert);
 
     // Determine step size and direction
     float stepLength = isHorizontal ? texelSize.y : texelSize.x;
     float luma1 = isHorizontal ? lumaS : lumaW;
     float luma2 = isHorizontal ? lumaN : lumaE;
-    
+
     // Find the steepest gradient
     float grad1 = luma1 - lumaM;
     float grad2 = luma2 - lumaM;
@@ -106,7 +111,7 @@ float4 fragmentMain(VSOutput input) : SV_Target
     // Shift UV half a pixel in the direction of the edge
     float2 currentUv = uv;
     if (isHorizontal) currentUv.y += stepLength * 0.5;
-    else              currentUv.x += stepLength * 0.5;
+    else currentUv.x += stepLength * 0.5;
 
     // Edge Search - Walk along the edge until the luma changes significantly
     float2 offset = isHorizontal ? float2(texelSize.x, 0.0) : float2(0.0, texelSize.y);
@@ -144,7 +149,7 @@ float4 fragmentMain(VSOutput input) : SV_Target
     bool isDirection1Closest = distance1 < distance2;
     float distanceFinal = min(distance1, distance2);
     float edgeThickness = (distance1 + distance2);
-    
+
     float pixelOffset = -distanceFinal / edgeThickness + 0.5;
 
     bool isLumaCenterSmaller = lumaM < lumaLocalAverage;
@@ -152,7 +157,7 @@ float4 fragmentMain(VSOutput input) : SV_Target
     float finalOffset = correctVariation ? pixelOffset : 0.0;
 
     // Sub-pixel aliasing mitigation (shimmering)
-    float lumaAverage = (1.0/9.0) * (lumaN + lumaS + lumaE + lumaW + lumaNE + lumaNW + lumaSE + lumaSW + lumaM);
+    float lumaAverage = (1.0 / 9.0) * (lumaN + lumaS + lumaE + lumaW + lumaNE + lumaNW + lumaSE + lumaSW + lumaM);
     float subPixelOffset1 = clamp(abs(lumaAverage - lumaM) / contrast, 0.0, 1.0);
     float subPixelOffset2 = (-2.0 * subPixelOffset1 + 3.0) * subPixelOffset1 * subPixelOffset1;
     float subPixelOffsetFinal = subPixelOffset2 * subPixelOffset2 * FXAA_SUBPIX_CAP;
@@ -162,9 +167,23 @@ float4 fragmentMain(VSOutput input) : SV_Target
     // Final texture sample
     float2 finalUv = uv;
     if (isHorizontal) finalUv.y += finalOffset * stepLength;
-    else              finalUv.x += finalOffset * stepLength;
+    else finalUv.x += finalOffset * stepLength;
 
     float4 finalColor = sceneColorTex.SampleLevel(linearSampler, finalUv, 0.0);
+    return finalColor.rgb;
+}
+
+[shader("fragment")]
+float4 fragmentMain(VSOutput input) : SV_Target
+{
+    float2 uv = input.uv;
+    float3 sceneColor = ApplyFXAA(uv);
+    float3 bloomColor = bloomSampler.Sample(uv).rgb;
+
+    float3 finalHDR = sceneColor + (bloomColor * pc.bloomIntensity);
+
+    float3 ldrColor = ApplyToneMapping(finalHDR, globalLighting.exposure, pc.tonemapOperator);
+    ldrColor = ApplyGammaCorrection(ldrColor, globalLighting.gamma);
     
-    return float4(finalColor.rgb, 1.0);
+    return float4(ldrColor, 1.0);
 }
