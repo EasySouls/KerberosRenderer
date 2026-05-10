@@ -196,7 +196,7 @@ namespace Kerberos
 		m_Registry.destroy(enttId);
 	}
 
-	void Scene::DuplicateEntity(const Entity entity, const bool duplicateChildren)
+	Entity Scene::DuplicateEntity(const Entity entity, const bool duplicateChildren)
 	{
 		KBR_PROFILE_FUNCTION();
 
@@ -300,10 +300,12 @@ namespace Kerberos
 			const auto children = GetChildren(entity);
 			for (const auto& child : children)
 			{
-				DuplicateEntity(child, true);
-				SetParent(child, newEntity, false);
+				const Entity duplicatedChild = DuplicateEntity(child, true);
+				SetParent(duplicatedChild, newEntity, false);
 			}
 		}
+
+		return newEntity;
 	}
 
 	void Scene::CreateChild(const Entity entity)
@@ -386,9 +388,9 @@ namespace Kerberos
 		const auto& parentHierarchy = parent.GetComponent<HierarchyComponent>();
 
 		std::vector<Entity> children;
-		for (const auto& child : parentHierarchy.Children)
+		for (const UUID& childId : parentHierarchy.Children)
 		{
-			Entity entity = GetEntityByUUID(child);
+			Entity entity = GetEntityByUUID(childId);
 			children.push_back(entity);
 		}
 		return children;

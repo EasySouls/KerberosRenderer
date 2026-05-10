@@ -56,8 +56,9 @@ namespace Kerberos
 		 *
 		 * @param entity The entity to duplicate
 		 * @param duplicateChildren If true, duplicates the children of the entity as well
+		 * @return Entity The duplicated entity
 		 */
-		void DuplicateEntity(Entity entity, bool duplicateChildren);
+		Entity DuplicateEntity(Entity entity, bool duplicateChildren);
 
 		void CreateChild(Entity entity);
 
