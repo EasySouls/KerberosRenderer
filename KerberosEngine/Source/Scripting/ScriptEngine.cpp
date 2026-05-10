@@ -276,6 +276,21 @@ namespace Kerberos
 		s_ScriptData->EntityFieldInitializers[entityID] = fieldInitializers;
 	}
 
+	void ScriptEngine::CopyScriptFieldInitializers(const Entity srcEntity, const Entity dstEntity) 
+	{
+		const std::string& dstClassName = dstEntity.GetComponent<ScriptComponent>().ClassName;
+
+		KBR_CORE_ASSERT(srcEntity.HasComponent<ScriptComponent>(), "Source entity does not have a ScriptComponent!");
+		KBR_CORE_ASSERT(dstEntity.HasComponent<ScriptComponent>(), "Destination entity does not have a ScriptComponent!");
+		KBR_CORE_ASSERT(srcEntity.GetComponent<ScriptComponent>().ClassName == dstClassName, "Script initializers can only be copied between entities of the same script class!");
+
+		CreateScriptFieldInitializers(dstEntity, dstClassName);
+
+		const auto& srcInitializers = GetScriptFieldInitializerMap(srcEntity);
+		auto& dstInitializers = GetScriptFieldInitializerMap(dstEntity);
+		dstInitializers = srcInitializers;
+	}
+
 	const std::unordered_map<std::string, Ref<ScriptClass>>& ScriptEngine::GetEntityClasses()
 	{
 		return s_ScriptData->EntityClasses;
@@ -432,52 +447,6 @@ namespace Kerberos
 		KBR_CORE_INFO("Successfully loaded .NET assembly: {}", assemblyPath);
 	}
 
-	template<typename T>
-	T ScriptEngine::LoadManagedFunction(const char* typeName, const char* methodName)
-	{
-		T fn = nullptr;
-		const dotnet_string assemblyPath = ToDotNetString(s_ScriptData->CoreAssemblyPath.string());
-		const dotnet_string type = ToDotNetString(typeName);
-		const dotnet_string method = ToDotNetString(methodName);
-
-		int rc = s_ScriptData->LoadAssemblyFn(
-			assemblyPath.c_str(),
-			type.c_str(),
-			method.c_str(),
-			UNMANAGEDCALLERSONLY_METHOD,
-			nullptr,
-			reinterpret_cast<void**>(&fn));
-
-		if (rc != 0)
-		{
-			KBR_CORE_ASSERT(false, "Failed to load managed function {}.{}. Error: 0x{:x}", typeName, methodName, rc);
-			KBR_CORE_ERROR("Failed to load managed function {}.{}. Error: 0x{:x}", typeName, methodName, rc);
-		}
-
-		return fn;
-	}
-
-	void ScriptEngine::LoadManagedFunctions()
-	{
-		const char* glueType = "Kerberos.Source.ScriptGlue, KerberosScriptCoreLib";
-		const char* callbacksType = "Kerberos.Source.InternalCalls, KerberosScriptCoreLib";
-
-		s_ScriptData->LoadAssemblyClasses = LoadManagedFunction<ManagedLoadAssemblyClassesFn>(glueType, "LoadAssemblyClasses");
-		s_ScriptData->ManagedClassExists = LoadManagedFunction<ManagedClassExistsFn>(glueType, "ClassExists");
-		s_ScriptData->ManagedCreateInstance = LoadManagedFunction<ManagedCreateInstanceFn>(glueType, "CreateInstance");
-		s_ScriptData->ManagedDestroyInstance = LoadManagedFunction<ManagedDestroyInstanceFn>(glueType, "DestroyInstance");
-		s_ScriptData->ManagedClearInstances = LoadManagedFunction<ManagedClearInstancesFn>(glueType, "ClearInstances");
-		s_ScriptData->ManagedInvokeOnCreate = LoadManagedFunction<ManagedInvokeOnCreateFn>(glueType, "InvokeOnCreate");
-		s_ScriptData->ManagedInvokeOnUpdate = LoadManagedFunction<ManagedInvokeOnUpdateFn>(glueType, "InvokeOnUpdate");
-		s_ScriptData->ManagedGetFieldCount = LoadManagedFunction<ManagedGetFieldCountFn>(glueType, "GetClassFieldCount");
-		s_ScriptData->ManagedGetFields = LoadManagedFunction<ManagedGetFieldsFn>(glueType, "GetClassFields");
-		s_ScriptData->ManagedGetFieldValue = LoadManagedFunction<ManagedGetFieldValueFn>(glueType, "GetFieldValue");
-		s_ScriptData->ManagedSetFieldValue = LoadManagedFunction<ManagedSetFieldValueFn>(glueType, "SetFieldValue");
-		s_ScriptData->ManagedGetEntityClassCount = LoadManagedFunction<ManagedGetEntityClassCountFn>(glueType, "GetEntityClassCount");
-		s_ScriptData->ManagedGetEntityClassNames = LoadManagedFunction<ManagedGetEntityClassNamesFn>(glueType, "GetEntityClassNames");
-		s_ScriptData->ManagedSetNativeCallbacks = LoadManagedFunction<ManagedSetNativeCallbacksFn>(callbacksType, "SetNativeCallbacks");
-	}
-
 	void ScriptEngine::LoadAssemblyClasses()
 	{
 		s_ScriptData->EntityClasses.clear();
@@ -558,6 +527,52 @@ namespace Kerberos
 
 		/// Register the Entity base class reference
 		s_ScriptData->EntityClass = ScriptClass("Kerberos.Source.Kerberos.Scene", "Entity", "Kerberos.Source.Kerberos.Scene.Entity");
+	}
+
+	template<typename T>
+	T ScriptEngine::LoadManagedFunction(const char* typeName, const char* methodName)
+	{
+		T fn = nullptr;
+		const dotnet_string assemblyPath = ToDotNetString(s_ScriptData->CoreAssemblyPath.string());
+		const dotnet_string type = ToDotNetString(typeName);
+		const dotnet_string method = ToDotNetString(methodName);
+
+		int rc = s_ScriptData->LoadAssemblyFn(
+			assemblyPath.c_str(),
+			type.c_str(),
+			method.c_str(),
+			UNMANAGEDCALLERSONLY_METHOD,
+			nullptr,
+			reinterpret_cast<void**>(&fn));
+
+		if (rc != 0)
+		{
+			KBR_CORE_ASSERT(false, "Failed to load managed function {}.{}. Error: 0x{:x}", typeName, methodName, rc);
+			KBR_CORE_ERROR("Failed to load managed function {}.{}. Error: 0x{:x}", typeName, methodName, rc);
+		}
+
+		return fn;
+	}
+
+	void ScriptEngine::LoadManagedFunctions()
+	{
+		const char* glueType = "Kerberos.Source.ScriptGlue, KerberosScriptCoreLib";
+		const char* callbacksType = "Kerberos.Source.InternalCalls, KerberosScriptCoreLib";
+
+		s_ScriptData->LoadAssemblyClasses = LoadManagedFunction<ManagedLoadAssemblyClassesFn>(glueType, "LoadAssemblyClasses");
+		s_ScriptData->ManagedClassExists = LoadManagedFunction<ManagedClassExistsFn>(glueType, "ClassExists");
+		s_ScriptData->ManagedCreateInstance = LoadManagedFunction<ManagedCreateInstanceFn>(glueType, "CreateInstance");
+		s_ScriptData->ManagedDestroyInstance = LoadManagedFunction<ManagedDestroyInstanceFn>(glueType, "DestroyInstance");
+		s_ScriptData->ManagedClearInstances = LoadManagedFunction<ManagedClearInstancesFn>(glueType, "ClearInstances");
+		s_ScriptData->ManagedInvokeOnCreate = LoadManagedFunction<ManagedInvokeOnCreateFn>(glueType, "InvokeOnCreate");
+		s_ScriptData->ManagedInvokeOnUpdate = LoadManagedFunction<ManagedInvokeOnUpdateFn>(glueType, "InvokeOnUpdate");
+		s_ScriptData->ManagedGetFieldCount = LoadManagedFunction<ManagedGetFieldCountFn>(glueType, "GetClassFieldCount");
+		s_ScriptData->ManagedGetFields = LoadManagedFunction<ManagedGetFieldsFn>(glueType, "GetClassFields");
+		s_ScriptData->ManagedGetFieldValue = LoadManagedFunction<ManagedGetFieldValueFn>(glueType, "GetFieldValue");
+		s_ScriptData->ManagedSetFieldValue = LoadManagedFunction<ManagedSetFieldValueFn>(glueType, "SetFieldValue");
+		s_ScriptData->ManagedGetEntityClassCount = LoadManagedFunction<ManagedGetEntityClassCountFn>(glueType, "GetEntityClassCount");
+		s_ScriptData->ManagedGetEntityClassNames = LoadManagedFunction<ManagedGetEntityClassNamesFn>(glueType, "GetEntityClassNames");
+		s_ScriptData->ManagedSetNativeCallbacks = LoadManagedFunction<ManagedSetNativeCallbacksFn>(callbacksType, "SetNativeCallbacks");
 	}
 
 	static std::string_view FileWatchEventToString(const filewatch::Event event)

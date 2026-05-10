@@ -220,6 +220,8 @@ namespace Kerberos
 		if (entity.HasComponent<ScriptComponent>())
 		{
 			newEntity.AddComponent<ScriptComponent>(entity.GetComponent<ScriptComponent>());
+
+			ScriptEngine::CopyScriptFieldInitializers(entity, newEntity);
 		}
 		if (entity.HasComponent<NativeScriptComponent>())
 		{

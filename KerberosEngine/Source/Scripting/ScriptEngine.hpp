@@ -49,6 +49,7 @@ namespace Kerberos
 
 		static bool ClassExists(const std::string& className);
 		static void CreateScriptFieldInitializers(Entity entity, const std::string& className);
+		static void CopyScriptFieldInitializers(Entity srcEntity, Entity dstEntity);
 
 		static const std::unordered_map<std::string, Ref<ScriptClass>>& GetEntityClasses();
 		static std::unordered_map<std::string, ScriptFieldInitializer>& GetScriptFieldInitializerMap(Entity entity);
