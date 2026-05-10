@@ -14,9 +14,6 @@ namespace Kerberos
 
     struct alignas(16) PointLight
     {
-        /// World-space position
-        alignas(16) glm::vec3 Position = glm::vec3(0.0f);
-
         alignas(16) glm::vec3 Color = glm::vec3(1.0f);
         alignas(4) float Intensity = 500.0f; // In candelas
         alignas(4) float Radius = 50.0f;

@@ -3573,28 +3573,34 @@ namespace Kerberos
 	{
 		std::vector<GPULight> sceneLights;
 
-		const auto pointLightView = scene.m_Registry.view<PointLightComponent>();
+		const auto pointLightView = scene.m_Registry.view<PointLightComponent, TransformComponent>();
 		for (const auto entity : pointLightView) {
 			auto& pl = pointLightView.get<PointLightComponent>(entity);
 			if (!pl.IsEnabled) continue;
 
+			const auto& tsc = pointLightView.get<TransformComponent>(entity);
+			const glm::vec3 position = tsc.WorldTransform[3];
+
 			GPULight gpuLight{};
 			gpuLight.Type = static_cast<uint32_t>(LightType::Point);
-			gpuLight.Position = pl.Light.Position;
+			gpuLight.Position = position;
 			gpuLight.Color = pl.Light.Color;
 			gpuLight.Intensity = pl.Light.Intensity;
 			gpuLight.Range = pl.Light.Radius;
 			sceneLights.push_back(gpuLight);
 		}
 
-		const auto spotLightView = scene.m_Registry.view<SpotLightComponent>();
+		const auto spotLightView = scene.m_Registry.view<SpotLightComponent, TransformComponent>();
 		for (const auto entity : spotLightView) {
-			auto& sl = spotLightView.get<SpotLightComponent>(entity);
+			const auto& sl = spotLightView.get<SpotLightComponent>(entity);
 			if (!sl.IsEnabled) continue;
+
+			const auto& tsc = spotLightView.get<TransformComponent>(entity);
+			const glm::vec3 position = tsc.WorldTransform[3];
 
 			GPULight gpuLight{};
 			gpuLight.Type = static_cast<uint32_t>(LightType::Spot);
-			gpuLight.Position = sl.Light.Position;
+			gpuLight.Position = position;
 			gpuLight.Direction = sl.Light.Direction;
 			gpuLight.Color = sl.Light.Color;
 			gpuLight.Intensity = sl.Light.Intensity;

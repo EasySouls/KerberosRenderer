@@ -209,7 +209,6 @@ namespace Kerberos
 			out << YAML::BeginMap;
 			const auto& pointLight = entity.GetComponent<PointLightComponent>();
 			out << YAML::Key << "Color" << YAML::Value << pointLight.Light.Color;
-			out << YAML::Key << "Position" << YAML::Value << pointLight.Light.Position;
 			out << YAML::Key << "Intensity" << YAML::Value << pointLight.Light.Intensity;
 			out << YAML::Key << "Radius" << YAML::Value << pointLight.Light.Radius;
 			out << YAML::EndMap;
@@ -221,7 +220,6 @@ namespace Kerberos
 			out << YAML::BeginMap;
 			const auto& spotLight = entity.GetComponent<SpotLightComponent>();
 			out << YAML::Key << "Color" << YAML::Value << spotLight.Light.Color;
-			out << YAML::Key << "Position" << YAML::Value << spotLight.Light.Position;
 			out << YAML::Key << "Direction" << YAML::Value << spotLight.Light.Direction;
 			out << YAML::Key << "Intensity" << YAML::Value << spotLight.Light.Intensity;
 			out << YAML::Key << "Radius" << YAML::Value << spotLight.Light.Radius;
@@ -582,7 +580,6 @@ namespace Kerberos
 				{
 					auto& pointLight = deserializedEntity.AddComponent<PointLightComponent>();
 					pointLight.Light.Color = pointLightComponent["Color"].as<glm::vec3>();
-					pointLight.Light.Position = pointLightComponent["Position"].as<glm::vec3>();
 					pointLight.Light.Intensity = pointLightComponent["Intensity"].as<float>();
 					pointLight.Light.Radius = pointLightComponent["Radius"].as<float>();
 				}
@@ -591,7 +588,6 @@ namespace Kerberos
 				{
 					auto& spotLight = deserializedEntity.AddComponent<SpotLightComponent>();
 					spotLight.Light.Color = spotLightComponent["Color"].as<glm::vec3>();
-					spotLight.Light.Position = spotLightComponent["Position"].as<glm::vec3>();
 					spotLight.Light.Direction = spotLightComponent["Direction"].as<glm::vec3>();
 					spotLight.Light.Intensity = spotLightComponent["Intensity"].as<float>();
 					spotLight.Light.Radius = spotLightComponent["Radius"].as<float>();
