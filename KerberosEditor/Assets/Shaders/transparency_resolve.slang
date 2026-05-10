@@ -62,7 +62,10 @@ float4 resolveMain(VSOutput input) : SV_Target
     float3 transparentColor = accum.rgb / max(accum.a, 0.00001f);
 
     float3 sceneColor = transparentColor + (background.rgb * revealage);
-    float bloomMask = background.a;
+
+    float backgroundBloomMask = background.a;
+    float transparentOpacity = 1.0f - revealage;
+    float bloomMask = transparentOpacity + (backgroundBloomMask * revealage);
 
     return float4(sceneColor, bloomMask);
 }
