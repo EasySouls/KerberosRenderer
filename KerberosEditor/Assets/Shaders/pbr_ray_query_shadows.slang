@@ -65,6 +65,8 @@ Sampler2D roughnessMapSampler;
 Sampler2D metallicMapSampler;
 [[vk::binding(4, 1)]]
 Sampler2D aoMapSampler;
+[[vk::binding(5, 1)]]
+Sampler2D emissiveMapSampler;
 
 [SpecializationConstant] const int enableSoftShadows = 0;
 
@@ -349,11 +351,9 @@ PSOutput fragmentMain(VSOutput input)
 
     float3 color = ambient + Lo;
 
-    //// Tone mapping
-    //color = Uncharted2Tonemap(color * globalLighting.exposure);
-    //color = color * (1.0f / Uncharted2Tonemap((11.2f).xxx));
-    //// Gamma correction
-    //color = pow(color, (1.0f / globalLighting.gamma).xxx);
+    float3 emissiveTex = emissiveMapSampler.Sample(input.TexCoord).rgb;
+    float3 emissive = emissiveTex * perObject.material.emissive;
+    color += emissive;
 
     PSOutput output;
     output.Color = float4(color.xyz, 1.0);
