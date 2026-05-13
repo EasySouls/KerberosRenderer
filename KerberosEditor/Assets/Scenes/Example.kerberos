@@ -1,4 +1,4 @@
-Scene: Unnamed Scene
+Scene: Example Scene
 Entities:
   - Entity: 12904545083047205477
     TagComponent:

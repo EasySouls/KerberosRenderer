@@ -90,6 +90,7 @@ namespace Kerberos
 		const PhysicsSystem& GetPhysicsSystem() const;
 		PhysicsSystem& GetPhysicsSystem();
 
+		void SetName(const std::string& name) { m_Name = name; }
 		const std::string& GetName() const { return m_Name; }
 
 		static Ref<Scene> Copy(const Ref<Scene>& other);

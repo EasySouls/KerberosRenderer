@@ -372,7 +372,7 @@ namespace Kerberos
 	{
 		YAML::Emitter out;
 		out << YAML::BeginMap;
-		out << YAML::Key << "Scene" << YAML::Value << "Unnamed Scene";
+		out << YAML::Key << "Scene" << YAML::Value << m_Scene->GetName();
 		out << YAML::Key << "Entities" << YAML::Value << YAML::BeginSeq;
 		for (const auto entityId : m_Scene->m_Registry.view<entt::entity>())
 		{
@@ -425,7 +425,8 @@ namespace Kerberos
 			return false;
 		}
 
-		auto sceneName = data["Scene"].as<std::string>();
+		const std::string sceneName = data["Scene"].as<std::string>();
+		m_Scene->SetName(sceneName);
 
 		if (auto entities = data["Entities"])
 		{
