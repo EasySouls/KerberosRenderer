@@ -31,6 +31,14 @@ namespace Kerberos
 
 		void SetFlipY(bool flip) override;
 
+		float GetNearClip() const override;
+		float GetFarClip() const override;
+		void SetNearClip(float nearClip) override;
+		void SetFarClip(float farClip) override;
+
+		float GetMoveSpeed() const override;
+		void SetMoveSpeed(float speed) override;
+
 		const glm::mat4& GetViewMatrix(Handedness handedness = Handedness::Right) const override;
 		const glm::mat4& GetProjectionMatrix(Handedness handedness = Handedness::Right) const override;
 		glm::mat4 GetViewProjectionMatrix(Handedness handedness = Handedness::Right) const override;

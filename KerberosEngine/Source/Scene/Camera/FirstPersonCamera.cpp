@@ -123,6 +123,38 @@ namespace Kerberos
 		m_ProjectionDirty = true;
 	}
 
+	float FirstPersonCamera::GetNearClip() const 
+	{
+		return m_NearClip;
+	}
+
+	float FirstPersonCamera::GetFarClip() const 
+	{
+		return m_FarClip;
+	}
+
+	void FirstPersonCamera::SetNearClip(const float nearClip) 
+	{
+		m_NearClip = nearClip;
+		m_ProjectionDirty = true;
+	}
+
+	void FirstPersonCamera::SetFarClip(const float farClip) 
+	{
+		m_FarClip = farClip;
+		m_ProjectionDirty = true;
+	}
+
+	float FirstPersonCamera::GetMoveSpeed() const 
+	{
+		return m_MoveSpeed;
+	}
+
+	void FirstPersonCamera::SetMoveSpeed(const float speed) 
+	{
+		m_MoveSpeed = speed;
+	}
+
 	const glm::mat4& FirstPersonCamera::GetViewMatrix(const Handedness handedness) const
 	{
 		if (handedness == Handedness::Right) 

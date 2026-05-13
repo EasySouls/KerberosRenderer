@@ -45,6 +45,14 @@ namespace Kerberos
 
 		virtual void SetFlipY(bool flip) = 0;
 
+		virtual float GetNearClip() const = 0;
+		virtual float GetFarClip() const = 0;
+		virtual void SetNearClip(float nearClip) = 0;
+		virtual void SetFarClip(float farClip) = 0;
+
+		virtual float GetMoveSpeed() const = 0;
+		virtual void SetMoveSpeed(float speed) = 0;
+
 		virtual const glm::mat4& GetViewMatrix(Handedness handedness = Handedness::Right) const = 0;
 		virtual const glm::mat4& GetProjectionMatrix(Handedness handedness = Handedness::Right) const = 0;
 		virtual glm::mat4 GetViewProjectionMatrix(Handedness handedness = Handedness::Right) const = 0;

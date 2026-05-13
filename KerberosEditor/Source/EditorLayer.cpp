@@ -897,6 +897,24 @@ namespace Kerberos
 		ImGui::Text("Rotation: (Pitch: %.2f, Yaw: %.2f)", m_EditorCamera->GetPitch(), m_EditorCamera->GetYaw());
 		ImGui::Text("Distance: %.2f", m_EditorCamera->GetDistance());
 
+		float nearClip = m_EditorCamera->GetNearClip();
+		if (ImGui::DragFloat("Near clip", &nearClip, 0.1f, 0.01f, 100.0f))
+		{
+			m_EditorCamera->SetNearClip(nearClip);
+		}
+
+		float farClip = m_EditorCamera->GetFarClip();
+		if (ImGui::DragFloat("Far clip", &farClip, 1.0f, 1.0f))
+		{
+			m_EditorCamera->SetFarClip(farClip);
+		}
+
+		float moveSpeed = m_EditorCamera->GetMoveSpeed();
+		if (ImGui::DragFloat("Camera speed", &moveSpeed, 0.1f, 0.1f, 100.0f))
+		{
+			m_EditorCamera->SetMoveSpeed(moveSpeed);
+		}
+
 		glm::vec3 focalPoint = m_EditorCamera->GetFocalPoint();
 		ImGui::DragFloat3("Focal point", glm::value_ptr(focalPoint), 0.1f, 0.0f, 0.0f, "%.3f", ImGuiSliderFlags_NoInput);
 

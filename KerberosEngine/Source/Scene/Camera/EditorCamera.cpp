@@ -59,6 +59,39 @@ namespace Kerberos
 		UpdateProjection();
 	}
 
+	float EditorCamera::GetNearClip() const
+	{
+		return m_NearClip;
+	}
+
+	float EditorCamera::GetFarClip() const
+	{
+		return m_FarClip;
+	}
+
+	void EditorCamera::SetNearClip(const float nearClip)
+	{
+		m_NearClip = nearClip;
+
+		UpdateProjection();
+	}
+
+	void EditorCamera::SetFarClip(const float farClip)
+	{
+		m_FarClip = farClip;
+		
+		UpdateProjection();
+	}
+
+	float EditorCamera::GetMoveSpeed() const
+	{
+		return 0.0f;
+	}
+
+	void EditorCamera::SetMoveSpeed(const float speed)
+	{
+	}
+
 	const glm::mat4& EditorCamera::GetViewMatrix(const Handedness handedness) const 
 	{
 		if (handedness == Handedness::Right)
