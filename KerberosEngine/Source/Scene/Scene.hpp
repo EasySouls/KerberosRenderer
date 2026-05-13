@@ -90,6 +90,8 @@ namespace Kerberos
 		const PhysicsSystem& GetPhysicsSystem() const;
 		PhysicsSystem& GetPhysicsSystem();
 
+		const std::string& GetName() const { return m_Name; }
+
 		static Ref<Scene> Copy(const Ref<Scene>& other);
 
 		AssetType GetType() override;
@@ -116,6 +118,8 @@ namespace Kerberos
 		}
 
 	private:
+		std::string m_Name = "Untitled Scene";
+
 		entt::registry m_Registry;
 
 		uint32_t m_ViewportWidth = 0;

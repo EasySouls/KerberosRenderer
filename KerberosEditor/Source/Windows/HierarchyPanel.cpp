@@ -59,11 +59,22 @@ namespace Kerberos
 	{
 		ImGui::Begin("Hierarchy");
 
-		/// Only draw the root nodes
-		for (const entt::entity& entityId : m_Context->GetRootEntities())
+		const bool dragDropTargetActive = HandleHierarchyPanelDragAndDrop();
+
+		constexpr ImGuiTreeNodeFlags flags = ImGuiTreeNodeFlags_OpenOnArrow | ImGuiTreeNodeFlags_SpanAvailWidth
+			| ImGuiTreeNodeFlags_DefaultOpen;
+
+		const char* sceneName = m_Context ? m_Context->GetName().c_str() : "No Scene Loaded";
+		if (ImGui::TreeNodeEx(reinterpret_cast<const void*>(sceneName), flags, "%s", sceneName))
 		{
-			Entity rootEntity{ entityId, m_Context.get() };
-			DrawEntityNode(rootEntity);
+			/// Only draw the root nodes
+			for (const entt::entity& entityId : m_Context->GetRootEntities())
+			{
+				Entity rootEntity{ entityId, m_Context.get() };
+				DrawEntityNode(rootEntity);
+			}
+
+			ImGui::TreePop();
 		}
 
 		/// If an empty space is clicked, deselect the entity
@@ -83,28 +94,9 @@ namespace Kerberos
 			ImGui::EndPopup();
 		}
 
-		if (ImGui::BeginDragDropTarget())
-		{
-			if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload(assetBrowserMesh))
-			{
-				const AssetHandle handle = *static_cast<AssetHandle*>(payload->Data);
-				const AssetType assetType = AssetManager::GetAssetType(handle);
-
-				if (assetType == AssetType::Model)
-				{
-					if (const Entity modelEntity = m_Context->InstantiateModelAsset(handle))
-						m_SelectedEntity = modelEntity;
-				}
-				else if (assetType == AssetType::Mesh)
-				{
-					Entity meshEntity = m_Context->CreateEntity("Mesh");
-					auto& smc = meshEntity.AddComponent<StaticMeshComponent>();
-					smc.StaticMesh = AssetManager::ResolveMeshAsset(handle);
-					m_SelectedEntity = meshEntity;
-				}
-			}
+		if (dragDropTargetActive)
 			ImGui::EndDragDropTarget();
-		}
+
 		ImGui::End();
 
 		ImGui::Begin("Properties");
@@ -142,6 +134,7 @@ namespace Kerberos
 		const auto& tag = entity.GetComponent<TagComponent>().Tag;
 
 		const ImGuiTreeNodeFlags flags = ImGuiTreeNodeFlags_OpenOnArrow | ImGuiTreeNodeFlags_SpanAvailWidth
+			| ImGuiTreeNodeFlags_DefaultOpen
 			| (entity == m_SelectedEntity ? ImGuiTreeNodeFlags_Selected : 0);
 
 		/// The entity's identifier serves as the unique ID for the ImGui tree node
@@ -153,50 +146,60 @@ namespace Kerberos
 		}
 
 		bool entityDeleted = false;
-
-		/// Context menu on entity right-click
-		{
-
-			if (ImGui::BeginPopupContextItem())
-			{
-				if (ImGui::MenuItem("Delete Entity", "Delete"))
-				{
-					/// Defer the deletion of the entity until the popup is closed to avoid invalidating the iterator
-					entityDeleted = true;
-				}
-				if (ImGui::MenuItem("Duplicate Entity", "Ctrl + D"))
-				{
-					m_Context->DuplicateEntity(entity, true);
-				}
-				if (ImGui::MenuItem("Create child"))
-				{
-					m_Context->CreateChild(entity);
-				}
-				ImGui::EndPopup();
-			}
-		}
+		DrawEntityNodeContextMenu(entity, entityDeleted);
 
 		if (opened)
 		{
-			for (const Entity& child : m_Context->GetChildren(entity))
-			{
-				DrawEntityNode(child);
-			}
-
+			DrawEntityNodeChildren(entity);
 			ImGui::TreePop();
 		}
 
 		if (entityDeleted)
 		{
-			m_DeletionQueue.push_back(entity);
-			if (m_SelectedEntity == entity)
-			{
-				m_SelectedEntity = {};
-			}
+			QueueEntityDeletion(entity);
 		}
 	}
 
-	void HierarchyPanel::AddComponentPopup(Entity entity)
+	void HierarchyPanel::DrawEntityNodeContextMenu(const Entity& entity, bool& entityDeleted) const 
+	{
+		if (!ImGui::BeginPopupContextItem())
+			return;
+
+		if (ImGui::MenuItem("Delete Entity", "Delete"))
+		{
+			/// Defer the deletion of the entity until the popup is closed to avoid invalidating the iterator
+			entityDeleted = true;
+		}
+		if (ImGui::MenuItem("Duplicate Entity", "Ctrl + D"))
+		{
+			m_Context->DuplicateEntity(entity, true);
+		}
+		if (ImGui::MenuItem("Create child"))
+		{
+			m_Context->CreateChild(entity);
+		}
+
+		ImGui::EndPopup();
+	}
+
+	void HierarchyPanel::DrawEntityNodeChildren(const Entity& entity)
+	{
+		for (const Entity& child : m_Context->GetChildren(entity))
+		{
+			DrawEntityNode(child);
+		}
+	}
+
+	void HierarchyPanel::QueueEntityDeletion(const Entity& entity)
+	{
+		m_DeletionQueue.push_back(entity);
+		if (m_SelectedEntity == entity)
+		{
+			m_SelectedEntity = {};
+		}
+	}
+
+	void HierarchyPanel::AddComponentPopup(const Entity entity)
 	{
 		if (ImGui::Button("Add Component"))
 		{
@@ -347,6 +350,33 @@ namespace Kerberos
 		}
 
 		return false;
+	}
+
+	bool HierarchyPanel::HandleHierarchyPanelDragAndDrop()
+	{
+		if (!ImGui::BeginDragDropTarget())
+			return false;
+
+		if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload(assetBrowserMesh))
+		{
+			const AssetHandle handle = *static_cast<AssetHandle*>(payload->Data);
+			const AssetType assetType = AssetManager::GetAssetType(handle);
+
+			if (assetType == AssetType::Model)
+			{
+				if (const Entity modelEntity = m_Context->InstantiateModelAsset(handle))
+					m_SelectedEntity = modelEntity;
+			}
+			else if (assetType == AssetType::Mesh)
+			{
+				Entity meshEntity = m_Context->CreateEntity("Mesh");
+				auto& smc = meshEntity.AddComponent<StaticMeshComponent>();
+				smc.StaticMesh = AssetManager::ResolveMeshAsset(handle);
+				m_SelectedEntity = meshEntity;
+			}
+		}
+
+		return true;
 	}
 
 	static void DrawVec3Control(const std::string& label, glm::vec3& values, const float resetValue = 0.0f, const float columnWidth = 80.0f, const std::function<void()>& onValueChanged = nullptr)

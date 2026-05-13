@@ -31,9 +31,14 @@ namespace Kerberos
 
 	private:
 		void DrawEntityNode(const Entity& entity);
+		void DrawEntityNodeContextMenu(const Entity& entity, bool& entityDeleted) const;
+		void DrawEntityNodeChildren(const Entity& entity);
+		void QueueEntityDeletion(const Entity& entity);
 		void AddComponentPopup(Entity entity);
 
 		bool OnKeyPressed(const KeyPressedEvent& event);
+
+		bool HandleHierarchyPanelDragAndDrop();
 
 		template<typename T>
 		void AddComponentWithCheck(Entity entity)
