@@ -600,8 +600,6 @@ namespace Kerberos
 		ImGui::Begin("Viewport");
 		ImGui::PopStyleVar();
 
-		const auto viewportOffset = ImGui::GetCursorPos(); // Includes the tab bar
-
 		m_ViewportFocused = ImGui::IsWindowFocused();
 		m_ViewportHovered = ImGui::IsWindowHovered();
 
@@ -611,18 +609,14 @@ namespace Kerberos
 
 		const auto viewportImage = Renderer::GetCompositedOutputImageID();
 		ImGui::Image(viewportImage, ImVec2(m_ViewportSize.x, m_ViewportSize.y));
+		const ImVec2 viewportMin = ImGui::GetItemRectMin();
+		const ImVec2 viewportMax = ImGui::GetItemRectMax();
 
 		HandleDragAndDrop();
 
-		/// Set the bounds of the viewport
-		const auto windowSize = ImGui::GetWindowSize();
-		ImVec2 minBound = ImGui::GetWindowPos();
-		minBound.x += viewportOffset.x;
-		minBound.y += viewportOffset.y;
-
-		ImVec2 maxBound = { minBound.x + windowSize.x, minBound.y + windowSize.y };
-		m_ViewportBounds[0] = { minBound.x, minBound.y };
-		m_ViewportBounds[1] = { maxBound.x, maxBound.y };
+		/// Set the bounds of the viewport to the actual image item.
+		m_ViewportBounds[0] = { viewportMin.x, viewportMin.y };
+		m_ViewportBounds[1] = { viewportMax.x, viewportMax.y };
 
 		/// Gizmos
 		const bool gizmosEnabled = m_SceneState == SceneState::Edit || m_SceneState == SceneState::Simulate;
@@ -631,9 +625,7 @@ namespace Kerberos
 			ImGuizmo::SetOrthographic(false);
 			ImGuizmo::SetDrawlist();
 
-			const float windowWidth = ImGui::GetWindowWidth();
-			const float windowHeight = ImGui::GetWindowHeight();
-			ImGuizmo::SetRect(ImGui::GetWindowPos().x, ImGui::GetWindowPos().y, windowWidth, windowHeight);
+			ImGuizmo::SetRect(viewportMin.x, viewportMin.y, m_ViewportSize.x, m_ViewportSize.y);
 
 			/// Will be used for the Runtime camera
 			/*const Entity cameraEntity = m_ActiveScene->GetPrimaryCameraEntity();
@@ -642,8 +634,9 @@ namespace Kerberos
 			const glm::mat4 cameraProjection = camera.GetProjection();
 			const glm::mat4 cameraView = glm::inverse(cameraEntity.GetComponent<TransformComponent>().GetTransform());*/
 
-			const glm::mat4 cameraProjection = m_EditorCamera->GetProjectionMatrix(Handedness::Left);
-			const glm::mat4 cameraView = m_EditorCamera->GetViewMatrix(Handedness::Left);
+			glm::mat4 cameraProjection = m_EditorCamera->GetProjectionMatrix();
+			cameraProjection[1][1] *= -1.0f;
+			const glm::mat4 cameraView = m_EditorCamera->GetViewMatrix();
 
 			/// Entity transform
 			auto& tc = selectedEntity.GetComponent<TransformComponent>();
