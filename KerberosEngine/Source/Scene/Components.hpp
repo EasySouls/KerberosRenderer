@@ -196,6 +196,19 @@ namespace Kerberos
 		StaticMeshComponent(const StaticMeshComponent&) = default;
 	};
 
+	struct ModelComponent
+	{
+		AssetHandle ModelAsset = AssetHandle::Invalid();
+		bool Visible = true;
+
+		ModelComponent() = default;
+		explicit ModelComponent(const AssetHandle modelAsset)
+			: ModelAsset(modelAsset)
+		{
+		}
+		ModelComponent(const ModelComponent&) = default;
+	};
+
 	struct DirectionalLightComponent
 	{
 		DirectionalLight Light;

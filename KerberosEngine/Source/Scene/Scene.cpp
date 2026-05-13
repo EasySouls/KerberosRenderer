@@ -242,6 +242,10 @@ namespace Kerberos
 		{
 			newEntity.AddComponent<StaticMeshComponent>(entity.GetComponent<StaticMeshComponent>());
 		}
+		if (entity.HasComponent<ModelComponent>())
+		{
+			newEntity.AddComponent<ModelComponent>(entity.GetComponent<ModelComponent>());
+		}
 		if (entity.HasComponent<RigidBody3DComponent>())
 		{
 			newEntity.AddComponent<RigidBody3DComponent>(entity.GetComponent<RigidBody3DComponent>());
@@ -314,6 +318,109 @@ namespace Kerberos
 	{
 		const Entity child = CreateEntity("Unnamed");
 		SetParent(child, entity);
+	}
+
+	Entity Scene::InstantiateModelAsset(const AssetHandle modelHandle, const std::string& rootName)
+	{
+		if (!modelHandle.IsValid())
+		{
+			KBR_CORE_ERROR("Cannot instantiate model with invalid handle.");
+			return {};
+		}
+
+		if (AssetManager::GetAssetType(modelHandle) != AssetType::Model)
+		{
+			KBR_CORE_ERROR("Asset {} is not a model asset.", modelHandle);
+			return {};
+		}
+
+		const Ref<Model> model = AssetManager::GetAsset<Model>(modelHandle);
+		if (!model)
+		{
+			KBR_CORE_ERROR("Failed to load model asset: {}", modelHandle);
+			return {};
+		}
+
+		const std::string resolvedRootName = rootName.empty() ? model->GetName() : rootName;
+		Entity modelRoot = CreateEntity(resolvedRootName.empty() ? "Model" : resolvedRootName);
+		modelRoot.AddComponent<ModelComponent>(modelHandle);
+
+		const auto& modelNodes = model->GetNodes();
+		const auto& modelPrimitives = model->GetPrimitives();
+
+		if (modelNodes.empty())
+		{
+			for (size_t primitiveIndex = 0; primitiveIndex < modelPrimitives.size(); ++primitiveIndex)
+			{
+				const auto& primitive = modelPrimitives[primitiveIndex];
+				Entity primitiveEntity = CreateEntity(primitive.Name.empty()
+					? "Primitive_" + std::to_string(primitiveIndex)
+					: primitive.Name);
+				SetParent(primitiveEntity, modelRoot, false);
+
+				auto& smc = primitiveEntity.AddComponent<StaticMeshComponent>();
+				smc.StaticMesh = primitive.Mesh;
+				smc.MeshMaterial = primitive.Material;
+			}
+
+			return modelRoot;
+		}
+
+		std::vector<Entity> nodeEntities(modelNodes.size());
+
+		for (size_t nodeIndex = 0; nodeIndex < modelNodes.size(); ++nodeIndex)
+		{
+			const auto& node = modelNodes[nodeIndex];
+			Entity nodeEntity = CreateEntity(node.Name.empty() ? "Node_" + std::to_string(nodeIndex) : node.Name);
+			nodeEntities[nodeIndex] = nodeEntity;
+
+			auto& transform = nodeEntity.GetComponent<TransformComponent>();
+			transform.Translation = node.Translation;
+			transform.Rotation = glm::eulerAngles(node.Rotation);
+			transform.Scale = node.Scale;
+
+			bool assignedPrimaryPrimitive = false;
+			for (size_t primitiveSlot = 0; primitiveSlot < node.PrimitiveIndices.size(); ++primitiveSlot)
+			{
+				const uint32_t primitiveIndex = node.PrimitiveIndices[primitiveSlot];
+				if (primitiveIndex >= modelPrimitives.size())
+					continue;
+
+				const auto& primitive = modelPrimitives[primitiveIndex];
+				if (!assignedPrimaryPrimitive)
+				{
+					auto& smc = nodeEntity.AddComponent<StaticMeshComponent>();
+					smc.StaticMesh = primitive.Mesh;
+					smc.MeshMaterial = primitive.Material;
+					assignedPrimaryPrimitive = true;
+					continue;
+				}
+
+				Entity primitiveEntity = CreateEntity(primitive.Name.empty()
+					? nodeEntity.GetComponent<TagComponent>().Tag + "_Primitive_" + std::to_string(primitiveSlot)
+					: primitive.Name);
+				SetParent(primitiveEntity, nodeEntity, false);
+
+				auto& smc = primitiveEntity.AddComponent<StaticMeshComponent>();
+				smc.StaticMesh = primitive.Mesh;
+				smc.MeshMaterial = primitive.Material;
+			}
+		}
+
+		for (size_t nodeIndex = 0; nodeIndex < modelNodes.size(); ++nodeIndex)
+		{
+			const auto& node = modelNodes[nodeIndex];
+			const Entity nodeEntity = nodeEntities[nodeIndex];
+			if (!nodeEntity)
+				continue;
+
+			if (node.ParentIndex >= 0 && node.ParentIndex < static_cast<int32_t>(nodeEntities.size()))
+				SetParent(nodeEntity, nodeEntities[node.ParentIndex], false);
+			else
+				SetParent(nodeEntity, modelRoot, false);
+		}
+
+		return modelRoot;
 	}
 
 	Entity Scene::GetEntityByUUID(const UUID uuid) const
@@ -487,6 +594,10 @@ namespace Kerberos
 			if (sourceRegistry.all_of<StaticMeshComponent>(entity))
 			{
 				newEntity.AddComponent<StaticMeshComponent>(sourceRegistry.get<StaticMeshComponent>(entity));
+			}
+			if (sourceRegistry.all_of<ModelComponent>(entity))
+			{
+				newEntity.AddComponent<ModelComponent>(sourceRegistry.get<ModelComponent>(entity));
 			}
 			if (sourceRegistry.all_of<RigidBody3DComponent>(entity))
 			{
@@ -976,6 +1087,11 @@ namespace Kerberos
 
 	template <>
 	void Scene::OnComponentAdded<StaticMeshComponent>(Entity, StaticMeshComponent&)
+	{
+	}
+
+	template <>
+	void Scene::OnComponentAdded<ModelComponent>(Entity, ModelComponent&)
 	{
 	}
 

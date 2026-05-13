@@ -21,6 +21,7 @@ namespace Kerberos
 		{ ".fbx", AssetType::Mesh },
 		{ ".obj", AssetType::Mesh },
 		{ ".gltf", AssetType::Model },
+		{ ".glb", AssetType::Model },
 		{ ".kerberos", AssetType::Scene },
 		{ ".wav", AssetType::Sound }, // TODO: Add more audio file types when supported
 		{ ".kbrmat", AssetType::Material }

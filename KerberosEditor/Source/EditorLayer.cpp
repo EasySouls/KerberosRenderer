@@ -383,6 +383,26 @@ namespace Kerberos
 					OpenScene(scene);
 				}
 			}
+
+			if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload(assetBrowserMesh))
+			{
+				const AssetHandle handle = *static_cast<AssetHandle*>(payload->Data);
+				const AssetType assetType = AssetManager::GetAssetType(handle);
+
+				if (assetType == AssetType::Model)
+				{
+					if (const Entity modelEntity = m_ActiveScene->InstantiateModelAsset(handle))
+						m_HierarchyPanel.SetSelectedEntity(modelEntity);
+				}
+				else if (assetType == AssetType::Mesh)
+				{
+					Entity meshEntity = m_ActiveScene->CreateEntity("Mesh");
+					auto& smc = meshEntity.AddComponent<StaticMeshComponent>();
+					smc.StaticMesh = AssetManager::ResolveMeshAsset(handle);
+					m_HierarchyPanel.SetSelectedEntity(meshEntity);
+				}
+			}
+
 			ImGui::EndDragDropTarget();
 		}
 	}

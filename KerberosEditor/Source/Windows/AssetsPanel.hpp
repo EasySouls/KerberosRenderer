@@ -56,11 +56,11 @@ namespace Kerberos
 
 		void ImportAssetDialog();
 
-		void HandleAssetDragAndDrop(AssetHandle handle, const std::filesystem::path& filename);
+		static void HandleAssetDragAndDrop(AssetHandle handle, const std::filesystem::path& filename);
 
 		void OpenMaterialEditor(const std::filesystem::path& materialPath);
 		void RenderMaterialEditors();
-		static void DrawMaterialTextureField(const char* label, const std::filesystem::path& materialFilepath, Ref<Texture2D>& texture);
+		static void DrawMaterialTextureField(const char* label, Ref<Texture2D>& texture);
 
 		std::filesystem::path GetRelativePath(const std::filesystem::path& absolutePath);
 

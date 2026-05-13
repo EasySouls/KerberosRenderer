@@ -114,18 +114,29 @@ namespace Kerberos
 				const uint64_t iconRendererID = VulkanContext::Get().GetImGuiRendererID(icon);
 				ImGui::ImageButton(item.string().c_str(), iconRendererID, { thumbnailSize, thumbnailSize }, { 0, 1 }, { 1, 0 });
 
+				if (ImGui::IsItemHovered() && !isDirectory)
+				{
+					const AssetType assetType = AssetManager::GetAssetType(m_AssetTreeNodes[treeNodeIndex].Handle);
+					const std::string_view assetTypeStr = AssetTypeToString(assetType);
+
+					ImGui::BeginTooltip();
+					ImGui::Text("Name: %s", itemStr.c_str());
+					ImGui::Text("Type: %.*s", static_cast<int>(assetTypeStr.length()), assetTypeStr.data());
+					ImGui::EndTooltip();
+				}
+
 				if (ImGui::BeginPopupContextItem())
 				{
 					if (ImGui::MenuItem("Delete"))
 					{
-						const char* path = (m_AssetsDirectory / item).string().c_str();
-						if (FileOperations::Delete(path))
+						const std::string itemPath = (m_CurrentDirectory / item).string();
+						if (FileOperations::Delete(itemPath.c_str()))
 						{
-							m_NotificationManager.AddNotification("Deleted: " + std::string(path), Notification::Type::Info);
+							m_NotificationManager.AddNotification("Deleted: " + itemPath, Notification::Type::Info);
 						}
 						else 
 						{
-							m_NotificationManager.AddNotification("Failed to delete: " + std::string(path), Notification::Type::Error);
+							m_NotificationManager.AddNotification("Failed to delete: " + itemPath, Notification::Type::Error);
 						}
 					}
 					ImGui::EndPopup();
@@ -205,6 +216,13 @@ namespace Kerberos
 					{
 						const uint64_t fileRendererID = VulkanContext::Get().GetImGuiRendererID(m_FileIcon);
 						ImGui::ImageButton(path.string().c_str(), fileRendererID, { thumbnailSize, thumbnailSize }, { 0, 1 }, { 1, 0 });
+
+						if (ImGui::IsItemHovered())
+						{
+							ImGui::BeginTooltip();
+							ImGui::Text("%s", fileName.c_str());
+							ImGui::EndTooltip();
+						}
 					}
 
 					ShowFileContextMenu(path);
@@ -449,7 +467,7 @@ namespace Kerberos
 		m_OpenMaterialEditors.emplace(key, std::move(state));
 	}
 
-	void AssetsPanel::DrawMaterialTextureField(const char* label, const std::filesystem::path& materialFilepath, Ref<Texture2D>& texture)
+	void AssetsPanel::DrawMaterialTextureField(const char* label, Ref<Texture2D>& texture)
 	{
 		std::string textureLabel = "None";
 		if (texture && texture->GetHandle().IsValid())
@@ -537,12 +555,12 @@ namespace Kerberos
 				ImGui::TextDisabled("Preview mesh selection is saved for this editor session.");
 
 				ImGui::Separator();
-				DrawMaterialTextureField("Albedo Texture", state.Filepath, state.WorkingCopy->AlbedoTexture);
-				DrawMaterialTextureField("Normal Texture", state.Filepath, state.WorkingCopy->NormalTexture);
-				DrawMaterialTextureField("Metallic Texture", state.Filepath, state.WorkingCopy->MetallicTexture);
-				DrawMaterialTextureField("Roughness Texture", state.Filepath, state.WorkingCopy->RoughnessTexture);
-				DrawMaterialTextureField("AO Texture", state.Filepath, state.WorkingCopy->AOTexture);
-				DrawMaterialTextureField("Emissive Texture", state.Filepath, state.WorkingCopy->EmissiveTexture);
+				DrawMaterialTextureField("Albedo Texture", state.WorkingCopy->AlbedoTexture);
+				DrawMaterialTextureField("Normal Texture", state.WorkingCopy->NormalTexture);
+				DrawMaterialTextureField("Metallic Texture", state.WorkingCopy->MetallicTexture);
+				DrawMaterialTextureField("Roughness Texture", state.WorkingCopy->RoughnessTexture);
+				DrawMaterialTextureField("AO Texture", state.WorkingCopy->AOTexture);
+				DrawMaterialTextureField("Emissive Texture", state.WorkingCopy->EmissiveTexture);
 				ImGui::Separator();
 				if (ImGui::Button("Save"))
 				{
@@ -626,6 +644,9 @@ namespace Kerberos
 		{
 			const AssetType assetType = Project::GetActive()->GetEditorAssetManager()->GetAssetType(handle);
 			const std::filesystem::path extension = filename.extension();
+
+			const std::string_view assetTypeStr = AssetTypeToString(assetType);
+
 			if (extension == ".jpg" || extension == ".png" || extension == ".svg")
 			{
 				ImGui::SetDragDropPayload(assetBrowserTexture, &handle, sizeof(AssetHandle), ImGuiCond_Once);
@@ -642,23 +663,22 @@ namespace Kerberos
 			else if (extension == ".kbrcubemap")
 			{
 				ImGui::SetDragDropPayload(assetBrowserTextureCube, &handle, sizeof(AssetHandle), ImGuiCond_Once);
-				ImGui::Text("%s", filename.string().c_str());
 			}
 			else if (assetType == AssetType::Mesh || assetType == AssetType::Model)
 			{
 				ImGui::SetDragDropPayload(assetBrowserMesh, &handle, sizeof(AssetHandle), ImGuiCond_Once);
-				ImGui::Text("%s", filename.string().c_str());
 			}
 			else if (assetType == AssetType::Sound)
 			{
 				ImGui::SetDragDropPayload(assetBrowserAudio, &handle, sizeof(AssetHandle), ImGuiCond_Once);
-				ImGui::Text("%s", filename.string().c_str());
 			}
 			else if (assetType == AssetType::Material)
 			{
 				ImGui::SetDragDropPayload(assetBrowserMaterial, &handle, sizeof(AssetHandle), ImGuiCond_Once);
-				ImGui::Text("%s", filename.string().c_str());
 			}
+
+			ImGui::Text("%s", filename.string().c_str());
+			ImGui::Text("Type: %.*s", static_cast<int>(assetTypeStr.length()), assetTypeStr.data());
 
 			ImGui::EndDragDropSource();
 		}

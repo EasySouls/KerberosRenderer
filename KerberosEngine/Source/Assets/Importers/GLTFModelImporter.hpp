@@ -3,6 +3,7 @@
 #include "Core/Core.hpp"
 #include "Assets/Asset.hpp"
 #include "Assets/AssetMetadata.hpp"
+#include "Assets/Model.hpp"
 #include "Renderer/Material.hpp"
 #include "Renderer/Mesh.hpp"
 
@@ -13,7 +14,7 @@ namespace Kerberos
 	class GLTFModelImporter
 	{
 	public:
-		static Ref<Mesh> ImportModel(AssetHandle handle, const AssetMetadata& metadata);
-		static Ref<Mesh> ImportModel(const std::filesystem::path& filepath);
+		static Ref<Model> ImportModel(AssetHandle handle, const AssetMetadata& metadata);
+		static Ref<Model> ImportModel(const std::filesystem::path& filepath);
 	};
 }

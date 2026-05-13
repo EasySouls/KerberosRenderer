@@ -302,6 +302,16 @@ namespace Kerberos
 			out << YAML::EndMap;
 		}
 
+		if (entity.HasComponent<ModelComponent>())
+		{
+			out << YAML::Key << "ModelComponent";
+			out << YAML::BeginMap;
+			const auto& modelComponent = entity.GetComponent<ModelComponent>();
+			out << YAML::Key << "ModelAsset" << YAML::Value << modelComponent.ModelAsset;
+			out << YAML::Key << "Visible" << YAML::Value << modelComponent.Visible;
+			out << YAML::EndMap;
+		}
+
 		if (entity.HasComponent<EnvironmentComponent>())
 		{
 			out << YAML::Key << "EnvironmentComponent";
@@ -636,7 +646,7 @@ namespace Kerberos
 					const AssetHandle meshHandle = AssetHandle(meshColliderComponent["Mesh"].as<uint64_t>());
 					if (meshHandle.IsValid())
 					{
-						meshCollider.Mesh = AssetManager::GetAsset<Mesh>(meshHandle);
+						meshCollider.Mesh = AssetManager::ResolveMeshAsset(meshHandle);
 					}
 				}
 
@@ -655,13 +665,20 @@ namespace Kerberos
 					const AssetHandle meshHandle = AssetHandle(staticMeshComponent["Mesh"].as<uint64_t>());
 					if (meshHandle.IsValid())
 					{
-						staticMesh.StaticMesh = AssetManager::GetAsset<Mesh>(meshHandle);
+						staticMesh.StaticMesh = AssetManager::ResolveMeshAsset(meshHandle);
 					}
 					else
 					{
 						KBR_CORE_WARN("AssetHandle for mesh is invalid, using default cube mesh.");
 						staticMesh.StaticMesh = AssetManager::GetDefaultCubeMesh();
 					}
+				}
+
+				if (auto modelComponent = entity["ModelComponent"])
+				{
+					auto& model = deserializedEntity.AddComponent<ModelComponent>();
+					model.ModelAsset = AssetHandle(modelComponent["ModelAsset"].as<uint64_t>());
+					model.Visible = modelComponent["Visible"].as<bool>(true);
 				}
 
 				if (auto environmentComponent = entity["EnvironmentComponent"])

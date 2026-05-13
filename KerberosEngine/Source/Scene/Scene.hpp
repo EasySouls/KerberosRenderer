@@ -61,6 +61,7 @@ namespace Kerberos
 		Entity DuplicateEntity(Entity entity, bool duplicateChildren);
 
 		void CreateChild(Entity entity);
+		Entity InstantiateModelAsset(AssetHandle modelHandle, const std::string& rootName = std::string());
 
 		Entity GetEntityByUUID(UUID uuid) const;
 

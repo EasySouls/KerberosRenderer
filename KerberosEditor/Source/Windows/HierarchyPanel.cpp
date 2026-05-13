@@ -82,6 +82,29 @@ namespace Kerberos
 
 			ImGui::EndPopup();
 		}
+
+		if (ImGui::BeginDragDropTarget())
+		{
+			if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload(assetBrowserMesh))
+			{
+				const AssetHandle handle = *static_cast<AssetHandle*>(payload->Data);
+				const AssetType assetType = AssetManager::GetAssetType(handle);
+
+				if (assetType == AssetType::Model)
+				{
+					if (const Entity modelEntity = m_Context->InstantiateModelAsset(handle))
+						m_SelectedEntity = modelEntity;
+				}
+				else if (assetType == AssetType::Mesh)
+				{
+					Entity meshEntity = m_Context->CreateEntity("Mesh");
+					auto& smc = meshEntity.AddComponent<StaticMeshComponent>();
+					smc.StaticMesh = AssetManager::ResolveMeshAsset(handle);
+					m_SelectedEntity = meshEntity;
+				}
+			}
+			ImGui::EndDragDropTarget();
+		}
 		ImGui::End();
 
 		ImGui::Begin("Properties");
@@ -794,9 +817,12 @@ namespace Kerberos
 								std::string meshLabel = "No mesh selected";
 								if (value != UUID::Invalid())
 								{
-									const Ref<Mesh> mesh = AssetManager::GetAsset<Mesh>(UUID(value));
-									const auto& [Type, Filepath] = Project::GetActive()->GetEditorAssetManager()->GetMetadata(mesh->GetHandle());
-									meshLabel = Filepath.filename().string();
+									const Ref<Mesh> mesh = AssetManager::ResolveMeshAsset(UUID(value));
+									if (mesh && AssetManager::IsAssetHandleValid(UUID(value)))
+									{
+										const auto& [Type, Filepath] = Project::GetActive()->GetEditorAssetManager()->GetMetadata(UUID(value));
+										meshLabel = Filepath.filename().string();
+									}
 								}
 								ImGui::Text("%s: %s", name.c_str(), meshLabel.c_str());
 
@@ -813,7 +839,14 @@ namespace Kerberos
 
 											return;
 										}
-										const Ref<Mesh> newMesh = AssetManager::GetAsset<Mesh>(handle);
+										const Ref<Mesh> newMesh = AssetManager::ResolveMeshAsset(handle);
+										if (!newMesh)
+										{
+											KBR_EDITOR_ERROR("Could not resolve mesh from asset: {0}", handle);
+											m_NotificationManager.AddNotification("Could not resolve mesh from selected asset", Notification::Type::Error);
+											ImGui::EndDragDropTarget();
+											return;
+										}
 										scriptInstance->SetFieldValue<uint64_t>(name, newMesh->GetHandle());
 									}
 									ImGui::EndDragDropTarget();
@@ -995,9 +1028,12 @@ namespace Kerberos
 								std::string meshLabel = "No mesh selected";
 								if (value != UUID::Invalid())
 								{
-									const Ref<Mesh> mesh = AssetManager::GetAsset<Mesh>(UUID(value));
-									const auto& [Type, Filepath] = Project::GetActive()->GetEditorAssetManager()->GetMetadata(mesh->GetHandle());
-									meshLabel = Filepath.filename().string();
+									const Ref<Mesh> mesh = AssetManager::ResolveMeshAsset(UUID(value));
+									if (mesh && AssetManager::IsAssetHandleValid(UUID(value)))
+									{
+										const auto& [Type, Filepath] = Project::GetActive()->GetEditorAssetManager()->GetMetadata(UUID(value));
+										meshLabel = Filepath.filename().string();
+									}
 								}
 								ImGui::Text("%s: %s", fieldName.c_str(), meshLabel.c_str());
 
@@ -1014,7 +1050,14 @@ namespace Kerberos
 
 											return;
 										}
-										const Ref<Mesh> newMesh = AssetManager::GetAsset<Mesh>(handle);
+										const Ref<Mesh> newMesh = AssetManager::ResolveMeshAsset(handle);
+										if (!newMesh)
+										{
+											KBR_EDITOR_ERROR("Could not resolve mesh from asset: {0}", handle);
+											m_NotificationManager.AddNotification("Could not resolve mesh from selected asset", Notification::Type::Error);
+											ImGui::EndDragDropTarget();
+											return;
+										}
 										fieldInitializer.SetValue(newMesh->GetHandle());
 									}
 									ImGui::EndDragDropTarget();
@@ -1251,7 +1294,13 @@ namespace Kerberos
 							m_NotificationManager.AddNotification("Asset is not a mesh", Notification::Type::Error);
 							return;
 						}
-						const Ref<Mesh> mesh = AssetManager::GetAsset<Mesh>(handle);
+						const Ref<Mesh> mesh = AssetManager::ResolveMeshAsset(handle);
+						if (!mesh)
+						{
+							KBR_EDITOR_ERROR("Could not resolve mesh from asset: {0}", handle);
+							m_NotificationManager.AddNotification("Could not resolve mesh from selected asset", Notification::Type::Error);
+							return;
+						}
 						staticMesh.StaticMesh = mesh;
 					}
 					ImGui::EndDragDropTarget();

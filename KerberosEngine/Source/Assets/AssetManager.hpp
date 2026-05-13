@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Asset.hpp"
+#include "Model.hpp"
 #include "Core/Core.hpp"
 #include "Renderer/Mesh.hpp"
 #include "Renderer/Font.hpp"
@@ -32,6 +33,8 @@ namespace Kerberos
 		{
 			return Project::GetActive()->GetAssetManager()->IsAssetHandleValid(handle);
 		}
+
+		static Ref<Mesh> ResolveMeshAsset(AssetHandle handle);
 
 		static Ref<Texture2D> GetDefaultTexture2D();
 		static Ref<Mesh> GetDefaultCubeMesh();

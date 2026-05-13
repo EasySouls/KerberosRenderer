@@ -38,6 +38,9 @@ AssetRegistry:
   - Handle: 6728996633782092594
     Type: Model
     Path: Assets\Models\avocado\Avocado.gltf
+  - Handle: 7820363183025911781
+    Type: Model
+    Path: Assets\Models\sponza\sponza.gltf
   - Handle: 8036360350461290503
     Type: Material
     Path: Assets\Materials\white.kbrmat
