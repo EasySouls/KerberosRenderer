@@ -20,6 +20,9 @@ namespace Kerberos
 
 	void FirstPersonCamera::OnUpdate(const float deltaTime)
 	{
+		if (IsInputBlocked())
+			return;
+
 		const bool forward = Input::IsKeyPressed(Key::W);
 		const bool backward = Input::IsKeyPressed(Key::S);
 		const bool left = Input::IsKeyPressed(Key::A);
@@ -282,6 +285,9 @@ namespace Kerberos
 
 	bool FirstPersonCamera::OnMouseButtonPressed(const MouseButtonPressedEvent& event) 
 	{
+		if (IsInputBlocked())
+			return false;
+
 		if (event.GetButton() == Mouse::Button1)
 		{
 			//Input::SetCursorMode(CursorMode::Locked);
@@ -294,6 +300,9 @@ namespace Kerberos
 
 	bool FirstPersonCamera::OnMouseButtonReleased(const MouseButtonReleasedEvent& event) 
 	{
+		if (IsInputBlocked())
+			return false;
+
 		if (event.GetButton() == Mouse::Button1)
 		{
 			//Input::SetCursorMode(CursorMode::Normal);
@@ -306,6 +315,9 @@ namespace Kerberos
 
 	bool FirstPersonCamera::OnMouseMoved(const MouseMovedEvent& event)
 	{
+		if (IsInputBlocked())
+			return false;
+
 		const int32_t x = static_cast<int32_t>(event.GetX());
 		const int32_t y = static_cast<int32_t>(event.GetY());
 

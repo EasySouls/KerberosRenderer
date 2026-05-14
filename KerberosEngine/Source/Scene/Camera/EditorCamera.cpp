@@ -15,6 +15,9 @@ namespace Kerberos
 
 	void EditorCamera::OnUpdate(const float)
 	{
+		if (IsInputBlocked())
+			return;
+
 		if (Input::IsKeyPressed(Key::LeftAlt))
 		{
 			const glm::vec2 mouse = { Input::GetMouseX(), Input::GetMouseY() };
@@ -263,7 +266,11 @@ namespace Kerberos
 		EventDispatcher dispatcher(event);
 		dispatcher.Dispatch<MouseScrolledEvent>([this](const MouseScrolledEvent& e)
 		{
-			OnMouseScrolled(e);
+			if (!IsInputBlocked())
+			{
+				OnMouseScrolled(e);
+			}
+
 			return true;
 		});
 	}

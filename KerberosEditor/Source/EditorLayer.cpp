@@ -198,6 +198,8 @@ namespace Kerberos
 		{
 			KBR_PROFILE_SCOPE("EditorCamera::OnUpdate");
 
+			m_EditorCamera->SetIsInputBlocked(m_DoesImGuiWantInput);
+
 			switch (m_SceneState)
 			{
 				case SceneState::Edit:
@@ -209,6 +211,8 @@ namespace Kerberos
 					/// Only update the camera when the viewport is focused
 					/*if (m_ViewportFocused)
 						m_CameraController.OnUpdate(deltaTime);*/
+					// TODO: Update the camera 
+					m_EditorCamera->OnUpdate(deltaTime);
 					break;
 				}
 			}
@@ -278,8 +282,7 @@ namespace Kerberos
 		if (dockspaceFlags & ImGuiDockNodeFlags_PassthruCentralNode)
 			windowFlags |= ImGuiWindowFlags_NoBackground;
 
-		//TODO const std::string sceneName = m_ActiveScene ? m_ActiveScene->GetName() : "No Scene Loaded";
-		const std::string sceneName = "Example Scene";
+		const std::string sceneName = m_ActiveScene ? m_ActiveScene->GetName() : "No Scene Loaded";
 
 		ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.0f, 0.0f));
 		ImGui::Begin(sceneName.c_str(), &dockspaceOpen, windowFlags);
@@ -310,6 +313,8 @@ namespace Kerberos
 		m_NotificationManager.RenderNotifications();
 
 		ImGui::End();
+
+		m_DoesImGuiWantInput = DoesImGuiWantInput();
 
 		if (Input::IsKeyPressed(Key::RightControl))
 		{
@@ -918,6 +923,7 @@ namespace Kerberos
 		ImGui::Text("Viewport size: %.2f x %.2f", m_ViewportSize.x, m_ViewportSize.y);
 		ImGui::Text("Viewport Focused: %s", m_ViewportFocused ? "Yes" : "No");
 		ImGui::Text("Viewport Hovered: %s", m_ViewportHovered ? "Yes" : "No");
+		ImGui::Text("ImGui Capturing Input: %s", m_DoesImGuiWantInput ? "Yes" : "No");
 
 		std::string hoveredEntityName = "None";
 		if (m_HoveredEntity)
@@ -1146,7 +1152,7 @@ namespace Kerberos
 		throw std::logic_error("Not implemented");
 	}
 
-	std::string EditorLayer::GetActiveGizmoTypeString() const 
+	std::string EditorLayer::GetActiveGizmoTypeString() const
 	{
 		switch (m_GizmoType)
 		{
@@ -1162,5 +1168,11 @@ namespace Kerberos
 
 		KBR_CORE_ASSERT(false, "Invalid gizmo type");
 		return "";
+	}
+
+	bool EditorLayer::DoesImGuiWantInput()
+	{
+		// Check if any ImGui item is actively being interacted with
+		return ImGui::IsAnyItemActive() || ImGui::IsAnyItemFocused();
 	}
 }

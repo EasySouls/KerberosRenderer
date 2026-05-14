@@ -53,6 +53,8 @@ namespace Kerberos
 		virtual float GetMoveSpeed() const = 0;
 		virtual void SetMoveSpeed(float speed) = 0;
 
+		void SetIsInputBlocked(const bool isInputBlocked) { m_IsInputBlocked = isInputBlocked; }
+
 		virtual const glm::mat4& GetViewMatrix(Handedness handedness = Handedness::Right) const = 0;
 		virtual const glm::mat4& GetProjectionMatrix(Handedness handedness = Handedness::Right) const = 0;
 		virtual glm::mat4 GetViewProjectionMatrix(Handedness handedness = Handedness::Right) const = 0;
@@ -67,5 +69,11 @@ namespace Kerberos
 		virtual float GetPitch() const = 0;
 		virtual float GetYaw() const = 0;
 		virtual const glm::vec3& GetFocalPoint() const = 0;
+
+	protected:
+		bool IsInputBlocked() const { return m_IsInputBlocked; }
+
+	private:
+		bool m_IsInputBlocked = false;
 	};
 }

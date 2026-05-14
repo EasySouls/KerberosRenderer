@@ -84,6 +84,8 @@ namespace Kerberos
 
 		std::string GetActiveGizmoTypeString() const;
 
+		static bool DoesImGuiWantInput();
+
 	private:
 		float m_Time = 0.0f;
 		float m_Fps = 0.0f;
@@ -116,6 +118,8 @@ namespace Kerberos
 		bool m_ViewportFocused = false;
 		bool m_ViewportHovered = false;
 		std::array<glm::vec2, 2> m_ViewportBounds;
+
+		bool m_DoesImGuiWantInput = false;
 
 		// From ImGuizmo.h
 		enum class GizmoType : std::uint16_t
