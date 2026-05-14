@@ -136,19 +136,26 @@ namespace Kerberos
 		//}
 	}
 
-	Entity Scene::CreateEntity(const std::string& name)
+	Entity Scene::CreateEntity(const std::string& name, const UUID parentId)
 	{
 		const auto enttId = m_Registry.create();
 		Entity entity = { enttId, this };
 		m_RootEntities.insert(enttId);
 
 		entity.AddComponent<TransformComponent>();
-		entity.AddComponent<HierarchyComponent>();
+		const auto& idComp = entity.AddComponent<IDComponent>();
+
+		auto& hierarchy = entity.AddComponent<HierarchyComponent>();
+		if (parentId.IsValid())
+		{
+			hierarchy.Parent = parentId;
+			const Entity parent = GetEntityByUUID(parentId);
+			parent.GetComponent<HierarchyComponent>().Children.push_back(entity.GetUUID());
+		}
 
 		auto& tag = entity.AddComponent<TagComponent>();
 		tag.Tag = name.empty() ? "Entity" : name;
 
-		const auto& idComp = entity.AddComponent<IDComponent>();
 #if USE_MAP_FOR_UUID
 		m_UUIDToEntityMap[idComp.ID] = entity;
 #endif
@@ -311,6 +318,15 @@ namespace Kerberos
 			}
 		}
 
+		// The duplicated entity will have the same parent as the original entity
+		const UUID originalParentUUID = entity.GetComponent<HierarchyComponent>().Parent;
+		newEntity.GetComponent<HierarchyComponent>().Parent = originalParentUUID;
+		if (originalParentUUID.IsValid())
+		{
+			const Entity originalParent = GetEntityByUUID(originalParentUUID);
+			originalParent.GetComponent<HierarchyComponent>().Children.push_back(newEntity.GetUUID());
+		}
+
 		return newEntity;
 	}
 
@@ -456,6 +472,9 @@ namespace Kerberos
 
 		childHierarchy.Parent = parent.GetUUID();
 		parentHierarchy.Children.emplace_back(child.GetUUID());
+		
+		// Recalculate the child's transform and all its descendants based on new parent
+		CalculateEntityTransform(child);
 	}
 
 	Entity Scene::GetParent(const Entity child) const
@@ -487,6 +506,9 @@ namespace Kerberos
 			childHierarchy.Parent = UUID::Invalid();
 			/// The child is a root entity now
 			m_RootEntities.insert(static_cast<entt::entity>(child));
+			
+			// Recalculate the child's transform and all its descendants since it's now a root entity
+			CalculateEntityTransform(child);
 		}
 	}
 
@@ -1020,11 +1042,27 @@ namespace Kerberos
 	void Scene::CalculateEntityTransform(const Entity& entity)
 	{
 		const UUID parentUUID = entity.GetComponent<HierarchyComponent>().Parent;
-		const glm::mat4 parentTransform = parentUUID.IsValid() 
-			? GetEntityByUUID(parentUUID).GetComponent<TransformComponent>().WorldTransform 
-			: glm::mat4(1.0f);
 
-		UpdateChildTransforms(entity, parentTransform);
+		/*const glm::mat4 parentTransform = parentUUID.IsValid()
+			? GetEntityByUUID(parentUUID).GetComponent<TransformComponent>().WorldTransform
+			: glm::mat4(1.0f);*/
+		
+		// If this entity has a parent, ensure the parent's transform is up-to-date first
+		if (parentUUID.IsValid())
+		{
+			const Entity parent = GetEntityByUUID(parentUUID);
+			// Recursively ensure all ancestors are updated first
+			CalculateEntityTransform(parent);
+			
+			// Now use the parent's freshly updated WorldTransform
+			const glm::mat4 parentTransform = parent.GetComponent<TransformComponent>().WorldTransform;
+			UpdateChildTransforms(entity, parentTransform);
+		}
+		else
+		{
+			// This is a root entity, use identity as parent transform
+			UpdateChildTransforms(entity, glm::mat4(1.0f));
+		}
 	}
 
 	Entity Scene::FindEntityByName(const std::string_view name)

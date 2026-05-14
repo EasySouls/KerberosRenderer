@@ -75,7 +75,6 @@ namespace Kerberos
 			// of the accumulated Bitangent, we must flip the bitangent in the shader.
 			float handedness = (glm::dot(glm::cross(n, t), tan2[i]) < 0.0f) ? -1.0f : 1.0f;
 
-			// Store final vec4 tangent
 			vertices[i].Tangent = glm::vec4(orthogonalizedTangent, handedness);
 		}
 	}

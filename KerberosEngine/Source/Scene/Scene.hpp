@@ -38,7 +38,7 @@ namespace Kerberos
 		 *
 		 * @return Entity The entity created
 		 */
-		Entity CreateEntity(const std::string& name = std::string());
+		Entity CreateEntity(const std::string& name = std::string(), UUID parentId = UUID::Invalid());
 
 		Entity CreateEntityWithUUID(const std::string& name, uint64_t uuid);
 

@@ -3633,7 +3633,8 @@ namespace Kerberos
 				continue;
 
 			RenderObject renderObject{};
-			renderObject.Transform = transform.GetTransform();
+			//renderObject.Transform = transform.GetTransform();
+			renderObject.Transform = transform.WorldTransform;
 			renderObject.Mesh = staticMesh.StaticMesh;
 			renderObject.Material = staticMesh.MeshMaterial;
 			renderObject.EntityID = static_cast<uint32_t>(entity);
