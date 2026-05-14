@@ -38,68 +38,66 @@ float3 GetViewPos(float2 uv)
     return viewPos.xyz / viewPos.w;
 }
 
+float IntegrateArc(float h, float n)
+{
+    return (cos(n) + 2.0 * h * sin(n) - cos(2.0 * h - n)) / 4.0;
+}
+
 float ComputeGTAO(float2 uv, float3 viewPos, float3 viewNormal)
 {
     float3 viewV = normalize(-viewPos); // Vector to camera
-    float occlusion = 0.0;
+    float visibility = 0.0;             // The integral accumulates visibility
     int directionCount = max(1, (int)cb.directionCount);
     int sampleCount = max(1, (int)cb.sampleCount);
 
-    // Use a simple hash or blue noise to rotate directions
     float rotation = cb.temporalIndex * 0.618;
 
-    // This converts world-space meters into UV-space 0..1 units
-    // projectionMatrix[0][0]/[1][1] are focal lengths in clip space.
     float2 focalLength = abs(float2(cb.projectionMatrix[0][0], cb.projectionMatrix[1][1]));
     float viewDepth = max(-viewPos.z, 1e-4);
     float2 radiusUV = 0.5 * (cb.radius * focalLength) / viewDepth;
+
+    // Prevent radiusUV from exploding when up close.
+    // In this case roughly 200 pixels of the view space
+    float maxRadiusUV = 200.0 / cb.viewportSize.y;
+    radiusUV = min(radiusUV, maxRadiusUV);
+
     float falloff2 = max(cb.falloff * cb.falloff, 1e-6);
 
     for (int d = 0; d < directionCount; ++d)
     {
-        // 1. Determine the search direction in screen space
         float angle = (float(d) + rotation) * (3.14159 / directionCount);
         float2 dir = float2(cos(angle), sin(angle));
 
-        // Horizon angles (initialized to cosine of the hemisphere)
         float h1 = -1.0;
         float h2 = -1.0;
 
-        // 2. March in two opposite directions along the line
         for (int s = 1; s <= sampleCount; ++s)
         {
             float2 offset = dir * (float(s) / sampleCount) * radiusUV;
             float2 uv1 = uv + offset;
             float2 uv2 = uv - offset;
 
-            // Skip out-of-screen taps to avoid edge-clamp streaking/block artifacts.
-            if (uv1.x <= 0.0 || uv1.x >= 1.0 || uv1.y <= 0.0 || uv1.y >= 1.0)
-                continue;
-            if (uv2.x <= 0.0 || uv2.x >= 1.0 || uv2.y <= 0.0 || uv2.y >= 1.0)
-                continue;
+            // Forward direction
+            if (uv1.x > 0.0 && uv1.x < 1.0 && uv1.y > 0.0 && uv1.y < 1.0)
+            {
+                float3 p1 = GetViewPos(uv1);
+                float3 v1 = p1 - viewPos;
+                float d2_1 = dot(v1, v1);
+                if (d2_1 <= falloff2)
+                    h1 = max(h1, dot(viewV, v1 * rsqrt(max(d2_1, 1e-6))));
+            }
 
-            // Sample neighbors
-            float3 p1 = GetViewPos(uv1);
-            float3 p2 = GetViewPos(uv2);
-
-            float3 v1 = p1 - viewPos;
-            float3 v2 = p2 - viewPos;
-
-            float d2_1 = dot(v1, v1);
-            float d2_2 = dot(v2, v2);
-            float lenInv1 = rsqrt(max(d2_1, 1e-6));
-            float lenInv2 = rsqrt(max(d2_2, 1e-6));
-            float3 nV1 = v1 * lenInv1;
-            float3 nV2 = v2 * lenInv2;
-
-            if (d2_1 <= falloff2)
-                h1 = max(h1, dot(viewV, nV1));
-            if (d2_2 <= falloff2)
-                h2 = max(h2, dot(viewV, nV2));
+            // Opposite direction
+            if (uv2.x > 0.0 && uv2.x < 1.0 && uv2.y > 0.0 && uv2.y < 1.0)
+            {
+                float3 p2 = GetViewPos(uv2);
+                float3 v2 = p2 - viewPos;
+                float d2_2 = dot(v2, v2);
+                if (d2_2 <= falloff2)
+                    h2 = max(h2, dot(viewV, v2 * rsqrt(max(d2_2, 1e-6))));
+            }
         }
 
-        // 3. Convert horizons to actual occlusion using the surface normal
-        // This is the "Ground Truth" part: integrating the projected area
         h1 = acos(h1);
         h2 = acos(h2);
 
@@ -108,14 +106,18 @@ float ComputeGTAO(float2 uv, float3 viewPos, float3 viewNormal)
         float3 tangent = cross(viewV, planeNormal);
         float3 projectedNormal = viewNormal - planeNormal * dot(viewNormal, planeNormal);
 
+        // The length of the projection needs to weight the final integration
+        float projLength = length(projectedNormal);
         float n = atan2(dot(projectedNormal, tangent), dot(projectedNormal, viewV));
 
-        // The GTAO integral formula
-        occlusion += (cos(n) + 2.0 * sin(h1) * sin(h1 - n) - cos(2.0 * h1 - n)) / 4.0;
-        occlusion += (cos(n) + 2.0 * sin(h2) * sin(h2 - n) - cos(2.0 * h2 - n)) / 4.0;
+        // Clamp horizons to the valid hemisphere defined by the normal
+        h1 = n + clamp(h1 - n, -1.570796, 1.570796);
+        h2 = -n + clamp(h2 + n, -1.570796, 1.570796);
+
+        visibility += projLength * (IntegrateArc(h1, n) + IntegrateArc(h2, -n));
     }
 
-    return saturate(occlusion / directionCount);
+    return saturate(visibility / directionCount);
 }
 
 [shader("compute")]

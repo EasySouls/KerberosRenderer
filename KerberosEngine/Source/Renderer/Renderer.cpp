@@ -3547,7 +3547,8 @@ namespace Kerberos
 		s_Data->GTAOData.falloff = 1.0f;
 		s_Data->GTAOData.sampleCount = 8.0f;
 		s_Data->GTAOData.directionCount = 4.0f;
-		s_Data->GTAOData.temporalIndex = static_cast<float>(currentImage);
+		// s_Data->GTAOData.temporalIndex = static_cast<float>(currentImage); TODO: Add temporal-spatial denoiser
+		s_Data->GTAOData.temporalIndex = 0.0f;
 		std::memcpy(s_Data->UniformBuffers[currentImage].gtao->GetMappedData(), &s_Data->GTAOData, sizeof(GTAOConstants));
 	}
 
