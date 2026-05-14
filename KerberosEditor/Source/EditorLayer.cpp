@@ -282,10 +282,11 @@ namespace Kerberos
 		if (dockspaceFlags & ImGuiDockNodeFlags_PassthruCentralNode)
 			windowFlags |= ImGuiWindowFlags_NoBackground;
 
-		const std::string sceneName = m_ActiveScene ? m_ActiveScene->GetName() : "No Scene Loaded";
+		// Keep window name constant to preserve dockspace layout across scene state changes
+		const char* dockspaceWindowName = "EditorDockSpace";
 
 		ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.0f, 0.0f));
-		ImGui::Begin(sceneName.c_str(), &dockspaceOpen, windowFlags);
+		ImGui::Begin(dockspaceWindowName, &dockspaceOpen, windowFlags);
 		ImGui::PopStyleVar();
 
 		if (m_IsFullScreenPersistent)
