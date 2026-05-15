@@ -2,22 +2,19 @@
 
 #include "Scene.hpp"
 #include "Entity.hpp"
-//#include "ScriptableEntity.hpp"
-
 #include "Components.hpp"
 #include "Components/PhysicsComponents.hpp"
 #include "Components/AudioComponents.hpp"
-//#include "Renderer/Renderer2D.h"
-//#include "Renderer/Renderer3D.h"
-#include "Physics/Jolt/Utils.hpp"
-
-#include <glm/gtx/matrix_decompose.hpp>
-
 #include "Application.hpp"
 #include "Assets/AssetManager.hpp"
 #include "Renderer/Renderer.hpp"
 #include "Scripting/ScriptEngine.hpp"
-//#include "Renderer/RenderCommand.h"
+#include "Physics/Jolt/Utils.hpp"
+
+#include <glm/gtx/matrix_decompose.hpp>
+
+#include <utility>
+
 
 #define USE_MAP_FOR_UUID 1
 
@@ -111,11 +108,11 @@ namespace Kerberos
 			const auto view = m_Registry.view<CameraComponent, TransformComponent>();
 			for (const auto entity : view)
 			{
-				auto [camera, transform] = view.get<CameraComponent, TransformComponent>(entity);
-				if (camera.IsPrimary)
+				auto [cameraComp, transformComp] = view.get<CameraComponent, TransformComponent>(entity);
+				if (cameraComp.IsPrimary)
 				{
-					mainCamera = &camera.Camera;
-					mainCameraTransform = transform.GetTransform();
+					mainCamera = &cameraComp.Camera;
+					mainCameraTransform = transformComp.GetTransform();
 					break;
 				}
 			}
@@ -140,7 +137,7 @@ namespace Kerberos
 	{
 		const auto enttId = m_Registry.create();
 		Entity entity = { enttId, this };
-		m_RootEntities.insert(enttId);
+		m_RootEntities.push_back(enttId);
 
 		entity.AddComponent<TransformComponent>();
 		const auto& idComp = entity.AddComponent<IDComponent>();
@@ -167,7 +164,7 @@ namespace Kerberos
 	{
 		const auto enttId = m_Registry.create();
 		Entity entity = { enttId, this };
-		m_RootEntities.insert(enttId);
+		m_RootEntities.push_back(enttId);
 
 		entity.AddComponent<TransformComponent>();
 		entity.AddComponent<HierarchyComponent>();
@@ -188,9 +185,9 @@ namespace Kerberos
 	void Scene::DestroyEntity(const Entity entity)
 	{
 		const entt::entity enttId = static_cast<entt::entity>(entity);
-		if (m_RootEntities.contains(enttId))
+		if (const auto it = std::ranges::find(m_RootEntities, enttId); it != m_RootEntities.end())
 		{
-			m_RootEntities.erase(enttId);
+			m_RootEntities.erase(it);
 		}
 
 		/// Destroy all children entities
@@ -320,11 +317,10 @@ namespace Kerberos
 
 		// The duplicated entity will have the same parent as the original entity
 		const UUID originalParentUUID = entity.GetComponent<HierarchyComponent>().Parent;
-		newEntity.GetComponent<HierarchyComponent>().Parent = originalParentUUID;
 		if (originalParentUUID.IsValid())
 		{
 			const Entity originalParent = GetEntityByUUID(originalParentUUID);
-			originalParent.GetComponent<HierarchyComponent>().Children.push_back(newEntity.GetUUID());
+			SetParent(newEntity, originalParent, false);
 		}
 
 		return newEntity;
@@ -430,7 +426,7 @@ namespace Kerberos
 			if (!nodeEntity)
 				continue;
 
-			if (node.ParentIndex >= 0 && node.ParentIndex < static_cast<int32_t>(nodeEntities.size()))
+			if (node.ParentIndex >= 0 && std::cmp_less(node.ParentIndex, nodeEntities.size()))
 				SetParent(nodeEntity, nodeEntities[node.ParentIndex], false);
 			else
 				SetParent(nodeEntity, modelRoot, false);
@@ -465,7 +461,10 @@ namespace Kerberos
 	{
 		RemoveParent(child);
 
-		m_RootEntities.erase(static_cast<entt::entity>(child));
+		if (const auto it = std::ranges::find(m_RootEntities, static_cast<entt::entity>(child)); it != m_RootEntities.end())
+		{
+			m_RootEntities.erase(it);
+		}
 
 		auto& childHierarchy = child.GetComponent<HierarchyComponent>();
 		auto& parentHierarchy = parent.GetComponent<HierarchyComponent>();
@@ -505,7 +504,7 @@ namespace Kerberos
 
 			childHierarchy.Parent = UUID::Invalid();
 			/// The child is a root entity now
-			m_RootEntities.insert(static_cast<entt::entity>(child));
+			m_RootEntities.push_back(static_cast<entt::entity>(child));
 			
 			// Recalculate the child's transform and all its descendants since it's now a root entity
 			CalculateEntityTransform(child);
@@ -563,118 +562,92 @@ namespace Kerberos
 		return *m_PhysicsSystem;
 	}
 
+	void Scene::CopyEntityRecursive(const Ref<Scene>& other, const entt::entity sourceEntity, const Ref<Scene>& newScene, const entt::entity parentNewEntity)
+	{
+		auto& sourceRegistry = other->m_Registry;
+
+		const UUID sourceID = sourceRegistry.get<IDComponent>(sourceEntity).ID;
+		const auto& tag = sourceRegistry.get<TagComponent>(sourceEntity).Tag;
+		Entity newEntity = newScene->CreateEntityWithUUID(tag, sourceID);
+
+		/// Copy all components
+
+		newEntity.GetComponent<TransformComponent>() = sourceRegistry.get<TransformComponent>(sourceEntity);
+
+		if (sourceRegistry.all_of<SpriteRendererComponent>(sourceEntity))
+			newEntity.AddComponent<SpriteRendererComponent>(sourceRegistry.get<SpriteRendererComponent>(sourceEntity));
+		if (sourceRegistry.all_of<CameraComponent>(sourceEntity))
+		{
+			auto& cameraComp = sourceRegistry.get<CameraComponent>(sourceEntity);
+			newEntity.AddComponent<CameraComponent>(cameraComp);
+			newEntity.GetComponent<CameraComponent>().Camera.SetViewportSize(newScene->m_ViewportWidth, newScene->m_ViewportHeight);
+		}
+		if (sourceRegistry.all_of<ScriptComponent>(sourceEntity))
+			newEntity.AddComponent<ScriptComponent>(sourceRegistry.get<ScriptComponent>(sourceEntity));
+		if (sourceRegistry.all_of<StaticMeshComponent>(sourceEntity))
+			newEntity.AddComponent<StaticMeshComponent>(sourceRegistry.get<StaticMeshComponent>(sourceEntity));
+		if (sourceRegistry.all_of<ModelComponent>(sourceEntity))
+			newEntity.AddComponent<ModelComponent>(sourceRegistry.get<ModelComponent>(sourceEntity));
+		if (sourceRegistry.all_of<RigidBody3DComponent>(sourceEntity))
+		{
+			auto& rigidBodyComp = sourceRegistry.get<RigidBody3DComponent>(sourceEntity);
+			newEntity.AddComponent<RigidBody3DComponent>(rigidBodyComp);
+			newEntity.GetComponent<RigidBody3DComponent>().RuntimeBody = nullptr;
+		}
+		if (sourceRegistry.all_of<BoxCollider3DComponent>(sourceEntity))
+			newEntity.AddComponent<BoxCollider3DComponent>(sourceRegistry.get<BoxCollider3DComponent>(sourceEntity));
+		if (sourceRegistry.all_of<SphereCollider3DComponent>(sourceEntity))
+			newEntity.AddComponent<SphereCollider3DComponent>(sourceRegistry.get<SphereCollider3DComponent>(sourceEntity));
+		if (sourceRegistry.all_of<CapsuleCollider3DComponent>(sourceEntity))
+			newEntity.AddComponent<CapsuleCollider3DComponent>(sourceRegistry.get<CapsuleCollider3DComponent>(sourceEntity));
+		if (sourceRegistry.all_of<MeshCollider3DComponent>(sourceEntity))
+			newEntity.AddComponent<MeshCollider3DComponent>(sourceRegistry.get<MeshCollider3DComponent>(sourceEntity));
+		if (sourceRegistry.all_of<DirectionalLightComponent>(sourceEntity))
+			newEntity.AddComponent<DirectionalLightComponent>(sourceRegistry.get<DirectionalLightComponent>(sourceEntity));
+		if (sourceRegistry.all_of<PointLightComponent>(sourceEntity))
+			newEntity.AddComponent<PointLightComponent>(sourceRegistry.get<PointLightComponent>(sourceEntity));
+		if (sourceRegistry.all_of<SpotLightComponent>(sourceEntity))
+			newEntity.AddComponent<SpotLightComponent>(sourceRegistry.get<SpotLightComponent>(sourceEntity));
+		if (sourceRegistry.all_of<EnvironmentComponent>(sourceEntity))
+			newEntity.AddComponent<EnvironmentComponent>(sourceRegistry.get<EnvironmentComponent>(sourceEntity));
+		if (sourceRegistry.all_of<TextComponent>(sourceEntity))
+			newEntity.AddComponent<TextComponent>(sourceRegistry.get<TextComponent>(sourceEntity));
+		if (sourceRegistry.all_of<AudioSource2DComponent>(sourceEntity))
+			newEntity.AddComponent<AudioSource2DComponent>(sourceRegistry.get<AudioSource2DComponent>(sourceEntity));
+		if (sourceRegistry.all_of<AudioSource3DComponent>(sourceEntity))
+			newEntity.AddComponent<AudioSource3DComponent>(sourceRegistry.get<AudioSource3DComponent>(sourceEntity));
+		if (sourceRegistry.all_of<AudioListenerComponent>(sourceEntity))
+			newEntity.AddComponent<AudioListenerComponent>(sourceRegistry.get<AudioListenerComponent>(sourceEntity));
+
+		/// Set parent if this is a child entity
+		if (parentNewEntity != entt::null)
+			newScene->SetParent(newEntity, Entity{ parentNewEntity, newScene.get() });
+
+		/// Recursively copy children in order
+		if (sourceRegistry.all_of<HierarchyComponent>(sourceEntity))
+		{
+			const auto& sourceHierarchy = sourceRegistry.get<HierarchyComponent>(sourceEntity);
+			for (const UUID& childSourceID : sourceHierarchy.Children)
+			{
+				Entity childSource = other->GetEntityByUUID(childSourceID);
+				CopyEntityRecursive(other, static_cast<entt::entity>(childSource), newScene, static_cast<entt::entity>(newEntity));
+			}
+		}
+	}
+
 	Ref<Scene> Scene::Copy(const Ref<Scene>& other)
 	{
 		Ref<Scene> newScene = CreateRef<Scene>();
 
+		newScene->SetName(other->m_Name);
+
 		newScene->m_ViewportWidth = other->m_ViewportWidth;
 		newScene->m_ViewportHeight = other->m_ViewportHeight;
 
-		auto& sourceRegistry = other->m_Registry;
-		//auto& newRegistry = newScene->m_Registry;
-
-		const auto idView = sourceRegistry.view<IDComponent>();
-		for (const auto& entity : idView)
+		/// Copy root entities first preserving order, then recursively copy children
+		for (const auto sourceRootEntity : other->m_RootEntities)
 		{
-			UUID sourceID = sourceRegistry.get<IDComponent>(entity).ID;
-			const auto& tag = sourceRegistry.get<TagComponent>(entity).Tag;
-			Entity newEntity = newScene->CreateEntityWithUUID(tag, sourceID);
-
-			/// Copy all components
-
-			newEntity.GetComponent<TransformComponent>() = sourceRegistry.get<TransformComponent>(entity);
-
-			if (sourceRegistry.all_of<SpriteRendererComponent>(entity))
-			{
-				newEntity.AddComponent<SpriteRendererComponent>(sourceRegistry.get<SpriteRendererComponent>(entity));
-			}
-			if (sourceRegistry.all_of<CameraComponent>(entity))
-			{
-				auto& cameraComp = sourceRegistry.get<CameraComponent>(entity);
-				newEntity.AddComponent<CameraComponent>(cameraComp);
-				newEntity.GetComponent<CameraComponent>().Camera.SetViewportSize(newScene->m_ViewportWidth, newScene->m_ViewportHeight);
-			}
-			if (sourceRegistry.all_of<ScriptComponent>(entity))
-			{
-				newEntity.AddComponent<ScriptComponent>(sourceRegistry.get<ScriptComponent>(entity));
-			}
-			if (sourceRegistry.all_of<NativeScriptComponent>(entity))
-			{
-				/*auto& scriptComp = sourceRegistry.get<NativeScriptComponent>(entity);
-				/// Instantiate the script instance, so that script.Instance is not nullptr,
-				/// when calling script.Instantiate() in the new entity.
-				scriptComp.Instantiate();
-
-				auto& newScriptComp = newEntity.AddComponent<NativeScriptComponent>();
-				newScriptComp.Instantiate = [&]() { newScriptComp.Instance = scriptComp.Instance; };
-				newScriptComp.Destroy = [&]()
-				{
-					delete newScriptComp.Instance;
-					newScriptComp.Instance = nullptr;
-				};*/
-			}
-			if (sourceRegistry.all_of<StaticMeshComponent>(entity))
-			{
-				newEntity.AddComponent<StaticMeshComponent>(sourceRegistry.get<StaticMeshComponent>(entity));
-			}
-			if (sourceRegistry.all_of<ModelComponent>(entity))
-			{
-				newEntity.AddComponent<ModelComponent>(sourceRegistry.get<ModelComponent>(entity));
-			}
-			if (sourceRegistry.all_of<RigidBody3DComponent>(entity))
-			{
-				auto& rigidBodyComp = sourceRegistry.get<RigidBody3DComponent>(entity);
-				newEntity.AddComponent<RigidBody3DComponent>(rigidBodyComp);
-				newEntity.GetComponent<RigidBody3DComponent>().RuntimeBody = nullptr; // Reset runtime body
-			}
-			if (sourceRegistry.all_of<BoxCollider3DComponent>(entity))
-			{
-				newEntity.AddComponent<BoxCollider3DComponent>(sourceRegistry.get<BoxCollider3DComponent>(entity));
-			}
-			if (sourceRegistry.all_of<SphereCollider3DComponent>(entity))
-			{
-				newEntity.AddComponent<SphereCollider3DComponent>(sourceRegistry.get<SphereCollider3DComponent>(entity));
-			}
-			if (sourceRegistry.all_of<CapsuleCollider3DComponent>(entity))
-			{
-				newEntity.AddComponent<CapsuleCollider3DComponent>(sourceRegistry.get<CapsuleCollider3DComponent>(entity));
-			}
-			if (sourceRegistry.all_of<MeshCollider3DComponent>(entity))
-			{
-				newEntity.AddComponent<MeshCollider3DComponent>(sourceRegistry.get<MeshCollider3DComponent>(entity));
-			}
-			if (sourceRegistry.all_of<DirectionalLightComponent>(entity))
-			{
-				newEntity.AddComponent<DirectionalLightComponent>(sourceRegistry.get<DirectionalLightComponent>(entity));
-			}
-			if (sourceRegistry.all_of<PointLightComponent>(entity))
-			{
-				newEntity.AddComponent<PointLightComponent>(sourceRegistry.get<PointLightComponent>(entity));
-			}
-			if (sourceRegistry.all_of<SpotLightComponent>(entity))
-			{
-				newEntity.AddComponent<SpotLightComponent>(sourceRegistry.get<SpotLightComponent>(entity));
-			}
-			if (sourceRegistry.all_of<EnvironmentComponent>(entity))
-			{
-				newEntity.AddComponent<EnvironmentComponent>(sourceRegistry.get<EnvironmentComponent>(entity));
-			}
-			if (sourceRegistry.all_of<TextComponent>(entity))
-			{
-				newEntity.AddComponent<TextComponent>(sourceRegistry.get<TextComponent>(entity));
-			}
-			if (sourceRegistry.all_of<AudioSource2DComponent>(entity))
-			{
-				newEntity.AddComponent<AudioSource2DComponent>(sourceRegistry.get<AudioSource2DComponent>(entity));
-			}
-			if (sourceRegistry.all_of<AudioSource3DComponent>(entity))
-			{
-				newEntity.AddComponent<AudioSource3DComponent>(sourceRegistry.get<AudioSource3DComponent>(entity));
-			}
-			if (sourceRegistry.all_of<AudioListenerComponent>(entity))
-			{
-				newEntity.AddComponent<AudioListenerComponent>(sourceRegistry.get<AudioListenerComponent>(entity));
-			}
+			CopyEntityRecursive(other, sourceRootEntity, newScene, entt::null);
 		}
 
 		return newScene;
@@ -693,7 +666,7 @@ namespace Kerberos
 		const auto view = m_Registry.view<TransformComponent, SpriteRendererComponent>();
 		for (const auto entity : view)
 		{
-			auto [transform, sprite] = view.get<TransformComponent, SpriteRendererComponent>(entity);
+			[[maybe_unused]] auto [transform, sprite] = view.get<TransformComponent, SpriteRendererComponent>(entity);
 
 			//Renderer2D::DrawQuad(transform.WorldTransform, sprite.Color);
 		}
@@ -934,7 +907,7 @@ namespace Kerberos
 		{
 			KBR_PROFILE_SCOPE("Scene::UpdateScripts - Native scripts update");
 
-			m_Registry.view<NativeScriptComponent>().each([this, ts](auto entity, const NativeScriptComponent& script)
+			m_Registry.view<NativeScriptComponent>().each([this]([[maybe_unused]] auto entity, [[maybe_unused]] const NativeScriptComponent& script)
 			{
 				/*if (!script.Instance)
 				{

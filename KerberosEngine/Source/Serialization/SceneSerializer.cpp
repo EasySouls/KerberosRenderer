@@ -483,7 +483,10 @@ namespace Kerberos
 					if (parentId.IsValid())
 					{
 						/// If the entity has a parent, it should not be a root entity
-						m_Scene->m_RootEntities.erase(static_cast<entt::entity>(deserializedEntity));
+						auto& rootEntities = m_Scene->m_RootEntities;
+						auto it = std::ranges::find(rootEntities, static_cast<entt::entity>(deserializedEntity));
+						if (it != rootEntities.end())
+							rootEntities.erase(it);
 					}
 
 					for (const auto& child : hierarchyComponent["Children"])

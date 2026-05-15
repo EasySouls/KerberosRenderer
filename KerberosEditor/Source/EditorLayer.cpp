@@ -1,7 +1,5 @@
 #include "EditorLayer.hpp"
 
-#include <ranges>
-
 #include "VulkanContext.hpp"
 #include "IO.hpp"
 #include "Renderer/Renderer.hpp"
@@ -23,8 +21,9 @@
 #include <glm/gtc/matrix_inverse.hpp>
 #include <glm/gtc/type_ptr.hpp>
 #include <imgui/imgui.h>
-#include <limits>
 
+#include <limits>
+#include <ranges>
 
 namespace Kerberos
 {

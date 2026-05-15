@@ -70,7 +70,7 @@ namespace Kerberos
 		void RemoveParent(Entity child);
 		std::vector<Entity> GetChildren(Entity parent) const;
 
-		const std::set<entt::entity>& GetRootEntities() const { return m_RootEntities; }
+		const std::vector<entt::entity>& GetRootEntities() const { return m_RootEntities; }
 
 		void OnViewportResize(uint32_t width, uint32_t height);
 
@@ -112,6 +112,8 @@ namespace Kerberos
 
 		bool ShouldRenderShadows(const DirectionalLightComponent* dlc) const;
 
+		static void CopyEntityRecursive(const Ref<Scene>& other, entt::entity sourceEntity, const Ref<Scene>& newScene, entt::entity parentNewEntity);
+
 		template<typename Component>
 		static void CopyComponent(entt::registry& dst, entt::registry& src)
 		{
@@ -134,7 +136,7 @@ namespace Kerberos
 
 		std::unordered_map<UUID, Entity> m_UUIDToEntityMap;
 
-		std::set<entt::entity> m_RootEntities;
+		std::vector<entt::entity> m_RootEntities;
 
 		JoltPhysicsSystem* m_PhysicsSystem;
 
