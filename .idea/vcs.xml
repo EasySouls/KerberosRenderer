@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="VcsDirectoryMappings">
+    <mapping directory="" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/KerberosEngine/ThirdParty/Assimp" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/KerberosEngine/ThirdParty/ImGuizmo" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/KerberosEngine/ThirdParty/JoltPhysics" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/KerberosEngine/ThirdParty/entt" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/KerberosEngine/ThirdParty/freetype" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/KerberosEngine/ThirdParty/freetype/subprojects/dlg" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/KerberosEngine/ThirdParty/imgui" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/KerberosEngine/ThirdParty/ktx" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/KerberosEngine/ThirdParty/ktx/tests/cts" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/KerberosEngine/ThirdParty/msdf-atlas-gen" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/KerberosEngine/ThirdParty/msdf-atlas-gen/artery-font-format" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/KerberosEngine/ThirdParty/msdf-atlas-gen/msdfgen" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/KerberosEngine/ThirdParty/yaml-cpp" vcs="Git" />
+  </component>
+</project>
