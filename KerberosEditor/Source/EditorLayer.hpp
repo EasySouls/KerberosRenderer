@@ -103,6 +103,7 @@ namespace Kerberos
 		Entity m_CameraEntity;
 
 		Entity m_HoveredEntity;
+		bool m_HoveredEntityDeletedLastFrame = false;
 
 		Ref<Font> m_BasicFont;
 

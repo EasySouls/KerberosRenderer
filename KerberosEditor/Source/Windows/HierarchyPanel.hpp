@@ -10,6 +10,9 @@
 #include "Events/KeyPressedEvent.hpp"
 #include "../Notification/NotificationManager.hpp"
 
+#include <vector>
+#include <functional>
+
 namespace Kerberos
 {
 	class HierarchyPanel : public EditorWindow
@@ -28,6 +31,8 @@ namespace Kerberos
 		void SetSelectedEntity(Entity entity);
 
 		void OnEvent(Event& event) override;
+
+		void SetOnEntityDeleted(const std::function<void(Entity)>& callback);
 
 	private:
 		void DrawEntityNode(const Entity& entity);
@@ -58,6 +63,8 @@ namespace Kerberos
 		Entity m_SelectedEntity;
 
 		std::vector<Entity> m_DeletionQueue;
+
+		std::function<void(Entity)> m_OnEntityDeleted;
 
 		// Examples
 		Ref<Texture2D> m_WhiteTexture;

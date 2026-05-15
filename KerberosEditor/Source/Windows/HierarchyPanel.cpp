@@ -112,6 +112,10 @@ namespace Kerberos
 		{
 			m_NotificationManager.AddNotification("Entity deleted: " + e.GetComponent<TagComponent>().Tag, Notification::Type::Info);
 			m_Context->DestroyEntity(e);
+			if (m_OnEntityDeleted)
+			{
+				m_OnEntityDeleted(e);
+			}
 		}
 		m_DeletionQueue.clear();
 
@@ -127,6 +131,11 @@ namespace Kerberos
 	{
 		EventDispatcher dispatcher(event);
 		dispatcher.Dispatch<KeyPressedEvent>(KBR_BIND_FN(HierarchyPanel::OnKeyPressed));
+	}
+
+	void HierarchyPanel::SetOnEntityDeleted(const std::function<void(Entity)>& callback)
+	{
+		m_OnEntityDeleted = callback;
 	}
 
 	void HierarchyPanel::DrawEntityNode(const Entity& entity)

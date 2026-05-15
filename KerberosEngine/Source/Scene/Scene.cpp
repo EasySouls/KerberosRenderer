@@ -197,6 +197,21 @@ namespace Kerberos
 			DestroyEntity(child);
 		}
 
+		// If the entity has a parent, remove the entity from its parent's list of children
+		const UUID parentUUID = entity.GetComponent<HierarchyComponent>().Parent;
+		if (parentUUID.IsValid())
+		{
+			const Entity parent = GetEntityByUUID(parentUUID);
+			auto& parentHierarchy = parent.GetComponent<HierarchyComponent>();
+			parentHierarchy.Children.erase(std::ranges::remove(parentHierarchy.Children, entity.GetUUID()).begin(), parentHierarchy.Children.end());
+		}
+
+#if USE_MAP_FOR_UUID
+		// Remove the entity from the UUID map before destroying it
+		const UUID entityUUID = entity.GetComponent<IDComponent>().ID;
+		m_UUIDToEntityMap.erase(entityUUID);
+#endif
+
 		m_Registry.destroy(enttId);
 	}
 

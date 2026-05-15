@@ -30,6 +30,13 @@ namespace Kerberos
 	EditorLayer::EditorLayer() 
 		: Layer("EditorLayer")
 	{
+		m_HierarchyPanel.SetOnEntityDeleted([this](const Entity entity) {
+			if (m_HoveredEntity == entity)
+			{
+				m_HoveredEntity = {};
+				m_HoveredEntityDeletedLastFrame = true;
+			}
+		});
 	}
 
 	EditorLayer::~EditorLayer() 
@@ -422,6 +429,12 @@ namespace Kerberos
 	{
 		KBR_PROFILE_FUNCTION();
 
+		if (m_HoveredEntityDeletedLastFrame) 
+		{
+			m_HoveredEntityDeletedLastFrame = false;
+			return;
+		}
+
 		auto [mx, my] = ImGui::GetMousePos();
 		mx -= m_ViewportBounds[0].x;
 		my -= m_ViewportBounds[0].y;
@@ -432,7 +445,7 @@ namespace Kerberos
 
 		if (mouseX >= 0 && mouseY >= 0 && mouseX <= static_cast<int>(viewportSize.x) && mouseY <= static_cast<int>(viewportSize.y))
 		{
-          Renderer::RequestMousePickingPixel(static_cast<uint32_t>(mouseX), static_cast<uint32_t>(mouseY));
+			Renderer::RequestMousePickingPixel(static_cast<uint32_t>(mouseX), static_cast<uint32_t>(mouseY));
 
 			if (const auto pickedEntityID = Renderer::GetMousePickingEntityID())
 			{
