@@ -337,7 +337,10 @@ namespace Kerberos
 		m_RuntimeScene->OnRuntimeStart();
 
 		m_ActiveScene = m_RuntimeScene;
+
+		const Entity selectedEntity = m_HierarchyPanel.GetSelectedEntity();
 		m_HierarchyPanel.SetContext(m_ActiveScene);
+		m_HierarchyPanel.SetSelectedEntity(selectedEntity);
 	}
 
 	void EditorLayer::OnSceneSimulate()
@@ -349,7 +352,10 @@ namespace Kerberos
 		m_RuntimeScene->OnSimulationStart();
 
 		m_ActiveScene = m_RuntimeScene;
+
+		const Entity selectedEntity = m_HierarchyPanel.GetSelectedEntity();
 		m_HierarchyPanel.SetContext(m_ActiveScene);
+		m_HierarchyPanel.SetSelectedEntity(selectedEntity);
 	}
 
 	void EditorLayer::OnSceneStop()
