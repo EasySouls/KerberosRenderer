@@ -525,6 +525,7 @@ namespace Kerberos
 			: std::vector<LineVertex>{};
 		s_Data->MaterialRegistry.UpdateDescriptorSetsForMaterials(uniqueMaterials);
 
+		ResolveGPUTimings(frameIndex);
 		ResetQueryPool(cmd, frameIndex);
 
 		WriteGPUTimestamp(cmd, frameIndex, static_cast<uint32_t>(GPUTimestampQuery::FrameBegin));
@@ -1671,8 +1672,6 @@ namespace Kerberos
 
 		WriteGPUTimestamp(cmd, frameIndex, static_cast<uint32_t>(GPUTimestampQuery::FrameEnd));
 		s_Data->PendingRender.IsValid = false;
-
-		ResolveGPUTimings(frameIndex);
 	}
 
 	void Renderer::CreateDefaultMaterials()
