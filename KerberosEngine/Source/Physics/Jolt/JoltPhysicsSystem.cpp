@@ -24,7 +24,7 @@
 #include "Jolt/Physics/Collision/Shape/StaticCompoundShape.h"
 #include <Jolt/Physics/Body/BodyCreationSettings.h>
 #include "Jolt/Physics/Collision/Shape/CapsuleShape.h"
-#include "Jolt/Physics/Collision/Shape/OffsetCenterOfMassShape.h"
+#include "Jolt/Physics/Collision/Shape/RotatedTranslatedShape.h"
 #include "Jolt/Physics/Collision/RayCast.h"
 #include "Jolt/Physics/Collision/CastResult.h"
 
@@ -152,12 +152,34 @@ namespace Kerberos
 		bodyInterface.AddImpulse(id, joltForce, joltPoint);
 	}
 
+	void JoltPhysicsSystem::SetLinearVelocity(const uint32_t bodyId, const glm::vec3& velocity) const
+	{
+		const JPH::BodyID id{ bodyId };
+		JPH::BodyInterface& bodyInterface = GetBodyInterface();
+		const JPH::Vec3Arg joltVelocity(velocity.x, velocity.y, velocity.z);
+		bodyInterface.SetLinearVelocity(id, joltVelocity);
+	}
+
 	bool JoltPhysicsSystem::Raycast(const glm::vec3& origin, const glm::vec3& direction, const float maxDistance,
 		RaycastHit& outHit) const 
 	{
+		if (maxDistance <= 0.0f)
+		{
+			return false;
+		}
+
+		const float directionLength = glm::length(direction);
+		if (directionLength <= 1e-6f)
+		{
+			return false;
+		}
+
+		// Physics raycasts expect world-space direction vectors.
+		const glm::vec3 normalizedDirection = direction / directionLength;
+
 		const JPH::RRayCast ray{
 			JPH::Vec3(origin.x, origin.y, origin.z),
-			JPH::Vec3(direction.x, direction.y, direction.z) * maxDistance
+			JPH::Vec3(normalizedDirection.x, normalizedDirection.y, normalizedDirection.z) * maxDistance
 		};
 
 		JPH::RayCastResult hit;
@@ -268,9 +290,7 @@ namespace Kerberos
 				const JPH::Body* body = static_cast<JPH::Body*>(rigidBody.RuntimeBody);
 
 				const Entity entity(e, m_Scene);
-				const JPH::Vec3 offset = m_ColliderOffsets.at(entity.GetUUID());
-
-				Physics::Utils::ApplyJoltTransformToEntity(transform.WorldTransform, *body, offset, entity.GetComponent<TransformComponent>());
+				Physics::Utils::ApplyJoltTransformToEntity(transform.WorldTransform, *body, entity.GetComponent<TransformComponent>());
 
 				// Sync velocity for access by other systems
 				JPH::Vec3 vel = body->GetLinearVelocity();
@@ -324,8 +344,7 @@ namespace Kerberos
 		const float posY = worldPos.y; //+ collider.Offset.y;
 		const float posZ = worldPos.z; //+ collider.Offset.z;
 
-		const JPH::Vec3 offset = m_ColliderOffsets[entity.GetUUID()];
-		const JPH::Vec3 position = JPH::Vec3(posX + offset.GetX(), posY + offset.GetY(), posZ + offset.GetZ());
+		const JPH::Vec3 position = JPH::Vec3(posX, posY, posZ);
 
 		/// Extract rotation quaternion from the transform matrix
 		glm::quat glmRotation = glm::quat_cast(glm::mat3(transform.WorldTransform));
@@ -372,39 +391,39 @@ namespace Kerberos
 
 	JPH::RefConst<JPH::Shape> JoltPhysicsSystem::CreateShapeForEntity(const Entity& entity)
 	{
-		std::vector<JPH::RefConst<JPH::Shape>> shapes;
+		struct PositionedShape
+		{
+			JPH::Vec3 Offset;
+			JPH::RefConst<JPH::Shape> Shape;
+		};
+
+		std::vector<PositionedShape> shapes;
 
 		if (entity.HasComponent<BoxCollider3DComponent>())
 		{
 			const auto& coll = entity.GetComponent<BoxCollider3DComponent>();
-			const JPH::Shape* shape = new JPH::BoxShape(JPH::Vec3(coll.Size.x, coll.Size.y, coll.Size.z));
-
-			const JPH::Vec3 offset(coll.Offset.x, coll.Offset.y, coll.Offset.z);
-			m_ColliderOffsets[entity.GetUUID()] = offset;
-
-			shapes.emplace_back(shape);
+			shapes.push_back({
+				.Offset = JPH::Vec3(coll.Offset.x, coll.Offset.y, coll.Offset.z),
+				.Shape = new JPH::BoxShape(JPH::Vec3(coll.Size.x, coll.Size.y, coll.Size.z))
+			});
 		}
 
 		if (entity.HasComponent<SphereCollider3DComponent>())
 		{
 			const auto& coll = entity.GetComponent<SphereCollider3DComponent>();
-			const JPH::Shape* shape = new JPH::SphereShape(coll.Radius);
-
-			const JPH::Vec3 offset(coll.Offset.x, coll.Offset.y, coll.Offset.z);
-			m_ColliderOffsets[entity.GetUUID()] = offset;
-
-			shapes.emplace_back(shape);
+			shapes.push_back({
+				.Offset = JPH::Vec3(coll.Offset.x, coll.Offset.y, coll.Offset.z),
+				.Shape = new JPH::SphereShape(coll.Radius)
+			});
 		}
 
 		if (entity.HasComponent<CapsuleCollider3DComponent>())
 		{
 			const auto& coll = entity.GetComponent<CapsuleCollider3DComponent>();
-			const JPH::Shape* shape = new JPH::CapsuleShape(coll.Height / 2, coll.Radius);
-
-			const JPH::Vec3 offset(coll.Offset.x, coll.Offset.y, coll.Offset.z);
-			m_ColliderOffsets[entity.GetUUID()] = offset;
-
-			shapes.emplace_back(shape);
+			shapes.push_back({
+				.Offset = JPH::Vec3(coll.Offset.x, coll.Offset.y, coll.Offset.z),
+				.Shape = new JPH::CapsuleShape(coll.Height / 2, coll.Radius)
+			});
 		}
 
 		if (entity.HasComponent<MeshCollider3DComponent>())
@@ -415,10 +434,10 @@ namespace Kerberos
 			{
 				if (const JPH::RefConst<JPH::Shape> shape = Physics::Utils::CreateJoltMeshShape(mesh.StaticMesh, entity.GetName()))
 				{
-					const JPH::Vec3 offset(coll.Offset.x, coll.Offset.y, coll.Offset.z);
-					m_ColliderOffsets[entity.GetUUID()] = offset;
-
-					shapes.push_back(shape);
+					shapes.push_back({
+						.Offset = JPH::Vec3(coll.Offset.x, coll.Offset.y, coll.Offset.z),
+						.Shape = shape
+					});
 				}
 			}
 		}
@@ -427,15 +446,22 @@ namespace Kerberos
 
 		if (shapes.size() == 1)
 		{
-			return shapes[0];
+			return new JPH::RotatedTranslatedShape(shapes[0].Offset, JPH::Quat::sIdentity(), shapes[0].Shape.GetPtr());
 		}
 
 		JPH::StaticCompoundShapeSettings compoundSettings;
-		for (const auto& shape : shapes)
+		for (const auto& [Offset, Shape] : shapes)
 		{
-			compoundSettings.AddShape(JPH::Vec3::sZero(), JPH::Quat::sIdentity(), shape);
+			compoundSettings.AddShape(Offset, JPH::Quat::sIdentity(), Shape);
 		}
-		return compoundSettings.Create().Get();
+
+		const JPH::ShapeSettings::ShapeResult compoundResult = compoundSettings.Create();
+		if (compoundResult.HasError())
+		{
+			KBR_CORE_ERROR("Jolt: failed to create compound shape for entity {}: {}", entity.GetName(), compoundResult.GetError().c_str());
+			return nullptr;
+		}
+		return compoundResult.Get();
 	}
 
 	bool JoltPhysicsSystem::IsColliderTrigger(const Entity& entity)

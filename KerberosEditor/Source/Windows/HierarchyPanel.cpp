@@ -516,6 +516,10 @@ namespace Kerberos
 				auto& transform = entity.GetComponent<TransformComponent>();
 				const auto onValueChanged = [&entity, this]()
 				{
+					if (entity.HasComponent<RigidBody3DComponent>())
+					{
+						entity.GetComponent<RigidBody3DComponent>().IsDirty = true;
+					}
 					m_Context->CalculateEntityTransform(entity);
 				};
 
@@ -1502,6 +1506,7 @@ namespace Kerberos
 			if (opened)
 			{
 				auto& rb = entity.GetComponent<RigidBody3DComponent>();
+				bool rbChanged = false;
 
 				const char* bodyTypeStrings[] = { "Static", "Dynamic", "Kinematic" };
 				const char* currentBodyTypeString = bodyTypeStrings[static_cast<int>(rb.Type)];
@@ -1513,6 +1518,7 @@ namespace Kerberos
 						if (ImGui::Selectable(bodyTypeStrings[i], isSelected))
 						{
 							rb.Type = static_cast<RigidBody3DComponent::BodyType>(i);
+							rbChanged = true;
 						}
 						if (isSelected)
 						{
@@ -1522,12 +1528,16 @@ namespace Kerberos
 					ImGui::EndCombo();
 				}
 
-				ImGui::DragFloat("Friction", &rb.Friction, 0.02f, 0.0f, 1.0f);
-				ImGui::DragFloat("Restitution", &rb.Restitution, 0.02f, 0.0f, 1.0f);
-				ImGui::DragFloat3("Velocity", glm::value_ptr(rb.Velocity), 0.1f);
-				ImGui::DragFloat3("Angular Velocity", glm::value_ptr(rb.AngularVelocity));
-				ImGui::Checkbox("Use Gravity", &rb.UseGravity);
-				ImGui::DragFloat("Mass", &rb.Mass, 0.1f, 0.01f, 100.0f);
+				rbChanged |= ImGui::DragFloat("Friction", &rb.Friction, 0.02f, 0.0f, 1.0f);
+				rbChanged |= ImGui::DragFloat("Restitution", &rb.Restitution, 0.02f, 0.0f, 1.0f);
+				rbChanged |= ImGui::DragFloat3("Velocity", glm::value_ptr(rb.Velocity), 0.1f);
+				rbChanged |= ImGui::DragFloat3("Angular Velocity", glm::value_ptr(rb.AngularVelocity));
+				rbChanged |= ImGui::Checkbox("Use Gravity", &rb.UseGravity);
+				rbChanged |= ImGui::DragFloat("Mass", &rb.Mass, 0.1f, 0.01f, 100.0f);
+				if (rbChanged)
+				{
+					rb.IsDirty = true;
+				}
 
 				ImGui::TreePop();
 			}
@@ -1564,15 +1574,24 @@ namespace Kerberos
 			if (opened)
 			{
 				auto& collider = entity.GetComponent<BoxCollider3DComponent>();
-				ImGui::DragFloat3("Size", glm::value_ptr(collider.Size), 0.1f);
-				ImGui::DragFloat3("Offset", glm::value_ptr(collider.Offset), 0.1f);
-				ImGui::Checkbox("Is Trigger", &collider.IsTrigger);
+				bool colliderChanged = false;
+				colliderChanged |= ImGui::DragFloat3("Size", glm::value_ptr(collider.Size), 0.1f);
+				colliderChanged |= ImGui::DragFloat3("Offset", glm::value_ptr(collider.Offset), 0.1f);
+				colliderChanged |= ImGui::Checkbox("Is Trigger", &collider.IsTrigger);
+				if (colliderChanged && entity.HasComponent<RigidBody3DComponent>())
+				{
+					entity.GetComponent<RigidBody3DComponent>().IsDirty = true;
+				}
 
 				ImGui::TreePop();
 			}
 
 			if (componentDeleted)
 			{
+				if (entity.HasComponent<RigidBody3DComponent>())
+				{
+					entity.GetComponent<RigidBody3DComponent>().IsDirty = true;
+				}
 				entity.RemoveComponent<BoxCollider3DComponent>();
 			}
 		}
@@ -1601,13 +1620,22 @@ namespace Kerberos
 			if (opened)
 			{
 				auto& collider = entity.GetComponent<SphereCollider3DComponent>();
-				ImGui::DragFloat("Radius", &collider.Radius, 0.1f);
-				ImGui::DragFloat3("Offset", glm::value_ptr(collider.Offset), 0.1f);
-				ImGui::Checkbox("Is Trigger", &collider.IsTrigger);
+				bool colliderChanged = false;
+				colliderChanged |= ImGui::DragFloat("Radius", &collider.Radius, 0.1f);
+				colliderChanged |= ImGui::DragFloat3("Offset", glm::value_ptr(collider.Offset), 0.1f);
+				colliderChanged |= ImGui::Checkbox("Is Trigger", &collider.IsTrigger);
+				if (colliderChanged && entity.HasComponent<RigidBody3DComponent>())
+				{
+					entity.GetComponent<RigidBody3DComponent>().IsDirty = true;
+				}
 				ImGui::TreePop();
 			}
 			if (componentDeleted)
 			{
+				if (entity.HasComponent<RigidBody3DComponent>())
+				{
+					entity.GetComponent<RigidBody3DComponent>().IsDirty = true;
+				}
 				entity.RemoveComponent<SphereCollider3DComponent>();
 			}
 		}
@@ -1636,14 +1664,23 @@ namespace Kerberos
 			if (opened)
 			{
 				auto& collider = entity.GetComponent<CapsuleCollider3DComponent>();
-				ImGui::DragFloat("Radius", &collider.Radius, 0.1f);
-				ImGui::DragFloat("Height", &collider.Height, 0.1f);
-				ImGui::DragFloat3("Offset", glm::value_ptr(collider.Offset), 0.1f);
-				ImGui::Checkbox("Is Trigger", &collider.IsTrigger);
+				bool colliderChanged = false;
+				colliderChanged |= ImGui::DragFloat("Radius", &collider.Radius, 0.1f);
+				colliderChanged |= ImGui::DragFloat("Height", &collider.Height, 0.1f);
+				colliderChanged |= ImGui::DragFloat3("Offset", glm::value_ptr(collider.Offset), 0.1f);
+				colliderChanged |= ImGui::Checkbox("Is Trigger", &collider.IsTrigger);
+				if (colliderChanged && entity.HasComponent<RigidBody3DComponent>())
+				{
+					entity.GetComponent<RigidBody3DComponent>().IsDirty = true;
+				}
 				ImGui::TreePop();
 			}
 			if (componentDeleted)
 			{
+				if (entity.HasComponent<RigidBody3DComponent>())
+				{
+					entity.GetComponent<RigidBody3DComponent>().IsDirty = true;
+				}
 				entity.RemoveComponent<CapsuleCollider3DComponent>();
 			}
 		}
@@ -1672,7 +1709,13 @@ namespace Kerberos
 			if (opened)
 			{
 				auto& collider = entity.GetComponent<MeshCollider3DComponent>();
-				ImGui::Checkbox("Is Trigger", &collider.IsTrigger);
+				bool colliderChanged = false;
+				colliderChanged |= ImGui::DragFloat3("Offset", glm::value_ptr(collider.Offset), 0.1f);
+				colliderChanged |= ImGui::Checkbox("Is Trigger", &collider.IsTrigger);
+				if (colliderChanged && entity.HasComponent<RigidBody3DComponent>())
+				{
+					entity.GetComponent<RigidBody3DComponent>().IsDirty = true;
+				}
 				std::string meshLabel = "None";
 				if (collider.Mesh)
 				{
@@ -1697,6 +1740,10 @@ namespace Kerberos
 			}
 			if (componentDeleted)
 			{
+				if (entity.HasComponent<RigidBody3DComponent>())
+				{
+					entity.GetComponent<RigidBody3DComponent>().IsDirty = true;
+				}
 				entity.RemoveComponent<MeshCollider3DComponent>();
 			}
 		}

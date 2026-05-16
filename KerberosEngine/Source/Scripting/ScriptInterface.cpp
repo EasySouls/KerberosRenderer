@@ -217,6 +217,10 @@ namespace Kerberos
 			const Entity entity = ownedScene->GetEntityByUUID(UUID(entityID));
 			glm::vec3& currentTranslation = entity.GetComponent<TransformComponent>().Translation;
 			currentTranslation = *translation;
+			if (entity.HasComponent<RigidBody3DComponent>())
+			{
+				entity.GetComponent<RigidBody3DComponent>().IsDirty = true;
+			}
 			ownedScene->CalculateEntityTransform(entity);
 		}
 	}
@@ -246,6 +250,10 @@ namespace Kerberos
 			const Entity entity = ownedScene->GetEntityByUUID(UUID(entityID));
 			glm::vec3& currentRotation = entity.GetComponent<TransformComponent>().Rotation;
 			currentRotation = *rotation;
+			if (entity.HasComponent<RigidBody3DComponent>())
+			{
+				entity.GetComponent<RigidBody3DComponent>().IsDirty = true;
+			}
 			ownedScene->CalculateEntityTransform(entity);
 		}
 	}
@@ -275,6 +283,10 @@ namespace Kerberos
 			const Entity entity = ownedScene->GetEntityByUUID(UUID(entityID));
 			glm::vec3& currentScale = entity.GetComponent<TransformComponent>().Scale;
 			currentScale = *scale;
+			if (entity.HasComponent<RigidBody3DComponent>())
+			{
+				entity.GetComponent<RigidBody3DComponent>().IsDirty = true;
+			}
 			ownedScene->CalculateEntityTransform(entity);
 		}
 	}
@@ -324,8 +336,24 @@ namespace Kerberos
 		if (velocity)
 		{
 			const std::weak_ptr<Scene>& scene = ScriptEngine::GetSceneContext();
-			glm::vec3& currentVelocity = scene.lock()->GetEntityByUUID(UUID(entityID)).GetComponent<RigidBody3DComponent>().Velocity;
+			const Ref<Scene> currentScene = scene.lock();
+			if (!currentScene)
+			{
+				KBR_CORE_ERROR("Failed to set rigidbody velocity for entity ID: {}. Scene context is not valid.", entityID);
+				return;
+			}
+
+			const Entity entity = currentScene->GetEntityByUUID(UUID(entityID));
+			RigidBody3DComponent& rb = entity.GetComponent<RigidBody3DComponent>();
+			glm::vec3& currentVelocity = rb.Velocity;
 			currentVelocity = *velocity;
+
+			if (rb.RuntimeBody)
+			{
+				const JPH::Body* body = static_cast<JPH::Body*>(rb.RuntimeBody);
+				const uint32_t bodyIdValue = body->GetID().GetIndexAndSequenceNumber();
+				currentScene->GetPhysicsSystem().SetLinearVelocity(bodyIdValue, *velocity);
+			}
 		}
 	}
 

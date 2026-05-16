@@ -13,6 +13,10 @@ public struct RaycastHit
 
 public static class Physics
 {
+    /// <summary>
+    /// Performs a world-space raycast.
+    /// The direction is interpreted in world space and is normalized by the native physics backend.
+    /// </summary>
     public static bool Raycast(Vector3 origin, Vector3 direction, float maxDistance, out RaycastHit hitInfo)
     {
         hitInfo = new RaycastHit();

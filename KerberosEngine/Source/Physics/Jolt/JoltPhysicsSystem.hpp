@@ -49,6 +49,7 @@ namespace Kerberos
 
 		void AddImpulse(uint32_t bodyId, const glm::vec3& impulse) const override;
 		void AddImpulse(uint32_t bodyId, const glm::vec3& impulse, const glm::vec3& point) const override;
+		void SetLinearVelocity(uint32_t bodyId, const glm::vec3& velocity) const override;
 
 		bool Raycast(const glm::vec3& origin, const glm::vec3& direction, float maxDistance,
 			RaycastHit& outHit) const override;
@@ -61,7 +62,7 @@ namespace Kerberos
 	private:
 		void UpdateAndCreatePhysicsBodies();
 		void CreatePhysicsBody(const Entity& entity);
-		JPH::RefConst<JPH::Shape> CreateShapeForEntity(const Entity& entity);
+		static JPH::RefConst<JPH::Shape> CreateShapeForEntity(const Entity& entity);
 
 		void SyncTransforms() const;
 
@@ -69,8 +70,6 @@ namespace Kerberos
 
 	private:
 		std::weak_ptr<Scene> m_Scene;
-
-		std::unordered_map<UUID, JPH::Vec3> m_ColliderOffsets;
 
 		JPH::PhysicsSystem* m_JoltSystem = nullptr;
 		JPH::TempAllocator* m_PhysicsTempAllocator = nullptr;

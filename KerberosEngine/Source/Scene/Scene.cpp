@@ -1147,18 +1147,30 @@ namespace Kerberos
 	}
 
 	template <>
-	void Scene::OnComponentAdded<BoxCollider3DComponent>(Entity, BoxCollider3DComponent&)
+	void Scene::OnComponentAdded<BoxCollider3DComponent>(const Entity entity, BoxCollider3DComponent&)
 	{
+		if (entity.HasComponent<RigidBody3DComponent>())
+		{
+			entity.GetComponent<RigidBody3DComponent>().IsDirty = true;
+		}
 	}
 
 	template <>
-	void Scene::OnComponentAdded<SphereCollider3DComponent>(Entity, SphereCollider3DComponent&)
+	void Scene::OnComponentAdded<SphereCollider3DComponent>(const Entity entity, SphereCollider3DComponent&)
 	{
+		if (entity.HasComponent<RigidBody3DComponent>())
+		{
+			entity.GetComponent<RigidBody3DComponent>().IsDirty = true;
+		}
 	}
 
 	template <>
-	void Scene::OnComponentAdded<CapsuleCollider3DComponent>(Entity, CapsuleCollider3DComponent&)
+	void Scene::OnComponentAdded<CapsuleCollider3DComponent>(const Entity entity, CapsuleCollider3DComponent&)
 	{
+		if (entity.HasComponent<RigidBody3DComponent>())
+		{
+			entity.GetComponent<RigidBody3DComponent>().IsDirty = true;
+		}
 	}
 
 	template <>
@@ -1172,6 +1184,11 @@ namespace Kerberos
 		}
 
 		component.Mesh = smc.StaticMesh;
+
+		if (entity.HasComponent<RigidBody3DComponent>())
+		{
+			entity.GetComponent<RigidBody3DComponent>().IsDirty = true;
+		}
 	}
 
 	template <>
