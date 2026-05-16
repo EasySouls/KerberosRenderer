@@ -50,10 +50,14 @@ namespace Kerberos
 		void AddImpulse(uint32_t bodyId, const glm::vec3& impulse) const override;
 		void AddImpulse(uint32_t bodyId, const glm::vec3& impulse, const glm::vec3& point) const override;
 
+		bool Raycast(const glm::vec3& origin, const glm::vec3& direction, float maxDistance,
+			RaycastHit& outHit) const override;
+
 		/// TODO: Might not be a good idea to expose this
 		JPH::BodyInterface& GetBodyInterface() const;
 
 		void Cleanup() override;
+
 	private:
 		void UpdateAndCreatePhysicsBodies();
 		void CreatePhysicsBody(const Entity& entity);
@@ -78,9 +82,15 @@ namespace Kerberos
 		JPH::BodyActivationListener* m_BodyActivationListener = nullptr;
 
 		/**
+		* Mapping from Jolt body ID to entity UUID. 
+		* This is needed to be able to get the entity associated with a physics body when we get a collision callback from Jolt.
+		*/
+		std::unordered_map<uint32_t, UUID> m_BodyIDToEntityID;
+
+		/**
 		 * Shape cache to avoid creating the same shape multiple times.
 		 */
-		std::unordered_map<size_t, JPH::RefConst<JPH::Shape>> shapeCache;
+		std::unordered_map<size_t, JPH::RefConst<JPH::Shape>> m_ShapeCache;
 	};
 
 }

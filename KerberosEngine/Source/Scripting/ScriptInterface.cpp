@@ -73,6 +73,8 @@ namespace Kerberos
 		void* AudioSource3DComponent_GetVolume;
 		void* AudioSource3DComponent_SetLooping;
 		void* AudioSource3DComponent_IsLooping;
+
+		void* Physics_Raycast;
 	};
 
 	/// Component type name to HasComponent check mapping
@@ -359,10 +361,10 @@ namespace Kerberos
 
 			KBR_CORE_ASSERT(entity.HasComponent<RigidBody3DComponent>(), "Entity doesn't have a Rigidbody3DComponent.");
 
-			const RigidBody3DComponent& rb3d = entity.GetComponent<RigidBody3DComponent>();
-			KBR_CORE_ASSERT(rb3d.RuntimeBody, "Rigidbody3DComponent doesn't have a runtime body.");
+			const RigidBody3DComponent& rb3D = entity.GetComponent<RigidBody3DComponent>();
+			KBR_CORE_ASSERT(rb3D.RuntimeBody, "Rigidbody3DComponent doesn't have a runtime body.");
 
-			const JPH::Body* body = static_cast<JPH::Body*>(rb3d.RuntimeBody);
+			const JPH::Body* body = static_cast<JPH::Body*>(rb3D.RuntimeBody);
 			const JPH::BodyID& bodyId = body->GetID();
 			const uint32_t bodyIdValue = bodyId.GetIndexAndSequenceNumber();
 
@@ -561,6 +563,25 @@ namespace Kerberos
 		return audioComponent.Loop ? 1 : 0;
 	}
 
+	static uint8_t Physics_Raycast(const glm::vec3* origin, const glm::vec3* direction, const float maxDistance, glm::vec3* outHitPoint, glm::vec3* outHitNormal, uint64_t* outEntityID)
+	{
+		if (!origin || !direction || !outHitPoint || !outHitNormal)
+			return 0;
+
+		const std::weak_ptr<Scene>& scene = ScriptEngine::GetSceneContext();
+		const Ref<Scene> currentScene = scene.lock();
+
+		RaycastHit hitInfo;
+		if (currentScene->GetPhysicsSystem().Raycast(*origin, *direction, maxDistance, hitInfo))
+		{
+			*outHitPoint = hitInfo.Point;
+			*outHitNormal = hitInfo.Normal;
+			*outEntityID = hitInfo.EntityID;
+			return 1;
+		}
+		return 0;
+	}
+
 	static uint8_t Input_IsKeyDown(const int key)
 	{
 		return Input::IsKeyPressed(static_cast<KeyCode>(key)) ? 1 : 0;
@@ -642,6 +663,8 @@ namespace Kerberos
 		callbackTable.AudioSource3DComponent_GetVolume = reinterpret_cast<void*>(&AudioSource3DComponent_GetVolume);
 		callbackTable.AudioSource3DComponent_SetLooping = reinterpret_cast<void*>(&AudioSource3DComponent_SetLooping);
 		callbackTable.AudioSource3DComponent_IsLooping = reinterpret_cast<void*>(&AudioSource3DComponent_IsLooping);
+
+		callbackTable.Physics_Raycast = reinterpret_cast<void*>(&Physics_Raycast);
 
 		/// Pass the callback table to the managed side
 		ScriptEngine::SetManagedNativeCallbacks(&callbackTable);

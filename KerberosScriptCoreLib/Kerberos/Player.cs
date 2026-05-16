@@ -20,6 +20,10 @@ namespace Kerberos.Source.Kerberos
         // Implement OnXButtonClicked methods
         private bool _isPlayingAudio = false;
 
+        public float JumpForce = 50f;
+        public float JumpCooldownTime = 1.0f;
+        private float _jumpCooldownTimer = 0.0f;
+
         internal Player() : base()
         {
         }
@@ -52,6 +56,14 @@ namespace Kerberos.Source.Kerberos
 
             Vector3 velocity = Vector3.Zero;
 
+            _jumpCooldownTimer -= deltaTime;
+            bool isGrounded = Physics.Raycast(_transformComponent.Translation, Vector3.Down, 5f, out RaycastHit hit);
+            if (Input.IsKeyDown(KeyCode.Space) && isGrounded && _jumpCooldownTimer <= 0.0f)
+            {
+                velocity.Y += 1.0f * JumpForce;
+                _jumpCooldownTimer = JumpCooldownTime;
+            }
+
             if (Input.IsKeyDown(KeyCode.A))
                 velocity.X -= 1.0f;
             if (Input.IsKeyDown(KeyCode.D))
@@ -60,9 +72,7 @@ namespace Kerberos.Source.Kerberos
                 velocity.Z += 1.0f;
             if (Input.IsKeyDown(KeyCode.S))
                 velocity.Z -= 1.0f;
-            if (Input.IsKeyDown(KeyCode.Space))
-                velocity.Y += 1.0f;
-
+            
             if (_rigidbody3DComponent != null && Input.IsKeyDown(KeyCode.F))
             {
                 _rigidbody3DComponent.ApplyImpulse(new Vector3(0.5f, 0.0f, 0.0f));

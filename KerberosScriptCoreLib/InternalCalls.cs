@@ -81,6 +81,9 @@ namespace Kerberos.Source
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
         internal delegate byte GetBoolFn(ulong entityID);
 
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        internal delegate byte PhysicsRaycastFn(ref Vector3 origin, ref Vector3 direction, float maxDistance, out Vector3 hitPoint, out Vector3 hitNormal, out ulong entityID);
+
         // ====================================================================
         // Stored delegate instances (prevent GC collection)
         // ====================================================================
@@ -132,6 +135,8 @@ namespace Kerberos.Source
         private static GetFloatFn? s_AudioSource3DGetVolume;
         private static SetBoolFn? s_AudioSource3DSetLooping;
         private static GetBoolFn? s_AudioSource3DIsLooping;
+
+        private static PhysicsRaycastFn? s_PhysicsRaycast;
 
         // ====================================================================
         // Initialization - called from C++ to provide function pointers
@@ -198,6 +203,8 @@ namespace Kerberos.Source
             s_AudioSource3DGetVolume = Marshal.GetDelegateForFunctionPointer<GetFloatFn>(ReadNext());
             s_AudioSource3DSetLooping = Marshal.GetDelegateForFunctionPointer<SetBoolFn>(ReadNext());
             s_AudioSource3DIsLooping = Marshal.GetDelegateForFunctionPointer<GetBoolFn>(ReadNext());
+
+            s_PhysicsRaycast = Marshal.GetDelegateForFunctionPointer<PhysicsRaycastFn>(ReadNext());
         }
 
         // ====================================================================
@@ -439,5 +446,15 @@ namespace Kerberos.Source
         {
             return s_AudioSource3DIsLooping?.Invoke(entityID) != 0;
         }
+
+        internal static bool Physics_Raycast(ref Vector3 origin, ref Vector3 direction, float maxDistance, out Vector3 hitPoint, out Vector3 hitNormal, out ulong entityID)
+        {
+            hitPoint = Vector3.Zero;
+            hitNormal = Vector3.Zero;
+            entityID = 0;
+
+            return s_PhysicsRaycast?.Invoke(ref origin, ref direction, maxDistance, out hitPoint, out hitNormal, out entityID) != 0;
+        }
+
     }
 }

@@ -25,6 +25,8 @@
 #include <Jolt/Physics/Body/BodyCreationSettings.h>
 #include "Jolt/Physics/Collision/Shape/CapsuleShape.h"
 #include "Jolt/Physics/Collision/Shape/OffsetCenterOfMassShape.h"
+#include "Jolt/Physics/Collision/RayCast.h"
+#include "Jolt/Physics/Collision/CastResult.h"
 
 
 namespace Kerberos
@@ -148,6 +150,46 @@ namespace Kerberos
 		const JPH::Vec3Arg joltForce(impulse.x, impulse.y, impulse.z);
 		const JPH::Vec3Arg joltPoint(point.x, point.y, point.z);
 		bodyInterface.AddImpulse(id, joltForce, joltPoint);
+	}
+
+	bool JoltPhysicsSystem::Raycast(const glm::vec3& origin, const glm::vec3& direction, const float maxDistance,
+		RaycastHit& outHit) const 
+	{
+		const JPH::RRayCast ray{
+			JPH::Vec3(origin.x, origin.y, origin.z),
+			JPH::Vec3(direction.x, direction.y, direction.z) * maxDistance
+		};
+
+		JPH::RayCastResult hit;
+
+		if (m_JoltSystem->GetNarrowPhaseQuery().CastRay(ray, hit))
+		{
+			const JPH::Vec3 joltPoint = ray.GetPointOnRay(hit.mFraction);
+			const glm::vec3 point = Physics::Utils::ToGlmVec3(joltPoint);
+
+			const float dist = hit.mFraction * maxDistance;
+
+			const uint32_t bodyId = hit.mBodyID.GetIndex();
+			const UUID entityId = m_BodyIDToEntityID.at(bodyId);
+			if (!entityId.IsValid())
+			{
+				KBR_CORE_ASSERT(false, "Invalid body ID in raycast hit!");
+				return false;
+			}
+
+			const JPH::BodyInterface& bodyInterface = GetBodyInterface();
+			const JPH::Vec3 joltNormal = bodyInterface.GetShape(hit.mBodyID)->GetSurfaceNormal(hit.mSubShapeID2, joltPoint);
+			const glm::vec3 normal = Physics::Utils::ToGlmVec3(joltNormal);
+
+			outHit.Point = point;
+			outHit.Normal = normal;
+			outHit.Distance = dist;
+			outHit.EntityID = entityId;
+
+			return true;
+		}
+
+		return false;
 	}
 
 	JPH::BodyInterface& JoltPhysicsSystem::GetBodyInterface() const
@@ -315,11 +357,15 @@ namespace Kerberos
 		JPH::BodyInterface& bodyInterface = m_JoltSystem->GetBodyInterface();
 		JPH::Body* body = bodyInterface.CreateBody(bodySettings);
 		rigidBody.RuntimeBody = body;
-		// Set starting velocity
-		bodyInterface.SetLinearVelocity(body->GetID(), JPH::Vec3(rigidBody.Velocity.x, rigidBody.Velocity.y, rigidBody.Velocity.z));
-		bodyInterface.SetAngularVelocity(body->GetID(), JPH::Vec3(rigidBody.AngularVelocity.x, rigidBody.AngularVelocity.y, rigidBody.AngularVelocity.z));
 
-		bodyInterface.AddBody(body->GetID(), JPH::EActivation::Activate);
+		const auto& bodyId = body->GetID();
+		m_BodyIDToEntityID[bodyId.GetIndex()] = entity.GetUUID();
+
+		// Set starting velocity
+		bodyInterface.SetLinearVelocity(bodyId, JPH::Vec3(rigidBody.Velocity.x, rigidBody.Velocity.y, rigidBody.Velocity.z));
+		bodyInterface.SetAngularVelocity(bodyId, JPH::Vec3(rigidBody.AngularVelocity.x, rigidBody.AngularVelocity.y, rigidBody.AngularVelocity.z));
+
+		bodyInterface.AddBody(bodyId, JPH::EActivation::Activate);
 
 		rigidBody.IsDirty = false;
 	}
@@ -423,6 +469,8 @@ namespace Kerberos
 		//	auto& rigidbody = view.get<RigidBody3DComponent>(e);
 		//	rigidbody.RuntimeBody = nullptr;
 		//}
+
+		m_BodyIDToEntityID.clear();
 
 		delete m_ContactListener;
 		m_ContactListener = nullptr;

@@ -1217,46 +1217,17 @@ namespace Kerberos
 				s_Data->Skybox.SkyboxMesh->Draw(cmd);
 			}
 
-			if (s_Data->UseRayQueryBasedShadows)
 			{
-				const auto& pipeline = GetUseRayQueryBasedSoftShadows() ? s_Data->PBRRayQuerySoftShadowsPipeline : s_Data->PBRRayQueryShadowsPipeline;
-				pipeline->Bind(cmd);
-			}
-			else
-			{
-				const auto& opaquePipeline = GetIsPCFEnabledForShadowMap() ? s_Data->PBROpaquePipelinePCF : s_Data->PBROpaquePipeline;
-				opaquePipeline->Bind(cmd);
-			}
-
-			{
-				//const auto meshView = scene->m_Registry.view<TransformComponent, StaticMeshComponent>();
-				//int i = 0;
-				//for (const auto entity : meshView)
-				//{
-				//	auto& transform = meshView.get<TransformComponent>(entity);
-				//	auto& staticMesh = meshView.get<StaticMeshComponent>(entity);
-				//	if (!staticMesh.Visible || !staticMesh.StaticMesh /* || !staticMesh.MeshMaterial*/)
-				//		continue;
-
-				//	// TODO: Remove this once we have a proper material system
-				//	Ref<Material> material = staticMesh.MeshMaterial;
-				//	if (material == nullptr)
-				//		material = s_Data->MaterialRegistry.Get("DebugPink");
-
-				//	UpdatePerObjectUniformBuffer(currentImage, static_cast<uint32_t>(i), transform.GetTransform(), *material, static_cast<uint32_t>(entity));
-				//	uint32_t dynamicOffset = static_cast<uint32_t>(i * s_Data->DynamicAlignment);
-
-				//	cmd.bindDescriptorSets(
-				//		vk::PipelineBindPoint::eGraphics,
-				//		*s_Data->PBRPipelineLayout,
-				//		0,
-				//		{ s_Data->DescriptorSets[currentImage].scene, material->DescriptorSets[currentImage] },
-				//		{ dynamicOffset });
-
-				//	staticMesh.StaticMesh->Draw(cmd);
-
-				//	++i;
-				//}
+				if (s_Data->UseRayQueryBasedShadows)
+				{
+					const auto& pipeline = GetUseRayQueryBasedSoftShadows() ? s_Data->PBRRayQuerySoftShadowsPipeline : s_Data->PBRRayQueryShadowsPipeline;
+					pipeline->Bind(cmd);
+				}
+				else
+				{
+					const auto& opaquePipeline = GetIsPCFEnabledForShadowMap() ? s_Data->PBROpaquePipelinePCF : s_Data->PBROpaquePipeline;
+					opaquePipeline->Bind(cmd);
+				}
 
 				for (uint32_t i = 0; i < renderObjects.size(); ++i)
 				{

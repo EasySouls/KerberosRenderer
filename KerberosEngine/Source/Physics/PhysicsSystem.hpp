@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Core/Core.hpp"
+#include "Core/UUID.hpp"
 
 #include <glm/glm.hpp>
 
@@ -9,6 +10,14 @@
 namespace Kerberos
 {
 	class Scene;
+
+	struct RaycastHit
+	{
+		glm::vec3 Point;
+		glm::vec3 Normal;
+		float Distance;
+		UUID EntityID;
+	};
 
 	class PhysicsSystem
 	{
@@ -29,5 +38,7 @@ namespace Kerberos
 
 		virtual void AddImpulse(std::uint32_t bodyId, const glm::vec3& impulse) const = 0;
 		virtual void AddImpulse(std::uint32_t bodyId, const glm::vec3& impulse, const glm::vec3& point) const = 0;
+
+		virtual bool Raycast(const glm::vec3& origin, const glm::vec3& direction, float maxDistance, RaycastHit& outHit) const = 0;
 	};
 }
