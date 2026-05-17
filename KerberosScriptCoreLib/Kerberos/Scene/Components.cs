@@ -49,19 +49,23 @@ namespace Kerberos.Source.Kerberos.Scene
         public void LookAt(Vector3 targetPosition)
         {
             Vector3 direction = targetPosition - Translation;
+            direction.Normalize();
 
-            const float epsilon = 0.000000f;
+            const float epsilon = 1e-6f;
             if (direction.Magnitude < epsilon)
-            {
-                Rotation = Vector3.Zero;
-            }
+                return;
 
-            double yaw = Math.Atan2(direction.X, direction.Y) * Constants.Rad2Deg;
-            float horizontalDistance = new Vector2(direction.X, direction.Z).Magnitude;
-            double pitch = -Math.Atan2(direction.Y, horizontalDistance) * Constants.Rad2Deg;
-            const double roll = 0;
+            //double yaw = Math.Atan2(direction.X, direction.Y) * Constants.Rad2Deg;
+            //float horizontalDistance = new Vector2(direction.X, direction.Z).Magnitude;
+            //double pitch = -Math.Atan2(direction.Y, horizontalDistance) * Constants.Rad2Deg;
+            //const double roll = 0;
 
-            Rotation = new Vector3((float)pitch, (float)yaw, (float)roll);
+            //Rotation = new Vector3((float)pitch, (float)yaw, (float)roll);
+
+            float horiz = (float)Math.Sqrt(direction.X * direction.X + direction.Z * direction.Z);
+            double yaw = Math.Atan2(direction.X, direction.Z) * Constants.Rad2Deg;           // atan2(x, z)
+            double pitch = -Math.Atan2(direction.Y, horiz) * Constants.Rad2Deg;        // -atan2(y, horiz)
+            Rotation = new Vector3((float)pitch, (float)yaw, 0f);
         }
     }
 

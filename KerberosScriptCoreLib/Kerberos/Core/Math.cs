@@ -10,6 +10,17 @@ namespace Kerberos.Source.Kerberos.Core
     }
 
 
+    public static class Maths
+    {
+        public static Vector3 Lerp(Vector3 a, Vector3 b, float t)
+        {
+            if (t <= 0) return a;
+            if (t >= 1) return b;
+            return a + (b - a) * t;
+        }
+    }
+
+
     public struct Vector2
     {
         public float X;
@@ -77,15 +88,17 @@ namespace Kerberos.Source.Kerberos.Core
         public float Magnitude => (float)Math.Sqrt(X * X + Y * Y + Z * Z);
         public float SqrMagnitude => X * X + Y * Y + Z * Z;
 
-        //public static Vector3 Normalize(Vector3 vector)
-        //{
+        public static Vector3 Normalize(Vector3 vector)
+        {
+            float magnitude = vector.Magnitude;
+            if (magnitude == 0) return Vector3.Zero;
+            return vector / magnitude;
+        }
 
-        //}
-
-        //public void Normalize()
-        //{
-        //    this = Normalize(this);
-        //}
+        public void Normalize()
+        {
+            this = Normalize(this);
+        }
 
         public static Vector3 Zero => new Vector3(0.0f);
         public static Vector3 Identity => new Vector3(1.0f);
