@@ -41,6 +41,18 @@ namespace Kerberos.Source.Kerberos.Core
         public float Magnitude => (float)Math.Sqrt(X * X + Y * Y);
         public float SqrMagnitude => X * X + Y * Y;
 
+        public static Vector2 Normalize(Vector2 vector)
+        {
+            float magnitude = vector.Magnitude;
+            if (magnitude == 0) return Vector2.Zero;
+            return vector / magnitude;
+        }
+
+        public void Normalize()
+        {
+            this = Normalize(this);
+        }
+
         public static Vector2 Zero => new Vector2(0.0f);
 
         public static Vector2 operator +(Vector2 a, Vector2 b)
@@ -100,6 +112,35 @@ namespace Kerberos.Source.Kerberos.Core
             this = Normalize(this);
         }
 
+        public Vector3 Normalized()
+        {
+            return Normalize(this);
+        }
+
+        public static Vector3 Cross(Vector3 a, Vector3 b)
+        {
+            return new Vector3(
+                a.Y * b.Z - a.Z * b.Y,
+                a.Z * b.X - a.X * b.Z,
+                a.X * b.Y - a.Y * b.X
+            );
+        }
+
+        public void Cross(ref Vector3 other)
+        {
+            this = Cross(this, other);
+        }
+
+        public static float Dot(Vector3 a, Vector3 b)
+        {
+            return a.X * b.X + a.Y * b.Y + a.Z * b.Z;
+        }
+
+        public float Dot(ref Vector3 other)
+        {
+            return Dot(this, other);
+        }
+
         public static Vector3 Zero => new Vector3(0.0f);
         public static Vector3 Identity => new Vector3(1.0f);
         public static Vector3 Up => new Vector3(0.0f, 1.0f, 0.0f);
@@ -155,6 +196,18 @@ namespace Kerberos.Source.Kerberos.Core
         }
         public float Magnitude => (float)Math.Sqrt(X * X + Y * Y + Z * Z + W * W);
         public float SqrMagnitude => X * X + Y * Y + Z * Z + W * W;
+
+        public static Vector4 Normalize(Vector4 vector)
+        {
+            float magnitude = vector.Magnitude;
+            if (magnitude == 0) return Vector4.Zero;
+            return vector / magnitude;
+        }
+
+        public void Normalize()
+        {
+            this = Normalize(this);
+        }
 
         public static Vector4 Zero => new Vector4(0.0f);
         public static Vector4 Identity => new Vector4(1.0f);
