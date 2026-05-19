@@ -62,10 +62,9 @@ namespace Kerberos
 
 		/// We need a temp allocator for temporary allocations during the physics update. We're
 		/// pre-allocating 10 MB to avoid having to do allocations during the physics update.
-		/// B.t.w. 10 MB is way too much for this example but it is a typical value you can use.
 		/// If you don't want to pre-allocate you can also use TempAllocatorMalloc to fall back to
 		/// malloc / free.
-		constexpr size_t cTempAllocatorSize = 10 * 1024 * 1024; /// 10 MB
+		constexpr size_t cTempAllocatorSize = 10ull * 1024ull * 1024ull; /// 10 MB
 		m_PhysicsTempAllocator = new JPH::TempAllocatorImpl(cTempAllocatorSize);
 
 		/// We need a job system that will execute physics jobs on multiple threads. Typically
@@ -83,13 +82,11 @@ namespace Kerberos
 		/// This is the max amount of body pairs that can be queued at any time (the broad phase will detect overlapping
 		/// body pairs based on their bounding boxes and will insert them into a queue for the narrowphase). If you make this buffer
 		/// too small the queue will fill up and the broad phase jobs will start to do narrow phase work. This is slightly less efficient.
-		/// Note: This value is low because this is a simple test. For a real project use something in the order of 65536.
-		constexpr uint32_t cMaxBodyPairs = 1024;
+		constexpr uint32_t cMaxBodyPairs = 65536;
 
 		/// This is the maximum size of the contact constraint buffer. If more contacts (collisions between bodies) are detected than this
 		/// number then these contacts will be ignored and bodies will start interpenetrating / fall through the world.
-		/// Note: This value is low because this is a simple test. For a real project use something in the order of 10240.
-		constexpr uint32_t cMaxContactConstraints = 1024;
+		constexpr uint32_t cMaxContactConstraints = 10240;
 
 		/// Create mapping table from object layer to broadphase layer
 		/// Note: As this is an interface, PhysicsSystem will take a reference to this so this instance needs to stay alive!
@@ -212,6 +209,11 @@ namespace Kerberos
 		}
 
 		return false;
+	}
+
+	std::vector<CollisionEvent> JoltPhysicsSystem::GetCollisionEvents() const 
+	{
+		return static_cast<Physics::ContactListener*>(m_ContactListener)->GetCollisionEventsAndResetQueue();
 	}
 
 	JPH::BodyInterface& JoltPhysicsSystem::GetBodyInterface() const
@@ -379,6 +381,8 @@ namespace Kerberos
 
 		const auto& bodyId = body->GetID();
 		m_BodyIDToEntityID[bodyId.GetIndex()] = entity.GetUUID();
+
+		body->SetUserData(entity.GetUUID());
 
 		// Set starting velocity
 		bodyInterface.SetLinearVelocity(bodyId, JPH::Vec3(rigidBody.Velocity.x, rigidBody.Velocity.y, rigidBody.Velocity.z));

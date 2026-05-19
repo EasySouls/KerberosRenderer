@@ -54,6 +54,8 @@ namespace Kerberos
 		bool Raycast(const glm::vec3& origin, const glm::vec3& direction, float maxDistance,
 			RaycastHit& outHit) const override;
 
+		std::vector<CollisionEvent> GetCollisionEvents() const override;
+
 		/// TODO: Might not be a good idea to expose this
 		JPH::BodyInterface& GetBodyInterface() const;
 

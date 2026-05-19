@@ -25,6 +25,8 @@
 #include <limits>
 #include <ranges>
 
+#include "Core/Timer.hpp"
+
 namespace Kerberos
 {
 	EditorLayer::EditorLayer() 
@@ -82,95 +84,103 @@ namespace Kerberos
 		m_BasicFont = AssetManager::GetDefaultFont();
 
 		m_EditorCamera = std::make_unique<FirstPersonCamera>(45.0f, 16.0f / 9.0f, 0.1f, 1000.0f);
+		//m_EditorCamera = std::make_unique<EditorCamera>(45.0f, 16.0f / 9.0f, 0.1f, 1000.0f);
 		m_EditorCamera->SetFlipY(true);
 		m_EditorCamera->SetPosition(glm::vec3(0.0f, 15.0f, -45.0f));
 		m_EditorCamera->SetRotation(glm::vec3(0.0f, 90.0f, 0.0f));
 
 		m_ViewportSize = { 1280.0f, 720.0f };
 
-		constexpr GLTFLoadingFlags loadingFlags = GLTFLoadingFlags::None;
-
-		// Load models
-		m_Meshes["avocado"] = CreateRef<Mesh>(ModelLoader::LoadModel("assets/models/avocado/Avocado.gltf", loadingFlags));
-		m_Meshes["cube"] = CreateRef<Mesh>(ModelLoader::LoadModel("assets/models/cube.gltf", loadingFlags));
-		m_Meshes["sphere"] = CreateRef<Mesh>(ModelLoader::LoadModel("assets/models/sphere.gltf", loadingFlags));
-		m_Meshes["cerberus"] = CreateRef<Mesh>(ModelLoader::LoadModel("assets/models/cerberus/cerberus.gltf", loadingFlags));
-
-		KBR_CORE_INFO("Loaded {} mesh(es)!", m_Meshes.size());
-
-		const std::vector<std::pair<std::string, vk::Format>> textureFiles = {
-			{ "assets/models/avocado/Avocado_baseColor.ktx2", vk::Format::eR8G8B8A8Srgb },
-			{ "assets/models/avocado/Avocado_normal.ktx2", vk::Format::eR8G8B8A8Unorm },
-			{ "assets/textures/stonefloor01_color_rgba.ktx", vk::Format::eR8G8B8A8Srgb },
-			{ "assets/textures/stonefloor01_normal_rgba.ktx", vk::Format::eR8G8B8A8Unorm },
-			{ "assets/textures/stonefloor02_color_rgba.ktx", vk::Format::eR8G8B8A8Srgb },
-			{ "assets/textures/stonefloor02_normal_rgba.ktx", vk::Format::eR8G8B8A8Unorm },
-
-			{ "assets/models/cerberus/albedo.ktx", vk::Format::eR8G8B8A8Unorm },
-			{ "assets/models/cerberus/normal.ktx", vk::Format::eR8G8B8A8Unorm },
-			{ "assets/models/cerberus/ao.ktx", vk::Format::eR8Unorm },
-			{ "assets/models/cerberus/metallic.ktx", vk::Format::eR8Unorm },
-			{ "assets/models/cerberus/roughness.ktx", vk::Format::eR8Unorm },
-		};
-
-		m_Textures.reserve(textureFiles.size());
-		for (const auto& filepath : textureFiles | std::views::keys)
 		{
-			auto texture = Texture2D::FromFile(filepath);
-			m_Textures.push_back(texture);
+			Timer timer("Loading sample assets", [](const TimerData& data) {
+				KBR_EDITOR_INFO("Loading sample meshes and textures took {} ms!", data.DurationMs);
+			});
+
+			constexpr GLTFLoadingFlags loadingFlags = GLTFLoadingFlags::None;
+
+			// Load models
+			m_Meshes["avocado"] = CreateRef<Mesh>(ModelLoader::LoadModel("assets/models/avocado/Avocado.gltf", loadingFlags));
+			m_Meshes["cube"] = CreateRef<Mesh>(ModelLoader::LoadModel("assets/models/cube.gltf", loadingFlags));
+			m_Meshes["sphere"] = CreateRef<Mesh>(ModelLoader::LoadModel("assets/models/sphere.gltf", loadingFlags));
+			m_Meshes["cerberus"] = CreateRef<Mesh>(ModelLoader::LoadModel("assets/models/cerberus/cerberus.gltf", loadingFlags));
+
+			KBR_EDITOR_INFO("Loaded {} mesh(es)!", m_Meshes.size());
+
+			const std::vector<std::pair<std::string, vk::Format>> textureFiles = {
+				{ "assets/models/avocado/Avocado_baseColor.ktx2", vk::Format::eR8G8B8A8Srgb },
+				{ "assets/models/avocado/Avocado_normal.ktx2", vk::Format::eR8G8B8A8Unorm },
+				{ "assets/textures/stonefloor01_color_rgba.ktx", vk::Format::eR8G8B8A8Srgb },
+				{ "assets/textures/stonefloor01_normal_rgba.ktx", vk::Format::eR8G8B8A8Unorm },
+				{ "assets/textures/stonefloor02_color_rgba.ktx", vk::Format::eR8G8B8A8Srgb },
+				{ "assets/textures/stonefloor02_normal_rgba.ktx", vk::Format::eR8G8B8A8Unorm },
+
+				{ "assets/models/cerberus/albedo.ktx", vk::Format::eR8G8B8A8Unorm },
+				{ "assets/models/cerberus/normal.ktx", vk::Format::eR8G8B8A8Unorm },
+				{ "assets/models/cerberus/ao.ktx", vk::Format::eR8Unorm },
+				{ "assets/models/cerberus/metallic.ktx", vk::Format::eR8Unorm },
+				{ "assets/models/cerberus/roughness.ktx", vk::Format::eR8Unorm },
+			};
+
+			m_Textures.reserve(textureFiles.size());
+			for (const auto& filepath : textureFiles | std::views::keys)
+			{
+				auto texture = Texture2D::FromFile(filepath);
+				m_Textures.push_back(texture);
+			}
+
+			KBR_EDITOR_INFO("Loaded {} texture(s)!", m_Textures.size());
+
+			const auto& avocadoMaterial = m_MaterialRegistry.AddAndRetrieve("Avocado", std::make_shared<Material>("Avocado", glm::vec4(1.0f, 1.0f, 1.0f, 1.0f), 0.9f, 0.03f, m_Textures[0], m_Textures[1]));
+			const auto& stoneFloorMaterial = m_MaterialRegistry.AddAndRetrieve("Stone Floor", std::make_shared<Material>("Stone Floor", glm::vec4(1.0f, 1.0f, 1.0f, 1.0f), 0.8f, 0.05f, m_Textures[2], m_Textures[3]));
+			const auto& stoneFloor2Material = m_MaterialRegistry.AddAndRetrieve("Stone Floor 2", std::make_shared<Material>("Stone Floor 2", glm::vec4(0.4f, 0.15f, 0.0f, 1.0f), 1.0f, 0.0f, m_Textures[4], m_Textures[5]));
+			const auto& cerberusMaterial = m_MaterialRegistry.AddAndRetrieve("Cerberus", std::make_shared<Material>("Cerberus", glm::vec4(1.0f, 1.0f, 1.0f, 1.0f), 1.0f, 0.0f, m_Textures[6], m_Textures[7]));
+
+			m_SceneNodes.push_back(CreateOwner<Node>(Node{
+				.Position = glm::vec3(6.0f, 9.5f, 0.0f),
+				.Rotation = glm::vec3(0.0f),
+				.Scale = glm::vec3(50.0f),
+				.Mesh = m_Meshes["avocado"],
+				.Material = avocadoMaterial,
+				.Name = "Avocado"
+			}));
+
+			m_SceneNodes.push_back(CreateOwner<Node>(Node{
+				.Position = glm::vec3(2.0f, 0.0f, 0.0f),
+				.Rotation = glm::vec3(0.0f),
+				.Scale = glm::vec3(1.0f),
+				.Mesh = m_Meshes["cube"],
+				.Material = stoneFloorMaterial,
+				.Name = "Cube"
+			}));
+
+			m_SceneNodes.push_back(CreateOwner<Node>(Node{
+				.Position = glm::vec3(2.0f, 6.0f, 3.0f),
+				.Rotation = glm::vec3(0.0f),
+				.Scale = glm::vec3(1.0f),
+				.Mesh = m_Meshes["sphere"],
+				.Material = m_MaterialRegistry.Get("Avocado"),
+				.Name = "Sphere"
+			}));
+
+			m_SceneNodes.push_back(CreateOwner<Node>(Node{
+				.Position = glm::vec3(2.0f, -10.0f, 3.0f),
+				.Rotation = glm::vec3(0.0f),
+				.Scale = glm::vec3(20.0f, 0.1f, 20.0f),
+				.Mesh = m_Meshes["cube"],
+				.Material = stoneFloor2Material,
+				.Name = "Floor"
+			}));
+
+			m_SceneNodes.push_back( CreateOwner<Node>(Node{
+				.Position = glm::vec3(-8.0f, 10.0f, 8.0f),
+				.Rotation = glm::vec3(-1.6f, 1.4, 0.0),
+				.Scale = glm::vec3(8.0f),
+				.Mesh = m_Meshes["cerberus"],
+				.Material = cerberusMaterial,
+				.Name = "Revolver"
+			}));
+
 		}
-
-		KBR_CORE_INFO("Loaded {} texture(s)!", m_Textures.size());
-
-		const auto& avocadoMaterial = m_MaterialRegistry.AddAndRetrieve("Avocado", std::make_shared<Material>("Avocado", glm::vec4(1.0f, 1.0f, 1.0f, 1.0f), 0.9f, 0.03f, m_Textures[0], m_Textures[1]));
-		const auto& stoneFloorMaterial = m_MaterialRegistry.AddAndRetrieve("Stone Floor", std::make_shared<Material>("Stone Floor", glm::vec4(1.0f, 1.0f, 1.0f, 1.0f), 0.8f, 0.05f, m_Textures[2], m_Textures[3]));
-		const auto& stoneFloor2Material = m_MaterialRegistry.AddAndRetrieve("Stone Floor 2", std::make_shared<Material>("Stone Floor 2", glm::vec4(0.4f, 0.15f, 0.0f, 1.0f), 1.0f, 0.0f, m_Textures[4], m_Textures[5]));
-		const auto& cerberusMaterial = m_MaterialRegistry.AddAndRetrieve("Cerberus", std::make_shared<Material>("Cerberus", glm::vec4(1.0f, 1.0f, 1.0f, 1.0f), 1.0f, 0.0f, m_Textures[6], m_Textures[7]));
-
-		m_SceneNodes.push_back(CreateOwner<Node>(Node{
-			.Position = glm::vec3(6.0f, 9.5f, 0.0f),
-			.Rotation = glm::vec3(0.0f),
-			.Scale = glm::vec3(50.0f),
-			.Mesh = m_Meshes["avocado"],
-			.Material = avocadoMaterial,
-			.Name = "Avocado"
-		}));
-
-		m_SceneNodes.push_back(CreateOwner<Node>(Node{
-			.Position = glm::vec3(2.0f, 0.0f, 0.0f),
-			.Rotation = glm::vec3(0.0f),
-			.Scale = glm::vec3(1.0f),
-			.Mesh = m_Meshes["cube"],
-			.Material = stoneFloorMaterial,
-			.Name = "Cube"
-		}));
-
-		m_SceneNodes.push_back(CreateOwner<Node>(Node{
-			.Position = glm::vec3(2.0f, 6.0f, 3.0f),
-			.Rotation = glm::vec3(0.0f),
-			.Scale = glm::vec3(1.0f),
-			.Mesh = m_Meshes["sphere"],
-			.Material = m_MaterialRegistry.Get("Avocado"),
-			.Name = "Sphere"
-		}));
-
-		m_SceneNodes.push_back(CreateOwner<Node>(Node{
-			.Position = glm::vec3(2.0f, -10.0f, 3.0f),
-			.Rotation = glm::vec3(0.0f),
-			.Scale = glm::vec3(20.0f, 0.1f, 20.0f),
-			.Mesh = m_Meshes["cube"],
-			.Material = stoneFloor2Material,
-			.Name = "Floor"
-		}));
-
-		m_SceneNodes.push_back( CreateOwner<Node>(Node{
-			.Position = glm::vec3(-8.0f, 10.0f, 8.0f),
-			.Rotation = glm::vec3(-1.6f, 1.4, 0.0),
-			.Scale = glm::vec3(8.0f),
-			.Mesh = m_Meshes["cerberus"],
-			.Material = cerberusMaterial,
-			.Name = "Revolver"
-		}));
 
 		m_AssetsPanel = CreateOwner<AssetsPanel>(m_NotificationManager);
 

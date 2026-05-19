@@ -2,10 +2,12 @@
 
 #include "Core/Core.hpp"
 #include "Core/UUID.hpp"
+#include "CollisionEvent.hpp"
 
 #include <glm/glm.hpp>
 
 #include <cstdint>
+#include <vector>
 
 namespace Kerberos
 {
@@ -68,5 +70,10 @@ namespace Kerberos
 		* @return True if a collision was found, false otherwise.
 		*/
 		virtual bool Raycast(const glm::vec3& origin, const glm::vec3& direction, float maxDistance, RaycastHit& outHit) const = 0;
+
+		/**
+		* Returns a list of collision events that occurred during the last physics update.
+		*/
+		virtual std::vector<CollisionEvent> GetCollisionEvents() const = 0;
 	};
 }

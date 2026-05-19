@@ -53,6 +53,54 @@ namespace Kerberos.Source.Kerberos.Core
             this = Normalize(this);
         }
 
+        public Vector2 Normalized()
+        {
+            return Normalize(this);
+        }
+
+        public static Vector2 Cross(Vector2 a, Vector2 b)
+        {
+            return new Vector2(
+                a.X * b.Y - a.Y * b.X
+            );
+        }
+
+        public Vector2 Cross(ref Vector2 other)
+        {
+            return Cross(this, other);
+        }
+
+        public static float Dot(Vector2 a, Vector2 b)
+        {
+            return a.X * b.X + a.Y * b.Y;
+        }
+
+        public float Dot(ref Vector2 other)
+        {
+            return Dot(this, other);
+        }
+
+        public static float Angle(Vector2 from, Vector2 to)
+        {
+            float dot = Dot(from.Normalized(), to.Normalized());
+            return (float)(Math.Acos(dot) * Constants.Rad2Deg);
+        }
+
+        public float Angle(ref Vector2 other)
+        {
+            return Angle(this, other);
+        }
+
+        public static float Distance(Vector2 a, Vector2 b)
+        {
+            return (a - b).Magnitude;
+        }
+
+        public float Distance(ref Vector2 other)
+        {
+            return Distance(this, other);
+        }
+
         public static Vector2 Zero => new Vector2(0.0f);
 
         public static Vector2 operator +(Vector2 a, Vector2 b)
@@ -141,6 +189,27 @@ namespace Kerberos.Source.Kerberos.Core
             return Dot(this, other);
         }
 
+        public static float Angle(Vector3 from, Vector3 to)
+        {
+            float dot = Dot(from.Normalized(), to.Normalized());
+            return (float)(Math.Acos(dot) * Constants.Rad2Deg);
+        }
+
+        public float Angle(ref Vector3 other)
+        {
+            return Angle(this, other);
+        }
+
+        public static float Distance(Vector3 a, Vector3 b)
+        {
+            return (a - b).Magnitude;
+        }
+
+        public float Distance(ref Vector3 other)
+        {
+            return Distance(this, other);
+        }
+
         public static Vector3 Zero => new Vector3(0.0f);
         public static Vector3 Identity => new Vector3(1.0f);
         public static Vector3 Up => new Vector3(0.0f, 1.0f, 0.0f);
@@ -207,6 +276,11 @@ namespace Kerberos.Source.Kerberos.Core
         public void Normalize()
         {
             this = Normalize(this);
+        }
+
+        public Vector4 Normalized()
+        {
+            return Normalize(this);
         }
 
         public static Vector4 Zero => new Vector4(0.0f);
