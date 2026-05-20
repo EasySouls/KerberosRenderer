@@ -1,6 +1,8 @@
 #include "kbrpch.hpp"
 #include "XAudio2AudioManager.hpp"
 
+#include <ranges>
+
 #include "Audio/Sound.hpp"
 
 namespace Kerberos
@@ -79,6 +81,12 @@ namespace Kerberos
 
 	void XAudio2AudioManager::Shutdown()
 	{
+		for (const auto& sourceVoice : m_PlayingAudios | std::views::values)
+		{
+			sourceVoice->Stop();
+			sourceVoice->DestroyVoice();
+		}
+
 		if (m_MasteringVoice)
 		{
 			m_MasteringVoice->DestroyVoice();

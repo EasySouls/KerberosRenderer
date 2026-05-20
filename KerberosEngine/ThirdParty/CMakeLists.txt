@@ -171,6 +171,12 @@ target_include_directories(filewatch INTERFACE
     ${CMAKE_CURRENT_SOURCE_DIR}/filewatch
 )
 
+# miniaudio
+add_library(miniaudio INTERFACE)
+target_include_directories(miniaudio INTERFACE
+    ${CMAKE_CURRENT_SOURCE_DIR}/miniaudio
+)
+
 # dotnet
 add_library(dotnet INTERFACE)
 target_include_directories(dotnet INTERFACE
@@ -187,6 +193,6 @@ target_link_libraries(dotnet INTERFACE
 set_target_properties(
     glfw imgui yaml-cpp msdf-atlas-gen freetype ktx
     ImGuizmo assimp Jolt tinygltf stb spdlog glm
-    filewatch EnTT dotnet
+    filewatch miniaudio EnTT dotnet
     PROPERTIES FOLDER "KerberosEngine/ThirdParty"
 )
