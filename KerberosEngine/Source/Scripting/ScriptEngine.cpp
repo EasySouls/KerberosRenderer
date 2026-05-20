@@ -85,6 +85,30 @@ namespace Kerberos
 	static ScriptEngineData* s_ScriptData = nullptr;
 	static Owner<filewatch::FileWatch<std::string>> s_Filewatcher = nullptr;
 
+	static ScriptCollisionPayload BuildScriptCollisionPayload(const uint64_t selfEntityID, const CollisionEvent& event)
+	{
+		const UUID selfUUID = UUID(selfEntityID);
+		const bool selfIsEntityA = event.EntityA == selfUUID;
+		const uint64_t otherEntityID = selfIsEntityA
+			? static_cast<uint64_t>(event.EntityB)
+			: static_cast<uint64_t>(event.EntityA);
+
+		const glm::vec3 contactNormal = selfIsEntityA
+			? event.ContactNormal
+			: -event.ContactNormal;
+
+		return ScriptCollisionPayload{
+			.OtherEntityID = otherEntityID,
+			.ContactPointX = event.ContactPoint.x,
+			.ContactPointY = event.ContactPoint.y,
+			.ContactPointZ = event.ContactPoint.z,
+			.ContactNormalX = contactNormal.x,
+			.ContactNormalY = contactNormal.y,
+			.ContactNormalZ = contactNormal.z,
+			.PenetrationDepth = event.PenetrationDepth
+		};
+	}
+
 	// ====================================================================
 	// Helpers for loading hostfxr
 	// ====================================================================
@@ -381,21 +405,24 @@ namespace Kerberos
 	{
 		KBR_CORE_ASSERT(s_ScriptData->ManagedInvokeOnCollisionEnter, "ManagedInvokeOnCollisionEnter function pointer is null!");
 
-		return s_ScriptData->ManagedInvokeOnCollisionEnter(entityID, event) != 0;
+		const ScriptCollisionPayload payload = BuildScriptCollisionPayload(entityID, event);
+		return s_ScriptData->ManagedInvokeOnCollisionEnter(entityID, &payload) != 0;
 	}
 
 	bool ScriptEngine::InvokeManagedOnCollisionPersist(const uint64_t entityID, const CollisionEvent& event)
 	{
 		KBR_CORE_ASSERT(s_ScriptData->ManagedInvokeOnCollisionPersist, "ManagedInvokeOnCollisionPersist function pointer is null!");
 
-		return s_ScriptData->ManagedInvokeOnCollisionPersist(entityID, event) != 0;
+		const ScriptCollisionPayload payload = BuildScriptCollisionPayload(entityID, event);
+		return s_ScriptData->ManagedInvokeOnCollisionPersist(entityID, &payload) != 0;
 	}
 
 	bool ScriptEngine::InvokeManagedOnCollisionExit(const uint64_t entityID, const CollisionEvent& event)
 	{
 		KBR_CORE_ASSERT(s_ScriptData->ManagedInvokeOnCollisionExit, "ManagedInvokeOnCollisionExit function pointer is null!");
 
-		return s_ScriptData->ManagedInvokeOnCollisionExit(entityID, event) != 0;
+		const ScriptCollisionPayload payload = BuildScriptCollisionPayload(entityID, event);
+		return s_ScriptData->ManagedInvokeOnCollisionExit(entityID, &payload) != 0;
 	}
 
 	bool ScriptEngine::GetManagedFieldValue(const uint64_t entityID, const std::string& fieldName, void* outValue, const int bufferSize)

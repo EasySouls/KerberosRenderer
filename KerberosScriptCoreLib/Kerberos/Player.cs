@@ -54,6 +54,8 @@ namespace Kerberos.Source.Kerberos
         {
             HandleShooting(deltaTime);
 
+            HandleSoundEffects();
+
             Vector3 velocity = Vector3.Zero;
 
             _jumpCooldownTimer -= deltaTime;
@@ -72,12 +74,6 @@ namespace Kerberos.Source.Kerberos
                 velocity.Z += 1.0f;
             if (Input.IsKeyDown(KeyCode.S))
                 velocity.Z -= 1.0f;
-            
-            if (_rigidbody3DComponent != null && Input.IsKeyDown(KeyCode.F))
-            {
-                _rigidbody3DComponent.ApplyImpulse(new Vector3(0.5f, 0.0f, 0.0f));
-                return;
-            }
 
             velocity *= Speed;
 
@@ -90,20 +86,13 @@ namespace Kerberos.Source.Kerberos
             if (Input.IsKeyDown(KeyCode.E))
                 _mainCamera.DistanceFromPlayer -= 1.0f * deltaTime;
 
-            if (Input.IsKeyDown(KeyCode.P) && _audioSource2DComponent != null && !_isPlayingAudio)
-            {
-                _audioSource2DComponent.Play();
-                _isPlayingAudio = true;
-            }
-            if (Input.IsKeyDown(KeyCode.O) && _audioSource2DComponent != null && _isPlayingAudio)
-            {
-                _audioSource2DComponent.Stop();
-                _isPlayingAudio = false;
-            }
+            
         }
 
         protected override void OnCollisionEnter(Collision collision)
         {
+            Console.WriteLine($"Playing sound on collision");
+
             _audioSource2DComponent?.Play();
         }
 
@@ -161,6 +150,24 @@ namespace Kerberos.Source.Kerberos
             Vector3 translation = Translation;
             translation += velocity * deltaTime;
             Translation = translation;
+        }
+
+        private void HandleSoundEffects()
+        {
+            if (Input.IsKeyDown(KeyCode.P) && _audioSource2DComponent != null && !_isPlayingAudio)
+            {
+                Console.WriteLine($"Playing audio from pressing P");
+
+                _audioSource2DComponent.Play();
+                _isPlayingAudio = true;
+            }
+            if (Input.IsKeyDown(KeyCode.O) && _audioSource2DComponent != null && _isPlayingAudio)
+            {
+                Console.WriteLine($"Stopping audio from pressing O");
+
+                _audioSource2DComponent.Stop();
+                _isPlayingAudio = false;
+            }
         }
     }
 }

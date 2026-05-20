@@ -18,6 +18,18 @@ namespace Kerberos { struct ScriptFieldInitializer; }
 
 namespace Kerberos
 {
+	struct ScriptCollisionPayload
+	{
+		uint64_t OtherEntityID = 0;
+		float ContactPointX = 0.0f;
+		float ContactPointY = 0.0f;
+		float ContactPointZ = 0.0f;
+		float ContactNormalX = 0.0f;
+		float ContactNormalY = 0.0f;
+		float ContactNormalZ = 0.0f;
+		float PenetrationDepth = 0.0f;
+	};
+
 	/// Function pointer types for calls into the managed ScriptGlue bridge
 	using ManagedLoadAssemblyClassesFn = int(*)(const char* assemblyPath);
 	using ManagedClassExistsFn = int(*)(const char* className);
@@ -26,9 +38,9 @@ namespace Kerberos
 	using ManagedClearInstancesFn = void(*)();
 	using ManagedInvokeOnCreateFn = int(*)(uint64_t entityID);
 	using ManagedInvokeOnUpdateFn = int(*)(uint64_t entityID, float deltaTime);
-	using ManagedInvokeOnCollisionEnterFn = int(*)(uint64_t entityID, const CollisionEvent& event);
-	using ManagedInvokeOnCollisionPersistFn = int(*)(uint64_t entityID, const CollisionEvent& event);
-	using ManagedInvokeOnCollisionExitFn = int(*)(uint64_t entityID, const CollisionEvent& event);
+	using ManagedInvokeOnCollisionEnterFn = int(*)(uint64_t entityID, const ScriptCollisionPayload* payload);
+	using ManagedInvokeOnCollisionPersistFn = int(*)(uint64_t entityID, const ScriptCollisionPayload* payload);
+	using ManagedInvokeOnCollisionExitFn = int(*)(uint64_t entityID, const ScriptCollisionPayload* payload);
 	using ManagedGetFieldCountFn = int(*)(const char* className);
 	using ManagedGetFieldsFn = int(*)(const char* className, void** fieldNames, void** fieldTypeNames, int maxFields, int bufferSize);
 	using ManagedGetFieldValueFn = int(*)(uint64_t entityID, const char* fieldName, void* outValue, int bufferSize);

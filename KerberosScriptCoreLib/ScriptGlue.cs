@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Reflection;
 using System.Runtime.InteropServices;
+using Kerberos.Source.Kerberos;
 using Kerberos.Source.Kerberos.Core;
 using Kerberos.Source.Kerberos.Scene;
 
@@ -13,6 +14,19 @@ namespace Kerberos.Source
     /// </summary>
     public static class ScriptGlue
     {
+        [StructLayout(LayoutKind.Sequential)]
+        private struct ScriptCollisionPayload
+        {
+            public ulong OtherEntityID;
+            public float ContactPointX;
+            public float ContactPointY;
+            public float ContactPointZ;
+            public float ContactNormalX;
+            public float ContactNormalY;
+            public float ContactNormalZ;
+            public float PenetrationDepth;
+        }
+
         private static Assembly? s_CoreAssembly;
         private static Type? s_EntityBaseClass;
         private static readonly Dictionary<string, Type> EntityClasses = new();
@@ -43,6 +57,9 @@ namespace Kerberos.Source
                 EntityClasses.Clear();
                 OnCreateMethods.Clear();
                 OnUpdateMethods.Clear();
+                OnCollisionEnterMethods.Clear();
+                OnCollisionPersistMethods.Clear();
+                OnCollisionExitMethods.Clear();
                 UlongConstructors.Clear();
                 EntityInstances.Clear();
 
@@ -72,13 +89,13 @@ namespace Kerberos.Source
                             null, new[] { typeof(float) }, null);
                         OnCollisionEnterMethods[type] = type.GetMethod("OnCollisionEnter",
                             BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public,
-                            null, new[] { typeof(Entity) }, null);
+                            null, new[] { typeof(Collision) }, null);
                         OnCollisionPersistMethods[type] = type.GetMethod("OnCollisionPersist",
                             BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public,
-                            null, new[] { typeof(Entity) }, null);
+                            null, new[] { typeof(Collision) }, null);
                         OnCollisionExitMethods[type] = type.GetMethod("OnCollisionExit",
                             BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public,
-                            null, new[] { typeof(Entity) }, null);
+                            null, new[] { typeof(Collision) }, null);
                         UlongConstructors[type] = type.GetConstructor(
                             BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public,
                             null, new[] { typeof(ulong) }, null);
@@ -284,11 +301,14 @@ namespace Kerberos.Source
             {
                 if (!EntityInstances.TryGetValue(entityID, out var instance))
                     return 0;
+                if (eventPtr == IntPtr.Zero)
+                    return 0;
 
                 var type = instance.GetType();
                 if (OnCollisionEnterMethods.TryGetValue(type, out var method) && method != null)
                 {
-                    method.Invoke(instance, new object[] { eventPtr });
+                    Collision collision = ToManagedCollision(eventPtr);
+                    method.Invoke(instance, new object[] { collision });
                 }
 
                 return 1;
@@ -307,10 +327,13 @@ namespace Kerberos.Source
             {
                 if (!EntityInstances.TryGetValue(entityID, out var instance))
                     return 0;
+                if (eventPtr == IntPtr.Zero)
+                    return 0;
                 var type = instance.GetType();
                 if (OnCollisionPersistMethods.TryGetValue(type, out var method) && method != null)
                 {
-                    method.Invoke(instance, new object[] { eventPtr });
+                    Collision collision = ToManagedCollision(eventPtr);
+                    method.Invoke(instance, new object[] { collision });
                 }
                 return 1;
             }
@@ -328,10 +351,13 @@ namespace Kerberos.Source
             {
                 if (!EntityInstances.TryGetValue(entityID, out var instance))
                     return 0;
+                if (eventPtr == IntPtr.Zero)
+                    return 0;
                 var type = instance.GetType();
                 if (OnCollisionExitMethods.TryGetValue(type, out var method) && method != null)
                 {
-                    method.Invoke(instance, new object[] { eventPtr });
+                    Collision collision = ToManagedCollision(eventPtr);
+                    method.Invoke(instance, new object[] { collision });
                 }
                 return 1;
             }
@@ -340,6 +366,18 @@ namespace Kerberos.Source
                 Console.Error.WriteLine($"[ScriptGlue] InvokeOnCollisionExit failed for entity {entityID}: {ex}");
                 return 0;
             }
+        }
+
+        private static Collision ToManagedCollision(IntPtr payloadPtr)
+        {
+            ScriptCollisionPayload payload = Marshal.PtrToStructure<ScriptCollisionPayload>(payloadPtr);
+            return new Collision
+            {
+                Entity = new Entity(payload.OtherEntityID),
+                ContactPoint = new Vector3(payload.ContactPointX, payload.ContactPointY, payload.ContactPointZ),
+                WorldNormal = new Vector3(payload.ContactNormalX, payload.ContactNormalY, payload.ContactNormalZ),
+                PenetrationDepth = payload.PenetrationDepth
+            };
         }
 
         // ====================================================================
