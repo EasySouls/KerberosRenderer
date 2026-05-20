@@ -97,6 +97,16 @@ namespace Kerberos
 			m_PhysicsSystem->Update(ts);
 
 			Application::Get().GetAudioManager()->Update();
+
+			const std::vector<CollisionEvent> collisionEvents = m_PhysicsSystem->GetCollisionEvents();
+			for (const CollisionEvent& event : collisionEvents)
+			{
+				const Entity entityA = GetEntityByUUID(event.EntityA);
+				const Entity entityB = GetEntityByUUID(event.EntityB);
+
+				ScriptEngine::OnCollision(entityA, event);
+				ScriptEngine::OnCollision(entityB, event);
+			}
 		}
 
 		/// Render the scene

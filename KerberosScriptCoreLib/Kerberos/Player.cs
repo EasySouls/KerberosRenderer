@@ -102,6 +102,11 @@ namespace Kerberos.Source.Kerberos
             }
         }
 
+        protected override void OnCollisionEnter(Collision collision)
+        {
+            _audioSource2DComponent?.Play();
+        }
+
         private void HandleShooting(float deltaTime)
         {
             _shootingCooldownTimer -= deltaTime;

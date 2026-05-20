@@ -70,6 +70,9 @@ namespace Kerberos
 		ManagedClearInstancesFn ManagedClearInstances = nullptr;
 		ManagedInvokeOnCreateFn ManagedInvokeOnCreate = nullptr;
 		ManagedInvokeOnUpdateFn ManagedInvokeOnUpdate = nullptr;
+		ManagedInvokeOnCollisionEnterFn ManagedInvokeOnCollisionEnter = nullptr;
+		ManagedInvokeOnCollisionPersistFn ManagedInvokeOnCollisionPersist = nullptr;
+		ManagedInvokeOnCollisionExitFn ManagedInvokeOnCollisionExit = nullptr;
 		ManagedGetFieldCountFn ManagedGetFieldCount = nullptr;
 		ManagedGetFieldsFn ManagedGetFields = nullptr;
 		ManagedGetFieldValueFn ManagedGetFieldValue = nullptr;
@@ -245,6 +248,27 @@ namespace Kerberos
 		s_ScriptData->EntityInstances[entity.GetUUID()]->InvokeOnUpdate(deltaTime);
 	}
 
+	void ScriptEngine::OnCollision(const Entity entity, const CollisionEvent& event) 
+	{
+		if (!entity.HasComponent<ScriptComponent>())
+			return;
+
+		KBR_CORE_ASSERT(s_ScriptData->EntityInstances.contains(entity.GetUUID()), "No script instance found for entity!");
+
+		switch (event.EventType)
+		{
+			case CollisionEventType::Enter:
+				s_ScriptData->EntityInstances[entity.GetUUID()]->InvokeOnCollisionEnter(event);
+				break;
+			case CollisionEventType::Persist:
+				s_ScriptData->EntityInstances[entity.GetUUID()]->InvokeOnCollisionPersist(event);
+				break;
+			case CollisionEventType::Exit:
+				s_ScriptData->EntityInstances[entity.GetUUID()]->InvokeOnCollisionExit(event);
+				break;
+		}
+	}
+
 	bool ScriptEngine::ClassExists(const std::string& className)
 	{
 		return s_ScriptData->EntityClasses.contains(className);
@@ -351,6 +375,27 @@ namespace Kerberos
 		KBR_CORE_ASSERT(s_ScriptData->ManagedInvokeOnUpdate, "ManagedInvokeOnUpdate function pointer is null!");
 		
 		return s_ScriptData->ManagedInvokeOnUpdate(entityID, deltaTime) != 0;
+	}
+
+	bool ScriptEngine::InvokeManagedOnCollisionEnter(const uint64_t entityID, const CollisionEvent& event)
+	{
+		KBR_CORE_ASSERT(s_ScriptData->ManagedInvokeOnCollisionEnter, "ManagedInvokeOnCollisionEnter function pointer is null!");
+
+		return s_ScriptData->ManagedInvokeOnCollisionEnter(entityID, event) != 0;
+	}
+
+	bool ScriptEngine::InvokeManagedOnCollisionPersist(const uint64_t entityID, const CollisionEvent& event)
+	{
+		KBR_CORE_ASSERT(s_ScriptData->ManagedInvokeOnCollisionPersist, "ManagedInvokeOnCollisionPersist function pointer is null!");
+
+		return s_ScriptData->ManagedInvokeOnCollisionPersist(entityID, event) != 0;
+	}
+
+	bool ScriptEngine::InvokeManagedOnCollisionExit(const uint64_t entityID, const CollisionEvent& event)
+	{
+		KBR_CORE_ASSERT(s_ScriptData->ManagedInvokeOnCollisionExit, "ManagedInvokeOnCollisionExit function pointer is null!");
+
+		return s_ScriptData->ManagedInvokeOnCollisionExit(entityID, event) != 0;
 	}
 
 	bool ScriptEngine::GetManagedFieldValue(const uint64_t entityID, const std::string& fieldName, void* outValue, const int bufferSize)
@@ -566,6 +611,9 @@ namespace Kerberos
 		s_ScriptData->ManagedClearInstances = LoadManagedFunction<ManagedClearInstancesFn>(glueType, "ClearInstances");
 		s_ScriptData->ManagedInvokeOnCreate = LoadManagedFunction<ManagedInvokeOnCreateFn>(glueType, "InvokeOnCreate");
 		s_ScriptData->ManagedInvokeOnUpdate = LoadManagedFunction<ManagedInvokeOnUpdateFn>(glueType, "InvokeOnUpdate");
+		s_ScriptData->ManagedInvokeOnCollisionEnter = LoadManagedFunction<ManagedInvokeOnCollisionEnterFn>(glueType, "InvokeOnCollisionEnter");
+		s_ScriptData->ManagedInvokeOnCollisionPersist = LoadManagedFunction<ManagedInvokeOnCollisionPersistFn>(glueType, "InvokeOnCollisionPersist");
+		s_ScriptData->ManagedInvokeOnCollisionExit = LoadManagedFunction<ManagedInvokeOnCollisionExitFn>(glueType, "InvokeOnCollisionExit");
 		s_ScriptData->ManagedGetFieldCount = LoadManagedFunction<ManagedGetFieldCountFn>(glueType, "GetClassFieldCount");
 		s_ScriptData->ManagedGetFields = LoadManagedFunction<ManagedGetFieldsFn>(glueType, "GetClassFields");
 		s_ScriptData->ManagedGetFieldValue = LoadManagedFunction<ManagedGetFieldValueFn>(glueType, "GetFieldValue");
@@ -579,11 +627,11 @@ namespace Kerberos
 	{
 		switch (event)
 		{
-			case filewatch::Event::added: return "Added"sv;
-			case filewatch::Event::removed: return "Removed"sv;
-			case filewatch::Event::modified: return "Modified"sv;
-			case filewatch::Event::renamed_old: return "Renamed Old"sv;
-			case filewatch::Event::renamed_new: return "Renamed New"sv;
+			case filewatch::Event::added: return "added"sv;
+			case filewatch::Event::removed: return "removed"sv;
+			case filewatch::Event::modified: return "modified"sv;
+			case filewatch::Event::renamed_old: return "renamed old"sv;
+			case filewatch::Event::renamed_new: return "renamed new"sv;
 		}
 
 		KBR_CORE_ASSERT(false, "Unknown filewatch::Event");
@@ -592,15 +640,12 @@ namespace Kerberos
 
 	void ScriptEngine::OnAssemblyFileChanged(const std::string& path, const filewatch::Event changeType)
 	{
-		if (changeType == filewatch::Event::modified)
-		{
-			const std::string extension = std::filesystem::path(path).extension().string();
-			if (extension == ".dll") {
-				KBR_CORE_INFO("Assembly file modified: {0}", path);
-				Application::Get().SubmitToMainThreadQueue([]() {
-					ReloadAssembly();
-				});
-			}
+		const std::string extension = std::filesystem::path(path).extension().string();
+		if (extension == ".dll") {
+			KBR_CORE_INFO("Assembly file {0}: {1}", FileWatchEventToString(changeType), path);
+			Application::Get().SubmitToMainThreadQueue([]() {
+				ReloadAssembly();
+			});
 		}
 	}
 }

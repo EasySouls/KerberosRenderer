@@ -21,6 +21,9 @@ namespace Kerberos.Source
         // Cached MethodInfo for OnCreate and OnUpdate
         private static readonly Dictionary<Type, MethodInfo?> OnCreateMethods = new();
         private static readonly Dictionary<Type, MethodInfo?> OnUpdateMethods = new();
+        private static readonly Dictionary<Type, MethodInfo?> OnCollisionEnterMethods = new();
+        private static readonly Dictionary<Type, MethodInfo?> OnCollisionPersistMethods = new();
+        private static readonly Dictionary<Type, MethodInfo?> OnCollisionExitMethods = new();
         private static readonly Dictionary<Type, ConstructorInfo?> UlongConstructors = new();
 
         // ====================================================================
@@ -67,6 +70,15 @@ namespace Kerberos.Source
                         OnUpdateMethods[type] = type.GetMethod("OnUpdate",
                             BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public,
                             null, new[] { typeof(float) }, null);
+                        OnCollisionEnterMethods[type] = type.GetMethod("OnCollisionEnter",
+                            BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public,
+                            null, new[] { typeof(Entity) }, null);
+                        OnCollisionPersistMethods[type] = type.GetMethod("OnCollisionPersist",
+                            BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public,
+                            null, new[] { typeof(Entity) }, null);
+                        OnCollisionExitMethods[type] = type.GetMethod("OnCollisionExit",
+                            BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public,
+                            null, new[] { typeof(Entity) }, null);
                         UlongConstructors[type] = type.GetConstructor(
                             BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public,
                             null, new[] { typeof(ulong) }, null);
@@ -261,6 +273,71 @@ namespace Kerberos.Source
             catch (Exception ex)
             {
                 Console.Error.WriteLine($"[ScriptGlue] InvokeOnUpdate failed for entity {entityID}: {ex}");
+                return 0;
+            }
+        }
+
+        [UnmanagedCallersOnly]
+        public static int InvokeOnCollisionEnter(ulong entityID, IntPtr eventPtr)
+        {
+            try
+            {
+                if (!EntityInstances.TryGetValue(entityID, out var instance))
+                    return 0;
+
+                var type = instance.GetType();
+                if (OnCollisionEnterMethods.TryGetValue(type, out var method) && method != null)
+                {
+                    method.Invoke(instance, new object[] { eventPtr });
+                }
+
+                return 1;
+            }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine($"[ScriptGlue] InvokeOnCollisionEnter failed for entity {entityID}: {ex}");
+                return 0;
+            }
+        }
+
+        [UnmanagedCallersOnly]
+        public static int InvokeOnCollisionPersist(ulong entityID, IntPtr eventPtr)
+        {
+            try
+            {
+                if (!EntityInstances.TryGetValue(entityID, out var instance))
+                    return 0;
+                var type = instance.GetType();
+                if (OnCollisionPersistMethods.TryGetValue(type, out var method) && method != null)
+                {
+                    method.Invoke(instance, new object[] { eventPtr });
+                }
+                return 1;
+            }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine($"[ScriptGlue] InvokeOnCollisionPersist failed for entity {entityID}: {ex}");
+                return 0;
+            }
+        }
+
+        [UnmanagedCallersOnly]
+        public static int InvokeOnCollisionExit(ulong entityID, IntPtr eventPtr)
+        {
+            try
+            {
+                if (!EntityInstances.TryGetValue(entityID, out var instance))
+                    return 0;
+                var type = instance.GetType();
+                if (OnCollisionExitMethods.TryGetValue(type, out var method) && method != null)
+                {
+                    method.Invoke(instance, new object[] { eventPtr });
+                }
+                return 1;
+            }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine($"[ScriptGlue] InvokeOnCollisionExit failed for entity {entityID}: {ex}");
                 return 0;
             }
         }

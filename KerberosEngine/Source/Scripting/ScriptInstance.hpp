@@ -17,6 +17,9 @@ namespace Kerberos
 
 		void InvokeOnCreate() const;
 		void InvokeOnUpdate(float deltaTime) const;
+		void InvokeOnCollisionEnter(const CollisionEvent& event) const;
+		void InvokeOnCollisionPersist(const CollisionEvent& event) const;
+		void InvokeOnCollisionExit(const CollisionEvent& event) const;
 
 		template<typename T>
 		T GetFieldValue(const std::string& name) const

@@ -26,6 +26,9 @@ namespace Kerberos
 	using ManagedClearInstancesFn = void(*)();
 	using ManagedInvokeOnCreateFn = int(*)(uint64_t entityID);
 	using ManagedInvokeOnUpdateFn = int(*)(uint64_t entityID, float deltaTime);
+	using ManagedInvokeOnCollisionEnterFn = int(*)(uint64_t entityID, const CollisionEvent& event);
+	using ManagedInvokeOnCollisionPersistFn = int(*)(uint64_t entityID, const CollisionEvent& event);
+	using ManagedInvokeOnCollisionExitFn = int(*)(uint64_t entityID, const CollisionEvent& event);
 	using ManagedGetFieldCountFn = int(*)(const char* className);
 	using ManagedGetFieldsFn = int(*)(const char* className, void** fieldNames, void** fieldTypeNames, int maxFields, int bufferSize);
 	using ManagedGetFieldValueFn = int(*)(uint64_t entityID, const char* fieldName, void* outValue, int bufferSize);
@@ -47,6 +50,8 @@ namespace Kerberos
 		static void OnCreateEntity(Entity entity);
 		static void OnUpdateEntity(Entity entity, float deltaTime);
 
+		static void OnCollision(Entity entity, const CollisionEvent& event);
+
 		static bool ClassExists(const std::string& className);
 		static void CreateScriptFieldInitializers(Entity entity, const std::string& className);
 		static void CopyScriptFieldInitializers(Entity srcEntity, Entity dstEntity);
@@ -61,12 +66,14 @@ namespace Kerberos
 		static void DestroyManagedInstance(uint64_t entityID);
 		static bool InvokeManagedOnCreate(uint64_t entityID);
 		static bool InvokeManagedOnUpdate(uint64_t entityID, float deltaTime);
+		static bool InvokeManagedOnCollisionEnter(uint64_t entityID, const CollisionEvent& event);
+		static bool InvokeManagedOnCollisionPersist(uint64_t entityID, const CollisionEvent& event);
+		static bool InvokeManagedOnCollisionExit(uint64_t entityID, const CollisionEvent& event);
 		static bool GetManagedFieldValue(uint64_t entityID, const std::string& fieldName, void* outValue, int bufferSize);
 		static bool SetManagedFieldValue(uint64_t entityID, const std::string& fieldName, void* value, int valueSize);
 
 		/// Passes the native callback table to the managed side
 		static void SetManagedNativeCallbacks(void* callbackTable);
-
 
 	private:
 		static void InitDotNet();

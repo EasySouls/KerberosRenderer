@@ -21,6 +21,10 @@ namespace Kerberos.Source.Kerberos.Scene
 
         protected virtual void OnUpdate(float deltaTime) { }
 
+        protected virtual void OnCollisionEnter(Collision collision) { }
+        protected virtual void OnCollisionPersist(Collision collision) { }
+        protected virtual void OnCollisionExit(Collision collision) { }
+
         public Vector3 Translation
         {
             get

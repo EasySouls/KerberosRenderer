@@ -32,6 +32,21 @@ namespace Kerberos
 		ScriptEngine::InvokeManagedOnUpdate(static_cast<uint64_t>(m_EntityID), deltaTime);
 	}
 
+	void ScriptInstance::InvokeOnCollisionEnter(const CollisionEvent& event) const 
+	{
+		ScriptEngine::InvokeManagedOnCollisionEnter(static_cast<uint64_t>(m_EntityID), event);
+	}
+
+	void ScriptInstance::InvokeOnCollisionPersist(const CollisionEvent& event) const 
+	{
+		ScriptEngine::InvokeManagedOnCollisionPersist(static_cast<uint64_t>(m_EntityID), event);
+	}
+
+	void ScriptInstance::InvokeOnCollisionExit(const CollisionEvent& event) const 
+	{
+		ScriptEngine::InvokeManagedOnCollisionExit(static_cast<uint64_t>(m_EntityID), event);
+	}
+
 	void ScriptInstance::IntializeFieldValues(
 		const std::unordered_map<std::string, ScriptFieldInitializer>& initialFieldValues) const
 	{

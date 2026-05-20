@@ -11,6 +11,14 @@ public struct RaycastHit
     public Entity Entity;
 }
 
+public struct Collision
+{
+    public Entity Entity;
+    public Vector3 ContactPoint;
+    public Vector3 WorldNormal;
+    public float PenetrationDepth;
+}
+
 public static class Physics
 {
     /// <summary>
