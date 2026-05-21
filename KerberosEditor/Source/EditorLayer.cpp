@@ -902,6 +902,7 @@ namespace Kerberos
 		ImGui::Text("Time: %.2f seconds", m_Time);
 		ImGui::Text("FPS: %.2f", m_Fps);
 
+		ImGui::SeparatorText("GPU Timings");
 		const GPUTimings gpuTimings = Renderer::GetLatestGPUTimings();
 		if (gpuTimings.IsValid)
 		{
@@ -918,6 +919,22 @@ namespace Kerberos
 		else
 		{
 			ImGui::Text("GPU timings: unavailable");
+		}
+
+		ImGui::SeparatorText("Renderer Statistics");
+		const RenderStatistics renderStatistics = Renderer::GetLatestRenderStatistics();
+		if (renderStatistics.IsValid)
+		{
+			ImGui::Text("Rendered objects: %u", renderStatistics.RenderObjectCount);
+			ImGui::Text("Unique materials: %u", renderStatistics.UniqueMaterialCount);
+			ImGui::Text("Vertices: %u", renderStatistics.VertexCount);
+			ImGui::Text("Indices: %u", renderStatistics.IndexCount);
+			ImGui::Text("Faces: %u", renderStatistics.FaceCount);
+			ImGui::Text("Collider line vertices: %u", renderStatistics.ColliderLineVertexCount);
+		}
+		else
+		{
+			ImGui::Text("Render stats: unavailable");
 		}
 
 		ImGui::Separator();

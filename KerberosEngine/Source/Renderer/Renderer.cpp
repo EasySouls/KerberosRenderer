@@ -356,6 +356,7 @@ namespace
 		float GPUTimestampPeriodNanoseconds = 0.0f;
 		bool SupportsGPUTimestamps = false;
 		GPUTimings LatestGPUTimings{};
+		RenderStatistics LatestRenderStatistics{};
 
 		RayTracingSceneCache RayTracingCache{};
 
@@ -531,6 +532,28 @@ namespace Kerberos
 		const auto colliderLineVertices = s_Data->DisplayPhysicsColliders
 			? GetColliderLineVerticesFromScene(*s_Data->PendingRender.Scene.get())
 			: std::vector<LineVertex>{};
+
+		auto& renderStatistics = s_Data->LatestRenderStatistics;
+		renderStatistics = {};
+		renderStatistics.RenderObjectCount = static_cast<uint32_t>(renderObjects.size());
+		renderStatistics.UniqueMaterialCount = static_cast<uint32_t>(uniqueMaterials.size());
+		renderStatistics.ColliderLineVertexCount = static_cast<uint32_t>(colliderLineVertices.size());
+
+		for (const auto& renderObject : renderObjects)
+		{
+			if (!renderObject.Mesh)
+				continue;
+
+			const uint32_t vertexCount = static_cast<uint32_t>(renderObject.Mesh->GetVertices().size());
+			const uint32_t indexCount = static_cast<uint32_t>(renderObject.Mesh->GetIndices().size());
+
+			renderStatistics.VertexCount += vertexCount;
+			renderStatistics.IndexCount += indexCount;
+			renderStatistics.FaceCount += indexCount / 3;
+		}
+
+		renderStatistics.IsValid = true;
+
 		s_Data->MaterialRegistry.UpdateDescriptorSetsForMaterials(uniqueMaterials);
 
 		ResolveGPUTimings(frameIndex);
@@ -3405,6 +3428,13 @@ namespace Kerberos
 		KBR_CORE_ASSERT(s_Data, "Renderer not initialized!");
 
 		return s_Data->LatestGPUTimings;
+	}
+
+	RenderStatistics Renderer::GetLatestRenderStatistics()
+	{
+		KBR_CORE_ASSERT(s_Data, "Renderer not initialized!");
+
+		return s_Data->LatestRenderStatistics;
 	}
 
 	void Renderer::WriteGPUTimestamp(const vk::raii::CommandBuffer& cmd, const uint32_t frameIndex, const uint32_t index)

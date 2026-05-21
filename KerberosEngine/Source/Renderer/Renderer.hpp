@@ -41,6 +41,17 @@ namespace Kerberos
 		bool  IsValid = false;
 	};
 
+	struct RenderStatistics
+	{
+		uint32_t RenderObjectCount = 0;
+		uint32_t UniqueMaterialCount = 0;
+		uint32_t VertexCount = 0;
+		uint32_t IndexCount = 0;
+		uint32_t FaceCount = 0;
+		uint32_t ColliderLineVertexCount = 0;
+		bool IsValid = false;
+	};
+
 	struct RenderObject
 	{
 		glm::mat4 Transform{};
@@ -119,6 +130,7 @@ namespace Kerberos
 		static std::optional<uint32_t> GetMousePickingEntityID();
         static bool ConsumePendingMousePickingTimelineSignal(vk::Semaphore& semaphore, uint64_t& value);
 		static GPUTimings GetLatestGPUTimings();
+		static RenderStatistics GetLatestRenderStatistics();
 
 	public:
 		static constexpr uint32_t MousePickingReadbackFrameLag = 3;
