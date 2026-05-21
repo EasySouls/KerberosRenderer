@@ -910,6 +910,10 @@ namespace Kerberos
 			ImGui::Text("GPU Shadow: %.3f ms", gpuTimings.ShadowPassMilliseconds);
 			ImGui::Text("GPU Opaque: %.3f ms", gpuTimings.OpaquePassMilliseconds);
 			ImGui::Text("GPU Transparent: %.3f ms", gpuTimings.TransparentPassMilliseconds);
+			ImGui::Text("GPU Transparency Resolve: %.3f ms", gpuTimings.TransparencyResolvePassMilliseconds);
+			ImGui::Text("GPU Bloom: %.3f ms", gpuTimings.BloomPassMilliseconds);
+			ImGui::Text("GPU Ambient Occlusion: %.3f ms", gpuTimings.AmbientOcclusionPassMilliseconds);
+			ImGui::Text("GPU Post-Processing: %.3f ms", gpuTimings.PostProcessingPassMilliseconds);
 		}
 		else
 		{

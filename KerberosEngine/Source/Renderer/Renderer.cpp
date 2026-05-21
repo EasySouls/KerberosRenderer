@@ -263,6 +263,14 @@ namespace
 		OpaqueEnd,
 		TransparentBegin,
 		TransparentEnd,
+		TransparencyResolveBegin,
+		TransparencyResolveEnd,
+		BloomPassBegin,
+		BloomPassEnd,
+		AmbientOcclusionPassBegin,
+		AmbientOcclusionPassEnd,
+		PostProcessPassBegin,
+		PostProcessPassEnd,
 		FrameEnd,
 		Count
 	};
@@ -794,6 +802,8 @@ namespace Kerberos
 
 		// GTAO compute pass
 		{
+			WriteGPUTimestamp(cmd, frameIndex, static_cast<uint32_t>(GPUTimestampQuery::AmbientOcclusionPassBegin));
+
 			const auto getSrcStageAccessForLayout = [](const vk::ImageLayout layout) -> std::pair<vk::PipelineStageFlags2, vk::AccessFlags2>
 			{
 				switch (layout)
@@ -1020,6 +1030,8 @@ namespace Kerberos
 			}
 
 			s_Data->PreviousUseGTAO = s_Data->UseGTAO;
+
+			WriteGPUTimestamp(cmd, frameIndex, static_cast<uint32_t>(GPUTimestampQuery::AmbientOcclusionPassEnd));
 		}
 
 		// Transition shadow map image layout for shader read
@@ -1567,7 +1579,7 @@ namespace Kerberos
 
 		// Resolve transparency
 		{
-			//WriteGPUTimestamp(cmd, frameIndex, static_cast<uint32_t>(GPUTimestampQuery::TransparencyResolveBegin));
+			WriteGPUTimestamp(cmd, frameIndex, static_cast<uint32_t>(GPUTimestampQuery::TransparencyResolveBegin));
 
 			vk::RenderingAttachmentInfo colorAttachmentInfo{
 				.imageView = s_Data->ResolveImage.ImageView,
@@ -1600,7 +1612,7 @@ namespace Kerberos
 			cmd.endRendering();
 			EndRenderPassDebugLabel(cmd);
 
-			//WriteGPUTimestamp(cmd, frameIndex, static_cast<uint32_t>(GPUTimestampQuery::TransparencyResolveEnd));
+			WriteGPUTimestamp(cmd, frameIndex, static_cast<uint32_t>(GPUTimestampQuery::TransparencyResolveEnd));
 
 			KBR_CORE_TRACE("Transparency resolve pass done!");
 		}
@@ -3445,6 +3457,10 @@ namespace Kerberos
 		s_Data->LatestGPUTimings.ShadowPassMilliseconds = toMilliseconds(GPUTimestampQuery::ShadowBegin, GPUTimestampQuery::ShadowEnd);
 		s_Data->LatestGPUTimings.OpaquePassMilliseconds = toMilliseconds(GPUTimestampQuery::OpaqueBegin, GPUTimestampQuery::OpaqueEnd);
 		s_Data->LatestGPUTimings.TransparentPassMilliseconds = toMilliseconds(GPUTimestampQuery::TransparentBegin, GPUTimestampQuery::TransparentEnd);
+		s_Data->LatestGPUTimings.TransparencyResolvePassMilliseconds = toMilliseconds(GPUTimestampQuery::TransparencyResolveBegin, GPUTimestampQuery::TransparencyResolveEnd);
+		s_Data->LatestGPUTimings.BloomPassMilliseconds = toMilliseconds(GPUTimestampQuery::BloomPassBegin, GPUTimestampQuery::BloomPassEnd);
+		s_Data->LatestGPUTimings.AmbientOcclusionPassMilliseconds = toMilliseconds(GPUTimestampQuery::AmbientOcclusionPassBegin, GPUTimestampQuery::AmbientOcclusionPassEnd);
+		s_Data->LatestGPUTimings.PostProcessingPassMilliseconds = toMilliseconds(GPUTimestampQuery::PostProcessPassBegin, GPUTimestampQuery::PostProcessPassEnd);
 		s_Data->LatestGPUTimings.IsValid = true;
 	}
 
@@ -3687,8 +3703,10 @@ namespace Kerberos
 		return vertices;
 	}
 
-	void Renderer::ApplyPostProcessing(const vk::raii::CommandBuffer& cmd, uint32_t currentImage)
+	void Renderer::ApplyPostProcessing(const vk::raii::CommandBuffer& cmd, uint32_t frameIndex)
 	{
+		WriteGPUTimestamp(cmd, frameIndex, static_cast<uint32_t>(GPUTimestampQuery::PostProcessPassBegin));
+
 		// Transfer resolve image from color attachment optimal to shader read optimal for post process sampling
 		// and transition composite image to color attachment optimal for it will be the render target
 		{
@@ -3793,7 +3811,7 @@ namespace Kerberos
 				vk::PipelineBindPoint::eGraphics,
 				*s_Data->FXAAPipelineLayout,
 				0,
-				*s_Data->DescriptorSets[currentImage].fxaa,
+				*s_Data->DescriptorSets[frameIndex].fxaa,
 				{});
 
 			cmd.pushConstants<FXAAPushConstants>(*s_Data->FXAAPipelineLayout, vk::ShaderStageFlagBits::eFragment, 0, { pushConstants });
@@ -3806,7 +3824,7 @@ namespace Kerberos
 				vk::PipelineBindPoint::eGraphics,
 				*s_Data->FXAAPipelineLayout,
 				0,
-				*s_Data->DescriptorSets[currentImage].fxaa,
+				*s_Data->DescriptorSets[frameIndex].fxaa,
 				{});
 
 			cmd.pushConstants<FXAAPushConstants>(*s_Data->FXAAPipelineLayout, vk::ShaderStageFlagBits::eFragment, 0, { pushConstants });
@@ -3820,10 +3838,14 @@ namespace Kerberos
 
 		cmd.endRendering();
 		EndRenderPassDebugLabel(cmd);
+
+		WriteGPUTimestamp(cmd, frameIndex, static_cast<uint32_t>(GPUTimestampQuery::PostProcessPassEnd));
 	}
 
-	void Renderer::ApplyBloom(const vk::raii::CommandBuffer& cmd, const uint32_t currentImage)
+	void Renderer::ApplyBloom(const vk::raii::CommandBuffer& cmd, const uint32_t frameIndex)
 	{
+		WriteGPUTimestamp(cmd, frameIndex, static_cast<uint32_t>(GPUTimestampQuery::BloomPassBegin));
+
 		{
 			const vk::ImageMemoryBarrier2 resolveBarrier = {
 				.srcStageMask = vk::PipelineStageFlagBits2::eColorAttachmentOutput,
@@ -3965,6 +3987,8 @@ namespace Kerberos
 			.pImageMemoryBarriers = &bloomFinalBarrier
 		};
 		cmd.pipelineBarrier2(finalDependencyInfo);
+
+		WriteGPUTimestamp(cmd, frameIndex, static_cast<uint32_t>(GPUTimestampQuery::BloomPassEnd));
 	}
 
 	glm::mat4 Renderer::CalculateLightSpaceMatrix() 

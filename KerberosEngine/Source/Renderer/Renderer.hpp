@@ -34,6 +34,10 @@ namespace Kerberos
 		float ShadowPassMilliseconds = 0.0f;
 		float OpaquePassMilliseconds = 0.0f;
 		float TransparentPassMilliseconds = 0.0f;
+		float TransparencyResolvePassMilliseconds = 0.0f;
+		float BloomPassMilliseconds = 0.0f;
+		float AmbientOcclusionPassMilliseconds = 0.0f;
+		float PostProcessingPassMilliseconds = 0.0f;
 		bool  IsValid = false;
 	};
 
@@ -143,8 +147,8 @@ namespace Kerberos
 		static std::pair<std::vector<RenderObject>, std::set<Ref<Material>>> GetRenderObjectsAndUniqueMaterialsFromScene(const Scene& scene);
 		static std::vector<LineVertex> GetColliderLineVerticesFromScene(const Scene& scene);
 
-		static void ApplyPostProcessing(const vk::raii::CommandBuffer& cmd, uint32_t currentImage);
-		static void ApplyBloom(const vk::raii::CommandBuffer& cmd, uint32_t currentImage);
+		static void ApplyPostProcessing(const vk::raii::CommandBuffer& cmd, uint32_t frameIndex);
+		static void ApplyBloom(const vk::raii::CommandBuffer& cmd, uint32_t frameIndex);
 		
 		static void WriteGPUTimestamp(const vk::raii::CommandBuffer& cmd, uint32_t frameIndex, uint32_t index);
 		static void ResolveGPUTimings(uint32_t frameIndex);
