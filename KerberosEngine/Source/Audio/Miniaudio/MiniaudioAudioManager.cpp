@@ -46,6 +46,7 @@ namespace Kerberos
 		{
 			ma_sound_stop(sound);
 			ma_sound_uninit(sound);
+			delete sound;
 		}
 		m_PlayingSounds.clear();
 
@@ -82,14 +83,14 @@ namespace Kerberos
 			ma_sound* s = existing->second;
 			ma_sound_stop(s);
 			ma_sound_uninit(s);
-			std::free(s);
+			delete s;
 			existing->second = nullptr;
 		}
 
-		ma_sound* pSound = static_cast<ma_sound*>(std::malloc(sizeof(ma_sound)));
+		ma_sound* pSound = new ma_sound{};
 		if (ma_sound_init_from_file(&m_Engine, filepath.string().c_str(), MA_SOUND_FLAG_DECODE, nullptr, nullptr, pSound) != MA_SUCCESS)
 		{
-			std::free(pSound);
+			delete pSound;
 			KBR_CORE_ERROR("Failed to init miniaudio sound for file: {0}", filepath.string());
 			return;
 		}
@@ -97,7 +98,7 @@ namespace Kerberos
 		if (ma_sound_start(pSound) != MA_SUCCESS)
 		{
 			ma_sound_uninit(pSound);
-			std::free(pSound);
+			delete pSound;
 			KBR_CORE_ERROR("Failed to start miniaudio sound for file: {0}", filepath.string());
 			return;
 		}
@@ -137,31 +138,31 @@ namespace Kerberos
 		ma_sound* s = it->second;
 		ma_sound_stop(s);
 		ma_sound_uninit(s);
-		free(s);
+		delete s;
 		m_PlayingSounds.erase(it);
 	}
 
 	void MiniaudioAudioManager::IncreaseVolume(const UUID& soundID, const float delta)
 	{
-		auto it = m_PlayingSounds.find(soundID);
+		const auto it = m_PlayingSounds.find(soundID);
 		if (it == m_PlayingSounds.end() || it->second == nullptr)
 		{
 			KBR_CORE_ERROR("You can only increase the volume of a sound currently playing");
 			return;
 		}
-		float current = ma_sound_get_volume(it->second);
+		const float current = ma_sound_get_volume(it->second);
 		ma_sound_set_volume(it->second, current + delta);
 	}
 
 	void MiniaudioAudioManager::DecreaseVolume(const UUID& soundID, const float delta)
 	{
-		auto it = m_PlayingSounds.find(soundID);
+		const auto it = m_PlayingSounds.find(soundID);
 		if (it == m_PlayingSounds.end() || it->second == nullptr)
 		{
 			KBR_CORE_ERROR("You can only decrease the volume of a sound currently playing");
 			return;
 		}
-		float current = ma_sound_get_volume(it->second);
+		const float current = ma_sound_get_volume(it->second);
 		ma_sound_set_volume(it->second, current - delta);
 	}
 

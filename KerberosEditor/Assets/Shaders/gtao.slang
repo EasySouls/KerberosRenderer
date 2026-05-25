@@ -43,14 +43,20 @@ float IntegrateArc(float h, float n)
     return (cos(n) + 2.0 * h * sin(n) - cos(2.0 * h - n)) / 4.0;
 }
 
-float ComputeGTAO(float2 uv, float3 viewPos, float3 viewNormal)
+float InterleavedGradientNoise(float2 pixelCoords)
 {
-    float3 viewV = normalize(-viewPos); // Vector to camera
-    float visibility = 0.0;             // The integral accumulates visibility
+    float3 magic = float3(0.06711056, 0.00583715, 52.9829189);
+    return frac(magic.z * frac(dot(pixelCoords, magic.xy)));
+}
+
+float ComputeGTAO(float2 uv, float3 viewPos, float3 viewNormal, float spatialNoise)
+{
+    float3 viewV = normalize(-viewPos);
+    float visibility = 0.0;
     int directionCount = max(1, (int)cb.directionCount);
     int sampleCount = max(1, (int)cb.sampleCount);
 
-    float rotation = cb.temporalIndex * 0.618;
+    float rotation = (cb.temporalIndex + spatialNoise) * 0.618;
 
     float2 focalLength = abs(float2(cb.projectionMatrix[0][0], cb.projectionMatrix[1][1]));
     float viewDepth = max(-viewPos.z, 1e-4);
@@ -73,7 +79,8 @@ float ComputeGTAO(float2 uv, float3 viewPos, float3 viewNormal)
 
         for (int s = 1; s <= sampleCount; ++s)
         {
-            float2 offset = dir * (float(s) / sampleCount) * radiusUV;
+            float stepJitter = (float(s) - spatialNoise) / sampleCount;
+            float2 offset = dir * stepJitter * radiusUV;
             float2 uv1 = uv + offset;
             float2 uv2 = uv - offset;
 
@@ -83,8 +90,16 @@ float ComputeGTAO(float2 uv, float3 viewPos, float3 viewNormal)
                 float3 p1 = GetViewPos(uv1);
                 float3 v1 = p1 - viewPos;
                 float d2_1 = dot(v1, v1);
-                if (d2_1 <= falloff2)
-                    h1 = max(h1, dot(viewV, v1 * rsqrt(max(d2_1, 1e-6))));
+
+                float cosHorizon = dot(viewV, v1 * rsqrt(max(d2_1, 1e-6)));
+
+                // Thickness heuristic
+                float distanceFraction = d2_1 / falloff2;
+                float weight = saturate(1.0 - distanceFraction);
+                cosHorizon = lerp(-1.0, cosHorizon, weight);
+
+                // Keep the highest horizon found so far
+                h1 = max(h1, cosHorizon);
             }
 
             // Opposite direction
@@ -93,8 +108,16 @@ float ComputeGTAO(float2 uv, float3 viewPos, float3 viewNormal)
                 float3 p2 = GetViewPos(uv2);
                 float3 v2 = p2 - viewPos;
                 float d2_2 = dot(v2, v2);
-                if (d2_2 <= falloff2)
-                    h2 = max(h2, dot(viewV, v2 * rsqrt(max(d2_2, 1e-6))));
+
+                float cosHorizon = dot(viewV, v2 * rsqrt(max(d2_2, 1e-6)));
+
+                // Thickness heuristic
+                float distanceFraction = d2_2 / falloff2;
+                float weight = saturate(1.0 - distanceFraction);
+                cosHorizon = lerp(-1.0, cosHorizon, weight);
+
+                // Keep the highest horizon found so far
+                h2 = max(h2, cosHorizon);
             }
         }
 
@@ -106,15 +129,13 @@ float ComputeGTAO(float2 uv, float3 viewPos, float3 viewNormal)
         float3 tangent = cross(viewV, planeNormal);
         float3 projectedNormal = viewNormal - planeNormal * dot(viewNormal, planeNormal);
 
-        // The length of the projection needs to weight the final integration
-        float projLength = length(projectedNormal);
         float n = atan2(dot(projectedNormal, tangent), dot(projectedNormal, viewV));
 
         // Clamp horizons to the valid hemisphere defined by the normal
         h1 = n + clamp(h1 - n, -1.570796, 1.570796);
         h2 = -n + clamp(h2 + n, -1.570796, 1.570796);
 
-        visibility += projLength * (IntegrateArc(h1, n) + IntegrateArc(h2, -n));
+        visibility += IntegrateArc(h1, n) + IntegrateArc(h2, -n);
     }
 
     return saturate(visibility / directionCount);
@@ -138,7 +159,9 @@ void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 
     float3 viewNormal = GetNormal(uv);
 
-    float ao = ComputeGTAO(uv, viewPos, viewNormal);
+    float noise = InterleavedGradientNoise(float2(dispatchThreadID.xy));
+
+    float ao = ComputeGTAO(uv, viewPos, viewNormal, noise);
 
     outAO[dispatchThreadID.xy] = ao;
 }

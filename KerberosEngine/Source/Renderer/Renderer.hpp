@@ -60,6 +60,18 @@ namespace Kerberos
 		uint32_t EntityID = 0;
 	};
 
+	struct GTAOConstants
+	{
+		glm::mat4 projectionMatrix{ 0.0f };
+		glm::mat4 invProjectionMatrix{ 0.0f };
+		glm::vec2 viewportSize{ 0.0f };
+		float radius = 1.0f;        // World space radius of AO
+		float falloff = 1.0f;        // Distance falloff
+		float sampleCount = 8.0f;    // Steps per direction (usually 4-8)
+		float directionCount = 4.0f; // Number of directions (usually 2-4)
+		float temporalIndex = 1.0f;  // For jittering over time
+	};
+
 	enum class AntiAliasingMode
 	{
 		None = 0,
@@ -108,6 +120,8 @@ namespace Kerberos
 		static bool& GetUseRayQueryBasedShadows();
 		static bool& GetUseRayQueryBasedSoftShadows();
 		static bool& GetUseGTAO();
+		static bool& GetUseBlurForGTAO();
+		static GTAOConstants& GetGTAOConstants();
 		static float& GetGamma();
 		static float& GetExposure();
 		static uint32_t GetShadowMapCascadeCount();
@@ -141,6 +155,7 @@ namespace Kerberos
 
 		static void UpdateSceneUniformBuffers(uint32_t currentImage, 
 											  const Camera* mainCamera, 
+											  uint32_t temporalIndex,
 											  const std::vector<glm::mat4>& lightSpaceMatrices,
 											  const glm::vec4& cascadeSplits,
 											  uint32_t lightCount);
@@ -149,6 +164,7 @@ namespace Kerberos
 											  const glm::mat4& view, 
 											  const glm::mat4& projection, 
 											  const glm::vec3& camPos,
+											  uint32_t temporalIndex,
 											  const std::vector<glm::mat4>& lightSpaceMatrices,
 											  const glm::vec4& cascadeSplits,
 											  uint32_t lightCount);

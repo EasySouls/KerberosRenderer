@@ -111,6 +111,7 @@ namespace
 		vk::raii::DescriptorSetLayout textures = nullptr;
 		vk::raii::DescriptorSetLayout composite = nullptr;
 		vk::raii::DescriptorSetLayout gtao = nullptr;
+		vk::raii::DescriptorSetLayout crossBilateralBlur = nullptr;
 		vk::raii::DescriptorSetLayout fxaa = nullptr;
 		vk::raii::DescriptorSetLayout bloom = nullptr;
 	};
@@ -119,7 +120,7 @@ namespace
 	{
 		glm::mat4 projection{ 0.f };
 		glm::mat4 view{ 0.f };
-		glm::mat4 lightSpaceMatrices[ShadowMap::CascadeCount]{ 0.f };
+		std::array<glm::mat4, ShadowMap::CascadeCount> lightSpaceMatrices{ glm::mat4(0.0f) };
 		glm::vec4 cascadeSplits{ 0.f };
 		alignas(16) glm::vec3 camPos{ 0.f };
 		uint32_t lightCount = 0;
@@ -156,16 +157,10 @@ namespace
 		Ref<GraphicsPipeline> MainPipeline = nullptr;
 	};
 
-	struct GTAOConstants
+	struct CrossBilateralBlurConstants
 	{
-		glm::mat4 projectionMatrix;
-		glm::mat4 invProjectionMatrix;
-		glm::vec2 viewportSize;
-		float radius;         // World space radius of AO
-		float falloff;        // Distance falloff
-		float sampleCount;    // Steps per direction (usually 4-8)
-		float directionCount; // Number of directions (usually 2-4)
-		float temporalIndex;  // For jittering over time
+		glm::vec2 inverseViewportSize{ 0.0f, 0.0f };
+		glm::vec2 direction{ 0.0f, 0.0f };
 	};
 
 	struct FXAAPushConstants
@@ -239,6 +234,8 @@ namespace
 		vk::raii::DescriptorSet skybox = nullptr;
 		vk::raii::DescriptorSet resolve = nullptr;
 		vk::raii::DescriptorSet gtao = nullptr;
+		vk::raii::DescriptorSet crossBilateralBlurHorizontal = nullptr;
+		vk::raii::DescriptorSet crossBilateralBlurVertical = nullptr;
 		vk::raii::DescriptorSet fxaa = nullptr;
 	};
 
@@ -299,6 +296,7 @@ namespace
 		ImageData CompositeImage;
 		ImageData PickingImage;
 		ImageData GTAOImage;
+		ImageData GTAOScratchImage;
 		vk::ImageLayout PickingImageLayout = vk::ImageLayout::eUndefined;
 
 		vk::raii::DescriptorPool DescriptorPool = nullptr;
@@ -316,6 +314,9 @@ namespace
 
 		vk::raii::PipelineLayout GTAOPipelineLayout = nullptr;
 		Ref<ComputePipeline> GTAOPipeline = nullptr;
+
+		vk::raii::PipelineLayout CrossBilateralBlurPipelineLayout = nullptr;
+		Ref<ComputePipeline> CrossBilateralBlurPipeline = nullptr;
 
 		vk::raii::PipelineLayout TransparencyResolvePipelineLayout = nullptr;
 		Ref<GraphicsPipeline> TransparencyResolvePipeline = nullptr;
@@ -362,6 +363,11 @@ namespace
 
 		glm::vec2 OutputSize{ 1280.0f, 720.0f };
 
+		constexpr static uint32_t TemporalSequenceLength = 8;
+
+		vk::ImageLayout GTAOImageLayout = vk::ImageLayout::eUndefined;
+		bool PreviousUseGTAO = true;
+
 		// Settings
 		bool DisplayDebugNormals = false;
 		bool DisplayPhysicsColliders = false;
@@ -369,8 +375,7 @@ namespace
 		bool UseRayQueryBasedShadows = false;
 		bool UseRayQueryBasedSoftShadows = false;
 		bool UseGTAO = true;
-		vk::ImageLayout GTAOImageLayout = vk::ImageLayout::eUndefined;
-		bool PreviousUseGTAO = true;
+		bool UseBlurredGTAO = true;
 
 		AntiAliasingMode AntiAliasingMode = AntiAliasingMode::FXAA;
 		TonemappingOperator TonemappingOperator = TonemappingOperator::ACES;
@@ -505,6 +510,8 @@ namespace Kerberos
 
 		auto& context = VulkanContext::Get();
 		const uint32_t frameIndex = context.GetCurrentFrameIndex();
+		const uint32_t frameCount = context.GetFrameCount();
+		const uint32_t temporalIndex = frameCount % RendererData::TemporalSequenceLength + 1;
 
 		if (IsUsingAccelerationStructures())
 		{
@@ -581,6 +588,7 @@ namespace Kerberos
             s_Data->PendingRender.View,
 			s_Data->PendingRender.Projection,
 			s_Data->PendingRender.CameraPosition,
+			temporalIndex,
 			lightSpaceMatrices,
 			cascadeSplits,
 			lightCount);
@@ -928,6 +936,134 @@ namespace Kerberos
 				cmd.dispatch(groupX, groupY, 1);
 
 				EndRenderPassDebugLabel(cmd);
+
+				if (s_Data->UseBlurredGTAO)
+				{
+					// Cross-bilateral blur horizontal pass
+
+					BeginRenderPassDebugLabel(cmd, "GTAO Horizontal Blur");
+
+					{
+						// Transition main image to shader read and scratch image to general for compute shader write
+						const auto [aoSrcStageMask, aoSrcAccessMask] = getSrcStageAccessForLayout(s_Data->GTAOImageLayout);
+						const vk::ImageMemoryBarrier2 aoBarrier{
+							.srcStageMask = aoSrcStageMask,
+							.srcAccessMask = aoSrcAccessMask,
+							.dstStageMask = vk::PipelineStageFlagBits2::eComputeShader,
+							.dstAccessMask = vk::AccessFlagBits2::eShaderStorageWrite,
+							.oldLayout = s_Data->GTAOImageLayout,
+							.newLayout = vk::ImageLayout::eGeneral,
+							.srcQueueFamilyIndex = vk::QueueFamilyIgnored,
+							.dstQueueFamilyIndex = vk::QueueFamilyIgnored,
+							.image = s_Data->GTAOImage.Image,
+							.subresourceRange = {
+								.aspectMask = vk::ImageAspectFlagBits::eColor,
+								.baseMipLevel = 0,
+								.levelCount = 1,
+								.baseArrayLayer = 0,
+								.layerCount = 1
+							}
+						};
+						const vk::ImageMemoryBarrier2 scratchBarrier{
+							.srcStageMask = vk::PipelineStageFlagBits2::eComputeShader,
+							.srcAccessMask = vk::AccessFlagBits2::eShaderStorageWrite,
+							.dstStageMask = vk::PipelineStageFlagBits2::eComputeShader,
+							.dstAccessMask = vk::AccessFlagBits2::eShaderStorageWrite,
+							.oldLayout = vk::ImageLayout::eUndefined,
+							.newLayout = vk::ImageLayout::eGeneral,
+							.srcQueueFamilyIndex = vk::QueueFamilyIgnored,
+							.dstQueueFamilyIndex = vk::QueueFamilyIgnored,
+							.image = s_Data->GTAOScratchImage.Image,
+							.subresourceRange = {
+								.aspectMask = vk::ImageAspectFlagBits::eColor,
+								.baseMipLevel = 0,
+								.levelCount = 1,
+								.baseArrayLayer = 0,
+								.layerCount = 1
+							}
+						};
+						const std::array barriers = { aoBarrier, scratchBarrier };
+						const vk::DependencyInfo dependencyInfo = {
+							.dependencyFlags = {},
+							.imageMemoryBarrierCount = barriers.size(),
+							.pImageMemoryBarriers = barriers.data()
+						};
+						cmd.pipelineBarrier2(dependencyInfo);
+					}
+
+					cmd.bindPipeline(vk::PipelineBindPoint::eCompute, *s_Data->CrossBilateralBlurPipeline->GetVulkanPipeline());
+					cmd.bindDescriptorSets(vk::PipelineBindPoint::eCompute, *s_Data->CrossBilateralBlurPipelineLayout, 0, { s_Data->DescriptorSets[currentImage].crossBilateralBlurHorizontal }, {});
+
+					CrossBilateralBlurConstants pushConstants;
+					pushConstants.inverseViewportSize = glm::vec2(1.0f) / s_Data->OutputSize;
+					pushConstants.direction = { 1.0f, 0.0f };
+					cmd.pushConstants<CrossBilateralBlurConstants>(*s_Data->CrossBilateralBlurPipelineLayout, vk::ShaderStageFlagBits::eCompute, 0, { pushConstants });
+
+					cmd.dispatch(groupX, groupY, 1);
+
+					EndRenderPassDebugLabel(cmd);
+
+					// Cross-bilateral blur vertical pass
+
+					BeginRenderPassDebugLabel(cmd, "GTAO Vertical Blur");
+
+					{
+						// Transition scratch image to shader read and main image to general for compute shader write
+						const vk::ImageMemoryBarrier2 mainImageToGeneralBarrier{
+							.srcStageMask = vk::PipelineStageFlagBits2::eComputeShader,
+							.srcAccessMask = vk::AccessFlagBits2::eShaderStorageWrite,
+							.dstStageMask = vk::PipelineStageFlagBits2::eComputeShader,
+							.dstAccessMask = vk::AccessFlagBits2::eShaderStorageWrite,
+							.oldLayout = vk::ImageLayout::eGeneral,
+							.newLayout = vk::ImageLayout::eGeneral,
+							.srcQueueFamilyIndex = vk::QueueFamilyIgnored,
+							.dstQueueFamilyIndex = vk::QueueFamilyIgnored,
+							.image = s_Data->GTAOImage.Image,
+							.subresourceRange = {
+								.aspectMask = vk::ImageAspectFlagBits::eColor,
+								.baseMipLevel = 0,
+								.levelCount = 1,
+								.baseArrayLayer = 0,
+								.layerCount = 1
+							}
+						};
+						const vk::ImageMemoryBarrier2 scratchImageToShaderReadBarrier{
+							.srcStageMask = vk::PipelineStageFlagBits2::eComputeShader,
+							.srcAccessMask = vk::AccessFlagBits2::eShaderStorageWrite,
+							.dstStageMask = vk::PipelineStageFlagBits2::eComputeShader,
+							.dstAccessMask = vk::AccessFlagBits2::eShaderRead,
+							.oldLayout = vk::ImageLayout::eGeneral,
+							.newLayout = vk::ImageLayout::eShaderReadOnlyOptimal,
+							.srcQueueFamilyIndex = vk::QueueFamilyIgnored,
+							.dstQueueFamilyIndex = vk::QueueFamilyIgnored,
+							.image = s_Data->GTAOScratchImage.Image,
+							.subresourceRange = {
+								.aspectMask = vk::ImageAspectFlagBits::eColor,
+								.baseMipLevel = 0,
+								.levelCount = 1,
+								.baseArrayLayer = 0,
+								.layerCount = 1
+							}
+						};
+						const std::array barriers = { mainImageToGeneralBarrier, scratchImageToShaderReadBarrier };
+						const vk::DependencyInfo dependencyInfo = {
+							.dependencyFlags = {},
+							.imageMemoryBarrierCount = barriers.size(),
+							.pImageMemoryBarriers = barriers.data()
+						};
+						cmd.pipelineBarrier2(dependencyInfo);
+					}
+
+					cmd.bindPipeline(vk::PipelineBindPoint::eCompute, *s_Data->CrossBilateralBlurPipeline->GetVulkanPipeline());
+					cmd.bindDescriptorSets(vk::PipelineBindPoint::eCompute, *s_Data->CrossBilateralBlurPipelineLayout, 0, { s_Data->DescriptorSets[currentImage].crossBilateralBlurVertical }, {});
+
+					pushConstants.direction = { 0.0f, 1.0f };
+					cmd.pushConstants<CrossBilateralBlurConstants>(*s_Data->CrossBilateralBlurPipelineLayout, vk::ShaderStageFlagBits::eCompute, 0, { pushConstants });
+
+					cmd.dispatch(groupX, groupY, 1);
+
+					EndRenderPassDebugLabel(cmd);
+				}
 
 				// Transition ao image from storage image to sampled image
 				// and transition depth image back to depth attachment
@@ -1870,6 +2006,7 @@ namespace Kerberos
 				vk::ImageTiling::eOptimal,
 				vk::FormatFeatureFlagBits::eStorageImage | vk::FormatFeatureFlagBits::eSampledImage
 			);
+			s_Data->GTAOScratchImage.Format = s_Data->GTAOImage.Format;
 
 			constexpr uint32_t gtaoImageWidth = 512;
 			constexpr uint32_t gtaoImageHeight = 512;
@@ -1877,34 +2014,34 @@ namespace Kerberos
 			CreateGTAOImage(gtaoImageWidth, gtaoImageHeight);
 
 			std::vector<vk::DescriptorSetLayoutBinding> bindings = {
-			vk::DescriptorSetLayoutBinding{ // Constants uniform buffer
-				.binding = 0,
-				.descriptorType = vk::DescriptorType::eUniformBuffer,
-				.descriptorCount = 1,
-				.stageFlags = vk::ShaderStageFlagBits::eCompute,
-				.pImmutableSamplers = nullptr
-			},
-			vk::DescriptorSetLayoutBinding{ // Depth texture
-				.binding = 1,
-				.descriptorType = vk::DescriptorType::eCombinedImageSampler,
-				.descriptorCount = 1,
-				.stageFlags = vk::ShaderStageFlagBits::eCompute,
-				.pImmutableSamplers = nullptr
-			},
-			vk::DescriptorSetLayoutBinding{ // Normal texture
-				.binding = 2,
-				.descriptorType = vk::DescriptorType::eCombinedImageSampler,
-				.descriptorCount = 1,
-				.stageFlags = vk::ShaderStageFlagBits::eCompute,
-				.pImmutableSamplers = nullptr
-			},
-			vk::DescriptorSetLayoutBinding{ // AO storage image
-				.binding = 3,
-				.descriptorType = vk::DescriptorType::eStorageImage,
-				.descriptorCount = 1,
-				.stageFlags = vk::ShaderStageFlagBits::eCompute,
-				.pImmutableSamplers = nullptr
-			},
+				vk::DescriptorSetLayoutBinding{ // Constants uniform buffer
+					.binding = 0,
+					.descriptorType = vk::DescriptorType::eUniformBuffer,
+					.descriptorCount = 1,
+					.stageFlags = vk::ShaderStageFlagBits::eCompute,
+					.pImmutableSamplers = nullptr
+				},
+				vk::DescriptorSetLayoutBinding{ // Depth texture
+					.binding = 1,
+					.descriptorType = vk::DescriptorType::eCombinedImageSampler,
+					.descriptorCount = 1,
+					.stageFlags = vk::ShaderStageFlagBits::eCompute,
+					.pImmutableSamplers = nullptr
+				},
+				vk::DescriptorSetLayoutBinding{ // Normal texture
+					.binding = 2,
+					.descriptorType = vk::DescriptorType::eCombinedImageSampler,
+					.descriptorCount = 1,
+					.stageFlags = vk::ShaderStageFlagBits::eCompute,
+					.pImmutableSamplers = nullptr
+				},
+				vk::DescriptorSetLayoutBinding{ // AO storage image
+					.binding = 3,
+					.descriptorType = vk::DescriptorType::eStorageImage,
+					.descriptorCount = 1,
+					.stageFlags = vk::ShaderStageFlagBits::eCompute,
+					.pImmutableSamplers = nullptr
+				},
 			};
 
 			const vk::DescriptorSetLayoutCreateInfo layoutInfo{
@@ -1935,6 +2072,74 @@ namespace Kerberos
 			gtaoPipelineSpec.PipelineLayout = *s_Data->GTAOPipelineLayout;
 
 			s_Data->GTAOPipeline = CreateRef<ComputePipeline>(gtaoPipelineSpec);
+
+			// Setting up the cross-bilateral blur resources for GTAO
+
+			std::vector<vk::DescriptorSetLayoutBinding> blurBindings = {
+				vk::DescriptorSetLayoutBinding{ // Input AO texture
+					.binding = 0,
+					.descriptorType = vk::DescriptorType::eCombinedImageSampler,
+					.descriptorCount = 1,
+					.stageFlags = vk::ShaderStageFlagBits::eCompute,
+					.pImmutableSamplers = nullptr
+				},
+				vk::DescriptorSetLayoutBinding{ // Depth texture
+					.binding = 1,
+					.descriptorType = vk::DescriptorType::eCombinedImageSampler,
+					.descriptorCount = 1,
+					.stageFlags = vk::ShaderStageFlagBits::eCompute,
+					.pImmutableSamplers = nullptr
+				},
+				vk::DescriptorSetLayoutBinding{ // Normal texture
+					.binding = 2,
+					.descriptorType = vk::DescriptorType::eCombinedImageSampler,
+					.descriptorCount = 1,
+					.stageFlags = vk::ShaderStageFlagBits::eCompute,
+					.pImmutableSamplers = nullptr
+				},
+				vk::DescriptorSetLayoutBinding{ // Output AO storage image
+					.binding = 3,
+					.descriptorType = vk::DescriptorType::eStorageImage,
+					.descriptorCount = 1,
+					.stageFlags = vk::ShaderStageFlagBits::eCompute,
+					.pImmutableSamplers = nullptr
+				},
+			};
+
+			const vk::DescriptorSetLayoutCreateInfo blurLayoutInfo{
+				.bindingCount = static_cast<uint32_t>(blurBindings.size()),
+				.pBindings = blurBindings.data()
+			};
+
+			s_Data->DescriptorSetLayouts.crossBilateralBlur = vk::raii::DescriptorSetLayout{ device, blurLayoutInfo };
+			context.SetObjectDebugName(s_Data->DescriptorSetLayouts.crossBilateralBlur, "Cross-Bilateral Blur Descriptor Set Layout");
+
+			const std::array blurSetLayouts = {
+				*s_Data->DescriptorSetLayouts.crossBilateralBlur
+			};
+
+			constexpr vk::PushConstantRange blurPushConstantRange{
+				.stageFlags = vk::ShaderStageFlagBits::eCompute,
+				.offset = 0,
+				.size = sizeof(CrossBilateralBlurConstants)
+			};
+
+			vk::PipelineLayoutCreateInfo blurPipelineLayoutInfo{
+				.setLayoutCount = static_cast<uint32_t>(blurSetLayouts.size()),
+				.pSetLayouts = blurSetLayouts.data(),
+				.pushConstantRangeCount = 1,
+				.pPushConstantRanges = &blurPushConstantRange
+			};
+
+			s_Data->CrossBilateralBlurPipelineLayout = vk::raii::PipelineLayout{ device, blurPipelineLayoutInfo };
+			context.SetObjectDebugName(s_Data->CrossBilateralBlurPipelineLayout, "Cross-Bilateral Blur Pipeline Layout");
+
+			ComputePipelineSpecification blurPipelineSpec{};
+			blurPipelineSpec.Name = "Cross-Bilateral Blur Pipeline";
+			blurPipelineSpec.Shader = CreateRef<Shader>("spatial_cross_bilateral_blur", "Cross-Bilateral Blur");
+			blurPipelineSpec.PipelineLayout = *s_Data->CrossBilateralBlurPipelineLayout;
+
+			s_Data->CrossBilateralBlurPipeline = CreateRef<ComputePipeline>(blurPipelineSpec);
 		}
 
 		// Create the shadow map resources
@@ -2803,6 +3008,9 @@ namespace Kerberos
 		s_Data->GTAOImage.ImageView.clear();
 		s_Data->GTAOImage.Image.clear();
 		s_Data->GTAOImage.ImageMemory.clear();
+		s_Data->GTAOScratchImage.ImageView.clear();
+		s_Data->GTAOScratchImage.Image.clear();
+		s_Data->GTAOScratchImage.ImageMemory.clear();
 
 		// Recreate resources with new size
 
@@ -2979,7 +3187,7 @@ namespace Kerberos
 				.imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal
 			};
 			const vk::DescriptorImageInfo aoImageInfo = {
-				.sampler = s_Data->LinearSampler,
+				.sampler = s_Data->PointSampler,
 				.imageView = s_Data->GTAOImage.ImageView,
 				.imageLayout = vk::ImageLayout::eGeneral
 			};
@@ -3014,6 +3222,114 @@ namespace Kerberos
 				};
 
 				// Overwrite the old bindings with the new ones
+				device.updateDescriptorSets(descriptorWrites, nullptr);
+			}
+		}
+
+		// Update the GTAO blur descriptor sets to point to the new images
+		{
+			const vk::DescriptorImageInfo depthImageInfo = {
+				.sampler = s_Data->PointSampler,
+				.imageView = s_Data->DepthImage.ImageView,
+				.imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal
+			};
+			const vk::DescriptorImageInfo normalImageInfo = {
+				.sampler = s_Data->LinearSampler,
+				.imageView = s_Data->NormalImage.ImageView,
+				.imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal
+			};
+
+			const vk::DescriptorImageInfo mainImageWriteInfo = {
+				.sampler = s_Data->PointSampler,
+				.imageView = s_Data->GTAOImage.ImageView,
+				.imageLayout = vk::ImageLayout::eGeneral
+			};
+			const vk::DescriptorImageInfo mainImageReadInfo = {
+				.sampler = s_Data->PointSampler,
+				.imageView = s_Data->GTAOImage.ImageView,
+				.imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal
+			};
+			const vk::DescriptorImageInfo scratchImageWriteInfo = {
+				.sampler = s_Data->PointSampler,
+				.imageView = s_Data->GTAOScratchImage.ImageView,
+				.imageLayout = vk::ImageLayout::eGeneral
+			};
+			const vk::DescriptorImageInfo scratchImageReadInfo = {
+				.sampler = s_Data->PointSampler,
+				.imageView = s_Data->GTAOScratchImage.ImageView,
+				.imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal
+			};
+
+			for (size_t frameIndex = 0; frameIndex < VulkanContext::MaxFramesInFlight; frameIndex++)
+			{
+				std::array<vk::WriteDescriptorSet, 8> descriptorWrites;
+
+				descriptorWrites[0] = {
+					.dstSet = s_Data->DescriptorSets[frameIndex].crossBilateralBlurHorizontal,
+					.dstBinding = 0,
+					.dstArrayElement = 0,
+					.descriptorCount = 1,
+					.descriptorType = vk::DescriptorType::eCombinedImageSampler,
+					.pImageInfo = &mainImageReadInfo
+				};
+				descriptorWrites[1] = {
+					.dstSet = s_Data->DescriptorSets[frameIndex].crossBilateralBlurHorizontal,
+					.dstBinding = 1,
+					.dstArrayElement = 0,
+					.descriptorCount = 1,
+					.descriptorType = vk::DescriptorType::eCombinedImageSampler,
+					.pImageInfo = &depthImageInfo
+				};
+				descriptorWrites[2] = {
+					.dstSet = s_Data->DescriptorSets[frameIndex].crossBilateralBlurHorizontal,
+					.dstBinding = 2,
+					.dstArrayElement = 0,
+					.descriptorCount = 1,
+					.descriptorType = vk::DescriptorType::eCombinedImageSampler,
+					.pImageInfo = &normalImageInfo
+				};
+				descriptorWrites[3] = {
+					.dstSet = s_Data->DescriptorSets[frameIndex].crossBilateralBlurHorizontal,
+					.dstBinding = 3,
+					.dstArrayElement = 0,
+					.descriptorCount = 1,
+					.descriptorType = vk::DescriptorType::eStorageImage,
+					.pImageInfo = &scratchImageWriteInfo
+				};
+
+				descriptorWrites[4] = {
+					.dstSet = s_Data->DescriptorSets[frameIndex].crossBilateralBlurVertical,
+					.dstBinding = 0,
+					.dstArrayElement = 0,
+					.descriptorCount = 1,
+					.descriptorType = vk::DescriptorType::eCombinedImageSampler,
+					.pImageInfo = &scratchImageReadInfo
+				};
+				descriptorWrites[5] = {
+					.dstSet = s_Data->DescriptorSets[frameIndex].crossBilateralBlurVertical,
+					.dstBinding = 1,
+					.dstArrayElement = 0,
+					.descriptorCount = 1,
+					.descriptorType = vk::DescriptorType::eCombinedImageSampler,
+					.pImageInfo = &depthImageInfo
+				};
+				descriptorWrites[6] = {
+					.dstSet = s_Data->DescriptorSets[frameIndex].crossBilateralBlurVertical,
+					.dstBinding = 2,
+					.dstArrayElement = 0,
+					.descriptorCount = 1,
+					.descriptorType = vk::DescriptorType::eCombinedImageSampler,
+					.pImageInfo = &normalImageInfo
+				};
+				descriptorWrites[7] = {
+					.dstSet = s_Data->DescriptorSets[frameIndex].crossBilateralBlurVertical,
+					.dstBinding = 3,
+					.dstArrayElement = 0,
+					.descriptorCount = 1,
+					.descriptorType = vk::DescriptorType::eStorageImage,
+					.pImageInfo = &mainImageWriteInfo
+				};
+
 				device.updateDescriptorSets(descriptorWrites, nullptr);
 			}
 		}
@@ -3219,6 +3535,8 @@ namespace Kerberos
 			bloomDownsamplePipeline->Recompile();
 		if (const auto& bloomUpsamplePipeline = s_Data->Bloom.UpsamplePipeline)
 			bloomUpsamplePipeline->Recompile();
+		if (const auto& crossBilateralBlurPipeline = s_Data->CrossBilateralBlurPipeline)
+			crossBilateralBlurPipeline->Recompile();
 	}
 
 	glm::vec3 Renderer::GetLightPositionForShadowMapCalculation() 
@@ -3282,6 +3600,16 @@ namespace Kerberos
 		KBR_CORE_ASSERT(s_Data, "Renderer not initialized!");
 
 		return s_Data->UseGTAO;
+	}
+
+	bool& Renderer::GetUseBlurForGTAO() 
+	{
+		return s_Data->UseBlurredGTAO;
+	}
+
+	GTAOConstants& Renderer::GetGTAOConstants() 
+	{
+		return s_Data->GTAOData;
 	}
 
 	float& Renderer::GetGamma() 
@@ -3514,7 +3842,7 @@ namespace Kerberos
 		std::memcpy(s_Data->StorageBuffers[currentImage].Lights->GetMappedData(), sceneLights.data(), sceneLights.size() * sizeof(GPULight));
 	}
 
-	void Renderer::UpdateSceneUniformBuffers(const uint32_t currentImage, const Camera* mainCamera, const std::vector<glm::mat4>& lightSpaceMatrices,
+	void Renderer::UpdateSceneUniformBuffers(const uint32_t currentImage, const Camera* mainCamera, uint32_t temporalIndex, const std::vector<glm::mat4>& lightSpaceMatrices,
 											 const glm::vec4& cascadeSplits, const uint32_t lightCount)
 	{
 		KBR_CORE_ASSERT(s_Data, "Renderer not initialized!");
@@ -3523,11 +3851,11 @@ namespace Kerberos
 		const glm::mat4& view = mainCamera->GetViewMatrix();
 		const glm::vec3 camPos = mainCamera->GetPosition();
 
-		UpdateSceneUniformBuffers(currentImage, view, projection, camPos, lightSpaceMatrices, cascadeSplits, lightCount);
+		UpdateSceneUniformBuffers(currentImage, view, projection, camPos, temporalIndex, lightSpaceMatrices, cascadeSplits, lightCount);
 	}
 
 	void Renderer::UpdateSceneUniformBuffers(const uint32_t currentImage, const glm::mat4& view, const glm::mat4& projection,
-												const glm::vec3& camPos, const std::vector<glm::mat4>& lightSpaceMatrices,
+												const glm::vec3& camPos, uint32_t temporalIndex, const std::vector<glm::mat4>& lightSpaceMatrices,
 												const glm::vec4& cascadeSplits, const uint32_t lightCount)
 	{
 		KBR_CORE_ASSERT(s_Data, "Renderer not initialized!");
@@ -3539,14 +3867,14 @@ namespace Kerberos
 		s_Data->SceneUniformData.lightCount = lightCount;
 		s_Data->SceneUniformData.viewportSize = s_Data->OutputSize;
 
-		for (size_t i = 0; i < s_Data->SceneUniformData.lightSpaceMatrices->length(); ++i)
+		for (size_t i = 0; i < s_Data->SceneUniformData.lightSpaceMatrices.size(); ++i)
 		{
 			s_Data->SceneUniformData.lightSpaceMatrices[i] = lightSpaceMatrices[i];
 		}
 
-		if (s_Data->SceneUniformData.lightSpaceMatrices->length() != lightSpaceMatrices.size())
+		if (s_Data->SceneUniformData.lightSpaceMatrices.size() != lightSpaceMatrices.size())
 		{
-			KBR_CORE_ERROR("Number of light space matrices exceeds the maximum supported count of {}", s_Data->SceneUniformData.lightSpaceMatrices->length());
+			KBR_CORE_ERROR("Number of light space matrices exceeds the maximum supported count of {}", s_Data->SceneUniformData.lightSpaceMatrices.size());
 		}
 
 		std::memcpy(s_Data->UniformBuffers[currentImage].scene->GetMappedData(), &s_Data->SceneUniformData, sizeof(SceneUniformData));
@@ -3559,12 +3887,8 @@ namespace Kerberos
 		s_Data->GTAOData.projectionMatrix = projection;
 		s_Data->GTAOData.invProjectionMatrix = glm::inverse(projection);
 		s_Data->GTAOData.viewportSize = s_Data->OutputSize;
-		s_Data->GTAOData.radius = 0.35f;
-		s_Data->GTAOData.falloff = 1.0f;
-		s_Data->GTAOData.sampleCount = 8.0f;
-		s_Data->GTAOData.directionCount = 4.0f;
-		// s_Data->GTAOData.temporalIndex = static_cast<float>(currentImage); TODO: Add temporal-spatial denoiser
-		s_Data->GTAOData.temporalIndex = 0.0f;
+		s_Data->GTAOData.temporalIndex = 1.0f;
+		//s_Data->GTAOData.temporalIndex = static_cast<float>(temporalIndex); // TODO: Add temporal-spatial denoiser
 		std::memcpy(s_Data->UniformBuffers[currentImage].gtao->GetMappedData(), &s_Data->GTAOData, sizeof(GTAOConstants));
 	}
 
@@ -4861,6 +5185,8 @@ namespace Kerberos
 	void Renderer::CreateGTAOImage(const uint32_t width, const uint32_t height) 
 	{
 		KBR_CORE_ASSERT(s_Data->GTAOImage.Format != vk::Format::eUndefined, "GTAO image format has to be set before creating GTAO image!");
+		KBR_CORE_ASSERT(s_Data->GTAOScratchImage.Format != vk::Format::eUndefined, "GTAO scratch image format has to be set before creating GTAO image!");
+		KBR_CORE_ASSERT(s_Data->GTAOImage.Format == s_Data->GTAOScratchImage.Format, "GTAO image format must be the same as GTAO scratch image format!");
 
 		auto& context = VulkanContext::Get();
 		const auto& device = context.GetDevice();
@@ -4888,12 +5214,34 @@ namespace Kerberos
 													  mipLevels);
 		context.SetObjectDebugName(s_Data->GTAOImage.ImageView,"GTAO Image View");
 		s_Data->GTAOImageLayout = vk::ImageLayout::eUndefined;
+
+		CreateImage(device,
+					width,
+					height,
+					mipLevels,
+					vk::SampleCountFlagBits::e1,
+					s_Data->GTAOScratchImage.Format,
+					vk::ImageTiling::eOptimal,
+					vk::ImageUsageFlagBits::eStorage | vk::ImageUsageFlagBits::eSampled | vk::ImageUsageFlagBits::eTransferDst,
+					vk::MemoryPropertyFlagBits::eDeviceLocal,
+					s_Data->GTAOScratchImage.Image,
+					s_Data->GTAOScratchImage.ImageMemory);
+
+		context.SetObjectDebugName(s_Data->GTAOScratchImage.Image, "GTAO Scratch Image");
+		context.SetObjectDebugName(s_Data->GTAOScratchImage.ImageMemory, "GTAO Scratch Image Memory");
+
+		s_Data->GTAOScratchImage.ImageView = CreateImageView(device,
+													  s_Data->GTAOScratchImage.Image,
+													  s_Data->GTAOScratchImage.Format, vk::ImageAspectFlagBits::eColor,
+													  mipLevels);
+		context.SetObjectDebugName(s_Data->GTAOScratchImage.ImageView, "GTAO Scratch Image View");
 	}
 
 	void Renderer::SetupGTAODescriptors()
 	{
 		KBR_CORE_ASSERT(s_Data->DescriptorPool != nullptr, "Descriptor pool has to be created before setting up GTAO descriptors");
 		KBR_CORE_ASSERT(s_Data->DescriptorSetLayouts.gtao != nullptr, "GTAO descriptor set layout has to be created before setting up GTAO descriptors");
+		KBR_CORE_ASSERT(s_Data->DescriptorSetLayouts.crossBilateralBlur != nullptr, "Cross-bilateral blur descriptor set layout has to be created before setting up GTAO descriptors");
 
 		auto& context = VulkanContext::Get();
 		const auto& device = context.GetDevice();
@@ -4908,6 +5256,18 @@ namespace Kerberos
 			.pSetLayouts = gtaoSetLayouts.data()
 		};
 
+		const vk::DescriptorImageInfo opaqueDepthImageInfo{
+				.sampler = *s_Data->PointSampler,
+				.imageView = *s_Data->DepthImage.ImageView,
+				.imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal
+		};
+
+		const vk::DescriptorImageInfo normalTextureImageInfo{
+			.sampler = *s_Data->PointSampler,
+			.imageView = *s_Data->NormalImage.ImageView,
+			.imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal
+		};
+
 		std::vector<vk::raii::DescriptorSet> gtaoDescriptorSets = device.allocateDescriptorSets(allocInfo);
 
 		for (uint32_t i = 0; i < VulkanContext::MaxFramesInFlight; i++)
@@ -4919,18 +5279,6 @@ namespace Kerberos
 				.buffer = *s_Data->UniformBuffers[i].gtao->GetBuffer(),
 				.offset = 0,
 				.range = sizeof(GTAOConstants)
-			};
-
-			const vk::DescriptorImageInfo opaqueDepthImageInfo{
-				.sampler = *s_Data->PointSampler,
-				.imageView = *s_Data->DepthImage.ImageView,
-				.imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal
-			};
-
-			const vk::DescriptorImageInfo normalTextureImageInfo{
-				.sampler = *s_Data->PointSampler,
-				.imageView = *s_Data->NormalImage.ImageView,
-				.imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal
 			};
 
 			const vk::DescriptorImageInfo gtaoStorageImageInfo{
@@ -4971,6 +5319,130 @@ namespace Kerberos
 					.descriptorCount = 1,
 					.descriptorType = vk::DescriptorType::eStorageImage,
 					.pImageInfo = &gtaoStorageImageInfo
+				}
+			};
+
+			device.updateDescriptorSets(descriptorWrites, {});
+		}
+
+		const std::vector<vk::DescriptorSetLayout> blurSetLayouts(
+			s_Data->DescriptorSets.size(),
+			*s_Data->DescriptorSetLayouts.crossBilateralBlur);
+
+		const vk::DescriptorSetAllocateInfo blurAllocInfo{
+			.descriptorPool = *s_Data->DescriptorPool,
+			.descriptorSetCount = static_cast<uint32_t>(s_Data->DescriptorSets.size()),
+			.pSetLayouts = blurSetLayouts.data()
+		};
+
+		std::vector<vk::raii::DescriptorSet> horizontalBlurDescriptorSets = device.allocateDescriptorSets(blurAllocInfo);
+
+		for (uint32_t i = 0; i < VulkanContext::MaxFramesInFlight; i++)
+		{
+			s_Data->DescriptorSets[i].crossBilateralBlurHorizontal = std::move(horizontalBlurDescriptorSets[i]);
+			context.SetObjectDebugName(s_Data->DescriptorSets[i].crossBilateralBlurHorizontal, "Cross-Bilateral Blur Horizontal Descriptor Set[" + std::to_string(i) + "]");
+
+			const vk::DescriptorImageInfo gtaoInputImageInfo{
+				.sampler = *s_Data->PointSampler,
+				.imageView = *s_Data->GTAOImage.ImageView,
+				.imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal
+			};
+
+			const vk::DescriptorImageInfo gtaoWriteStorageImageInfo{
+				.sampler = *s_Data->PointSampler,
+				.imageView = *s_Data->GTAOScratchImage.ImageView,
+				.imageLayout = vk::ImageLayout::eGeneral
+			};
+
+			const std::vector descriptorWrites = {
+				vk::WriteDescriptorSet{
+					.dstSet = *s_Data->DescriptorSets[i].crossBilateralBlurHorizontal,
+					.dstBinding = 0,
+					.dstArrayElement = 0,
+					.descriptorCount = 1,
+					.descriptorType = vk::DescriptorType::eCombinedImageSampler,
+					.pImageInfo = &gtaoInputImageInfo
+				},
+				vk::WriteDescriptorSet{
+					.dstSet = *s_Data->DescriptorSets[i].crossBilateralBlurHorizontal,
+					.dstBinding = 1,
+					.dstArrayElement = 0,
+					.descriptorCount = 1,
+					.descriptorType = vk::DescriptorType::eCombinedImageSampler,
+					.pImageInfo = &opaqueDepthImageInfo
+				},
+				vk::WriteDescriptorSet{
+					.dstSet = *s_Data->DescriptorSets[i].crossBilateralBlurHorizontal,
+					.dstBinding = 2,
+					.dstArrayElement = 0,
+					.descriptorCount = 1,
+					.descriptorType = vk::DescriptorType::eCombinedImageSampler,
+					.pImageInfo = &normalTextureImageInfo
+				},
+				vk::WriteDescriptorSet{
+					.dstSet = *s_Data->DescriptorSets[i].crossBilateralBlurHorizontal,
+					.dstBinding = 3,
+					.dstArrayElement = 0,
+					.descriptorCount = 1,
+					.descriptorType = vk::DescriptorType::eStorageImage,
+					.pImageInfo = &gtaoWriteStorageImageInfo
+				}
+			};
+
+			device.updateDescriptorSets(descriptorWrites, {});
+		}
+
+		std::vector<vk::raii::DescriptorSet> verticalBlurDescriptorSets = device.allocateDescriptorSets(blurAllocInfo);
+
+		for (uint32_t i = 0; i < VulkanContext::MaxFramesInFlight; i++)
+		{
+			s_Data->DescriptorSets[i].crossBilateralBlurVertical = std::move(verticalBlurDescriptorSets[i]);
+			context.SetObjectDebugName(s_Data->DescriptorSets[i].crossBilateralBlurVertical, "Cross-Bilateral Blur Vertical Descriptor Set[" + std::to_string(i) + "]");
+
+			const vk::DescriptorImageInfo gtaoInputImageInfo{
+				.sampler = *s_Data->PointSampler,
+				.imageView = *s_Data->GTAOScratchImage.ImageView,
+				.imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal
+			};
+
+			const vk::DescriptorImageInfo gtaoWriteStorageImageInfo{
+				.sampler = *s_Data->PointSampler,
+				.imageView = *s_Data->GTAOImage.ImageView,
+				.imageLayout = vk::ImageLayout::eGeneral
+			};
+
+			const std::vector descriptorWrites = {
+				vk::WriteDescriptorSet{
+					.dstSet = *s_Data->DescriptorSets[i].crossBilateralBlurVertical,
+					.dstBinding = 0,
+					.dstArrayElement = 0,
+					.descriptorCount = 1,
+					.descriptorType = vk::DescriptorType::eCombinedImageSampler,
+					.pImageInfo = &gtaoInputImageInfo
+				},
+				vk::WriteDescriptorSet{
+					.dstSet = *s_Data->DescriptorSets[i].crossBilateralBlurVertical,
+					.dstBinding = 1,
+					.dstArrayElement = 0,
+					.descriptorCount = 1,
+					.descriptorType = vk::DescriptorType::eCombinedImageSampler,
+					.pImageInfo = &opaqueDepthImageInfo
+				},
+				vk::WriteDescriptorSet{
+					.dstSet = *s_Data->DescriptorSets[i].crossBilateralBlurVertical,
+					.dstBinding = 2,
+					.dstArrayElement = 0,
+					.descriptorCount = 1,
+					.descriptorType = vk::DescriptorType::eCombinedImageSampler,
+					.pImageInfo = &normalTextureImageInfo
+				},
+				vk::WriteDescriptorSet{
+					.dstSet = *s_Data->DescriptorSets[i].crossBilateralBlurVertical,
+					.dstBinding = 3,
+					.dstArrayElement = 0,
+					.descriptorCount = 1,
+					.descriptorType = vk::DescriptorType::eStorageImage,
+					.pImageInfo = &gtaoWriteStorageImageInfo
 				}
 			};
 

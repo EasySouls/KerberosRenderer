@@ -1046,7 +1046,22 @@ namespace Kerberos
 			ImGui::Checkbox("Enable PCF", &Renderer::GetIsPCFEnabledForShadowMap());
 		}
 
-		ImGui::Checkbox("Use GTAO", &Renderer::GetUseGTAO());
+		bool& useGTAO = Renderer::GetUseGTAO();
+		ImGui::Checkbox("Use GTAO", &useGTAO);
+		if (useGTAO)
+		{
+			ImGui::Indent();
+
+			ImGui::Checkbox("Blur GTAO image", &Renderer::GetUseBlurForGTAO());
+
+			GTAOConstants& gtaoConstants = Renderer::GetGTAOConstants();
+			ImGui::DragFloat("Radius", &gtaoConstants.radius, 0.01f, 0.01f, 10.0f);
+			ImGui::DragFloat("Falloff", &gtaoConstants.falloff, 0.01f, 0.01f, 10.0f);
+			ImGui::DragFloat("Sample Count", &gtaoConstants.sampleCount, 0.1f, 1.0f, 16.0f);
+			ImGui::DragFloat("Direction Count", &gtaoConstants.directionCount, 0.1f, 1.0f, 8.0f);
+
+			ImGui::Unindent();
+		}
 
 		AntiAliasingMode& aaMode = Renderer::GetAntiAliasingMode();
 		const char* aaModeItems[] = { "None", "FXAA", "TAA" };

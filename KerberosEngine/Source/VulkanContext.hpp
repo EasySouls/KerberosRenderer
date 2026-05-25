@@ -77,6 +77,7 @@ namespace Kerberos
 
 		uint32_t GetMaxFramesInFlight() const;
 		uint32_t GetCurrentFrameIndex() const { return m_FrameIndex; }
+		uint32_t GetFrameCount() const { return m_FrameCount; }
 
 		const VMA::Allocator& GetAllocator() const { return m_Allocator; }
 
@@ -231,6 +232,7 @@ namespace Kerberos
 
 		uint32_t m_FrameIndex = 0;
 		uint32_t m_CurrentImageIndex = 0;
+		uint32_t m_FrameCount = 0; // Total number of frames rendered since the application started
 
 		MemoryBudget m_MemoryBudget;
 		ImGuiDescriptorSetManager m_ImGuiDescriptorSetManager;

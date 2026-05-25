@@ -236,6 +236,8 @@ namespace Kerberos
 		// In the future it might be enough to call this from the client, since we do not need to update the memory budget info every frame,
 		// only when we create or destroy resources, or the memory usage window is opened
 		m_MemoryBudget.UpdateMemoryBudgetInfo();
+
+		m_FrameCount++;
 	}
 
 	void VulkanContext::Present()
