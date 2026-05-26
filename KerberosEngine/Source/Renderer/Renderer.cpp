@@ -112,6 +112,7 @@ namespace
 		vk::raii::DescriptorSetLayout composite = nullptr;
 		vk::raii::DescriptorSetLayout gtao = nullptr;
 		vk::raii::DescriptorSetLayout crossBilateralBlur = nullptr;
+		vk::raii::DescriptorSetLayout tonemappingResolve = nullptr;
 		vk::raii::DescriptorSetLayout fxaa = nullptr;
 		vk::raii::DescriptorSetLayout bloom = nullptr;
 	};
@@ -163,11 +164,17 @@ namespace
 		glm::vec2 direction{ 0.0f, 0.0f };
 	};
 
+	struct TonemappingResolvePushConstants
+	{
+		glm::vec2 inverseScreenSize{ 0.0f, 0.0f };
+		float bloomIntensity = 0.05f;
+		float tonemapOperator = 0.0f; // 0 = Uncharted, 1 = Reinhard, 2 = ACES Filmic, 3 = ACES Fitted
+		uint32_t needsLuma = 1u; // 1 if using FXAA/spatial AA, 0 otherwise
+	};
+
 	struct FXAAPushConstants
 	{
 		glm::vec2 inverseViewportSize{ 0.0f, 0.0f };
-		float bloomIntensity = 0.05f;
-		float tonemapOperator = 0.0f; // 0 = Uncharted, 1 = Reinhard, 2 = ACES Filmic, 3 = ACES Fitted
 	};
 
 	struct BloomData
@@ -236,6 +243,7 @@ namespace
 		vk::raii::DescriptorSet gtao = nullptr;
 		vk::raii::DescriptorSet crossBilateralBlurHorizontal = nullptr;
 		vk::raii::DescriptorSet crossBilateralBlurVertical = nullptr;
+		vk::raii::DescriptorSet tonemappingResolve = nullptr;
 		vk::raii::DescriptorSet fxaa = nullptr;
 	};
 
@@ -293,6 +301,7 @@ namespace
 		ImageData DepthImage;
 		ImageData NormalImage;
 		ImageData ResolveImage;
+		ImageData TonemappedImage;
 		ImageData CompositeImage;
 		ImageData PickingImage;
 		ImageData GTAOImage;
@@ -320,6 +329,9 @@ namespace
 
 		vk::raii::PipelineLayout TransparencyResolvePipelineLayout = nullptr;
 		Ref<GraphicsPipeline> TransparencyResolvePipeline = nullptr;
+
+		vk::raii::PipelineLayout TonemappingResolvePipelineLayout = nullptr;
+		Ref<GraphicsPipeline> TonemappingResolvePipeline = nullptr;
 
 		vk::raii::PipelineLayout FXAAPipelineLayout = nullptr;
 		Ref<GraphicsPipeline> FXAAPipeline = nullptr;
@@ -941,18 +953,14 @@ namespace Kerberos
 				{
 					// Cross-bilateral blur horizontal pass
 
-					BeginRenderPassDebugLabel(cmd, "GTAO Horizontal Blur");
-
 					{
-						// Transition main image to shader read and scratch image to general for compute shader write
-						const auto [aoSrcStageMask, aoSrcAccessMask] = getSrcStageAccessForLayout(s_Data->GTAOImageLayout);
-						const vk::ImageMemoryBarrier2 aoBarrier{
-							.srcStageMask = aoSrcStageMask,
-							.srcAccessMask = aoSrcAccessMask,
+						const vk::ImageMemoryBarrier2 mainImageToShaderReadBarrier{
+							.srcStageMask = vk::PipelineStageFlagBits2::eComputeShader,
+							.srcAccessMask = vk::AccessFlagBits2::eShaderStorageWrite,
 							.dstStageMask = vk::PipelineStageFlagBits2::eComputeShader,
-							.dstAccessMask = vk::AccessFlagBits2::eShaderStorageWrite,
-							.oldLayout = s_Data->GTAOImageLayout,
-							.newLayout = vk::ImageLayout::eGeneral,
+							.dstAccessMask = vk::AccessFlagBits2::eShaderRead,
+							.oldLayout = vk::ImageLayout::eGeneral,
+							.newLayout = vk::ImageLayout::eShaderReadOnlyOptimal,
 							.srcQueueFamilyIndex = vk::QueueFamilyIgnored,
 							.dstQueueFamilyIndex = vk::QueueFamilyIgnored,
 							.image = s_Data->GTAOImage.Image,
@@ -964,6 +972,7 @@ namespace Kerberos
 								.layerCount = 1
 							}
 						};
+
 						const vk::ImageMemoryBarrier2 scratchBarrier{
 							.srcStageMask = vk::PipelineStageFlagBits2::eComputeShader,
 							.srcAccessMask = vk::AccessFlagBits2::eShaderStorageWrite,
@@ -982,7 +991,8 @@ namespace Kerberos
 								.layerCount = 1
 							}
 						};
-						const std::array barriers = { aoBarrier, scratchBarrier };
+
+						const std::array barriers = { mainImageToShaderReadBarrier, scratchBarrier };
 						const vk::DependencyInfo dependencyInfo = {
 							.dependencyFlags = {},
 							.imageMemoryBarrierCount = barriers.size(),
@@ -990,6 +1000,8 @@ namespace Kerberos
 						};
 						cmd.pipelineBarrier2(dependencyInfo);
 					}
+
+					BeginRenderPassDebugLabel(cmd, "GTAO Horizontal Blur");
 
 					cmd.bindPipeline(vk::PipelineBindPoint::eCompute, *s_Data->CrossBilateralBlurPipeline->GetVulkanPipeline());
 					cmd.bindDescriptorSets(vk::PipelineBindPoint::eCompute, *s_Data->CrossBilateralBlurPipelineLayout, 0, { s_Data->DescriptorSets[currentImage].crossBilateralBlurHorizontal }, {});
@@ -1011,10 +1023,10 @@ namespace Kerberos
 						// Transition scratch image to shader read and main image to general for compute shader write
 						const vk::ImageMemoryBarrier2 mainImageToGeneralBarrier{
 							.srcStageMask = vk::PipelineStageFlagBits2::eComputeShader,
-							.srcAccessMask = vk::AccessFlagBits2::eShaderStorageWrite,
+							.srcAccessMask = vk::AccessFlagBits2::eShaderRead,
 							.dstStageMask = vk::PipelineStageFlagBits2::eComputeShader,
 							.dstAccessMask = vk::AccessFlagBits2::eShaderStorageWrite,
-							.oldLayout = vk::ImageLayout::eGeneral,
+							.oldLayout = vk::ImageLayout::eShaderReadOnlyOptimal,
 							.newLayout = vk::ImageLayout::eGeneral,
 							.srcQueueFamilyIndex = vk::QueueFamilyIgnored,
 							.dstQueueFamilyIndex = vk::QueueFamilyIgnored,
@@ -1148,8 +1160,8 @@ namespace Kerberos
 				};
 				cmd.pipelineBarrier2(toTransferDependencyInfo);
 
-				const vk::ClearColorValue clearNoAO{ std::array<float, 4>{ 1.0f, 0.0f, 0.0f, 0.0f } };
-				const std::array clearRanges = {
+				constexpr vk::ClearColorValue clearNoAO{ std::array<float, 4>{ 1.0f, 0.0f, 0.0f, 0.0f } };
+				constexpr std::array clearRanges = {
 					vk::ImageSubresourceRange{
 						.aspectMask = vk::ImageAspectFlagBits::eColor,
 						.baseMipLevel = 0,
@@ -1867,7 +1879,7 @@ namespace Kerberos
 			MappedData = Memory.mapMemory(0, colliderLineBufferSize);
 		}
 
-		const vk::SemaphoreTypeCreateInfo timelineSemaphoreTypeInfo{
+		constexpr vk::SemaphoreTypeCreateInfo timelineSemaphoreTypeInfo{
 			.semaphoreType = vk::SemaphoreType::eTimeline,
 			.initialValue = 0
 		};
@@ -2724,6 +2736,97 @@ namespace Kerberos
 			s_Data->TransparencyResolvePipeline = CreateRef<GraphicsPipeline>(compositePipelineSpec);
 		}
 
+		// Create tonemapping resolve pipeline resources
+		{
+			std::vector<vk::DescriptorSetLayoutBinding> bindings = {
+				vk::DescriptorSetLayoutBinding{ // Scene color
+					.binding = 0,
+					.descriptorType = vk::DescriptorType::eSampledImage,
+					.descriptorCount = 1,
+					.stageFlags = vk::ShaderStageFlagBits::eFragment,
+					.pImmutableSamplers = nullptr
+				},
+				vk::DescriptorSetLayoutBinding{ // Linear sampler
+					.binding = 1,
+					.descriptorType = vk::DescriptorType::eSampler,
+					.descriptorCount = 1,
+					.stageFlags = vk::ShaderStageFlagBits::eFragment,
+					.pImmutableSamplers = nullptr
+				},
+				vk::DescriptorSetLayoutBinding{ // Bloom texture
+					.binding = 2,
+					.descriptorType = vk::DescriptorType::eCombinedImageSampler,
+					.descriptorCount = 1,
+					.stageFlags = vk::ShaderStageFlagBits::eFragment,
+					.pImmutableSamplers = nullptr
+				},
+				vk::DescriptorSetLayoutBinding{ // Global lighting buffer
+					.binding = 3,
+					.descriptorType = vk::DescriptorType::eUniformBuffer,
+					.descriptorCount = 1,
+					.stageFlags = vk::ShaderStageFlagBits::eFragment,
+					.pImmutableSamplers = nullptr
+				},
+			};
+
+			const vk::DescriptorSetLayoutCreateInfo layoutInfo{
+				.bindingCount = static_cast<uint32_t>(bindings.size()),
+				.pBindings = bindings.data()
+			};
+
+			s_Data->DescriptorSetLayouts.tonemappingResolve = vk::raii::DescriptorSetLayout{ device, layoutInfo };
+			context.SetObjectDebugName(s_Data->DescriptorSetLayouts.tonemappingResolve, "Tonemapping Resolve Descriptor Set Layout");
+
+			const std::array setLayouts = {
+				*s_Data->DescriptorSetLayouts.tonemappingResolve
+			};
+
+			constexpr vk::PushConstantRange tonemappingPushConstantRange{
+				.stageFlags = vk::ShaderStageFlagBits::eFragment,
+				.offset = 0,
+				.size = sizeof(TonemappingResolvePushConstants)
+			};
+
+			vk::PipelineLayoutCreateInfo tonemappingPipelineLayoutInfo{
+				.setLayoutCount = static_cast<uint32_t>(setLayouts.size()),
+				.pSetLayouts = setLayouts.data(),
+				.pushConstantRangeCount = 1,
+				.pPushConstantRanges = &tonemappingPushConstantRange
+			};
+
+			s_Data->TonemappingResolvePipelineLayout = vk::raii::PipelineLayout{ device, tonemappingPipelineLayoutInfo };
+			context.SetObjectDebugName(s_Data->TonemappingResolvePipelineLayout, "Tonemapping Resolve Pipeline Layout");
+
+			s_Data->TonemappedImage.Format = s_Data->ResolveImage.Format;
+
+			constexpr uint32_t initialImageWidth = 1920;
+			constexpr uint32_t initialImageHeight = 1080;
+
+			CreateTonemappedImage(initialImageWidth, initialImageHeight);
+			SetupTonemappingResolveDescriptors();
+
+			Ref<Shader> tonemappingShader = CreateRef<Shader>("tonemapping_resolve", "Tonemapping Resolve");
+
+			GraphicsPipelineSpecification tonemappingPipelineSpec{};
+			tonemappingPipelineSpec.Name = "Tonemapping Resolve Pipeline";
+			tonemappingPipelineSpec.Shader = tonemappingShader;
+			tonemappingPipelineSpec.PipelineLayout = *s_Data->TonemappingResolvePipelineLayout;
+			tonemappingPipelineSpec.BindingDescription = {};
+			tonemappingPipelineSpec.InputAttributeDescriptions = {};
+			tonemappingPipelineSpec.SampleCount = vk::SampleCountFlagBits::e1;
+			tonemappingPipelineSpec.CullMode = CullMode::None;
+			tonemappingPipelineSpec.EnableDepthClamp = false;
+			tonemappingPipelineSpec.EnableDepthBias = false;
+			tonemappingPipelineSpec.EnableDepthTest = false;
+			tonemappingPipelineSpec.EnableDepthWrite = false;
+			tonemappingPipelineSpec.BlendModes = { BlendMode::None };
+			tonemappingPipelineSpec.ColorAttachmentFormats = { s_Data->TonemappedImage.Format };
+			tonemappingPipelineSpec.DepthAttachmentFormat = std::nullopt;
+			tonemappingPipelineSpec.DynamicStates = commonDynamicStates;
+
+			s_Data->TonemappingResolvePipeline = CreateRef<GraphicsPipeline>(tonemappingPipelineSpec);
+		}
+
 		// Create fxaa pipeline resources
 		{
 			constexpr uint32_t initialImageWidth = 1920;
@@ -2999,6 +3102,9 @@ namespace Kerberos
 		s_Data->ResolveImage.ImageView.clear();
 		s_Data->ResolveImage.Image.clear();
 		s_Data->ResolveImage.ImageMemory.clear();
+		s_Data->TonemappedImage.ImageView.clear();
+		s_Data->TonemappedImage.Image.clear();
+		s_Data->TonemappedImage.ImageMemory.clear();
 		s_Data->CompositeImage.ImageView.clear();
 		s_Data->CompositeImage.Image.clear();
 		s_Data->CompositeImage.ImageMemory.clear();
@@ -3013,6 +3119,8 @@ namespace Kerberos
 		s_Data->GTAOScratchImage.ImageMemory.clear();
 
 		// Recreate resources with new size
+
+		CreateTonemappedImage(width, height);
 
 		CreateFXAAImage(width, height);
 
@@ -3138,6 +3246,8 @@ namespace Kerberos
 
 		CreateGTAOImage(width, height);
 
+		SetupTonemappingResolveDescriptors();
+		SetupFXAADescriptors();
 		SetupBloomDescriptors();
 
 		// Update the transparency resolve descriptor sets to point to the new images
@@ -3359,11 +3469,11 @@ namespace Kerberos
 			}
 		}
 
-		// Update the FXAA descriptor set to use the resized color image, in this case the resolved image
+		// Update the FXAA descriptor set to use the resized tonemapped image
 		{
 			const vk::DescriptorImageInfo sceneColorWithLumaImageInfo = {
 				.sampler = nullptr,
-				.imageView = s_Data->ResolveImage.ImageView,
+				.imageView = s_Data->TonemappedImage.ImageView,
 				.imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal
 			};
 
@@ -3410,6 +3520,24 @@ namespace Kerberos
 				.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
 				.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
 				.image = s_Data->ResolveImage.Image,
+				.subresourceRange = {
+					.aspectMask = vk::ImageAspectFlagBits::eColor,
+					.baseMipLevel = 0,
+					.levelCount = 1,
+					.baseArrayLayer = 0,
+					.layerCount = 1
+				}
+			};
+			const vk::ImageMemoryBarrier2 tonemappedImageBarrier = {
+				.srcStageMask = vk::PipelineStageFlagBits2::eTopOfPipe,
+				.srcAccessMask = {},
+				.dstStageMask = vk::PipelineStageFlagBits2::eFragmentShader,
+				.dstAccessMask = vk::AccessFlagBits2::eShaderRead,
+				.oldLayout = vk::ImageLayout::eUndefined,
+				.newLayout = vk::ImageLayout::eShaderReadOnlyOptimal,
+				.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+				.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+				.image = s_Data->TonemappedImage.Image,
 				.subresourceRange = {
 					.aspectMask = vk::ImageAspectFlagBits::eColor,
 					.baseMipLevel = 0,
@@ -3472,7 +3600,7 @@ namespace Kerberos
 					.layerCount = 1
 				}
 			};
-			const std::array barriers = { resolveImageBarrier, compositeImageBarrier, colorOutputImageBarrier, bloomImageBarrier };
+			const std::array barriers = { resolveImageBarrier, tonemappedImageBarrier, compositeImageBarrier, colorOutputImageBarrier, bloomImageBarrier };
 			const vk::DependencyInfo dependencyInfo = {
 				.dependencyFlags = {},
 				.imageMemoryBarrierCount = barriers.size(),
@@ -3527,6 +3655,8 @@ namespace Kerberos
 			compositePipeline->Recompile();
 		if (const auto& gtaoPipeline = s_Data->GTAOPipeline)
 			gtaoPipeline->Recompile();
+		if (const auto& tonemappingPipeline = s_Data->TonemappingResolvePipeline)
+			tonemappingPipeline->Recompile();
 		if (const auto& fxaaPipeline = s_Data->FXAAPipeline)
 			fxaaPipeline->Recompile();
 		if (const auto& noopPostProcessPipeline = s_Data->NoopPostProcessPipeline)
@@ -4061,16 +4191,31 @@ namespace Kerberos
 	{
 		WriteGPUTimestamp(cmd, frameIndex, static_cast<uint32_t>(GPUTimestampQuery::PostProcessPassBegin));
 
-		// Transfer resolve image from color attachment optimal to shader read optimal for post process sampling
-		// and transition composite image to color attachment optimal for it will be the render target
+		const uint32_t outputWidth = static_cast<uint32_t>(s_Data->OutputSize.x);
+		const uint32_t outputHeight = static_cast<uint32_t>(s_Data->OutputSize.y);
+		if (outputWidth == 0 || outputHeight == 0)
 		{
-			const vk::ImageMemoryBarrier2 sceneColorBarrier = {
-				/*.srcStageMask = vk::PipelineStageFlagBits2::eColorAttachmentOutput,
-				.srcAccessMask = vk::AccessFlagBits2::eColorAttachmentWrite,
-				.dstStageMask = vk::PipelineStageFlagBits2::eFragmentShader,
-				.dstAccessMask = vk::AccessFlagBits2::eShaderRead,
-				.oldLayout = vk::ImageLayout::eColorAttachmentOptimal,
-				.newLayout = vk::ImageLayout::eShaderReadOnlyOptimal,*/
+			WriteGPUTimestamp(cmd, frameIndex, static_cast<uint32_t>(GPUTimestampQuery::PostProcessPassEnd));
+			return;
+		}
+
+		const vk::Rect2D renderArea{
+			.offset = vk::Offset2D{ .x = 0, .y = 0 },
+			.extent = vk::Extent2D{ .width = outputWidth, .height = outputHeight }
+		};
+
+		const vk::Viewport viewport{
+			.x = 0.0f,
+			.y = 0.0f,
+			.width = static_cast<float>(outputWidth),
+			.height = static_cast<float>(outputHeight),
+			.minDepth = 0.0f,
+			.maxDepth = 1.0f
+		};
+
+		// First pass: TonemappingResolve (resolve -> tonemapped)
+		{
+			const vk::ImageMemoryBarrier2 resolveBarrier = {
 				.srcStageMask = vk::PipelineStageFlagBits2::eComputeShader,
 				.srcAccessMask = vk::AccessFlagBits2::eShaderRead,
 				.dstStageMask = vk::PipelineStageFlagBits2::eFragmentShader,
@@ -4080,6 +4225,99 @@ namespace Kerberos
 				.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
 				.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
 				.image = s_Data->ResolveImage.Image,
+				.subresourceRange = {
+					.aspectMask = vk::ImageAspectFlagBits::eColor,
+					.baseMipLevel = 0,
+					.levelCount = 1,
+					.baseArrayLayer = 0,
+					.layerCount = 1
+				}
+			};
+
+			const vk::ImageMemoryBarrier2 tonemappedBarrier = {
+				.srcStageMask = vk::PipelineStageFlagBits2::eFragmentShader,
+				.srcAccessMask = vk::AccessFlagBits2::eShaderRead,
+				.dstStageMask = vk::PipelineStageFlagBits2::eColorAttachmentOutput,
+				.dstAccessMask = vk::AccessFlagBits2::eColorAttachmentWrite,
+				.oldLayout = vk::ImageLayout::eUndefined,
+				.newLayout = vk::ImageLayout::eColorAttachmentOptimal,
+				.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+				.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+				.image = s_Data->TonemappedImage.Image,
+				.subresourceRange = {
+					.aspectMask = vk::ImageAspectFlagBits::eColor,
+					.baseMipLevel = 0,
+					.levelCount = 1,
+					.baseArrayLayer = 0,
+					.layerCount = 1
+				}
+			};
+
+			const std::array barriers = { resolveBarrier, tonemappedBarrier };
+
+			const vk::DependencyInfo dependencyInfo = {
+				.dependencyFlags = {},
+				.imageMemoryBarrierCount = barriers.size(),
+				.pImageMemoryBarriers = barriers.data()
+			};
+
+			cmd.pipelineBarrier2(dependencyInfo);
+		}
+
+		vk::RenderingAttachmentInfo tonemappedAttachmentInfo{
+			.imageView = s_Data->TonemappedImage.ImageView,
+			.imageLayout = vk::ImageLayout::eColorAttachmentOptimal,
+			.loadOp = vk::AttachmentLoadOp::eClear,
+			.storeOp = vk::AttachmentStoreOp::eStore,
+			.clearValue = vk::ClearColorValue{ std::array{0.0f, 0.0f, 0.0f, 1.0f} }
+		};
+		const vk::RenderingInfo tonemappedRenderingInfo{
+			.renderArea = renderArea,
+			.layerCount = 1,
+			.colorAttachmentCount = 1,
+			.pColorAttachments = &tonemappedAttachmentInfo,
+			.pDepthAttachment = nullptr
+		};
+
+		BeginRenderPassDebugLabel(cmd, "Tonemapping Resolve Pass");
+		cmd.beginRendering(tonemappedRenderingInfo);
+		cmd.setViewport(0, viewport);
+		cmd.setScissor(0, renderArea);
+
+		s_Data->TonemappingResolvePipeline->Bind(cmd);
+
+		cmd.bindDescriptorSets(
+			vk::PipelineBindPoint::eGraphics,
+			*s_Data->TonemappingResolvePipelineLayout,
+			0,
+			*s_Data->DescriptorSets[frameIndex].tonemappingResolve,
+			{});
+
+		TonemappingResolvePushConstants tonemappingConstants;
+		tonemappingConstants.inverseScreenSize = glm::vec2(1.0f) / s_Data->OutputSize;
+		tonemappingConstants.bloomIntensity = s_Data->Bloom.Intensity;
+		tonemappingConstants.tonemapOperator = static_cast<float>(s_Data->TonemappingOperator);
+		tonemappingConstants.needsLuma = (s_Data->AntiAliasingMode == AntiAliasingMode::FXAA) ? 1u : 0u;
+
+		cmd.pushConstants<TonemappingResolvePushConstants>(*s_Data->TonemappingResolvePipelineLayout, vk::ShaderStageFlagBits::eFragment, 0, { tonemappingConstants });
+
+		cmd.draw(3, 1, 0, 0);
+
+		cmd.endRendering();
+		EndRenderPassDebugLabel(cmd);
+
+		// Second pass: FXAA (tonemapped -> composite)
+		{
+			const vk::ImageMemoryBarrier2 tonemappedBarrier = {
+				.srcStageMask = vk::PipelineStageFlagBits2::eColorAttachmentOutput,
+				.srcAccessMask = vk::AccessFlagBits2::eColorAttachmentWrite,
+				.dstStageMask = vk::PipelineStageFlagBits2::eFragmentShader,
+				.dstAccessMask = vk::AccessFlagBits2::eShaderRead,
+				.oldLayout = vk::ImageLayout::eColorAttachmentOptimal,
+				.newLayout = vk::ImageLayout::eShaderReadOnlyOptimal,
+				.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+				.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+				.image = s_Data->TonemappedImage.Image,
 				.subresourceRange = {
 					.aspectMask = vk::ImageAspectFlagBits::eColor,
 					.baseMipLevel = 0,
@@ -4108,7 +4346,7 @@ namespace Kerberos
 				}
 			};
 
-			const std::array barriers = { sceneColorBarrier, compositeImageBarrier };
+			const std::array barriers = { tonemappedBarrier, compositeImageBarrier };
 
 			const vk::DependencyInfo dependencyInfo = {
 				.dependencyFlags = {},
@@ -4119,43 +4357,28 @@ namespace Kerberos
 			cmd.pipelineBarrier2(dependencyInfo);
 		}
 
-		const vk::Rect2D renderArea{
-			.offset = vk::Offset2D{ 0, 0 },
-			.extent = vk::Extent2D{ static_cast<uint32_t>(s_Data->OutputSize.x), static_cast<uint32_t>(s_Data->OutputSize.y) }
-		};
-
-		const vk::Viewport viewport{
-			.x = 0.0f,
-			.y = 0.0f,
-			.width = s_Data->OutputSize.x,
-			.height = s_Data->OutputSize.y,
-			.minDepth = 0.0f,
-			.maxDepth = 1.0f
-		};
-
-		vk::RenderingAttachmentInfo colorAttachmentInfo{
+		vk::RenderingAttachmentInfo compositeAttachmentInfo{
 			.imageView = s_Data->CompositeImage.ImageView,
 			.imageLayout = vk::ImageLayout::eColorAttachmentOptimal,
 			.loadOp = vk::AttachmentLoadOp::eClear,
 			.storeOp = vk::AttachmentStoreOp::eStore,
 			.clearValue = vk::ClearColorValue{ std::array{0.0f, 0.0f, 0.0f, 1.0f} }
 		};
-		const vk::RenderingInfo renderingInfo{
+		const vk::RenderingInfo compositeRenderingInfo{
 			.renderArea = renderArea,
 			.layerCount = 1,
 			.colorAttachmentCount = 1,
-			.pColorAttachments = &colorAttachmentInfo,
+			.pColorAttachments = &compositeAttachmentInfo,
 			.pDepthAttachment = nullptr
 		};
+
 		BeginRenderPassDebugLabel(cmd, "Post Processing Pass");
-		cmd.beginRendering(renderingInfo);
+		cmd.beginRendering(compositeRenderingInfo);
 		cmd.setViewport(0, viewport);
 		cmd.setScissor(0, renderArea);
 
-		FXAAPushConstants pushConstants;
-		pushConstants.inverseViewportSize = glm::vec2(1.0f) / s_Data->OutputSize;
-		pushConstants.tonemapOperator = static_cast<float>(s_Data->TonemappingOperator);
-		pushConstants.bloomIntensity = s_Data->Bloom.Intensity;
+		FXAAPushConstants fxaaConstants;
+		fxaaConstants.inverseViewportSize = glm::vec2(1.0f) / s_Data->OutputSize;
 
 		if (s_Data->AntiAliasingMode == AntiAliasingMode::None)
 		{
@@ -4168,7 +4391,7 @@ namespace Kerberos
 				*s_Data->DescriptorSets[frameIndex].fxaa,
 				{});
 
-			cmd.pushConstants<FXAAPushConstants>(*s_Data->FXAAPipelineLayout, vk::ShaderStageFlagBits::eFragment, 0, { pushConstants });
+			cmd.pushConstants<FXAAPushConstants>(*s_Data->FXAAPipelineLayout, vk::ShaderStageFlagBits::eFragment, 0, { fxaaConstants });
 		}
 		else if (s_Data->AntiAliasingMode == AntiAliasingMode::FXAA)
 		{
@@ -4181,7 +4404,7 @@ namespace Kerberos
 				*s_Data->DescriptorSets[frameIndex].fxaa,
 				{});
 
-			cmd.pushConstants<FXAAPushConstants>(*s_Data->FXAAPipelineLayout, vk::ShaderStageFlagBits::eFragment, 0, { pushConstants });
+			cmd.pushConstants<FXAAPushConstants>(*s_Data->FXAAPipelineLayout, vk::ShaderStageFlagBits::eFragment, 0, { fxaaConstants });
 		}
 		else if (s_Data->AntiAliasingMode == AntiAliasingMode::TAA)
 		{
@@ -5450,6 +5673,37 @@ namespace Kerberos
 		}
 	}
 
+	void Renderer::CreateTonemappedImage(const uint32_t width, const uint32_t height)
+	{
+		KBR_CORE_ASSERT(s_Data->TonemappedImage.Format != vk::Format::eUndefined, "Tonemapped image format has to be set before creating tonemapped image!");
+
+		auto& context = VulkanContext::Get();
+		const auto& device = context.GetDevice();
+
+		constexpr uint32_t mipLevels = 1;
+
+		CreateImage(device,
+					width,
+					height,
+					mipLevels,
+					vk::SampleCountFlagBits::e1,
+					s_Data->TonemappedImage.Format,
+					vk::ImageTiling::eOptimal,
+					vk::ImageUsageFlagBits::eColorAttachment | vk::ImageUsageFlagBits::eSampled,
+					vk::MemoryPropertyFlagBits::eDeviceLocal,
+					s_Data->TonemappedImage.Image,
+					s_Data->TonemappedImage.ImageMemory);
+
+		context.SetObjectDebugName(s_Data->TonemappedImage.Image, "Tonemapped Image");
+		context.SetObjectDebugName(s_Data->TonemappedImage.ImageMemory, "Tonemapped Image Memory");
+
+		s_Data->TonemappedImage.ImageView = CreateImageView(device,
+														s_Data->TonemappedImage.Image,
+														s_Data->TonemappedImage.Format, vk::ImageAspectFlagBits::eColor,
+														mipLevels);
+		context.SetObjectDebugName(s_Data->TonemappedImage.ImageView, "Tonemapped Image View");
+	}
+
 	void Renderer::CreateFXAAImage(const uint32_t width, const uint32_t height) 
 	{
 		KBR_CORE_ASSERT(s_Data->CompositeImage.Format != vk::Format::eUndefined, "Composite image format has to be set before creating composite image!");
@@ -5481,6 +5735,94 @@ namespace Kerberos
 		context.SetObjectDebugName(s_Data->CompositeImage.ImageView, "Composite Image View");
 	}
 
+	void Renderer::SetupTonemappingResolveDescriptors()
+	{
+		KBR_CORE_ASSERT(s_Data->DescriptorPool != nullptr, "Descriptor pool has to be created before setting up tonemapping descriptors");
+		KBR_CORE_ASSERT(s_Data->DescriptorSetLayouts.tonemappingResolve != nullptr, "Tonemapping resolve descriptor set layout has to be created before setting up tonemapping descriptors");
+
+		auto& context = VulkanContext::Get();
+		const auto& device = context.GetDevice();
+
+		const std::vector<vk::DescriptorSetLayout> tonemappingSetLayouts(
+			s_Data->DescriptorSets.size(),
+			*s_Data->DescriptorSetLayouts.tonemappingResolve);
+
+		const vk::DescriptorSetAllocateInfo allocInfo{
+			.descriptorPool = *s_Data->DescriptorPool,
+			.descriptorSetCount = static_cast<uint32_t>(s_Data->DescriptorSets.size()),
+			.pSetLayouts = tonemappingSetLayouts.data()
+		};
+
+		std::vector<vk::raii::DescriptorSet> tonemappingDescriptorSets = device.allocateDescriptorSets(allocInfo);
+
+		for (uint32_t i = 0; i < VulkanContext::MaxFramesInFlight; i++)
+		{
+			s_Data->DescriptorSets[i].tonemappingResolve = std::move(tonemappingDescriptorSets[i]);
+			context.SetObjectDebugName(s_Data->DescriptorSets[i].tonemappingResolve, "Tonemapping Resolve Descriptor Set[" + std::to_string(i) + "]");
+
+			const vk::DescriptorImageInfo sceneColorImageInfo{
+				.sampler = nullptr,
+				.imageView = *s_Data->ResolveImage.ImageView,
+				.imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal
+			};
+
+			const vk::DescriptorImageInfo linearSamplerInfo{
+				.sampler = *s_Data->LinearSampler,
+				.imageView = nullptr,
+				.imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal
+			};
+
+			const vk::DescriptorImageInfo bloomTextureInfo{
+				.sampler = *s_Data->LinearSampler,
+				.imageView = *s_Data->Bloom.ImageViews[0],
+				.imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal
+			};
+
+			const vk::DescriptorBufferInfo globalLightingBufferInfo{
+				.buffer = *s_Data->UniformBuffers[i].globalLighting->GetBuffer(),
+				.offset = 0,
+				.range = sizeof(GlobalLighting)
+			};
+
+			const std::vector descriptorWrites = {
+				vk::WriteDescriptorSet{
+					.dstSet = *s_Data->DescriptorSets[i].tonemappingResolve,
+					.dstBinding = 0,
+					.dstArrayElement = 0,
+					.descriptorCount = 1,
+					.descriptorType = vk::DescriptorType::eSampledImage,
+					.pImageInfo = &sceneColorImageInfo
+				},
+				vk::WriteDescriptorSet{
+					.dstSet = *s_Data->DescriptorSets[i].tonemappingResolve,
+					.dstBinding = 1,
+					.dstArrayElement = 0,
+					.descriptorCount = 1,
+					.descriptorType = vk::DescriptorType::eSampler,
+					.pImageInfo = &linearSamplerInfo
+				},
+				vk::WriteDescriptorSet{
+					.dstSet = *s_Data->DescriptorSets[i].tonemappingResolve,
+					.dstBinding = 2,
+					.dstArrayElement = 0,
+					.descriptorCount = 1,
+					.descriptorType = vk::DescriptorType::eCombinedImageSampler,
+					.pImageInfo = &bloomTextureInfo
+				},
+				vk::WriteDescriptorSet{
+					.dstSet = *s_Data->DescriptorSets[i].tonemappingResolve,
+					.dstBinding = 3,
+					.dstArrayElement = 0,
+					.descriptorCount = 1,
+					.descriptorType = vk::DescriptorType::eUniformBuffer,
+					.pBufferInfo = &globalLightingBufferInfo
+				}
+			};
+
+			device.updateDescriptorSets(descriptorWrites, {});
+		}
+	}
+
 	void Renderer::SetupFXAADescriptors() 
 	{
 		KBR_CORE_ASSERT(s_Data->DescriptorPool != nullptr, "Descriptor pool has to be created before setting up FXAA descriptors");
@@ -5506,9 +5848,9 @@ namespace Kerberos
 			s_Data->DescriptorSets[i].fxaa = std::move(fxaaDescriptorSets[i]);
 			context.SetObjectDebugName(s_Data->DescriptorSets[i].fxaa, "FXAA Descriptor Set[" + std::to_string(i) + "]");
 
-			const vk::DescriptorImageInfo sceneColorWithLumaImageInfo{
+			const vk::DescriptorImageInfo tonemappedImageInfo{
 				.sampler = nullptr,
-				.imageView = *s_Data->ResolveImage.ImageView,
+				.imageView = *s_Data->TonemappedImage.ImageView,
 				.imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal
 			};
 
@@ -5537,7 +5879,7 @@ namespace Kerberos
 					.dstArrayElement = 0,
 					.descriptorCount = 1,
 					.descriptorType = vk::DescriptorType::eSampledImage,
-					.pImageInfo = &sceneColorWithLumaImageInfo
+					.pImageInfo = &tonemappedImageInfo
 				},
 				vk::WriteDescriptorSet{
 					.dstSet = *s_Data->DescriptorSets[i].fxaa,

@@ -21,11 +21,11 @@
 
 #include "ImGuizmo.h"
 
-const std::vector<char const*> validationLayers = {
+static constexpr std::array validationLayers = {
 	"VK_LAYER_KHRONOS_validation"
 };
 
-const std::vector<const char*> deviceExtensions = {
+static constexpr std::array deviceExtensions = {
 	vk::KHRSwapchainExtensionName,
 	vk::KHRSpirv14ExtensionName,
 	vk::KHRSynchronization2ExtensionName,
@@ -1250,6 +1250,7 @@ namespace Kerberos
 		if (surfaceCapabilities.maxImageCount > 0 && imageCount > surfaceCapabilities.maxImageCount) {
 			imageCount = surfaceCapabilities.maxImageCount;
 		}
+		m_ImageCount = imageCount;
 
 		const vk::PresentModeKHR presentMode = ChooseSwapPresentMode(m_PhysicalDevice.getSurfacePresentModesKHR(m_Surface));
 

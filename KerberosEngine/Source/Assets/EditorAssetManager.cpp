@@ -105,7 +105,8 @@ namespace Kerberos
 		const bool isInAssetRegistry = m_AssetRegistry.Contains(handle);
 		if (!isInAssetRegistry)
 		{
-			KBR_CORE_WARN("Asset handle is not in asset registry: {}", handle);
+			// TODO: Uncomment this when done with GLTF loading
+			//KBR_CORE_WARN("Asset handle is not in asset registry: {}", handle);
 			return false;
 		}
 

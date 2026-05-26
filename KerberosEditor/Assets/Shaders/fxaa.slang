@@ -1,24 +1,16 @@
 import common;
-import tonemapping;
 
 // ============================================================================
-// FXAA 3.11 Shader in Slang
+// FXAA 3.11 Shader
 // ============================================================================
 
-// The input texture MUST have Tonemapped RGB color, and Luma in the Alpha channel.
+// The input texture MUST have Pre-tonemapped LDR RGB color, and Luma in the Alpha channel.
 // The Sampler MUST be VK_FILTER_LINEAR with VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE.
 [[vk::binding(0, 0)]] Texture2D<float4> sceneColorTex;
 [[vk::binding(1, 0)]] SamplerState linearSampler;
 
-[[vk::binding(2, 0)]] Sampler2D<float4> bloomSampler;
-
-[[vk::binding(3, 0)]]
-ConstantBuffer<GlobalLighting> globalLighting;
-
 struct PushConstants {
     float2 inverseScreenSize;
-    float bloomIntensity;
-    float tonemapOperator;
 };
 [[vk::push_constant]] 
 PushConstants pc;
@@ -39,16 +31,10 @@ VSOutput vertexMain(uint vertexID : SV_VertexID)
     return output;
 }
 
-// Helper function to calculate LDR Luma from an HDR texture
+// Helper function to get pre-calculated Luma from alpha channel
 float SampleLuma(float2 uv)
 {
-    float3 hdrColor = sceneColorTex.SampleLevel(linearSampler, uv, 0.0).rgb;
-
-    // Fast Reinhard Tonemap just for edge detection (compresses HDR to 0-1)
-    float3 ldrColor = hdrColor / (1.0 + hdrColor);
-
-    // Calculate Perceptual Luma
-    return dot(ldrColor, float3(0.299, 0.587, 0.114));
+    return sceneColorTex.SampleLevel(linearSampler, uv, 0.0).a;
 }
 
 static const float FXAA_EDGE_THRESHOLD_MIN = 0.0833;
@@ -101,8 +87,8 @@ float3 ApplyFXAA(float2 uv)
 
     // Determine step size and direction
     float stepLength = isHorizontal ? texelSize.y : texelSize.x;
-    float luma1 = isHorizontal ? lumaS : lumaW;
-    float luma2 = isHorizontal ? lumaN : lumaE;
+    float luma1 = isHorizontal ? lumaN : lumaW;
+    float luma2 = isHorizontal ? lumaS : lumaE;
 
     // Find the steepest gradient
     float grad1 = luma1 - lumaM;
@@ -189,13 +175,7 @@ float3 ApplyFXAA(float2 uv)
 float4 fragmentMain(VSOutput input) : SV_Target
 {
     float2 uv = input.uv;
-    float3 sceneColor = ApplyFXAA(uv);
-    float3 bloomColor = bloomSampler.Sample(uv).rgb;
-
-    float3 finalHDR = sceneColor + (bloomColor * pc.bloomIntensity);
-
-    float3 ldrColor = ApplyToneMapping(finalHDR, globalLighting.exposure, pc.tonemapOperator);
-    ldrColor = ApplyGammaCorrection(ldrColor, globalLighting.gamma);
+    float3 ldrColor = ApplyFXAA(uv);
     
     return float4(ldrColor, 1.0);
 }

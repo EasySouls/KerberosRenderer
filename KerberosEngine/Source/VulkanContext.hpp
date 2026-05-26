@@ -18,7 +18,7 @@ namespace Kerberos
 	class VulkanContext final
 	{
 	public:
-		inline static constexpr uint32_t MaxFramesInFlight = 2;
+		static constexpr uint32_t MaxFramesInFlight = 2;
 
 		explicit VulkanContext(GLFWwindow* window);
 		~VulkanContext();
@@ -233,6 +233,7 @@ namespace Kerberos
 		uint32_t m_FrameIndex = 0;
 		uint32_t m_CurrentImageIndex = 0;
 		uint32_t m_FrameCount = 0; // Total number of frames rendered since the application started
+		uint32_t m_ImageCount = 0; // Number of images in the swapchain
 
 		MemoryBudget m_MemoryBudget;
 		ImGuiDescriptorSetManager m_ImGuiDescriptorSetManager;

@@ -65,11 +65,11 @@ namespace Kerberos
 		glm::mat4 projectionMatrix{ 0.0f };
 		glm::mat4 invProjectionMatrix{ 0.0f };
 		glm::vec2 viewportSize{ 0.0f };
-		float radius = 1.0f;        // World space radius of AO
-		float falloff = 1.0f;        // Distance falloff
-		float sampleCount = 8.0f;    // Steps per direction (usually 4-8)
-		float directionCount = 4.0f; // Number of directions (usually 2-4)
-		float temporalIndex = 1.0f;  // For jittering over time
+		float radius = 1.0f;			// World space radius of AO
+		float falloff = 1.0f;			// Distance falloff
+		float sampleCount = 8.0f;		// Steps per direction (usually 4-8)
+		float directionCount = 4.0f;	// Number of directions (usually 2-4)
+		float temporalIndex = 1.0f;		// For jittering over time
 	};
 
 	enum class AntiAliasingMode
@@ -208,5 +208,8 @@ namespace Kerberos
 		static void CreateBloomImage(uint32_t width, uint32_t height);
 		static void SetupBloomDescriptors();
 		static void CreateBloomResources(uint32_t width, uint32_t height);
+
+		static void CreateTonemappedImage(uint32_t width, uint32_t height);
+		static void SetupTonemappingResolveDescriptors();
 	};
 }
