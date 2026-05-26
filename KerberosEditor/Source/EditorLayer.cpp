@@ -914,7 +914,8 @@ namespace Kerberos
 			ImGui::Text("GPU Transparency Resolve: %.3f ms", gpuTimings.TransparencyResolvePassMilliseconds);
 			ImGui::Text("GPU Bloom: %.3f ms", gpuTimings.BloomPassMilliseconds);
 			ImGui::Text("GPU Ambient Occlusion: %.3f ms", gpuTimings.AmbientOcclusionPassMilliseconds);
-			ImGui::Text("GPU Post-Processing: %.3f ms", gpuTimings.PostProcessingPassMilliseconds);
+			ImGui::Text("GPU Antialiasing: %.3f ms", gpuTimings.AntialiasingPassMilliseconds);
+			ImGui::Text("GPU Tonemapping: %.3f ms", gpuTimings.TonemappingPassMilliseconds);
 		}
 		else
 		{
@@ -1064,7 +1065,7 @@ namespace Kerberos
 		}
 
 		AntiAliasingMode& aaMode = Renderer::GetAntiAliasingMode();
-		const char* aaModeItems[] = { "None", "FXAA", "TAA" };
+		const char* aaModeItems[] = { "None", "FXAA", "SMAA", "TAA" };
 		if (ImGui::Combo("Anti-aliasing mode", reinterpret_cast<int*>(&aaMode), aaModeItems, IM_ARRAYSIZE(aaModeItems)))
 		{
 			Renderer::GetAntiAliasingMode() = static_cast<AntiAliasingMode>(aaMode);

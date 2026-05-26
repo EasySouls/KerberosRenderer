@@ -37,7 +37,8 @@ namespace Kerberos
 		float TransparencyResolvePassMilliseconds = 0.0f;
 		float BloomPassMilliseconds = 0.0f;
 		float AmbientOcclusionPassMilliseconds = 0.0f;
-		float PostProcessingPassMilliseconds = 0.0f;
+		float TonemappingPassMilliseconds = 0.0f;
+		float AntialiasingPassMilliseconds = 0.0f;
 		bool  IsValid = false;
 	};
 
@@ -76,10 +77,11 @@ namespace Kerberos
 	{
 		None = 0,
 		FXAA = 1,
-		TAA = 2
+		SMAA = 2,
+		TAA = 3
 	};
 
-	enum class TonemappingOperator
+	enum class TonemappingOperator : std::uint8_t
 	{
 		Uncharted = 0,
 		Reinhard = 1,
@@ -87,7 +89,7 @@ namespace Kerberos
 		ACESFitted = 3
 	};
 
-	enum class BloomMode
+	enum class BloomMode : std::uint8_t
 	{
 		Legacy = 0,
 		BrightPassPrefilter = 1
@@ -175,7 +177,13 @@ namespace Kerberos
 		static std::pair<std::vector<RenderObject>, std::set<Ref<Material>>> GetRenderObjectsAndUniqueMaterialsFromScene(const Scene& scene);
 		static std::vector<LineVertex> GetColliderLineVerticesFromScene(const Scene& scene);
 
-		static void ApplyPostProcessing(const vk::raii::CommandBuffer& cmd, uint32_t frameIndex);
+		static void ApplyTonemapping(const vk::raii::CommandBuffer& cmd, uint32_t frameIndex);
+		
+		static void ApplyAntiAliasing(const vk::raii::CommandBuffer& cmd, uint32_t frameIndex);
+		static void ApplyFXAA(const vk::raii::CommandBuffer& cmd, uint32_t frameIndex, const vk::Rect2D& renderArea, const vk::Viewport& viewport);
+		static void ApplyNoOpPostProcessing(const vk::raii::CommandBuffer& cmd, uint32_t frameIndex, const vk::Rect2D& renderArea, const vk::Viewport& viewport);
+		static void ApplySMAA(const vk::raii::CommandBuffer& cmd, uint32_t frameIndex, const vk::Rect2D& renderArea, const vk::Viewport& viewport);
+		
 		static void ApplyBloom(const vk::raii::CommandBuffer& cmd, uint32_t frameIndex);
 		
 		static void WriteGPUTimestamp(const vk::raii::CommandBuffer& cmd, uint32_t frameIndex, uint32_t index);
@@ -211,5 +219,10 @@ namespace Kerberos
 
 		static void CreateTonemappedImage(uint32_t width, uint32_t height);
 		static void SetupTonemappingResolveDescriptors();
+
+		static void CreateSMAATextures();
+		static void CreateSMAADescriptorSetAndPipelineLayouts();
+		static void CreateSMAAImages(uint32_t width, uint32_t height);
+		static void SetupSMAADescriptors();
 	};
 }

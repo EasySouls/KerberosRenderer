@@ -31,5 +31,8 @@ if not exist "%SLANGC%" (
 "%SLANGC%" bloom_downsample.slang -target spirv -profile spirv_1_6 -emit-spirv-directly -fvk-use-entrypoint-name -entry computeMain -o ../Cache/Shaders/bloom_downsample.spv
 "%SLANGC%" bloom_upsample.slang -target spirv -profile spirv_1_6 -emit-spirv-directly -fvk-use-entrypoint-name -entry computeMain -o ../Cache/Shaders/bloom_upsample.spv
 "%SLANGC%" spatial_cross_bilateral_blur.slang -target spirv -profile spirv_1_6 -emit-spirv-directly -fvk-use-entrypoint-name -entry computeMain -o ../Cache/Shaders/spatial_cross_bilateral_blur.spv
+"%SLANGC%" smaa_edge.slang -target spirv -profile spirv_1_6 -emit-spirv-directly -fvk-use-entrypoint-name -entry computeMain -o ../Cache/Shaders/smaa_edge.spv
+"%SLANGC%" smaa_weights.slang -target spirv -profile spirv_1_6 -emit-spirv-directly -fvk-use-entrypoint-name -entry computeMain -o ../Cache/Shaders/smaa_weights.spv
+"%SLANGC%" smaa_blend.slang -target spirv -profile spirv_1_6 -emit-spirv-directly -fvk-use-entrypoint-name -entry computeMain -o ../Cache/Shaders/smaa_blend.spv
 
 PAUSE

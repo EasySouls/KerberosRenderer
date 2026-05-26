@@ -1133,7 +1133,7 @@ namespace Kerberos
 			 {.shaderDrawParameters = true },
 			 {.descriptorIndexing = true, .descriptorBindingSampledImageUpdateAfterBind = true, .descriptorBindingPartiallyBound = true, .timelineSemaphore = true, 
 				.bufferDeviceAddress = true, .shaderOutputLayer = true },
-			 {.synchronization2 = true, .dynamicRendering = true },
+			 {.shaderDemoteToHelperInvocation = true, .synchronization2 = true, .dynamicRendering = true },
 			 {.extendedDynamicState = true },
 			 {.accelerationStructure = true },
 			 {.rayQuery = true }

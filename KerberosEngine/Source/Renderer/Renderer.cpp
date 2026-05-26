@@ -12,6 +12,8 @@
 #include "RayTracingSceneCache.hpp"
 #include "ColliderDebugHelpers.hpp"
 #include "Utils.hpp"
+#include "SMAA/SMAAAreaTex.hpp"
+#include "SMAA/SMAASearchTex.hpp"
 #include "Scene/Components/PhysicsComponents.hpp"
 
 #include <glm/gtc/matrix_inverse.hpp>
@@ -177,6 +179,47 @@ namespace
 		glm::vec2 inverseViewportSize{ 0.0f, 0.0f };
 	};
 
+	struct SMAAData
+	{
+		ImageData EdgesImage;
+		ImageData BlendImage;
+
+		// SMAA lookup textures
+		ImageData AreaTexture;
+		ImageData SearchTexture;
+
+		vk::raii::PipelineLayout EdgeDetectionPipelineLayout = nullptr;
+		Ref<GraphicsPipeline> EdgeDetectionPipeline = nullptr;
+
+		vk::raii::PipelineLayout BlendWeightPipelineLayout = nullptr;
+		Ref<GraphicsPipeline> BlendWeightPipeline = nullptr;
+
+		vk::raii::PipelineLayout NeighborhoodBlendingPipelineLayout = nullptr;
+		Ref<GraphicsPipeline> NeighborhoodBlendingPipeline = nullptr;
+
+		struct DescriptorSetLayouts
+		{
+			vk::raii::DescriptorSetLayout EdgeDetection = nullptr;
+			vk::raii::DescriptorSetLayout BlendWeight = nullptr;
+			vk::raii::DescriptorSetLayout NeighbourhoodBlend = nullptr;
+		};
+		SMAAData::DescriptorSetLayouts DescriptorSetLayouts{};
+
+		struct DescriptorSets
+		{
+			vk::raii::DescriptorSet EdgeDetection = nullptr;
+			vk::raii::DescriptorSet BlendWeight = nullptr;
+			vk::raii::DescriptorSet NeighbourhoodBlend = nullptr;
+		};
+		std::array<SMAAData::DescriptorSets, VulkanContext::MaxFramesInFlight> DescriptorSets{};
+
+		struct PushConstants
+		{
+			glm::vec2 InverseViewportSize{ 0.0f, 0.0f };
+			glm::vec2 ViewportSize{ 0.0f, 0.0f };
+		};
+	};
+
 	struct BloomData
 	{
 		vk::raii::Image Image = nullptr;
@@ -274,8 +317,10 @@ namespace
 		BloomPassEnd,
 		AmbientOcclusionPassBegin,
 		AmbientOcclusionPassEnd,
-		PostProcessPassBegin,
-		PostProcessPassEnd,
+		TonemappingPassBegin,
+		TonemappingPassEnd,
+		AntialiasingPassBegin,
+		AntialiasingPassEnd,
 		FrameEnd,
 		Count
 	};
@@ -306,6 +351,7 @@ namespace
 		ImageData PickingImage;
 		ImageData GTAOImage;
 		ImageData GTAOScratchImage;
+		
 		vk::ImageLayout PickingImageLayout = vk::ImageLayout::eUndefined;
 
 		vk::raii::DescriptorPool DescriptorPool = nullptr;
@@ -347,6 +393,7 @@ namespace
 		PerObjectData PerObjectData{};
 		SkyboxData SkyboxData{};
 		GTAOConstants GTAOData{};
+		SMAAData SMAAResources{};
 
 		std::array<UniformBufferObject, VulkanContext::MaxFramesInFlight> UniformBuffers{};
 		std::array<StorageBuffers, VulkanContext::MaxFramesInFlight> StorageBuffers{};
@@ -1790,7 +1837,9 @@ namespace Kerberos
 
 		ApplyBloom(cmd, currentImage);
 
-		ApplyPostProcessing(cmd, currentImage);
+		ApplyTonemapping(cmd, currentImage);
+
+		ApplyAntiAliasing(cmd, currentImage);
 
 		HandleMousePickingReadback(cmd);
 
@@ -2946,6 +2995,86 @@ namespace Kerberos
 			s_Data->NoopPostProcessPipeline = CreateRef<GraphicsPipeline>(noopPostProcessPipelineSpec);
 		}
 
+		// Create SMAA resources
+		{
+			CreateSMAATextures();
+
+			s_Data->SMAAResources.EdgesImage.Format = context.FindSupportedFormat(
+				{ vk::Format::eR8G8Unorm },
+				vk::ImageTiling::eOptimal,
+				vk::FormatFeatureFlagBits::eColorAttachment | vk::FormatFeatureFlagBits::eSampledImage
+			);
+			s_Data->SMAAResources.BlendImage.Format = context.FindSupportedFormat(
+				{ vk::Format::eR8G8B8A8Unorm },
+				vk::ImageTiling::eOptimal,
+				vk::FormatFeatureFlagBits::eColorAttachment | vk::FormatFeatureFlagBits::eSampledImage
+			);
+
+			constexpr uint32_t initialImageWidth = 1920;
+			constexpr uint32_t initialImageHeight = 1080;
+
+			CreateSMAADescriptorSetAndPipelineLayouts();
+			CreateSMAAImages(initialImageWidth, initialImageHeight);
+			SetupSMAADescriptors();
+
+			GraphicsPipelineSpecification smaaEdgeDetectionPipelineSpec{};
+			smaaEdgeDetectionPipelineSpec.Name = "SMAA Edge Detection Pipeline";
+			smaaEdgeDetectionPipelineSpec.Shader = CreateRef<Shader>("smaa_edge", "SMAA Edge Detection");
+			smaaEdgeDetectionPipelineSpec.PipelineLayout = *s_Data->SMAAResources.EdgeDetectionPipelineLayout;
+			smaaEdgeDetectionPipelineSpec.BindingDescription = {};
+			smaaEdgeDetectionPipelineSpec.InputAttributeDescriptions = {};
+			smaaEdgeDetectionPipelineSpec.SampleCount = vk::SampleCountFlagBits::e1;
+			smaaEdgeDetectionPipelineSpec.CullMode = CullMode::None;
+			smaaEdgeDetectionPipelineSpec.EnableDepthClamp = false;
+			smaaEdgeDetectionPipelineSpec.EnableDepthBias = false;
+			smaaEdgeDetectionPipelineSpec.EnableDepthTest = false;
+			smaaEdgeDetectionPipelineSpec.EnableDepthWrite = false;
+			smaaEdgeDetectionPipelineSpec.BlendModes = { BlendMode::None };
+			smaaEdgeDetectionPipelineSpec.ColorAttachmentFormats = { s_Data->SMAAResources.EdgesImage.Format };
+			smaaEdgeDetectionPipelineSpec.DepthAttachmentFormat = std::nullopt;
+			smaaEdgeDetectionPipelineSpec.DynamicStates = commonDynamicStates;
+
+			s_Data->SMAAResources.EdgeDetectionPipeline = CreateRef<GraphicsPipeline>(smaaEdgeDetectionPipelineSpec);
+
+			GraphicsPipelineSpecification smaaBlendWeightPipelineSpec{};
+			smaaBlendWeightPipelineSpec.Name = "SMAA Blend Weight Pipeline";
+			smaaBlendWeightPipelineSpec.Shader = CreateRef<Shader>("smaa_weights", "SMAA Blend Weights");
+			smaaBlendWeightPipelineSpec.PipelineLayout = *s_Data->SMAAResources.BlendWeightPipelineLayout;
+			smaaBlendWeightPipelineSpec.BindingDescription = {};
+			smaaBlendWeightPipelineSpec.InputAttributeDescriptions = {};
+			smaaBlendWeightPipelineSpec.SampleCount = vk::SampleCountFlagBits::e1;
+			smaaBlendWeightPipelineSpec.CullMode = CullMode::None;
+			smaaBlendWeightPipelineSpec.EnableDepthClamp = false;
+			smaaBlendWeightPipelineSpec.EnableDepthBias = false;
+			smaaBlendWeightPipelineSpec.EnableDepthTest = false;
+			smaaBlendWeightPipelineSpec.EnableDepthWrite = false;
+			smaaBlendWeightPipelineSpec.BlendModes = { BlendMode::None };
+			smaaBlendWeightPipelineSpec.ColorAttachmentFormats = { s_Data->SMAAResources.BlendImage.Format };
+			smaaBlendWeightPipelineSpec.DepthAttachmentFormat = std::nullopt;
+			smaaBlendWeightPipelineSpec.DynamicStates = commonDynamicStates;
+
+			s_Data->SMAAResources.BlendWeightPipeline = CreateRef<GraphicsPipeline>(smaaBlendWeightPipelineSpec);
+
+			GraphicsPipelineSpecification smaaNeighbourhoodBlendPipelineSpec{};
+			smaaNeighbourhoodBlendPipelineSpec.Name = "SMAA Neighbourhood Blend Pipeline";
+			smaaNeighbourhoodBlendPipelineSpec.Shader = CreateRef<Shader>("smaa_neighbourhood_blend", "SMAA Neighbourhood Blend");
+			smaaNeighbourhoodBlendPipelineSpec.PipelineLayout = *s_Data->SMAAResources.NeighborhoodBlendingPipelineLayout;
+			smaaNeighbourhoodBlendPipelineSpec.BindingDescription = {};
+			smaaNeighbourhoodBlendPipelineSpec.InputAttributeDescriptions = {};
+			smaaNeighbourhoodBlendPipelineSpec.SampleCount = vk::SampleCountFlagBits::e1;
+			smaaNeighbourhoodBlendPipelineSpec.CullMode = CullMode::None;
+			smaaNeighbourhoodBlendPipelineSpec.EnableDepthClamp = false;
+			smaaNeighbourhoodBlendPipelineSpec.EnableDepthBias = false;
+			smaaNeighbourhoodBlendPipelineSpec.EnableDepthTest = false;
+			smaaNeighbourhoodBlendPipelineSpec.EnableDepthWrite = false;
+			smaaNeighbourhoodBlendPipelineSpec.BlendModes = { BlendMode::None };
+			smaaNeighbourhoodBlendPipelineSpec.ColorAttachmentFormats = { s_Data->CompositeImage.Format };
+			smaaNeighbourhoodBlendPipelineSpec.DepthAttachmentFormat = std::nullopt;
+			smaaNeighbourhoodBlendPipelineSpec.DynamicStates = commonDynamicStates;
+
+			s_Data->SMAAResources.NeighborhoodBlendingPipeline = CreateRef<GraphicsPipeline>(smaaNeighbourhoodBlendPipelineSpec);
+		}
+
 		// Transition sampled post-process inputs to shader read layout
 		{
 			const vk::ImageMemoryBarrier2 resolveImageBarrier = {
@@ -3117,6 +3246,12 @@ namespace Kerberos
 		s_Data->GTAOScratchImage.ImageView.clear();
 		s_Data->GTAOScratchImage.Image.clear();
 		s_Data->GTAOScratchImage.ImageMemory.clear();
+		s_Data->SMAAResources.EdgesImage.ImageView.clear();
+		s_Data->SMAAResources.EdgesImage.Image.clear();
+		s_Data->SMAAResources.EdgesImage.ImageMemory.clear();
+		s_Data->SMAAResources.BlendImage.ImageView.clear();
+		s_Data->SMAAResources.BlendImage.Image.clear();
+		s_Data->SMAAResources.BlendImage.ImageMemory.clear();
 
 		// Recreate resources with new size
 
@@ -3246,9 +3381,12 @@ namespace Kerberos
 
 		CreateGTAOImage(width, height);
 
+		CreateSMAAImages(width, height);
+
 		SetupTonemappingResolveDescriptors();
 		SetupFXAADescriptors();
 		SetupBloomDescriptors();
+		SetupSMAADescriptors();
 
 		// Update the transparency resolve descriptor sets to point to the new images
 		{
@@ -3667,6 +3805,12 @@ namespace Kerberos
 			bloomUpsamplePipeline->Recompile();
 		if (const auto& crossBilateralBlurPipeline = s_Data->CrossBilateralBlurPipeline)
 			crossBilateralBlurPipeline->Recompile();
+		if (const auto& smaaEdgePipeline = s_Data->SMAAResources.EdgeDetectionPipeline)
+			smaaEdgePipeline->Recompile();
+		if (const auto& smaaBlendPipeline = s_Data->SMAAResources.BlendWeightPipeline)
+			smaaBlendPipeline->Recompile();
+		if (const auto& smaaNeighborhoodPipeline = s_Data->SMAAResources.NeighborhoodBlendingPipeline)
+			smaaNeighborhoodPipeline->Recompile();
 	}
 
 	glm::vec3 Renderer::GetLightPositionForShadowMapCalculation() 
@@ -3948,7 +4092,8 @@ namespace Kerberos
 		s_Data->LatestGPUTimings.TransparencyResolvePassMilliseconds = toMilliseconds(GPUTimestampQuery::TransparencyResolveBegin, GPUTimestampQuery::TransparencyResolveEnd);
 		s_Data->LatestGPUTimings.BloomPassMilliseconds = toMilliseconds(GPUTimestampQuery::BloomPassBegin, GPUTimestampQuery::BloomPassEnd);
 		s_Data->LatestGPUTimings.AmbientOcclusionPassMilliseconds = toMilliseconds(GPUTimestampQuery::AmbientOcclusionPassBegin, GPUTimestampQuery::AmbientOcclusionPassEnd);
-		s_Data->LatestGPUTimings.PostProcessingPassMilliseconds = toMilliseconds(GPUTimestampQuery::PostProcessPassBegin, GPUTimestampQuery::PostProcessPassEnd);
+		s_Data->LatestGPUTimings.AntialiasingPassMilliseconds = toMilliseconds(GPUTimestampQuery::AntialiasingPassBegin, GPUTimestampQuery::AntialiasingPassEnd);
+		s_Data->LatestGPUTimings.TonemappingPassMilliseconds = toMilliseconds(GPUTimestampQuery::TonemappingPassBegin, GPUTimestampQuery::TonemappingPassEnd);
 		s_Data->LatestGPUTimings.IsValid = true;
 	}
 
@@ -4187,15 +4332,15 @@ namespace Kerberos
 		return vertices;
 	}
 
-	void Renderer::ApplyPostProcessing(const vk::raii::CommandBuffer& cmd, uint32_t frameIndex)
+	void Renderer::ApplyTonemapping(const vk::raii::CommandBuffer& cmd, uint32_t frameIndex)
 	{
-		WriteGPUTimestamp(cmd, frameIndex, static_cast<uint32_t>(GPUTimestampQuery::PostProcessPassBegin));
+		WriteGPUTimestamp(cmd, frameIndex, static_cast<uint32_t>(GPUTimestampQuery::TonemappingPassBegin));
 
 		const uint32_t outputWidth = static_cast<uint32_t>(s_Data->OutputSize.x);
 		const uint32_t outputHeight = static_cast<uint32_t>(s_Data->OutputSize.y);
 		if (outputWidth == 0 || outputHeight == 0)
 		{
-			WriteGPUTimestamp(cmd, frameIndex, static_cast<uint32_t>(GPUTimestampQuery::PostProcessPassEnd));
+			WriteGPUTimestamp(cmd, frameIndex, static_cast<uint32_t>(GPUTimestampQuery::TonemappingPassEnd));
 			return;
 		}
 
@@ -4213,7 +4358,7 @@ namespace Kerberos
 			.maxDepth = 1.0f
 		};
 
-		// First pass: TonemappingResolve (resolve -> tonemapped)
+		// Resolve -> Tonemapped
 		{
 			const vk::ImageMemoryBarrier2 resolveBarrier = {
 				.srcStageMask = vk::PipelineStageFlagBits2::eComputeShader,
@@ -4306,7 +4451,13 @@ namespace Kerberos
 		cmd.endRendering();
 		EndRenderPassDebugLabel(cmd);
 
-		// Second pass: FXAA (tonemapped -> composite)
+		WriteGPUTimestamp(cmd, frameIndex, static_cast<uint32_t>(GPUTimestampQuery::TonemappingPassEnd));
+	}
+
+	void Renderer::ApplyAntiAliasing(const vk::raii::CommandBuffer& cmd, const uint32_t frameIndex)
+	{
+		WriteGPUTimestamp(cmd, frameIndex, static_cast<uint32_t>(GPUTimestampQuery::AntialiasingPassBegin));
+
 		{
 			const vk::ImageMemoryBarrier2 tonemappedBarrier = {
 				.srcStageMask = vk::PipelineStageFlagBits2::eColorAttachmentOutput,
@@ -4357,6 +4508,49 @@ namespace Kerberos
 			cmd.pipelineBarrier2(dependencyInfo);
 		}
 
+		const uint32_t outputWidth = static_cast<uint32_t>(s_Data->OutputSize.x);
+		const uint32_t outputHeight = static_cast<uint32_t>(s_Data->OutputSize.y);
+
+		const vk::Rect2D renderArea{
+			.offset = vk::Offset2D{.x = 0, .y = 0 },
+			.extent = vk::Extent2D{.width = outputWidth, .height = outputHeight }
+		};
+
+		const vk::Viewport viewport{
+			.x = 0.0f,
+			.y = 0.0f,
+			.width = static_cast<float>(outputWidth),
+			.height = static_cast<float>(outputHeight),
+			.minDepth = 0.0f,
+			.maxDepth = 1.0f
+		};
+
+		BeginRenderPassDebugLabel(cmd, "Antialiasing Pass");
+
+		if (s_Data->AntiAliasingMode == AntiAliasingMode::None)
+		{
+			ApplyNoOpPostProcessing(cmd, frameIndex, renderArea, viewport);
+		}
+		else if (s_Data->AntiAliasingMode == AntiAliasingMode::FXAA)
+		{
+			ApplyFXAA(cmd, frameIndex, renderArea, viewport);
+		}
+		else if (s_Data->AntiAliasingMode == AntiAliasingMode::SMAA)
+		{
+			ApplySMAA(cmd, frameIndex, renderArea, viewport);
+		}
+		else if (s_Data->AntiAliasingMode == AntiAliasingMode::TAA)
+		{
+
+		}
+
+		EndRenderPassDebugLabel(cmd);
+
+		WriteGPUTimestamp(cmd, frameIndex, static_cast<uint32_t>(GPUTimestampQuery::AntialiasingPassEnd));
+	}
+
+	void Renderer::ApplyFXAA(const vk::raii::CommandBuffer& cmd, const uint32_t frameIndex, const vk::Rect2D& renderArea, const vk::Viewport& viewport)
+	{
 		vk::RenderingAttachmentInfo compositeAttachmentInfo{
 			.imageView = s_Data->CompositeImage.ImageView,
 			.imageLayout = vk::ImageLayout::eColorAttachmentOptimal,
@@ -4372,7 +4566,6 @@ namespace Kerberos
 			.pDepthAttachment = nullptr
 		};
 
-		BeginRenderPassDebugLabel(cmd, "Post Processing Pass");
 		cmd.beginRendering(compositeRenderingInfo);
 		cmd.setViewport(0, viewport);
 		cmd.setScissor(0, renderArea);
@@ -4380,43 +4573,291 @@ namespace Kerberos
 		FXAAPushConstants fxaaConstants;
 		fxaaConstants.inverseViewportSize = glm::vec2(1.0f) / s_Data->OutputSize;
 
-		if (s_Data->AntiAliasingMode == AntiAliasingMode::None)
-		{
-			s_Data->NoopPostProcessPipeline->Bind(cmd);
+		s_Data->FXAAPipeline->Bind(cmd);
 
-			cmd.bindDescriptorSets(
-				vk::PipelineBindPoint::eGraphics,
-				*s_Data->FXAAPipelineLayout,
-				0,
-				*s_Data->DescriptorSets[frameIndex].fxaa,
-				{});
+		cmd.bindDescriptorSets(
+			vk::PipelineBindPoint::eGraphics,
+			*s_Data->FXAAPipelineLayout,
+			0,
+			*s_Data->DescriptorSets[frameIndex].fxaa,
+			{});
 
-			cmd.pushConstants<FXAAPushConstants>(*s_Data->FXAAPipelineLayout, vk::ShaderStageFlagBits::eFragment, 0, { fxaaConstants });
-		}
-		else if (s_Data->AntiAliasingMode == AntiAliasingMode::FXAA)
-		{
-			s_Data->FXAAPipeline->Bind(cmd);
-
-			cmd.bindDescriptorSets(
-				vk::PipelineBindPoint::eGraphics,
-				*s_Data->FXAAPipelineLayout,
-				0,
-				*s_Data->DescriptorSets[frameIndex].fxaa,
-				{});
-
-			cmd.pushConstants<FXAAPushConstants>(*s_Data->FXAAPipelineLayout, vk::ShaderStageFlagBits::eFragment, 0, { fxaaConstants });
-		}
-		else if (s_Data->AntiAliasingMode == AntiAliasingMode::TAA)
-		{
-
-		}
+		cmd.pushConstants<FXAAPushConstants>(*s_Data->FXAAPipelineLayout, vk::ShaderStageFlagBits::eFragment, 0, { fxaaConstants });
 
 		cmd.draw(3, 1, 0, 0);
 
 		cmd.endRendering();
-		EndRenderPassDebugLabel(cmd);
+	}
 
-		WriteGPUTimestamp(cmd, frameIndex, static_cast<uint32_t>(GPUTimestampQuery::PostProcessPassEnd));
+	void Renderer::ApplyNoOpPostProcessing(const vk::raii::CommandBuffer& cmd, const uint32_t frameIndex, const vk::Rect2D& renderArea, const vk::Viewport& viewport)
+	{
+		vk::RenderingAttachmentInfo compositeAttachmentInfo{
+			.imageView = s_Data->CompositeImage.ImageView,
+			.imageLayout = vk::ImageLayout::eColorAttachmentOptimal,
+			.loadOp = vk::AttachmentLoadOp::eClear,
+			.storeOp = vk::AttachmentStoreOp::eStore,
+			.clearValue = vk::ClearColorValue{ std::array{0.0f, 0.0f, 0.0f, 1.0f} }
+		};
+		const vk::RenderingInfo compositeRenderingInfo{
+			.renderArea = renderArea,
+			.layerCount = 1,
+			.colorAttachmentCount = 1,
+			.pColorAttachments = &compositeAttachmentInfo,
+			.pDepthAttachment = nullptr
+		};
+
+		cmd.beginRendering(compositeRenderingInfo);
+		cmd.setViewport(0, viewport);
+		cmd.setScissor(0, renderArea);
+
+		FXAAPushConstants fxaaConstants;
+		fxaaConstants.inverseViewportSize = glm::vec2(1.0f) / s_Data->OutputSize;
+
+		s_Data->NoopPostProcessPipeline->Bind(cmd);
+		
+		cmd.bindDescriptorSets(
+			vk::PipelineBindPoint::eGraphics,
+			*s_Data->FXAAPipelineLayout,
+			0,
+			*s_Data->DescriptorSets[frameIndex].fxaa,
+			{});
+
+		cmd.pushConstants<FXAAPushConstants>(*s_Data->FXAAPipelineLayout, vk::ShaderStageFlagBits::eFragment, 0, { fxaaConstants });
+
+		cmd.draw(3, 1, 0, 0);
+
+		cmd.endRendering();
+	}
+
+	void Renderer::ApplySMAA(const vk::raii::CommandBuffer& cmd, const uint32_t frameIndex, const vk::Rect2D& renderArea, const vk::Viewport& viewport)
+	{
+		// Tonemapped image is already shader read-only optimal and composite image is already color attachment optimal
+
+		SMAAData::PushConstants smaaPushConstants;
+		smaaPushConstants.InverseViewportSize = glm::vec2(1.0f) / s_Data->OutputSize;
+		smaaPushConstants.ViewportSize = s_Data->OutputSize;
+
+		// Transfer edges image to color attachment optimal for the edge detection pass
+		{
+			const vk::ImageMemoryBarrier2 edgeImageBarrier = {
+				.srcStageMask = vk::PipelineStageFlagBits2::eFragmentShader,
+				.srcAccessMask = vk::AccessFlagBits2::eShaderRead,
+				.dstStageMask = vk::PipelineStageFlagBits2::eColorAttachmentOutput,
+				.dstAccessMask = vk::AccessFlagBits2::eColorAttachmentWrite,
+				.oldLayout = vk::ImageLayout::eUndefined,
+				.newLayout = vk::ImageLayout::eColorAttachmentOptimal,
+				.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+				.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+				.image = s_Data->SMAAResources.EdgesImage.Image,
+				.subresourceRange = {
+					.aspectMask = vk::ImageAspectFlagBits::eColor,
+					.baseMipLevel = 0,
+					.levelCount = 1,
+					.baseArrayLayer = 0,
+					.layerCount = 1
+				}
+			};
+			const std::array barriers = { edgeImageBarrier };
+			cmd.pipelineBarrier2({ .imageMemoryBarrierCount = barriers.size(), .pImageMemoryBarriers = barriers.data() });
+		}
+
+		// Edge Detection Pass
+		{
+			vk::RenderingAttachmentInfo edgeDetectionAttachmentInfo{
+				.imageView = s_Data->SMAAResources.EdgesImage.ImageView,
+				.imageLayout = vk::ImageLayout::eColorAttachmentOptimal,
+				.loadOp = vk::AttachmentLoadOp::eClear,
+				.storeOp = vk::AttachmentStoreOp::eStore,
+				.clearValue = vk::ClearColorValue{ std::array{0.0f, 0.0f, 0.0f, 0.0f} }
+			};
+			const vk::RenderingInfo edgeDetectionRenderingInfo{
+				.renderArea = renderArea,
+				.layerCount = 1,
+				.colorAttachmentCount = 1,
+				.pColorAttachments = &edgeDetectionAttachmentInfo,
+				.pDepthAttachment = nullptr
+			};
+
+			BeginRenderPassDebugLabel(cmd, "SMAA Edge Detection Pass");
+
+			cmd.beginRendering(edgeDetectionRenderingInfo);
+			cmd.setViewport(0, viewport);
+			cmd.setScissor(0, renderArea);
+
+			s_Data->SMAAResources.EdgeDetectionPipeline->Bind(cmd);
+
+			cmd.bindDescriptorSets(
+				vk::PipelineBindPoint::eGraphics,
+				*s_Data->SMAAResources.EdgeDetectionPipelineLayout,
+				0,
+				*s_Data->SMAAResources.DescriptorSets[frameIndex].EdgeDetection,
+				{});
+
+			cmd.pushConstants<SMAAData::PushConstants>(*s_Data->SMAAResources.EdgeDetectionPipelineLayout, 
+													   vk::ShaderStageFlagBits::eFragment | vk::ShaderStageFlagBits::eVertex, 
+													   0, { smaaPushConstants });
+			
+			cmd.draw(3, 1, 0, 0);
+			
+			cmd.endRendering();
+			
+			EndRenderPassDebugLabel(cmd);
+		}
+
+		// Transition EdgesImage to shader read-only optimal and BlendImage to color attachment optimal for the next pass
+		{
+			const vk::ImageMemoryBarrier2 edgeImageBarrier = {
+				.srcStageMask = vk::PipelineStageFlagBits2::eColorAttachmentOutput,
+				.srcAccessMask = vk::AccessFlagBits2::eColorAttachmentWrite,
+				.dstStageMask = vk::PipelineStageFlagBits2::eFragmentShader,
+				.dstAccessMask = vk::AccessFlagBits2::eShaderRead,
+				.oldLayout = vk::ImageLayout::eUndefined,
+				.newLayout = vk::ImageLayout::eShaderReadOnlyOptimal,
+				.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+				.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+				.image = s_Data->SMAAResources.EdgesImage.Image,
+				.subresourceRange = {
+					.aspectMask = vk::ImageAspectFlagBits::eColor,
+					.baseMipLevel = 0,
+					.levelCount = 1,
+					.baseArrayLayer = 0,
+					.layerCount = 1
+				}
+			};
+			const vk::ImageMemoryBarrier2 blendImageBarrier = {
+				.srcStageMask = vk::PipelineStageFlagBits2::eFragmentShader,
+				.srcAccessMask = vk::AccessFlagBits2::eShaderRead,
+				.dstStageMask = vk::PipelineStageFlagBits2::eColorAttachmentOutput,
+				.dstAccessMask = vk::AccessFlagBits2::eColorAttachmentWrite,
+				.oldLayout = vk::ImageLayout::eUndefined,
+				.newLayout = vk::ImageLayout::eColorAttachmentOptimal,
+				.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+				.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+				.image = s_Data->SMAAResources.BlendImage.Image,
+				.subresourceRange = {
+					.aspectMask = vk::ImageAspectFlagBits::eColor,
+					.baseMipLevel = 0,
+					.levelCount = 1,
+					.baseArrayLayer = 0,
+					.layerCount = 1
+				}
+			};
+			const std::array barriers = { edgeImageBarrier, blendImageBarrier };
+
+			cmd.pipelineBarrier2({ .imageMemoryBarrierCount = barriers.size(), .pImageMemoryBarriers = barriers.data()});
+
+		}
+
+		// Blend Weights Calculation Pass
+		{
+			vk::RenderingAttachmentInfo blendWeightAttachmentInfo{
+				.imageView = s_Data->SMAAResources.BlendImage.ImageView,
+				.imageLayout = vk::ImageLayout::eColorAttachmentOptimal,
+				.loadOp = vk::AttachmentLoadOp::eClear,
+				.storeOp = vk::AttachmentStoreOp::eStore,
+				.clearValue = vk::ClearColorValue{ std::array{0.0f, 0.0f, 0.0f, 0.0f} }
+			};
+			const vk::RenderingInfo blendWeightRenderingInfo{
+				.renderArea = renderArea,
+				.layerCount = 1,
+				.colorAttachmentCount = 1,
+				.pColorAttachments = &blendWeightAttachmentInfo,
+				.pDepthAttachment = nullptr
+			};
+
+			BeginRenderPassDebugLabel(cmd, "SMAA Blend Weights Pass");
+
+			cmd.beginRendering(blendWeightRenderingInfo);
+
+			cmd.setViewport(0, viewport);
+			cmd.setScissor(0, renderArea);
+
+			s_Data->SMAAResources.BlendWeightPipeline->Bind(cmd);
+
+			cmd.bindDescriptorSets(
+				vk::PipelineBindPoint::eGraphics,
+				*s_Data->SMAAResources.BlendWeightPipelineLayout,
+				0,
+				*s_Data->SMAAResources.DescriptorSets[frameIndex].BlendWeight,
+				{});
+
+			cmd.pushConstants<SMAAData::PushConstants>(*s_Data->SMAAResources.BlendWeightPipelineLayout, 
+													   vk::ShaderStageFlagBits::eFragment | vk::ShaderStageFlagBits::eVertex, 
+													   0, { smaaPushConstants });
+			
+			cmd.draw(3, 1, 0, 0);
+			
+			cmd.endRendering();
+			
+			EndRenderPassDebugLabel(cmd);
+		}
+
+		// Transition BlendImage to shader read-only optimal for the next pass
+		{
+			const vk::ImageMemoryBarrier2 blendImageBarrier = {
+				.srcStageMask = vk::PipelineStageFlagBits2::eColorAttachmentOutput,
+				.srcAccessMask = vk::AccessFlagBits2::eColorAttachmentWrite,
+				.dstStageMask = vk::PipelineStageFlagBits2::eFragmentShader,
+				.dstAccessMask = vk::AccessFlagBits2::eShaderRead,
+				.oldLayout = vk::ImageLayout::eColorAttachmentOptimal,
+				.newLayout = vk::ImageLayout::eShaderReadOnlyOptimal,
+				.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+				.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+				.image = s_Data->SMAAResources.BlendImage.Image,
+				.subresourceRange = {
+					.aspectMask = vk::ImageAspectFlagBits::eColor,
+					.baseMipLevel = 0,
+					.levelCount = 1,
+					.baseArrayLayer = 0,
+					.layerCount = 1
+				}
+			};
+			cmd.pipelineBarrier2({ .imageMemoryBarrierCount = 1, .pImageMemoryBarriers = &blendImageBarrier });
+		}
+
+		// Neighborhood Blending Pass
+		{
+			vk::RenderingAttachmentInfo neighbourhoodBlendRenderingInfo{
+				.imageView = s_Data->CompositeImage.ImageView,
+				.imageLayout = vk::ImageLayout::eColorAttachmentOptimal,
+				.loadOp = vk::AttachmentLoadOp::eClear,
+				.storeOp = vk::AttachmentStoreOp::eStore,
+				.clearValue = vk::ClearColorValue{ std::array{0.0f, 0.0f, 0.0f, 0.0f} }
+			};
+			const vk::RenderingInfo blendWeightRenderingInfo{
+				.renderArea = renderArea,
+				.layerCount = 1,
+				.colorAttachmentCount = 1,
+				.pColorAttachments = &neighbourhoodBlendRenderingInfo,
+				.pDepthAttachment = nullptr
+			};
+
+			BeginRenderPassDebugLabel(cmd, "SMAA Neighbourhood Blend Pass");
+
+			cmd.beginRendering(blendWeightRenderingInfo);
+
+			cmd.setViewport(0, viewport);
+			cmd.setScissor(0, renderArea);
+			
+			s_Data->SMAAResources.NeighborhoodBlendingPipeline->Bind(cmd);
+			
+			cmd.bindDescriptorSets(
+				vk::PipelineBindPoint::eGraphics,
+				*s_Data->SMAAResources.NeighborhoodBlendingPipelineLayout,
+				0,
+				*s_Data->SMAAResources.DescriptorSets[frameIndex].NeighbourhoodBlend,
+				{});
+			
+			cmd.pushConstants<SMAAData::PushConstants>(*s_Data->SMAAResources.NeighborhoodBlendingPipelineLayout, 
+													   vk::ShaderStageFlagBits::eFragment | vk::ShaderStageFlagBits::eVertex, 
+													   0, { smaaPushConstants });
+
+			cmd.draw(3, 1, 0, 0);
+
+			cmd.endRendering();
+
+			EndRenderPassDebugLabel(cmd);
+		}
 	}
 
 	void Renderer::ApplyBloom(const vk::raii::CommandBuffer& cmd, const uint32_t frameIndex)
@@ -6160,5 +6601,516 @@ namespace Kerberos
 		bloomUpsamplePipelineSpec.PipelineLayout = *s_Data->Bloom.UpsamplePipelineLayout;
 
 		s_Data->Bloom.UpsamplePipeline = CreateRef<ComputePipeline>(bloomUpsamplePipelineSpec);
+	}
+
+	void Renderer::CreateSMAATextures()
+	{
+		KBR_CORE_ASSERT(s_Data, "Renderer not initialized!");
+
+		auto& context = VulkanContext::Get();
+		const auto& device = context.GetDevice();
+
+		constexpr uint64_t areaWidth = 160, areaHeight = 560;
+		constexpr vk::DeviceSize areaSize = areaWidth * areaHeight * 2; // 2 bytes per pixel
+		constexpr vk::Format areaFormat = vk::Format::eR8G8Unorm;
+
+		constexpr uint64_t searchWidth = 66, searchHeight = 33;
+		constexpr vk::DeviceSize searchSize = searchWidth * searchHeight * 1; // 1 byte per pixel
+		constexpr vk::Format searchFormat = vk::Format::eR8Unorm;
+
+		auto uploadLUT = [&](ImageData& outImage, const unsigned char* byteData, uint32_t width, uint32_t height, vk::Format format, vk::DeviceSize size, const std::string& debugName)
+		{
+			vk::raii::Buffer stagingBuffer = nullptr;
+			vk::raii::DeviceMemory stagingMemory = nullptr;
+			CreateBuffer(device, size,
+						 vk::BufferUsageFlagBits::eTransferSrc,
+						 vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent,
+						 stagingBuffer, stagingMemory);
+
+			void* mappedData = stagingMemory.mapMemory(0, size);
+			std::memcpy(mappedData, byteData, size);
+			stagingMemory.unmapMemory();
+
+			CreateImage(device, width, height, 1, vk::SampleCountFlagBits::e1, format,
+						vk::ImageTiling::eOptimal,
+						vk::ImageUsageFlagBits::eTransferDst | vk::ImageUsageFlagBits::eSampled,
+						vk::MemoryPropertyFlagBits::eDeviceLocal,
+						outImage.Image, outImage.ImageMemory);
+
+			context.SetObjectDebugName(outImage.Image, debugName);
+			outImage.Format = format;
+
+			outImage.ImageView = CreateImageView(device, outImage.Image, format, vk::ImageAspectFlagBits::eColor, 1);
+			context.SetObjectDebugName(outImage.ImageView, debugName + " View");
+
+			auto cmd = context.BeginSingleTimeCommands();
+
+			const vk::ImageMemoryBarrier2 toTransferBarrier = {
+				.srcStageMask = vk::PipelineStageFlagBits2::eTopOfPipe,
+				.srcAccessMask = {},
+				.dstStageMask = vk::PipelineStageFlagBits2::eTransfer,
+				.dstAccessMask = vk::AccessFlagBits2::eTransferWrite,
+				.oldLayout = vk::ImageLayout::eUndefined,
+				.newLayout = vk::ImageLayout::eTransferDstOptimal,
+				.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+				.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+				.image = *outImage.Image,
+				.subresourceRange = { vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1 }
+			};
+			cmd.pipelineBarrier2({ .imageMemoryBarrierCount = 1, .pImageMemoryBarriers = &toTransferBarrier });
+
+
+			const vk::BufferImageCopy copyRegion{
+				.bufferOffset = 0,
+				.bufferRowLength = 0,
+				.bufferImageHeight = 0,
+				.imageSubresource = { vk::ImageAspectFlagBits::eColor, 0, 0, 1 },
+				.imageOffset = { 0, 0, 0 },
+				.imageExtent = { width, height, 1 }
+			};
+			cmd.copyBufferToImage(*stagingBuffer, *outImage.Image, vk::ImageLayout::eTransferDstOptimal, copyRegion);
+
+			const vk::ImageMemoryBarrier2 toShaderReadBarrier = {
+				.srcStageMask = vk::PipelineStageFlagBits2::eTransfer,
+				.srcAccessMask = vk::AccessFlagBits2::eTransferWrite,
+				.dstStageMask = vk::PipelineStageFlagBits2::eFragmentShader,
+				.dstAccessMask = vk::AccessFlagBits2::eShaderRead,
+				.oldLayout = vk::ImageLayout::eTransferDstOptimal,
+				.newLayout = vk::ImageLayout::eShaderReadOnlyOptimal,
+				.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+				.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+				.image = *outImage.Image,
+				.subresourceRange = { vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1 }
+			};
+			cmd.pipelineBarrier2({ .imageMemoryBarrierCount = 1, .pImageMemoryBarriers = &toShaderReadBarrier });
+
+			context.EndSingleTimeCommands(cmd);
+		};
+
+		uploadLUT(s_Data->SMAAResources.AreaTexture, areaTexBytes, areaWidth, areaHeight, areaFormat, areaSize, "SMAA Area Texture");
+		uploadLUT(s_Data->SMAAResources.SearchTexture, searchTexBytes, searchWidth, searchHeight, searchFormat, searchSize, "SMAA Search Texture");
+	}
+
+	void Renderer::CreateSMAADescriptorSetAndPipelineLayouts()
+	{
+
+		auto& context = VulkanContext::Get();
+		const auto& device = context.GetDevice();
+
+		constexpr vk::PushConstantRange pushConstantRange{
+			.stageFlags = vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment,
+			.offset = 0,
+			.size = sizeof(SMAAData::PushConstants)
+		};
+
+		// Edge detection
+		{
+			std::vector<vk::DescriptorSetLayoutBinding> bindings = {
+				vk::DescriptorSetLayoutBinding{ // Tonemapped image
+					.binding = 0,
+					.descriptorType = vk::DescriptorType::eCombinedImageSampler,
+					.descriptorCount = 1,
+					.stageFlags = vk::ShaderStageFlagBits::eFragment,
+					.pImmutableSamplers = nullptr
+				},
+				vk::DescriptorSetLayoutBinding{ // Linear sampler
+					.binding = 1,
+					.descriptorType = vk::DescriptorType::eSampler,
+					.descriptorCount = 1,
+					.stageFlags = vk::ShaderStageFlagBits::eFragment,
+					.pImmutableSamplers = nullptr
+				},
+				vk::DescriptorSetLayoutBinding{ // Point sampler
+					.binding = 2,
+					.descriptorType = vk::DescriptorType::eSampler,
+					.descriptorCount = 1,
+					.stageFlags = vk::ShaderStageFlagBits::eFragment,
+					.pImmutableSamplers = nullptr
+				},
+			};
+
+			const vk::DescriptorSetLayoutCreateInfo layoutInfo{
+				.bindingCount = static_cast<uint32_t>(bindings.size()),
+				.pBindings = bindings.data()
+			};
+
+			s_Data->SMAAResources.DescriptorSetLayouts.EdgeDetection = vk::raii::DescriptorSetLayout{ device, layoutInfo };
+			context.SetObjectDebugName(s_Data->SMAAResources.DescriptorSetLayouts.EdgeDetection, "SMAA Edge Detection Set Layout");
+
+			const std::array setLayouts = {
+				*s_Data->SMAAResources.DescriptorSetLayouts.EdgeDetection
+			};
+
+			const vk::PipelineLayoutCreateInfo pipelineLayoutInfo{
+				.setLayoutCount = static_cast<uint32_t>(setLayouts.size()),
+				.pSetLayouts = setLayouts.data(),
+				.pushConstantRangeCount = 1,
+				.pPushConstantRanges = &pushConstantRange
+			};
+
+			s_Data->SMAAResources.EdgeDetectionPipelineLayout = vk::raii::PipelineLayout{ device, pipelineLayoutInfo };
+			context.SetObjectDebugName(s_Data->SMAAResources.EdgeDetectionPipelineLayout, "SMAA Edge Detection Pipeline Layout");
+		}
+
+		// Blend Weight Calculation
+		{
+			std::vector<vk::DescriptorSetLayoutBinding> bindings = {
+				vk::DescriptorSetLayoutBinding{ // Edges texture
+					.binding = 0,
+					.descriptorType = vk::DescriptorType::eCombinedImageSampler,
+					.descriptorCount = 1,
+					.stageFlags = vk::ShaderStageFlagBits::eFragment,
+					.pImmutableSamplers = nullptr
+				},
+				vk::DescriptorSetLayoutBinding{ // Area texture
+					.binding = 1,
+					.descriptorType = vk::DescriptorType::eCombinedImageSampler,
+					.descriptorCount = 1,
+					.stageFlags = vk::ShaderStageFlagBits::eFragment,
+					.pImmutableSamplers = nullptr
+				},
+				vk::DescriptorSetLayoutBinding{ // Search texture
+					.binding = 2,
+					.descriptorType = vk::DescriptorType::eCombinedImageSampler,
+					.descriptorCount = 1,
+					.stageFlags = vk::ShaderStageFlagBits::eFragment,
+					.pImmutableSamplers = nullptr
+				},
+				vk::DescriptorSetLayoutBinding{ // Linear sampler
+					.binding = 3,
+					.descriptorType = vk::DescriptorType::eSampler,
+					.descriptorCount = 1,
+					.stageFlags = vk::ShaderStageFlagBits::eFragment,
+					.pImmutableSamplers = nullptr
+				},
+				vk::DescriptorSetLayoutBinding{ // Point sampler
+					.binding = 4,
+					.descriptorType = vk::DescriptorType::eSampler,
+					.descriptorCount = 1,
+					.stageFlags = vk::ShaderStageFlagBits::eFragment,
+					.pImmutableSamplers = nullptr
+				},
+			};
+
+			const vk::DescriptorSetLayoutCreateInfo layoutInfo{
+				.bindingCount = static_cast<uint32_t>(bindings.size()),
+				.pBindings = bindings.data()
+			};
+
+			s_Data->SMAAResources.DescriptorSetLayouts.BlendWeight = vk::raii::DescriptorSetLayout{ device, layoutInfo };
+			context.SetObjectDebugName(s_Data->SMAAResources.DescriptorSetLayouts.BlendWeight, "SMAA Blend Weights Set Layout");
+
+			const std::array setLayouts = {
+				*s_Data->SMAAResources.DescriptorSetLayouts.BlendWeight
+			};
+
+			const vk::PipelineLayoutCreateInfo pipelineLayoutInfo{
+				.setLayoutCount = static_cast<uint32_t>(setLayouts.size()),
+				.pSetLayouts = setLayouts.data(),
+				.pushConstantRangeCount = 1,
+				.pPushConstantRanges = &pushConstantRange
+			};
+
+			s_Data->SMAAResources.BlendWeightPipelineLayout = vk::raii::PipelineLayout{ device, pipelineLayoutInfo };
+			context.SetObjectDebugName(s_Data->SMAAResources.BlendWeightPipelineLayout, "SMAA Blend Weights Pipeline Layout");
+		}
+
+		// Neighbourhood Blend
+		{
+			std::vector<vk::DescriptorSetLayoutBinding> bindings = {
+				vk::DescriptorSetLayoutBinding{ // Tonemapped image
+					.binding = 0,
+					.descriptorType = vk::DescriptorType::eCombinedImageSampler,
+					.descriptorCount = 1,
+					.stageFlags = vk::ShaderStageFlagBits::eFragment,
+					.pImmutableSamplers = nullptr
+				},
+				vk::DescriptorSetLayoutBinding{ // Blend weights texture
+					.binding = 1,
+					.descriptorType = vk::DescriptorType::eCombinedImageSampler,
+					.descriptorCount = 1,
+					.stageFlags = vk::ShaderStageFlagBits::eFragment,
+					.pImmutableSamplers = nullptr
+				},
+				vk::DescriptorSetLayoutBinding{ // Linear sampler
+					.binding = 2,
+					.descriptorType = vk::DescriptorType::eSampler,
+					.descriptorCount = 1,
+					.stageFlags = vk::ShaderStageFlagBits::eFragment,
+					.pImmutableSamplers = nullptr
+				},
+				vk::DescriptorSetLayoutBinding{ // Point sampler
+					.binding = 3,
+					.descriptorType = vk::DescriptorType::eSampler,
+					.descriptorCount = 1,
+					.stageFlags = vk::ShaderStageFlagBits::eFragment,
+					.pImmutableSamplers = nullptr
+				},
+			};
+
+			const vk::DescriptorSetLayoutCreateInfo layoutInfo{
+				.bindingCount = static_cast<uint32_t>(bindings.size()),
+				.pBindings = bindings.data()
+			};
+
+			s_Data->SMAAResources.DescriptorSetLayouts.NeighbourhoodBlend = vk::raii::DescriptorSetLayout{ device, layoutInfo };
+			context.SetObjectDebugName(s_Data->SMAAResources.DescriptorSetLayouts.NeighbourhoodBlend, "SMAA Neighbourhood Blend Set Layout");
+
+			const std::array setLayouts = {
+				*s_Data->SMAAResources.DescriptorSetLayouts.NeighbourhoodBlend
+			};
+
+			const vk::PipelineLayoutCreateInfo pipelineLayoutInfo{
+				.setLayoutCount = static_cast<uint32_t>(setLayouts.size()),
+				.pSetLayouts = setLayouts.data(),
+				.pushConstantRangeCount = 1,
+				.pPushConstantRanges = &pushConstantRange
+			};
+
+			s_Data->SMAAResources.NeighborhoodBlendingPipelineLayout = vk::raii::PipelineLayout{ device, pipelineLayoutInfo };
+			context.SetObjectDebugName(s_Data->SMAAResources.NeighborhoodBlendingPipelineLayout, "SMAA Neighbourhood Blend Pipeline Layout");
+		}
+	}
+
+	void Renderer::CreateSMAAImages(const uint32_t width, const uint32_t height)
+	{
+		KBR_CORE_ASSERT(s_Data->SMAAResources.EdgesImage.Format != vk::Format::eUndefined, "SMAA edge detection image format has to be set before creating SMAA images!");
+		KBR_CORE_ASSERT(s_Data->SMAAResources.BlendImage.Format != vk::Format::eUndefined, "SMAA blend image format has to be set before creating SMAA images!");
+
+		auto& context = VulkanContext::Get();
+		const auto& device = context.GetDevice();
+
+		constexpr uint32_t mipLevels = 1;
+
+		CreateImage(device,
+					width,
+					height,
+					mipLevels,
+					vk::SampleCountFlagBits::e1,
+					s_Data->SMAAResources.EdgesImage.Format,
+					vk::ImageTiling::eOptimal,
+					vk::ImageUsageFlagBits::eColorAttachment | vk::ImageUsageFlagBits::eSampled,
+					vk::MemoryPropertyFlagBits::eDeviceLocal,
+					s_Data->SMAAResources.EdgesImage.Image,
+					s_Data->SMAAResources.EdgesImage.ImageMemory);
+
+		context.SetObjectDebugName(s_Data->SMAAResources.EdgesImage.Image, "SMAA Edges Image");
+		context.SetObjectDebugName(s_Data->SMAAResources.EdgesImage.ImageMemory, "SMAA Edges Image Memory");
+
+		s_Data->SMAAResources.EdgesImage.ImageView = CreateImageView(device,
+																	s_Data->SMAAResources.EdgesImage.Image,
+																	s_Data->SMAAResources.EdgesImage.Format, vk::ImageAspectFlagBits::eColor,
+																	mipLevels);
+		context.SetObjectDebugName(s_Data->SMAAResources.EdgesImage.ImageView, "SMAA Edges Image View");
+
+		CreateImage(device,
+					width,
+					height,
+					mipLevels,
+					vk::SampleCountFlagBits::e1,
+					s_Data->SMAAResources.BlendImage.Format,
+					vk::ImageTiling::eOptimal,
+					vk::ImageUsageFlagBits::eColorAttachment | vk::ImageUsageFlagBits::eSampled,
+					vk::MemoryPropertyFlagBits::eDeviceLocal,
+					s_Data->SMAAResources.BlendImage.Image,
+					s_Data->SMAAResources.BlendImage.ImageMemory);
+
+		context.SetObjectDebugName(s_Data->SMAAResources.BlendImage.Image, "SMAA Blend Image");
+		context.SetObjectDebugName(s_Data->SMAAResources.BlendImage.ImageMemory, "SMAA Blend Image Memory");
+
+		s_Data->SMAAResources.BlendImage.ImageView = CreateImageView(device,
+																	 s_Data->SMAAResources.BlendImage.Image,
+																	 s_Data->SMAAResources.BlendImage.Format, vk::ImageAspectFlagBits::eColor,
+																	 mipLevels);
+		context.SetObjectDebugName(s_Data->SMAAResources.BlendImage.ImageView, "SMAA Blend Image View");
+	}
+
+	void Renderer::SetupSMAADescriptors()
+	{
+		KBR_CORE_ASSERT(s_Data->DescriptorPool != nullptr, "Descriptor pool has to be created before setting up transparency descriptors");
+
+		auto& context = VulkanContext::Get();
+		const auto& device = context.GetDevice();
+
+		const vk::DescriptorImageInfo linearSamplerInfo{
+			.sampler = *s_Data->LinearSampler,
+			.imageView = nullptr,
+		};
+		const vk::DescriptorImageInfo pointSamplerInfo{
+			.sampler = *s_Data->PointSampler,
+			.imageView = nullptr,
+		};
+		const vk::DescriptorImageInfo tonemappedImageInfo{
+			.sampler = *s_Data->LinearSampler,
+			.imageView = *s_Data->TonemappedImage.ImageView,
+			.imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal
+		};
+		
+
+		for (uint32_t i = 0; i < VulkanContext::MaxFramesInFlight; i++)
+		{
+			// Edge Detection Set
+			{
+				const vk::DescriptorSetAllocateInfo allocInfo{
+					.descriptorPool = *s_Data->DescriptorPool,
+					.descriptorSetCount = 1,
+					.pSetLayouts = &*s_Data->SMAAResources.DescriptorSetLayouts.EdgeDetection
+				};
+				s_Data->SMAAResources.DescriptorSets[i].EdgeDetection = std::move(device.allocateDescriptorSets(allocInfo).front());
+				context.SetObjectDebugName(s_Data->SMAAResources.DescriptorSets[i].EdgeDetection, "SMAA Edge Detection Descriptor Set[" + std::to_string(i) + "]");
+
+				const std::array write = {
+					vk::WriteDescriptorSet{
+						.dstSet = *s_Data->SMAAResources.DescriptorSets[i].EdgeDetection,
+						.dstBinding = 0,
+						.dstArrayElement = 0,
+						.descriptorCount = 1,
+						.descriptorType = vk::DescriptorType::eCombinedImageSampler,
+						.pImageInfo = &tonemappedImageInfo
+					},
+					vk::WriteDescriptorSet{
+						.dstSet = *s_Data->SMAAResources.DescriptorSets[i].EdgeDetection,
+						.dstBinding = 1,
+						.dstArrayElement = 0,
+						.descriptorCount = 1,
+						.descriptorType = vk::DescriptorType::eSampler,
+						.pImageInfo = &linearSamplerInfo
+					},
+					vk::WriteDescriptorSet{
+						.dstSet = *s_Data->SMAAResources.DescriptorSets[i].EdgeDetection,
+						.dstBinding = 2,
+						.dstArrayElement = 0,
+						.descriptorCount = 1,
+						.descriptorType = vk::DescriptorType::eSampler,
+						.pImageInfo = &pointSamplerInfo
+					}
+				};
+				device.updateDescriptorSets(write, {});
+			}
+
+			// Blend Weight Calculation Set
+			{
+				const vk::DescriptorSetAllocateInfo allocInfo{
+					.descriptorPool = *s_Data->DescriptorPool,
+					.descriptorSetCount = 1,
+					.pSetLayouts = &*s_Data->SMAAResources.DescriptorSetLayouts.BlendWeight
+				};
+				s_Data->SMAAResources.DescriptorSets[i].BlendWeight = std::move(device.allocateDescriptorSets(allocInfo).front());
+				context.SetObjectDebugName(s_Data->SMAAResources.DescriptorSets[i].BlendWeight, "SMAA Blend Weights Descriptor Set[" + std::to_string(i) + "]");
+				
+				const vk::DescriptorImageInfo edgesImageInfo{
+					.sampler = *s_Data->LinearSampler,
+					.imageView = *s_Data->SMAAResources.EdgesImage.ImageView,
+					.imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal
+				};
+				const vk::DescriptorImageInfo areaTextureInfo{
+					.sampler = *s_Data->LinearSampler,
+					.imageView = *s_Data->SMAAResources.AreaTexture.ImageView,
+					.imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal
+				};
+				const vk::DescriptorImageInfo searchTextureInfo{
+					.sampler = *s_Data->LinearSampler,
+					.imageView = *s_Data->SMAAResources.SearchTexture.ImageView,
+					.imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal
+				};
+
+				const std::array write = {
+					vk::WriteDescriptorSet{
+						.dstSet = *s_Data->SMAAResources.DescriptorSets[i].BlendWeight,
+						.dstBinding = 0,
+						.dstArrayElement = 0,
+						.descriptorCount = 1,
+						.descriptorType = vk::DescriptorType::eCombinedImageSampler,
+						.pImageInfo = &edgesImageInfo
+					},
+					vk::WriteDescriptorSet{
+						.dstSet = *s_Data->SMAAResources.DescriptorSets[i].BlendWeight,
+						.dstBinding = 1,
+						.dstArrayElement = 0,
+						.descriptorCount = 1,
+						.descriptorType = vk::DescriptorType::eCombinedImageSampler,
+						.pImageInfo = &areaTextureInfo
+					},
+					vk::WriteDescriptorSet{
+						.dstSet = *s_Data->SMAAResources.DescriptorSets[i].BlendWeight,
+						.dstBinding = 2,
+						.dstArrayElement = 0,
+						.descriptorCount = 1,
+						.descriptorType = vk::DescriptorType::eCombinedImageSampler,
+						.pImageInfo = &searchTextureInfo
+					},
+					vk::WriteDescriptorSet{
+						.dstSet = *s_Data->SMAAResources.DescriptorSets[i].BlendWeight,
+						.dstBinding = 3,
+						.dstArrayElement = 0,
+						.descriptorCount = 1,
+						.descriptorType = vk::DescriptorType::eSampler,
+						.pImageInfo = &linearSamplerInfo
+					},
+					vk::WriteDescriptorSet{
+						.dstSet = *s_Data->SMAAResources.DescriptorSets[i].BlendWeight,
+						.dstBinding = 4,
+						.dstArrayElement = 0,
+						.descriptorCount = 1,
+						.descriptorType = vk::DescriptorType::eSampler,
+						.pImageInfo = &pointSamplerInfo
+					}
+				};
+				device.updateDescriptorSets(write, {});
+			}
+
+			// Neighbourhood Blend Set
+			{
+				const vk::DescriptorSetAllocateInfo allocInfo{
+					.descriptorPool = *s_Data->DescriptorPool,
+					.descriptorSetCount = 1,
+					.pSetLayouts = &*s_Data->SMAAResources.DescriptorSetLayouts.NeighbourhoodBlend
+				};
+				s_Data->SMAAResources.DescriptorSets[i].NeighbourhoodBlend = std::move(device.allocateDescriptorSets(allocInfo).front());
+				context.SetObjectDebugName(s_Data->SMAAResources.DescriptorSets[i].NeighbourhoodBlend, "SMAA Neighbourhood Blend Descriptor Set[" + std::to_string(i) + "]");
+				
+				const vk::DescriptorImageInfo blendWeightsImageInfo{
+					.sampler = *s_Data->LinearSampler,
+					.imageView = *s_Data->SMAAResources.BlendImage.ImageView,
+					.imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal
+				};
+
+				const std::array write = {
+					vk::WriteDescriptorSet{
+						.dstSet = *s_Data->SMAAResources.DescriptorSets[i].NeighbourhoodBlend,
+						.dstBinding = 0,
+						.dstArrayElement = 0,
+						.descriptorCount = 1,
+						.descriptorType = vk::DescriptorType::eCombinedImageSampler,
+						.pImageInfo = &tonemappedImageInfo
+					},
+					vk::WriteDescriptorSet{
+						.dstSet = *s_Data->SMAAResources.DescriptorSets[i].NeighbourhoodBlend,
+						.dstBinding = 1,
+						.dstArrayElement = 0,
+						.descriptorCount = 1,
+						.descriptorType = vk::DescriptorType::eCombinedImageSampler,
+						.pImageInfo = &blendWeightsImageInfo
+					},
+					vk::WriteDescriptorSet{
+						.dstSet = *s_Data->SMAAResources.DescriptorSets[i].NeighbourhoodBlend,
+						.dstBinding = 2,
+						.dstArrayElement = 0,
+						.descriptorCount = 1,
+						.descriptorType = vk::DescriptorType::eSampler,
+						.pImageInfo = &linearSamplerInfo
+					},
+					vk::WriteDescriptorSet{
+						.dstSet = *s_Data->SMAAResources.DescriptorSets[i].NeighbourhoodBlend,
+						.dstBinding = 3,
+						.dstArrayElement = 0,
+						.descriptorCount = 1,
+						.descriptorType = vk::DescriptorType::eSampler,
+						.pImageInfo = &pointSamplerInfo
+					}
+				};
+				device.updateDescriptorSets(write, {});
+			}
+		}
 	}
 }
