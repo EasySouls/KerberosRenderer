@@ -209,6 +209,18 @@ namespace Kerberos
 		ModelComponent(const ModelComponent&) = default;
 	};
 
+	struct PrefabInstanceComponent
+	{
+		AssetHandle PrefabAsset = AssetHandle::Invalid();
+		bool IsExpandedInHierarchy = true; // Editor UI state
+
+		PrefabInstanceComponent() = default;
+		explicit PrefabInstanceComponent(const AssetHandle prefab)
+			: PrefabAsset(prefab)
+		{
+		}
+	};
+
 	struct DirectionalLightComponent
 	{
 		DirectionalLight Light;

@@ -1,0 +1,147 @@
+Prefab:
+  Name: sponza
+  RootEntityID: 2255222929962738201
+Entities:
+  - ID: 2255222929962738201
+    Tag: Mesh_0
+    Translation: [0, 0, 0.30850065]
+    EulerRotation: [0, -0, 0]
+    Scale: [0.008, 0.008, 0.008]
+    Parent: 0
+    Children:
+      []
+    HasStaticMesh: true
+    MeshAssetPath: ""
+    MaterialAssetPath: ""
+  - ID: 14005497972142821778
+    Tag: Flowerpots
+    Translation: [0, 0, 0.30850065]
+    EulerRotation: [0, -0, 0]
+    Scale: [0.008, 0.008, 0.008]
+    Parent: 0
+    Children:
+      []
+    HasStaticMesh: true
+    MeshAssetPath: ""
+    MaterialAssetPath: ""
+  - ID: 12478394425533117681
+    Tag: Flowers
+    Translation: [0, 0, 0.30850065]
+    EulerRotation: [0, -0, 0]
+    Scale: [0.008, 0.008, 0.008]
+    Parent: 0
+    Children:
+      []
+    HasStaticMesh: true
+    MeshAssetPath: ""
+    MaterialAssetPath: ""
+  - ID: 16351073964918303612
+    Tag: Lions
+    Translation: [0, 0, 0.30850065]
+    EulerRotation: [0, -0, 0]
+    Scale: [0.008, 0.008, 0.008]
+    Parent: 0
+    Children:
+      []
+    HasStaticMesh: true
+    MeshAssetPath: ""
+    MaterialAssetPath: ""
+  - ID: 4578423405926909900
+    Tag: Shrub
+    Translation: [0, 0, 0.30850065]
+    EulerRotation: [0, -0, 0]
+    Scale: [0.008, 0.008, 0.008]
+    Parent: 0
+    Children:
+      []
+    HasStaticMesh: true
+    MeshAssetPath: ""
+    MaterialAssetPath: ""
+  - ID: 6544962047648763416
+    Tag: Curtains (green)
+    Translation: [0, 0, 0.30850065]
+    EulerRotation: [0, -0, 0]
+    Scale: [0.008, 0.008, 0.008]
+    Parent: 0
+    Children:
+      []
+    HasStaticMesh: true
+    MeshAssetPath: ""
+    MaterialAssetPath: ""
+  - ID: 11614077764986490400
+    Tag: Curtains (blue)
+    Translation: [0, 0, 0.30850065]
+    EulerRotation: [0, -0, 0]
+    Scale: [0.008, 0.008, 0.008]
+    Parent: 0
+    Children:
+      []
+    HasStaticMesh: true
+    MeshAssetPath: ""
+    MaterialAssetPath: ""
+  - ID: 3932744845027760546
+    Tag: Curtains (red)
+    Translation: [0, 0, 0.30850065]
+    EulerRotation: [0, -0, 0]
+    Scale: [0.008, 0.008, 0.008]
+    Parent: 0
+    Children:
+      []
+    HasStaticMesh: true
+    MeshAssetPath: ""
+    MaterialAssetPath: ""
+  - ID: 1912716000071929977
+    Tag: Braziers
+    Translation: [0, 0, 0.30850065]
+    EulerRotation: [0, -0, 0]
+    Scale: [0.008, 0.008, 0.008]
+    Parent: 0
+    Children:
+      []
+    HasStaticMesh: true
+    MeshAssetPath: ""
+    MaterialAssetPath: ""
+  - ID: 16611324774949641743
+    Tag: Brazier chains
+    Translation: [0, 0, 0.30850065]
+    EulerRotation: [0, -0, 0]
+    Scale: [0.008, 0.008, 0.008]
+    Parent: 0
+    Children:
+      []
+    HasStaticMesh: true
+    MeshAssetPath: ""
+    MaterialAssetPath: ""
+  - ID: 841070374628095940
+    Tag: Fountains
+    Translation: [0, 0, 0.30850065]
+    EulerRotation: [0, -0, 0]
+    Scale: [0.008, 0.008, 0.008]
+    Parent: 0
+    Children:
+      []
+    HasStaticMesh: true
+    MeshAssetPath: ""
+    MaterialAssetPath: ""
+  - ID: 8629901785144223857
+    Tag: Rods
+    Translation: [0, 0, 0.30850065]
+    EulerRotation: [0, -0, 0]
+    Scale: [0.008, 0.008, 0.008]
+    Parent: 0
+    Children:
+      []
+    HasStaticMesh: true
+    MeshAssetPath: ""
+    MaterialAssetPath: ""
+  - ID: 14886913442291894397
+    Tag: Roof
+    Translation: [0, 0, 0.30850065]
+    EulerRotation: [0, -0, 0]
+    Scale: [0.008, 0.008, 0.008]
+    Parent: 0
+    Children:
+      []
+    HasStaticMesh: true
+    MeshAssetPath: ""
+    MaterialAssetPath: ""

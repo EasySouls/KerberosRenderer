@@ -7,6 +7,7 @@
 #include "Components/AudioComponents.hpp"
 #include "Application.hpp"
 #include "Assets/AssetManager.hpp"
+#include "Assets/Prefab.hpp"
 #include "Renderer/Renderer.hpp"
 #include "Scripting/ScriptEngine.hpp"
 #include "Physics/Jolt/Utils.hpp"
@@ -191,6 +192,99 @@ namespace Kerberos
 
 		return entity;
 	}
+
+Entity Scene::InstantiatePrefab(const AssetHandle prefabHandle, const std::string& rootName)
+{
+	KBR_PROFILE_FUNCTION();
+
+	if (!prefabHandle.IsValid())
+	{
+		KBR_CORE_ERROR("Cannot instantiate prefab with invalid handle.");
+		return {};
+	}
+
+	if (AssetManager::GetAssetType(prefabHandle) != AssetType::Prefab)
+	{
+		KBR_CORE_ERROR("Asset {} is not a prefab asset.", prefabHandle);
+		return {};
+	}
+
+	const Ref<Prefab> prefab = AssetManager::GetAsset<Prefab>(prefabHandle);
+	if (!prefab)
+	{
+		KBR_CORE_ERROR("Failed to load prefab asset: {}", prefabHandle);
+		return {};
+	}
+
+	// Map old UUIDs from the prefab template to new instance UUIDs
+	std::unordered_map<UUID, UUID> uuidMapping;
+	std::unordered_map<UUID, Entity> entityMapping;
+
+	const std::string resolvedRootName = rootName.empty() ? prefab->GetName() : rootName;
+
+	// First pass: create all entities with new UUIDs
+	for (const auto& prefabEntity : prefab->Entities)
+	{
+		const UUID newUUID = UUID();
+		uuidMapping[prefabEntity.ID] = newUUID;
+
+		Entity newEntity = CreateEntityWithUUID(prefabEntity.Tag, newUUID);
+		entityMapping[prefabEntity.ID] = newEntity;
+
+		// Restore transform
+		auto& transform = newEntity.GetComponent<TransformComponent>();
+		transform.Translation = prefabEntity.Translation;
+		transform.Rotation = prefabEntity.EulerRotation;
+		transform.Scale = prefabEntity.Scale;
+
+		// If this entity has a static mesh, attempt to resolve and attach it
+		if (prefabEntity.HasStaticMesh && !prefabEntity.MeshAssetPath.empty())
+		{
+			// For now, we store asset paths as relative paths and need to resolve them
+			// TODO: implement proper asset path resolution
+			// For now, we just create the component without assets - they should be saved with handles instead
+			auto& smc = newEntity.AddComponent<StaticMeshComponent>();
+			// TODO: resolve mesh and material handles from paths
+		}
+	}
+
+	// Second pass: establish hierarchy relationships
+	for (const auto& prefabEntity : prefab->Entities)
+	{
+		const UUID oldUUID = prefabEntity.ID;
+		const UUID newUUID = uuidMapping[oldUUID];
+		Entity newEntity = entityMapping[oldUUID];
+
+		// Handle parent-child relationships
+		if (prefabEntity.Parent.IsValid() && uuidMapping.contains(prefabEntity.Parent))
+		{
+			const UUID newParentUUID = uuidMapping[prefabEntity.Parent];
+			Entity parentEntity = GetEntityByUUID(newParentUUID);
+			if (parentEntity)
+			{
+				SetParent(newEntity, parentEntity, false);
+			}
+		}
+		else if (prefabEntity.Parent == prefab->RootEntityID || !prefabEntity.Parent.IsValid())
+		{
+			// This is a root-level entity in the prefab, mark it for later reparenting to the instance root
+		}
+	}
+
+	// Find or identify the root entity in the new instance
+	Entity instanceRoot = entityMapping[prefab->RootEntityID];
+	if (instanceRoot)
+	{
+		// Rename the root to match the resolved name
+		if (!resolvedRootName.empty())
+			instanceRoot.GetComponent<TagComponent>().Tag = resolvedRootName;
+
+		// Attach PrefabInstanceComponent to mark this as a prefab instance
+		instanceRoot.AddComponent<PrefabInstanceComponent>(PrefabInstanceComponent{ prefabHandle });
+	}
+
+	return instanceRoot;
+}
 
 	void Scene::DestroyEntity(const Entity entity)
 	{
@@ -1223,6 +1317,11 @@ namespace Kerberos
 
 	template <>
 	void Scene::OnComponentAdded<AudioListenerComponent>(Entity, AudioListenerComponent&)
+	{
+	}
+
+	template <>
+	void Scene::OnComponentAdded<PrefabInstanceComponent>(Entity, PrefabInstanceComponent&)
 	{
 	}
 

@@ -1,0 +1,15 @@
+Prefab:
+  Name: cube
+  RootEntityID: 8752428322824565652
+Entities:
+  - ID: 8752428322824565652
+    Tag: Cube
+    Translation: [0, 0, 0]
+    EulerRotation: [0, -0, 0]
+    Scale: [1, 1, 1]
+    Parent: 0
+    Children:
+      []
+    HasStaticMesh: true
+    MeshAssetPath: ""
+    MaterialAssetPath: ""

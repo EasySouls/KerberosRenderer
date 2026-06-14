@@ -17,7 +17,9 @@ namespace Kerberos
 		Mesh,
 		Scene,
 		Sound,
-		Model
+		Model,
+		Prefab,
+		Animation
 	};
 
 	class Asset
@@ -55,6 +57,10 @@ namespace Kerberos
 				return "Sound";
 			case AssetType::Model:
 				return "Model";
+			case AssetType::Prefab:
+				return "Prefab";
+			case AssetType::Animation:
+				return "Animation";
 		}
 
 		KBR_CORE_ASSERT(false, "Unknown Asset Type!");
@@ -77,6 +83,10 @@ namespace Kerberos
 			return AssetType::Sound;
 		if (str == "Model")
 			return AssetType::Model;
+		if (str == "Prefab")
+			return AssetType::Prefab;
+		if (str == "Animation")
+			return AssetType::Animation;
 
 		KBR_CORE_ASSERT(false, "Unknown Asset Type as string!");
 		return AssetType::Texture2D;

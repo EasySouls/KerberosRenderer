@@ -20,11 +20,14 @@ namespace Kerberos
 		{ ".kbrcubemap", AssetType::TextureCube },
 		{ ".fbx", AssetType::Mesh },
 		{ ".obj", AssetType::Mesh },
+		{ ".kbrmesh", AssetType::Mesh },
 		{ ".gltf", AssetType::Model },
 		{ ".glb", AssetType::Model },
 		{ ".kerberos", AssetType::Scene },
 		{ ".wav", AssetType::Sound }, // TODO: Add more audio file types when supported
-		{ ".kbrmat", AssetType::Material }
+		{ ".kbrmat", AssetType::Material },
+		{ ".kbrprefab", AssetType::Prefab },
+		{ ".kbranim", AssetType::Animation }
 	};
 
 	static AssetType AssetTypeFromFileExtension(const std::filesystem::path& filepath)
@@ -131,17 +134,17 @@ namespace Kerberos
 
 	AssetHandle EditorAssetManager::ImportAsset(const std::filesystem::path& filepath)
 	{
-		/// Generate new handle
-		const AssetHandle handle;
-		AssetMetadata metadata;
-		metadata.Filepath = filepath;
-		metadata.Type = AssetTypeFromFileExtension(filepath);
-
 		/// If the asset is already in the registry, return its handle
 		if (m_AssetRegistry.ContainsPath(filepath))
 		{
 			return m_AssetRegistry.GetHandle(filepath);
 		}
+
+		/// Generate new handle
+		const AssetHandle handle;
+		AssetMetadata metadata;
+		metadata.Filepath = filepath;
+		metadata.Type = AssetTypeFromFileExtension(filepath);
 
 		const Ref<Asset> asset = AssetImporter::ImportAsset(handle, metadata);
 		if (!asset)
@@ -267,7 +270,7 @@ namespace Kerberos
 
 			const AssetType type = AssetTypeFromString(typeStr);
 			// TODO: This check is not needed when every asset type is supported
-			if (type == AssetType::Texture2D || type == AssetType::TextureCube || type == AssetType::Mesh || type == AssetType::Sound || type == AssetType::Model || type == AssetType::Material)
+			if (type == AssetType::Texture2D || type == AssetType::TextureCube || type == AssetType::Mesh || type == AssetType::Sound || type == AssetType::Model || type == AssetType::Material || type == AssetType::Prefab || type == AssetType::Animation)
 			{
 				m_AssetRegistry.Add(handle, { .Type = type, .Filepath = filepath });
 			}

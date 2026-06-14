@@ -1,0 +1,26 @@
+Prefab:
+  Name: donut
+  RootEntityID: 4483295269090402125
+Entities:
+  - ID: 11819578203022399684
+    Tag: Icing
+    Translation: [0, 0, 0]
+    EulerRotation: [0, -0, 0]
+    Scale: [1, 1, 1]
+    Parent: 4483295269090402125
+    Children:
+      []
+    HasStaticMesh: true
+    MeshAssetPath: ""
+    MaterialAssetPath: ""
+  - ID: 4483295269090402125
+    Tag: Donut
+    Translation: [0, 0.5602324, 0]
+    EulerRotation: [0, -0, 0]
+    Scale: [1, 1, 1]
+    Parent: 0
+    Children:
+      - 11819578203022399684
+    HasStaticMesh: true
+    MeshAssetPath: ""
+    MaterialAssetPath: ""

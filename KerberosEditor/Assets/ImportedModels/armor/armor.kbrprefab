@@ -1,0 +1,62 @@
+Prefab:
+  Name: armor
+  RootEntityID: 13168516314896408853
+Entities:
+  - ID: 13168516314896408853
+    Tag: Group61487.001
+    Translation: [0, -2.309529, 0]
+    EulerRotation: [1.5707965, -0, 0]
+    Scale: [0.029987507, 0.029987507, 0.029987507]
+    Parent: 0
+    Children:
+      []
+    HasStaticMesh: true
+    MeshAssetPath: ""
+    MaterialAssetPath: ""
+  - ID: 14496859304413703798
+    Tag: Sun.002
+    Translation: [-13.896765, -1.0874784, -9.628021]
+    EulerRotation: [2.288438, -0.83629405, -2.29137]
+    Scale: [1, 1, 1]
+    Parent: 0
+    Children:
+      []
+    HasStaticMesh: false
+  - ID: 1653764152276138456
+    Tag: Sun.001
+    Translation: [-6.5880213, 1.6441717, -15.420403]
+    EulerRotation: [-0.8719103, 0.8471122, -0.86421084]
+    Scale: [1, 1, 1]
+    Parent: 0
+    Children:
+      []
+    HasStaticMesh: false
+  - ID: 5806986133591071422
+    Tag: Sun
+    Translation: [7.188636, 1.6441717, -15.420403]
+    EulerRotation: [0.25041327, -0.5909689, -0.6516234]
+    Scale: [1, 1, 1]
+    Parent: 0
+    Children:
+      []
+    HasStaticMesh: false
+  - ID: 5731485454576409416
+    Tag: Group61487
+    Translation: [0, -2.309529, 0]
+    EulerRotation: [1.5707965, -0, 0]
+    Scale: [0.029987507, 0.029987507, 0.029987507]
+    Parent: 0
+    Children:
+      []
+    HasStaticMesh: true
+    MeshAssetPath: ""
+    MaterialAssetPath: ""
+  - ID: 11312042260208364322
+    Tag: Camera
+    Translation: [6.599717, 3.4286988, 9.715829]
+    EulerRotation: [1.3119321, 0.5679402, -0.013785162]
+    Scale: [1, 1, 1]
+    Parent: 0
+    Children:
+      []
+    HasStaticMesh: false

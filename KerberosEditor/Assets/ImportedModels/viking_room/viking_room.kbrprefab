@@ -1,0 +1,15 @@
+Prefab:
+  Name: viking_room
+  RootEntityID: 13115811026242024352
+Entities:
+  - ID: 13115811026242024352
+    Tag: mesh_all1_Texture1_0
+    Translation: [0, 0, 0]
+    EulerRotation: [0, -0, 0]
+    Scale: [1, 1, 1]
+    Parent: 0
+    Children:
+      []
+    HasStaticMesh: true
+    MeshAssetPath: ""
+    MaterialAssetPath: ""

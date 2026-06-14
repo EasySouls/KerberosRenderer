@@ -1,0 +1,6 @@
+Material:
+  Name: 2256_Avocado_d
+  Params:
+    AlbedoFactor: [1, 1, 1, 1]
+    MetallicFactor: 1
+    RoughnessFactor: 1

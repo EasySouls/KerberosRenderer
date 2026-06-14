@@ -1,0 +1,6 @@
+Material:
+  Name: Material.001
+  Params:
+    AlbedoFactor: [0.8001648, 0.14684477, 0.60408014, 1]
+    MetallicFactor: 0
+    RoughnessFactor: 0.3888889

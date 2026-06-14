@@ -1,0 +1,6 @@
+Material:
+  Name: tex_02_AO
+  Params:
+    AlbedoFactor: [1, 1, 1, 1]
+    MetallicFactor: 0
+    RoughnessFactor: 0.5

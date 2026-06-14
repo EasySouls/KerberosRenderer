@@ -1,0 +1,6 @@
+Material:
+  Name: m1_03___Default
+  Params:
+    AlbedoFactor: [0.133333, 0.133333, 0.133333, 1]
+    MetallicFactor: 0
+    RoughnessFactor: 0.5

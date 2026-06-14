@@ -1,14 +1,20 @@
-#include "kbrpch.hpp"
 #include "GLTFModelImporter.hpp"
+#include "kbrpch.hpp"
 
-#include "TextureImporter.hpp"
+#include "Core/UUID.hpp"
 #include "Renderer/Vertex.hpp"
+#include "TextureImporter.hpp"
+#include "Assets/EditorAssetManager.hpp"
+#include "Project/Project.hpp"
 
-#include <tiny_gltf.h>
-#include <ktx.h>
+#include <glm/gtx/matrix_decompose.hpp>
 #include <glm/gtx/norm.hpp>
-#include <limits>
+#include <ktx.h>
+#include <tiny_gltf.h>
+#include <yaml-cpp/yaml.h>
+
 #include <cstring>
+#include <limits>
 #include <unordered_map>
 
 namespace Kerberos
@@ -490,6 +496,184 @@ namespace Kerberos
 		}
 
 		outSkins.reserve(gltfModel.skins.size());
+
+		// After populating model data, attempt to export materials and a prefab file when running in the Editor
+		if (Project::GetActive() && Project::GetActive()->GetEditorAssetManager())
+		{
+			try
+			{
+				const std::filesystem::path projectAssetDir = Project::GetAssetFileSystemPath("");
+				std::filesystem::path exportFolder = Project::GetProjectDirectory() / Project::GetActive()->GetInfo().AssetDirectory / "ImportedModels" / filepath.stem();
+				std::filesystem::create_directories(exportFolder);
+
+				// Export mesh primitives as .kbrmesh files
+				for (size_t primIndex = 0; primIndex < outPrimitives.size(); ++primIndex)
+				{
+					auto& prim = outPrimitives[primIndex];
+					if (!prim.Mesh)
+						continue;
+
+					std::string meshFileName = prim.Name + ".kbrmesh";
+					std::filesystem::path meshPath = exportFolder / meshFileName;
+
+					std::ofstream mout(meshPath, std::ios::binary);
+					if (!mout.is_open())
+					{
+						KBR_CORE_ERROR("Failed to write mesh file: {}", meshPath.string());
+						continue;
+					}
+
+					const auto& vertices = prim.Mesh->GetVertices();
+					const auto& indices = prim.Mesh->GetIndices();
+
+					uint32_t version = 1;
+					uint32_t vertexCount = static_cast<uint32_t>(vertices.size());
+					uint32_t indexCount = static_cast<uint32_t>(indices.size());
+
+					mout.write(reinterpret_cast<const char*>(&version), sizeof(version));
+					mout.write(reinterpret_cast<const char*>(&vertexCount), sizeof(vertexCount));
+					mout.write(reinterpret_cast<const char*>(&indexCount), sizeof(indexCount));
+
+					for (const auto& v : vertices)
+					{
+						mout.write(reinterpret_cast<const char*>(&v.Position), sizeof(v.Position));
+						mout.write(reinterpret_cast<const char*>(&v.Normal), sizeof(v.Normal));
+						mout.write(reinterpret_cast<const char*>(&v.Tangent), sizeof(v.Tangent));
+						mout.write(reinterpret_cast<const char*>(&v.TexCoord), sizeof(v.TexCoord));
+					}
+
+					mout.write(reinterpret_cast<const char*>(indices.data()), sizeof(uint32_t) * indices.size());
+					mout.close();
+
+					// Register mesh asset with editor asset manager
+					Project::GetActive()->GetEditorAssetManager()->ImportAsset(meshPath);
+				}
+
+				// Export materials
+				for (size_t i = 0; i < outMaterials.size(); ++i)
+				{
+					auto& mat = outMaterials[i];
+					std::string matName = mat->Name.empty() ? ("Material_" + std::to_string(i)) : mat->Name;
+					std::filesystem::path matPath = exportFolder / (matName + ".kbrmat");
+
+					YAML::Emitter out;
+					out << YAML::BeginMap;
+					out << YAML::Key << "Material" << YAML::Value;
+					out << YAML::BeginMap;
+					out << YAML::Key << "Name" << YAML::Value << matName;
+					out << YAML::Key << "Params" << YAML::Value;
+					out << YAML::BeginMap;
+					out << YAML::Key << "AlbedoFactor" << YAML::Value << YAML::Flow << YAML::BeginSeq << mat->Params.AlbedoFactor.r << mat->Params.AlbedoFactor.g << mat->Params.AlbedoFactor.b << mat->Params.AlbedoFactor.a << YAML::EndSeq;
+					out << YAML::Key << "MetallicFactor" << YAML::Value << mat->Params.MetallicFactor;
+					out << YAML::Key << "RoughnessFactor" << YAML::Value << mat->Params.RoughnessFactor;
+					out << YAML::EndMap; // Params
+					if (mat->EmissiveColor != glm::vec3(0.0f))
+					{
+						out << YAML::Key << "EmissiveColor" << YAML::Value << YAML::Flow << YAML::BeginSeq << mat->EmissiveColor.r << mat->EmissiveColor.g << mat->EmissiveColor.b << YAML::EndSeq;
+					}
+					out << YAML::EndMap; // Material
+
+					std::ofstream fout(matPath);
+					fout << out.c_str();
+					fout.close();
+
+					// Register imported material asset in editor asset manager
+					Project::GetActive()->GetEditorAssetManager()->ImportAsset(matPath);
+				}
+
+				// Export a prefab YAML with proper UUID-based entity references
+				std::filesystem::path prefabPath = exportFolder / (filepath.stem().string() + ".kbrprefab");
+				// Generate UUIDs for each node (mapping nodeIndex -> UUID)
+				std::vector<UUID> nodeUUIDs;
+				nodeUUIDs.reserve(outNodes.size());
+				for (size_t i = 0; i < outNodes.size(); ++i)
+					nodeUUIDs.push_back(UUID());
+				
+				// Determine root entity (first node without parent or with parent index -1)
+				UUID rootEntityID = nodeUUIDs[0];
+				if (!outNodes.empty() && outNodes[0].ParentIndex >= 0 && static_cast<size_t>(outNodes[0].ParentIndex) < outNodes.size())
+				{
+					// Find first node without a valid parent
+					for (size_t i = 0; i < outNodes.size(); ++i)
+					{
+						if (outNodes[i].ParentIndex < 0 || static_cast<size_t>(outNodes[i].ParentIndex) >= outNodes.size())
+						{
+							rootEntityID = nodeUUIDs[i];
+							break;
+						}
+					}
+				}
+
+				YAML::Emitter prefabOut;
+				prefabOut << YAML::BeginMap;
+				prefabOut << YAML::Key << "Prefab" << YAML::Value << YAML::BeginMap;
+				prefabOut << YAML::Key << "Name" << YAML::Value << filepath.stem().string();
+				prefabOut << YAML::Key << "RootEntityID" << YAML::Value << static_cast<uint64_t>(rootEntityID);
+				prefabOut << YAML::EndMap; // Prefab
+
+				prefabOut << YAML::Key << "Entities" << YAML::Value << YAML::BeginSeq;
+				for (size_t nodeIndex = 0; nodeIndex < outNodes.size(); ++nodeIndex)
+				{
+					auto& node = outNodes[nodeIndex];
+					prefabOut << YAML::BeginMap;
+					prefabOut << YAML::Key << "ID" << YAML::Value << static_cast<uint64_t>(nodeUUIDs[nodeIndex]);
+					prefabOut << YAML::Key << "Tag" << YAML::Value << node.Name;
+					
+					// Convert translation
+					prefabOut << YAML::Key << "Translation" << YAML::Value << YAML::Flow << YAML::BeginSeq << node.Translation.x << node.Translation.y << node.Translation.z << YAML::EndSeq;
+					
+					// Convert quaternion rotation to euler angles
+					glm::vec3 eulerAngles = glm::eulerAngles(node.Rotation);
+					prefabOut << YAML::Key << "EulerRotation" << YAML::Value << YAML::Flow << YAML::BeginSeq << eulerAngles.x << eulerAngles.y << eulerAngles.z << YAML::EndSeq;
+					
+					// Scale
+					prefabOut << YAML::Key << "Scale" << YAML::Value << YAML::Flow << YAML::BeginSeq << node.Scale.x << node.Scale.y << node.Scale.z << YAML::EndSeq;
+					
+					// Parent reference
+					UUID parentUUID = UUID::Invalid();
+					if (node.ParentIndex >= 0 && static_cast<size_t>(node.ParentIndex) < nodeUUIDs.size())
+						parentUUID = nodeUUIDs[node.ParentIndex];
+					prefabOut << YAML::Key << "Parent" << YAML::Value << static_cast<uint64_t>(parentUUID);
+					
+					// Children references
+					prefabOut << YAML::Key << "Children" << YAML::Value << YAML::BeginSeq;
+					for (const int child : node.Children)
+					{
+						if (child >= 0 && static_cast<size_t>(child) < nodeUUIDs.size())
+							prefabOut << static_cast<uint64_t>(nodeUUIDs[child]);
+					}
+					prefabOut << YAML::EndSeq;
+					
+					// StaticMeshComponent data (if has primitives)
+					prefabOut << YAML::Key << "HasStaticMesh" << YAML::Value << (!node.PrimitiveIndices.empty());
+					if (!node.PrimitiveIndices.empty())
+					{
+						// Store mesh and material paths for later resolution
+						// For now, we use placeholder paths - these should be updated to actual asset paths
+						// TODO: resolve to actual mesh/material asset paths
+						prefabOut << YAML::Key << "MeshAssetPath" << YAML::Value << "";
+						prefabOut << YAML::Key << "MaterialAssetPath" << YAML::Value << "";
+					}
+					
+					prefabOut << YAML::EndMap; // Entity
+				}
+				prefabOut << YAML::EndSeq; // Entities
+				prefabOut << YAML::EndMap; // Root
+
+				std::ofstream pfout(prefabPath);
+				if (pfout.is_open())
+				{
+					pfout << prefabOut.c_str();
+					pfout.close();
+					Project::GetActive()->GetEditorAssetManager()->ImportAsset(prefabPath);
+				}
+			}
+			catch (const std::exception& e)
+			{
+				KBR_CORE_ERROR("GLTF import export error: {}", e.what());
+			}
+		}
+
 		for (size_t skinIndex = 0; skinIndex < gltfModel.skins.size(); ++skinIndex)
 		{
 			const tinygltf::Skin& sourceSkin = gltfModel.skins[skinIndex];

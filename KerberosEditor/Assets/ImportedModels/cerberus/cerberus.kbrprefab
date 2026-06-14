@@ -1,0 +1,33 @@
+Prefab:
+  Name: cerberus
+  RootEntityID: 11572819789368522570
+Entities:
+  - ID: 7344349996447154691
+    Tag: Cerberus00_Fixed.001
+    Translation: [0, 0, 0]
+    EulerRotation: [0, -0, 0]
+    Scale: [1, 1, 1]
+    Parent: 1424756383028001325
+    Children:
+      []
+    HasStaticMesh: true
+    MeshAssetPath: ""
+    MaterialAssetPath: ""
+  - ID: 1424756383028001325
+    Tag: Node_1
+    Translation: [0, 0, -0.9372016]
+    EulerRotation: [-1.5707964, 0, 0]
+    Scale: [1, 1, 1]
+    Parent: 11572819789368522570
+    Children:
+      - 7344349996447154691
+    HasStaticMesh: false
+  - ID: 11572819789368522570
+    Tag: Cerberus00_Fixed
+    Translation: [0, 0, 0]
+    EulerRotation: [0, -0, 0]
+    Scale: [2, 2, 2]
+    Parent: 0
+    Children:
+      - 1424756383028001325
+    HasStaticMesh: false

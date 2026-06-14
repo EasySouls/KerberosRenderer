@@ -3,7 +3,7 @@ Albedo: [1, 1, 1, 1]
 Roughness: 1
 Metallic: 0
 EmissiveColor: [0.56078434, 0.06666667, 0.09019608]
-EmissiveIntensity: 4
+EmissiveIntensity: 0
 AlbedoTexture: Assets/Textures/stonefloor01_color_rgba.ktx2
 NormalTexture: Assets/Textures/stonefloor01_normal_rgba.ktx2
 MetallicTexture: ""

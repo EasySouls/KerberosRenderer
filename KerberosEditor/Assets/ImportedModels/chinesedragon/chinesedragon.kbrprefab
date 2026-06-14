@@ -1,0 +1,26 @@
+Prefab:
+  Name: chinesedragon
+  RootEntityID: 4882067837932002840
+Entities:
+  - ID: 4882067837932002840
+    Tag: objdefault
+    Translation: [0.0028870106, -0.77852386, 0.3802654]
+    EulerRotation: [1.5707965, -0, 0]
+    Scale: [0.21234202, 0.21234202, 0.21234202]
+    Parent: 0
+    Children:
+      []
+    HasStaticMesh: true
+    MeshAssetPath: ""
+    MaterialAssetPath: ""
+  - ID: 6495373977444201303
+    Tag: Sphere03.001
+    Translation: [-0.7385645, -0.608056, 0.83540344]
+    EulerRotation: [1.5707965, -0, 0]
+    Scale: [0.28299245, 0.28299245, 0.28299245]
+    Parent: 0
+    Children:
+      []
+    HasStaticMesh: true
+    MeshAssetPath: ""
+    MaterialAssetPath: ""

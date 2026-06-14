@@ -1,0 +1,37 @@
+Prefab:
+  Name: voyager
+  RootEntityID: 8898923123433587473
+Entities:
+  - ID: 8898923123433587473
+    Tag: tex_02_AO_dark
+    Translation: [-0.0027135895, 1.2817107, 0]
+    EulerRotation: [0, -0, 0]
+    Scale: [0.48457533, 0.48457524, 0.48457533]
+    Parent: 0
+    Children:
+      []
+    HasStaticMesh: true
+    MeshAssetPath: ""
+    MaterialAssetPath: ""
+  - ID: 4097729954308101361
+    Tag: tex_02_AO
+    Translation: [-0.0027135895, 1.2817107, 0]
+    EulerRotation: [0, -0, 0]
+    Scale: [0.48457533, 0.48457524, 0.48457533]
+    Parent: 0
+    Children:
+      []
+    HasStaticMesh: true
+    MeshAssetPath: ""
+    MaterialAssetPath: ""
+  - ID: 688857872617417008
+    Tag: tex_01
+    Translation: [-0.0027135895, 1.2817107, 0]
+    EulerRotation: [0, -0, 0]
+    Scale: [0.48457533, 0.48457524, 0.48457533]
+    Parent: 0
+    Children:
+      []
+    HasStaticMesh: true
+    MeshAssetPath: ""
+    MaterialAssetPath: ""

@@ -6,6 +6,8 @@
 #include "AssimpModelImporter.hpp"
 #include "GLTFModelImporter.hpp"
 #include "MaterialImporter.hpp"
+#include "MeshImporter.hpp"
+#include "PrefabImporter.hpp"
 #include "SoundImporter.hpp"
 #include "Assets/Asset.hpp"
 
@@ -26,7 +28,6 @@ namespace Kerberos
 				return CubemapImporter::ImportCubemap(handle, metadata);
 			case AssetType::Material:
 				return MaterialImporter::ImportMaterial(handle, metadata);
-				break;
 			case AssetType::Model:
 			{
 				const auto extension = metadata.Filepath.extension().string();
@@ -39,13 +40,21 @@ namespace Kerberos
 			case AssetType::Sound:
 				return SoundImporter::ImportSound(handle, metadata);
 			case AssetType::Mesh:
-				KBR_CORE_ASSERT(false, "Mesh should not be imported directly, it should be imported as part of a model!");
+				return MeshImporter::ImportMesh(handle, metadata);
+				break;
+			case AssetType::Prefab:
+				return PrefabImporter::ImportPrefab(handle, metadata);
+				break;
+			case AssetType::Animation:
+				// TODO: Implement AnimationImporter
+				KBR_CORE_WARN("Animation import not yet implemented");
 				break;
 		}
 
 		KBR_CORE_ASSERT(false, "Unsupported asset type by AssetImporter!");
 		return nullptr;
 	}
+
 
 	std::future<Ref<Asset>> AssetImporter::ImportAssetAsync(AssetHandle handle, const AssetMetadata& metadata) 
 	{

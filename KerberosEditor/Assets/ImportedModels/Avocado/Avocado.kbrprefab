@@ -1,0 +1,15 @@
+Prefab:
+  Name: Avocado
+  RootEntityID: 12309855199726026105
+Entities:
+  - ID: 12309855199726026105
+    Tag: Avocado
+    Translation: [0, 0, 0]
+    EulerRotation: [3.1415927, -0, 3.1415927]
+    Scale: [1, 1, 1]
+    Parent: 0
+    Children:
+      []
+    HasStaticMesh: true
+    MeshAssetPath: ""
+    MaterialAssetPath: ""

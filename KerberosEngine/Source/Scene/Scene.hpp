@@ -62,6 +62,7 @@ namespace Kerberos
 
 		void CreateChild(Entity entity);
 		Entity InstantiateModelAsset(AssetHandle modelHandle, const std::string& rootName = std::string());
+		Entity InstantiatePrefab(AssetHandle prefabHandle, const std::string& rootName = std::string());
 
 		Entity GetEntityByUUID(UUID uuid) const;
 

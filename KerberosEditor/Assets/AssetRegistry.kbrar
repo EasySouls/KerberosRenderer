@@ -2,15 +2,66 @@ AssetRegistry:
   - Handle: 115472114555992723
     Type: Texture2D
     Path: Assets\Textures\rocks_color_rgba.ktx2
+  - Handle: 572616004775238160
+    Type: Material
+    Path: C:\Development\KerberosRenderer\KerberosEditor\Assets\ImportedModels\sponza\Material_19.kbrmat
+  - Handle: 792751798279805644
+    Type: Mesh
+    Path: C:\Development\KerberosRenderer\KerberosEditor\Assets\ImportedModels\sponza\Mesh_0_Primitive_1.kbrmesh
+  - Handle: 844557776114095216
+    Type: Mesh
+    Path: C:\Development\KerberosRenderer\KerberosEditor\Assets\ImportedModels\sponza\Mesh_0.007_Primitive_1.kbrmesh
   - Handle: 926753587182379847
     Type: Texture2D
     Path: Assets\Textures\rocks_normal_height_rgba.ktx2
+  - Handle: 968436190321385366
+    Type: Material
+    Path: C:\Development\KerberosRenderer\KerberosEditor\Assets\ImportedModels\sponza\Material_10.kbrmat
+  - Handle: 1000229212702657575
+    Type: Material
+    Path: C:\Development\KerberosRenderer\KerberosEditor\Assets\ImportedModels\sponza\Material_23.kbrmat
+  - Handle: 1400560920602527997
+    Type: Mesh
+    Path: C:\Development\KerberosRenderer\KerberosEditor\Assets\ImportedModels\sponza\Mesh_0_Primitive_5.kbrmesh
+  - Handle: 1578540728065322556
+    Type: Mesh
+    Path: C:\Development\KerberosRenderer\KerberosEditor\Assets\ImportedModels\sponza\Mesh_0.007_Primitive_0.kbrmesh
   - Handle: 1854418276753847419
     Type: Texture2D
     Path: Assets\Models\cerberus\albedo.ktx2
   - Handle: 1896423241257672216
     Type: Material
     Path: Assets\Materials\avocado.kbrmat
+  - Handle: 1985546689699643148
+    Type: Prefab
+    Path: C:\Development\KerberosRenderer\KerberosEditor\Assets\ImportedModels\sponza\sponza.kbrprefab
+  - Handle: 2117441579707542348
+    Type: Mesh
+    Path: C:\Development\KerberosRenderer\KerberosEditor\Assets\ImportedModels\voyager\BODY.000_Primitive_0.kbrmesh
+  - Handle: 2185523637935097111
+    Type: Material
+    Path: C:\Development\KerberosRenderer\KerberosEditor\Assets\ImportedModels\voyager\tex_02_AO.kbrmat
+  - Handle: 2197928796798794323
+    Type: Mesh
+    Path: C:\Development\KerberosRenderer\KerberosEditor\Assets\ImportedModels\chinesedragon\meshId1_name_Primitive_0.kbrmesh
+  - Handle: 2212863030507879663
+    Type: Mesh
+    Path: C:\Development\KerberosRenderer\KerberosEditor\Assets\ImportedModels\sponza\Mesh_0.009_Primitive_0.kbrmesh
+  - Handle: 2313910257031395391
+    Type: Prefab
+    Path: C:\Development\KerberosRenderer\KerberosEditor\Assets\ImportedModels\chinesedragon\chinesedragon.kbrprefab
+  - Handle: 2402103498944851199
+    Type: Material
+    Path: C:\Development\KerberosRenderer\KerberosEditor\Assets\ImportedModels\sponza\Material_5.kbrmat
+  - Handle: 2481271026598046075
+    Type: Material
+    Path: C:\Development\KerberosRenderer\KerberosEditor\Assets\ImportedModels\donut\Material.002.kbrmat
+  - Handle: 2721834236491277777
+    Type: Material
+    Path: C:\Development\KerberosRenderer\KerberosEditor\Assets\ImportedModels\sponza\Material_13.kbrmat
+  - Handle: 2762335970411167862
+    Type: Prefab
+    Path: C:\Development\KerberosRenderer\KerberosEditor\Assets\ImportedModels\Avocado\Avocado.kbrprefab
   - Handle: 2971773807105207837
     Type: Model
     Path: Assets\Models\voyager.gltf
@@ -20,6 +71,12 @@ AssetRegistry:
   - Handle: 2995231662383101662
     Type: Texture2D
     Path: Assets\Textures\lavaplanet_rgba.ktx
+  - Handle: 3005753193285632817
+    Type: Mesh
+    Path: C:\Development\KerberosRenderer\KerberosEditor\Assets\ImportedModels\sponza\Mesh_0.008_Primitive_0.kbrmesh
+  - Handle: 3029088774030921175
+    Type: Material
+    Path: C:\Development\KerberosRenderer\KerberosEditor\Assets\ImportedModels\sponza\Material_8.kbrmat
   - Handle: 3148316396032555593
     Type: Material
     Path: Assets\Materials\ground.kbrmat
@@ -29,42 +86,165 @@ AssetRegistry:
   - Handle: 3420994376372366335
     Type: Material
     Path: Assets\Materials\cerberus.kbrmat
+  - Handle: 3514735240808057282
+    Type: Material
+    Path: C:\Development\KerberosRenderer\KerberosEditor\Assets\ImportedModels\sponza\Material_1.kbrmat
+  - Handle: 3583575422004731089
+    Type: Mesh
+    Path: C:\Development\KerberosRenderer\KerberosEditor\Assets\ImportedModels\sponza\Mesh_0.006_Primitive_1.kbrmesh
+  - Handle: 4029197792042952432
+    Type: Material
+    Path: C:\Development\KerberosRenderer\KerberosEditor\Assets\ImportedModels\sponza\Material_18.kbrmat
+  - Handle: 4296341157651913682
+    Type: Material
+    Path: C:\Development\KerberosRenderer\KerberosEditor\Assets\ImportedModels\sponza\Material_20.kbrmat
+  - Handle: 4400029905207782943
+    Type: Mesh
+    Path: C:\Development\KerberosRenderer\KerberosEditor\Assets\ImportedModels\sponza\Mesh_0.006_Primitive_0.kbrmesh
+  - Handle: 4500952078880421768
+    Type: Material
+    Path: C:\Development\KerberosRenderer\KerberosEditor\Assets\ImportedModels\cerberus\Material_0.kbrmat
+  - Handle: 4544352555973189598
+    Type: Mesh
+    Path: C:\Development\KerberosRenderer\KerberosEditor\Assets\ImportedModels\sponza\Mesh_0.005_Primitive_1.kbrmesh
+  - Handle: 4604761697649251832
+    Type: Material
+    Path: C:\Development\KerberosRenderer\KerberosEditor\Assets\ImportedModels\sponza\Material_2.kbrmat
+  - Handle: 5047151701795733860
+    Type: Mesh
+    Path: C:\Development\KerberosRenderer\KerberosEditor\Assets\ImportedModels\sponza\Mesh_0_Primitive_2.kbrmesh
   - Handle: 5184093595592760978
     Type: Texture2D
     Path: Assets\Textures\stonefloor01_color_rgba.ktx2
+  - Handle: 5391837060668823719
+    Type: Mesh
+    Path: C:\Development\KerberosRenderer\KerberosEditor\Assets\ImportedModels\voyager\BODY.002_Primitive_0.kbrmesh
+  - Handle: 5486903486868619713
+    Type: Material
+    Path: C:\Development\KerberosRenderer\KerberosEditor\Assets\ImportedModels\sponza\Material_0.kbrmat
+  - Handle: 5505299009030506695
+    Type: Mesh
+    Path: C:\Development\KerberosRenderer\KerberosEditor\Assets\ImportedModels\sponza\Mesh_0_Primitive_7.kbrmesh
   - Handle: 5556831655075431416
     Type: Model
     Path: Assets\Models\cube.gltf
+  - Handle: 5693554478534276019
+    Type: Material
+    Path: C:\Development\KerberosRenderer\KerberosEditor\Assets\ImportedModels\sponza\Material_16.kbrmat
+  - Handle: 5814854513775848522
+    Type: Mesh
+    Path: C:\Development\KerberosRenderer\KerberosEditor\Assets\ImportedModels\Avocado\Avocado_Primitive_0.kbrmesh
+  - Handle: 5853895366006955517
+    Type: Mesh
+    Path: C:\Development\KerberosRenderer\KerberosEditor\Assets\ImportedModels\sponza\Mesh_0_Primitive_0.kbrmesh
+  - Handle: 6046853508453816669
+    Type: Mesh
+    Path: C:\Development\KerberosRenderer\KerberosEditor\Assets\ImportedModels\sponza\Mesh_0_Primitive_6.kbrmesh
+  - Handle: 6167201469478241023
+    Type: Mesh
+    Path: C:\Development\KerberosRenderer\KerberosEditor\Assets\ImportedModels\armor\Group61487.001_Primitive_0.kbrmesh
+  - Handle: 6244015166064182966
+    Type: Mesh
+    Path: C:\Development\KerberosRenderer\KerberosEditor\Assets\ImportedModels\sponza\Mesh_0.005_Primitive_0.kbrmesh
+  - Handle: 6429038834771945568
+    Type: Material
+    Path: C:\Development\KerberosRenderer\KerberosEditor\Assets\ImportedModels\donut\Material.001.kbrmat
+  - Handle: 6670369002054473151
+    Type: Mesh
+    Path: C:\Development\KerberosRenderer\KerberosEditor\Assets\ImportedModels\sponza\Mesh_0.004_Primitive_0.kbrmesh
   - Handle: 6728996633782092594
     Type: Model
     Path: Assets\Models\avocado\Avocado.gltf
+  - Handle: 7177556335001025494
+    Type: Material
+    Path: C:\Development\KerberosRenderer\KerberosEditor\Assets\ImportedModels\sponza\Material_7.kbrmat
+  - Handle: 7204054728404717068
+    Type: Material
+    Path: C:\Development\KerberosRenderer\KerberosEditor\Assets\ImportedModels\chinesedragon\m0_01___Default.003.kbrmat
+  - Handle: 7335942878670336745
+    Type: Mesh
+    Path: C:\Development\KerberosRenderer\KerberosEditor\Assets\ImportedModels\sponza\Mesh_0.010_Primitive_0.kbrmesh
+  - Handle: 7396187236355038171
+    Type: Mesh
+    Path: C:\Development\KerberosRenderer\KerberosEditor\Assets\ImportedModels\donut\Mesh_Primitive_0.kbrmesh
+  - Handle: 7413324548806464077
+    Type: Mesh
+    Path: C:\Development\KerberosRenderer\KerberosEditor\Assets\ImportedModels\chinesedragon\meshId2_name_Primitive_0.kbrmesh
+  - Handle: 7622441056620654659
+    Type: Material
+    Path: C:\Development\KerberosRenderer\KerberosEditor\Assets\ImportedModels\sponza\Material_14.kbrmat
+  - Handle: 7673524594568801244
+    Type: Material
+    Path: C:\Development\KerberosRenderer\KerberosEditor\Assets\ImportedModels\sponza\Material_24.kbrmat
   - Handle: 7820363183025911781
     Type: Model
     Path: Assets\Models\sponza\sponza.gltf
+  - Handle: 7828195659395051690
+    Type: Prefab
+    Path: C:\Development\KerberosRenderer\KerberosEditor\Assets\ImportedModels\armor\armor.kbrprefab
+  - Handle: 7877625335327602090
+    Type: Material
+    Path: C:\Development\KerberosRenderer\KerberosEditor\Assets\ImportedModels\sponza\Material_15.kbrmat
+  - Handle: 7919457072350179587
+    Type: Material
+    Path: C:\Development\KerberosRenderer\KerberosEditor\Assets\ImportedModels\viking_room\Texture1.kbrmat
   - Handle: 8036360350461290503
     Type: Material
     Path: Assets\Materials\white.kbrmat
+  - Handle: 8103100536738941148
+    Type: Mesh
+    Path: C:\Development\KerberosRenderer\KerberosEditor\Assets\ImportedModels\voyager\BODY.040_Primitive_0.kbrmesh
   - Handle: 8165452178448060093
     Type: Material
     Path: Assets\Materials\rock.kbrmat
+  - Handle: 8807528193767602462
+    Type: Material
+    Path: C:\Development\KerberosRenderer\KerberosEditor\Assets\ImportedModels\Avocado\2256_Avocado_d.kbrmat
+  - Handle: 8897475448482137047
+    Type: Mesh
+    Path: C:\Development\KerberosRenderer\KerberosEditor\Assets\ImportedModels\sponza\Mesh_0.003_Primitive_0.kbrmesh
   - Handle: 8912166731112440424
     Type: Material
     Path: Assets\Materials\armor.kbrmat
+  - Handle: 8949900514839449857
+    Type: Prefab
+    Path: C:\Development\KerberosRenderer\KerberosEditor\Assets\ImportedModels\donut\donut.kbrprefab
+  - Handle: 9065197302072222697
+    Type: Material
+    Path: C:\Development\KerberosRenderer\KerberosEditor\Assets\ImportedModels\sponza\Material_17.kbrmat
   - Handle: 9108541160281777125
     Type: Texture2D
     Path: Assets\Models\avocado\Avocado_baseColor.ktx2
+  - Handle: 9320686832095606801
+    Type: Model
+    Path: Assets\Models\viking_room\viking_room.glb
   - Handle: 9862963687860094857
     Type: Texture2D
     Path: Assets\Models\cerberus\normal.ktx2
+  - Handle: 9991878637003736656
+    Type: Mesh
+    Path: C:\Development\KerberosRenderer\KerberosEditor\Assets\ImportedModels\cube\Cube_Primitive_0.kbrmesh
   - Handle: 10385886156252848361
     Type: Texture2D
     Path: Assets\Models\armor\colormap_rgba.ktx2
+  - Handle: 10845181145430735859
+    Type: Prefab
+    Path: Assets\ImportedModels\viking_room\viking_room.kbrprefab
   - Handle: 10941221693871244172
     Type: Material
     Path: Assets\Models\cerberus\ground.kbrmat
+  - Handle: 11082898557348059499
+    Type: Mesh
+    Path: Assets\ImportedModels\viking_room\mesh_all1_Texture1_0_Primitive_0.kbrmesh
   - Handle: 11110766416391397672
     Type: Texture2D
     Path: Assets\Models\avocado\Avocado_normal.ktx2
+  - Handle: 11630427730085622806
+    Type: Material
+    Path: C:\Development\KerberosRenderer\KerberosEditor\Assets\ImportedModels\armor\Material.001.kbrmat
+  - Handle: 11754012471285403044
+    Type: Material
+    Path: C:\Development\KerberosRenderer\KerberosEditor\Assets\ImportedModels\sponza\Material_21.kbrmat
   - Handle: 11976243570351608760
     Type: Texture2D
     Path: Assets\Models\cerberus\metallic.ktx2
@@ -74,27 +254,108 @@ AssetRegistry:
   - Handle: 12385282943144861126
     Type: Sound
     Path: Assets\Sounds\freesound_community-doorhit.wav
+  - Handle: 12548685093040419776
+    Type: Mesh
+    Path: C:\Development\KerberosRenderer\KerberosEditor\Assets\ImportedModels\donut\Torus.001_Primitive_0.kbrmesh
   - Handle: 12640333732108170778
     Type: Model
     Path: Assets\Models\cerberus\cerberus.gltf
+  - Handle: 12670654817304774701
+    Type: Prefab
+    Path: C:\Development\KerberosRenderer\KerberosEditor\Assets\ImportedModels\cube\cube.kbrprefab
+  - Handle: 12827518248758605724
+    Type: Material
+    Path: C:\Development\KerberosRenderer\KerberosEditor\Assets\ImportedModels\cube\Material.kbrmat
+  - Handle: 13181684465211399634
+    Type: Material
+    Path: C:\Development\KerberosRenderer\KerberosEditor\Assets\ImportedModels\voyager\tex_01.kbrmat
+  - Handle: 13230019158391286614
+    Type: Mesh
+    Path: C:\Development\KerberosRenderer\KerberosEditor\Assets\ImportedModels\viking_room\mesh_all1_Texture1_0_Primitive_0.kbrmesh
+  - Handle: 13711232128976214987
+    Type: Material
+    Path: C:\Development\KerberosRenderer\KerberosEditor\Assets\ImportedModels\sponza\Material_12.kbrmat
+  - Handle: 13863523950314748862
+    Type: Mesh
+    Path: C:\Development\KerberosRenderer\KerberosEditor\Assets\ImportedModels\cerberus\Mesh_0_Primitive_0.kbrmesh
+  - Handle: 13895854784709814300
+    Type: Mesh
+    Path: C:\Development\KerberosRenderer\KerberosEditor\Assets\ImportedModels\sponza\Mesh_0.002_Primitive_0.kbrmesh
+  - Handle: 14063752565109843757
+    Type: Mesh
+    Path: C:\Development\KerberosRenderer\KerberosEditor\Assets\ImportedModels\sponza\Mesh_0_Primitive_4.kbrmesh
+  - Handle: 14164167043473483478
+    Type: Prefab
+    Path: C:\Development\KerberosRenderer\KerberosEditor\Assets\ImportedModels\viking_room\viking_room.kbrprefab
+  - Handle: 14188850353945904889
+    Type: Prefab
+    Path: C:\Development\KerberosRenderer\KerberosEditor\Assets\ImportedModels\voyager\voyager.kbrprefab
+  - Handle: 14398913470295554365
+    Type: Mesh
+    Path: C:\Development\KerberosRenderer\KerberosEditor\Assets\ImportedModels\armor\Group61487_Primitive_0.kbrmesh
   - Handle: 14435992229711920281
     Type: Model
     Path: Assets\Models\donut.glb
+  - Handle: 14591437211258571756
+    Type: Material
+    Path: C:\Development\KerberosRenderer\KerberosEditor\Assets\ImportedModels\sponza\Material_6.kbrmat
   - Handle: 14931318297342753047
     Type: Texture2D
     Path: Assets\Textures\colored_glass_rgba.ktx
+  - Handle: 15280944020157937240
+    Type: Material
+    Path: C:\Development\KerberosRenderer\KerberosEditor\Assets\ImportedModels\sponza\Material_22.kbrmat
+  - Handle: 15528059548702057946
+    Type: Material
+    Path: C:\Development\KerberosRenderer\KerberosEditor\Assets\ImportedModels\voyager\tex_02_AO_dark.kbrmat
   - Handle: 15732811219696105851
     Type: Texture2D
     Path: Assets\Textures\stonefloor02_normal_rgba.ktx2
+  - Handle: 15759434310442606276
+    Type: Mesh
+    Path: C:\Development\KerberosRenderer\KerberosEditor\Assets\ImportedModels\sponza\Mesh_0_Primitive_3.kbrmesh
+  - Handle: 15864024267254738854
+    Type: Material
+    Path: C:\Development\KerberosRenderer\KerberosEditor\Assets\ImportedModels\sponza\Material_3.kbrmat
+  - Handle: 16495062471363572314
+    Type: Material
+    Path: C:\Development\KerberosRenderer\KerberosEditor\Assets\ImportedModels\sponza\Material_9.kbrmat
+  - Handle: 16611564538998006184
+    Type: Material
+    Path: C:\Development\KerberosRenderer\KerberosEditor\Assets\ImportedModels\sponza\Material_11.kbrmat
   - Handle: 16678733153879101124
     Type: Texture2D
     Path: Assets\Textures\colored_glass_rgba.ktx2
+  - Handle: 17130771604486280636
+    Type: Prefab
+    Path: C:\Development\KerberosRenderer\KerberosEditor\Assets\ImportedModels\cerberus\cerberus.kbrprefab
+  - Handle: 17255823633520271877
+    Type: Mesh
+    Path: C:\Development\KerberosRenderer\KerberosEditor\Assets\ImportedModels\sponza\Mesh_0.001_Primitive_0.kbrmesh
+  - Handle: 17511191851501632967
+    Type: Material
+    Path: C:\Development\KerberosRenderer\KerberosEditor\Assets\ImportedModels\chinesedragon\m1_03___Default.kbrmat
+  - Handle: 17534892018297420932
+    Type: Mesh
+    Path: C:\Development\KerberosRenderer\KerberosEditor\Assets\ImportedModels\sponza\Mesh_0.012_Primitive_0.kbrmesh
+  - Handle: 17586271447011618386
+    Type: Material
+    Path: C:\Development\KerberosRenderer\KerberosEditor\Assets\ImportedModels\sponza\Material_4.kbrmat
   - Handle: 17603742072307990361
     Type: Texture2D
     Path: Assets\Models\cerberus\ao.ktx2
   - Handle: 17625694878102777012
     Type: Texture2D
     Path: Assets\Textures\stonefloor01_normal_rgba.ktx2
+  - Handle: 17680000698282020191
+    Type: Mesh
+    Path: C:\Development\KerberosRenderer\KerberosEditor\Assets\ImportedModels\sponza\Mesh_0_Primitive_8.kbrmesh
+  - Handle: 17789491233944992851
+    Type: Mesh
+    Path: C:\Development\KerberosRenderer\KerberosEditor\Assets\ImportedModels\sponza\Mesh_0.003_Primitive_1.kbrmesh
+  - Handle: 17991883302199881321
+    Type: Mesh
+    Path: C:\Development\KerberosRenderer\KerberosEditor\Assets\ImportedModels\sponza\Mesh_0.011_Primitive_0.kbrmesh
   - Handle: 18177791179963863543
     Type: Model
     Path: Assets\Models\chinesedragon.gltf
