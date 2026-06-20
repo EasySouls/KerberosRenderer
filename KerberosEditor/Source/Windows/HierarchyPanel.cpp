@@ -5,6 +5,7 @@
 #include "Scene/Components.hpp"
 #include "Scene/Components/PhysicsComponents.hpp"
 #include "Scene/Components/AudioComponents.hpp"
+#include "Scene/Components/ParticleComponents.hpp"
 #include "Assets/AssetManager.hpp"
 #include "Input/InputSystem.hpp"
 #include "Assets/Importers/TextureImporter.hpp"
@@ -322,6 +323,12 @@ namespace Kerberos
 				}
 
 				ImGui::EndMenu();
+			}
+
+			if (ImGui::MenuItem("Particle Emitter"))
+			{
+				AddComponentWithCheck<ParticleEmitterComponent>(entity);
+				ImGui::CloseCurrentPopup();
 			}
 
 			ImGui::EndPopup();
@@ -2029,6 +2036,59 @@ namespace Kerberos
 			if (componentDeleted)
 			{
 				entity.RemoveComponent<AudioListenerComponent>();
+			}
+		}
+		if (entity.HasComponent<ParticleEmitterComponent>())
+		{
+			ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(6, 6));
+			const bool opened = ImGui::TreeNodeEx(reinterpret_cast<void*>(typeid(ParticleEmitterComponent).hash_code()), treeNodeFlags, "Particle Emitter");
+			ImGui::SameLine(ImGui::GetContentRegionAvail().x - 20.f);
+			if (ImGui::Button("+", ImVec2{ 20, 20 }))
+			{
+				ImGui::OpenPopup("ComponentSettings");
+			}
+			ImGui::PopStyleVar();
+
+			bool componentDeleted = false;
+			if (ImGui::BeginPopup("ComponentSettings"))
+			{
+				ImGui::Text("Particle Emitter Settings");
+				ImGui::Separator();
+				if (ImGui::MenuItem("Remove Component"))
+				{
+					componentDeleted = true;
+					ImGui::CloseCurrentPopup();
+				}
+				ImGui::EndPopup();
+			}
+
+			if (opened)
+			{
+				auto& particleEmitter = entity.GetComponent<ParticleEmitterComponent>();
+				ImGui::Checkbox("Active", &particleEmitter.IsActive);
+				ImGui::DragFloat("Spawn Rate", &particleEmitter.SpawnRate, 1.0f, 0.0f);
+
+				float* lifetimeRange = &particleEmitter.MinLifetime;
+				ImGui::DragFloat2("Lifetime Range", lifetimeRange, 0.1f, 0.0f);
+
+				ImGui::DragFloat3("Velocity Range Min", glm::value_ptr(particleEmitter.MinVelocity), 0.1f);
+				ImGui::DragFloat3("Velocity Range Max", glm::value_ptr(particleEmitter.MaxVelocity), 0.1f);
+
+				ImGui::DragFloat3("Acceleration Range Min", glm::value_ptr(particleEmitter.MinAcceleration), 0.1f);
+				ImGui::DragFloat3("Acceleration Range Max", glm::value_ptr(particleEmitter.MaxAcceleration), 0.1f);
+
+				ImGui::ColorEdit3("Start Color", &particleEmitter.StartColor[0]);
+				ImGui::ColorEdit3("End Color", &particleEmitter.EndColor[0]);
+
+				float* sizeRange = &particleEmitter.StartSize;
+				ImGui::DragFloat2("Size Range", sizeRange, 0.1f, 0.0f);
+
+				ImGui::TreePop();
+			}
+
+			if (componentDeleted)
+			{
+				entity.RemoveComponent<ParticleEmitterComponent>();
 			}
 		}
 	}

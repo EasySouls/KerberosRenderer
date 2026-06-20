@@ -9,6 +9,10 @@ public struct SceneData
     public float3 camPos;
     public uint lightCount;
     public float2 viewportSize;
+    public float3 cameraRight;
+    public float deltaTime;
+    public float3 cameraUp;
+    public float time;
 };
 
 public struct Material 
@@ -33,4 +37,12 @@ public struct GlobalLighting
     public float4 sunLight;
     public float exposure;
     public float gamma;
+};
+
+public struct DrawIndirectCommand 
+{
+    public uint vertexCount;
+    public uint instanceCount;
+    public uint firstVertex;
+    public uint firstInstance;
 };

@@ -102,10 +102,10 @@ namespace Kerberos
 		template<typename T>
 		void OnComponentAdded(Entity entity, T& component);
 
-		void Render2DRuntime(const SceneCamera* mainCamera, const glm::mat4& mainCameraTransform);
-		void Render3DRuntime(const SceneCamera* mainCamera, const glm::mat4& mainCameraTransform);
-		void Render3DRuntime(const Camera& camera);
-		void Render3DEditor(const Camera& camera);
+		void Render2DRuntime(const SceneCamera* mainCamera, const glm::mat4& mainCameraTransform, float dt);
+		void Render3DRuntime(const SceneCamera* mainCamera, const glm::mat4& mainCameraTransform, float dt);
+		void Render3DRuntime(const Camera& camera, float dt);
+		void Render3DEditor(const Camera& camera, float dt);
 
 		void UpdateScripts(float ts);
 
@@ -147,5 +147,6 @@ namespace Kerberos
 		friend class HierarchyPanel;
 		friend class SceneSerializer;
 		friend class RayTracingSceneCache;
+		friend class ParticleSystem;
 	};
 }

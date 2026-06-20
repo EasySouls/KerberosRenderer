@@ -33,6 +33,7 @@ namespace Kerberos
 		float DepthPrePassMilliseconds = 0.0f;
 		float ShadowPassMilliseconds = 0.0f;
 		float OpaquePassMilliseconds = 0.0f;
+		float ParticlesPassMilliseconds = 0.0f;
 		float TransparentPassMilliseconds = 0.0f;
 		float TransparencyResolvePassMilliseconds = 0.0f;
 		float BloomPassMilliseconds = 0.0f;
@@ -101,12 +102,12 @@ namespace Kerberos
 		static void Init();
 		static void Shutdown();
 
-		static void RenderSceneEditor(const Ref<Scene>& scene, const Camera& camera);
-		static void RenderSceneRuntime(const Ref<Scene>& scene, const Camera& mainCamera, const glm::mat4& mainCameraTransform);
+		static void RenderSceneEditor(const Ref<Scene>& scene, const Camera& camera, float dt);
+		static void RenderSceneRuntime(const Ref<Scene>& scene, const Camera& mainCamera, const glm::mat4& mainCameraTransform, float dt);
 		static void RenderScene(const Ref<Scene>& scene,
 								const glm::mat4& view, const glm::mat4& projection,
 								const glm::vec3& camPos,
-								const std::function<std::pair<std::vector<glm::mat4>, glm::vec4>(const glm::vec3&, const std::function<glm::vec4(float)>&)>& calculateLightSpaceMatricesFunc);
+								const std::function<std::pair<std::vector<glm::mat4>, glm::vec4>(const glm::vec3&, const std::function<glm::vec4(float)>&)>& calculateLightSpaceMatricesFunc, float dt);
 		static void RecordQueuedSceneRender(const vk::raii::CommandBuffer& cmd);
 
 		static void ResizeResources(uint32_t width, uint32_t height);
@@ -160,7 +161,8 @@ namespace Kerberos
 											  uint32_t temporalIndex,
 											  const std::vector<glm::mat4>& lightSpaceMatrices,
 											  const glm::vec4& cascadeSplits,
-											  uint32_t lightCount);
+											  uint32_t lightCount,
+											  float deltaTime);
 
 		static void UpdateSceneUniformBuffers(uint32_t currentImage, 
 											  const glm::mat4& view, 
@@ -169,13 +171,16 @@ namespace Kerberos
 											  uint32_t temporalIndex,
 											  const std::vector<glm::mat4>& lightSpaceMatrices,
 											  const glm::vec4& cascadeSplits,
-											  uint32_t lightCount);
+											  uint32_t lightCount,
+											  float deltaTime);
 
 		static void UpdatePerObjectUniformBuffer(uint32_t currentImage, uint32_t objectIndex, const glm::mat4& model, const Material& material, uint32_t entityID);
 
 		static std::vector<GPULight> GetLightsFromScene(const Scene& scene);
 		static std::pair<std::vector<RenderObject>, std::set<Ref<Material>>> GetRenderObjectsAndUniqueMaterialsFromScene(const Scene& scene);
 		static std::vector<LineVertex> GetColliderLineVerticesFromScene(const Scene& scene);
+
+		static void RenderParticles(const vk::raii::CommandBuffer& cmd, uint32_t frameIndex);
 
 		static void ApplyTonemapping(const vk::raii::CommandBuffer& cmd, uint32_t frameIndex);
 		

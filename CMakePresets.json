@@ -11,7 +11,13 @@
       "name": "vs2026",
       "generator": "Visual Studio 18 2026",
       "architecture": "x64",
-      "binaryDir": "build/vs2026"
+      "binaryDir": "build/vs2026",
+      "cacheVariables": {
+        "CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
+        "KBR_ENABLE_ASAN": "OFF",
+        "KBR_ENABLE_FUZZING": "OFF",
+        "KBR_ENABLE_THIRDPARTY_INSTRUMENTATION": "OFF"
+      }
     },
     {
       "name": "vs2026-asan",

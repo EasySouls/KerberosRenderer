@@ -10,6 +10,7 @@
 #include "GraphicsPipeline.hpp"
 #include "ComputePipeline.hpp"
 #include "RayTracingSceneCache.hpp"
+#include "ParticleSystem.hpp"
 #include "ColliderDebugHelpers.hpp"
 #include "Utils.hpp"
 #include "SMAA/SMAAAreaTex.hpp"
@@ -128,6 +129,10 @@ namespace
 		alignas(16) glm::vec3 camPos{ 0.f };
 		uint32_t lightCount = 0;
 		glm::vec2 viewportSize{ 0.0f, 0.0f };
+		glm::vec3 cameraRight{ 0.f };
+		float deltaTime = 0.0f;
+		glm::vec3 cameraUp{ 0.f };
+		float time = 0.0f;
 	};
 
 	struct GlobalLighting
@@ -297,6 +302,7 @@ namespace
 		glm::mat4 Projection{ 1.0f };
 		glm::vec3 CameraPosition{ 0.0f };
 		std::function<std::pair<std::vector<glm::mat4>, glm::vec4>(const glm::vec3&, const std::function<glm::vec4(float)>&)> CalculateLightSpaceMatricesFunc;
+		float DeltaTime = 0.0f;
 		bool IsValid = false;
 	};
 
@@ -309,6 +315,8 @@ namespace
 		ShadowEnd,
 		OpaqueBegin,
 		OpaqueEnd,
+		ParticlesBegin,
+		ParticlesEnd,
 		TransparentBegin,
 		TransparentEnd,
 		TransparencyResolveBegin,
@@ -419,6 +427,7 @@ namespace
 		RenderStatistics LatestRenderStatistics{};
 
 		RayTracingSceneCache RayTracingCache{};
+		ParticleSystem ParticleSystem{};
 
 		glm::vec2 OutputSize{ 1280.0f, 720.0f };
 
@@ -527,28 +536,30 @@ namespace Kerberos
 		s_Data = nullptr;
 	}
 
-	void Renderer::RenderSceneEditor(const Ref<Scene>& scene, const Camera& camera) 
+	void Renderer::RenderSceneEditor(const Ref<Scene>& scene, const Camera& camera, const float dt) 
 	{
 		RenderScene(scene, 
 					camera.GetViewMatrix(),
 					camera.GetProjectionMatrix(), 
 					camera.GetPosition(),
-					[&camera](const glm::vec3& lightDir, const std::function<glm::vec4(float)>& getCascadeSplits) { return camera.GetLightSpaceMatrices(lightDir, getCascadeSplits); });
+					[&camera](const glm::vec3& lightDir, const std::function<glm::vec4(float)>& getCascadeSplits) { return camera.GetLightSpaceMatrices(lightDir, getCascadeSplits); },
+					dt);
 	}
 
 	void Renderer::RenderSceneRuntime(const Ref<Scene>& scene, const Camera& mainCamera,
-									  const glm::mat4& mainCameraTransform)
+									  const glm::mat4& mainCameraTransform, const float dt)
 	{
 		const glm::vec3 camPos = mainCameraTransform[3];
 		RenderScene(scene, 
 					mainCamera.GetViewMatrix(), 
 					mainCamera.GetProjectionMatrix(),
 					camPos, 
-					[&mainCamera](const glm::vec3& lightDir, const std::function<glm::vec4(float)>& getCascadeSplits) { return mainCamera.GetLightSpaceMatrices(lightDir, getCascadeSplits); });
+					[&mainCamera](const glm::vec3& lightDir, const std::function<glm::vec4(float)>& getCascadeSplits) { return mainCamera.GetLightSpaceMatrices(lightDir, getCascadeSplits); }, 
+					dt);
 	}
 
 	void Renderer::RenderScene(const Ref<Scene>& scene, const glm::mat4& view, const glm::mat4& projection,
-		const glm::vec3& camPos, const std::function<std::pair<std::vector<glm::mat4>, glm::vec4>(const glm::vec3&, const std::function<glm::vec4(float)>&)>& calculateLightSpaceMatricesFunc)
+		const glm::vec3& camPos, const std::function<std::pair<std::vector<glm::mat4>, glm::vec4>(const glm::vec3&, const std::function<glm::vec4(float)>&)>& calculateLightSpaceMatricesFunc, const float dt)
 	{
 		KBR_CORE_ASSERT(!s_Data->PendingRender.IsValid, "Scene has already been queued for rendering!");
 
@@ -557,6 +568,7 @@ namespace Kerberos
 		s_Data->PendingRender.Projection = projection;
 		s_Data->PendingRender.CameraPosition = camPos;
 		s_Data->PendingRender.CalculateLightSpaceMatricesFunc = calculateLightSpaceMatricesFunc;
+		s_Data->PendingRender.DeltaTime = dt;
 		s_Data->PendingRender.IsValid = scene != nullptr;
 	}
 
@@ -650,7 +662,10 @@ namespace Kerberos
 			temporalIndex,
 			lightSpaceMatrices,
 			cascadeSplits,
-			lightCount);
+			lightCount, 
+			s_Data->PendingRender.DeltaTime);
+
+		s_Data->ParticleSystem.Update(s_Data->PendingRender.Scene, s_Data->PendingRender.DeltaTime, cmd, frameIndex, s_Data->DescriptorSets[frameIndex].scene);
 
 		const Ref<Scene>& scene = s_Data->PendingRender.Scene;
 
@@ -1524,6 +1539,8 @@ namespace Kerberos
 
 			KBR_CORE_TRACE("Opaque pass done!");
 		}
+
+		RenderParticles(cmd, frameIndex);
 
 		// Transfer accumulation, revealage and distortion images to color attachment optimal for they will be render targets
 		{
@@ -2683,6 +2700,8 @@ namespace Kerberos
 
 			s_Data->SkyboxPipeline = CreateRef<GraphicsPipeline>(skyboxPipelineSpec);
 		}
+
+		s_Data->ParticleSystem.Initialize(s_Data->ColorImage.Format, s_Data->DepthImage.Format, s_Data->DescriptorSetLayouts.scene);
 
 		// Create transparent pipeline resources
 		{
@@ -4088,6 +4107,7 @@ namespace Kerberos
 		s_Data->LatestGPUTimings.DepthPrePassMilliseconds = toMilliseconds(GPUTimestampQuery::DepthPrePassBegin, GPUTimestampQuery::DepthPrePassEnd);
 		s_Data->LatestGPUTimings.ShadowPassMilliseconds = toMilliseconds(GPUTimestampQuery::ShadowBegin, GPUTimestampQuery::ShadowEnd);
 		s_Data->LatestGPUTimings.OpaquePassMilliseconds = toMilliseconds(GPUTimestampQuery::OpaqueBegin, GPUTimestampQuery::OpaqueEnd);
+		s_Data->LatestGPUTimings.ParticlesPassMilliseconds = toMilliseconds(GPUTimestampQuery::ParticlesBegin, GPUTimestampQuery::ParticlesEnd);
 		s_Data->LatestGPUTimings.TransparentPassMilliseconds = toMilliseconds(GPUTimestampQuery::TransparentBegin, GPUTimestampQuery::TransparentEnd);
 		s_Data->LatestGPUTimings.TransparencyResolvePassMilliseconds = toMilliseconds(GPUTimestampQuery::TransparencyResolveBegin, GPUTimestampQuery::TransparencyResolveEnd);
 		s_Data->LatestGPUTimings.BloomPassMilliseconds = toMilliseconds(GPUTimestampQuery::BloomPassBegin, GPUTimestampQuery::BloomPassEnd);
@@ -4117,8 +4137,8 @@ namespace Kerberos
 		std::memcpy(s_Data->StorageBuffers[currentImage].Lights->GetMappedData(), sceneLights.data(), sceneLights.size() * sizeof(GPULight));
 	}
 
-	void Renderer::UpdateSceneUniformBuffers(const uint32_t currentImage, const Camera* mainCamera, uint32_t temporalIndex, const std::vector<glm::mat4>& lightSpaceMatrices,
-											 const glm::vec4& cascadeSplits, const uint32_t lightCount)
+	void Renderer::UpdateSceneUniformBuffers(const uint32_t currentImage, const Camera* mainCamera, const uint32_t temporalIndex, const std::vector<glm::mat4>& lightSpaceMatrices,
+											 const glm::vec4& cascadeSplits, const uint32_t lightCount, const float deltaTime)
 	{
 		KBR_CORE_ASSERT(s_Data, "Renderer not initialized!");
 
@@ -4126,12 +4146,12 @@ namespace Kerberos
 		const glm::mat4& view = mainCamera->GetViewMatrix();
 		const glm::vec3 camPos = mainCamera->GetPosition();
 
-		UpdateSceneUniformBuffers(currentImage, view, projection, camPos, temporalIndex, lightSpaceMatrices, cascadeSplits, lightCount);
+		UpdateSceneUniformBuffers(currentImage, view, projection, camPos, temporalIndex, lightSpaceMatrices, cascadeSplits, lightCount, deltaTime);
 	}
 
 	void Renderer::UpdateSceneUniformBuffers(const uint32_t currentImage, const glm::mat4& view, const glm::mat4& projection,
 												const glm::vec3& camPos, uint32_t temporalIndex, const std::vector<glm::mat4>& lightSpaceMatrices,
-												const glm::vec4& cascadeSplits, const uint32_t lightCount)
+												const glm::vec4& cascadeSplits, const uint32_t lightCount, const float deltaTime)
 	{
 		KBR_CORE_ASSERT(s_Data, "Renderer not initialized!");
 
@@ -4141,6 +4161,15 @@ namespace Kerberos
 		s_Data->SceneUniformData.cascadeSplits = cascadeSplits;
 		s_Data->SceneUniformData.lightCount = lightCount;
 		s_Data->SceneUniformData.viewportSize = s_Data->OutputSize;
+
+		// TODO: Insert real values
+		s_Data->SceneUniformData.cameraRight = glm::vec4(view[0][0], view[1][0], view[2][0], 0.0f);
+		s_Data->SceneUniformData.cameraUp = glm::vec4(view[0][1], view[1][1], view[2][1], 0.0f);
+		s_Data->SceneUniformData.deltaTime = deltaTime;
+
+		static float time = 0.0f;
+		time += deltaTime;
+		s_Data->SceneUniformData.time = time;
 
 		for (size_t i = 0; i < s_Data->SceneUniformData.lightSpaceMatrices.size(); ++i)
 		{
@@ -4330,6 +4359,59 @@ namespace Kerberos
 		}
 
 		return vertices;
+	}
+
+	void Renderer::RenderParticles(const vk::raii::CommandBuffer& cmd, const uint32_t frameIndex)
+	{
+		WriteGPUTimestamp(cmd, frameIndex, static_cast<uint32_t>(GPUTimestampQuery::ParticlesBegin));
+
+		vk::RenderingAttachmentInfo colorAttachmentInfo{
+			.imageView = s_Data->ColorImage.ImageView,
+			.imageLayout = vk::ImageLayout::eColorAttachmentOptimal,
+			.loadOp = vk::AttachmentLoadOp::eLoad,
+			.storeOp = vk::AttachmentStoreOp::eStore,
+		};
+
+		vk::RenderingAttachmentInfo depthAttachmentInfo{
+			.imageView = s_Data->DepthImage.ImageView,
+			.imageLayout = vk::ImageLayout::eDepthAttachmentOptimal,
+			.loadOp = vk::AttachmentLoadOp::eLoad,
+			.storeOp = vk::AttachmentStoreOp::eDontCare,
+		};
+
+		const vk::Rect2D renderArea{
+			.offset = vk::Offset2D{.x = 0, .y = 0 },
+			.extent = vk::Extent2D{.width = static_cast<uint32_t>(s_Data->OutputSize.x), .height = static_cast<uint32_t>(s_Data->OutputSize.y) }
+		};
+
+		const vk::Viewport viewport{
+			.x = 0.0f,
+			.y = 0.0f,
+			.width = s_Data->OutputSize.x,
+			.height = s_Data->OutputSize.y,
+			.minDepth = 0.0f,
+			.maxDepth = 1.0f
+		};
+
+		const vk::RenderingInfo renderingInfo{
+			.renderArea = renderArea,
+			.layerCount = 1,
+			.colorAttachmentCount = 1,
+			.pColorAttachments = &colorAttachmentInfo,
+			.pDepthAttachment = &depthAttachmentInfo
+		};
+
+		BeginRenderPassDebugLabel(cmd, "GPU Particles Pass");
+		cmd.beginRendering(renderingInfo);
+		cmd.setViewport(0, viewport);
+		cmd.setScissor(0, renderArea);
+
+		s_Data->ParticleSystem.RecordDraw(cmd, frameIndex, s_Data->DescriptorSets[frameIndex].scene);
+
+		cmd.endRendering();
+		EndRenderPassDebugLabel(cmd);
+
+		WriteGPUTimestamp(cmd, frameIndex, static_cast<uint32_t>(GPUTimestampQuery::ParticlesEnd));
 	}
 
 	void Renderer::ApplyTonemapping(const vk::raii::CommandBuffer& cmd, uint32_t frameIndex)
@@ -5248,7 +5330,7 @@ namespace Kerberos
 				.binding = 0,
 				.descriptorType = vk::DescriptorType::eUniformBuffer,
 				.descriptorCount = 1,
-				.stageFlags = vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment | vk::ShaderStageFlagBits::eGeometry,
+				.stageFlags = vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment | vk::ShaderStageFlagBits::eGeometry | vk::ShaderStageFlagBits::eCompute,
 				.pImmutableSamplers = nullptr
 			},
 			vk::DescriptorSetLayoutBinding{ // Light data and other params

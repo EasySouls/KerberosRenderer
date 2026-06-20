@@ -5,6 +5,7 @@
 #include "Components.hpp"
 #include "Components/PhysicsComponents.hpp"
 #include "Components/AudioComponents.hpp"
+#include "Components/ParticleComponents.hpp"
 #include "Application.hpp"
 #include "Assets/AssetManager.hpp"
 #include "Assets/Prefab.hpp"
@@ -71,9 +72,9 @@ namespace Kerberos
 		m_IsScenePaused = isPaused;
 	}
 
-	void Scene::OnUpdateEditor(float ts, const Camera& camera)
+	void Scene::OnUpdateEditor(const float ts, const Camera& camera)
 	{
-		Render3DEditor(camera);
+		Render3DEditor(camera, ts);
 	}
 
 	void Scene::OnUpdateSimulation(const float ts, const Camera& camera)
@@ -84,7 +85,7 @@ namespace Kerberos
 			m_PhysicsSystem->Update(ts);
 		}
 
-		Render3DEditor(camera);
+		Render3DEditor(camera, ts);
 	}
 
 	void Scene::OnUpdateRuntime(const float ts, const Camera& camera)
@@ -135,11 +136,11 @@ namespace Kerberos
 			{
 				//Render3DRuntime(mainCamera, mainCameraTransform);
 				// TODO: Implement rendering with CameraComponent
-				Render3DRuntime(camera);
+				Render3DRuntime(camera, ts);
 			}
 			else
 			{
-				Render2DRuntime(mainCamera, mainCameraTransform);
+				Render2DRuntime(mainCamera, mainCameraTransform, ts);
 			}
 		//}
 	}
@@ -778,7 +779,7 @@ Entity Scene::InstantiatePrefab(const AssetHandle prefabHandle, const std::strin
 	}
 
 
-	void Scene::Render2DRuntime(const SceneCamera* mainCamera, const glm::mat4& mainCameraTransform)
+	void Scene::Render2DRuntime(const SceneCamera* mainCamera, const glm::mat4& mainCameraTransform, const float dt)
 	{
 		//Renderer2D::BeginScene(*mainCamera, mainCameraTransform);
 
@@ -793,7 +794,7 @@ Entity Scene::InstantiatePrefab(const AssetHandle prefabHandle, const std::strin
 		//Renderer2D::EndScene();
 	}
 
-	void Scene::Render3DRuntime(const SceneCamera* mainCamera, const glm::mat4& mainCameraTransform)
+	void Scene::Render3DRuntime(const SceneCamera* mainCamera, const glm::mat4& mainCameraTransform, const float dt)
 	{
 		KBR_PROFILE_FUNCTION();
 #pragma region old_rendering_code
@@ -904,15 +905,15 @@ Entity Scene::InstantiatePrefab(const AssetHandle prefabHandle, const std::strin
 		//Renderer::RenderSceneRuntime(shared_from_this(), mainCamera, mainCameraTransform);
 	}
 
-	void Scene::Render3DRuntime(const Camera& camera) 
+	void Scene::Render3DRuntime(const Camera& camera, const float dt) 
 	{
 		glm::mat4 cameraTransform(1.0f);
 		const glm::vec4 camPos = { camera.GetPosition().x, camera.GetPosition().y, camera.GetPosition().z, 1.0f };
 		cameraTransform[3] = camPos;
-		Renderer::RenderSceneRuntime(shared_from_this(), camera, cameraTransform);
+		Renderer::RenderSceneRuntime(shared_from_this(), camera, cameraTransform, dt);
 	}
 
-	void Scene::Render3DEditor(const Camera& camera)
+	void Scene::Render3DEditor(const Camera& camera, const float dt)
 	{
 #pragma region old_rendering_code
 		//DirectionalLightComponent* dlc = nullptr;
@@ -1016,7 +1017,7 @@ Entity Scene::InstantiatePrefab(const AssetHandle prefabHandle, const std::strin
 
 		////Renderer3D::EndScene();
 #pragma endregion
-		Renderer::RenderSceneEditor(shared_from_this(), camera);
+		Renderer::RenderSceneEditor(shared_from_this(), camera, dt);
 	}
 
 	void Scene::UpdateScripts(float ts)
@@ -1322,6 +1323,11 @@ Entity Scene::InstantiatePrefab(const AssetHandle prefabHandle, const std::strin
 
 	template <>
 	void Scene::OnComponentAdded<PrefabInstanceComponent>(Entity, PrefabInstanceComponent&)
+	{
+	}
+
+	template <>
+	void Scene::OnComponentAdded<ParticleEmitterComponent>(Entity, ParticleEmitterComponent&)
 	{
 	}
 
