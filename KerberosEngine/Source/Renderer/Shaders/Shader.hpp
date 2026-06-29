@@ -35,7 +35,7 @@ namespace Kerberos
 		std::vector<vk::PipelineShaderStageCreateInfo> GetPipelineShaderStageCreateInfo() const;
 
 	private:
-		void Reflect();
+		std::vector<ShaderStageEntry> Reflect();
 
 	private:
 		std::string m_Name;

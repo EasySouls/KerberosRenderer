@@ -3,11 +3,12 @@
 
 #include "IO.hpp"
 #include "VulkanContext.hpp"
+#include "SlangCompiler.hpp"
+#include "Logging/Log.hpp"
 
 #include <spirv_cross/spirv_cross.hpp>
 
-#include "SlangCompiler.hpp"
-#include "Logging/Log.hpp"
+#include <format>
 
 namespace Kerberos
 {
@@ -46,6 +47,67 @@ namespace Kerberos
 				KBR_CORE_ERROR("Unsupported SPIR-V execution model: {}", static_cast<int>(model));
 				return vk::ShaderStageFlagBits::eVertex;
 		}
+	}
+
+	static void ReflectStructMembers(const spirv_cross::Compiler& compiler, const uint32_t typeId, const std::string_view indent)
+	{
+		const spirv_cross::SPIRType& type = compiler.get_type(typeId);
+
+		for (uint32_t i = 0; i < type.member_types.size(); ++i)
+		{
+			const uint32_t memberTypeId = type.member_types[i];
+			const spirv_cross::SPIRType& memberType = compiler.get_type(memberTypeId);
+
+			const std::string& memberName = compiler.get_member_name(typeId, i);
+			size_t memberSize = compiler.get_declared_struct_member_size(type, i);
+			const uint32_t offset = compiler.type_struct_member_offset(type, i);
+
+			std::string arrayInfo;
+			if (!memberType.array.empty())
+			{
+				if (memberType.array[0] == 0)
+				{
+					const size_t stride = compiler.type_struct_member_array_stride(type, i);
+					arrayInfo = std::format("[] (Runtime Array, Stride: {})", stride);
+					memberSize = 0; // Size is dynamic
+				}
+				else
+				{
+					arrayInfo = std::format("[{}] (Stride: {})", memberType.array[0], compiler.type_struct_member_array_stride(type, i));
+				}
+			}
+
+			std::string typeName = "Unknown";
+			switch (memberType.basetype)
+			{
+				case spirv_cross::SPIRType::Struct: typeName = "Struct"; break;
+				case spirv_cross::SPIRType::Float:  typeName = "Float"; break;
+				case spirv_cross::SPIRType::Int:    typeName = "Int"; break;
+				case spirv_cross::SPIRType::UInt:   typeName = "UInt"; break;
+				case spirv_cross::SPIRType::Boolean:typeName = "Bool"; break;
+				// TODO:  Add Vector/Matrix checks using member_type.vecsize / columns
+				default: break;
+			}
+
+			KBR_CORE_INFO("{0}Member: {1}{2}, Type: {3}, Offset: {4}, Size: {5}",
+						  indent, memberName, arrayInfo, typeName, offset, memberSize);
+
+			if (memberType.basetype == spirv_cross::SPIRType::Struct)
+			{
+				const std::string_view newIndent = std::string_view(indent).substr(0, indent.size() + 1);
+				ReflectStructMembers(compiler, memberTypeId, newIndent);
+			}
+		}
+	}
+
+	static uint32_t GetDescriptorArraySize(const spirv_cross::Compiler& compiler, const spirv_cross::Resource& resource)
+	{
+		const spirv_cross::SPIRType& type = compiler.get_type(resource.base_type_id);
+		if (!type.array.empty())
+		{
+			return type.array[0] == 0 ? 1 : type.array[0];
+		}
+		return 1;
 	}
 
 	Shader::Shader(const std::filesystem::path& filepath, std::string name)
@@ -134,7 +196,7 @@ namespace Kerberos
 								   vk::ObjectType::eShaderModule,
 								   m_Name + "_ShaderModule");
 
-		Reflect();
+		m_StageEntries = Reflect();
 	}
 
 	std::expected<bool, std::string> Shader::Recompile() 
@@ -172,7 +234,7 @@ namespace Kerberos
 									   vk::ObjectType::eShaderModule,
 									   m_Name + "_ShaderModule");
 
-			Reflect();
+			m_StageEntries = Reflect();
 		}
 		catch (const CompilationFailedException& e) 
 		{
@@ -204,139 +266,105 @@ namespace Kerberos
 		return stages;
 	}
 
-	void Shader::Reflect() 
+	std::vector<ShaderStageEntry> Shader::Reflect()
 	{
-		const spirv_cross::Compiler compiler(m_SpirvCode);
-		spirv_cross::ShaderResources resources = compiler.get_shader_resources();
+		using namespace spirv_cross;
+
+		const Compiler compiler(m_SpirvCode);
+		const ShaderResources resources = compiler.get_shader_resources();
 
 		KBR_CORE_INFO("Reflecting shader {}", m_Name);
 
-		auto entryPoints = compiler.get_entry_points_and_stages();
-		m_StageEntries.clear();
-		m_StageEntries.reserve(entryPoints.size());
+		const auto entryPoints = compiler.get_entry_points_and_stages();
+
+		std::vector<ShaderStageEntry> stageEntries;
+		stageEntries.reserve(entryPoints.size());
+
+		constexpr std::string_view threeSpaces{"   "};
 
 		for (const auto& [name, execution_model] : entryPoints) {
 			const vk::ShaderStageFlagBits stage = ExecutionModelToShaderStage(execution_model);
-			m_StageEntries.push_back({ .stage = stage, .entryPoint = name });
+			stageEntries.push_back({ .stage = stage, .entryPoint = name });
 			KBR_CORE_INFO("  Entry point: {0}, Stage: {1}", name, vk::to_string(stage));
 		}
 
-		KBR_CORE_INFO("    Uniform Buffers: {0}", resources.uniform_buffers.size());
-		for (const auto& resource : resources.uniform_buffers) {
-			const auto& bufferType = compiler.get_type(resource.base_type_id);
-			uint32_t set = compiler.get_decoration(resource.id, spv::DecorationDescriptorSet);
-			uint32_t binding = compiler.get_decoration(resource.id, spv::DecorationBinding);
-			size_t bufferSize = compiler.get_declared_struct_size(bufferType);
+		KBR_CORE_INFO(" Uniform Buffers: {0}", resources.uniform_buffers.size());
+		for (const Resource& resource : resources.uniform_buffers) {
+			const SPIRType& bufferType = compiler.get_type(resource.base_type_id);
+			const uint32_t set = compiler.get_decoration(resource.id, spv::DecorationDescriptorSet);
+			const uint32_t binding = compiler.get_decoration(resource.id, spv::DecorationBinding);
+			const size_t bufferSize = compiler.get_declared_struct_size(bufferType);
 
-			KBR_CORE_INFO("      Name: {0}, Set: {1}, Binding: {2}, Size: {3}", resource.name, set, binding, bufferSize);
+			KBR_CORE_INFO("  Name: {0}, Set: {1}, Binding: {2}, Size: {3}", resource.name, set, binding, bufferSize);
 
-			// List members
-			for (uint32_t i = 0; i < bufferType.member_types.size(); ++i) {
-				std::string memberName = compiler.get_member_name(resource.base_type_id, i);
-				size_t memberSize = compiler.get_declared_struct_member_size(bufferType, i);
-				uint32_t offset = compiler.type_struct_member_offset(bufferType, i);
-				KBR_CORE_INFO("        Member: {0}, Offset: {1}, Size: {2}", memberName, offset, memberSize);
+			ReflectStructMembers(compiler, resource.base_type_id, threeSpaces);
+		}
+
+		KBR_CORE_INFO(" Storage Buffers: {0}", resources.storage_buffers.size());
+		for (const Resource& resource : resources.storage_buffers)
+		{
+			const SPIRType& bufferType = compiler.get_type(resource.base_type_id);
+			const uint32_t set = compiler.get_decoration(resource.id, spv::DecorationDescriptorSet);
+			const uint32_t binding = compiler.get_decoration(resource.id, spv::DecorationBinding);
+			const size_t bufferSize = compiler.get_declared_struct_size_runtime_array(bufferType, 0);
+
+			KBR_CORE_INFO("  Name: {0}, Set: {1}, Binding: {2}, Base Size: {3}", resource.name, set, binding, bufferSize);
+
+			ReflectStructMembers(compiler, resource.base_type_id, threeSpaces);
+		}
+
+		auto reflectImageSampler = [&](const auto& resourceList, const char* label)
+		{
+			KBR_CORE_INFO(" {0}: {1}", label, resourceList.size());
+			for (const Resource& resource : resourceList)
+			{
+				const uint32_t set = compiler.get_decoration(resource.id, spv::DecorationDescriptorSet);
+				const uint32_t binding = compiler.get_decoration(resource.id, spv::DecorationBinding);
+				const uint32_t count = GetDescriptorArraySize(compiler, resource);
+				KBR_CORE_INFO("  Name: {0}, Set: {1}, Binding: {2}, Count: {3}", resource.name, set, binding, count);
 			}
-		}
+		};
 
-		KBR_CORE_INFO("    Sampled Images (Textures/Samplers): {0}", resources.sampled_images.size());
-		for (const auto& resource : resources.sampled_images) {
-			uint32_t set = compiler.get_decoration(resource.id, spv::DecorationDescriptorSet);
-			uint32_t binding = compiler.get_decoration(resource.id, spv::DecorationBinding);
-			uint32_t descriptorCount = 1;
+		reflectImageSampler(resources.sampled_images, "Sampled Images");
+		reflectImageSampler(resources.separate_images, "Images");
+		reflectImageSampler(resources.separate_samplers, "Samplers");
 
-			// Check if it's an array of textures (e.g., `sampler2D textures[4]`)
-			const spirv_cross::SPIRType& type = compiler.get_type(resource.base_type_id);
-			if (!type.array.empty()) {
-				descriptorCount = type.array[0]; // Assuming 1D array for simplicity
-				if (descriptorCount == 0) // Unsized array (e.g., `sampler2D textures[]`)
-					//descriptorCount = VulkanContext::Get().GetCapabilities().maxSamplerAllocationCount; // Or some max you define
-					descriptorCount = 1; // Default to 1 if unsized
-			}
+		KBR_CORE_INFO(" Storage Images: {0}", resources.storage_images.size());
+		for (const Resource& resource : resources.storage_images) {
+			const uint32_t set = compiler.get_decoration(resource.id, spv::DecorationDescriptorSet);
+			const uint32_t binding = compiler.get_decoration(resource.id, spv::DecorationBinding);
+			const SPIRType& type = compiler.get_type(resource.base_type_id);
 
-			KBR_CORE_INFO("      Name: {0}, Set: {1}, Binding: {2}, Count: {3}", resource.name, set, binding, descriptorCount);
-		}
-
-		KBR_CORE_INFO("    Images: {0}", resources.separate_images.size());
-		for (const auto& resource : resources.separate_images) {
-			uint32_t set = compiler.get_decoration(resource.id, spv::DecorationDescriptorSet);
-			uint32_t binding = compiler.get_decoration(resource.id, spv::DecorationBinding);
-			uint32_t descriptorCount = 1;
-
-			// Check if it's an array of textures (e.g., `sampler2D textures[4]`)
-			const spirv_cross::SPIRType& type = compiler.get_type(resource.base_type_id);
-			if (!type.array.empty()) {
-				descriptorCount = type.array[0]; // Assuming 1D array for simplicity
-				if (descriptorCount == 0) // Unsized array (e.g., `sampler2D textures[]`)
-					//descriptorCount = VulkanContext::Get().GetCapabilities().maxSamplerAllocationCount; // Or some max you define
-					descriptorCount = 1; // Default to 1 if unsized
-			}
-
-			KBR_CORE_INFO("      Name: {0}, Set: {1}, Binding: {2}, Count: {3}", resource.name, set, binding, descriptorCount);
-		}
-
-		KBR_CORE_INFO("    Samplers: {0}", resources.separate_samplers.size());
-		for (const auto& resource : resources.separate_samplers) {
-			uint32_t set = compiler.get_decoration(resource.id, spv::DecorationDescriptorSet);
-			uint32_t binding = compiler.get_decoration(resource.id, spv::DecorationBinding);
-			uint32_t descriptorCount = 1;
-
-			// Check if it's an array of textures (e.g., `sampler2D textures[4]`)
-			const spirv_cross::SPIRType& type = compiler.get_type(resource.base_type_id);
-			if (!type.array.empty()) {
-				descriptorCount = type.array[0]; // Assuming 1D array for simplicity
-				if (descriptorCount == 0) // Unsized array (e.g., `sampler2D textures[]`)
-					//descriptorCount = VulkanContext::Get().GetCapabilities().maxSamplerAllocationCount; // Or some max you define
-					descriptorCount = 1; // Default to 1 if unsized
-			}
-
-			KBR_CORE_INFO("      Name: {0}, Set: {1}, Binding: {2}, Count: {3}", resource.name, set, binding, descriptorCount);
-		}
-
-		KBR_CORE_INFO("    Storage Buffers: {0}", resources.storage_buffers.size());
-		for (const auto& resource : resources.storage_buffers) {
-			const auto& bufferType = compiler.get_type(resource.base_type_id);
-			uint32_t set = compiler.get_decoration(resource.id, spv::DecorationDescriptorSet);
-			uint32_t binding = compiler.get_decoration(resource.id, spv::DecorationBinding);
-			size_t bufferSize = compiler.get_declared_struct_size(bufferType);
-
-			KBR_CORE_INFO("      Name: {0}, Set: {1}, Binding: {2}, Approx Size: {3}", resource.name, set, binding, bufferSize);
-		}
-
-		KBR_CORE_INFO("    Storage Images: {0}", resources.storage_images.size());
-		for (const auto& resource : resources.storage_images) {
-			uint32_t set = compiler.get_decoration(resource.id, spv::DecorationDescriptorSet);
-			uint32_t binding = compiler.get_decoration(resource.id, spv::DecorationBinding);
-			const spirv_cross::SPIRType& type = compiler.get_type(resource.base_type_id);
+			const char* dimStr = "Unknown";
 			switch (type.image.dim) {
-				case spv::Dim1D:   KBR_CORE_INFO("      Name: {0}, Set: {1}, Binding: {2}, Type: 1D Image", resource.name, set, binding); break;
-				case spv::Dim2D:   KBR_CORE_INFO("      Name: {0}, Set: {1}, Binding: {2}, Type: 2D Image", resource.name, set, binding); break;
-				case spv::Dim3D:   KBR_CORE_INFO("      Name: {0}, Set: {1}, Binding: {2}, Type: 3D Image", resource.name, set, binding); break;
-				case spv::DimCube: KBR_CORE_INFO("      Name: {0}, Set: {1}, Binding: {2}, Type: Cube Image", resource.name, set, binding); break;
-				default:           KBR_CORE_INFO("      Name: {0}, Set: {1}, Binding: {2}, Type: Unknown Image", resource.name, set, binding); break;
+				case spv::Dim1D:   dimStr = "1D"; break;
+				case spv::Dim2D:   dimStr = "2D"; break;
+				case spv::Dim3D:   dimStr = "3D"; break;
+				case spv::DimCube: dimStr = "Cube"; break;
+				default:           dimStr = "Unknown"; break;
 			}
+			KBR_CORE_INFO("  Name: {0}, Set: {1}, Binding: {2}, Type: {3} Image", resource.name, set, binding, dimStr);
 		}
 
-		KBR_CORE_INFO("    Push Constant Buffers: {0}", resources.push_constant_buffers.size());
-		for (const auto& resource : resources.push_constant_buffers) {
-			const auto& bufferType = compiler.get_type(resource.base_type_id);
-			uint32_t offset = 0; // Typically
-			// SPIRV-Cross might need a bit more work to get exact offset for members if it's a struct.
-		   // For a single push constant block, its range covers the whole block.
-			size_t size = compiler.get_declared_struct_size(bufferType);
+		KBR_CORE_INFO(" Push Constant Buffers: {0}", resources.push_constant_buffers.size());
+		for (const Resource& resource : resources.push_constant_buffers) {
+			auto activeRanges = compiler.get_active_buffer_ranges(resource.id);
 
-			// Get shader stage for this push constant more accurately
-			// auto ranges = compiler.get_active_buffer_ranges(resource.id);
-			// For now, we assume the 'stage' passed to Reflect applies.
+			for (const auto& range : activeRanges)
+			{
+				KBR_CORE_INFO("  Name: {0}, Active Offset: {1}, Active Size: {2}", resource.name, range.offset, range.range);
+			}
 
-			KBR_CORE_INFO("      Name: {0}, Offset: {1}, Size: {2}", resource.name, offset, size);
+			ReflectStructMembers(compiler, resource.base_type_id, threeSpaces);
 		}
 
-		KBR_CORE_INFO("    Acceleration Structures: {0}", resources.acceleration_structures.size());
-		for (const auto& resource : resources.acceleration_structures) {
-			uint32_t set = compiler.get_decoration(resource.id, spv::DecorationDescriptorSet);
-			uint32_t binding = compiler.get_decoration(resource.id, spv::DecorationBinding);
-			KBR_CORE_INFO("      Name: {0}, Set: {1}, Binding: {2}", resource.name, set, binding);
+		KBR_CORE_INFO(" Acceleration Structures: {0}", resources.acceleration_structures.size());
+		for (const Resource& resource : resources.acceleration_structures) {
+			const uint32_t set = compiler.get_decoration(resource.id, spv::DecorationDescriptorSet);
+			const uint32_t binding = compiler.get_decoration(resource.id, spv::DecorationBinding);
+			KBR_CORE_INFO("  Name: {0}, Set: {1}, Binding: {2}", resource.name, set, binding);
 		}
+
+		return stageEntries;
 	}
 }
