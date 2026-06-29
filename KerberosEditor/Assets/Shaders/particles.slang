@@ -39,3 +39,11 @@ public struct SpawnRequest {
     public float startSize;
     public float endSize;
 }
+
+public struct ParticleFrameData {
+    public float4x4 viewProj;
+    public float3 cameraUp;
+    public float deltaTime;
+    public float3 cameraRight;
+    public float time;
+};

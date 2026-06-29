@@ -246,8 +246,11 @@ namespace Kerberos
 			shaderStages[shaderStageIndex].pSpecializationInfo = &specInfo;
 		}
 
+		const vk::PipelineCreateFlags flags = spec.UsingDescriptorBuffers ? vk::PipelineCreateFlagBits::eDescriptorBufferEXT : vk::PipelineCreateFlags();
+
 		const vk::GraphicsPipelineCreateInfo pipelineCreateInfo{
 			.pNext = &pipelineRenderingCreateInfo,
+			.flags = flags,
 			.stageCount = static_cast<uint32_t>(shaderStages.size()),
 			.pStages = shaderStages.data(),
 			.pVertexInputState = &vertexInputInfo,

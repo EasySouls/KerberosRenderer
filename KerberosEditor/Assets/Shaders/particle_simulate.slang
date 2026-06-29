@@ -1,14 +1,13 @@
 import particles;
 import common;
 
-[[vk::binding(0, 0)]] 
-ConstantBuffer<SceneData> scene;
+[vk::binding(0, 0)] RWStructuredBuffer<Particle> particlePool;
+[vk::binding(1, 0)] RWStructuredBuffer<uint> deadList;
+[vk::binding(2, 0)] RWStructuredBuffer<uint> aliveList;
+[vk::binding(3, 0)] RWStructuredBuffer<uint> counters; // [0] = deadCount, [1] = aliveCount
+[vk::binding(4, 0)] RWStructuredBuffer<DrawIndirectCommand> indirectBuffer;
 
-[[vk::binding(0, 1)]] RWStructuredBuffer<Particle> particlePool;
-[[vk::binding(1, 1)]] RWStructuredBuffer<uint> deadList;
-[[vk::binding(2, 1)]] RWStructuredBuffer<uint> aliveList;
-[[vk::binding(3, 1)]] RWStructuredBuffer<uint> counters; // [0] = deadCount, [1] = aliveCount
-[[vk::binding(4, 1)]] RWStructuredBuffer<DrawIndirectCommand> indirectBuffer;
+[vk::binding(1, 1)] ConstantBuffer<ParticleFrameData> scene;
 
 [shader("compute")]
 [numthreads(64, 1, 1)]

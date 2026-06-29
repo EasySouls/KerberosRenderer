@@ -30,6 +30,7 @@ static constexpr std::array deviceExtensions = {
 	vk::KHRSpirv14ExtensionName,
 	vk::KHRSynchronization2ExtensionName,
 	vk::KHRCreateRenderpass2ExtensionName,
+	vk::EXTDescriptorBufferExtensionName,
 
 	// TODO: These are not neccessary, implement a fallback when ray tracing is not supported
 	vk::KHRAccelerationStructureExtensionName,
@@ -1123,7 +1124,14 @@ namespace Kerberos
 		 }
 	
 		 // Create a chain of feature structures
-		 vk::StructureChain<vk::PhysicalDeviceFeatures2, vk::PhysicalDeviceVulkan11Features, vk::PhysicalDeviceVulkan12Features, vk::PhysicalDeviceVulkan13Features, vk::PhysicalDeviceExtendedDynamicStateFeaturesEXT, vk::PhysicalDeviceAccelerationStructureFeaturesKHR, vk::PhysicalDeviceRayQueryFeaturesKHR> featureChain = {
+		 vk::StructureChain<vk::PhysicalDeviceFeatures2, 
+			 vk::PhysicalDeviceVulkan11Features, 
+			 vk::PhysicalDeviceVulkan12Features, 
+			 vk::PhysicalDeviceVulkan13Features, 
+			 vk::PhysicalDeviceExtendedDynamicStateFeaturesEXT, 
+			 vk::PhysicalDeviceAccelerationStructureFeaturesKHR, 
+			 vk::PhysicalDeviceRayQueryFeaturesKHR,
+			 vk::PhysicalDeviceDescriptorBufferFeaturesEXT> featureChain = {
 			 {.features = {
 				 .independentBlend = true,
 				 .geometryShader = true, .depthClamp = true, .depthBiasClamp = true, .samplerAnisotropy = true,
@@ -1136,7 +1144,8 @@ namespace Kerberos
 			 {.shaderDemoteToHelperInvocation = true, .synchronization2 = true, .dynamicRendering = true },
 			 {.extendedDynamicState = true },
 			 {.accelerationStructure = true },
-			 {.rayQuery = true }
+			 {.rayQuery = true },
+			 {.descriptorBuffer = true, .descriptorBufferCaptureReplay = true, .descriptorBufferPushDescriptors = true }
 		 };
 	
 		 const vk::DeviceCreateInfo deviceCreateInfo{

@@ -72,7 +72,9 @@ namespace Kerberos
 
 		const vk::PipelineShaderStageCreateInfo& computeShaderStage = shaderStages[0];
 
+		const vk::PipelineCreateFlags flags = spec.UsingDescriptorBuffers ? vk::PipelineCreateFlagBits::eDescriptorBufferEXT : vk::PipelineCreateFlags();
 		const vk::ComputePipelineCreateInfo pipelineCreateInfo{
+			.flags = flags,
 			.stage = computeShaderStage,
 			.layout = spec.PipelineLayout
 		};

@@ -15,6 +15,7 @@ namespace Kerberos::VMA
 	Allocator CreateAllocator(const vk::Instance instance, const vk::PhysicalDevice physicalDevice, const vk::Device device)
 	{
 		VmaAllocatorCreateInfo allocatorCi = VmaAllocatorCreateInfo{};
+		allocatorCi.flags = VMA_ALLOCATOR_CREATE_BUFFER_DEVICE_ADDRESS_BIT;
 		allocatorCi.physicalDevice = physicalDevice;
 		allocatorCi.device = device;
 		allocatorCi.instance = instance;

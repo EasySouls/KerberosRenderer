@@ -11,11 +11,26 @@
 
 namespace
 {
-	struct GPUParticle
+	struct alignas(16) GPUParticle
 	{
-		glm::vec4 PositionAndSize;	// xyz = position, w = size
-		glm::vec4 VelocityAndAge;	// xyz = velocity, w = age
-		glm::vec4 Color;			// rgba
+		// Must stay in lockstep with particles.slang::Particle.
+		glm::vec3 Position;
+		float     Size;
+
+		glm::vec3 Velocity;
+		float     Life;
+
+		glm::vec4 Color;
+
+		glm::vec3 Acceleration;
+		float     MaxLife;
+
+		glm::vec4 StartColor;
+		glm::vec4 EndColor;
+
+		float     StartSize;
+		float     EndSize;
+		float     _Padding[2]{ 0.0f, 0.0f };
 	};
 
 	struct alignas(16) SpawnRequest
@@ -60,25 +75,12 @@ namespace Kerberos
 		, m_DeadListBuffer(sizeof(uint32_t) * MaxParticles)
 		, m_AliveListBuffer(sizeof(uint32_t) * MaxParticles)
 		, m_CountersBuffer(sizeof(Counters))
+		, m_ParticleFrameBuffers(VulkanContext::Get().GetMaxFramesInFlight())
+		, m_DescriptorBuffers(VulkanContext::Get().GetMaxFramesInFlight())
 		, m_IndirectDrawBuffers(VulkanContext::Get().GetMaxFramesInFlight())
 	{
-		for (uint32_t i = 0; i < VulkanContext::Get().GetMaxFramesInFlight(); ++i)
-		{
-			VkBufferCreateInfo bufferInfo{};
-			bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-			bufferInfo.size = sizeof(VkDrawIndirectCommand);
-			bufferInfo.usage = VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT;
-			bufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-			VmaAllocationCreateInfo allocInfo{};
-			allocInfo.usage = VMA_MEMORY_USAGE_CPU_TO_GPU;
-
-			VkBuffer buffer = nullptr;
-			if (vmaCreateBuffer(VulkanContext::Get().GetAllocator().get(), &bufferInfo, &allocInfo, &buffer, &m_IndirectDrawBuffers[i].allocation, nullptr) != VK_SUCCESS)
-				KBR_CORE_ASSERT(false, "Failed to create indirect draw buffer!");
-
-			m_IndirectDrawBuffers[i].Handle = vk::Buffer(buffer);
-			vmaMapMemory(VulkanContext::Get().GetAllocator().get(), m_IndirectDrawBuffers[i].allocation, &m_IndirectDrawBuffers[i].MappedData);
-		}
+		AllocateParticleFrameBuffers();
+		AllocateIndirectDrawBuffers();
 
 		for (uint32_t i = 0; i < VulkanContext::Get().GetMaxFramesInFlight(); ++i)
 		{
@@ -93,12 +95,12 @@ namespace Kerberos
 		};
 		std::memcpy(m_CountersBuffer.GetMappedData(), &counters, sizeof(Counters));
 
+		std::memset(m_ParticlePoolBuffer.GetMappedData(), 0, m_ParticlePoolBuffer.GetBufferSize());
+
 		std::vector<uint32_t> deadList(MaxParticles);
 		for (uint32_t i = 0; i < MaxParticles; ++i)
 			deadList[i] = i;
 		std::memcpy(m_DeadListBuffer.GetMappedData(), deadList.data(), sizeof(uint32_t) * MaxParticles);
-
-		
 	}
 
 	ParticleSystem::~ParticleSystem() 
@@ -109,24 +111,37 @@ namespace Kerberos
 		{
 			vmaUnmapMemory(allocator, m_IndirectDrawBuffers[i].allocation);
 			vmaDestroyBuffer(allocator, m_IndirectDrawBuffers[i].Handle, m_IndirectDrawBuffers[i].allocation);
+
+			vmaUnmapMemory(allocator, m_ParticleFrameBuffers[i].allocation);
+			vmaDestroyBuffer(allocator, m_ParticleFrameBuffers[i].Handle, m_ParticleFrameBuffers[i].allocation);
+
+			vmaUnmapMemory(allocator, m_DescriptorBuffers[i].allocation);
+			vmaDestroyBuffer(allocator, m_DescriptorBuffers[i].Handle, m_DescriptorBuffers[i].allocation);
 		}
 	}
 
-	void ParticleSystem::Initialize(const vk::Format colorFormat, const vk::Format depthFormat, const vk::raii::DescriptorSetLayout& sceneDescriptorLayout)
+	void ParticleSystem::Initialize(const vk::Format colorFormat, const vk::Format depthFormat)
 	{
-		SetupDescriptors(sceneDescriptorLayout);
-		SetupPipelineLayouts(sceneDescriptorLayout);
+		SetupDescriptors();
+		CreateDefaultParticleTexture();
+		AllocateDescriptorBuffers();
+		
 		SetupPipelines(colorFormat, depthFormat);
 	}
 
-	void ParticleSystem::Update(const Ref<Scene>& scene, const float dt, const vk::raii::CommandBuffer& cmd, const uint32_t frameIndex, const vk::raii::DescriptorSet& sceneDescriptorSet)
+	void ParticleSystem::Update(const Ref<Scene>& scene, const float dt, const vk::raii::CommandBuffer& cmd, const uint32_t frameIndex, const ParticleFrameData& frameData) const 
 	{
 		KBR_PROFILE_FUNCTION();
+
+		// Copy the frame data to the GPU buffer
+		std::memcpy(m_ParticleFrameBuffers[frameIndex].MappedData, &frameData, sizeof(ParticleFrameData));
 
 		const auto emitterView = scene->m_Registry.view<ParticleEmitterComponent, TransformComponent>();
 
 		std::vector<SpawnRequest> activeRequests;
 		activeRequests.reserve(emitterView.size_hint());
+
+		uint32_t totalParticlesToSpawn = 0;
 		
 		for (const auto entity : emitterView)
 		{
@@ -144,7 +159,7 @@ namespace Kerberos
 
 				SpawnRequest req{};
 
-				req.emitterPosition = transform.Translation;
+				req.emitterPosition = transform.WorldTransform[3];
 				req.spawnCount = spawnCount;
 
 				req.minLife = emitter.MinLifetime;
@@ -159,6 +174,8 @@ namespace Kerberos
 				req.endSize = emitter.EndSize;
 
 				activeRequests.push_back(req);
+
+				totalParticlesToSpawn += spawnCount;
 			}
 		}
 
@@ -169,15 +186,27 @@ namespace Kerberos
 			const size_t dataSize = sizeof(SpawnRequest) * requestCount;
 
 			std::memcpy(m_SpawnRequestBuffers[frameIndex].GetMappedData(), activeRequests.data(), dataSize);
+
+			KBR_CORE_INFO("ParticleSystem: Spawning {} particles in {} requests", totalParticlesToSpawn, requestCount);
 		}
 
 		// Emit pass
 		{
-			cmd.bindDescriptorSets(
+			const vk::DescriptorBufferBindingInfoEXT bindingInfo{
+				.address = m_DescriptorBuffers[frameIndex].DeviceAddress,
+				.usage = vk::BufferUsageFlagBits::eResourceDescriptorBufferEXT
+			};
+			cmd.bindDescriptorBuffersEXT({ bindingInfo });
+
+			constexpr uint32_t bufferIndices[2] = { 0, 0 }; // Both sets live in buffer index 0
+			const vk::DeviceSize offsets[2] = { m_ParticleBufferOffset, m_SpawnBufferOffset };
+
+			cmd.setDescriptorBufferOffsetsEXT(
 				vk::PipelineBindPoint::eCompute,
-				m_ComputePipelineLayout,
-				0,  { sceneDescriptorSet, m_ParticleBufferDescriptorSets[frameIndex], m_SpawnRequestDescriptorSets[frameIndex] },
-				{ 0 }
+				*m_ComputePipelineLayout,
+				0, // First Set
+				bufferIndices,
+				offsets
 			);
 
 			if (requestCount > 0)
@@ -237,15 +266,25 @@ namespace Kerberos
 		}
 	}
 
-	void ParticleSystem::RecordDraw(const vk::raii::CommandBuffer& cmd, const uint32_t frameIndex, const vk::raii::DescriptorSet& sceneDescriptorSet)
+	void ParticleSystem::RecordDraw(const vk::raii::CommandBuffer& cmd, const uint32_t frameIndex) const 
 	{
 		cmd.bindPipeline(vk::PipelineBindPoint::eGraphics, m_RenderPipeline->GetVulkanPipeline());
 
-		cmd.bindDescriptorSets(
+		const vk::DescriptorBufferBindingInfoEXT bindingInfo{
+				.address = m_DescriptorBuffers[frameIndex].DeviceAddress,
+				.usage = vk::BufferUsageFlagBits::eResourceDescriptorBufferEXT
+		};
+		cmd.bindDescriptorBuffersEXT({ bindingInfo });
+
+		constexpr uint32_t bufferIndices[3] = { 0, 0, 0 }; // Both sets live in buffer index 0
+		const vk::DeviceSize offsets[3] = { m_ParticleBufferOffset, m_SpawnBufferOffset, m_TextureBufferOffset };
+
+		cmd.setDescriptorBufferOffsetsEXT(
 			vk::PipelineBindPoint::eGraphics,
-			m_GraphicsPipelineLayout,
-			0, { sceneDescriptorSet, m_ParticleBufferDescriptorSets[frameIndex], m_TextureDescriptorSet },
-			{ 0 }
+			*m_GraphicsPipelineLayout,
+			0,
+			bufferIndices,
+			offsets
 		);
 
 		cmd.drawIndirect(
@@ -256,12 +295,12 @@ namespace Kerberos
 		);
 	}
 
-	void ParticleSystem::SetupDescriptors(const vk::raii::DescriptorSetLayout& sceneLayout) 
+	void ParticleSystem::SetupDescriptors() 
 	{
 		auto& context = VulkanContext::Get();
 		const auto& device = context.GetDevice();
 
-		// SET 1: Particle Buffers (5 Storage Buffers)
+		// SET 0: Particle Buffers (5 Storage Buffers)
 		const std::vector<vk::DescriptorSetLayoutBinding> particleBindings = {
 			{0, vk::DescriptorType::eStorageBuffer, 1, vk::ShaderStageFlagBits::eCompute | vk::ShaderStageFlagBits::eVertex}, // Pool
 			{1, vk::DescriptorType::eStorageBuffer, 1, vk::ShaderStageFlagBits::eCompute}, // DeadList
@@ -270,32 +309,43 @@ namespace Kerberos
 			{4, vk::DescriptorType::eStorageBuffer, 1, vk::ShaderStageFlagBits::eCompute}  // Indirect Buffer 
 		};
 		const vk::DescriptorSetLayoutCreateInfo particleLayoutInfo{
+			.flags = vk::DescriptorSetLayoutCreateFlagBits::eDescriptorBufferEXT,
 			.bindingCount = static_cast<uint32_t>(particleBindings.size()),
 			.pBindings = particleBindings.data()
 		};
 		m_ParticleBuffersLayout = vk::raii::DescriptorSetLayout(device, particleLayoutInfo);
 		context.SetObjectDebugName(m_ParticleBuffersLayout, "Particle Buffers Descriptor Set Layout");
 
-		// SET 2: Spawn Requests (Storage Buffer updated per frame by CPU)
-		constexpr vk::DescriptorSetLayoutBinding spawnReqBinding{
-			.binding = 0,
-			.descriptorType = vk::DescriptorType::eStorageBuffer,
-			.descriptorCount = 1,
-			.stageFlags = vk::ShaderStageFlagBits::eCompute
+		// SET 1: Spawn Requests and Particle Frame Data (Storage and uniform buffer updated per frame by CPU)
+		const std::vector<vk::DescriptorSetLayoutBinding> spawnReqBinding{
+			{
+				.binding = 0,
+				.descriptorType = vk::DescriptorType::eStorageBuffer, // Spawn requests
+				.descriptorCount = 1,
+				.stageFlags = vk::ShaderStageFlagBits::eCompute
+			},
+			{
+				.binding = 1,
+				.descriptorType = vk::DescriptorType::eUniformBuffer, // Particle frame data
+				.descriptorCount = 1,
+				.stageFlags = vk::ShaderStageFlagBits::eCompute | vk::ShaderStageFlagBits::eVertex
+			}
 		};
 		const vk::DescriptorSetLayoutCreateInfo spawnReqLayoutInfo{
-			.bindingCount = 1,
-			.pBindings = &spawnReqBinding
+			.flags = vk::DescriptorSetLayoutCreateFlagBits::eDescriptorBufferEXT,
+			.bindingCount = static_cast<uint32_t>(spawnReqBinding.size()),
+			.pBindings = spawnReqBinding.data()
 		};
 		m_SpawnRequestsLayout = vk::raii::DescriptorSetLayout(device, spawnReqLayoutInfo);
 		context.SetObjectDebugName(m_SpawnRequestsLayout, "Particle Spawn Requests Descriptor Set Layout");
 
-		// SET 3: Texture and Sampler
+		// SET 2: Texture and Sampler
 		const std::vector<vk::DescriptorSetLayoutBinding> textureBindings = {
-			{0, vk::DescriptorType::eSampledImage, 1, vk::ShaderStageFlagBits::eFragment},
-			{1, vk::DescriptorType::eSampler,      1, vk::ShaderStageFlagBits::eFragment}
+			{ .binding = 0, . descriptorType = vk::DescriptorType::eSampledImage, .descriptorCount =  1, . stageFlags = vk::ShaderStageFlagBits::eFragment },
+			{ .binding = 1, . descriptorType = vk::DescriptorType::eSampler,      .descriptorCount = 1, . stageFlags = vk::ShaderStageFlagBits::eFragment }
 		};
 		const vk::DescriptorSetLayoutCreateInfo texLayoutInfo{
+			.flags = vk::DescriptorSetLayoutCreateFlagBits::eDescriptorBufferEXT,
 			.bindingCount = static_cast<uint32_t>(textureBindings.size()),
 			.pBindings = textureBindings.data()
 		};
@@ -303,8 +353,8 @@ namespace Kerberos
 		context.SetObjectDebugName(m_TextureLayout, "Particle Texture Descriptor Set Layout");
 
 		// Compute needs Sets 0, 1, and 2. Plus a push constant for requestCount.
-		const std::array<vk::DescriptorSetLayout, 3> computeLayouts = {
-			*sceneLayout, *m_ParticleBuffersLayout, *m_SpawnRequestsLayout
+		const std::array<vk::DescriptorSetLayout, 2> computeLayouts = {
+			*m_ParticleBuffersLayout, *m_SpawnRequestsLayout
 		};
 		constexpr vk::PushConstantRange computePushConstant{
 			.stageFlags = vk::ShaderStageFlagBits::eCompute,
@@ -322,7 +372,7 @@ namespace Kerberos
 
 		// Graphics needs Sets 0, 1, and 3.
 		const std::array<vk::DescriptorSetLayout, 3> graphicsLayouts = {
-			*sceneLayout,* m_ParticleBuffersLayout,* m_TextureLayout
+			*m_ParticleBuffersLayout, *m_SpawnRequestsLayout, *m_TextureLayout
 		};
 		const vk::PipelineLayoutCreateInfo graphicsPipelineLayoutInfo{
 			.setLayoutCount = graphicsLayouts.size(),
@@ -332,53 +382,6 @@ namespace Kerberos
 		};
 		m_GraphicsPipelineLayout = vk::raii::PipelineLayout(device, graphicsPipelineLayoutInfo);
 		context.SetObjectDebugName(m_GraphicsPipelineLayout, "Particle Graphics Pipeline Layout");
-
-		const uint32_t maxFramesInFlight = VulkanContext::Get().GetMaxFramesInFlight();
-
-		const std::vector<vk::DescriptorPoolSize> poolSizes = {
-			{vk::DescriptorType::eUniformBuffer, maxFramesInFlight},
-			{vk::DescriptorType::eStorageBuffer, maxFramesInFlight * 7}, // 5 for particles, 1 for spawn per frame
-			{vk::DescriptorType::eSampledImage, 1},
-			{vk::DescriptorType::eSampler, 1}
-		};
-
-		const vk::DescriptorPoolCreateInfo descriptorPoolInfo{
-			.flags = vk::DescriptorPoolCreateFlagBits::eFreeDescriptorSet,
-			.maxSets = (maxFramesInFlight * 3) + 1, // Sets 0, 1, 2 per frame + 1 Set 3 global
-			.poolSizeCount = static_cast<uint32_t>(poolSizes.size()),
-			.pPoolSizes = poolSizes.data()
-		};
-		m_DescriptorPool = vk::raii::DescriptorPool(device, descriptorPoolInfo);
-		context.SetObjectDebugName(m_DescriptorPool, "Particle Descriptor Pool");
-
-		// Setup arrays of layouts for allocation
-		std::vector<vk::DescriptorSetLayout> particleLayouts(maxFramesInFlight, *m_ParticleBuffersLayout);
-		std::vector<vk::DescriptorSetLayout> spawnLayouts(maxFramesInFlight, *m_SpawnRequestsLayout);
-
-		// Allocate Sets
-		vk::DescriptorSetAllocateInfo allocInfo;
-		allocInfo.descriptorPool = *m_DescriptorPool;
-
-		allocInfo.descriptorSetCount = maxFramesInFlight;
-
-		allocInfo.pSetLayouts = particleLayouts.data();
-		m_ParticleBufferDescriptorSets = vk::raii::DescriptorSets(device, allocInfo);
-		for (uint32_t i = 0; i < m_ParticleBufferDescriptorSets.size(); ++i)
-		{
-			context.SetObjectDebugName(m_ParticleBufferDescriptorSets[i], "Particle Buffer Descriptor Set[" + std::to_string(i) + "]");
-		}
-
-		allocInfo.pSetLayouts = spawnLayouts.data();
-		m_SpawnRequestDescriptorSets = vk::raii::DescriptorSets(device, allocInfo);
-		for (uint32_t i = 0; i < m_SpawnRequestDescriptorSets.size(); ++i)
-		{
-			context.SetObjectDebugName(m_SpawnRequestDescriptorSets[i], "Particle Spawn Request Descriptor Set[" + std::to_string(i) + "]");
-		}
-
-		allocInfo.descriptorSetCount = 1;
-		allocInfo.pSetLayouts = &(*m_TextureLayout);
-		m_TextureDescriptorSet = std::move(vk::raii::DescriptorSets(device, allocInfo)[0]);
-		context.SetObjectDebugName(m_TextureDescriptorSet, "Particle Texture Descriptor Set");
 
 		// Create sampler for particle texture
 		vk::SamplerCreateInfo samplerInfo{
@@ -399,102 +402,6 @@ namespace Kerberos
 			.unnormalizedCoordinates = vk::False
 		};
 		m_ParticleSampler = vk::raii::Sampler(device, samplerInfo);
-
-
-		std::vector<vk::WriteDescriptorSet> descriptorWrites;
-
-		for (uint32_t i = 0; i < maxFramesInFlight; i++)
-		{
-
-			// Spawn Requests
-			vk::DescriptorBufferInfo spawnReqInfo{ *m_SpawnRequestBuffers[i].GetBuffer(), 0, VK_WHOLE_SIZE};
-			descriptorWrites.push_back({
-				.dstSet = *m_SpawnRequestDescriptorSets[i], .dstBinding = 0, .dstArrayElement = 0, .descriptorCount = 1, .descriptorType = vk::DescriptorType::eStorageBuffer, .pImageInfo = nullptr, .pBufferInfo = &spawnReqInfo, .pTexelBufferView = nullptr
-									   });
-
-			// 3. Particle Buffers (Shared buffers, but we bind them to the per-frame descriptor sets)
-			// Assuming global buffers: particlePoolBuffer, deadListBuffer, etc.
-			vk::DescriptorBufferInfo poolInfo{ *m_ParticlePoolBuffer.GetBuffer(), 0, VK_WHOLE_SIZE };
-			descriptorWrites.push_back({ .dstSet = *m_ParticleBufferDescriptorSets[i], .dstBinding = 0, .dstArrayElement = 0, .descriptorCount = 1, .descriptorType = vk::DescriptorType::eStorageBuffer, .pImageInfo = nullptr, .pBufferInfo = &poolInfo, .pTexelBufferView = nullptr });
-
-			vk::DescriptorBufferInfo deadInfo{ *m_DeadListBuffer.GetBuffer(), 0, VK_WHOLE_SIZE };
-			descriptorWrites.push_back({ .dstSet = *m_ParticleBufferDescriptorSets[i], .dstBinding = 1, .dstArrayElement = 0, .descriptorCount = 1, .descriptorType = vk::DescriptorType::eStorageBuffer, .pImageInfo = nullptr, .pBufferInfo = &deadInfo, .pTexelBufferView = nullptr });
-
-			vk::DescriptorBufferInfo aliveInfo{ *m_AliveListBuffer.GetBuffer(), 0, VK_WHOLE_SIZE };
-			descriptorWrites.push_back({ .dstSet = *m_ParticleBufferDescriptorSets[i], .dstBinding = 2, .dstArrayElement = 0, .descriptorCount = 1, .descriptorType = vk::DescriptorType::eStorageBuffer, .pImageInfo = nullptr, .pBufferInfo = &aliveInfo, .pTexelBufferView = nullptr });
-
-			vk::DescriptorBufferInfo counterInfo{ *m_CountersBuffer.GetBuffer(), 0, VK_WHOLE_SIZE };
-			descriptorWrites.push_back({ .dstSet = *m_ParticleBufferDescriptorSets[i], .dstBinding = 3, .dstArrayElement = 0, .descriptorCount = 1, .descriptorType = vk::DescriptorType::eStorageBuffer, .pImageInfo = nullptr, .pBufferInfo = &counterInfo, .pTexelBufferView = nullptr });
-
-			vk::DescriptorBufferInfo indirectInfo{ m_IndirectDrawBuffers[i].Handle, 0, VK_WHOLE_SIZE};
-			descriptorWrites.push_back({ .dstSet = *m_ParticleBufferDescriptorSets[i], .dstBinding = 4, .dstArrayElement = 0, .descriptorCount = 1, .descriptorType = vk::DescriptorType::eStorageBuffer, .pImageInfo = nullptr, .pBufferInfo = &indirectInfo, .pTexelBufferView = nullptr });
-		}
-
-		/*vk::DescriptorImageInfo imageInfo{
-			nullptr,
-			*particleImageView,
-			vk::ImageLayout::eShaderReadOnlyOptimal
-		};
-		descriptorWrites.push_back({
-			*textureSet, 0, 0, 1, vk::DescriptorType::eSampledImage, &imageInfo, nullptr, nullptr
-								   });*/
-
-		vk::DescriptorImageInfo samplerDescriptorInfo{
-			.sampler = *m_ParticleSampler,
-			.imageView = nullptr,
-			.imageLayout = vk::ImageLayout::eUndefined
-		};
-
-		descriptorWrites.push_back(vk::WriteDescriptorSet{
-					.dstSet = m_TextureDescriptorSet,
-					.dstBinding = 1,
-					.dstArrayElement = 0,
-					.descriptorCount = 1,
-					.descriptorType = vk::DescriptorType::eSampler,
-					.pImageInfo = &samplerDescriptorInfo
-		});
-
-		device.updateDescriptorSets(descriptorWrites, nullptr);
-	}
-
-	void ParticleSystem::SetupPipelineLayouts(const vk::raii::DescriptorSetLayout& sceneLayout)
-	{
-		auto& context = VulkanContext::Get();
-		const auto& device = context.GetDevice();
-
-		// Compute pipeline layout
-		{
-			const std::array setLayouts = {
-				*sceneLayout, *m_ParticleBuffersLayout, *m_SpawnRequestsLayout
-			};
-			constexpr vk::PushConstantRange pushConstantRange{
-				.stageFlags = vk::ShaderStageFlagBits::eCompute,
-				.offset = 0,
-				.size = sizeof(uint32_t)
-			};
-
-			const vk::PipelineLayoutCreateInfo computePipelineLayoutInfo{
-				.setLayoutCount = static_cast<uint32_t>(setLayouts.size()),
-				.pSetLayouts = setLayouts.data(),
-				.pushConstantRangeCount = 1,
-				.pPushConstantRanges = &pushConstantRange
-			};
-			m_ComputePipelineLayout = vk::raii::PipelineLayout{ device, computePipelineLayoutInfo };
-			context.SetObjectDebugName(m_ComputePipelineLayout, "Particle Compute Pipeline Layout");
-		}
-		
-		// Graphics pipeline layout
-		{
-			const std::array setLayouts = {
-				*sceneLayout, *m_ParticleBuffersLayout, *m_TextureLayout
-			};
-			const vk::PipelineLayoutCreateInfo graphicsPipelineLayoutInfo{
-				.setLayoutCount = static_cast<uint32_t>(setLayouts.size()),
-				.pSetLayouts = setLayouts.data()
-			};
-			m_GraphicsPipelineLayout = vk::raii::PipelineLayout{ device, graphicsPipelineLayoutInfo };
-			context.SetObjectDebugName(m_GraphicsPipelineLayout, "Particle Graphics Pipeline Layout");
-		}
 	}
 
 	void ParticleSystem::SetupPipelines(vk::Format colorFormat, vk::Format depthFormat)
@@ -503,6 +410,7 @@ namespace Kerberos
 		spawnPipelineSpec.Name = "Particle Spawn Pipeline";
 		spawnPipelineSpec.Shader = CreateRef<Shader>("particle_emit", "Particle Emit");
 		spawnPipelineSpec.PipelineLayout = m_ComputePipelineLayout;
+		spawnPipelineSpec.UsingDescriptorBuffers = true;
 
 		m_SpawnPipeline = CreateRef<ComputePipeline>(spawnPipelineSpec);
 
@@ -510,6 +418,7 @@ namespace Kerberos
 		prepareSimulatePipelineSpec.Name = "Particle Prepare Simulate Pipeline";
 		prepareSimulatePipelineSpec.Shader = CreateRef<Shader>("particle_prepare_simulation", "Particle Prepare Simulation");
 		prepareSimulatePipelineSpec.PipelineLayout = m_ComputePipelineLayout;
+		prepareSimulatePipelineSpec.UsingDescriptorBuffers = true;
 
 		m_PrepareSimulatePipeline = CreateRef<ComputePipeline>(prepareSimulatePipelineSpec);
 
@@ -517,6 +426,7 @@ namespace Kerberos
 		updatePipelineSpec.Name = "Particle Update Pipeline";
 		updatePipelineSpec.Shader = CreateRef<Shader>("particle_simulate", "Particle Simulate");
 		updatePipelineSpec.PipelineLayout = m_ComputePipelineLayout;
+		updatePipelineSpec.UsingDescriptorBuffers = true;
 
 		m_UpdatePipeline = CreateRef<ComputePipeline>(updatePipelineSpec);
 
@@ -535,13 +445,196 @@ namespace Kerberos
 		renderPipelineSpec.CullMode = CullMode::None;
 		renderPipelineSpec.EnableDepthClamp = false;
 		renderPipelineSpec.EnableDepthBias = false;
-		renderPipelineSpec.EnableDepthTest = true;
+		renderPipelineSpec.EnableDepthTest = false;
 		renderPipelineSpec.EnableDepthWrite = false;
+		renderPipelineSpec.FrontFace = FrontFace::CounterClockwise;
 		renderPipelineSpec.BlendModes = { BlendMode::Additive };
 		renderPipelineSpec.ColorAttachmentFormats = { colorFormat };
 		renderPipelineSpec.DepthAttachmentFormat = depthFormat;
 		renderPipelineSpec.DynamicStates = dynamicStates;
+		renderPipelineSpec.UsingDescriptorBuffers = true;
 
 		m_RenderPipeline = CreateRef<GraphicsPipeline>(renderPipelineSpec);
+	}
+
+	void ParticleSystem::AllocateParticleFrameBuffers() 
+	{
+		for (uint32_t i = 0; i < VulkanContext::Get().GetMaxFramesInFlight(); ++i)
+		{
+			VkBufferCreateInfo bufferInfo{};
+			bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+			bufferInfo.size = sizeof(ParticleFrameData);
+			bufferInfo.usage = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT;
+			bufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+			VmaAllocationCreateInfo allocInfo{};
+			allocInfo.usage = VMA_MEMORY_USAGE_CPU_TO_GPU;
+
+			VkBuffer buffer = nullptr;
+			if (vmaCreateBuffer(VulkanContext::Get().GetAllocator().get(), &bufferInfo, &allocInfo, &buffer, &m_ParticleFrameBuffers[i].allocation, nullptr) != VK_SUCCESS)
+				KBR_CORE_ASSERT(false, "Failed to create indirect draw buffer!");
+
+			m_ParticleFrameBuffers[i].Handle = vk::Buffer(buffer);
+			vmaMapMemory(VulkanContext::Get().GetAllocator().get(), m_ParticleFrameBuffers[i].allocation, &m_ParticleFrameBuffers[i].MappedData);
+		}
+	}
+
+	void ParticleSystem::AllocateDescriptorBuffers()
+	{
+		KBR_CORE_ASSERT(*m_ParticleBuffersLayout != nullptr && *m_SpawnRequestsLayout != nullptr, "Descriptor Set Layouts must be created before allocating descriptor buffers!");
+
+		auto& context = VulkanContext::Get();
+		const auto& device = context.GetDevice();
+		const auto& physicalDevice = context.GetPhysicalDevice();
+
+		const vk::DeviceSize particleLayoutSize = m_ParticleBuffersLayout.getSizeEXT();
+		const vk::DeviceSize spawnLayoutSize = m_SpawnRequestsLayout.getSizeEXT();
+		const vk::DeviceSize textureLayoutSize = m_TextureLayout.getSizeEXT();
+
+		auto alignOffset = [](const vk::DeviceSize offset, const vk::DeviceSize alignment)
+		{
+			return (offset + alignment - 1) & ~(alignment - 1);
+		};
+
+		const auto result = physicalDevice.getProperties2<vk::PhysicalDeviceProperties2, vk::PhysicalDeviceDescriptorBufferPropertiesEXT>();
+		vk::PhysicalDeviceDescriptorBufferPropertiesEXT descBufferProps = result.get<vk::PhysicalDeviceDescriptorBufferPropertiesEXT>();
+
+		const vk::DeviceSize alignment = descBufferProps.descriptorBufferOffsetAlignment;
+
+		m_ParticleBufferOffset = 0;
+		m_SpawnBufferOffset = alignOffset(m_ParticleBufferOffset + particleLayoutSize, alignment);
+		m_TextureBufferOffset = alignOffset(m_SpawnBufferOffset + spawnLayoutSize, alignment);
+
+		const vk::DeviceSize totalBufferSize = alignOffset(m_TextureBufferOffset + textureLayoutSize, alignment);
+
+		for (uint32_t i = 0; i < context.GetMaxFramesInFlight(); ++i)
+		{
+			VkBufferCreateInfo bufferInfo{};
+			bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+			bufferInfo.size = totalBufferSize;
+			bufferInfo.usage = VK_BUFFER_USAGE_RESOURCE_DESCRIPTOR_BUFFER_BIT_EXT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT;
+			bufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+			VmaAllocationCreateInfo allocInfo{};
+			allocInfo.usage = VMA_MEMORY_USAGE_CPU_TO_GPU;
+
+			VkBuffer buffer = nullptr;
+			if (vmaCreateBuffer(VulkanContext::Get().GetAllocator().get(), &bufferInfo, &allocInfo, &buffer, &m_DescriptorBuffers[i].allocation, nullptr) != VK_SUCCESS)
+				KBR_CORE_ASSERT(false, "Failed to create indirect draw buffer!");
+
+			m_DescriptorBuffers[i].Handle = vk::Buffer(buffer);
+			vmaMapMemory(VulkanContext::Get().GetAllocator().get(), m_DescriptorBuffers[i].allocation, &m_DescriptorBuffers[i].MappedData);
+
+			vk::BufferDeviceAddressInfo addressInfo{ .buffer = m_DescriptorBuffers[i].Handle };
+			m_DescriptorBuffers[i].DeviceAddress = device.getBufferAddress(addressInfo);
+
+			char* mappedPtr = static_cast<char*>(m_DescriptorBuffers[i].MappedData);
+
+			auto writeStorageBuffer = [&](const vk::raii::DescriptorSetLayout& layout, const uint32_t binding,
+			                              const vk::DeviceSize setOffset, const vk::Buffer bufferHandle, const vk::DeviceSize bufferSize)
+			{
+				const vk::DeviceSize bindingOffset = layout.getBindingOffsetEXT(binding);
+
+				const vk::DescriptorAddressInfoEXT addrInfo{
+					.address = device.getBufferAddress({.buffer = bufferHandle }),
+					.range = bufferSize,
+					.format = vk::Format::eUndefined
+				};
+				const vk::DescriptorGetInfoEXT getInfo{
+					.type = vk::DescriptorType::eStorageBuffer,
+					.data = vk::DescriptorDataEXT(&addrInfo)
+				};
+				device.getDescriptorEXT(getInfo, descBufferProps.storageBufferDescriptorSize, mappedPtr + setOffset + bindingOffset);
+			};
+
+			writeStorageBuffer(m_ParticleBuffersLayout, 0, m_ParticleBufferOffset, m_ParticlePoolBuffer.GetBuffer(), m_ParticlePoolBuffer.GetBufferSize());
+			writeStorageBuffer(m_ParticleBuffersLayout, 1, m_ParticleBufferOffset, m_DeadListBuffer.GetBuffer(), m_DeadListBuffer.GetBufferSize());
+			writeStorageBuffer(m_ParticleBuffersLayout, 2, m_ParticleBufferOffset, m_AliveListBuffer.GetBuffer(), m_AliveListBuffer.GetBufferSize());
+			writeStorageBuffer(m_ParticleBuffersLayout, 3, m_ParticleBufferOffset, m_CountersBuffer.GetBuffer(), m_CountersBuffer.GetBufferSize());
+			writeStorageBuffer(m_ParticleBuffersLayout, 4, m_ParticleBufferOffset, m_IndirectDrawBuffers[i].Handle, sizeof(VkDrawIndirectCommand));
+
+			writeStorageBuffer(m_SpawnRequestsLayout, 0, m_SpawnBufferOffset, m_SpawnRequestBuffers[i].GetBuffer(), m_SpawnRequestBuffers[i].GetBufferSize());
+
+			const vk::DeviceSize frameBindingOffset = m_SpawnRequestsLayout.getBindingOffsetEXT(1);
+
+			const vk::DescriptorAddressInfoEXT frameAddrInfo{
+				.address = device.getBufferAddress({.buffer = m_ParticleFrameBuffers[i].Handle }),
+				.range = sizeof(ParticleFrameData),
+				.format = vk::Format::eUndefined
+			};
+			const vk::DescriptorGetInfoEXT frameGetInfo{
+				.type = vk::DescriptorType::eUniformBuffer,
+				.data = vk::DescriptorDataEXT(&frameAddrInfo)
+			};
+			device.getDescriptorEXT(frameGetInfo, descBufferProps.uniformBufferDescriptorSize, mappedPtr + m_SpawnBufferOffset + frameBindingOffset);
+
+			const vk::DeviceSize textureBindingOffset = m_TextureLayout.getBindingOffsetEXT(0);
+
+			const vk::ImageView particleView = m_DefaultParticleTexture->GetImageView();
+
+			vk::DescriptorImageInfo imageInfo{
+				.sampler = nullptr,
+				.imageView = particleView,
+				.imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal
+			};
+			vk::DescriptorGetInfoEXT imageGetInfo{
+				.type = vk::DescriptorType::eSampledImage,
+				.data = vk::DescriptorDataEXT(&imageInfo)
+			};
+			device.getDescriptorEXT(imageGetInfo, descBufferProps.sampledImageDescriptorSize, mappedPtr + m_TextureBufferOffset + textureBindingOffset);
+
+			const vk::DeviceSize samplerBindingOffset = m_TextureLayout.getBindingOffsetEXT(1);
+
+			vk::DescriptorImageInfo samplerInfo{
+				.sampler = *m_ParticleSampler,
+				.imageView = nullptr,
+				.imageLayout = vk::ImageLayout::eUndefined
+			};
+			vk::DescriptorGetInfoEXT samplerGetInfo{
+				.type = vk::DescriptorType::eSampler,
+				.data = vk::DescriptorDataEXT(&samplerInfo)
+			};
+			device.getDescriptorEXT(samplerGetInfo, descBufferProps.samplerDescriptorSize, mappedPtr + m_TextureBufferOffset + samplerBindingOffset);
+		}
+	}
+
+	void ParticleSystem::CreateDefaultParticleTexture() 
+	{
+		constexpr std::array<uint8_t, 4> buffer = { 255, 255, 255, 255 };
+		TextureSpecification spec{};
+		spec.Width = 1;
+		spec.Height = 1;
+		spec.Format = ImageFormat::RGBA8;
+		const Buffer bufferStruct{ sizeof(uint8_t) * buffer.size() };
+		std::memcpy(bufferStruct.Data, buffer.data(), bufferStruct.Size);
+		m_DefaultParticleTexture = Texture2D::FromBuffer(spec, bufferStruct);
+	}
+
+	void ParticleSystem::AllocateIndirectDrawBuffers() 
+	{
+		for (uint32_t i = 0; i < VulkanContext::Get().GetMaxFramesInFlight(); ++i)
+		{
+			VkBufferCreateInfo bufferInfo{};
+			bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+			bufferInfo.size = sizeof(VkDrawIndirectCommand);
+			bufferInfo.usage = VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT 
+				| VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT;
+			bufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+			VmaAllocationCreateInfo allocInfo{};
+			allocInfo.usage = VMA_MEMORY_USAGE_CPU_TO_GPU;
+
+			VkBuffer buffer = nullptr;
+			if (vmaCreateBuffer(VulkanContext::Get().GetAllocator().get(), &bufferInfo, &allocInfo, &buffer, &m_IndirectDrawBuffers[i].allocation, nullptr) != VK_SUCCESS)
+				KBR_CORE_ASSERT(false, "Failed to create indirect draw buffer!");
+
+			m_IndirectDrawBuffers[i].Handle = vk::Buffer(buffer);
+			vmaMapMemory(VulkanContext::Get().GetAllocator().get(), m_IndirectDrawBuffers[i].allocation, &m_IndirectDrawBuffers[i].MappedData);
+
+			const VkDrawIndirectCommand drawCommand{
+				.vertexCount = 6,
+				.instanceCount = 0,
+				.firstVertex = 0,
+				.firstInstance = 0
+			};
+			std::memcpy(m_IndirectDrawBuffers[i].MappedData, &drawCommand, sizeof(drawCommand));
+		}
 	}
 }

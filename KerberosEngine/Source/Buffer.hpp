@@ -66,11 +66,13 @@ namespace Kerberos
 
 		const vk::raii::Buffer& GetBuffer() const { return m_Buffer; }
 		const vk::raii::DeviceMemory& GetBufferMemory() const { return m_BufferMemory; }
+		vk::DeviceSize GetBufferSize() const { return m_BufferSize; }
 		void* GetMappedData() const { return m_MappedData; }
 
 	private:
 		vk::raii::Buffer m_Buffer = nullptr;
 		vk::raii::DeviceMemory m_BufferMemory = nullptr;
+		vk::DeviceSize m_BufferSize = 0;
 		void* m_MappedData = nullptr;
 	};
 }

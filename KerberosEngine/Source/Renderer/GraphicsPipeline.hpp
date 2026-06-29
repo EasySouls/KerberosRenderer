@@ -77,6 +77,8 @@ namespace Kerberos
 
 		std::vector<vk::DynamicState> DynamicStates;
 
+		bool UsingDescriptorBuffers = false;
+
 		std::unordered_map<vk::ShaderStageFlagBits, vk::SpecializationInfo> SpecializationMapEntries;
 	};
 

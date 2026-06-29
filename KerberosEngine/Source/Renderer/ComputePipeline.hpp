@@ -14,6 +14,7 @@ namespace Kerberos
 		std::string Name;
 		Ref<Shader> Shader;
 		vk::PipelineLayout PipelineLayout;
+		bool UsingDescriptorBuffers = false;
 
 		std::unordered_map<vk::ShaderStageFlagBits, vk::SpecializationInfo> SpecializationMapEntries;
 	};

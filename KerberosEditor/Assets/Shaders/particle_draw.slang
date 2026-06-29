@@ -1,14 +1,12 @@
 import particles;
-import common;
 
-[[vk::binding(0, 0)]]
-ConstantBuffer<SceneData> scene;
+[vk::binding(0, 0)] StructuredBuffer<Particle> particlePool;
+[vk::binding(2, 0)] StructuredBuffer<uint> aliveList;
 
-[vk::binding(0, 1)] StructuredBuffer<Particle> particlePool;
-[vk::binding(2, 1)] StructuredBuffer<uint> aliveList;
+[vk::binding(1, 1)] ConstantBuffer<ParticleFrameData> scene;
 
-[vk::binding(0, 3)] SamplerState particleSampler;
-[vk::binding(1, 3)] Texture2D particleTexture;
+[vk::binding(0, 2)] Texture2D particleTexture;
+[vk::binding(1, 2)] SamplerState particleSampler;
 
 struct VertexOutput {
     float4 position : SV_Position;
@@ -26,7 +24,7 @@ static const float2 QUAD_UVS[6] = {
 };
 
 [shader("vertex")]
-VertexOutput vertexMain(uint vertexID: SV_VertexID, uint instanceID: SV_InstanceID) {
+VertexOutput vertexMain(uint vertexID: SV_VulkanVertexID, uint instanceID: SV_VulkanInstanceID) {
     VertexOutput output;
 
     uint poolIndex = aliveList[instanceID];
@@ -37,7 +35,7 @@ VertexOutput vertexMain(uint vertexID: SV_VertexID, uint instanceID: SV_Instance
                     + (scene.cameraRight * quadPos.x) 
                     + (scene.cameraUp * quadPos.y);
 
-    output.position = mul(scene.projection, mul(scene.view, float4(worldPos, 1.0)));
+    output.position = mul(scene.viewProj, float4(worldPos, 1.0));
     output.color = p.color;
     output.uv = QUAD_UVS[vertexID];
 

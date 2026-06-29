@@ -136,11 +136,13 @@ StorageBuffer::StorageBuffer(const vk::DeviceSize bufferSize)
 
 	CreateBuffer(device,
 				 bufferSize,
-				 vk::BufferUsageFlagBits::eStorageBuffer,
+				 vk::BufferUsageFlagBits::eStorageBuffer | vk::BufferUsageFlagBits::eShaderDeviceAddress,
 				 vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent,
 				 m_Buffer, m_BufferMemory);
 
 	m_MappedData = m_BufferMemory.mapMemory(0, bufferSize);
+
+	m_BufferSize = bufferSize;
 }
 
 }

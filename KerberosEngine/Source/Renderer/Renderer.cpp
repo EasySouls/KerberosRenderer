@@ -301,6 +301,8 @@ namespace
 		glm::mat4 View{ 1.0f };
 		glm::mat4 Projection{ 1.0f };
 		glm::vec3 CameraPosition{ 0.0f };
+		glm::vec3 CameraUp{ 0.0f, 1.0f, 0.0f };
+		glm::vec3 CameraRight{ 1.0f, 0.0f, 0.0f };
 		std::function<std::pair<std::vector<glm::mat4>, glm::vec4>(const glm::vec3&, const std::function<glm::vec4(float)>&)> CalculateLightSpaceMatricesFunc;
 		float DeltaTime = 0.0f;
 		bool IsValid = false;
@@ -571,6 +573,8 @@ namespace Kerberos
 		s_Data->PendingRender.View = view;
 		s_Data->PendingRender.Projection = projection;
 		s_Data->PendingRender.CameraPosition = camPos;
+		s_Data->PendingRender.CameraRight = glm::vec4(view[0][0], view[1][0], view[2][0], 0.0f);
+		s_Data->PendingRender.CameraUp = glm::vec4(view[0][1], view[1][1], view[2][1], 0.0f);
 		s_Data->PendingRender.CalculateLightSpaceMatricesFunc = calculateLightSpaceMatricesFunc;
 		s_Data->PendingRender.DeltaTime = dt;
 		s_Data->PendingRender.IsValid = scene != nullptr;
@@ -673,7 +677,17 @@ namespace Kerberos
 			lightCount, 
 			s_Data->PendingRender.DeltaTime);
 
-		s_Data->ParticleSystem.Update(s_Data->PendingRender.Scene, s_Data->PendingRender.DeltaTime, cmd, frameIndex, s_Data->DescriptorSets[frameIndex].scene);
+		static float time = 0.0f;
+		time += s_Data->PendingRender.DeltaTime;
+
+		const ParticleFrameData particleFrameData{
+			.ViewProj = s_Data->PendingRender.View * s_Data->PendingRender.Projection,
+			.CameraUp = s_Data->PendingRender.CameraUp,
+			.DeltaTime = s_Data->PendingRender.DeltaTime,
+			.CameraRight = s_Data->PendingRender.CameraRight,
+			.Time = time
+		};
+		s_Data->ParticleSystem.Update(s_Data->PendingRender.Scene, s_Data->PendingRender.DeltaTime, cmd, frameIndex, particleFrameData);
 
 		const Ref<Scene>& scene = s_Data->PendingRender.Scene;
 
@@ -2742,7 +2756,7 @@ namespace Kerberos
 			s_Data->SkyboxPipeline = CreateRef<GraphicsPipeline>(skyboxPipelineSpec);
 		}
 
-		s_Data->ParticleSystem.Initialize(s_Data->ColorImage.Format, s_Data->DepthImage.Format, s_Data->DescriptorSetLayouts.scene);
+		s_Data->ParticleSystem.Initialize(s_Data->ColorImage.Format, s_Data->DepthImage.Format);
 
 		// Create transparent pipeline resources
 		{
@@ -4168,15 +4182,12 @@ namespace Kerberos
 	void Renderer::ResetQueryPools(const vk::raii::CommandBuffer& cmd, const uint32_t frameIndex)
 	{
 		if (s_Data->SupportsGPUTimestamps)
-	{
-		if (!s_Data->SupportsGPUTimestamps)
-			return;
+		{
+			KBR_CORE_ASSERT(frameIndex < s_Data->GPUTimestampQueryPools.size(), "Current frame index exceeds GPU Timestamp Query Pools size!");
+			KBR_CORE_ASSERT(s_Data->GPUTimestampQueryPools[frameIndex] != nullptr, "GPU Timestamp Query Pool for current frame is null!");
 
-		KBR_CORE_ASSERT(frameIndex < s_Data->GPUTimestampQueryPools.size(), "Current frame index exceeds GPU Timestamp Query Pools size!");
-		KBR_CORE_ASSERT(s_Data->GPUTimestampQueryPools[frameIndex] != nullptr, "GPU Timestamp Query Pool for current frame is null!");
-
-		cmd.resetQueryPool(s_Data->GPUTimestampQueryPools[frameIndex], 0, static_cast<uint32_t>(GPUTimestampQuery::Count));
-	}
+			cmd.resetQueryPool(s_Data->GPUTimestampQueryPools[frameIndex], 0, static_cast<uint32_t>(GPUTimestampQuery::Count));
+		}
 		if (s_Data->SupportsPipelineStatistics)
 		{
 			KBR_CORE_ASSERT(frameIndex < s_Data->PipelineStatisticsQueryPools.size(), "Current frame index exceeds Pipeline Statistics Query Pools size!");
@@ -4254,7 +4265,6 @@ namespace Kerberos
 		s_Data->SceneUniformData.lightCount = lightCount;
 		s_Data->SceneUniformData.viewportSize = s_Data->OutputSize;
 
-		// TODO: Insert real values
 		s_Data->SceneUniformData.cameraRight = glm::vec4(view[0][0], view[1][0], view[2][0], 0.0f);
 		s_Data->SceneUniformData.cameraUp = glm::vec4(view[0][1], view[1][1], view[2][1], 0.0f);
 		s_Data->SceneUniformData.deltaTime = deltaTime;
@@ -4498,7 +4508,7 @@ namespace Kerberos
 		cmd.setViewport(0, viewport);
 		cmd.setScissor(0, renderArea);
 
-		s_Data->ParticleSystem.RecordDraw(cmd, frameIndex, s_Data->DescriptorSets[frameIndex].scene);
+		s_Data->ParticleSystem.RecordDraw(cmd, frameIndex);
 
 		cmd.endRendering();
 		EndRenderPassDebugLabel(cmd);
