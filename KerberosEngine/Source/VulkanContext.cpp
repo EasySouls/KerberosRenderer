@@ -1127,7 +1127,7 @@ namespace Kerberos
 			 {.features = {
 				 .independentBlend = true,
 				 .geometryShader = true, .depthClamp = true, .depthBiasClamp = true, .samplerAnisotropy = true,
-				 .shaderInt64 = true
+				 .pipelineStatisticsQuery = true, .shaderInt64 = true,
 				},
 			 },
 			 {.shaderDrawParameters = true },

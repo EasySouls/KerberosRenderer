@@ -54,6 +54,20 @@ namespace Kerberos
 		bool IsValid = false;
 	};
 
+	struct PipelineStatistics
+	{
+		uint32_t InputAssemblyVertices = 0;
+		uint32_t InputAssemblyPrimitives = 0;
+		uint32_t VertexShaderInvocations = 0;
+		uint32_t GeometryShaderInvocations = 0;
+		uint32_t GeometryShaderPrimitives = 0;
+		uint32_t ClippingInvocations = 0;
+		uint32_t ClippingPrimitives = 0;
+		uint32_t FragmentShaderInvocations = 0;
+		uint32_t TessellationControlShaderPatches = 0;
+		uint32_t TessellationEvaluationShaderInvocations = 0;
+	};
+
 	struct RenderObject
 	{
 		glm::mat4 Transform{};
@@ -148,6 +162,7 @@ namespace Kerberos
         static bool ConsumePendingMousePickingTimelineSignal(vk::Semaphore& semaphore, uint64_t& value);
 		static GPUTimings GetLatestGPUTimings();
 		static RenderStatistics GetLatestRenderStatistics();
+		static PipelineStatistics GetLatestPipelineStatistics();
 
 	public:
 		static constexpr uint32_t MousePickingReadbackFrameLag = 3;
@@ -193,7 +208,8 @@ namespace Kerberos
 		
 		static void WriteGPUTimestamp(const vk::raii::CommandBuffer& cmd, uint32_t frameIndex, uint32_t index);
 		static void ResolveGPUTimings(uint32_t frameIndex);
-		static void ResetQueryPool(const vk::raii::CommandBuffer& cmd, uint32_t frameIndex);
+		static void ResetQueryPools(const vk::raii::CommandBuffer& cmd, uint32_t frameIndex);
+		static void ResolvePipelineStatistics(uint32_t frameIndex);
 
 		static glm::mat4 CalculateLightSpaceMatrix();
 

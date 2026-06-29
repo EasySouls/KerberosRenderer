@@ -426,6 +426,10 @@ namespace
 		GPUTimings LatestGPUTimings{};
 		RenderStatistics LatestRenderStatistics{};
 
+		bool SupportsPipelineStatistics = false;
+		std::vector<vk::raii::QueryPool> PipelineStatisticsQueryPools;
+		PipelineStatistics LatestPipelineStatistics{};
+
 		RayTracingSceneCache RayTracingCache{};
 		ParticleSystem ParticleSystem{};
 
@@ -635,7 +639,11 @@ namespace Kerberos
 		s_Data->MaterialRegistry.UpdateDescriptorSetsForMaterials(uniqueMaterials);
 
 		ResolveGPUTimings(frameIndex);
-		ResetQueryPool(cmd, frameIndex);
+		ResolvePipelineStatistics(frameIndex);
+
+		ResetQueryPools(cmd, frameIndex);
+
+		cmd.beginQuery(s_Data->PipelineStatisticsQueryPools[frameIndex], 0, {});
 
 		WriteGPUTimestamp(cmd, frameIndex, static_cast<uint32_t>(GPUTimestampQuery::FrameBegin));
 
@@ -1891,6 +1899,9 @@ namespace Kerberos
 		}
 
 		WriteGPUTimestamp(cmd, frameIndex, static_cast<uint32_t>(GPUTimestampQuery::FrameEnd));
+
+		cmd.endQuery(s_Data->PipelineStatisticsQueryPools[frameIndex], 0);
+
 		s_Data->PendingRender.IsValid = false;
 	}
 
@@ -1985,6 +1996,36 @@ namespace Kerberos
 					context.SetObjectDebugName(s_Data->GPUTimestampQueryPools.back(), "Renderer GPU Timestamp Query Pool[" + std::to_string(i) + "]");
 					// Reset query pool at the beginning so that we can immediately start using it without waiting for the first render to reset it
 					cmd.resetQueryPool(s_Data->GPUTimestampQueryPools.back(), 0, static_cast<uint32_t>(GPUTimestampQuery::Count));
+				}
+			});
+		}
+
+		// TODO: Query from VulkanContext
+		s_Data->SupportsPipelineStatistics = true;
+
+		if (s_Data->SupportsPipelineStatistics)
+		{
+			s_Data->PipelineStatisticsQueryPools.clear();
+			s_Data->PipelineStatisticsQueryPools.reserve(context.GetMaxFramesInFlight());
+
+			constexpr vk::QueryPoolCreateInfo queryPoolInfo{
+				.flags = {}, // vk::QueryPoolCreateFlagBits::eResetKHR,
+				.queryType = vk::QueryType::ePipelineStatistics,
+				.queryCount = 1,
+				.pipelineStatistics = vk::QueryPipelineStatisticFlagBits::eInputAssemblyVertices |
+									  vk::QueryPipelineStatisticFlagBits::eInputAssemblyPrimitives |
+									  vk::QueryPipelineStatisticFlagBits::eVertexShaderInvocations |
+									  vk::QueryPipelineStatisticFlagBits::eFragmentShaderInvocations
+			};
+
+			context.Submit(VulkanContext::OperationType::Graphics, [&](const vk::raii::CommandBuffer& cmd)
+			{
+				for (uint32_t i = 0; i < context.GetMaxFramesInFlight(); ++i)
+				{
+					s_Data->PipelineStatisticsQueryPools.emplace_back(device, queryPoolInfo);
+					context.SetObjectDebugName(s_Data->PipelineStatisticsQueryPools.back(), "Renderer Pipeline Statistics Query Pool[" + std::to_string(i) + "]");
+					// Reset query pool at the beginning so that we can immediately start using it without waiting for the first render to reset it
+					cmd.resetQueryPool(s_Data->PipelineStatisticsQueryPools.back(), 0, 1);
 				}
 			});
 		}
@@ -4058,6 +4099,13 @@ namespace Kerberos
 		return s_Data->LatestRenderStatistics;
 	}
 
+	PipelineStatistics Renderer::GetLatestPipelineStatistics() 
+	{
+		KBR_CORE_ASSERT(s_Data, "Renderer not initialized!");
+
+		return s_Data->LatestPipelineStatistics;
+	}
+
 	void Renderer::WriteGPUTimestamp(const vk::raii::CommandBuffer& cmd, const uint32_t frameIndex, const uint32_t index)
 	{
 		if (!s_Data->SupportsGPUTimestamps || frameIndex >= s_Data->GPUTimestampQueryPools.size() || s_Data->GPUTimestampQueryPools[frameIndex] == nullptr)
@@ -4117,7 +4165,9 @@ namespace Kerberos
 		s_Data->LatestGPUTimings.IsValid = true;
 	}
 
-	void Renderer::ResetQueryPool(const vk::raii::CommandBuffer& cmd, const uint32_t frameIndex)
+	void Renderer::ResetQueryPools(const vk::raii::CommandBuffer& cmd, const uint32_t frameIndex)
+	{
+		if (s_Data->SupportsGPUTimestamps)
 	{
 		if (!s_Data->SupportsGPUTimestamps)
 			return;
@@ -4126,6 +4176,48 @@ namespace Kerberos
 		KBR_CORE_ASSERT(s_Data->GPUTimestampQueryPools[frameIndex] != nullptr, "GPU Timestamp Query Pool for current frame is null!");
 
 		cmd.resetQueryPool(s_Data->GPUTimestampQueryPools[frameIndex], 0, static_cast<uint32_t>(GPUTimestampQuery::Count));
+	}
+		if (s_Data->SupportsPipelineStatistics)
+		{
+			KBR_CORE_ASSERT(frameIndex < s_Data->PipelineStatisticsQueryPools.size(), "Current frame index exceeds Pipeline Statistics Query Pools size!");
+			KBR_CORE_ASSERT(s_Data->PipelineStatisticsQueryPools[frameIndex] != nullptr, "Pipeline Statistics Query Pool for current frame is null!");
+
+			cmd.resetQueryPool(s_Data->PipelineStatisticsQueryPools[frameIndex], 0, 1);
+		}
+	}
+
+	void Renderer::ResolvePipelineStatistics(const uint32_t frameIndex) 
+	{
+		if (!s_Data->SupportsPipelineStatistics)
+			return;
+
+		KBR_CORE_ASSERT(frameIndex < s_Data->PipelineStatisticsQueryPools.size(), "Current frame index exceeds Pipeline Statistics Query Pools size!");
+		KBR_CORE_ASSERT(s_Data->PipelineStatisticsQueryPools[frameIndex] != nullptr, "Pipeline Statistics Query Pool for current frame is null!");
+
+		constexpr uint32_t statisticsPerQuery = 4;
+		std::array<uint64_t, statisticsPerQuery> results{};
+		const auto& device = VulkanContext::Get().GetDevice();
+
+		const vk::Result result = static_cast<vk::Device>(device).getQueryPoolResults(
+			s_Data->PipelineStatisticsQueryPools[frameIndex],
+			0,
+			1,
+			results.size() * sizeof(uint64_t),
+			results.data(),
+			statisticsPerQuery * sizeof(uint64_t),
+			vk::QueryResultFlagBits::e64);
+
+		// On the first VulkanContext::GetMaxFramesInFlight calls, this will return NotReady
+		if (result != vk::Result::eSuccess && result != vk::Result::eNotReady)
+		{
+			KBR_CORE_ERROR("Failed to retrieve pipeline statistics query results: {}", vk::to_string(result));
+			return;
+		}
+
+		s_Data->LatestPipelineStatistics.InputAssemblyVertices = results[0];
+		s_Data->LatestPipelineStatistics.InputAssemblyPrimitives = results[1];
+		s_Data->LatestPipelineStatistics.VertexShaderInvocations = results[2];
+		s_Data->LatestPipelineStatistics.FragmentShaderInvocations = results[3];
 	}
 
 	void Renderer::UpdateLights(const uint32_t currentImage, const std::vector<GPULight>& sceneLights) 

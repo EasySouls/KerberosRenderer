@@ -936,7 +936,21 @@ namespace Kerberos
 		}
 		else
 		{
-			ImGui::Text("Render stats: unavailable");
+			ImGui::Text("Render statistics: unavailable");
+		}
+
+		ImGui::SeparatorText("Pipeline Statistics");
+		const PipelineStatistics pipelineStatistics = Renderer::GetLatestPipelineStatistics();
+		if (true /*pipelineStatistics.IsValid*/)
+		{
+			ImGui::Text("Input Assembly Vertices: %u", pipelineStatistics.InputAssemblyVertices);
+			ImGui::Text("Input Assembly Primitives: %u", pipelineStatistics.InputAssemblyPrimitives);
+			ImGui::Text("Vertex Shader Invocations: %u", pipelineStatistics.VertexShaderInvocations);
+			ImGui::Text("Fragment Shader Invocations: %u", pipelineStatistics.FragmentShaderInvocations);
+		}
+		else
+		{
+			ImGui::Text("Pipeline statistics: unavailable");
 		}
 
 		ImGui::Separator();
