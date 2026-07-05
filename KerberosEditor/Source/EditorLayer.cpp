@@ -910,6 +910,7 @@ namespace Kerberos
 			ImGui::Text("GPU Depth Pre-Pass: %.3f ms", gpuTimings.DepthPrePassMilliseconds);
 			ImGui::Text("GPU Shadow: %.3f ms", gpuTimings.ShadowPassMilliseconds);
 			ImGui::Text("GPU Opaque: %.3f ms", gpuTimings.OpaquePassMilliseconds);
+			ImGui::Text("GPU Grass: %.3f ms", gpuTimings.GrassPassMilliseconds);
 			ImGui::Text("GPU Particles: %.3f ms", gpuTimings.ParticlesPassMilliseconds);
 			ImGui::Text("GPU Transparent: %.3f ms", gpuTimings.TransparentPassMilliseconds);
 			ImGui::Text("GPU Transparency Resolve: %.3f ms", gpuTimings.TransparencyResolvePassMilliseconds);
@@ -946,6 +947,8 @@ namespace Kerberos
 			ImGui::Text("Input Assembly Vertices: %u", pipelineStatistics.InputAssemblyVertices);
 			ImGui::Text("Input Assembly Primitives: %u", pipelineStatistics.InputAssemblyPrimitives);
 			ImGui::Text("Vertex Shader Invocations: %u", pipelineStatistics.VertexShaderInvocations);
+			ImGui::Text("Task Shader Invocations: %u", pipelineStatistics.TaskShaderInvocations);
+			ImGui::Text("Mesh Shader Invocations: %u", pipelineStatistics.MeshShaderInvocations);
 			ImGui::Text("Fragment Shader Invocations: %u", pipelineStatistics.FragmentShaderInvocations);
 		}
 		else

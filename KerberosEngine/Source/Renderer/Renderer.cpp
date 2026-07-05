@@ -11,6 +11,7 @@
 #include "ComputePipeline.hpp"
 #include "RayTracingSceneCache.hpp"
 #include "ParticleSystem.hpp"
+#include "GrassSystem.hpp"
 #include "ColliderDebugHelpers.hpp"
 #include "Utils.hpp"
 #include "SMAA/SMAAAreaTex.hpp"
@@ -317,6 +318,8 @@ namespace
 		ShadowEnd,
 		OpaqueBegin,
 		OpaqueEnd,
+		GrassBegin,
+		GrassEnd,
 		ParticlesBegin,
 		ParticlesEnd,
 		TransparentBegin,
@@ -430,10 +433,12 @@ namespace
 
 		bool SupportsPipelineStatistics = false;
 		std::vector<vk::raii::QueryPool> PipelineStatisticsQueryPools;
+		std::vector<vk::raii::QueryPool> MeshPipelineStatisticsQueryPools;
 		PipelineStatistics LatestPipelineStatistics{};
 
 		RayTracingSceneCache RayTracingCache{};
 		ParticleSystem ParticleSystem{};
+		GrassSystem GrassSystem{};
 
 		glm::vec2 OutputSize{ 1280.0f, 720.0f };
 
@@ -1564,6 +1569,16 @@ namespace Kerberos
 
 		RenderParticles(cmd, frameIndex);
 
+		cmd.endQuery(s_Data->PipelineStatisticsQueryPools[frameIndex], 0);
+
+		cmd.beginQuery(s_Data->MeshPipelineStatisticsQueryPools[frameIndex], 0, {});
+
+		RenderGrass(cmd, frameIndex);
+
+		cmd.endQuery(s_Data->MeshPipelineStatisticsQueryPools[frameIndex], 0);
+
+		cmd.beginQuery(s_Data->PipelineStatisticsQueryPools[frameIndex], 1, {});
+
 		// Transfer accumulation, revealage and distortion images to color attachment optimal for they will be render targets
 		{
 			std::array<vk::ImageMemoryBarrier2, 3> barriers;
@@ -1914,7 +1929,7 @@ namespace Kerberos
 
 		WriteGPUTimestamp(cmd, frameIndex, static_cast<uint32_t>(GPUTimestampQuery::FrameEnd));
 
-		cmd.endQuery(s_Data->PipelineStatisticsQueryPools[frameIndex], 0);
+		cmd.endQuery(s_Data->PipelineStatisticsQueryPools[frameIndex], 1);
 
 		s_Data->PendingRender.IsValid = false;
 	}
@@ -2025,10 +2040,22 @@ namespace Kerberos
 			constexpr vk::QueryPoolCreateInfo queryPoolInfo{
 				.flags = {}, // vk::QueryPoolCreateFlagBits::eResetKHR,
 				.queryType = vk::QueryType::ePipelineStatistics,
-				.queryCount = 1,
+				.queryCount = 2,
 				.pipelineStatistics = vk::QueryPipelineStatisticFlagBits::eInputAssemblyVertices |
 									  vk::QueryPipelineStatisticFlagBits::eInputAssemblyPrimitives |
 									  vk::QueryPipelineStatisticFlagBits::eVertexShaderInvocations |
+									  vk::QueryPipelineStatisticFlagBits::eFragmentShaderInvocations
+			};
+
+			s_Data->MeshPipelineStatisticsQueryPools.clear();
+			s_Data->MeshPipelineStatisticsQueryPools.reserve(context.GetMaxFramesInFlight());
+
+			constexpr vk::QueryPoolCreateInfo meshQueryPoolInfo{
+				.flags = {}, // vk::QueryPoolCreateFlagBits::eResetKHR,
+				.queryType = vk::QueryType::ePipelineStatistics,
+				.queryCount = 1,
+				.pipelineStatistics = vk::QueryPipelineStatisticFlagBits::eTaskShaderInvocationsEXT |
+									  vk::QueryPipelineStatisticFlagBits::eMeshShaderInvocationsEXT |
 									  vk::QueryPipelineStatisticFlagBits::eFragmentShaderInvocations
 			};
 
@@ -2039,7 +2066,12 @@ namespace Kerberos
 					s_Data->PipelineStatisticsQueryPools.emplace_back(device, queryPoolInfo);
 					context.SetObjectDebugName(s_Data->PipelineStatisticsQueryPools.back(), "Renderer Pipeline Statistics Query Pool[" + std::to_string(i) + "]");
 					// Reset query pool at the beginning so that we can immediately start using it without waiting for the first render to reset it
-					cmd.resetQueryPool(s_Data->PipelineStatisticsQueryPools.back(), 0, 1);
+					cmd.resetQueryPool(s_Data->PipelineStatisticsQueryPools.back(), 0, 2);
+
+					s_Data->MeshPipelineStatisticsQueryPools.emplace_back(device, meshQueryPoolInfo);
+					context.SetObjectDebugName(s_Data->MeshPipelineStatisticsQueryPools.back(), "Renderer Mesh Pipeline Statistics Query Pool[" + std::to_string(i) + "]");
+					// Reset query pool at the beginning so that we can immediately start using it without waiting for the first render to reset it
+					cmd.resetQueryPool(s_Data->MeshPipelineStatisticsQueryPools.back(), 0, 1);
 				}
 			});
 		}
@@ -2757,6 +2789,7 @@ namespace Kerberos
 		}
 
 		s_Data->ParticleSystem.Initialize(s_Data->ColorImage.Format, s_Data->DepthImage.Format);
+		s_Data->GrassSystem.Init();
 
 		// Create transparent pipeline resources
 		{
@@ -4169,6 +4202,7 @@ namespace Kerberos
 		s_Data->LatestGPUTimings.DepthPrePassMilliseconds = toMilliseconds(GPUTimestampQuery::DepthPrePassBegin, GPUTimestampQuery::DepthPrePassEnd);
 		s_Data->LatestGPUTimings.ShadowPassMilliseconds = toMilliseconds(GPUTimestampQuery::ShadowBegin, GPUTimestampQuery::ShadowEnd);
 		s_Data->LatestGPUTimings.OpaquePassMilliseconds = toMilliseconds(GPUTimestampQuery::OpaqueBegin, GPUTimestampQuery::OpaqueEnd);
+		s_Data->LatestGPUTimings.GrassPassMilliseconds = toMilliseconds(GPUTimestampQuery::GrassBegin, GPUTimestampQuery::GrassEnd);
 		s_Data->LatestGPUTimings.ParticlesPassMilliseconds = toMilliseconds(GPUTimestampQuery::ParticlesBegin, GPUTimestampQuery::ParticlesEnd);
 		s_Data->LatestGPUTimings.TransparentPassMilliseconds = toMilliseconds(GPUTimestampQuery::TransparentBegin, GPUTimestampQuery::TransparentEnd);
 		s_Data->LatestGPUTimings.TransparencyResolvePassMilliseconds = toMilliseconds(GPUTimestampQuery::TransparencyResolveBegin, GPUTimestampQuery::TransparencyResolveEnd);
@@ -4193,7 +4227,12 @@ namespace Kerberos
 			KBR_CORE_ASSERT(frameIndex < s_Data->PipelineStatisticsQueryPools.size(), "Current frame index exceeds Pipeline Statistics Query Pools size!");
 			KBR_CORE_ASSERT(s_Data->PipelineStatisticsQueryPools[frameIndex] != nullptr, "Pipeline Statistics Query Pool for current frame is null!");
 
-			cmd.resetQueryPool(s_Data->PipelineStatisticsQueryPools[frameIndex], 0, 1);
+			cmd.resetQueryPool(s_Data->PipelineStatisticsQueryPools[frameIndex], 0, 2);
+
+			KBR_CORE_ASSERT(frameIndex < s_Data->MeshPipelineStatisticsQueryPools.size(), "Current frame index exceeds Mesh Pipeline Statistics Query Pools size!");
+			KBR_CORE_ASSERT(s_Data->MeshPipelineStatisticsQueryPools[frameIndex] != nullptr, "Mesh Pipeline Statistics Query Pool for current frame is null!");
+
+			cmd.resetQueryPool(s_Data->MeshPipelineStatisticsQueryPools[frameIndex], 0, 1);
 		}
 	}
 
@@ -4205,14 +4244,20 @@ namespace Kerberos
 		KBR_CORE_ASSERT(frameIndex < s_Data->PipelineStatisticsQueryPools.size(), "Current frame index exceeds Pipeline Statistics Query Pools size!");
 		KBR_CORE_ASSERT(s_Data->PipelineStatisticsQueryPools[frameIndex] != nullptr, "Pipeline Statistics Query Pool for current frame is null!");
 
+		KBR_CORE_ASSERT(frameIndex < s_Data->MeshPipelineStatisticsQueryPools.size(), "Current frame index exceeds Mesh Pipeline Statistics Query Pools size!");
+		KBR_CORE_ASSERT(s_Data->MeshPipelineStatisticsQueryPools[frameIndex] != nullptr, "Mesh Pipeline Statistics Query Pool for current frame is null!");
+
+		// Traditional pipeline statistics
+
 		constexpr uint32_t statisticsPerQuery = 4;
-		std::array<uint64_t, statisticsPerQuery> results{};
+		constexpr uint32_t totalStatisticsCount = statisticsPerQuery * 2;
+		std::array<uint64_t, totalStatisticsCount> results{};
 		const auto& device = VulkanContext::Get().GetDevice();
 
-		const vk::Result result = static_cast<vk::Device>(device).getQueryPoolResults(
+		vk::Result result = static_cast<vk::Device>(device).getQueryPoolResults(
 			s_Data->PipelineStatisticsQueryPools[frameIndex],
 			0,
-			1,
+			2,
 			results.size() * sizeof(uint64_t),
 			results.data(),
 			statisticsPerQuery * sizeof(uint64_t),
@@ -4225,10 +4270,35 @@ namespace Kerberos
 			return;
 		}
 
-		s_Data->LatestPipelineStatistics.InputAssemblyVertices = results[0];
-		s_Data->LatestPipelineStatistics.InputAssemblyPrimitives = results[1];
-		s_Data->LatestPipelineStatistics.VertexShaderInvocations = results[2];
-		s_Data->LatestPipelineStatistics.FragmentShaderInvocations = results[3];
+		s_Data->LatestPipelineStatistics.InputAssemblyVertices = results[0] + results[4];
+		s_Data->LatestPipelineStatistics.InputAssemblyPrimitives = results[1] + results[5];
+		s_Data->LatestPipelineStatistics.VertexShaderInvocations = results[2] + results[6];
+		s_Data->LatestPipelineStatistics.FragmentShaderInvocations = results[3] + results[7];
+
+		// Mesh pipeline statistics
+		constexpr uint32_t statisticsPerMeshQuery = 3;
+		constexpr uint32_t totalMeshStatisticsCount = statisticsPerMeshQuery * 1;
+		std::array<uint64_t, totalMeshStatisticsCount> meshResults{};
+
+		result = static_cast<vk::Device>(device).getQueryPoolResults(
+			s_Data->MeshPipelineStatisticsQueryPools[frameIndex],
+			0,
+			1,
+			meshResults.size() * sizeof(uint64_t),
+			meshResults.data(),
+			statisticsPerMeshQuery * sizeof(uint64_t),
+			vk::QueryResultFlagBits::e64);
+
+		// On the first VulkanContext::GetMaxFramesInFlight calls, this will return NotReady
+		if (result != vk::Result::eSuccess && result != vk::Result::eNotReady)
+		{
+			KBR_CORE_ERROR("Failed to retrieve mesh pipeline statistics query results: {}", vk::to_string(result));
+			return;
+		}
+
+		s_Data->LatestPipelineStatistics.TaskShaderInvocations = meshResults[0];
+		s_Data->LatestPipelineStatistics.MeshShaderInvocations = meshResults[1];
+		s_Data->LatestPipelineStatistics.FragmentShaderInvocations += meshResults[2];
 	}
 
 	void Renderer::UpdateLights(const uint32_t currentImage, const std::vector<GPULight>& sceneLights) 
@@ -4514,6 +4584,63 @@ namespace Kerberos
 		EndRenderPassDebugLabel(cmd);
 
 		WriteGPUTimestamp(cmd, frameIndex, static_cast<uint32_t>(GPUTimestampQuery::ParticlesEnd));
+	}
+
+	void Renderer::RenderGrass(const vk::raii::CommandBuffer& cmd, const uint32_t frameIndex)
+	{
+		WriteGPUTimestamp(cmd, frameIndex, static_cast<uint32_t>(GPUTimestampQuery::GrassBegin));
+
+		vk::RenderingAttachmentInfo colorAttachmentInfo{
+			.imageView = s_Data->ColorImage.ImageView,
+			.imageLayout = vk::ImageLayout::eColorAttachmentOptimal,
+			.loadOp = vk::AttachmentLoadOp::eLoad,
+			.storeOp = vk::AttachmentStoreOp::eStore,
+		};
+
+		vk::RenderingAttachmentInfo depthAttachmentInfo{
+			.imageView = s_Data->DepthImage.ImageView,
+			.imageLayout = vk::ImageLayout::eDepthAttachmentOptimal,
+			.loadOp = vk::AttachmentLoadOp::eLoad,
+			.storeOp = vk::AttachmentStoreOp::eDontCare,
+		};
+
+		const vk::Rect2D renderArea{
+			.offset = vk::Offset2D{.x = 0, .y = 0 },
+			.extent = vk::Extent2D{.width = static_cast<uint32_t>(s_Data->OutputSize.x), .height = static_cast<uint32_t>(s_Data->OutputSize.y) }
+		};
+
+		const vk::Viewport viewport{
+			.x = 0.0f,
+			.y = 0.0f,
+			.width = s_Data->OutputSize.x,
+			.height = s_Data->OutputSize.y,
+			.minDepth = 0.0f,
+			.maxDepth = 1.0f
+		};
+
+		const vk::RenderingInfo renderingInfo{
+			.renderArea = renderArea,
+			.layerCount = 1,
+			.colorAttachmentCount = 1,
+			.pColorAttachments = &colorAttachmentInfo,
+			.pDepthAttachment = &depthAttachmentInfo
+		};
+
+		BeginRenderPassDebugLabel(cmd, "GPU Grass Pass");
+		cmd.beginRendering(renderingInfo);
+		cmd.setViewportWithCount({ viewport });
+		cmd.setScissorWithCount({ renderArea });
+
+		const GrassConstants grassConstants{
+			.viewProjMatrix = s_Data->SceneUniformData.projection * s_Data->SceneUniformData.view,
+			.time = s_Data->SceneUniformData.time,
+		};
+		s_Data->GrassSystem.RecordDraw(cmd, frameIndex, grassConstants);
+
+		cmd.endRendering();
+		EndRenderPassDebugLabel(cmd);
+
+		WriteGPUTimestamp(cmd, frameIndex, static_cast<uint32_t>(GPUTimestampQuery::GrassEnd));
 	}
 
 	void Renderer::ApplyTonemapping(const vk::raii::CommandBuffer& cmd, uint32_t frameIndex)

@@ -33,6 +33,7 @@ namespace Kerberos
 		float DepthPrePassMilliseconds = 0.0f;
 		float ShadowPassMilliseconds = 0.0f;
 		float OpaquePassMilliseconds = 0.0f;
+		float GrassPassMilliseconds = 0.0f;
 		float ParticlesPassMilliseconds = 0.0f;
 		float TransparentPassMilliseconds = 0.0f;
 		float TransparencyResolvePassMilliseconds = 0.0f;
@@ -64,6 +65,8 @@ namespace Kerberos
 		uint32_t ClippingInvocations = 0;
 		uint32_t ClippingPrimitives = 0;
 		uint32_t FragmentShaderInvocations = 0;
+		uint32_t TaskShaderInvocations = 0;
+		uint32_t MeshShaderInvocations = 0;
 		uint32_t TessellationControlShaderPatches = 0;
 		uint32_t TessellationEvaluationShaderInvocations = 0;
 	};
@@ -196,6 +199,7 @@ namespace Kerberos
 		static std::vector<LineVertex> GetColliderLineVerticesFromScene(const Scene& scene);
 
 		static void RenderParticles(const vk::raii::CommandBuffer& cmd, uint32_t frameIndex);
+		static void RenderGrass(const vk::raii::CommandBuffer& cmd, uint32_t frameIndex);
 
 		static void ApplyTonemapping(const vk::raii::CommandBuffer& cmd, uint32_t frameIndex);
 		

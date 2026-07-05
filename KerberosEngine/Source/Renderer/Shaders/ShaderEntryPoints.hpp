@@ -8,6 +8,8 @@ namespace Kerberos
 		Geometry,
 		Fragment,
 		Compute,
+		Task,
+		Mesh
 	};
 
 	static const char* GetEntryPointName(const ShaderEntryPoint entryPoint)
@@ -22,6 +24,10 @@ namespace Kerberos
 			return "fragmentMain";
 		case ShaderEntryPoint::Compute:
 			return "computeMain";
+		case ShaderEntryPoint::Task:
+			return "taskMain";
+		case ShaderEntryPoint::Mesh:
+			return "meshMain";
 		default:
 			throw std::runtime_error("Invalid shader entry point");
 		}
@@ -31,6 +37,8 @@ namespace Kerberos
 		ShaderEntryPoint::Vertex,
 		ShaderEntryPoint::Geometry,
 		ShaderEntryPoint::Fragment,
-		ShaderEntryPoint::Compute
+		ShaderEntryPoint::Compute,
+		ShaderEntryPoint::Task,
+		ShaderEntryPoint::Mesh
 	};
 }
