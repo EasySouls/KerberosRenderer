@@ -21,6 +21,14 @@ public struct Material
     public float3 emissive;
     public float roughness;
     public float metallic;
+
+    public uint albedoTexIndex;
+    public uint normalTexIndex;
+    public uint roughnessTexIndex;
+    public uint metallicTexIndex;
+    public uint aoTexIndex;
+    public uint emissiveTexIndex;
+
 };
 
 public struct PerObject 

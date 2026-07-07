@@ -21,6 +21,12 @@ namespace Kerberos
 			Allocate(size);
 		}
 
+		explicit Buffer(const std::vector<uint8_t>& data)
+		{
+			Allocate(data.size());
+			std::memcpy(Data, data.data(), Size);
+		}
+
 		Buffer(const Buffer&) = delete;
 		Buffer(Buffer&& other) noexcept
 			: Data(other.Data), Size(other.Size)

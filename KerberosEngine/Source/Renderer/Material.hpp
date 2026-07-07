@@ -3,6 +3,7 @@
 #include "Vulkan.hpp"
 #include "Assets/Asset.hpp"
 #include "Textures/Texture2D.hpp"
+#include "TextureManager.hpp"
 
 #include <glm/vec3.hpp>
 
@@ -21,6 +22,12 @@ namespace Kerberos
 			glm::vec3 Emissive{ 0.0f };
 			float RoughnessFactor{ 1.0f };
 			float MetallicFactor{ 0.0f };
+			uint32_t AlbedoIndex = 0;
+			uint32_t NormalIndex = 0;
+			uint32_t RoughnessIndex = 0;
+			uint32_t MetallicIndex = 0;
+			uint32_t AOIndex = 0;
+			uint32_t EmissiveIndex = 0;
 		};
 		UniformBlock Params{};
 
@@ -36,11 +43,32 @@ namespace Kerberos
 		Ref<Texture2D> AOTexture = nullptr;
 		Ref<Texture2D> EmissiveTexture = nullptr;
 
-		std::vector<vk::raii::DescriptorSet> DescriptorSets;
-
 		bool IsTransparent() const 
 		{
 			return Params.AlbedoFactor.a < 1.0f;
+		}
+
+		void ResolveIndices(TextureManager& textureManager)
+		{
+			const uint32_t albedoTex = AlbedoTexture ? textureManager.GetTextureIndex(AlbedoTexture) : textureManager.GetWhiteTexture();
+			Params.AlbedoIndex = TextureManager::Pack(albedoTex, DefaultSampler::AnisoWrap);
+
+			const uint32_t normalTex = NormalTexture ? textureManager.GetTextureIndex(NormalTexture) : textureManager.GetDefaultNormalTexture();
+			Params.NormalIndex = TextureManager::Pack(normalTex, DefaultSampler::LinearWrap);
+
+			const uint32_t roughnessTex = RoughnessTexture ? textureManager.GetTextureIndex(RoughnessTexture) : textureManager.GetDefaultRoughnessTexture();
+			Params.RoughnessIndex = TextureManager::Pack(roughnessTex, DefaultSampler::LinearWrap);
+
+			const uint32_t metallicTex = MetallicTexture ? textureManager.GetTextureIndex(MetallicTexture) : textureManager.GetDefaultMetallicTexture();
+			Params.MetallicIndex = TextureManager::Pack(metallicTex, DefaultSampler::LinearWrap);
+
+			const uint32_t aoTex = AOTexture ? textureManager.GetTextureIndex(AOTexture) : textureManager.GetDefaultAOTexture();
+			Params.AOIndex = TextureManager::Pack(aoTex, DefaultSampler::LinearWrap);
+
+			const uint32_t emissiveTex = EmissiveTexture ? textureManager.GetTextureIndex(EmissiveTexture) : textureManager.GetDefaultEmissiveTexture();
+			Params.EmissiveIndex = TextureManager::Pack(emissiveTex, DefaultSampler::LinearWrap);
+
+			Params.Emissive = EmissiveColor * EmissiveIntensity;
 		}
 
 		Material() = default;
@@ -92,7 +120,6 @@ namespace Kerberos
 				RoughnessTexture = other.RoughnessTexture;
 				AOTexture = other.AOTexture;
 				EmissiveTexture = other.EmissiveTexture;
-				// DescriptorSets intentionally not copied
 			}
 			return *this;
 		}

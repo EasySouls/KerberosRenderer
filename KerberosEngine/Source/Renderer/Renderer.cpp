@@ -1,6 +1,7 @@
 #include "kbrpch.hpp"
 #include "Renderer.hpp"
 
+#include "TextureManager.hpp"
 #include "MaterialRegistry.hpp"
 #include "ModelLoader.hpp"
 #include "SkyboxUtils.hpp"
@@ -24,6 +25,7 @@
 #include <limits>
 #include <numbers>
 #include <cmath>
+
 
 namespace
 {
@@ -112,7 +114,6 @@ namespace
 	struct DescriptorSetLayouts
 	{
 		vk::raii::DescriptorSetLayout scene = nullptr;
-		vk::raii::DescriptorSetLayout textures = nullptr;
 		vk::raii::DescriptorSetLayout composite = nullptr;
 		vk::raii::DescriptorSetLayout gtao = nullptr;
 		vk::raii::DescriptorSetLayout crossBilateralBlur = nullptr;
@@ -347,7 +348,8 @@ namespace
 			void* MappedData = nullptr;
 		};
 
-		MaterialRegistry MaterialRegistry;
+		TextureManager TextureManager{};
+		MaterialRegistry MaterialRegistry{};
 
 		DepthBias DepthBias;
 		ShadowMap ShadowMap;
@@ -508,9 +510,9 @@ namespace Kerberos
 		// Setup initial directional light which we will use to generate the shadow map
 		s_Data->GlobalLightingData.sunLight = glm::vec4(0.0f, 1.0f, 0.0f, 0.0f);
 
-		CreateResources();
+		s_Data->TextureManager.Initialize();
 
-		s_Data->MaterialRegistry.SetupDescriptorSets(s_Data->DescriptorSetLayouts.textures);
+		CreateResources();
 	}
 
 	void Renderer::Shutdown() 
@@ -645,7 +647,8 @@ namespace Kerberos
 
 		renderStatistics.IsValid = true;
 
-		s_Data->MaterialRegistry.UpdateDescriptorSetsForMaterials(uniqueMaterials);
+		s_Data->MaterialRegistry.SyncWithCurrentMaterials(uniqueMaterials);
+		s_Data->MaterialRegistry.ResolveAllMaterialIndices(s_Data->TextureManager);
 
 		ResolveGPUTimings(frameIndex);
 		ResolvePipelineStatistics(frameIndex);
@@ -811,7 +814,7 @@ namespace Kerberos
 					vk::PipelineBindPoint::eGraphics,
 					*s_Data->PBRPipelineLayout,
 					0,
-					{ s_Data->DescriptorSets[currentImage].scene, material->DescriptorSets[currentImage] },
+					{ s_Data->DescriptorSets[currentImage].scene, s_Data->TextureManager.GetGlobalDescriptorSet() },
 					{ dynamicOffset });
 
 				Mesh->Draw(cmd);
@@ -1519,7 +1522,7 @@ namespace Kerberos
 						vk::PipelineBindPoint::eGraphics,
 						*s_Data->PBRPipelineLayout,
 						0,
-						{ s_Data->DescriptorSets[currentImage].scene, material->DescriptorSets[currentImage] },
+						{ s_Data->DescriptorSets[currentImage].scene, s_Data->TextureManager.GetGlobalDescriptorSet() },
 						{ dynamicOffset });
 
 					Mesh->Draw(cmd);
@@ -1693,7 +1696,7 @@ namespace Kerberos
 					vk::PipelineBindPoint::eGraphics,
 					*s_Data->PBRPipelineLayout,
 					0,
-					{ s_Data->DescriptorSets[currentImage].scene, material->DescriptorSets[currentImage] },
+					{ s_Data->DescriptorSets[currentImage].scene, s_Data->TextureManager.GetGlobalDescriptorSet() },
 					{ dynamicOffset });
 
 				Mesh->Draw(cmd);
@@ -2628,7 +2631,7 @@ namespace Kerberos
 
 			const std::array<vk::DescriptorSetLayout, 2> setLayouts = {
 				s_Data->DescriptorSetLayouts.scene,
-				s_Data->DescriptorSetLayouts.textures
+				s_Data->TextureManager.GetGlobalDescriptorSetLayout()
 			};
 
 			vk::PipelineLayoutCreateInfo pipelineLayoutInfo{
@@ -5635,65 +5638,6 @@ namespace Kerberos
 
 		s_Data->DescriptorSetLayouts.scene = vk::raii::DescriptorSetLayout{ device, layoutInfo };
 		context.SetObjectDebugName(s_Data->DescriptorSetLayouts.scene, "PBR Descriptor Set Layout");
-
-		std::vector<vk::DescriptorSetLayoutBinding> textureBindings = {
-			vk::DescriptorSetLayoutBinding{ // Albedo map
-				.binding = 0,
-				.descriptorType = vk::DescriptorType::eCombinedImageSampler,
-				.descriptorCount = 1,
-				.stageFlags = vk::ShaderStageFlagBits::eFragment,
-			},
-			vk::DescriptorSetLayoutBinding{ // Normal map
-				.binding = 1,
-				.descriptorType = vk::DescriptorType::eCombinedImageSampler,
-				.descriptorCount = 1,
-				.stageFlags = vk::ShaderStageFlagBits::eFragment,
-			},
-			vk::DescriptorSetLayoutBinding{ // Roughness map
-				.binding = 2,
-				.descriptorType = vk::DescriptorType::eCombinedImageSampler,
-				.descriptorCount = 1,
-				.stageFlags = vk::ShaderStageFlagBits::eFragment,
-			},
-			vk::DescriptorSetLayoutBinding{ // Metallic map
-				.binding = 3,
-				.descriptorType = vk::DescriptorType::eCombinedImageSampler,
-				.descriptorCount = 1,
-				.stageFlags = vk::ShaderStageFlagBits::eFragment,
-			},
-			vk::DescriptorSetLayoutBinding{ // Ambient occlusion map
-				.binding = 4,
-				.descriptorType = vk::DescriptorType::eCombinedImageSampler,
-				.descriptorCount = 1,
-				.stageFlags = vk::ShaderStageFlagBits::eFragment,
-			},
-			vk::DescriptorSetLayoutBinding{ // Emissive map
-				.binding = 5,
-				.descriptorType = vk::DescriptorType::eCombinedImageSampler,
-				.descriptorCount = 1,
-				.stageFlags = vk::ShaderStageFlagBits::eFragment,
-			},
-		};
-
-		const std::vector<vk::DescriptorBindingFlags> textureBindingFlags(
-			textureBindings.size(), 
-			vk::DescriptorBindingFlagBits::ePartiallyBound | vk::DescriptorBindingFlagBits::eUpdateAfterBind
-		);
-
-		const vk::DescriptorSetLayoutBindingFlagsCreateInfo textureLayoutBindingFlagsInfo{
-			.bindingCount = static_cast<uint32_t>(textureBindingFlags.size()),
-			.pBindingFlags = textureBindingFlags.data()
-		};
-
-		const vk::DescriptorSetLayoutCreateInfo textureLayoutInfo{
-			.pNext = &textureLayoutBindingFlagsInfo,
-			.flags = vk::DescriptorSetLayoutCreateFlagBits::eUpdateAfterBindPool,
-			.bindingCount = static_cast<uint32_t>(textureBindings.size()),
-			.pBindings = textureBindings.data()
-		};
-
-		s_Data->DescriptorSetLayouts.textures = vk::raii::DescriptorSetLayout{ device, textureLayoutInfo };
-		context.SetObjectDebugName(s_Data->DescriptorSetLayouts.textures, "Texture Descriptor Set Layout");
 
 		const std::vector<vk::DescriptorSetLayout> sceneSetLayouts(
 			s_Data->DescriptorSets.size(),

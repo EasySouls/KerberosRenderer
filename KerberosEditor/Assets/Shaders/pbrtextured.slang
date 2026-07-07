@@ -57,21 +57,20 @@ StructuredBuffer<GPULight> sceneLights;
 Sampler2D<float> globalAoTexture;
 
 [[vk::binding(0, 1)]]
-Sampler2D albedoMapSampler;
+Texture2D globalTextures[];
 [[vk::binding(1, 1)]]
-Sampler2D normalMapSampler;
-[[vk::binding(2, 1)]]
-Sampler2D roughnessMapSampler;
-[[vk::binding(3, 1)]]
-Sampler2D metallicMapSampler;
-[[vk::binding(4, 1)]]
-Sampler2D aoMapSampler;
-[[vk::binding(5, 1)]]
-Sampler2D emissiveMapSampler;
+SamplerState globalSamplers[];
 
 [SpecializationConstant] const int enablePCF = 0;
 
 static const float PI = 3.14159265359;
+
+float4 SampleBindless(uint packedIndex, float2 uv) {
+    uint texIdx = packedIndex & 0x00FFFFFF;
+    uint sampIdx = packedIndex >> 24;
+
+    return globalTextures[texIdx].Sample(globalSamplers[sampIdx], uv);
+}
 
 float3 prefilteredReflection(float3 R, float roughness)
 {
@@ -152,7 +151,8 @@ float3 CalculateNormal(VSOutput input)
 
     float3x3 TBN = float3x3(T, B, N);
 
-    float3 tangentNormal = normalMapSampler.Sample(input.TexCoord).xyz * 2.0 - 1.0;
+    uint32_t normalMapIndex = perObject.material.normalTexIndex;
+    float3 tangentNormal = SampleBindless(normalMapIndex, input.TexCoord).xyz * 2.0 - 1.0;
 
     return normalize(mul(tangentNormal, TBN));
 }
@@ -217,17 +217,21 @@ PSOutput fragmentMain(VSOutput input)
     float3 V = normalize(scene.camPos - input.FragPos_WorldSpace);
     float3 R = reflect(-V, N);
 
-    float metallicTex = metallicMapSampler.Sample(input.TexCoord).r;
+    uint metallicTexIndex = perObject.material.metallicTexIndex;
+    float metallicTex = SampleBindless(metallicTexIndex, input.TexCoord).r;
     float metallic = clamp(metallicTex * perObject.material.metallic, 0.0, 1.0);
-    float roughnessTex = roughnessMapSampler.Sample(input.TexCoord).r;
+    uint roughnessTexIndex = perObject.material.roughnessTexIndex;
+    float roughnessTex = SampleBindless(roughnessTexIndex, input.TexCoord).r;
     float roughness = clamp(roughnessTex * perObject.material.roughness, 0.0, 1.0);
 
     float2 screenUV = input.Position.xy / scene.viewportSize;
     float globalAO = globalAoTexture.Sample(screenUV).r;
-    float materialAO = aoMapSampler.Sample(input.TexCoord).r;
+    uint aoTexIndex = perObject.material.aoTexIndex;
+    float materialAO = SampleBindless(aoTexIndex, input.TexCoord).r;
     float ao = globalAO * materialAO;
 
-    float3 albedoTex = albedoMapSampler.Sample(input.TexCoord).rgb;
+    uint albedoMapIndex = perObject.material.albedoTexIndex;
+    float3 albedoTex = SampleBindless(albedoMapIndex, input.TexCoord).rgb;
     float3 albedo = albedoTex * perObject.material.albedo.rgb;
 
     float3 F0 = float3(0.04, 0.04, 0.04);
@@ -276,7 +280,8 @@ PSOutput fragmentMain(VSOutput input)
 
     float3 color = ambient + Lo;
 
-    float3 emissiveTex = emissiveMapSampler.Sample(input.TexCoord).rgb;
+    uint emissiveTexIndex = perObject.material.emissiveTexIndex;
+    float3 emissiveTex = SampleBindless(emissiveTexIndex, input.TexCoord).rgb;
     float3 emissive = emissiveTex * perObject.material.emissive;
     color += emissive;
 

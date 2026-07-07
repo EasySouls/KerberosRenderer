@@ -51,15 +51,16 @@ SamplerCube prefilteredMapSampler;
 StructuredBuffer<GPULight> sceneLights;
 
 [[vk::binding(0, 1)]]
-Sampler2D albedoMapSampler;
+Texture2D globalTextures[];
 [[vk::binding(1, 1)]]
-Sampler2D normalMapSampler;
-[[vk::binding(2, 1)]]
-Sampler2D roughnessMapSampler;
-[[vk::binding(3, 1)]]
-Sampler2D metallicMapSampler;
-[[vk::binding(4, 1)]]
-Sampler2D aoMapSampler;
+SamplerState globalSamplers[];
+
+float4 SampleBindless(uint packedIndex, float2 uv) {
+    uint texIdx = packedIndex & 0x00FFFFFF;
+    uint sampIdx = packedIndex >> 24;
+
+    return globalTextures[texIdx].Sample(globalSamplers[sampIdx], uv);
+}
 
 float CalculateWeight(float z, float alpha) {
     return clamp(pow(alpha + 0.01f, 2.0f) * 1e3 * exp(-z * z * 0.1f), 1e-2, 3e3);
@@ -138,7 +139,8 @@ float3 CalculateNormal(VSOutput input)
 
     float3x3 TBN = float3x3(T, B, N);
 
-    float3 tangentNormal = normalMapSampler.Sample(input.TexCoord).xyz * 2.0 - 1.0;
+    uint normalMapIndex = perObject.material.normalTexIndex;
+    float3 tangentNormal = SampleBindless(normalMapIndex, input.TexCoord).xyz * 2.0 - 1.0;
 
     return normalize(mul(tangentNormal, TBN));
 }
@@ -179,12 +181,16 @@ PBOITData fragmentMain(VSOutput input)
     float3 V = normalize(scene.camPos - input.FragPos_WorldSpace);
     float3 R = reflect(-V, N);
 
-    float metallicTex = metallicMapSampler.Sample(input.TexCoord).r;
+    uint metallicTexIndex = perObject.material.metallicTexIndex;
+    float metallicTex = SampleBindless(metallicTexIndex, input.TexCoord).r;
     float metallic = clamp(metallicTex * perObject.material.metallic, 0.0, 1.0);
-    float roughnessTex = roughnessMapSampler.Sample(input.TexCoord).r;
+    uint roughnessTexIndex = perObject.material.roughnessTexIndex;
+    float roughnessTex = SampleBindless(roughnessTexIndex, input.TexCoord).r;
     float roughness = clamp(roughnessTex * perObject.material.roughness, 0.0, 1.0);
-    float ao = aoMapSampler.Sample(input.TexCoord).r;
-    float4 albedoTex = albedoMapSampler.Sample(input.TexCoord);
+    uint aoTexIndex = perObject.material.aoTexIndex;
+    float ao = SampleBindless(aoTexIndex, input.TexCoord).r;
+    uint albedoMapIndex = perObject.material.albedoTexIndex;
+    float4 albedoTex = SampleBindless(albedoMapIndex, input.TexCoord);
     float3 albedo = albedoTex.rgb * perObject.material.albedo.rgb;
 
     float baseAlpha = albedoTex.a * perObject.material.albedo.a;
