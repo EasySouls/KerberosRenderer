@@ -458,6 +458,13 @@ namespace
 		bool UseGTAO = true;
 		bool UseBlurredGTAO = true;
 
+		bool UseFrustumCulling = true;
+		bool FreezeFrustum = false;
+		Frustum FrozenFrustum{};
+		uint32_t AllObjectCount = 0;
+		uint32_t VisibleObjectCount = 0;
+		uint32_t CulledObjectCount = 0;
+
 		AntiAliasingMode AntiAliasingMode = AntiAliasingMode::FXAA;
 		TonemappingOperator TonemappingOperator = TonemappingOperator::ACES;
 	};
@@ -621,10 +628,51 @@ namespace Kerberos
 			context.GetDevice().updateDescriptorSets(asWrite, {});
 		}
 
-		auto [renderObjects, uniqueMaterials] = GetRenderObjectsAndUniqueMaterialsFromScene(*s_Data->PendingRender.Scene.get());
+		auto [allObjects, uniqueMaterials] = GetRenderObjectsAndUniqueMaterialsFromScene(*s_Data->PendingRender.Scene.get());
 		const auto colliderLineVertices = s_Data->DisplayPhysicsColliders
 			? GetColliderLineVerticesFromScene(*s_Data->PendingRender.Scene.get())
 			: std::vector<LineVertex>{};
+
+		// Update all per-object uniform buffers once
+		for (const auto& renderObject : allObjects)
+		{
+			const auto& [Transform, Mesh, Material, EntityID, WorldAABB, UBOIndex] = renderObject;
+
+			Ref<Kerberos::Material> material = Material;
+			if (material == nullptr)
+				material = s_Data->MaterialRegistry.Get("DebugPink");
+
+			UpdatePerObjectUniformBuffer(frameIndex, UBOIndex, Transform, *material, EntityID);
+		}
+
+		std::vector<RenderObject> renderObjects;
+		renderObjects.reserve(allObjects.size());
+
+		if (!s_Data->UseFrustumCulling)
+		{
+			renderObjects = allObjects;
+		}
+		else
+		{
+
+			Frustum frustum;
+			if (s_Data->FreezeFrustum)
+			{
+				frustum = s_Data->FrozenFrustum;
+			}
+			else
+			{
+				frustum = Frustum::CreateFromViewProjection(s_Data->PendingRender.Projection * s_Data->PendingRender.View);
+			}
+
+			renderObjects = FrustumCullRenderObjects(allObjects, frustum);
+
+			s_Data->FrozenFrustum = frustum;
+		}
+
+		s_Data->AllObjectCount = static_cast<uint32_t>(allObjects.size());
+		s_Data->VisibleObjectCount = static_cast<uint32_t>(renderObjects.size());
+		s_Data->CulledObjectCount = s_Data->AllObjectCount - s_Data->VisibleObjectCount;
 
 		auto& renderStatistics = s_Data->LatestRenderStatistics;
 		renderStatistics = {};
@@ -796,19 +844,12 @@ namespace Kerberos
 
 			cmd.bindPipeline(vk::PipelineBindPoint::eGraphics, *s_Data->DepthPrePassPipeline->GetVulkanPipeline());
 
-			for (uint32_t i = 0; i < renderObjects.size(); ++i)
+			for (const auto& renderObject : renderObjects)
 			{
-				const auto& [Transform, Mesh, Material, EntityID] = renderObjects[i];
-
-				Ref<Kerberos::Material> material = Material;
-				if (material == nullptr)
-					material = s_Data->MaterialRegistry.Get("DebugPink");
-
-				if (material->IsTransparent())
+				if (renderObject.Material != nullptr && renderObject.Material->IsTransparent())
 					continue;
 
-				UpdatePerObjectUniformBuffer(currentImage, i, Transform, *material, EntityID);
-				uint32_t dynamicOffset = static_cast<uint32_t>(i * s_Data->DynamicAlignment);
+				uint32_t dynamicOffset = static_cast<uint32_t>(renderObject.UBOIndex * s_Data->DynamicAlignment);
 
 				cmd.bindDescriptorSets(
 					vk::PipelineBindPoint::eGraphics,
@@ -817,7 +858,7 @@ namespace Kerberos
 					{ s_Data->DescriptorSets[currentImage].scene, s_Data->TextureManager.GetGlobalDescriptorSet() },
 					{ dynamicOffset });
 
-				Mesh->Draw(cmd);
+				renderObject.Mesh->Draw(cmd);
 			}
 
 			cmd.endRendering();
@@ -826,114 +867,11 @@ namespace Kerberos
 			WriteGPUTimestamp(cmd, frameIndex, static_cast<uint32_t>(GPUTimestampQuery::DepthPrePassEnd));
 		}
 
-		// Render shadow map
-	   {
-			WriteGPUTimestamp(cmd, frameIndex, static_cast<uint32_t>(GPUTimestampQuery::ShadowBegin));
+		WriteGPUTimestamp(cmd, frameIndex, static_cast<uint32_t>(GPUTimestampQuery::ShadowBegin));
 
-			vk::ImageMemoryBarrier2 barrier = {
-				.srcStageMask = vk::PipelineStageFlagBits2::eEarlyFragmentTests | vk::PipelineStageFlagBits2::eLateFragmentTests,
-				.srcAccessMask = vk::AccessFlagBits2::eDepthStencilAttachmentWrite,
-				.dstStageMask = vk::PipelineStageFlagBits2::eEarlyFragmentTests | vk::PipelineStageFlagBits2::eLateFragmentTests,
-				.dstAccessMask = vk::AccessFlagBits2::eDepthStencilAttachmentRead | vk::AccessFlagBits2::eDepthStencilAttachmentWrite,
-				.oldLayout = vk::ImageLayout::eUndefined,
-				.newLayout = vk::ImageLayout::eDepthAttachmentOptimal,
-				.srcQueueFamilyIndex = vk::QueueFamilyIgnored,
-				.dstQueueFamilyIndex = vk::QueueFamilyIgnored,
-				.image = s_Data->ShadowMap.Image,
-				.subresourceRange = {
-					.aspectMask = vk::ImageAspectFlagBits::eDepth,
-					.baseMipLevel = 0,
-					.levelCount = 1,
-					.baseArrayLayer = 0,
-					.layerCount = ShadowMap::CascadeCount
-				}
-			};
+		RenderShadowPass(cmd, frameIndex, allObjects);
 
-			const vk::DependencyInfo dependencyInfo = {
-				.dependencyFlags = {},
-				.imageMemoryBarrierCount = 1,
-				.pImageMemoryBarriers = &barrier
-			};
-
-			cmd.pipelineBarrier2(dependencyInfo);
-
-			cmd.bindPipeline(vk::PipelineBindPoint::eGraphics, *s_Data->ShadowMap.Pipeline->GetVulkanPipeline());
-			cmd.setDepthBias(s_Data->DepthBias.ConstantFactor, s_Data->DepthBias.Clamp, s_Data->DepthBias.SlopeFactor);
-
-			const vk::Rect2D renderArea{
-				.offset = vk::Offset2D{.x = 0, .y = 0 },
-				.extent = vk::Extent2D{.width = s_Data->ShadowMap.Size, .height = s_Data->ShadowMap.Size }
-			};
-
-			static constexpr std::array<std::string_view, ShadowMap::CascadeCount> ShadowCascadePassLabels = {
-				"Shadow Pass (Cascade 0)",
-				"Shadow Pass (Cascade 1)",
-				"Shadow Pass (Cascade 2)",
-				"Shadow Pass (Cascade 3)"
-			};
-			for (uint32_t cascadeIndex = 0; cascadeIndex < ShadowMap::CascadeCount; ++cascadeIndex)
-			{
-				vk::RenderingAttachmentInfo shadowMapDepthAttachmentInfo{
-				.imageView = s_Data->ShadowMap.WriteImageViews[cascadeIndex],
-				.imageLayout = vk::ImageLayout::eDepthAttachmentOptimal,
-				.loadOp = vk::AttachmentLoadOp::eClear,
-				.storeOp = vk::AttachmentStoreOp::eStore,
-				.clearValue = vk::ClearDepthStencilValue{.depth = 1.0f, .stencil = 0 }
-				};
-
-				const vk::RenderingInfo shadowMapRenderingInfo{
-					.renderArea = renderArea,
-					.layerCount = 1,
-					.colorAttachmentCount = 0,
-					.pColorAttachments = nullptr,
-					.pDepthAttachment = &shadowMapDepthAttachmentInfo
-				};
-
-				BeginRenderPassDebugLabel(cmd, ShadowCascadePassLabels[cascadeIndex]);
-				cmd.beginRendering(shadowMapRenderingInfo);
-				cmd.setViewport(0, vk::Viewport{
-									.x = 0.0f, .y = 0.0f,
-									.width = static_cast<float>(s_Data->ShadowMap.Size),
-									.height = static_cast<float>(s_Data->ShadowMap.Size),
-									.minDepth = 0.0f,
-									.maxDepth = 1.0f
-								});
-				cmd.setScissor(0, renderArea);
-
-				cmd.pushConstants<uint32_t>(*s_Data->ShadowMap.PipelineLayout, vk::ShaderStageFlagBits::eVertex, 0, { cascadeIndex });
-
-				for (uint32_t i = 0; i < renderObjects.size(); ++i)
-				{
-					const auto& [Transform, Mesh, Material, EntityID] = renderObjects[i];
-
-					Ref<Kerberos::Material> material = Material;
-					if (material == nullptr)
-						material = s_Data->MaterialRegistry.Get("DebugPink");
-
-					if (material->IsTransparent())
-						continue;
-
-					UpdatePerObjectUniformBuffer(currentImage, i, Transform, *material, EntityID);
-					uint32_t dynamicOffset = static_cast<uint32_t>(i * s_Data->DynamicAlignment);
-
-					cmd.bindDescriptorSets(
-						vk::PipelineBindPoint::eGraphics,
-						*s_Data->ShadowMap.PipelineLayout,
-						0,
-						{ s_Data->DescriptorSets[currentImage].scene },
-						{ dynamicOffset });
-
-					Mesh->Draw(cmd);
-				}
-				
-				cmd.endRendering();
-				EndRenderPassDebugLabel(cmd);
-			}
-
-			WriteGPUTimestamp(cmd, frameIndex, static_cast<uint32_t>(GPUTimestampQuery::ShadowEnd));
-
-			KBR_CORE_TRACE("Shadow pass done!");
-		}
+		WriteGPUTimestamp(cmd, frameIndex, static_cast<uint32_t>(GPUTimestampQuery::ShadowEnd));
 
 		// GTAO compute pass
 		{
@@ -1504,19 +1442,12 @@ namespace Kerberos
 					opaquePipeline->Bind(cmd);
 				}
 
-				for (uint32_t i = 0; i < renderObjects.size(); ++i)
+				for (const auto& renderObject : renderObjects)
 				{
-					const auto& [Transform, Mesh, Material, EntityID] = renderObjects[i];
-
-					Ref<Kerberos::Material> material = Material;
-					if (material == nullptr)
-						material = s_Data->MaterialRegistry.Get("DebugPink");
-
-					if (material->IsTransparent())
+					if (renderObject.Material != nullptr && renderObject.Material->IsTransparent())
 						continue;
 
-					UpdatePerObjectUniformBuffer(currentImage, i, Transform, *material, EntityID);
-					uint32_t dynamicOffset = static_cast<uint32_t>(i * s_Data->DynamicAlignment);
+					uint32_t dynamicOffset = static_cast<uint32_t>(renderObject.UBOIndex * s_Data->DynamicAlignment);
 
 					cmd.bindDescriptorSets(
 						vk::PipelineBindPoint::eGraphics,
@@ -1525,7 +1456,7 @@ namespace Kerberos
 						{ s_Data->DescriptorSets[currentImage].scene, s_Data->TextureManager.GetGlobalDescriptorSet() },
 						{ dynamicOffset });
 
-					Mesh->Draw(cmd);
+					renderObject.Mesh->Draw(cmd);
 				}
 			}
 
@@ -1533,21 +1464,9 @@ namespace Kerberos
 			{
 				s_Data->NormalDebugPipeline->Bind(cmd);
 
-				const auto meshView = scene->m_Registry.view<TransformComponent, StaticMeshComponent>();
-				int i = 0;
-				for (const auto entity : meshView)
+				for (const auto& renderObject : renderObjects)
 				{
-					auto& transform = meshView.get<TransformComponent>(entity);
-					auto& meshComp = meshView.get<StaticMeshComponent>(entity);
-					if (!meshComp.Visible || !meshComp.StaticMesh /* || !meshComp.MeshMaterial*/)
-						continue;
-
-					Ref<Material> material = meshComp.MeshMaterial;
-					if (material == nullptr)
-						material = s_Data->MaterialRegistry.Get("DebugPink");
-
-					UpdatePerObjectUniformBuffer(currentImage, static_cast<uint32_t>(i), transform.GetTransform(), *material, std::numeric_limits<uint32_t>::max());
-					uint32_t dynamicOffset = static_cast<uint32_t>(i * s_Data->DynamicAlignment);
+					const uint32_t dynamicOffset = static_cast<uint32_t>(renderObject.UBOIndex * s_Data->DynamicAlignment);
 
 					cmd.bindDescriptorSets(
 						vk::PipelineBindPoint::eGraphics,
@@ -1556,9 +1475,7 @@ namespace Kerberos
 						{ s_Data->DescriptorSets[currentImage].scene },
 						{ dynamicOffset });
 
-					meshComp.StaticMesh->Draw(cmd);
-
-					++i;
+					renderObject.Mesh->Draw(cmd);
 				}
 			}
 
@@ -1678,19 +1595,12 @@ namespace Kerberos
 
 			s_Data->Transparency.MainPipeline->Bind(cmd);
 
-			for (uint32_t i = 0; i < renderObjects.size(); ++i)
+			for (const auto& renderObject : renderObjects)
 			{
-				const auto& [Transform, Mesh, Material, EntityID] = renderObjects[i];
-
-				Ref<Kerberos::Material> material = Material;
-				if (material == nullptr)
-					material = s_Data->MaterialRegistry.Get("DebugPink");
-
-				if (!material->IsTransparent())
+				if (renderObject.Material != nullptr && !renderObject.Material->IsTransparent())
 					continue;
 
-				UpdatePerObjectUniformBuffer(currentImage, i, Transform, *material, EntityID);
-				uint32_t dynamicOffset = static_cast<uint32_t>(i * s_Data->DynamicAlignment);
+				uint32_t dynamicOffset = static_cast<uint32_t>(renderObject.UBOIndex * s_Data->DynamicAlignment);
 
 				cmd.bindDescriptorSets(
 					vk::PipelineBindPoint::eGraphics,
@@ -1699,7 +1609,7 @@ namespace Kerberos
 					{ s_Data->DescriptorSets[currentImage].scene, s_Data->TextureManager.GetGlobalDescriptorSet() },
 					{ dynamicOffset });
 
-				Mesh->Draw(cmd);
+				renderObject.Mesh->Draw(cmd);
 			}
 
 			cmd.endRendering();
@@ -4082,6 +3992,31 @@ namespace Kerberos
 		return s_Data->TonemappingOperator;
 	}
 
+	bool& Renderer::GetUseFrustumCulling()
+	{
+		return s_Data->UseFrustumCulling;
+	}
+
+	bool& Renderer::GetFreezeFrustum()
+	{
+		return s_Data->FreezeFrustum;
+	}
+
+	uint32_t Renderer::GetAllObjectCount()
+	{
+		return s_Data->AllObjectCount;
+	}
+
+	uint32_t Renderer::GetVisibleObjectCount()
+	{
+		return s_Data->VisibleObjectCount;
+	}
+
+	uint32_t Renderer::GetCulledObjectCount()
+	{
+		return s_Data->CulledObjectCount;
+	}
+
 	glm::vec2 Renderer::GetOutputImageSize() 
 	{
 		KBR_CORE_ASSERT(s_Data, "Renderer not initialized!");
@@ -4435,6 +4370,36 @@ namespace Kerberos
 		return sceneLights;
     }
 
+    static AABB CalculateWorldAABB(const AABB& localAABB, const glm::mat4& worldTransform)
+	{
+		AABB worldAABB;
+
+		const glm::mat3 rotScaleMatrix = glm::mat3(worldTransform);
+
+		glm::mat3 absRotScaleMat;
+		for (int col = 0; col < 3; ++col)
+		{
+			for (int row = 0; row < 3; ++row)
+			{
+				absRotScaleMat[col][row] = std::abs(rotScaleMatrix[col][row]);
+			}
+		}
+
+		const glm::vec3 localMin = localAABB.Min;
+		const glm::vec3 localMax = localAABB.Max;
+
+		const glm::vec3 worldCenter = glm::vec3(worldTransform * glm::vec4((localMin + localMax) * 0.5f, 1.0f));
+
+		const glm::vec3 localExtents = (localMax - localMin) * 0.5f;
+
+		const glm::vec3 worldExtents = absRotScaleMat * localExtents;
+
+		worldAABB.Min = worldCenter - worldExtents;
+		worldAABB.Max = worldCenter + worldExtents;
+
+		return worldAABB;
+	}
+
     std::pair<std::vector<RenderObject>, std::set<Ref<Material>>> Renderer::GetRenderObjectsAndUniqueMaterialsFromScene(
 	    const Scene& scene) 
 	{
@@ -4443,6 +4408,8 @@ namespace Kerberos
 		std::vector<RenderObject> renderObjects;
 		std::set<Ref<Material>> uniqueMaterials;
 		renderObjects.reserve(renderObjectCountFromLastFrame);
+
+		uint32_t entityCount = 0;
 
 		const auto meshView = scene.m_Registry.view<TransformComponent, StaticMeshComponent>();
 		for (const auto entity : meshView)
@@ -4458,6 +4425,11 @@ namespace Kerberos
 			renderObject.Mesh = staticMesh.StaticMesh;
 			renderObject.Material = staticMesh.MeshMaterial;
 			renderObject.EntityID = static_cast<uint32_t>(entity);
+
+			renderObject.WorldAABB = CalculateWorldAABB(staticMesh.StaticMesh->GetBoundingBox(), renderObject.Transform);
+
+			renderObject.UBOIndex = entityCount++;
+
 			renderObjects.push_back(renderObject);
 			if (renderObject.Material)
 				uniqueMaterials.insert(renderObject.Material);
@@ -4534,6 +4506,124 @@ namespace Kerberos
 		}
 
 		return vertices;
+	}
+
+	std::vector<RenderObject> Renderer::FrustumCullRenderObjects(const std::vector<RenderObject>& renderObjects,
+		const Frustum& frustum) 
+	{
+		std::vector<RenderObject> culledObjects;
+		culledObjects.reserve(renderObjects.size());
+
+		for (const auto& renderObject : renderObjects)
+		{
+			if (renderObject.WorldAABB.IsInsideFrustum(frustum))
+			{
+				culledObjects.push_back(renderObject);
+			}
+		}
+
+		return culledObjects;
+	}
+
+	void Renderer::RenderShadowPass(const vk::raii::CommandBuffer& cmd, uint32_t frameIndex,
+	                                const std::vector<RenderObject>& renderObjects)
+	{
+		vk::ImageMemoryBarrier2 barrier = {
+				.srcStageMask = vk::PipelineStageFlagBits2::eEarlyFragmentTests | vk::PipelineStageFlagBits2::eLateFragmentTests,
+				.srcAccessMask = vk::AccessFlagBits2::eDepthStencilAttachmentWrite,
+				.dstStageMask = vk::PipelineStageFlagBits2::eEarlyFragmentTests | vk::PipelineStageFlagBits2::eLateFragmentTests,
+				.dstAccessMask = vk::AccessFlagBits2::eDepthStencilAttachmentRead | vk::AccessFlagBits2::eDepthStencilAttachmentWrite,
+				.oldLayout = vk::ImageLayout::eUndefined,
+				.newLayout = vk::ImageLayout::eDepthAttachmentOptimal,
+				.srcQueueFamilyIndex = vk::QueueFamilyIgnored,
+				.dstQueueFamilyIndex = vk::QueueFamilyIgnored,
+				.image = s_Data->ShadowMap.Image,
+				.subresourceRange = {
+					.aspectMask = vk::ImageAspectFlagBits::eDepth,
+					.baseMipLevel = 0,
+					.levelCount = 1,
+					.baseArrayLayer = 0,
+					.layerCount = ShadowMap::CascadeCount
+				}
+		};
+
+		const vk::DependencyInfo dependencyInfo = {
+			.dependencyFlags = {},
+			.imageMemoryBarrierCount = 1,
+			.pImageMemoryBarriers = &barrier
+		};
+
+		cmd.pipelineBarrier2(dependencyInfo);
+
+		cmd.bindPipeline(vk::PipelineBindPoint::eGraphics, *s_Data->ShadowMap.Pipeline->GetVulkanPipeline());
+		cmd.setDepthBias(s_Data->DepthBias.ConstantFactor, s_Data->DepthBias.Clamp, s_Data->DepthBias.SlopeFactor);
+
+		const vk::Rect2D renderArea{
+			.offset = vk::Offset2D{.x = 0, .y = 0 },
+			.extent = vk::Extent2D{.width = s_Data->ShadowMap.Size, .height = s_Data->ShadowMap.Size }
+		};
+
+		static constexpr std::array<std::string_view, ShadowMap::CascadeCount> ShadowCascadePassLabels = {
+			"Shadow Pass (Cascade 0)",
+			"Shadow Pass (Cascade 1)",
+			"Shadow Pass (Cascade 2)",
+			"Shadow Pass (Cascade 3)"
+		};
+		for (uint32_t cascadeIndex = 0; cascadeIndex < ShadowMap::CascadeCount; ++cascadeIndex)
+		{
+			vk::RenderingAttachmentInfo shadowMapDepthAttachmentInfo{
+				.imageView = s_Data->ShadowMap.WriteImageViews[cascadeIndex],
+				.imageLayout = vk::ImageLayout::eDepthAttachmentOptimal,
+				.loadOp = vk::AttachmentLoadOp::eClear,
+				.storeOp = vk::AttachmentStoreOp::eStore,
+				.clearValue = vk::ClearDepthStencilValue{.depth = 1.0f, .stencil = 0 }
+			};
+
+			const vk::RenderingInfo shadowMapRenderingInfo{
+				.renderArea = renderArea,
+				.layerCount = 1,
+				.colorAttachmentCount = 0,
+				.pColorAttachments = nullptr,
+				.pDepthAttachment = &shadowMapDepthAttachmentInfo
+			};
+
+			BeginRenderPassDebugLabel(cmd, ShadowCascadePassLabels[cascadeIndex]);
+			cmd.beginRendering(shadowMapRenderingInfo);
+			cmd.setViewport(0, vk::Viewport{
+								.x = 0.0f, .y = 0.0f,
+								.width = static_cast<float>(s_Data->ShadowMap.Size),
+								.height = static_cast<float>(s_Data->ShadowMap.Size),
+								.minDepth = 0.0f,
+								.maxDepth = 1.0f
+							});
+			cmd.setScissor(0, renderArea);
+
+			cmd.pushConstants<uint32_t>(*s_Data->ShadowMap.PipelineLayout, vk::ShaderStageFlagBits::eVertex, 0, { cascadeIndex });
+
+			// Cull objects
+			Frustum frustum = Frustum::CreateFromViewProjection(s_Data->SceneUniformData.lightSpaceMatrices[cascadeIndex]);
+			const std::vector<RenderObject> culledObjects = FrustumCullRenderObjects(renderObjects, frustum);
+
+			for (const auto& renderObject : culledObjects)
+			{
+				if (renderObject.Material != nullptr && renderObject.Material->IsTransparent())
+					continue;
+
+				const uint32_t dynamicOffset = static_cast<uint32_t>(renderObject.UBOIndex * s_Data->DynamicAlignment);
+
+				cmd.bindDescriptorSets(
+					vk::PipelineBindPoint::eGraphics,
+					*s_Data->ShadowMap.PipelineLayout,
+					0,
+					{ s_Data->DescriptorSets[frameIndex].scene },
+					{ dynamicOffset });
+
+				renderObject.Mesh->Draw(cmd);
+			}
+
+			cmd.endRendering();
+			EndRenderPassDebugLabel(cmd);
+		}
 	}
 
 	void Renderer::RenderParticles(const vk::raii::CommandBuffer& cmd, const uint32_t frameIndex)
@@ -6670,7 +6760,6 @@ namespace Kerberos
 		const auto& device = context.GetDevice();
 		const uint32_t mipCount = s_Data->Bloom.MipLevels;
 
-		// 1. Allocate Descriptor Sets (if they don't exist yet)
 		if (s_Data->Bloom.ExtractSet == nullptr)
 		{
 			const vk::DescriptorSetAllocateInfo extractAllocInfo{
@@ -6678,7 +6767,7 @@ namespace Kerberos
 				.descriptorSetCount = 1,
 				.pSetLayouts = &*s_Data->DescriptorSetLayouts.bloom
 			};
-			// Allocate 1 set for the initial extract pass
+
 			s_Data->Bloom.ExtractSet = std::move(device.allocateDescriptorSets(extractAllocInfo).front());
 
 			std::vector<vk::DescriptorSetLayout> mipLayouts(mipCount - 1, *s_Data->DescriptorSetLayouts.bloom);
@@ -6688,18 +6777,16 @@ namespace Kerberos
 				.pSetLayouts = mipLayouts.data()
 			};
 
-			// Allocate sets for going down and coming back up the mip chain
 			s_Data->Bloom.DownsampleSets = device.allocateDescriptorSets(mipAllocInfo);
 			s_Data->Bloom.UpsampleSets = device.allocateDescriptorSets(mipAllocInfo);
 		}
 
 		std::vector<vk::WriteDescriptorSet> writes;
 
-		// We must keep these structs alive in memory until updateDescriptorSets is called!
 		std::vector<vk::DescriptorImageInfo> imageInfos;
 		imageInfos.reserve(2 + (mipCount - 1) * 4);
 
-		// 2. Write Extract Set (Resolve Image -> Bloom Mip 0)
+		// Write Extract Set (Resolve Image -> Bloom Mip 0)
 		imageInfos.push_back({ *s_Data->LinearSampler, *s_Data->ResolveImage.ImageView, vk::ImageLayout::eShaderReadOnlyOptimal });
 		imageInfos.push_back({ *s_Data->LinearSampler, *s_Data->Bloom.ImageViews[0], vk::ImageLayout::eGeneral });
 
@@ -6720,10 +6807,10 @@ namespace Kerberos
 			.pImageInfo = &imageInfos[1]
 		});
 
-		// 3. Write Downsample and Upsample Sets
+		// Write Downsample and Upsample Sets
 		for (uint32_t i = 0; i < mipCount - 1; i++)
 		{
-			uint32_t baseIdx = imageInfos.size();
+			const uint32_t baseIdx = imageInfos.size();
 
 			// Downsample: Reads Mip i, Writes Mip i+1
 			imageInfos.push_back({ *s_Data->LinearSampler, *s_Data->Bloom.ImageViews[i], vk::ImageLayout::eGeneral });

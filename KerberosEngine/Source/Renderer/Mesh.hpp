@@ -2,6 +2,7 @@
 
 #include "Vulkan.hpp"
 #include "Renderer/Vertex.hpp"
+#include "Scene/AABB.hpp"
 #include "Assets/Asset.hpp"
 #include "Buffer.hpp"
 
@@ -36,6 +37,8 @@ namespace Kerberos
 		const VertexBuffer& GetVertexBuffer() const { return m_VertexBuffer; }
 		const IndexBuffer& GetIndexBuffer() const { return m_IndexBuffer; }
 
+		const AABB& GetBoundingBox() const { return m_BoundingBox; }
+
 	private:
 		std::vector<Vertex> m_Vertices;
 		std::vector<uint32_t> m_Indices;
@@ -44,5 +47,7 @@ namespace Kerberos
 
 		VertexBuffer m_VertexBuffer;
 		IndexBuffer m_IndexBuffer;
+
+		AABB m_BoundingBox;
 	};
 }

@@ -9,11 +9,20 @@ namespace Kerberos
 	Mesh::Mesh(const std::vector<Vertex>& vertices, const std::vector<uint32_t>& indices)
 		: m_Vertices(vertices), m_Indices(indices), m_VertexBuffer(vertices), m_IndexBuffer(indices)
 	{
+		AABB boundingBox;
+
+		for (const auto& vertex : vertices)
+		{
+			boundingBox.Min = glm::min(boundingBox.Min, vertex.Position);
+			boundingBox.Max = glm::max(boundingBox.Max, vertex.Position);
+		}
+		m_BoundingBox = boundingBox;
 	}
 
 	Mesh::Mesh(const std::string& name, const std::vector<Vertex>& vertices, const std::vector<uint32_t>& indices) 
-		: m_Vertices(vertices), m_Indices(indices), m_Name(name), m_VertexBuffer(vertices), m_IndexBuffer(indices)
+		: Mesh(vertices, indices)
 	{
+		m_Name = name;
 		SetDebugName(name);
 	}
 

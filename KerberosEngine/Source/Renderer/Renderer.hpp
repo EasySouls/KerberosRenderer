@@ -77,6 +77,8 @@ namespace Kerberos
 		Ref<Mesh> Mesh = nullptr;
 		Ref<Material> Material{};
 		uint32_t EntityID = 0;
+		AABB WorldAABB{};
+		uint32_t UBOIndex = 0;
 	};
 
 	struct GTAOConstants
@@ -155,6 +157,11 @@ namespace Kerberos
 		static float& GetBloomKnee();
 		static float& GetBloomMaxBrightness();
 		static TonemappingOperator& GetTonemappingOperator();
+		static bool& GetUseFrustumCulling();
+		static bool& GetFreezeFrustum();
+		static uint32_t GetAllObjectCount();
+		static uint32_t GetVisibleObjectCount();
+		static uint32_t GetCulledObjectCount();
 
 		static glm::vec2 GetOutputImageSize();
 
@@ -197,6 +204,10 @@ namespace Kerberos
 		static std::vector<GPULight> GetLightsFromScene(const Scene& scene);
 		static std::pair<std::vector<RenderObject>, std::set<Ref<Material>>> GetRenderObjectsAndUniqueMaterialsFromScene(const Scene& scene);
 		static std::vector<LineVertex> GetColliderLineVerticesFromScene(const Scene& scene);
+
+		static std::vector<RenderObject> FrustumCullRenderObjects(const std::vector<RenderObject>& renderObjects, const Frustum& frustum);
+
+		static void RenderShadowPass(const vk::raii::CommandBuffer& cmd, uint32_t frameIndex, const std::vector<RenderObject>& renderObjects);
 
 		static void RenderParticles(const vk::raii::CommandBuffer& cmd, uint32_t frameIndex);
 		static void RenderGrass(const vk::raii::CommandBuffer& cmd, uint32_t frameIndex);

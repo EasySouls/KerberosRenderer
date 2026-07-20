@@ -17,6 +17,7 @@
 #include "Renderer/Textures/Texture.hpp"
 #include "Renderer/Textures/TextureCube.hpp"
 #include "Scene/Camera/SceneCamera.hpp"
+#include "Scene/AABB.hpp"
 #include "Renderer/Font.hpp"
 #include "Core/UUID.hpp"
 
@@ -179,6 +180,8 @@ namespace Kerberos
 		Ref<Mesh> StaticMesh = nullptr;
 		Ref<Material> MeshMaterial = nullptr;
 		Ref<Texture2D> MeshTexture = nullptr;
+
+		AABB WorldAABB;
 
 		bool Visible = true;
 		bool CastShadows = true;

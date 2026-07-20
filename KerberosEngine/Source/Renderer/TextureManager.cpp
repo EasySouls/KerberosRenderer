@@ -166,7 +166,7 @@ namespace Kerberos
 		const Ref<Texture2D> texture = AssetManager::GetAsset<Texture2D>(handle);
 		if (!texture)
 		{
-			KBR_CORE_ASSERT("Texture not found for handle: {0}", handle);
+			KBR_CORE_ASSERT(false, "Texture not found for handle: {0}", handle);
 			return GetWhiteTexture();
 		}
 

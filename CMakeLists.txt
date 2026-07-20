@@ -35,6 +35,10 @@ target_compile_options(KerberosBuildSettings INTERFACE
     $<$<CXX_COMPILER_ID:Clang>:-Wall -Wextra -Wpedantic>
 )
 
+if(MSVC)
+    add_compile_options(/FC)
+endif()
+
 add_subdirectory(KerberosEngine)
 add_subdirectory(KerberosScriptCoreLib)
 add_subdirectory(KerberosEditor)

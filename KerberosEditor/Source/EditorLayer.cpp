@@ -1003,6 +1003,16 @@ namespace Kerberos
 
 		ImGui::Separator();
 
+		ImGui::Text("Frustum culling");
+
+		ImGui::Checkbox("Use Frustum Culling", &Renderer::GetUseFrustumCulling());
+		ImGui::Checkbox("Freeze Frustum", &Renderer::GetFreezeFrustum());
+		ImGui::Text("All objects: %u", Renderer::GetAllObjectCount());
+		ImGui::Text("Visible objects: %u", Renderer::GetVisibleObjectCount());
+		ImGui::Text("Culled objects: %u", Renderer::GetCulledObjectCount());
+
+		ImGui::Separator();
+
 		// Light controls
 		/*ImGui::Text("Light directions");
 		ImGui::DragFloat3("Light 1 Direction", glm::value_ptr(m_UniformDataParams.lights[0]), 0.1f);
