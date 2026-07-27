@@ -1,7 +1,7 @@
 #pragma once
 
 #include "Application.hpp"
-#include "Debug/Instrumentor.hpp"
+#include "Profiling/Instrumentor.hpp"
 #include "Logging/CrashHandler.hpp"
 
 namespace Kerberos

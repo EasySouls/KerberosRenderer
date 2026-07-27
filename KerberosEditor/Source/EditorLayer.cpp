@@ -7,7 +7,7 @@
 #include "AssetConstants.hpp"
 #include "Assets/AssetManager.hpp"
 #include "Assets/Importers/TextureImporter.hpp"
-#include "Debug/Instrumentor.hpp"
+#include "Profiling/Instrumentor.hpp"
 #include "ImGuizmo/ImGuizmo.h"
 #include "Input/InputSystem.hpp"
 #include "Utils/SystemOperations.hpp"

@@ -5,7 +5,7 @@
 #include "Assets/AssetManager.hpp"
 #include "Assets/Importers/MaterialImporter.hpp"
 #include "Assets/Importers/TextureImporter.hpp"
-#include "Debug/Instrumentor.hpp"
+#include "Profiling/Instrumentor.hpp"
 #include "Project/Project.hpp"
 #include "Utils/SystemOperations.hpp"
 

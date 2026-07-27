@@ -14,8 +14,9 @@
 #include <filesystem>
 #include <optional>
 
-// Windows
+#ifdef KBR_PLATFORM_WINDOWS
 #include <Windows.h>
+#endif
 
 // Third-party
 #define VULKAN_HPP_NO_STRUCT_CONSTRUCTORS
@@ -33,4 +34,4 @@
 #include "Core/Core.hpp"
 #include "Core/UUID.hpp"
 #include "Logging/Log.hpp"
-#include "Debug/Instrumentor.hpp"
+#include "Profiling/Instrumentor.hpp"
