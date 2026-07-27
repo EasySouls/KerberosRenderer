@@ -1,0 +1,15 @@
+{
+  "configurations": [
+    {
+      "name": "Debug Game Engine",
+      "type": "cppvsdbg",
+      "request": "launch",
+      "program": "${command:cmake.launchTargetPath}",
+      "args": [],
+      "stopAtEntry": false,
+      "cwd": "${workspaceFolder}",
+      "environment": [],
+      "console": "integratedTerminal"
+    }
+  ]
+}

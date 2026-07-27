@@ -37,6 +37,7 @@ target_compile_options(KerberosBuildSettings INTERFACE
 
 if(MSVC)
     add_compile_options(/FC)
+    add_compile_options(/EHsc)
 endif()
 
 add_subdirectory(KerberosEngine)
