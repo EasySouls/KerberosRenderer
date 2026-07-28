@@ -25,16 +25,18 @@ static constexpr std::array validationLayers = {
 	"VK_LAYER_KHRONOS_validation"
 };
 
-static constexpr std::array deviceExtensions = {
+static constexpr std::array requiredDeviceExtensions = {
 	vk::KHRSwapchainExtensionName,
 	vk::KHRSpirv14ExtensionName,
 	vk::KHRSynchronization2ExtensionName,
 	vk::KHRCreateRenderpass2ExtensionName,
 	vk::EXTDescriptorBufferExtensionName,
+};
+
+static constexpr std::array optionalDeviceExtensions = {
 	vk::EXTMeshShaderExtensionName,
 	vk::EXTShaderObjectExtensionName,
-
-	// TODO: These are not neccessary, implement a fallback when ray tracing is not supported
+	// Ray Tracing optional extensions
 	vk::KHRAccelerationStructureExtensionName,
 	vk::KHRBufferDeviceAddressExtensionName,
 	vk::KHRDeferredHostOperationsExtensionName,
@@ -924,43 +926,87 @@ namespace Kerberos
 	void VulkanContext::PickPhysicalDevice()
 	{
 		const auto devices = m_Instance.enumeratePhysicalDevices();
-		if (devices.empty()) {
+		if (devices.empty())
+		{
 			throw std::runtime_error("Failed to find GPUs with Vulkan support!");
 		}
 
-		const auto devIter = std::ranges::find_if(devices,
-		                                          [&](const vk::raii::PhysicalDevice& device) {
-			                                          auto queueFamilies = device.getQueueFamilyProperties2() 
-														  | std::views::transform([](const vk::QueueFamilyProperties2& qfp2) { return qfp2.queueFamilyProperties; });
+		for (const vk::raii::PhysicalDevice& device : devices)
+		{
+			const auto deviceProperties = device.getProperties2().properties;
+			KBR_CORE_INFO("Evaluating GPU: {}", deviceProperties.deviceName.data());
 
-			                                          bool isSuitable = device.getProperties2().properties.apiVersion >= VK_API_VERSION_1_3;
-			                                          const auto qfpIter = std::ranges::find_if(queueFamilies,
-				                                          [](vk::QueueFamilyProperties const& qfp)
-				                                          {
-					                                          return (qfp.queueFlags & vk::QueueFlagBits::eGraphics) != static_cast<vk::QueueFlags>(0);
-				                                          });
-			                                          isSuitable = isSuitable && (qfpIter != queueFamilies.end());
-			                                          auto extensions = device.enumerateDeviceExtensionProperties();
-			                                          bool found = true;
-			                                          for (auto const& extension : deviceExtensions) {
-				                                          auto extensionIter = std::ranges::find_if(extensions, [extension](auto const& ext) {return strcmp(ext.extensionName, extension) == 0; });
-				                                          found = found && extensionIter != extensions.end();
-			                                          }
-			                                          isSuitable = isSuitable && found;
-			                                          if (isSuitable) {
-				                                          m_PhysicalDevice = device;
-				                                          m_MaxMSAASamples = GetMaxUsableSampleCount(m_PhysicalDevice);
+			if (deviceProperties.apiVersion < VK_API_VERSION_1_3)
+			{
+				KBR_CORE_WARN("  -> Rejected: Vulkan 1.3 not supported.");
+				continue;
+			}
 
-				                                          // Save name of the selected GPU
-				                                          const auto deviceProperties = m_PhysicalDevice.getProperties2().properties;
-				                                          m_PhysicalDeviceName = deviceProperties.deviceName.data();
-				                                          KBR_CORE_INFO("Selected GPU: {}", m_PhysicalDeviceName);
-			                                          }
-			                                          return isSuitable;
-		                                          });
-		if (devIter == devices.end()) {
-			throw std::runtime_error("failed to find a suitable GPU!");
+			auto queueFamilies = device.getQueueFamilyProperties2()
+				| std::views::transform([](const vk::QueueFamilyProperties2& qfp2) { return qfp2.queueFamilyProperties; });
+
+			bool hasGraphics = std::ranges::any_of(queueFamilies, [](vk::QueueFamilyProperties const& qfp)
+				{
+					return (qfp.queueFlags & vk::QueueFlagBits::eGraphics) != static_cast<vk::QueueFlags>(0);
+				});
+
+			if (!hasGraphics)
+			{
+				KBR_CORE_WARN("  -> Rejected: No graphics queue family found.");
+				continue;
+			}
+
+			auto availableExtensions = device.enumerateDeviceExtensionProperties();
+			bool missingRequired = false;
+			for (const auto& requiredExt : requiredDeviceExtensions)
+			{
+				auto it = std::ranges::find_if(availableExtensions, [&requiredExt](const auto& ext)
+					{
+						return strcmp(ext.extensionName, requiredExt) == 0;
+					});
+
+				if (it == availableExtensions.end())
+				{
+					KBR_CORE_WARN("  -> Rejected: Missing required extension '{}'", requiredExt);
+					missingRequired = true;
+					break;
+				}
+			}
+			if (missingRequired) continue;
+
+			const vk::PhysicalDeviceFeatures2 features2 = device.getFeatures2();
+
+			if (!features2.features.geometryShader)
+			{
+				KBR_CORE_WARN("  -> Rejected: Missing required feature 'geometryShader'");
+				continue;
+			}
+
+			m_PhysicalDevice = device;
+			m_MaxMSAASamples = GetMaxUsableSampleCount(m_PhysicalDevice);
+			m_PhysicalDeviceName = deviceProperties.deviceName.data();
+			KBR_CORE_INFO("Selected GPU: {}", m_PhysicalDeviceName);
+
+			m_ActiveDeviceExtensions.assign(requiredDeviceExtensions.begin(), requiredDeviceExtensions.end());
+
+			for (const auto& optExt : optionalDeviceExtensions)
+			{
+				auto it = std::ranges::find_if(availableExtensions, [&optExt](const auto& ext)
+					{
+						return strcmp(ext.extensionName, optExt) == 0;
+					});
+
+				if (it != availableExtensions.end())
+				{
+					m_ActiveDeviceExtensions.push_back(optExt);
+					KBR_CORE_TRACE("  -> Enabled optional extension: {}", optExt);
+				}
+			}
+
+			return;
 		}
+
+		throw std::runtime_error("Failed to find a suitable GPU!");
 	}
 
 	std::vector<const char*> VulkanContext::GetRequiredExtensions()
@@ -975,6 +1021,11 @@ namespace Kerberos
 		}
 
 		return extensions;
+	}
+
+	bool VulkanContext::IsExtensionActive(const char* extensionName) const
+	{
+		return std::ranges::find(m_ActiveDeviceExtensions, extensionName) != m_ActiveDeviceExtensions.end();
 	}
 
 	static bool IsDeviceSuitable(const vk::raii::PhysicalDevice& physicalDevice)
@@ -1153,13 +1204,34 @@ namespace Kerberos
 			 {.taskShader = true, .meshShader = true, .meshShaderQueries = true },
 			 {.shaderObject = true }
 		 };
+
+		 if (!IsExtensionActive(vk::EXTDescriptorBufferExtensionName))
+		 {
+			 featureChain.unlink<vk::PhysicalDeviceDescriptorBufferFeaturesEXT>();
+		 }
+		 if (!IsExtensionActive(vk::EXTMeshShaderExtensionName))
+		 {
+			 featureChain.unlink<vk::PhysicalDeviceMeshShaderFeaturesEXT>();
+		 }
+		 if (!IsExtensionActive(vk::EXTShaderObjectExtensionName))
+		 {
+			 featureChain.unlink<vk::PhysicalDeviceShaderObjectFeaturesEXT>();
+		 }
+		 if (!IsExtensionActive(vk::KHRAccelerationStructureExtensionName))
+		 {
+			 featureChain.unlink<vk::PhysicalDeviceAccelerationStructureFeaturesKHR>();
+		 }
+		 if (!IsExtensionActive(vk::KHRRayQueryExtensionName))
+		 {
+			 featureChain.unlink<vk::PhysicalDeviceRayQueryFeaturesKHR>();
+		 }
 	
 		 const vk::DeviceCreateInfo deviceCreateInfo{
 			 .pNext = &featureChain.get<vk::PhysicalDeviceFeatures2>(),
 			 .queueCreateInfoCount = static_cast<uint32_t>(queueCreateInfos.size()),
 			 .pQueueCreateInfos = queueCreateInfos.data(),
-			 .enabledExtensionCount = static_cast<uint32_t>(deviceExtensions.size()),
-			 .ppEnabledExtensionNames = deviceExtensions.data()
+			 .enabledExtensionCount = static_cast<uint32_t>(m_ActiveDeviceExtensions.size()),
+			 .ppEnabledExtensionNames = m_ActiveDeviceExtensions.data()
 		 };
 	
 		 m_Device = vk::raii::Device{ m_PhysicalDevice, deviceCreateInfo };

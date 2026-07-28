@@ -122,6 +122,8 @@ namespace Kerberos
 		float GetMaxAnisotropy() const;
 		const QueueFamilyInfo& GetQueueFamilyInfo() const { return m_QueueFamilyInfo; }
 
+		bool IsExtensionActive(const char* extensionName) const;
+
 		static vk::DescriptorSet GenerateImGuiDescriptorSet(const vk::raii::Sampler& sampler,
 															const vk::raii::ImageView& imageView, 
 															vk::ImageLayout imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal);
@@ -179,6 +181,8 @@ namespace Kerberos
 		vk::raii::Context m_Context;
 		vk::raii::Instance m_Instance = nullptr;
 		vk::raii::DebugUtilsMessengerEXT m_DebugMessenger = nullptr;
+
+		std::vector<const char*> m_ActiveDeviceExtensions;
 
 		vk::raii::PhysicalDevice m_PhysicalDevice = nullptr;
 		std::string m_PhysicalDeviceName;
