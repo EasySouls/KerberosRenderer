@@ -30,10 +30,10 @@ static constexpr std::array requiredDeviceExtensions = {
 	vk::KHRSpirv14ExtensionName,
 	vk::KHRSynchronization2ExtensionName,
 	vk::KHRCreateRenderpass2ExtensionName,
-	vk::EXTDescriptorBufferExtensionName,
 };
 
 static constexpr std::array optionalDeviceExtensions = {
+	vk::EXTDescriptorBufferExtensionName,
 	vk::EXTMeshShaderExtensionName,
 	vk::EXTShaderObjectExtensionName,
 	// Ray Tracing optional extensions
@@ -456,8 +456,9 @@ namespace Kerberos
 		const vk::raii::Semaphore* signalSemaphore
 	) const
 	{
+		const vk::CommandPool cmdPool = m_QueueFamilyInfo.HasSeparateTransferQueue() ? *m_TransferCommandPool : *m_GraphicsCommandPool;
 		const vk::CommandBufferAllocateInfo allocInfo{
-			.commandPool = *m_TransferCommandPool,
+			.commandPool = cmdPool,
 			.level = vk::CommandBufferLevel::ePrimary,
 			.commandBufferCount = 1
 		};
@@ -1003,6 +1004,19 @@ namespace Kerberos
 				}
 			}
 
+			// Query and store all supported features
+			m_SupportedFeatures = m_PhysicalDevice.getFeatures2<
+				vk::PhysicalDeviceFeatures2,
+				vk::PhysicalDeviceVulkan11Features,
+				vk::PhysicalDeviceVulkan12Features,
+				vk::PhysicalDeviceVulkan13Features,
+				vk::PhysicalDeviceExtendedDynamicStateFeaturesEXT,
+				vk::PhysicalDeviceAccelerationStructureFeaturesKHR,
+				vk::PhysicalDeviceRayQueryFeaturesKHR,
+				vk::PhysicalDeviceDescriptorBufferFeaturesEXT,
+				vk::PhysicalDeviceMeshShaderFeaturesEXT,
+				vk::PhysicalDeviceShaderObjectFeaturesEXT>();
+
 			return;
 		}
 
@@ -1028,19 +1042,12 @@ namespace Kerberos
 		return std::ranges::find(m_ActiveDeviceExtensions, extensionName) != m_ActiveDeviceExtensions.end();
 	}
 
-	static bool IsDeviceSuitable(const vk::raii::PhysicalDevice& physicalDevice)
+	bool VulkanContext::UseDescriptorBuffers() const
 	{
-		const auto deviceProperties = physicalDevice.getProperties2().properties;
-		const auto deviceFeatures = physicalDevice.getFeatures2().features;
-
-		if (deviceProperties.deviceType == vk::PhysicalDeviceType::eDiscreteGpu && deviceFeatures.geometryShader) {
-			return true;
-		}
-
-		return false;
+		return IsExtensionActive(vk::EXTDescriptorBufferExtensionName);
 	}
 
- VulkanContext::QueueFamilyInfo VulkanContext::FindQueueFamilies(const vk::raii::PhysicalDevice& physicalDevice, const vk::raii::SurfaceKHR& surface)
+	VulkanContext::QueueFamilyInfo VulkanContext::FindQueueFamilies(const vk::raii::PhysicalDevice& physicalDevice, const vk::raii::SurfaceKHR& surface)
 	{
 		QueueFamilyInfo queueFamilyInfo{};
 
@@ -1176,34 +1183,51 @@ namespace Kerberos
 			 });
 		 }
 	
-		 // Create a chain of feature structures
-		 vk::StructureChain<vk::PhysicalDeviceFeatures2, 
-		 vk::PhysicalDeviceVulkan11Features, 
-		 vk::PhysicalDeviceVulkan12Features, 
-		 vk::PhysicalDeviceVulkan13Features, 
-		 vk::PhysicalDeviceExtendedDynamicStateFeaturesEXT, 
-		 vk::PhysicalDeviceAccelerationStructureFeaturesKHR, 
-		 vk::PhysicalDeviceRayQueryFeaturesKHR,
-		 vk::PhysicalDeviceDescriptorBufferFeaturesEXT,
-		 vk::PhysicalDeviceMeshShaderFeaturesEXT,
-		 vk::PhysicalDeviceShaderObjectFeaturesEXT> featureChain = {
-			 {.features = {
-				 .independentBlend = true,
-				 .geometryShader = true, .depthClamp = true, .depthBiasClamp = true, .samplerAnisotropy = true,
-				 .pipelineStatisticsQuery = true, .shaderInt64 = true,
-				},
-			 },
-			 {.shaderDrawParameters = true },
-			 {.descriptorIndexing = true, .descriptorBindingSampledImageUpdateAfterBind = true, .descriptorBindingPartiallyBound = true, .runtimeDescriptorArray = true, .timelineSemaphore = true,
-				 .bufferDeviceAddress = true, .shaderOutputLayer = true },
-			 {.shaderDemoteToHelperInvocation = true, .synchronization2 = true, .dynamicRendering = true },
-			 {.extendedDynamicState = true },
-			 {.accelerationStructure = true },
-			 {.rayQuery = true },
-			 {.descriptorBuffer = true, .descriptorBufferCaptureReplay = true, .descriptorBufferPushDescriptors = true },
-			 {.taskShader = true, .meshShader = true, .meshShaderQueries = true },
-			 {.shaderObject = true }
-		 };
+		 // Start with the supported features from the physical device
+		 auto featureChain = m_SupportedFeatures;
+
+		 // Disable features that we don't need
+		 auto& features = featureChain.get<vk::PhysicalDeviceFeatures2>();
+		 features.features.robustBufferAccess = false;
+		 features.features.fullDrawIndexUint32 = false;
+		 features.features.imageCubeArray = false;
+		 features.features.independentBlend = true;  // We want this
+		 features.features.geometryShader = true;    // Required
+		 features.features.tessellationShader = false;
+		 features.features.sampleRateShading = false;
+		 features.features.dualSrcBlend = false;
+		 features.features.logicOp = false;
+		 features.features.multiDrawIndirect = false;
+		 features.features.drawIndirectFirstInstance = false;
+		 features.features.depthClamp = true;        // We want this
+		 features.features.depthBiasClamp = true;    // We want this
+		 features.features.fillModeNonSolid = false;
+		 features.features.depthBounds = false;
+		 features.features.wideLines = false;
+		 features.features.largePoints = false;
+		 features.features.alphaToOne = false;
+		 features.features.multiViewport = false;
+		 features.features.samplerAnisotropy = true; // We want this
+		 features.features.textureCompressionETC2 = false;
+		 features.features.textureCompressionASTC_LDR = false;
+		 features.features.textureCompressionBC = false;
+		 features.features.occlusionQueryPrecise = false;
+		 features.features.pipelineStatisticsQuery = true;  // We want this
+		 // shaderInt64 is only enabled if supported
+		 features.features.shaderInt64 = m_SupportedFeatures.get<vk::PhysicalDeviceFeatures2>().features.shaderInt64;
+		 features.features.shaderInt16 = false;
+		 features.features.shaderResourceMinLod = false;
+		 features.features.sparseBinding = false;
+		 features.features.sparseResidencyBuffer = false;
+		 features.features.sparseResidencyImage2D = false;
+		 features.features.sparseResidencyImage3D = false;
+		 features.features.sparseResidency2Samples = false;
+		 features.features.sparseResidency4Samples = false;
+		 features.features.sparseResidency8Samples = false;
+		 features.features.sparseResidency16Samples = false;
+		 features.features.sparseResidencyAliased = false;
+		 features.features.variableMultisampleRate = false;
+		 features.features.inheritedQueries = false;
 
 		 if (!IsExtensionActive(vk::EXTDescriptorBufferExtensionName))
 		 {

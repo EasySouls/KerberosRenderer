@@ -123,6 +123,7 @@ namespace Kerberos
 		const QueueFamilyInfo& GetQueueFamilyInfo() const { return m_QueueFamilyInfo; }
 
 		bool IsExtensionActive(const char* extensionName) const;
+		bool UseDescriptorBuffers() const;
 
 		static vk::DescriptorSet GenerateImGuiDescriptorSet(const vk::raii::Sampler& sampler,
 															const vk::raii::ImageView& imageView, 
@@ -186,6 +187,16 @@ namespace Kerberos
 
 		vk::raii::PhysicalDevice m_PhysicalDevice = nullptr;
 		std::string m_PhysicalDeviceName;
+		vk::StructureChain<vk::PhysicalDeviceFeatures2, 
+			vk::PhysicalDeviceVulkan11Features, 
+			vk::PhysicalDeviceVulkan12Features, 
+			vk::PhysicalDeviceVulkan13Features, 
+			vk::PhysicalDeviceExtendedDynamicStateFeaturesEXT, 
+			vk::PhysicalDeviceAccelerationStructureFeaturesKHR, 
+			vk::PhysicalDeviceRayQueryFeaturesKHR,
+			vk::PhysicalDeviceDescriptorBufferFeaturesEXT,
+			vk::PhysicalDeviceMeshShaderFeaturesEXT,
+			vk::PhysicalDeviceShaderObjectFeaturesEXT> m_SupportedFeatures;
 		vk::raii::Device m_Device = nullptr;
 		vk::raii::Queue m_GraphicsQueue = nullptr;
 		vk::raii::Queue m_PresentQueue = nullptr;
