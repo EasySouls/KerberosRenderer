@@ -101,4 +101,16 @@ namespace Kerberos
 
 		return set;
 	}
+
+	void DescriptorAllocator::Reset()
+	{
+		if (m_UseDescriptorBuffers)
+		{
+			m_CurrentOffset = 0;
+		}
+		else
+		{
+			m_DescriptorPool.reset();
+		}
+	}
 }

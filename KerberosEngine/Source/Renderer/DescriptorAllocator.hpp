@@ -15,6 +15,8 @@ namespace Kerberos
 
 		ShaderResourceSet Allocate(const vk::raii::DescriptorSetLayout& layout);
 
+		void Reset();
+
 	private:
 		bool m_UseDescriptorBuffers = false;
 
