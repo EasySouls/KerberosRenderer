@@ -51,22 +51,34 @@ namespace Kerberos
 		void ResolveIndices(TextureManager& textureManager)
 		{
 			const uint32_t albedoTex = AlbedoTexture ? textureManager.GetTextureIndex(AlbedoTexture) : textureManager.GetWhiteTexture();
+			KBR_CORE_ASSERT(albedoTex != 0, "Albedo texture index is 0!");
 			Params.AlbedoIndex = TextureManager::Pack(albedoTex, DefaultSampler::AnisoWrap);
+			KBR_CORE_ASSERT(Params.AlbedoIndex != 0, "Albedo texture index is 0!");
 
 			const uint32_t normalTex = NormalTexture ? textureManager.GetTextureIndex(NormalTexture) : textureManager.GetDefaultNormalTexture();
+			KBR_CORE_ASSERT(normalTex != 0, "Normal texture index is 0!");
 			Params.NormalIndex = TextureManager::Pack(normalTex, DefaultSampler::LinearWrap);
+			KBR_CORE_ASSERT(Params.NormalIndex != 0, "Normal texture index is 0!");
 
 			const uint32_t roughnessTex = RoughnessTexture ? textureManager.GetTextureIndex(RoughnessTexture) : textureManager.GetDefaultRoughnessTexture();
+			KBR_CORE_ASSERT(roughnessTex != 0, "Roughness texture index is 0!");
 			Params.RoughnessIndex = TextureManager::Pack(roughnessTex, DefaultSampler::LinearWrap);
+			KBR_CORE_ASSERT(Params.RoughnessIndex != 0, "Roughness texture index is 0!");
 
 			const uint32_t metallicTex = MetallicTexture ? textureManager.GetTextureIndex(MetallicTexture) : textureManager.GetDefaultMetallicTexture();
+			KBR_CORE_ASSERT(metallicTex != 0, "Metallic texture index is 0!");
 			Params.MetallicIndex = TextureManager::Pack(metallicTex, DefaultSampler::LinearWrap);
+			KBR_CORE_ASSERT(Params.MetallicIndex != 0, "Metallic texture index is 0!");
 
 			const uint32_t aoTex = AOTexture ? textureManager.GetTextureIndex(AOTexture) : textureManager.GetDefaultAOTexture();
+			KBR_CORE_ASSERT(aoTex != 0, "AO texture index is 0!");
 			Params.AOIndex = TextureManager::Pack(aoTex, DefaultSampler::LinearWrap);
+			KBR_CORE_ASSERT(Params.AOIndex != 0, "AO texture index is 0!");
 
 			const uint32_t emissiveTex = EmissiveTexture ? textureManager.GetTextureIndex(EmissiveTexture) : textureManager.GetDefaultEmissiveTexture();
+			KBR_CORE_ASSERT(emissiveTex != 0, "Emissive texture index is 0!");
 			Params.EmissiveIndex = TextureManager::Pack(emissiveTex, DefaultSampler::LinearWrap);
+			KBR_CORE_ASSERT(Params.EmissiveIndex != 0, "Emissive texture index is 0!");
 
 			Params.Emissive = EmissiveColor * EmissiveIntensity;
 		}
