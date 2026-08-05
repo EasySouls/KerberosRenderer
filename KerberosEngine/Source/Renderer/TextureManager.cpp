@@ -147,8 +147,8 @@ namespace Kerberos
 		UploadDefaultTextures();
 	}
 
-	void TextureManager::Shutdown() {
-		throw std::logic_error("Not implemented");
+	void TextureManager::Shutdown()
+	{
 	}
 
 	uint32_t TextureManager::GetTextureIndex(AssetHandle handle)
