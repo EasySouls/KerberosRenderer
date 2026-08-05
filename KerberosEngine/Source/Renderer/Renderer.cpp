@@ -636,7 +636,13 @@ namespace Kerberos
 		// Update all per-object uniform buffers once
 		for (const auto& renderObject : allObjects)
 		{
-			const auto& [Transform, Mesh, Material, EntityID, WorldAABB, UBOIndex] = renderObject;
+			const auto& [Transform, 
+				Mesh, 
+				Material, 
+				EntityID, 
+				WorldAABB, 
+				UBOIndex, 
+				DebugName] = renderObject;
 
 			Ref<Kerberos::Material> material = Material;
 			if (material == nullptr)
@@ -1598,6 +1604,11 @@ namespace Kerberos
 			for (const auto& renderObject : renderObjects)
 			{
 				if (renderObject.Material != nullptr && !renderObject.Material->IsTransparent())
+					continue;
+
+				// In the case of opaque objects, we want to render them with default magenta material,
+				// but of course they shouldn't be rendered in the transparent pass, so we skip them here.
+				if (renderObject.Material == nullptr)
 					continue;
 
 				uint32_t dynamicOffset = static_cast<uint32_t>(renderObject.UBOIndex * s_Data->DynamicAlignment);
@@ -4425,6 +4436,7 @@ namespace Kerberos
 			renderObject.Mesh = staticMesh.StaticMesh;
 			renderObject.Material = staticMesh.MeshMaterial;
 			renderObject.EntityID = static_cast<uint32_t>(entity);
+			renderObject.DebugName = meshView.get<TagComponent>(entity).Tag;
 
 			renderObject.WorldAABB = CalculateWorldAABB(staticMesh.StaticMesh->GetBoundingBox(), renderObject.Transform);
 

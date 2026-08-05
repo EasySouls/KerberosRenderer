@@ -59,6 +59,11 @@ float4 SampleBindless(uint packedIndex, float2 uv) {
     uint texIdx = packedIndex & 0x00FFFFFF;
     uint sampIdx = packedIndex >> 24;
 
+    if (texIdx == 0) {
+        //printf("Warning: Attempted to sample an unbound texture. Returning magenta color.\n");
+        return float4(1.0, 0.0, 1.0, 1.0);
+    }
+
     return globalTextures[texIdx].Sample(globalSamplers[sampIdx], uv);
 }
 

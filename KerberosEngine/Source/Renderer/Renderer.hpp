@@ -79,6 +79,7 @@ namespace Kerberos
 		uint32_t EntityID = 0;
 		AABB WorldAABB{};
 		uint32_t UBOIndex = 0;
+		std::string DebugName{};
 	};
 
 	struct GTAOConstants

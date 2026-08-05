@@ -889,7 +889,38 @@ namespace Kerberos
 			}
 		}
 
+		// In debug mode, we would always like to see shader printf's and synchronization validation errors,
+		// the rest is enough to see when configured via the Vulkan Configurator
+		constexpr vk::ValidationFeatureEnableEXT enabledValidationFeatures[] = {
+#ifdef KBR_DEBUG
+			vk::ValidationFeatureEnableEXT::eDebugPrintf,
+			vk::ValidationFeatureEnableEXT::eSynchronizationValidation
+#endif
+		};
+
+		const vk::ValidationFeaturesEXT validationFeatures{
+			.enabledValidationFeatureCount = static_cast<uint32_t>(std::size(enabledValidationFeatures)),
+			.pEnabledValidationFeatures = enabledValidationFeatures
+		};
+
+		constexpr int32_t shaderDebugPrintfBufferSize = 1024 * 1024; // 1 MB
+
+		const vk::LayerSettingEXT layerSetting{
+			.pLayerName = "VK_LAYER_KHRONOS_validation",
+			.pSettingName = "printf_buffer_size",
+			.type = vk::LayerSettingTypeEXT::eInt32,
+			.valueCount = 1,
+			.pValues = &shaderDebugPrintfBufferSize,
+		};
+
+		const vk::LayerSettingsCreateInfoEXT layerSettingsCreateInfo{
+			.pNext = &validationFeatures,
+			.settingCount = 1,
+			.pSettings = &layerSetting
+		};
+
 		const vk::InstanceCreateInfo createInfo{
+			.pNext = &layerSettingsCreateInfo,
 			.pApplicationInfo = &appInfo,
 			.enabledLayerCount = static_cast<uint32_t>(requiredLayers.size()),
 			.ppEnabledLayerNames = requiredLayers.data(),
@@ -904,8 +935,8 @@ namespace Kerberos
 		if (!enableValidationLayers) 
 			return;
 
-		constexpr vk::DebugUtilsMessageSeverityFlagsEXT severityFlags(vk::DebugUtilsMessageSeverityFlagBitsEXT::eVerbose | vk::DebugUtilsMessageSeverityFlagBitsEXT::eWarning | vk::DebugUtilsMessageSeverityFlagBitsEXT::eError);
-		constexpr vk::DebugUtilsMessageTypeFlagsEXT    messageTypeFlags(vk::DebugUtilsMessageTypeFlagBitsEXT::eGeneral | vk::DebugUtilsMessageTypeFlagBitsEXT::ePerformance | vk::DebugUtilsMessageTypeFlagBitsEXT::eValidation);
+		constexpr vk::DebugUtilsMessageSeverityFlagsEXT severityFlags(vk::DebugUtilsMessageSeverityFlagBitsEXT::eVerbose | vk::DebugUtilsMessageSeverityFlagBitsEXT::eInfo | vk::DebugUtilsMessageSeverityFlagBitsEXT::eWarning | vk::DebugUtilsMessageSeverityFlagBitsEXT::eError);
+		constexpr vk::DebugUtilsMessageTypeFlagsEXT    messageTypeFlags(vk::DebugUtilsMessageTypeFlagBitsEXT::eGeneral | vk::DebugUtilsMessageTypeFlagBitsEXT::ePerformance | vk::DebugUtilsMessageTypeFlagBitsEXT::eValidation | vk::DebugUtilsMessageTypeFlagBitsEXT::eDeviceAddressBinding);
 		constexpr vk::DebugUtilsMessengerCreateInfoEXT debugUtilsMessengerCreateInfoEXT{
 			.messageSeverity = severityFlags,
 			.messageType = messageTypeFlags,
@@ -1188,33 +1219,32 @@ namespace Kerberos
 
 		 // Disable features that we don't need
 		 auto& features = featureChain.get<vk::PhysicalDeviceFeatures2>();
+		 features.features.independentBlend = true;
+		 features.features.geometryShader = true;
+		 features.features.depthClamp = true;
+		 features.features.depthBiasClamp = true;
+		 features.features.samplerAnisotropy = true;
+		 features.features.pipelineStatisticsQuery = true;
+		 features.features.shaderInt64 = m_SupportedFeatures.get<vk::PhysicalDeviceFeatures2>().features.shaderInt64;
 		 features.features.robustBufferAccess = false;
 		 features.features.fullDrawIndexUint32 = false;
 		 features.features.imageCubeArray = false;
-		 features.features.independentBlend = true;  // We want this
-		 features.features.geometryShader = true;    // Required
 		 features.features.tessellationShader = false;
 		 features.features.sampleRateShading = false;
 		 features.features.dualSrcBlend = false;
 		 features.features.logicOp = false;
 		 features.features.multiDrawIndirect = false;
 		 features.features.drawIndirectFirstInstance = false;
-		 features.features.depthClamp = true;        // We want this
-		 features.features.depthBiasClamp = true;    // We want this
 		 features.features.fillModeNonSolid = false;
 		 features.features.depthBounds = false;
 		 features.features.wideLines = false;
 		 features.features.largePoints = false;
 		 features.features.alphaToOne = false;
 		 features.features.multiViewport = false;
-		 features.features.samplerAnisotropy = true; // We want this
 		 features.features.textureCompressionETC2 = false;
 		 features.features.textureCompressionASTC_LDR = false;
 		 features.features.textureCompressionBC = false;
 		 features.features.occlusionQueryPrecise = false;
-		 features.features.pipelineStatisticsQuery = true;  // We want this
-		 // shaderInt64 is only enabled if supported
-		 features.features.shaderInt64 = m_SupportedFeatures.get<vk::PhysicalDeviceFeatures2>().features.shaderInt64;
 		 features.features.shaderInt16 = false;
 		 features.features.shaderResourceMinLod = false;
 		 features.features.sparseBinding = false;
@@ -1228,6 +1258,11 @@ namespace Kerberos
 		 features.features.sparseResidencyAliased = false;
 		 features.features.variableMultisampleRate = false;
 		 features.features.inheritedQueries = false;
+
+		 auto& meshShaderFeatures = featureChain.get<vk::PhysicalDeviceMeshShaderFeaturesEXT>();
+		 meshShaderFeatures.primitiveFragmentShadingRateMeshShader = false;
+
+		 // Disable extensions which are not supported
 
 		 if (!IsExtensionActive(vk::EXTDescriptorBufferExtensionName))
 		 {
