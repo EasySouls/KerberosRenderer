@@ -690,6 +690,13 @@ namespace Kerberos
 #endif
 	}
 
+	void VulkanContext::SetObjectDebugName(const VmaAllocation allocation, const std::string& name) const
+	{
+#ifdef KBR_DEBUG
+		vmaSetAllocationName(m_Allocator.get(), allocation, name.c_str());
+#endif
+	}
+
 	MemoryBudgetInfo VulkanContext::GetMemoryBudgetInfo() const
 	{
 		return m_MemoryBudget.GetMemoryBudgetInfo();

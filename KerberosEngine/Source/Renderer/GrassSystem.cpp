@@ -21,8 +21,10 @@ namespace Kerberos
         Cleanup();
 	}
 
-	void GrassSystem::Init()
+	void GrassSystem::Init(const Owner<DescriptorAllocator>& allocator)
 	{
+        m_DescriptorAllocator = allocator.get();
+
 		InitGrassDataBuffer();
 		InitDescriptorLayouts();
 		InitShaderObjects();

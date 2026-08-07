@@ -232,8 +232,6 @@ namespace Kerberos
 		static void HandleMousePickingReadback(const vk::raii::CommandBuffer& cmd);
 
 		static bool IsUsingAccelerationStructures();
-		static void BeginRenderPassDebugLabel(const vk::raii::CommandBuffer& cmd, std::string_view labelName);
-		static void EndRenderPassDebugLabel(const vk::raii::CommandBuffer& cmd);
 
 		static void CreateDefaultMaterials();
 		static void CreateResources();

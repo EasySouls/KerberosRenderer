@@ -4,10 +4,13 @@
 #include "Scene/Scene.hpp"
 #include "Scene/Components/ParticleComponents.hpp"
 #include "VulkanContext.hpp"
+#include "DescriptorManager.hpp"
+#include "DescriptorWriter.hpp"
 
 #include <glm/gtc/random.hpp>
 
 #include <array>
+#include <format>
 
 namespace
 {
@@ -69,6 +72,7 @@ namespace
 
 namespace Kerberos
 {
+#define USING_MANUAL_DESCRIPTOR_ALLOCATION 0
 
 	ParticleSystem::ParticleSystem()
 		: m_ParticlePoolBuffer(sizeof(GPUParticle) * MaxParticles)
@@ -76,16 +80,33 @@ namespace Kerberos
 		, m_AliveListBuffer(sizeof(uint32_t) * MaxParticles)
 		, m_CountersBuffer(sizeof(Counters))
 		, m_ParticleFrameBuffers(VulkanContext::Get().GetMaxFramesInFlight())
+#if USING_MANUAL_DESCRIPTOR_ALLOCATION
 		, m_DescriptorBuffers(VulkanContext::Get().GetMaxFramesInFlight())
+#endif
 		, m_IndirectDrawBuffers(VulkanContext::Get().GetMaxFramesInFlight())
 	{
+		const auto& context = VulkanContext::Get();
+
 		AllocateParticleFrameBuffers();
 		AllocateIndirectDrawBuffers();
 
 		for (uint32_t i = 0; i < VulkanContext::Get().GetMaxFramesInFlight(); ++i)
 		{
 			m_SpawnRequestBuffers.emplace_back(sizeof(SpawnRequest) * MaxParticles);
+
+			const auto& buffer = m_SpawnRequestBuffers[i];
+			context.SetObjectDebugName(buffer.GetBufferMemory(), std::format("Particle Spawn Request Buffer Memory {}", i));
+			context.SetObjectDebugName(buffer.GetBuffer(), std::format("Particle Spawn Request Buffer {}", i));
 		}
+
+		context.SetObjectDebugName(m_ParticlePoolBuffer.GetBufferMemory(), "Particle Pool Buffer Memory");
+		context.SetObjectDebugName(m_ParticlePoolBuffer.GetBuffer(), "Particle Pool Buffer");
+		context.SetObjectDebugName(m_DeadListBuffer.GetBufferMemory(), "Particle Dead List Buffer Memory");
+		context.SetObjectDebugName(m_DeadListBuffer.GetBuffer(), "Particle Dead List Buffer");
+		context.SetObjectDebugName(m_AliveListBuffer.GetBufferMemory(), "Particle Alive List Buffer Memory");
+		context.SetObjectDebugName(m_AliveListBuffer.GetBuffer(), "Particle Alive List Buffer");
+		context.SetObjectDebugName(m_CountersBuffer.GetBufferMemory(), "Particle Counters Buffer Memory");
+		context.SetObjectDebugName(m_CountersBuffer.GetBuffer(), "Particle Counters Buffer");
 
 		constexpr Counters counters = {
 			.DeadCount = static_cast<uint32_t>(MaxParticles), 
@@ -115,13 +136,17 @@ namespace Kerberos
 			vmaUnmapMemory(allocator, m_ParticleFrameBuffers[i].allocation);
 			vmaDestroyBuffer(allocator, m_ParticleFrameBuffers[i].Handle, m_ParticleFrameBuffers[i].allocation);
 
+#if USING_MANUAL_DESCRIPTOR_ALLOCATION
 			vmaUnmapMemory(allocator, m_DescriptorBuffers[i].allocation);
 			vmaDestroyBuffer(allocator, m_DescriptorBuffers[i].Handle, m_DescriptorBuffers[i].allocation);
+#endif
 		}
 	}
 
-	void ParticleSystem::Initialize(const vk::Format colorFormat, const vk::Format depthFormat)
+	void ParticleSystem::Initialize(const vk::Format colorFormat, const vk::Format depthFormat, const Owner<DescriptorAllocator>& allocator)
 	{
+		m_DescriptorAllocator = allocator.get();
+
 		SetupDescriptors();
 		CreateDefaultParticleTexture();
 		AllocateDescriptorBuffers();
@@ -129,9 +154,16 @@ namespace Kerberos
 		SetupPipelines(colorFormat, depthFormat);
 	}
 
-	void ParticleSystem::Update(const Ref<Scene>& scene, const float dt, const vk::raii::CommandBuffer& cmd, const uint32_t frameIndex, const ParticleFrameData& frameData) const 
+	void ParticleSystem::Update(const Ref<Scene>& scene, 
+								const float dt, 
+								const vk::raii::CommandBuffer& cmd, 
+								const uint32_t frameIndex, 
+								const ParticleFrameData& frameData, 
+								DescriptorAllocator& frameAllocator)
 	{
 		KBR_PROFILE_FUNCTION();
+
+		BeginRenderPassDebugLabel(cmd, "Particle System Compute Update Passes");
 
 		// Copy the frame data to the GPU buffer
 		std::memcpy(m_ParticleFrameBuffers[frameIndex].MappedData, &frameData, sizeof(ParticleFrameData));
@@ -192,6 +224,18 @@ namespace Kerberos
 
 		// Emit pass
 		{
+#if not USING_MANUAL_DESCRIPTOR_ALLOCATION
+
+			DescriptorManager::BindSets(
+				cmd,
+				vk::PipelineBindPoint::eCompute,
+				m_ComputePipelineLayout,
+				0,
+				{ m_ParticleSet, m_SpawnSets[frameIndex] }
+			);
+
+#else
+
 			const vk::DescriptorBufferBindingInfoEXT bindingInfo{
 				.address = m_DescriptorBuffers[frameIndex].DeviceAddress,
 				.usage = vk::BufferUsageFlagBits::eResourceDescriptorBufferEXT
@@ -208,6 +252,9 @@ namespace Kerberos
 				bufferIndices,
 				offsets
 			);
+
+#endif
+			BeginRenderPassDebugLabel(cmd, "Particle Emit Pass");
 
 			if (requestCount > 0)
 			{
@@ -231,10 +278,14 @@ namespace Kerberos
 				};
 				cmd.pipelineBarrier2({.memoryBarrierCount = 1, .pMemoryBarriers = &barrier});
 			}
+
+			EndRenderPassDebugLabel(cmd);
 		}
 
 		// Prepare simulation pass
 		{
+			BeginRenderPassDebugLabel(cmd, "Particle Prepare Simulation Pass");
+
 			cmd.bindPipeline(vk::PipelineBindPoint::eCompute, m_PrepareSimulatePipeline->GetVulkanPipeline());
 			cmd.dispatch(1, 1, 1);
 
@@ -246,10 +297,14 @@ namespace Kerberos
 				.dstAccessMask = vk::AccessFlagBits2::eShaderRead | vk::AccessFlagBits2::eShaderWrite,
 			};
 			cmd.pipelineBarrier2({.memoryBarrierCount = 1, .pMemoryBarriers = &barrier});
+
+			EndRenderPassDebugLabel(cmd);
 		}
 
 		// Simulate pass
 		{
+			BeginRenderPassDebugLabel(cmd, "Particle Simulate Pass");
+
 			cmd.bindPipeline(vk::PipelineBindPoint::eCompute, m_UpdatePipeline->GetVulkanPipeline());
 			constexpr uint32_t workGroupSize = 256;
 			cmd.dispatch((MaxParticles + (workGroupSize - 1)) / workGroupSize, 1, 1);
@@ -263,12 +318,30 @@ namespace Kerberos
 				.dstAccessMask = vk::AccessFlagBits2::eIndirectCommandRead | vk::AccessFlagBits2::eShaderRead,
 			};
 			cmd.pipelineBarrier2({ .memoryBarrierCount = 1, .pMemoryBarriers = &barrier });
+
+			EndRenderPassDebugLabel(cmd);
 		}
+
+		EndRenderPassDebugLabel(cmd);
 	}
 
 	void ParticleSystem::RecordDraw(const vk::raii::CommandBuffer& cmd, const uint32_t frameIndex) const 
 	{
+		BeginRenderPassDebugLabel(cmd, "Particle Render Pass");
+
 		cmd.bindPipeline(vk::PipelineBindPoint::eGraphics, m_RenderPipeline->GetVulkanPipeline());
+
+#if not USING_MANUAL_DESCRIPTOR_ALLOCATION
+
+		DescriptorManager::BindSets(
+			cmd,
+			vk::PipelineBindPoint::eGraphics,
+			m_GraphicsPipelineLayout,
+			0, // start at set 0
+			{ m_ParticleSet, m_SpawnSets[frameIndex], m_TextureSet }
+		);
+
+#else
 
 		const vk::DescriptorBufferBindingInfoEXT bindingInfo{
 				.address = m_DescriptorBuffers[frameIndex].DeviceAddress,
@@ -287,12 +360,16 @@ namespace Kerberos
 			offsets
 		);
 
+#endif
+
 		cmd.drawIndirect(
 			m_IndirectDrawBuffers[frameIndex].Handle,
 			0,
 			1,
 			sizeof(vk::DrawIndirectCommand)
 		);
+
+		EndRenderPassDebugLabel(cmd);
 	}
 
 	void ParticleSystem::SetupDescriptors() 
@@ -302,18 +379,14 @@ namespace Kerberos
 
 		// SET 0: Particle Buffers (5 Storage Buffers)
 		const std::vector<vk::DescriptorSetLayoutBinding> particleBindings = {
-			{0, vk::DescriptorType::eStorageBuffer, 1, vk::ShaderStageFlagBits::eCompute | vk::ShaderStageFlagBits::eVertex}, // Pool
-			{1, vk::DescriptorType::eStorageBuffer, 1, vk::ShaderStageFlagBits::eCompute}, // DeadList
-			{2, vk::DescriptorType::eStorageBuffer, 1, vk::ShaderStageFlagBits::eCompute | vk::ShaderStageFlagBits::eVertex}, // AliveList
-			{3, vk::DescriptorType::eStorageBuffer, 1, vk::ShaderStageFlagBits::eCompute}, // Counters
-			{4, vk::DescriptorType::eStorageBuffer, 1, vk::ShaderStageFlagBits::eCompute}  // Indirect Buffer 
+			{.binding = 0, .descriptorType = vk::DescriptorType::eStorageBuffer, .descriptorCount = 1, .stageFlags = vk::ShaderStageFlagBits::eCompute | vk::ShaderStageFlagBits::eVertex}, // Pool
+			{.binding = 1, .descriptorType = vk::DescriptorType::eStorageBuffer, .descriptorCount = 1, .stageFlags = vk::ShaderStageFlagBits::eCompute}, // DeadList
+			{.binding = 2, .descriptorType = vk::DescriptorType::eStorageBuffer, .descriptorCount = 1, .stageFlags = vk::ShaderStageFlagBits::eCompute | vk::ShaderStageFlagBits::eVertex}, // AliveList
+			{.binding = 3, .descriptorType = vk::DescriptorType::eStorageBuffer, .descriptorCount = 1, .stageFlags = vk::ShaderStageFlagBits::eCompute}, // Counters
+			{.binding = 4, .descriptorType = vk::DescriptorType::eStorageBuffer, .descriptorCount = 1, .stageFlags = vk::ShaderStageFlagBits::eCompute}  // Indirect Buffer 
 		};
-		const vk::DescriptorSetLayoutCreateInfo particleLayoutInfo{
-			.flags = vk::DescriptorSetLayoutCreateFlagBits::eDescriptorBufferEXT,
-			.bindingCount = static_cast<uint32_t>(particleBindings.size()),
-			.pBindings = particleBindings.data()
-		};
-		m_ParticleBuffersLayout = vk::raii::DescriptorSetLayout(device, particleLayoutInfo);
+
+		m_ParticleBuffersLayout = DescriptorManager::CreateDescriptorSetLayout(particleBindings);
 		context.SetObjectDebugName(m_ParticleBuffersLayout, "Particle Buffers Descriptor Set Layout");
 
 		// SET 1: Spawn Requests and Particle Frame Data (Storage and uniform buffer updated per frame by CPU)
@@ -331,12 +404,8 @@ namespace Kerberos
 				.stageFlags = vk::ShaderStageFlagBits::eCompute | vk::ShaderStageFlagBits::eVertex
 			}
 		};
-		const vk::DescriptorSetLayoutCreateInfo spawnReqLayoutInfo{
-			.flags = vk::DescriptorSetLayoutCreateFlagBits::eDescriptorBufferEXT,
-			.bindingCount = static_cast<uint32_t>(spawnReqBinding.size()),
-			.pBindings = spawnReqBinding.data()
-		};
-		m_SpawnRequestsLayout = vk::raii::DescriptorSetLayout(device, spawnReqLayoutInfo);
+
+		m_SpawnRequestsLayout = DescriptorManager::CreateDescriptorSetLayout(spawnReqBinding);
 		context.SetObjectDebugName(m_SpawnRequestsLayout, "Particle Spawn Requests Descriptor Set Layout");
 
 		// SET 2: Texture and Sampler
@@ -344,12 +413,8 @@ namespace Kerberos
 			{ .binding = 0, . descriptorType = vk::DescriptorType::eSampledImage, .descriptorCount =  1, . stageFlags = vk::ShaderStageFlagBits::eFragment },
 			{ .binding = 1, . descriptorType = vk::DescriptorType::eSampler,      .descriptorCount = 1, . stageFlags = vk::ShaderStageFlagBits::eFragment }
 		};
-		const vk::DescriptorSetLayoutCreateInfo texLayoutInfo{
-			.flags = vk::DescriptorSetLayoutCreateFlagBits::eDescriptorBufferEXT,
-			.bindingCount = static_cast<uint32_t>(textureBindings.size()),
-			.pBindings = textureBindings.data()
-		};
-		m_TextureLayout = vk::raii::DescriptorSetLayout(device, texLayoutInfo);
+
+		m_TextureLayout = DescriptorManager::CreateDescriptorSetLayout(textureBindings);
 		context.SetObjectDebugName(m_TextureLayout, "Particle Texture Descriptor Set Layout");
 
 		// Compute needs Sets 0, 1, and 2. Plus a push constant for requestCount.
@@ -384,7 +449,7 @@ namespace Kerberos
 		context.SetObjectDebugName(m_GraphicsPipelineLayout, "Particle Graphics Pipeline Layout");
 
 		// Create sampler for particle texture
-		vk::SamplerCreateInfo samplerInfo{
+		constexpr vk::SamplerCreateInfo samplerInfo{
 			.magFilter = vk::Filter::eLinear,
 			.minFilter = vk::Filter::eLinear,
 			.mipmapMode = vk::SamplerMipmapMode::eLinear,
@@ -459,7 +524,9 @@ namespace Kerberos
 
 	void ParticleSystem::AllocateParticleFrameBuffers() 
 	{
-		for (uint32_t i = 0; i < VulkanContext::Get().GetMaxFramesInFlight(); ++i)
+		const auto& context = VulkanContext::Get();
+
+		for (uint32_t i = 0; i < context.GetMaxFramesInFlight(); ++i)
 		{
 			VkBufferCreateInfo bufferInfo{};
 			bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
@@ -475,6 +542,9 @@ namespace Kerberos
 
 			m_ParticleFrameBuffers[i].Handle = vk::Buffer(buffer);
 			vmaMapMemory(VulkanContext::Get().GetAllocator().get(), m_ParticleFrameBuffers[i].allocation, &m_ParticleFrameBuffers[i].MappedData);
+
+			context.SetObjectDebugName(reinterpret_cast<uint64_t>(static_cast<VkBuffer>(m_ParticleFrameBuffers[i].Handle)), vk::ObjectType::eBuffer, std::format("Particle Frame Buffer {}", i));
+			context.SetObjectDebugName(m_ParticleFrameBuffers[i].allocation, std::format("Particle Frame Buffer Allocation {}", i));
 		}
 	}
 
@@ -485,6 +555,43 @@ namespace Kerberos
 		auto& context = VulkanContext::Get();
 		const auto& device = context.GetDevice();
 		const auto& physicalDevice = context.GetPhysicalDevice();
+
+#if not USING_MANUAL_DESCRIPTOR_ALLOCATION
+
+		m_ParticleSet = m_DescriptorAllocator->Allocate(m_ParticleBuffersLayout, "Particle Static Set");
+		{
+			DescriptorWriter writer(m_ParticleBuffersLayout, m_ParticleSet);
+			writer.WriteStorageBuffer(0, m_ParticlePoolBuffer.GetBuffer(), m_ParticlePoolBuffer.GetBufferSize());
+			writer.WriteStorageBuffer(1, m_DeadListBuffer.GetBuffer(), m_DeadListBuffer.GetBufferSize());
+			writer.WriteStorageBuffer(2, m_AliveListBuffer.GetBuffer(), m_AliveListBuffer.GetBufferSize());
+			writer.WriteStorageBuffer(3, m_CountersBuffer.GetBuffer(), m_CountersBuffer.GetBufferSize());
+			writer.WriteStorageBuffer(4, m_IndirectDrawBuffers[0].Handle, sizeof(VkDrawIndirectCommand));
+			writer.Flush();
+		}
+
+		const uint32_t framesInFlight = VulkanContext::Get().GetMaxFramesInFlight();
+		m_SpawnSets.resize(framesInFlight);
+
+		for (uint32_t i = 0; i < framesInFlight; ++i)
+		{
+			m_SpawnSets[i] = m_DescriptorAllocator->Allocate(m_SpawnRequestsLayout, std::format("Particle Spawn Set {}", i));
+
+			DescriptorWriter writer(m_SpawnRequestsLayout, m_SpawnSets[i]);
+			writer.WriteStorageBuffer(0, m_SpawnRequestBuffers[i].GetBuffer(), m_SpawnRequestBuffers[i].GetBufferSize());
+			writer.WriteUniformBuffer(1, m_ParticleFrameBuffers[i].Handle, sizeof(ParticleFrameData));
+			writer.Flush();
+		}
+
+		m_TextureSet = m_DescriptorAllocator->Allocate(m_TextureLayout, "Particle Texture Set");
+		{
+			DescriptorWriter writer(m_TextureLayout, m_TextureSet);
+
+			writer.WriteSampledImage(0, m_DefaultParticleTexture->GetImageView());
+			writer.WriteSampler(1, *m_ParticleSampler);
+			writer.Flush();
+		}
+
+#else
 
 		const vk::DeviceSize particleLayoutSize = m_ParticleBuffersLayout.getSizeEXT();
 		const vk::DeviceSize spawnLayoutSize = m_SpawnRequestsLayout.getSizeEXT();
@@ -522,6 +629,9 @@ namespace Kerberos
 
 			m_DescriptorBuffers[i].Handle = vk::Buffer(buffer);
 			vmaMapMemory(VulkanContext::Get().GetAllocator().get(), m_DescriptorBuffers[i].allocation, &m_DescriptorBuffers[i].MappedData);
+
+			context.SetObjectDebugName(m_DescriptorBuffers[i].Handle, std::format("Particle Descriptor Buffer {}", i));
+			context.SetObjectDebugName(m_DescriptorBuffers[i].allocation, std::format("Particle Descriptor Buffer Allocation {}", i));
 
 			vk::BufferDeviceAddressInfo addressInfo{ .buffer = m_DescriptorBuffers[i].Handle };
 			m_DescriptorBuffers[i].DeviceAddress = device.getBufferAddress(addressInfo);
@@ -594,6 +704,8 @@ namespace Kerberos
 			};
 			device.getDescriptorEXT(samplerGetInfo, descBufferProps.samplerDescriptorSize, mappedPtr + m_TextureBufferOffset + samplerBindingOffset);
 		}
+
+#endif
 	}
 
 	void ParticleSystem::CreateDefaultParticleTexture() 
@@ -610,7 +722,9 @@ namespace Kerberos
 
 	void ParticleSystem::AllocateIndirectDrawBuffers() 
 	{
-		for (uint32_t i = 0; i < VulkanContext::Get().GetMaxFramesInFlight(); ++i)
+		const auto& context = VulkanContext::Get();
+
+		for (uint32_t i = 0; i < context.GetMaxFramesInFlight(); ++i)
 		{
 			VkBufferCreateInfo bufferInfo{};
 			bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
@@ -628,7 +742,10 @@ namespace Kerberos
 			m_IndirectDrawBuffers[i].Handle = vk::Buffer(buffer);
 			vmaMapMemory(VulkanContext::Get().GetAllocator().get(), m_IndirectDrawBuffers[i].allocation, &m_IndirectDrawBuffers[i].MappedData);
 
-			const VkDrawIndirectCommand drawCommand{
+			context.SetObjectDebugName(reinterpret_cast<uint64_t>(static_cast<VkBuffer>(m_IndirectDrawBuffers[i].Handle)), vk::ObjectType::eBuffer, std::format("Particle Indirect Draw Buffer {}", i));
+			context.SetObjectDebugName(m_IndirectDrawBuffers[i].allocation, std::format("Particle Indirect Draw Buffer Allocation {}", i));
+
+			constexpr VkDrawIndirectCommand drawCommand{
 				.vertexCount = 6,
 				.instanceCount = 0,
 				.firstVertex = 0,

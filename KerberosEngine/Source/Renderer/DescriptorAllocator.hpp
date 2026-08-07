@@ -5,15 +5,21 @@
 
 #include <vma/vk_mem_alloc.h>
 
+
+#include <string>
+#ifdef KBR_DEBUG
+#include <map>
+#endif
+
 namespace Kerberos
 {
 	class DescriptorAllocator
 	{
 	public:
-		explicit DescriptorAllocator(uint32_t maxSets);
+		explicit DescriptorAllocator(uint32_t maxSets, vk::DeviceSize bufferHeapSize = 1024 * 1024);
 		~DescriptorAllocator();
 
-		ShaderResourceSet Allocate(const vk::raii::DescriptorSetLayout& layout);
+		ShaderResourceSet Allocate(const vk::raii::DescriptorSetLayout& layout, const std::string& debugName = "");
 
 		void Reset();
 
@@ -28,5 +34,9 @@ namespace Kerberos
 		void* m_MappedData = nullptr;
 		vk::DeviceSize m_OffsetAlignment = 0;
 		uint32_t m_CurrentOffset = 0;
+
+#ifdef KBR_DEBUG
+		std::map<vk::DeviceSize, std::string> m_AllocationDebugNames;
+#endif
 	};
 }

@@ -7,7 +7,7 @@ namespace Kerberos
 	struct ShaderResourceSet
 	{
 		// For traditional descriptor sets
-		vk::raii::DescriptorSet DescriptorSet = nullptr;
+		vk::DescriptorSet DescriptorSet = nullptr;
 
 		// For descriptor buffers
 		vk::Buffer BackingBuffer = nullptr;

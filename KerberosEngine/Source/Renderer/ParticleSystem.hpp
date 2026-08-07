@@ -3,6 +3,7 @@
 #include "Core/Core.hpp"
 #include "Buffer.hpp"
 #include "Vulkan.hpp"
+#include "DescriptorAllocator.hpp"
 #include "ComputePipeline.hpp"
 #include "GraphicsPipeline.hpp"
 #include "Textures/Texture2D.hpp"
@@ -33,9 +34,9 @@ public:
 	ParticleSystem();
 	~ParticleSystem();
 
-	void Initialize(vk::Format colorFormat, vk::Format depthFormat);
+	void Initialize(vk::Format colorFormat, vk::Format depthFormat, const Owner<DescriptorAllocator>& allocator);
 
-	void Update(const Ref<Scene>& scene, float dt, const vk::raii::CommandBuffer& cmd, uint32_t frameIndex, const ParticleFrameData& frameData) const;
+	void Update(const Ref<Scene>& scene, float dt, const vk::raii::CommandBuffer& cmd, uint32_t frameIndex, const ParticleFrameData& frameData, DescriptorAllocator& frameAllocator);
 
 	void RecordDraw(const vk::raii::CommandBuffer& cmd, uint32_t frameIndex) const;
 
@@ -52,14 +53,12 @@ private:
 private:
 	static constexpr size_t MaxParticles = 1'000'000;
 
+	DescriptorAllocator* m_DescriptorAllocator = nullptr;
+
 	StorageBuffer m_ParticlePoolBuffer;
 	StorageBuffer m_DeadListBuffer;
 	StorageBuffer m_AliveListBuffer;
 	StorageBuffer m_CountersBuffer;
-
-	vk::DeviceSize m_ParticleBufferOffset = 0;
-	vk::DeviceSize m_SpawnBufferOffset = 0;
-	vk::DeviceSize m_TextureBufferOffset = 0;
 
 	struct VulkanBuffer
 	{
@@ -69,9 +68,12 @@ private:
 		vk::DeviceAddress DeviceAddress = 0;
 	};
 	std::vector<VulkanBuffer> m_ParticleFrameBuffers;
-	std::vector<VulkanBuffer> m_DescriptorBuffers;
 	std::vector<VulkanBuffer> m_IndirectDrawBuffers;
 	std::vector<StorageBuffer> m_SpawnRequestBuffers;
+
+	ShaderResourceSet m_ParticleSet;
+	std::vector<ShaderResourceSet> m_SpawnSets;
+	ShaderResourceSet m_TextureSet;
 
 	vk::raii::DescriptorSetLayout m_ParticleBuffersLayout = nullptr;
 	vk::raii::DescriptorSetLayout m_SpawnRequestsLayout = nullptr;

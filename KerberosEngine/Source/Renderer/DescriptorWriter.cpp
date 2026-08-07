@@ -9,10 +9,11 @@ namespace Kerberos
 	{
 		m_Layout = &layout;
 		m_Set = &set;
-		if (const auto& context = VulkanContext::Get(); context.UseDescriptorBuffers())
+		if (auto& context = VulkanContext::Get(); context.UseDescriptorBuffers())
 		{
 			m_UseDescriptorBuffers = true;
-			m_DescriptorSize = m_Layout->getSizeEXT();
+			m_DescProps = context.GetPhysicalDevice().getProperties2<vk::PhysicalDeviceProperties2, vk::PhysicalDeviceDescriptorBufferPropertiesEXT>()
+				.get<vk::PhysicalDeviceDescriptorBufferPropertiesEXT>();
 		}
 		else
 		{
@@ -20,7 +21,7 @@ namespace Kerberos
 		}
 	}
 
-	void DescriptorWriter::WriteStorageBuffer(const uint32_t binding, const vk::raii::Buffer& buffer, const vk::DeviceSize size,
+	void DescriptorWriter::WriteStorageBuffer(const uint32_t binding, const vk::Buffer& buffer, const vk::DeviceSize size,
 		const vk::DeviceSize offset)
 	{
 		auto& context = VulkanContext::Get();
@@ -28,7 +29,7 @@ namespace Kerberos
 
 		if (m_UseDescriptorBuffers)
 		{
-			const vk::DeviceSize layoutOffset = m_Layout->getBindingOffsetEXT(binding);
+			const vk::DeviceSize bindingOffset = m_Layout->getBindingOffsetEXT(binding);
 
 			const vk::DescriptorAddressInfoEXT addrInfo{
 				.address = device.getBufferAddress({ .buffer = buffer }) + offset,
@@ -40,11 +41,11 @@ namespace Kerberos
 				.data = vk::DescriptorDataEXT(&addrInfo)
 			};
 
-			device.getDescriptorEXT(getInfo, m_DescriptorSize, static_cast<uint8_t*>(m_Set->MappedData) + layoutOffset);
+			device.getDescriptorEXT(getInfo, m_DescProps.storageBufferDescriptorSize, static_cast<uint8_t*>(m_Set->MappedData) + bindingOffset);
 		}
 		else
 		{
-			m_BufferInfos.push_back({.buffer = *buffer, .offset = offset, .range = size });
+			m_BufferInfos.push_back({.buffer = buffer, .offset = offset, .range = size });
 			m_Writes.push_back({ 
 				.dstSet = m_Set->DescriptorSet,
 				.dstBinding = binding,
@@ -58,7 +59,7 @@ namespace Kerberos
 		}
 	}
 
-	void DescriptorWriter::WriteUniformBuffer(const uint32_t binding, const vk::raii::Buffer& buffer, const vk::DeviceSize size,
+	void DescriptorWriter::WriteUniformBuffer(const uint32_t binding, const vk::Buffer& buffer, const vk::DeviceSize size,
 		const vk::DeviceSize offset) 
 	{
 		auto& context = VulkanContext::Get();
@@ -66,7 +67,7 @@ namespace Kerberos
 
 		if (m_UseDescriptorBuffers)
 		{
-			const vk::DeviceSize layoutOffset = m_Layout->getBindingOffsetEXT(binding);
+			const vk::DeviceSize bindingOffset = m_Layout->getBindingOffsetEXT(binding);
 
 			const vk::DescriptorAddressInfoEXT addrInfo{
 				.address = device.getBufferAddress({.buffer = buffer }) + offset,
@@ -78,11 +79,11 @@ namespace Kerberos
 				.data = vk::DescriptorDataEXT(&addrInfo)
 			};
 
-			device.getDescriptorEXT(getInfo, m_DescriptorSize, static_cast<uint8_t*>(m_Set->MappedData) + layoutOffset);
+			device.getDescriptorEXT(getInfo, m_DescProps.uniformBufferDescriptorSize, static_cast<uint8_t*>(m_Set->MappedData) + bindingOffset);
 		}
 		else
 		{
-			m_BufferInfos.push_back({ .buffer = *buffer, .offset = offset, .range = size });
+			m_BufferInfos.push_back({ .buffer = buffer, .offset = offset, .range = size });
 			m_Writes.push_back({
 				.dstSet = m_Set->DescriptorSet,
 				.dstBinding = binding,
@@ -96,14 +97,14 @@ namespace Kerberos
 		}
 	}
 
-	void DescriptorWriter::WriteSampledImage(const uint32_t binding, const vk::raii::ImageView& imageView) 
+	void DescriptorWriter::WriteSampledImage(const uint32_t binding, const vk::ImageView& imageView) 
 	{
 		auto& context = VulkanContext::Get();
 		const auto& device = context.GetDevice();
 
 		if (m_UseDescriptorBuffers)
 		{
-			const vk::DeviceSize layoutOffset = m_Layout->getBindingOffsetEXT(binding);
+			const vk::DeviceSize bindingOffset = m_Layout->getBindingOffsetEXT(binding);
 
 			vk::DescriptorImageInfo imageInfo{
 				.sampler = nullptr,
@@ -115,7 +116,7 @@ namespace Kerberos
 				.data = vk::DescriptorDataEXT(&imageInfo)
 			};
 
-			device.getDescriptorEXT(imageGetInfo, m_DescriptorSize, static_cast<uint8_t*>(m_Set->MappedData) + layoutOffset);
+			device.getDescriptorEXT(imageGetInfo, m_DescProps.sampledImageDescriptorSize, static_cast<uint8_t*>(m_Set->MappedData) + bindingOffset);
 		}
 		else
 		{
@@ -133,14 +134,14 @@ namespace Kerberos
 		}
 	}
 
-	void DescriptorWriter::WriteSampler(const uint32_t binding, const vk::raii::Sampler& sampler)
+	void DescriptorWriter::WriteSampler(const uint32_t binding, const vk::Sampler& sampler)
 	{
 		auto& context = VulkanContext::Get();
 		const auto& device = context.GetDevice();
 
 		if (m_UseDescriptorBuffers)
 		{
-			const vk::DeviceSize layoutOffset = m_Layout->getBindingOffsetEXT(binding);
+			const vk::DeviceSize bindingOffset = m_Layout->getBindingOffsetEXT(binding);
 
 			vk::DescriptorImageInfo imageInfo{
 				.sampler = sampler,
@@ -152,7 +153,7 @@ namespace Kerberos
 				.data = vk::DescriptorDataEXT(&imageInfo)
 			};
 
-			device.getDescriptorEXT(imageGetInfo, m_DescriptorSize, static_cast<uint8_t*>(m_Set->MappedData) + layoutOffset);
+			device.getDescriptorEXT(imageGetInfo, m_DescProps.samplerDescriptorSize, static_cast<uint8_t*>(m_Set->MappedData) + bindingOffset);
 		}
 		else
 		{

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Vulkan.hpp"
+#include "DescriptorAllocator.hpp"
 
 #include <glm/mat4x4.hpp>
 #include <glm/vec4.hpp>
@@ -25,7 +26,7 @@ namespace Kerberos
 	public:
 		~GrassSystem();
 
-		void Init();
+		void Init(const Owner<DescriptorAllocator>& allocator);
 		
 		void RecordDraw(const vk::raii::CommandBuffer& cmd, uint32_t frameIndex, const GrassConstants& constants);
 
@@ -40,6 +41,8 @@ namespace Kerberos
 		void Cleanup() const;
 
 	private:
+		DescriptorAllocator* m_DescriptorAllocator = nullptr;
+
 		vk::raii::DescriptorSetLayout m_SetLayout = nullptr;
 		vk::raii::PipelineLayout m_PipelineLayout = nullptr;
 

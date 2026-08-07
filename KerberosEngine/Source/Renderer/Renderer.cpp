@@ -7,6 +7,7 @@
 #include "SkyboxUtils.hpp"
 #include "Buffer.hpp"
 #include "VulkanContext.hpp"
+#include "DescriptorAllocator.hpp"
 #include "Shaders/Shader.hpp"
 #include "GraphicsPipeline.hpp"
 #include "ComputePipeline.hpp"
@@ -416,6 +417,9 @@ namespace
 		std::array<DescriptorSets, VulkanContext::MaxFramesInFlight> DescriptorSets{};
 		std::array<ColliderLineBuffer, VulkanContext::MaxFramesInFlight> ColliderLineBuffers{};
 
+		Owner<DescriptorAllocator> PersistentDescriptorAllocator = nullptr;
+		std::array<Owner<DescriptorAllocator>, VulkanContext::MaxFramesInFlight> FrameDescriptorAllocators{ nullptr };
+
 		// Dynamic uniform buffer related members
 		VkDeviceSize MinUniformBufferOffsetAlignment = 0;
 		uint64_t DynamicAlignment = 0;
@@ -476,34 +480,18 @@ namespace Kerberos
 
 	static Owner<RendererData> s_Data = nullptr;
 
-	void Renderer::BeginRenderPassDebugLabel(const vk::raii::CommandBuffer& cmd, const std::string_view labelName)
-	{
-#ifdef KBR_DEBUG
-		const vk::DebugUtilsLabelEXT labelInfo{
-			.pLabelName = labelName.data()
-		};
-		cmd.beginDebugUtilsLabelEXT(labelInfo);
-#else
-		(void)cmd;
-		(void)labelName;
-#endif
-	}
-
-	void Renderer::EndRenderPassDebugLabel(const vk::raii::CommandBuffer& cmd)
-	{
-#ifdef KBR_DEBUG
-		cmd.endDebugUtilsLabelEXT();
-#else
-		(void)cmd;
-#endif
-	}
-
 	void Renderer::Init()
 	{
 		KBR_CORE_ASSERT(s_Data == nullptr, "Renderer is already initialized!");
 		KBR_CORE_INFO("Initializing Renderer...");
 
 		s_Data = CreateOwner<RendererData>();
+
+		s_Data->PersistentDescriptorAllocator = CreateOwner<DescriptorAllocator>(1000);
+		for (uint32_t i = 0; i < VulkanContext::MaxFramesInFlight; ++i)
+		{
+			s_Data->FrameDescriptorAllocators[i] = CreateOwner<DescriptorAllocator>(1000);
+		}
 
 		KBR_CORE_INFO("Size of SceneUniformData: {} bytes", sizeof(SceneUniformData));
 		KBR_CORE_INFO("Size of GlobalLighting: {} bytes", sizeof(GlobalLighting));
@@ -605,6 +593,9 @@ namespace Kerberos
 		const uint32_t frameIndex = context.GetCurrentFrameIndex();
 		const uint32_t frameCount = context.GetFrameCount();
 		const uint32_t temporalIndex = frameCount % RendererData::TemporalSequenceLength + 1;
+
+		DescriptorAllocator& frameDescriptorAllocator = *s_Data->FrameDescriptorAllocators[frameIndex];
+		frameDescriptorAllocator.Reset();
 
 		if (IsUsingAccelerationStructures())
 		{
@@ -749,7 +740,7 @@ namespace Kerberos
 			.CameraRight = s_Data->PendingRender.CameraRight,
 			.Time = time
 		};
-		s_Data->ParticleSystem.Update(s_Data->PendingRender.Scene, s_Data->PendingRender.DeltaTime, cmd, frameIndex, particleFrameData);
+		s_Data->ParticleSystem.Update(s_Data->PendingRender.Scene, s_Data->PendingRender.DeltaTime, cmd, frameIndex, particleFrameData, frameDescriptorAllocator);
 
 		const Ref<Scene>& scene = s_Data->PendingRender.Scene;
 
@@ -2712,8 +2703,8 @@ namespace Kerberos
 			s_Data->SkyboxPipeline = CreateRef<GraphicsPipeline>(skyboxPipelineSpec);
 		}
 
-		s_Data->ParticleSystem.Initialize(s_Data->ColorImage.Format, s_Data->DepthImage.Format);
-		s_Data->GrassSystem.Init();
+		s_Data->ParticleSystem.Initialize(s_Data->ColorImage.Format, s_Data->DepthImage.Format, s_Data->PersistentDescriptorAllocator);
+		s_Data->GrassSystem.Init(s_Data->PersistentDescriptorAllocator);
 
 		// Create transparent pipeline resources
 		{
@@ -4422,7 +4413,7 @@ namespace Kerberos
 
 		uint32_t entityCount = 0;
 
-		const auto meshView = scene.m_Registry.view<TransformComponent, StaticMeshComponent>();
+		const auto meshView = scene.m_Registry.view<TransformComponent, StaticMeshComponent, TagComponent>();
 		for (const auto entity : meshView)
 		{
 			auto& transform = meshView.get<TransformComponent>(entity);

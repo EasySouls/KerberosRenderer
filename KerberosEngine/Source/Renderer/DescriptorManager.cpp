@@ -12,30 +12,54 @@ namespace Kerberos
 		const uint32_t firstSet,
 		const std::vector<ShaderResourceSet>& sets)
 	{
+		if (sets.empty())
+			return;
+
 		if (const auto& context = VulkanContext::Get(); context.UseDescriptorBuffers())
 		{
-			vk::DescriptorBufferBindingInfoEXT bindingInfo{
-				.address = sets[0].BufferAddress,
-				.usage = vk::BufferUsageFlagBits::eResourceDescriptorBufferEXT
-			};
-			cmd.bindDescriptorBuffersEXT({ bindingInfo });
-
-			const std::vector<uint32_t> bufferIndices(sets.size(), 0);
+			std::vector<vk::DescriptorBufferBindingInfoEXT> bindingInfos(sets.size());;
+			std::vector<uint32_t> bufferIndices(sets.size());
 			std::vector<vk::DeviceSize> offsets(sets.size());
-			for (size_t i = 0; i < sets.size(); i++)
+
+			for (size_t i = 0; i < sets.size(); ++i)
 			{
+				bindingInfos[i] = { .address = sets[i].BufferAddress, .usage = vk::BufferUsageFlagBits::eResourceDescriptorBufferEXT };
+				bufferIndices[i] = static_cast<uint32_t>(i);
 				offsets[i] = sets[i].BufferOffset;
 			}
 
+			cmd.bindDescriptorBuffersEXT({ bindingInfos });
 			cmd.setDescriptorBufferOffsetsEXT(bindPoint, *pipelineLayout, firstSet, bufferIndices, offsets);
 		}
 		else
 		{
-			std::vector<vk::DescriptorSet> traditionalSets(sets.size());
+			std::vector<vk::DescriptorSet> rawSets(sets.size());
 			for (size_t i = 0; i < sets.size(); i++)
-				traditionalSets[i] = sets[i].DescriptorSet;
+			{
+				rawSets[i] = sets[i].DescriptorSet;
+			}
 
-			cmd.bindDescriptorSets(bindPoint, *pipelineLayout, firstSet, traditionalSets, nullptr);
+			cmd.bindDescriptorSets(bindPoint, *pipelineLayout, firstSet, rawSets, nullptr);
 		}
+	}
+
+	vk::raii::DescriptorSetLayout DescriptorManager::CreateDescriptorSetLayout(
+		const std::vector<vk::DescriptorSetLayoutBinding>& bindings)
+	{
+		auto& context = VulkanContext::Get();
+		vk::DescriptorSetLayoutCreateFlags flags{};
+
+		if (context.UseDescriptorBuffers())
+		{
+			flags |= vk::DescriptorSetLayoutCreateFlagBits::eDescriptorBufferEXT;
+		}
+
+		const vk::DescriptorSetLayoutCreateInfo layoutInfo{
+			.flags = flags,
+			.bindingCount = static_cast<uint32_t>(bindings.size()),
+			.pBindings = bindings.data()
+		};
+
+		return { context.GetDevice(), layoutInfo };
 	}
 }

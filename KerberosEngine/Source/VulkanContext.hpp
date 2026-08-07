@@ -9,6 +9,7 @@
 #include <limits>
 #include <optional>
 #include <vector>
+#include <type_traits>
 
 
 struct GLFWwindow;
@@ -84,16 +85,41 @@ namespace Kerberos
 		void WaitIdle() const;
 
 		void SetObjectDebugName(uint64_t objectHandle, vk::ObjectType objectType, const std::string& name) const;
+		void SetObjectDebugName(VmaAllocation allocation, const std::string& name) const;
 
-		template<typename T>
+		template <typename Handle>
+		static uint64_t RawHandleToUint64(Handle handle)
+		{
+			if constexpr (std::is_pointer_v<Handle>)
+			{
+				return reinterpret_cast<uint64_t>(handle);
+			}
+			else
+			{
+				return static_cast<uint64_t>(handle);
+			}
+		}
+
+		template <typename T>
 		void SetObjectDebugName(const T& object, const std::string& name) const
 			requires requires { T::objectType; }
 		{
-			SetObjectDebugName(
-				reinterpret_cast<uint64_t>(static_cast<T::CType>(*object)),
-				T::objectType,
-				name
-			);
+			uint64_t rawHandle;
+
+			if constexpr (requires { typename T::CppType; })
+			{
+				rawHandle = RawHandleToUint64(static_cast<typename T::CType>(*object));
+			}
+			else if constexpr (requires { typename T::CType; })
+			{
+				rawHandle = RawHandleToUint64(static_cast<typename T::CType>(object));
+			}
+			else
+			{
+				rawHandle = RawHandleToUint64(object);
+			}
+
+			SetObjectDebugName(rawHandle, T::objectType, name);
 		}
 
 		struct QueueFamilyInfo
@@ -256,4 +282,26 @@ namespace Kerberos
 		// Singleton instance
 		static VulkanContext* s_Instance;
 	};
+
+	static void BeginRenderPassDebugLabel(const vk::raii::CommandBuffer& cmd, const std::string_view labelName)
+	{
+#ifdef KBR_DEBUG
+		const vk::DebugUtilsLabelEXT labelInfo{
+			.pLabelName = labelName.data()
+		};
+		cmd.beginDebugUtilsLabelEXT(labelInfo);
+#else
+		(void)cmd;
+		(void)labelName;
+#endif
+	}
+
+	static void EndRenderPassDebugLabel(const vk::raii::CommandBuffer& cmd)
+	{
+#ifdef KBR_DEBUG
+		cmd.endDebugUtilsLabelEXT();
+#else
+		(void)cmd;
+#endif
+	}
 } 

@@ -5,7 +5,7 @@
 
 namespace Kerberos
 {
-	DescriptorAllocator::DescriptorAllocator(const uint32_t maxSets)
+	DescriptorAllocator::DescriptorAllocator(const uint32_t maxSets, vk::DeviceSize bufferHeapSize)
 	{
 		auto& context = VulkanContext::Get();
 		const auto& device = context.GetDevice();
@@ -13,13 +13,11 @@ namespace Kerberos
 
 		m_UseDescriptorBuffers = context.UseDescriptorBuffers();
 
-		constexpr vk::DeviceSize totalBufferSize = 1024ull * 1024ull;
-
 		if (m_UseDescriptorBuffers)
 		{
 			VkBufferCreateInfo bufferInfo{};
 			bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-			bufferInfo.size = totalBufferSize;
+			bufferInfo.size = bufferHeapSize;
 			bufferInfo.usage = VK_BUFFER_USAGE_RESOURCE_DESCRIPTOR_BUFFER_BIT_EXT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT;
 			bufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 			VmaAllocationCreateInfo allocInfo{};
@@ -45,11 +43,19 @@ namespace Kerberos
 		else
 		{
 			// Create a descriptor pool for traditional descriptor sets
+
+			std::vector<vk::DescriptorPoolSize> poolSizes = {
+				{ .type = vk::DescriptorType::eUniformBuffer, .descriptorCount = maxSets },
+				{ .type = vk::DescriptorType::eStorageBuffer, .descriptorCount = maxSets },
+				{ .type = vk::DescriptorType::eSampledImage, .descriptorCount = maxSets },
+				{ .type = vk::DescriptorType::eSampler, .descriptorCount = maxSets }
+			};
+
 			const vk::DescriptorPoolCreateInfo poolInfo{
 				.flags = vk::DescriptorPoolCreateFlagBits::eFreeDescriptorSet,
 				.maxSets = maxSets,
-				.poolSizeCount = 0,
-				.pPoolSizes = nullptr
+				.poolSizeCount = static_cast<uint32_t>(poolSizes.size()),
+				.pPoolSizes = poolSizes.data()
 			};
 			m_DescriptorPool = vk::raii::DescriptorPool{ device, poolInfo };
 		}
@@ -63,13 +69,12 @@ namespace Kerberos
 		vmaDestroyBuffer(allocator, m_Handle, m_Allocation);
 	}
 
-	ShaderResourceSet DescriptorAllocator::Allocate(const vk::raii::DescriptorSetLayout& layout)
+	ShaderResourceSet DescriptorAllocator::Allocate(const vk::raii::DescriptorSetLayout& layout, const std::string& debugName)
 	{
 		ShaderResourceSet set{};
 
 		auto& context = VulkanContext::Get();
 		const auto& device = context.GetDevice();
-		const auto& physicalDevice = context.GetPhysicalDevice();
 
 		if (m_UseDescriptorBuffers)
 		{
@@ -88,6 +93,15 @@ namespace Kerberos
 			set.MappedData = static_cast<uint8_t*>(m_MappedData) + m_CurrentOffset;
 
 			m_CurrentOffset += layoutSize;
+
+#ifdef KBR_DEBUG
+			if (!debugName.empty())
+			{
+				m_AllocationDebugNames[m_CurrentOffset] = debugName;
+
+				KBR_CORE_TRACE("Descriptor Allocator: Bound '{}' at offset {} (size {})", debugName, m_CurrentOffset, layoutSize);
+			}
+#endif
 		}
 		else
 		{
