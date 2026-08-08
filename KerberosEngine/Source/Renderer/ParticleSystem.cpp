@@ -471,11 +471,13 @@ namespace Kerberos
 
 	void ParticleSystem::SetupPipelines(vk::Format colorFormat, vk::Format depthFormat)
 	{
+		const auto& context = VulkanContext::Get();
+
 		ComputePipelineSpecification spawnPipelineSpec{};
 		spawnPipelineSpec.Name = "Particle Spawn Pipeline";
 		spawnPipelineSpec.Shader = CreateRef<Shader>("particle_emit", "Particle Emit");
 		spawnPipelineSpec.PipelineLayout = m_ComputePipelineLayout;
-		spawnPipelineSpec.UsingDescriptorBuffers = true;
+		spawnPipelineSpec.UsingDescriptorBuffers = context.UseDescriptorBuffers();
 
 		m_SpawnPipeline = CreateRef<ComputePipeline>(spawnPipelineSpec);
 
@@ -483,7 +485,7 @@ namespace Kerberos
 		prepareSimulatePipelineSpec.Name = "Particle Prepare Simulate Pipeline";
 		prepareSimulatePipelineSpec.Shader = CreateRef<Shader>("particle_prepare_simulation", "Particle Prepare Simulation");
 		prepareSimulatePipelineSpec.PipelineLayout = m_ComputePipelineLayout;
-		prepareSimulatePipelineSpec.UsingDescriptorBuffers = true;
+		prepareSimulatePipelineSpec.UsingDescriptorBuffers = context.UseDescriptorBuffers();
 
 		m_PrepareSimulatePipeline = CreateRef<ComputePipeline>(prepareSimulatePipelineSpec);
 
@@ -491,7 +493,7 @@ namespace Kerberos
 		updatePipelineSpec.Name = "Particle Update Pipeline";
 		updatePipelineSpec.Shader = CreateRef<Shader>("particle_simulate", "Particle Simulate");
 		updatePipelineSpec.PipelineLayout = m_ComputePipelineLayout;
-		updatePipelineSpec.UsingDescriptorBuffers = true;
+		updatePipelineSpec.UsingDescriptorBuffers = context.UseDescriptorBuffers();
 
 		m_UpdatePipeline = CreateRef<ComputePipeline>(updatePipelineSpec);
 
@@ -517,7 +519,7 @@ namespace Kerberos
 		renderPipelineSpec.ColorAttachmentFormats = { colorFormat };
 		renderPipelineSpec.DepthAttachmentFormat = depthFormat;
 		renderPipelineSpec.DynamicStates = dynamicStates;
-		renderPipelineSpec.UsingDescriptorBuffers = true;
+		renderPipelineSpec.UsingDescriptorBuffers = context.UseDescriptorBuffers();
 
 		m_RenderPipeline = CreateRef<GraphicsPipeline>(renderPipelineSpec);
 	}

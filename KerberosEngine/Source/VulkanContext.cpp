@@ -910,12 +910,12 @@ namespace Kerberos
 			.pEnabledValidationFeatures = enabledValidationFeatures
 		};
 
-		constexpr int32_t shaderDebugPrintfBufferSize = 1024 * 1024; // 1 MB
+		constexpr uint32_t shaderDebugPrintfBufferSize = 1024 * 1024; // 1 MB
 
 		const vk::LayerSettingEXT layerSetting{
 			.pLayerName = "VK_LAYER_KHRONOS_validation",
 			.pSettingName = "printf_buffer_size",
-			.type = vk::LayerSettingTypeEXT::eInt32,
+			.type = vk::LayerSettingTypeEXT::eUint32,
 			.valueCount = 1,
 			.pValues = &shaderDebugPrintfBufferSize,
 		};
