@@ -349,6 +349,12 @@ namespace
 			void* MappedData = nullptr;
 		};
 
+		Owner<DescriptorAllocator> PersistentDescriptorAllocator = nullptr;
+		std::array<Owner<DescriptorAllocator>, VulkanContext::MaxFramesInFlight> FrameDescriptorAllocators{ nullptr };
+
+		vk::raii::DescriptorPool DescriptorPool = nullptr;
+		DescriptorSetLayouts DescriptorSetLayouts;
+
 		TextureManager TextureManager{};
 		MaterialRegistry MaterialRegistry{};
 
@@ -369,9 +375,6 @@ namespace
 		ImageData GTAOScratchImage;
 		
 		vk::ImageLayout PickingImageLayout = vk::ImageLayout::eUndefined;
-
-		vk::raii::DescriptorPool DescriptorPool = nullptr;
-		DescriptorSetLayouts DescriptorSetLayouts;
 
 		vk::raii::PipelineLayout PBRPipelineLayout = nullptr;
 		Ref<GraphicsPipeline> DepthPrePassPipeline = nullptr;
@@ -416,9 +419,6 @@ namespace
 
 		std::array<DescriptorSets, VulkanContext::MaxFramesInFlight> DescriptorSets{};
 		std::array<ColliderLineBuffer, VulkanContext::MaxFramesInFlight> ColliderLineBuffers{};
-
-		Owner<DescriptorAllocator> PersistentDescriptorAllocator = nullptr;
-		std::array<Owner<DescriptorAllocator>, VulkanContext::MaxFramesInFlight> FrameDescriptorAllocators{ nullptr };
 
 		// Dynamic uniform buffer related members
 		VkDeviceSize MinUniformBufferOffsetAlignment = 0;
