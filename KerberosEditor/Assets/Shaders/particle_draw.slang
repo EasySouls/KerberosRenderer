@@ -47,9 +47,13 @@ VertexOutput vertexMain(uint vertexID: SV_VulkanVertexID, uint instanceID: SV_Vu
 float4 fragmentMain(VertexOutput input) : SV_Target {
     float4 texColor = particleTexture.Sample(particleSampler, input.uv);
     float4 finalColor = texColor * input.color;
+    // Premultiply alpha for correct blending
+    finalColor.rgb *= finalColor.a;
     //float4 finalColor = input.color;
 
     if (finalColor.a < 0.01) discard;
 
-    return finalColor;
+    // The 0 alpha is important, because the alpha of every pass before the bloom pass
+    // is considered to be the bloom mask, and we don't want to bloom the particles.
+    return float4(finalColor.xyz, 0);
 }

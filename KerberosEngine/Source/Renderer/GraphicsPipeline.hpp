@@ -41,6 +41,7 @@ namespace Kerberos
 		Additive = 1,
 		AlphaBlend = 2,
 		Multiplicative = 3,
+		PremultipliedAlpha = 4
 	};
 
 	enum class PrimitiveTopology : uint8_t

@@ -99,12 +99,24 @@ namespace
 		.colorWriteMask = vk::ColorComponentFlagBits::eR | vk::ColorComponentFlagBits::eG | vk::ColorComponentFlagBits::eB | vk::ColorComponentFlagBits::eA
 	};
 
+	constexpr vk::PipelineColorBlendAttachmentState premultipliedAlphaBlendAttachment{
+		.blendEnable = vk::True,
+		.srcColorBlendFactor = vk::BlendFactor::eOne,
+		.dstColorBlendFactor = vk::BlendFactor::eOneMinusSrcAlpha,
+		.colorBlendOp = vk::BlendOp::eAdd,
+		.srcAlphaBlendFactor = vk::BlendFactor::eOne,
+		.dstAlphaBlendFactor = vk::BlendFactor::eOneMinusSrcAlpha,
+		.alphaBlendOp = vk::BlendOp::eAdd,
+		.colorWriteMask = vk::ColorComponentFlagBits::eR | vk::ColorComponentFlagBits::eG | vk::ColorComponentFlagBits::eB | vk::ColorComponentFlagBits::eA
+	};
+
 	std::map<Kerberos::BlendMode, vk::PipelineColorBlendAttachmentState> s_BlendModeToVkBlendState
 	{
 		{ Kerberos::BlendMode::None, noBlendAttachment },
 		{ Kerberos::BlendMode::Additive, additiveBlendAttachment },
 		{ Kerberos::BlendMode::AlphaBlend, alphaBlendAttachment },
 		{ Kerberos::BlendMode::Multiplicative, multiplicativeBlendAttachment },
+		{ Kerberos::BlendMode::PremultipliedAlpha, premultipliedAlphaBlendAttachment }
 	};
 }
 
