@@ -31,6 +31,7 @@ VertexOutput vertexMain(uint vertexID: SV_VulkanVertexID, uint instanceID: SV_Vu
     Particle p = particlePool[poolIndex];
 
     float2 quadPos = QUAD_POSITIONS[vertexID] * p.size;
+
     float3 worldPos = p.position 
                     + (scene.cameraRight * quadPos.x) 
                     + (scene.cameraUp * quadPos.y);
@@ -44,12 +45,11 @@ VertexOutput vertexMain(uint vertexID: SV_VulkanVertexID, uint instanceID: SV_Vu
 
 [shader("fragment")]
 float4 fragmentMain(VertexOutput input) : SV_Target {
-    // float4 texColor = particleTexture.Sample(particleSampler, input.uv);
-    //float4 finalColor = texColor * input.color;
-    float4 finalColor = input.color;
+    float4 texColor = particleTexture.Sample(particleSampler, input.uv);
+    float4 finalColor = texColor * input.color;
+    //float4 finalColor = input.color;
 
-    // Alpha clipping
-    // if (finalColor.a < 0.01) discard;
+    if (finalColor.a < 0.01) discard;
 
     return finalColor;
 }

@@ -5,16 +5,18 @@ import common;
 [vk::binding(1, 0)] RWStructuredBuffer<uint> deadList;
 [vk::binding(2, 0)] RWStructuredBuffer<uint> aliveList;
 [vk::binding(3, 0)] RWStructuredBuffer<uint> counters; // [0] = deadCount, [1] = aliveCount
-[vk::binding(4, 0)] RWStructuredBuffer<DrawIndirectCommand> indirectBuffer;
 
 [vk::binding(1, 1)] ConstantBuffer<ParticleFrameData> scene;
 
 [shader("compute")]
-[numthreads(64, 1, 1)]
+[numthreads(256, 1, 1)]
 void computeMain(uint3 threadId: SV_DispatchThreadID)
 {
     // We dispatch over the MAXIMUM particle pool budget
     uint poolIndex = threadId.x;
+
+    if (poolIndex >= 1000000)
+        return;
 
     // Read particle
     Particle p = particlePool[poolIndex];
@@ -24,7 +26,7 @@ void computeMain(uint3 threadId: SV_DispatchThreadID)
 
     // Integrate
     p.life -= scene.deltaTime;
-    p.velocity += p.acceleration *  scene.deltaTime;
+    p.velocity += p.acceleration * scene.deltaTime;
     p.position += p.velocity * scene.deltaTime;
 
     // Check if it just died

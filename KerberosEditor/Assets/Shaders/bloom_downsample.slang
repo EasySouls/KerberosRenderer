@@ -73,7 +73,8 @@ void computeMain(uint3 threadId : SV_DispatchThreadID)
 
     if (isExtract == 1)
     {   
-        color = color * e.a;
+        // The alpha channel is used to store the bloom contribution for later stages
+        color = color * saturate(e.a);
 
         color = min(color, float3(maxBrightness));
     }

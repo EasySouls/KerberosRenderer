@@ -5,10 +5,10 @@ import common;
 [vk::binding(1, 0)] RWStructuredBuffer<uint> deadList;
 [vk::binding(2, 0)] RWStructuredBuffer<uint> aliveList;
 [vk::binding(3, 0)] RWStructuredBuffer<uint> counters; // [0] = deadCount, [1] = aliveCount
-[vk::binding(4, 0)] RWStructuredBuffer<DrawIndirectCommand> indirectBuffer;
 
 [vk::binding(0, 1)] StructuredBuffer<SpawnRequest> spawnRequests;
 [vk::binding(1, 1)] ConstantBuffer<ParticleFrameData> scene;
+[vk::binding(2, 1)] RWStructuredBuffer<DrawIndirectCommand> indirectBuffer;
 
 struct PushConstants {
     uint spawnRequestCount;
@@ -48,7 +48,7 @@ void computeMain(uint3 threadId: SV_DispatchThreadID)
     for (uint i = 0; i < req.spawnCount; i++) {
         // Get a dead particle index
         uint originalDeadCount;
-        InterlockedAdd(counters[0], -1, originalDeadCount);
+        InterlockedAdd(counters[0], 0xFFFFFFFF /* -1 */, originalDeadCount);
 
         // If we ran out of dead particles, revert and abort
         if (originalDeadCount <= 0) {

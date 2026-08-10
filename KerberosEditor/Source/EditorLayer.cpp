@@ -906,18 +906,19 @@ namespace Kerberos
 		const GPUTimings gpuTimings = Renderer::GetLatestGPUTimings();
 		if (gpuTimings.IsValid)
 		{
-			ImGui::Text("GPU Frame: %.3f ms", gpuTimings.FrameMilliseconds);
-			ImGui::Text("GPU Depth Pre-Pass: %.3f ms", gpuTimings.DepthPrePassMilliseconds);
-			ImGui::Text("GPU Shadow: %.3f ms", gpuTimings.ShadowPassMilliseconds);
-			ImGui::Text("GPU Opaque: %.3f ms", gpuTimings.OpaquePassMilliseconds);
-			ImGui::Text("GPU Grass: %.3f ms", gpuTimings.GrassPassMilliseconds);
-			ImGui::Text("GPU Particles: %.3f ms", gpuTimings.ParticlesPassMilliseconds);
-			ImGui::Text("GPU Transparent: %.3f ms", gpuTimings.TransparentPassMilliseconds);
-			ImGui::Text("GPU Transparency Resolve: %.3f ms", gpuTimings.TransparencyResolvePassMilliseconds);
-			ImGui::Text("GPU Bloom: %.3f ms", gpuTimings.BloomPassMilliseconds);
-			ImGui::Text("GPU Ambient Occlusion: %.3f ms", gpuTimings.AmbientOcclusionPassMilliseconds);
-			ImGui::Text("GPU Antialiasing: %.3f ms", gpuTimings.AntialiasingPassMilliseconds);
-			ImGui::Text("GPU Tonemapping: %.3f ms", gpuTimings.TonemappingPassMilliseconds);
+			ImGui::Text("Frame: %.3f ms", gpuTimings.FrameMilliseconds);
+			ImGui::Text("Depth Pre-Pass: %.3f ms", gpuTimings.DepthPrePassMilliseconds);
+			ImGui::Text("Shadow: %.3f ms", gpuTimings.ShadowPassMilliseconds);
+			ImGui::Text("Opaque: %.3f ms", gpuTimings.OpaquePassMilliseconds);
+			ImGui::Text("Grass: %.3f ms", gpuTimings.GrassPassMilliseconds);
+			ImGui::Text("Particles Simulate: %.3f ms", gpuTimings.ParticlesSimulateMilliseconds);
+			ImGui::Text("Particles Draw: %.3f ms", gpuTimings.ParticlesDrawMilliseconds);
+			ImGui::Text("Transparent: %.3f ms", gpuTimings.TransparentPassMilliseconds);
+			ImGui::Text("Transparency Resolve: %.3f ms", gpuTimings.TransparencyResolvePassMilliseconds);
+			ImGui::Text("Bloom: %.3f ms", gpuTimings.BloomPassMilliseconds);
+			ImGui::Text("Ambient Occlusion: %.3f ms", gpuTimings.AmbientOcclusionPassMilliseconds);
+			ImGui::Text("Antialiasing: %.3f ms", gpuTimings.AntialiasingPassMilliseconds);
+			ImGui::Text("Tonemapping: %.3f ms", gpuTimings.TonemappingPassMilliseconds);
 		}
 		else
 		{

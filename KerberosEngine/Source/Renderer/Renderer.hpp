@@ -34,7 +34,8 @@ namespace Kerberos
 		float ShadowPassMilliseconds = 0.0f;
 		float OpaquePassMilliseconds = 0.0f;
 		float GrassPassMilliseconds = 0.0f;
-		float ParticlesPassMilliseconds = 0.0f;
+		float ParticlesDrawMilliseconds = 0.0f;
+		float ParticlesSimulateMilliseconds = 0.0f;
 		float TransparentPassMilliseconds = 0.0f;
 		float TransparencyResolvePassMilliseconds = 0.0f;
 		float BloomPassMilliseconds = 0.0f;

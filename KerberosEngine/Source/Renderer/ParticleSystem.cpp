@@ -38,27 +38,31 @@ namespace
 
 	struct alignas(16) SpawnRequest
 	{
-		glm::vec3 emitterPosition;
-		uint32_t  spawnCount;
+		glm::vec3 emitterPosition;      // offset 0
+		uint32_t  spawnCount;           // offset 12
 
-		float     minLife;
-		float     maxLife;
-		glm::vec3 minVelocity;
-		[[maybe_unused]] float     _pad0;
-		glm::vec3 maxVelocity;
-		[[maybe_unused]] float     _pad1;
+		float     minLife;              // offset 16
+		float     maxLife;              // offset 20
+		[[maybe_unused]] glm::vec2 _pad0;                // offset 24 (8 bytes of padding to align the next vec3!)
 
-		glm::vec3 minAcceleration;
-		[[maybe_unused]] float     _pad2;
-		glm::vec3 maxAcceleration;
-		[[maybe_unused]] float     _pad3;
+		glm::vec3 minVelocity;          // offset 32
+		[[maybe_unused]] float     _pad1;                // offset 44
 
-		glm::vec4 startColor;
-		glm::vec4 endColor;
+		glm::vec3 maxVelocity;          // offset 48
+		[[maybe_unused]] float     _pad2;                // offset 60
 
-		float     startSize;
-		float     endSize;
-		[[maybe_unused]] glm::vec2 _pad4;
+		glm::vec3 minAcceleration;      // offset 64
+		[[maybe_unused]] float     _pad3;                // offset 76
+
+		glm::vec3 maxAcceleration;      // offset 80
+		[[maybe_unused]] float     _pad4;                // offset 92
+
+		glm::vec4 startColor;           // offset 96
+		glm::vec4 endColor;             // offset 112
+
+		float     startSize;            // offset 128
+		float     endSize;              // offset 132
+		[[maybe_unused]] glm::vec2 _pad5;                // offset 136 (pads to 144)
 	};
 
 	struct Counters
@@ -164,6 +168,15 @@ namespace Kerberos
 		KBR_PROFILE_FUNCTION();
 
 		BeginRenderPassDebugLabel(cmd, "Particle System Compute Update Passes");
+
+		// Ensures the previous frame has completely finished reading/writing the global particle buffers.
+		vk::MemoryBarrier2 globalBarrier{
+			.srcStageMask = vk::PipelineStageFlagBits2::eComputeShader | vk::PipelineStageFlagBits2::eVertexShader,
+			.srcAccessMask = vk::AccessFlagBits2::eShaderWrite | vk::AccessFlagBits2::eShaderRead,
+			.dstStageMask = vk::PipelineStageFlagBits2::eComputeShader,
+			.dstAccessMask = vk::AccessFlagBits2::eShaderRead | vk::AccessFlagBits2::eShaderWrite,
+		};
+		cmd.pipelineBarrier2({ .memoryBarrierCount = 1, .pMemoryBarriers = &globalBarrier });
 
 		// Copy the frame data to the GPU buffer
 		std::memcpy(m_ParticleFrameBuffers[frameIndex].MappedData, &frameData, sizeof(ParticleFrameData));
@@ -282,25 +295,6 @@ namespace Kerberos
 			EndRenderPassDebugLabel(cmd);
 		}
 
-		// Prepare simulation pass
-		{
-			BeginRenderPassDebugLabel(cmd, "Particle Prepare Simulation Pass");
-
-			cmd.bindPipeline(vk::PipelineBindPoint::eCompute, m_PrepareSimulatePipeline->GetVulkanPipeline());
-			cmd.dispatch(1, 1, 1);
-
-			// Ensure Prepare writes to Indirect Buffer and Counters finish before Simulate
-			vk::MemoryBarrier2 barrier{
-				.srcStageMask = vk::PipelineStageFlagBits2::eComputeShader,
-				.srcAccessMask = vk::AccessFlagBits2::eShaderWrite | vk::AccessFlagBits2::eShaderRead,
-				.dstStageMask = vk::PipelineStageFlagBits2::eComputeShader,
-				.dstAccessMask = vk::AccessFlagBits2::eShaderRead | vk::AccessFlagBits2::eShaderWrite,
-			};
-			cmd.pipelineBarrier2({.memoryBarrierCount = 1, .pMemoryBarriers = &barrier});
-
-			EndRenderPassDebugLabel(cmd);
-		}
-
 		// Simulate pass
 		{
 			BeginRenderPassDebugLabel(cmd, "Particle Simulate Pass");
@@ -311,6 +305,25 @@ namespace Kerberos
 
 			// Ensure Simulate writes finish before the Graphics pipeline reads them.
 			// We are waiting on writes to the AliveList, ParticlePool, and IndirectCommand buffers.
+			vk::MemoryBarrier2 barrier{
+				.srcStageMask = vk::PipelineStageFlagBits2::eComputeShader,
+				.srcAccessMask = vk::AccessFlagBits2::eShaderWrite,
+				.dstStageMask = vk::PipelineStageFlagBits2::eComputeShader,
+				.dstAccessMask = vk::AccessFlagBits2::eShaderRead | vk::AccessFlagBits2::eShaderRead,
+			};
+			cmd.pipelineBarrier2({ .memoryBarrierCount = 1, .pMemoryBarriers = &barrier });
+
+			EndRenderPassDebugLabel(cmd);
+		}
+
+		// Prepare simulation pass
+		{
+			BeginRenderPassDebugLabel(cmd, "Particle Prepare Simulation Pass");
+
+			cmd.bindPipeline(vk::PipelineBindPoint::eCompute, m_PrepareSimulatePipeline->GetVulkanPipeline());
+			cmd.dispatch(1, 1, 1);
+
+			// Ensure Prepare writes to Indirect Buffer and Counters finish before Simulate
 			vk::MemoryBarrier2 barrier{
 				.srcStageMask = vk::PipelineStageFlagBits2::eComputeShader,
 				.srcAccessMask = vk::AccessFlagBits2::eShaderWrite,
@@ -383,13 +396,12 @@ namespace Kerberos
 			{.binding = 1, .descriptorType = vk::DescriptorType::eStorageBuffer, .descriptorCount = 1, .stageFlags = vk::ShaderStageFlagBits::eCompute}, // DeadList
 			{.binding = 2, .descriptorType = vk::DescriptorType::eStorageBuffer, .descriptorCount = 1, .stageFlags = vk::ShaderStageFlagBits::eCompute | vk::ShaderStageFlagBits::eVertex}, // AliveList
 			{.binding = 3, .descriptorType = vk::DescriptorType::eStorageBuffer, .descriptorCount = 1, .stageFlags = vk::ShaderStageFlagBits::eCompute}, // Counters
-			{.binding = 4, .descriptorType = vk::DescriptorType::eStorageBuffer, .descriptorCount = 1, .stageFlags = vk::ShaderStageFlagBits::eCompute}  // Indirect Buffer 
 		};
 
 		m_ParticleBuffersLayout = DescriptorManager::CreateDescriptorSetLayout(particleBindings);
 		context.SetObjectDebugName(m_ParticleBuffersLayout, "Particle Buffers Descriptor Set Layout");
 
-		// SET 1: Spawn Requests and Particle Frame Data (Storage and uniform buffer updated per frame by CPU)
+		// SET 1: Spawn Requests and Particle Frame Data
 		const std::vector<vk::DescriptorSetLayoutBinding> spawnReqBinding{
 			{
 				.binding = 0,
@@ -402,6 +414,12 @@ namespace Kerberos
 				.descriptorType = vk::DescriptorType::eUniformBuffer, // Particle frame data
 				.descriptorCount = 1,
 				.stageFlags = vk::ShaderStageFlagBits::eCompute | vk::ShaderStageFlagBits::eVertex
+			},
+			{
+				.binding = 2, 
+				.descriptorType = vk::DescriptorType::eStorageBuffer, // Indirect Buffer 
+				.descriptorCount = 1, 
+				.stageFlags = vk::ShaderStageFlagBits::eCompute
 			}
 		};
 
@@ -417,7 +435,7 @@ namespace Kerberos
 		m_TextureLayout = DescriptorManager::CreateDescriptorSetLayout(textureBindings);
 		context.SetObjectDebugName(m_TextureLayout, "Particle Texture Descriptor Set Layout");
 
-		// Compute needs Sets 0, 1, and 2. Plus a push constant for requestCount.
+		// Compute needs Sets 0, 1, and 2, and a push constant for requestCount.
 		const std::array<vk::DescriptorSetLayout, 2> computeLayouts = {
 			*m_ParticleBuffersLayout, *m_SpawnRequestsLayout
 		};
@@ -567,7 +585,6 @@ namespace Kerberos
 			writer.WriteStorageBuffer(1, m_DeadListBuffer.GetBuffer(), m_DeadListBuffer.GetBufferSize());
 			writer.WriteStorageBuffer(2, m_AliveListBuffer.GetBuffer(), m_AliveListBuffer.GetBufferSize());
 			writer.WriteStorageBuffer(3, m_CountersBuffer.GetBuffer(), m_CountersBuffer.GetBufferSize());
-			writer.WriteStorageBuffer(4, m_IndirectDrawBuffers[0].Handle, sizeof(VkDrawIndirectCommand));
 			writer.Flush();
 		}
 
@@ -581,6 +598,7 @@ namespace Kerberos
 			DescriptorWriter writer(m_SpawnRequestsLayout, m_SpawnSets[i]);
 			writer.WriteStorageBuffer(0, m_SpawnRequestBuffers[i].GetBuffer(), m_SpawnRequestBuffers[i].GetBufferSize());
 			writer.WriteUniformBuffer(1, m_ParticleFrameBuffers[i].Handle, sizeof(ParticleFrameData));
+			writer.WriteStorageBuffer(2, m_IndirectDrawBuffers[i].Handle, sizeof(VkDrawIndirectCommand));
 			writer.Flush();
 		}
 

@@ -314,6 +314,8 @@ namespace
 	enum class GPUTimestampQuery : uint32_t
 	{
 		FrameBegin = 0,
+		ParticlesSimulateBegin,
+		ParticlesSimulateEnd,
 		DepthPrePassBegin,
 		DepthPrePassEnd,
 		ShadowBegin,
@@ -322,8 +324,8 @@ namespace
 		OpaqueEnd,
 		GrassBegin,
 		GrassEnd,
-		ParticlesBegin,
-		ParticlesEnd,
+		ParticlesDrawBegin,
+		ParticlesDrawEnd,
 		TransparentBegin,
 		TransparentEnd,
 		TransparencyResolveBegin,
@@ -571,12 +573,14 @@ namespace Kerberos
 	{
 		KBR_CORE_ASSERT(!s_Data->PendingRender.IsValid, "Scene has already been queued for rendering!");
 
+		glm::mat4 invView = glm::inverse(view);
+
 		s_Data->PendingRender.Scene = scene;
 		s_Data->PendingRender.View = view;
 		s_Data->PendingRender.Projection = projection;
 		s_Data->PendingRender.CameraPosition = camPos;
-		s_Data->PendingRender.CameraRight = glm::vec4(view[0][0], view[1][0], view[2][0], 0.0f);
-		s_Data->PendingRender.CameraUp = glm::vec4(view[0][1], view[1][1], view[2][1], 0.0f);
+		s_Data->PendingRender.CameraRight = glm::normalize(glm::vec3(invView[0]));
+		s_Data->PendingRender.CameraUp = glm::normalize(glm::vec3(invView[1]));
 		s_Data->PendingRender.CalculateLightSpaceMatricesFunc = calculateLightSpaceMatricesFunc;
 		s_Data->PendingRender.DeltaTime = dt;
 		s_Data->PendingRender.IsValid = scene != nullptr;
@@ -734,13 +738,15 @@ namespace Kerberos
 		time += s_Data->PendingRender.DeltaTime;
 
 		const ParticleFrameData particleFrameData{
-			.ViewProj = s_Data->PendingRender.View * s_Data->PendingRender.Projection,
+			.ViewProj = s_Data->PendingRender.Projection * s_Data->PendingRender.View,
 			.CameraUp = s_Data->PendingRender.CameraUp,
 			.DeltaTime = s_Data->PendingRender.DeltaTime,
 			.CameraRight = s_Data->PendingRender.CameraRight,
 			.Time = time
 		};
+		WriteGPUTimestamp(cmd, frameIndex, static_cast<uint32_t>(GPUTimestampQuery::ParticlesSimulateBegin));
 		s_Data->ParticleSystem.Update(s_Data->PendingRender.Scene, s_Data->PendingRender.DeltaTime, cmd, frameIndex, particleFrameData, frameDescriptorAllocator);
+		WriteGPUTimestamp(cmd, frameIndex, static_cast<uint32_t>(GPUTimestampQuery::ParticlesSimulateEnd));
 
 		const Ref<Scene>& scene = s_Data->PendingRender.Scene;
 
@@ -4143,7 +4149,8 @@ namespace Kerberos
 		s_Data->LatestGPUTimings.ShadowPassMilliseconds = toMilliseconds(GPUTimestampQuery::ShadowBegin, GPUTimestampQuery::ShadowEnd);
 		s_Data->LatestGPUTimings.OpaquePassMilliseconds = toMilliseconds(GPUTimestampQuery::OpaqueBegin, GPUTimestampQuery::OpaqueEnd);
 		s_Data->LatestGPUTimings.GrassPassMilliseconds = toMilliseconds(GPUTimestampQuery::GrassBegin, GPUTimestampQuery::GrassEnd);
-		s_Data->LatestGPUTimings.ParticlesPassMilliseconds = toMilliseconds(GPUTimestampQuery::ParticlesBegin, GPUTimestampQuery::ParticlesEnd);
+		s_Data->LatestGPUTimings.ParticlesSimulateMilliseconds = toMilliseconds(GPUTimestampQuery::ParticlesSimulateBegin, GPUTimestampQuery::ParticlesSimulateEnd);
+		s_Data->LatestGPUTimings.ParticlesDrawMilliseconds = toMilliseconds(GPUTimestampQuery::ParticlesDrawBegin, GPUTimestampQuery::ParticlesDrawEnd);
 		s_Data->LatestGPUTimings.TransparentPassMilliseconds = toMilliseconds(GPUTimestampQuery::TransparentBegin, GPUTimestampQuery::TransparentEnd);
 		s_Data->LatestGPUTimings.TransparencyResolvePassMilliseconds = toMilliseconds(GPUTimestampQuery::TransparencyResolveBegin, GPUTimestampQuery::TransparencyResolveEnd);
 		s_Data->LatestGPUTimings.BloomPassMilliseconds = toMilliseconds(GPUTimestampQuery::BloomPassBegin, GPUTimestampQuery::BloomPassEnd);
@@ -4631,7 +4638,7 @@ namespace Kerberos
 
 	void Renderer::RenderParticles(const vk::raii::CommandBuffer& cmd, const uint32_t frameIndex)
 	{
-		WriteGPUTimestamp(cmd, frameIndex, static_cast<uint32_t>(GPUTimestampQuery::ParticlesBegin));
+		WriteGPUTimestamp(cmd, frameIndex, static_cast<uint32_t>(GPUTimestampQuery::ParticlesDrawBegin));
 
 		vk::RenderingAttachmentInfo colorAttachmentInfo{
 			.imageView = s_Data->ColorImage.ImageView,
@@ -4669,7 +4676,7 @@ namespace Kerberos
 			.pDepthAttachment = &depthAttachmentInfo
 		};
 
-		BeginRenderPassDebugLabel(cmd, "GPU Particles Pass");
+		BeginRenderPassDebugLabel(cmd, "Particles Draw Pass");
 		cmd.beginRendering(renderingInfo);
 		cmd.setViewport(0, viewport);
 		cmd.setScissor(0, renderArea);
@@ -4679,7 +4686,7 @@ namespace Kerberos
 		cmd.endRendering();
 		EndRenderPassDebugLabel(cmd);
 
-		WriteGPUTimestamp(cmd, frameIndex, static_cast<uint32_t>(GPUTimestampQuery::ParticlesEnd));
+		WriteGPUTimestamp(cmd, frameIndex, static_cast<uint32_t>(GPUTimestampQuery::ParticlesDrawEnd));
 	}
 
 	void Renderer::RenderGrass(const vk::raii::CommandBuffer& cmd, const uint32_t frameIndex)
