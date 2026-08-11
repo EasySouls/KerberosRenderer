@@ -14,6 +14,8 @@ public struct Particle {
     public float4 endColor;
     public float startSize;
     public float endSize;
+
+    public float2 subUVGrid;
 }
 
 public struct Counters {
@@ -38,6 +40,8 @@ public struct SpawnRequest {
 
     public float startSize;
     public float endSize;
+
+    public float2 subUVGrid;
 }
 
 public struct ParticleFrameData {

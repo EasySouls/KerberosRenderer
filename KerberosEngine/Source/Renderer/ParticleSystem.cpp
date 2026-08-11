@@ -33,7 +33,7 @@ namespace
 
 		float     StartSize;
 		float     EndSize;
-		float     _Padding[2]{ 0.0f, 0.0f };
+		glm::vec2 SubUVGrid;
 	};
 
 	struct alignas(16) SpawnRequest
@@ -62,7 +62,7 @@ namespace
 
 		float     startSize;            // offset 128
 		float     endSize;              // offset 132
-		[[maybe_unused]] glm::vec2 _pad5;                // offset 136 (pads to 144)
+		glm::vec2 subUVGrid;           // offset 136
 	};
 
 	struct Counters
@@ -218,6 +218,7 @@ namespace Kerberos
 				req.endColor = emitter.EndColor;
 				req.startSize = emitter.StartSize;
 				req.endSize = emitter.EndSize;
+				req.subUVGrid = emitter.SubUVGrid;
 
 				activeRequests.push_back(req);
 

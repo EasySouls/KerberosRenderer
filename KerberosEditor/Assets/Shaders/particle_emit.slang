@@ -75,6 +75,8 @@ void computeMain(uint3 threadId: SV_DispatchThreadID)
         p.endSize = req.endSize;
         p.size = req.startSize;
 
+        p.subUVGrid = req.subUVGrid;
+
         // Write back to pool
         particlePool[poolIndex] = p;
     }

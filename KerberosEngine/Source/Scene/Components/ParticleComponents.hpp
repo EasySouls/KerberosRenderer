@@ -23,6 +23,7 @@ struct ParticleEmitterComponent
 	glm::vec4 EndColor = glm::vec4(1.0f, 1.0f, 1.0f, 0.0f); // Final color of particles
 	float StartSize = 0.1f; // Initial size of particles
 	float EndSize = 0.5f; // Final size of particles
+	glm::vec2 SubUVGrid = glm::vec2(1, 1); // SubUV grid dimensions (columns, rows) for texture animation
 
 	AssetHandle ParticleTexture = AssetHandle::Invalid(); // Handle to the particle texture
 

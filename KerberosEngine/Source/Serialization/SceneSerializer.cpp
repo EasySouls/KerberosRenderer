@@ -382,6 +382,7 @@ namespace Kerberos
 			out << YAML::Key << "EndColor" << YAML::Value << particleEmitter.EndColor;
 			out << YAML::Key << "StartSize" << YAML::Value << particleEmitter.StartSize;
 			out << YAML::Key << "EndSize" << YAML::Value << particleEmitter.EndSize;
+			out << YAML::Key << "SubUVGrid" << YAML::Value << particleEmitter.SubUVGrid;
 			out << YAML::Key << "ParticleTexture" << YAML::Value << particleEmitter.ParticleTexture;
 			out << YAML::EndMap;
 		}
@@ -759,6 +760,7 @@ namespace Kerberos
 					particleEmitter.EndColor = particleEmitterComponent["EndColor"].as<glm::vec4>();
 					particleEmitter.StartSize = particleEmitterComponent["StartSize"].as<float>();
 					particleEmitter.EndSize = particleEmitterComponent["EndSize"].as<float>();
+					particleEmitter.SubUVGrid = particleEmitterComponent["SubUVGrid"].as<glm::vec2>();
 					particleEmitter.ParticleTexture = AssetHandle(particleEmitterComponent["ParticleTexture"].as<uint64_t>());
 				}
 			}

@@ -2083,6 +2083,8 @@ namespace Kerberos
 				float* sizeRange = &particleEmitter.StartSize;
 				ImGui::DragFloat2("Size Range", sizeRange, 0.1f, 0.0f);
 
+				ImGui::DragFloat2("Sub UV Grid", glm::value_ptr(particleEmitter.SubUVGrid), 1, 1, 16, "%f");
+
 				ImGui::Button("Texture");
 
 				std::string textureLabel = "None";
