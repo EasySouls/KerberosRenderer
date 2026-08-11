@@ -5,6 +5,7 @@
 #include "Scene/Components.hpp"
 #include "Scene/Components/PhysicsComponents.hpp"
 #include "Scene/Components/AudioComponents.hpp"
+#include "Scene/Components/ParticleComponents.hpp"
 #include "Assets/AssetManager.hpp"
 #include "Scripting/ScriptEngine.hpp"
 #include "Scripting/ScriptUtils.hpp"
@@ -364,6 +365,27 @@ namespace Kerberos
 			out << YAML::EndMap;
 		}
 
+		if (entity.HasComponent<ParticleEmitterComponent>())
+		{
+			out << YAML::Key << "ParticleEmitterComponent";
+			out << YAML::BeginMap;
+			const auto& particleEmitter = entity.GetComponent<ParticleEmitterComponent>();
+			out << YAML::Key << "IsActive" << YAML::Value << particleEmitter.IsActive;
+			out << YAML::Key << "SpawnRate" << YAML::Value << particleEmitter.SpawnRate;
+			out << YAML::Key << "MinLifetime" << YAML::Value << particleEmitter.MinLifetime;
+			out << YAML::Key << "MaxLifetime" << YAML::Value << particleEmitter.MaxLifetime;
+			out << YAML::Key << "MinVelocity" << YAML::Value << particleEmitter.MinVelocity;
+			out << YAML::Key << "MaxVelocity" << YAML::Value << particleEmitter.MaxVelocity;
+			out << YAML::Key << "MinAcceleration" << YAML::Value << particleEmitter.MinAcceleration;
+			out << YAML::Key << "MaxAcceleration" << YAML::Value << particleEmitter.MaxAcceleration;
+			out << YAML::Key << "StartColor" << YAML::Value << particleEmitter.StartColor;
+			out << YAML::Key << "EndColor" << YAML::Value << particleEmitter.EndColor;
+			out << YAML::Key << "StartSize" << YAML::Value << particleEmitter.StartSize;
+			out << YAML::Key << "EndSize" << YAML::Value << particleEmitter.EndSize;
+			out << YAML::Key << "ParticleTexture" << YAML::Value << particleEmitter.ParticleTexture;
+			out << YAML::EndMap;
+		}
+
 		out << YAML::EndMap;
 
 	}
@@ -720,6 +742,24 @@ namespace Kerberos
 				{
 					auto& audioListener = deserializedEntity.AddComponent<AudioListenerComponent>();
 					audioListener.Volume = audioListenerComponent["Volume"].as<float>();
+				}
+
+				if (auto particleEmitterComponent = entity["ParticleEmitterComponent"])
+				{
+					auto& particleEmitter = deserializedEntity.AddComponent<ParticleEmitterComponent>();
+					particleEmitter.IsActive = particleEmitterComponent["IsActive"].as<bool>();
+					particleEmitter.SpawnRate = particleEmitterComponent["SpawnRate"].as<float>();
+					particleEmitter.MinLifetime = particleEmitterComponent["MinLifetime"].as<float>();
+					particleEmitter.MaxLifetime = particleEmitterComponent["MaxLifetime"].as<float>();
+					particleEmitter.MinVelocity = particleEmitterComponent["MinVelocity"].as<glm::vec3>();
+					particleEmitter.MaxVelocity = particleEmitterComponent["MaxVelocity"].as<glm::vec3>();
+					particleEmitter.MinAcceleration = particleEmitterComponent["MinAcceleration"].as<glm::vec3>();
+					particleEmitter.MaxAcceleration = particleEmitterComponent["MaxAcceleration"].as<glm::vec3>();
+					particleEmitter.StartColor = particleEmitterComponent["StartColor"].as<glm::vec4>();
+					particleEmitter.EndColor = particleEmitterComponent["EndColor"].as<glm::vec4>();
+					particleEmitter.StartSize = particleEmitterComponent["StartSize"].as<float>();
+					particleEmitter.EndSize = particleEmitterComponent["EndSize"].as<float>();
+					particleEmitter.ParticleTexture = AssetHandle(particleEmitterComponent["ParticleTexture"].as<uint64_t>());
 				}
 			}
 		}

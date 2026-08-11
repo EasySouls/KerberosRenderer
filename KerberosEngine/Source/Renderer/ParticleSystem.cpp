@@ -187,6 +187,7 @@ namespace Kerberos
 		activeRequests.reserve(emitterView.size_hint());
 
 		uint32_t totalParticlesToSpawn = 0;
+		AssetHandle lastTextureHandle = AssetHandle::Invalid(); // TODO: Use bindless textures here as well
 		
 		for (const auto entity : emitterView)
 		{
@@ -221,6 +222,8 @@ namespace Kerberos
 				activeRequests.push_back(req);
 
 				totalParticlesToSpawn += spawnCount;
+
+				lastTextureHandle = emitter.ParticleTexture;
 			}
 		}
 
@@ -232,7 +235,17 @@ namespace Kerberos
 
 			std::memcpy(m_SpawnRequestBuffers[frameIndex].GetMappedData(), activeRequests.data(), dataSize);
 
-			KBR_CORE_INFO("ParticleSystem: Spawning {} particles in {} requests", totalParticlesToSpawn, requestCount);
+			//KBR_CORE_INFO("ParticleSystem: Spawning {} particles in {} requests", totalParticlesToSpawn, requestCount);
+
+			if (lastTextureHandle.IsValid())
+			{
+				if (const auto& texture = AssetManager::GetAsset<Texture2D>(lastTextureHandle))
+				{
+					DescriptorWriter writer(m_TextureLayout, m_TextureSet);
+					writer.WriteSampledImage(0, texture->GetImageView());
+					writer.Flush();
+				}
+			}
 		}
 
 		// Emit pass

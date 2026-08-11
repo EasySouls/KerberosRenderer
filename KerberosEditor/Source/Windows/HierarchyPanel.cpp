@@ -2077,11 +2077,48 @@ namespace Kerberos
 				ImGui::DragFloat3("Acceleration Range Min", glm::value_ptr(particleEmitter.MinAcceleration), 0.1f);
 				ImGui::DragFloat3("Acceleration Range Max", glm::value_ptr(particleEmitter.MaxAcceleration), 0.1f);
 
-				ImGui::ColorEdit3("Start Color", &particleEmitter.StartColor[0]);
-				ImGui::ColorEdit3("End Color", &particleEmitter.EndColor[0]);
+				ImGui::ColorEdit4("Start Color", &particleEmitter.StartColor[0]);
+				ImGui::ColorEdit4("End Color", &particleEmitter.EndColor[0]);
 
 				float* sizeRange = &particleEmitter.StartSize;
 				ImGui::DragFloat2("Size Range", sizeRange, 0.1f, 0.0f);
+
+				ImGui::Button("Texture");
+
+				std::string textureLabel = "None";
+				if (AssetManager::IsAssetHandleValid(particleEmitter.ParticleTexture))
+				{
+					const auto& [Type, Filepath] = Project::GetActive()->GetEditorAssetManager()->GetMetadata(particleEmitter.ParticleTexture);
+					textureLabel = Filepath.filename().string();
+				}
+				else
+				{
+					textureLabel = "Invalid Texture";
+				}
+				ImGui::Text("%s", textureLabel.c_str());
+
+				if (ImGui::BeginDragDropTarget())
+				{
+					if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload(assetBrowserTexture))
+					{
+						const AssetHandle handle = *static_cast<AssetHandle*>(payload->Data);
+						if (const AssetType assetType = AssetManager::GetAssetType(handle); assetType != AssetType::Texture2D)
+						{
+							KBR_EDITOR_ERROR("Asset is not a texture: {0}", handle);
+							m_NotificationManager.AddNotification("Asset is not a texture", Notification::Type::Error);
+							return;
+						}
+						const Ref<Texture2D> texture = AssetManager::GetAsset<Texture2D>(handle);
+						if (!texture)
+						{
+							KBR_EDITOR_ERROR("Could not resolve texture from asset: {0}", handle);
+							m_NotificationManager.AddNotification("Could not resolve texture from selected asset", Notification::Type::Error);
+							return;
+						}
+						particleEmitter.ParticleTexture = handle;
+					}
+					ImGui::EndDragDropTarget();
+				}
 
 				ImGui::TreePop();
 			}

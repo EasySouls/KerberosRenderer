@@ -101,7 +101,6 @@ namespace Kerberos
 	{
 		if (!handle.IsValid())
 		{
-			KBR_CORE_WARN("Asset handle is not valid: {}", handle);
 			return false;
 		}
 

@@ -237,3 +237,28 @@ Entities:
       Mesh: 6728996633782092594
       Material: 1896423241257672216
       Texture: 0
+  - Entity: 10572231963151751024
+    TagComponent:
+      Tag: Particle Spawner
+    TransformComponent:
+      Translation: [0, 21.625885, 0]
+      Rotation: [0, -0, 0]
+      Scale: [1, 1, 1]
+    HierarchyComponent:
+      Parent: 0
+      Children:
+        []
+    ParticleEmitterComponent:
+      IsActive: true
+      SpawnRate: 10
+      MinLifetime: 1
+      MaxLifetime: 5
+      MinVelocity: [-1, 0, -1]
+      MaxVelocity: [1, 5, 1]
+      MinAcceleration: [0, -9.81, 0]
+      MaxAcceleration: [0, -9.81, 0]
+      StartColor: [1, 1, 1, 1]
+      EndColor: [1, 1, 1, 1]
+      StartSize: 1
+      EndSize: 1.5
+      ParticleTexture: 14940489137489425248
