@@ -1836,4 +1836,26 @@ namespace Kerberos
 
 		return vk::SampleCountFlagBits::e1;
 	}
+
+	void BeginRenderPassDebugLabel(const vk::raii::CommandBuffer& cmd, const std::string_view labelName)
+	{
+#ifdef KBR_DEBUG
+		const vk::DebugUtilsLabelEXT labelInfo{
+			.pLabelName = labelName.data()
+		};
+		cmd.beginDebugUtilsLabelEXT(labelInfo);
+#else
+		(void)cmd;
+		(void)labelName;
+#endif
+	}
+
+	void EndRenderPassDebugLabel(const vk::raii::CommandBuffer& cmd)
+	{
+#ifdef KBR_DEBUG
+		cmd.endDebugUtilsLabelEXT();
+#else
+		(void)cmd;
+#endif
+	}
 }

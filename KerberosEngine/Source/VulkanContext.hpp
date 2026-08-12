@@ -283,25 +283,6 @@ namespace Kerberos
 		static VulkanContext* s_Instance;
 	};
 
-	static void BeginRenderPassDebugLabel(const vk::raii::CommandBuffer& cmd, const std::string_view labelName)
-	{
-#ifdef KBR_DEBUG
-		const vk::DebugUtilsLabelEXT labelInfo{
-			.pLabelName = labelName.data()
-		};
-		cmd.beginDebugUtilsLabelEXT(labelInfo);
-#else
-		(void)cmd;
-		(void)labelName;
-#endif
-	}
-
-	static void EndRenderPassDebugLabel(const vk::raii::CommandBuffer& cmd)
-	{
-#ifdef KBR_DEBUG
-		cmd.endDebugUtilsLabelEXT();
-#else
-		(void)cmd;
-#endif
-	}
+	void BeginRenderPassDebugLabel(const vk::raii::CommandBuffer& cmd, const std::string_view labelName);
+	void EndRenderPassDebugLabel(const vk::raii::CommandBuffer& cmd);
 } 

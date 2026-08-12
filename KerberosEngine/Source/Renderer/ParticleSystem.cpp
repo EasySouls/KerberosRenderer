@@ -570,7 +570,7 @@ namespace Kerberos
 		renderPipelineSpec.CullMode = CullMode::None;
 		renderPipelineSpec.EnableDepthClamp = false;
 		renderPipelineSpec.EnableDepthBias = false;
-		renderPipelineSpec.EnableDepthTest = false;
+		renderPipelineSpec.EnableDepthTest = true;
 		renderPipelineSpec.EnableDepthWrite = false;
 		renderPipelineSpec.FrontFace = FrontFace::CounterClockwise;
 		renderPipelineSpec.BlendModes = { BlendMode::Additive };
