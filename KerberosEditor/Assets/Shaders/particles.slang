@@ -16,6 +16,8 @@ public struct Particle {
     public float endSize;
 
     public float2 subUVGrid;
+    public float frameAspect;
+    public uint texIndex;
 }
 
 public struct Counters {
@@ -30,6 +32,9 @@ public struct SpawnRequest {
 
     public float minLife;
     public float maxLife;
+    public uint texIdx;
+    public float frameAspect;
+
     public float3 minVelocity;
     public float3 maxVelocity;
 

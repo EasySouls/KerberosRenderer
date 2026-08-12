@@ -57,6 +57,8 @@ VertexOutput vertexMain(uint vertexID: SV_VulkanVertexID, uint instanceID: SV_Vu
 
     float2 quadPos = QUAD_POSITIONS[vertexID] * p.size;
 
+    //quadPos.x *= p.frameAspect; // Adjust for frame aspect ratio
+
     float3 worldPos = p.position 
                     + (scene.cameraRight * quadPos.x) 
                     + (scene.cameraUp * quadPos.y);
@@ -82,5 +84,5 @@ float4 fragmentMain(VertexOutput input) : SV_Target {
 
     // The 0 alpha is important, because the alpha of every pass before the bloom pass
     // is considered to be the bloom mask, and we don't want to bloom the particles.
-    return float4(finalColor.xyz, 0);
+    return float4(finalColor.rgb, 0);
 }

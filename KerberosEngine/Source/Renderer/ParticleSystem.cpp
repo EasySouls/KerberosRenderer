@@ -34,6 +34,9 @@ namespace
 		float     StartSize;
 		float     EndSize;
 		glm::vec2 SubUVGrid;
+
+		float     FrameAspect;
+		uint32_t  TextureIndex;
 	};
 
 	struct alignas(16) SpawnRequest
@@ -43,26 +46,31 @@ namespace
 
 		float     minLife;              // offset 16
 		float     maxLife;              // offset 20
-		[[maybe_unused]] glm::vec2 _pad0;                // offset 24 (8 bytes of padding to align the next vec3!)
+		uint32_t  TextureIndex;         // offset 24 
+		float     FrameAspect;          // offset 28
 
 		glm::vec3 minVelocity;          // offset 32
-		[[maybe_unused]] float     _pad1;                // offset 44
+		[[maybe_unused]]
+		float     _pad1;                // offset 44
 
 		glm::vec3 maxVelocity;          // offset 48
-		[[maybe_unused]] float     _pad2;                // offset 60
+		[[maybe_unused]]
+		float     _pad2;                // offset 60
 
 		glm::vec3 minAcceleration;      // offset 64
-		[[maybe_unused]] float     _pad3;                // offset 76
+		[[maybe_unused]]
+		float     _pad3;                // offset 76
 
 		glm::vec3 maxAcceleration;      // offset 80
-		[[maybe_unused]] float     _pad4;                // offset 92
+		[[maybe_unused]]
+		float     _pad4;                // offset 92
 
 		glm::vec4 startColor;           // offset 96
 		glm::vec4 endColor;             // offset 112
 
 		float     startSize;            // offset 128
 		float     endSize;              // offset 132
-		glm::vec2 subUVGrid;           // offset 136
+		glm::vec2 subUVGrid;            // offset 136
 	};
 
 	struct Counters
@@ -225,6 +233,24 @@ namespace Kerberos
 				totalParticlesToSpawn += spawnCount;
 
 				lastTextureHandle = emitter.ParticleTexture;
+
+				if (AssetManager::IsAssetHandleValid(lastTextureHandle))
+				{
+					const auto& texture = AssetManager::GetAsset<Texture2D>(lastTextureHandle);
+					KBR_CORE_ASSERT(texture, "Particle texture is invalid for entity {}", static_cast<uint64_t>(entity));
+
+					float frameWidth = static_cast<float>(texture->width) / emitter.SubUVGrid.x;
+					float frameHeight = static_cast<float>(texture->height) / emitter.SubUVGrid.y;
+					float aspect = frameWidth / frameHeight;
+
+					req.FrameAspect = aspect;
+					req.TextureIndex = 0; // TODO: Bindless
+				}
+				else
+				{
+					req.FrameAspect = 1.0f;
+					req.TextureIndex = 0; // TODO: Bindless
+				}
 			}
 		}
 

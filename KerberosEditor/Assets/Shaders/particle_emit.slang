@@ -76,6 +76,8 @@ void computeMain(uint3 threadId: SV_DispatchThreadID)
         p.size = req.startSize;
 
         p.subUVGrid = req.subUVGrid;
+        p.frameAspect = req.frameAspect;
+        p.texIndex = req.texIdx;
 
         // Write back to pool
         particlePool[poolIndex] = p;

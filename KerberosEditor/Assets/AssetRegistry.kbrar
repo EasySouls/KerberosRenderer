@@ -155,6 +155,9 @@ AssetRegistry:
   - Handle: 6728996633782092594
     Type: Model
     Path: Assets\Models\avocado\Avocado.gltf
+  - Handle: 6850852730073157448
+    Type: Texture2D
+    Path: Assets\Cloud01_8x8.png
   - Handle: 7177556335001025494
     Type: Material
     Path: C:\Development\KerberosRenderer\KerberosEditor\Assets\ImportedModels\sponza\Material_7.kbrmat
@@ -304,7 +307,7 @@ AssetRegistry:
     Path: Assets\Textures\colored_glass_rgba.ktx
   - Handle: 14940489137489425248
     Type: Texture2D
-    Path: Assets\Explosion00_5x5.jpg
+    Path: Assets\Explosion00_5x5.png
   - Handle: 15280944020157937240
     Type: Material
     Path: C:\Development\KerberosRenderer\KerberosEditor\Assets\ImportedModels\sponza\Material_22.kbrmat
@@ -329,6 +332,9 @@ AssetRegistry:
   - Handle: 16678733153879101124
     Type: Texture2D
     Path: Assets\Textures\colored_glass_rgba.ktx2
+  - Handle: 16923694788902762780
+    Type: Texture2D
+    Path: Assets\Flame03-hollow_16x4.png
   - Handle: 17130771604486280636
     Type: Prefab
     Path: C:\Development\KerberosRenderer\KerberosEditor\Assets\ImportedModels\cerberus\cerberus.kbrprefab
