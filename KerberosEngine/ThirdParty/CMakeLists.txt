@@ -125,12 +125,12 @@ add_library(ImGuizmo STATIC)
 target_compile_definitions(ImGuizmo PRIVATE "IMGUI_API=__declspec(dllexport)")
 
 target_sources(ImGuizmo PRIVATE
-    ImGuizmo/ImGuizmo.cpp
-    ImGuizmo/ImGuizmo.h
+    ImGuizmo/src/ImGuizmo.cpp
+    ImGuizmo/src/ImGuizmo.h
 )
 
 target_include_directories(ImGuizmo PUBLIC
-    ${CMAKE_CURRENT_SOURCE_DIR}/ImGuizmo
+    ${CMAKE_CURRENT_SOURCE_DIR}/ImGuizmo/src
 )
 
 target_include_directories(ImGuizmo PRIVATE

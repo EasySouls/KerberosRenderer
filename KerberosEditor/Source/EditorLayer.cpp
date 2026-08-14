@@ -8,7 +8,6 @@
 #include "Assets/AssetManager.hpp"
 #include "Assets/Importers/TextureImporter.hpp"
 #include "Profiling/Instrumentor.hpp"
-#include "ImGuizmo/ImGuizmo.h"
 #include "Input/InputSystem.hpp"
 #include "Utils/SystemOperations.hpp"
 #include "ModelLoader.hpp"
@@ -21,6 +20,7 @@
 #include <glm/gtc/matrix_inverse.hpp>
 #include <glm/gtc/type_ptr.hpp>
 #include <imgui/imgui.h>
+#include <ImGuizmo/src/ImGuizmo.h>
 
 #include <limits>
 #include <ranges>
@@ -29,24 +29,24 @@
 
 namespace Kerberos
 {
-	EditorLayer::EditorLayer() 
-		: Layer("EditorLayer")
+	EditorLayer::EditorLayer()
+			: Layer("EditorLayer")
 	{
-		m_HierarchyPanel.SetOnEntityDeleted([this](const Entity entity) {
+		m_HierarchyPanel.SetOnEntityDeleted([this](const Entity entity)
+																				{
 			if (m_HoveredEntity == entity)
 			{
 				m_HoveredEntity = {};
 				m_HoveredEntityDeletedLastFrame = true;
-			}
-		});
+			} });
 	}
 
-	EditorLayer::~EditorLayer() 
+	EditorLayer::~EditorLayer()
 	{
 		m_SceneNodes.clear();
 	}
 
-	void EditorLayer::OnAttach() 
+	void EditorLayer::OnAttach()
 	{
 		KBR_CORE_INFO("EditorLayer attached!");
 
@@ -58,7 +58,7 @@ namespace Kerberos
 		else
 		{
 			/// If there is a command line argument, try to open the project specified in it
-			const auto& [Count, Args] = Application::Get().GetSpecification().CommandLineArgs;
+			const auto &[Count, Args] = Application::Get().GetSpecification().CommandLineArgs;
 			if (Count > 1)
 			{
 				const std::filesystem::path projectPath = Args[1];
@@ -84,17 +84,16 @@ namespace Kerberos
 		m_BasicFont = AssetManager::GetDefaultFont();
 
 		m_EditorCamera = std::make_unique<FirstPersonCamera>(45.0f, 16.0f / 9.0f, 0.1f, 1000.0f);
-		//m_EditorCamera = std::make_unique<EditorCamera>(45.0f, 16.0f / 9.0f, 0.1f, 1000.0f);
+		// m_EditorCamera = std::make_unique<EditorCamera>(45.0f, 16.0f / 9.0f, 0.1f, 1000.0f);
 		m_EditorCamera->SetFlipY(true);
 		m_EditorCamera->SetPosition(glm::vec3(0.0f, 15.0f, -45.0f));
 		m_EditorCamera->SetRotation(glm::vec3(0.0f, 90.0f, 0.0f));
 
-		m_ViewportSize = { 1280.0f, 720.0f };
+		m_ViewportSize = {1280.0f, 720.0f};
 
 		{
-			Timer timer("Loading sample assets", [](const TimerData& data) {
-				KBR_EDITOR_INFO("Loading sample meshes and textures took {} ms!", data.DurationMs);
-			});
+			Timer timer("Loading sample assets", [](const TimerData &data)
+									{ KBR_EDITOR_INFO("Loading sample meshes and textures took {} ms!", data.DurationMs); });
 
 			constexpr GLTFLoadingFlags loadingFlags = GLTFLoadingFlags::None;
 
@@ -107,22 +106,22 @@ namespace Kerberos
 			KBR_EDITOR_INFO("Loaded {} mesh(es)!", m_Meshes.size());
 
 			const std::vector<std::pair<std::string, vk::Format>> textureFiles = {
-				{ "assets/models/avocado/Avocado_baseColor.ktx2", vk::Format::eR8G8B8A8Srgb },
-				{ "assets/models/avocado/Avocado_normal.ktx2", vk::Format::eR8G8B8A8Unorm },
-				{ "assets/textures/stonefloor01_color_rgba.ktx", vk::Format::eR8G8B8A8Srgb },
-				{ "assets/textures/stonefloor01_normal_rgba.ktx", vk::Format::eR8G8B8A8Unorm },
-				{ "assets/textures/stonefloor02_color_rgba.ktx", vk::Format::eR8G8B8A8Srgb },
-				{ "assets/textures/stonefloor02_normal_rgba.ktx", vk::Format::eR8G8B8A8Unorm },
+					{"assets/models/avocado/Avocado_baseColor.ktx2", vk::Format::eR8G8B8A8Srgb},
+					{"assets/models/avocado/Avocado_normal.ktx2", vk::Format::eR8G8B8A8Unorm},
+					{"assets/textures/stonefloor01_color_rgba.ktx", vk::Format::eR8G8B8A8Srgb},
+					{"assets/textures/stonefloor01_normal_rgba.ktx", vk::Format::eR8G8B8A8Unorm},
+					{"assets/textures/stonefloor02_color_rgba.ktx", vk::Format::eR8G8B8A8Srgb},
+					{"assets/textures/stonefloor02_normal_rgba.ktx", vk::Format::eR8G8B8A8Unorm},
 
-				{ "assets/models/cerberus/albedo.ktx", vk::Format::eR8G8B8A8Unorm },
-				{ "assets/models/cerberus/normal.ktx", vk::Format::eR8G8B8A8Unorm },
-				{ "assets/models/cerberus/ao.ktx", vk::Format::eR8Unorm },
-				{ "assets/models/cerberus/metallic.ktx", vk::Format::eR8Unorm },
-				{ "assets/models/cerberus/roughness.ktx", vk::Format::eR8Unorm },
+					{"assets/models/cerberus/albedo.ktx", vk::Format::eR8G8B8A8Unorm},
+					{"assets/models/cerberus/normal.ktx", vk::Format::eR8G8B8A8Unorm},
+					{"assets/models/cerberus/ao.ktx", vk::Format::eR8Unorm},
+					{"assets/models/cerberus/metallic.ktx", vk::Format::eR8Unorm},
+					{"assets/models/cerberus/roughness.ktx", vk::Format::eR8Unorm},
 			};
 
 			m_Textures.reserve(textureFiles.size());
-			for (const auto& filepath : textureFiles | std::views::keys)
+			for (const auto &filepath : textureFiles | std::views::keys)
 			{
 				auto texture = Texture2D::FromFile(filepath);
 				m_Textures.push_back(texture);
@@ -130,56 +129,50 @@ namespace Kerberos
 
 			KBR_EDITOR_INFO("Loaded {} texture(s)!", m_Textures.size());
 
-			const auto& avocadoMaterial = m_MaterialRegistry.AddAndRetrieve("Avocado", std::make_shared<Material>("Avocado", glm::vec4(1.0f, 1.0f, 1.0f, 1.0f), 0.9f, 0.03f, m_Textures[0], m_Textures[1]));
-			const auto& stoneFloorMaterial = m_MaterialRegistry.AddAndRetrieve("Stone Floor", std::make_shared<Material>("Stone Floor", glm::vec4(1.0f, 1.0f, 1.0f, 1.0f), 0.8f, 0.05f, m_Textures[2], m_Textures[3]));
-			const auto& stoneFloor2Material = m_MaterialRegistry.AddAndRetrieve("Stone Floor 2", std::make_shared<Material>("Stone Floor 2", glm::vec4(0.4f, 0.15f, 0.0f, 1.0f), 1.0f, 0.0f, m_Textures[4], m_Textures[5]));
-			const auto& cerberusMaterial = m_MaterialRegistry.AddAndRetrieve("Cerberus", std::make_shared<Material>("Cerberus", glm::vec4(1.0f, 1.0f, 1.0f, 1.0f), 1.0f, 0.0f, m_Textures[6], m_Textures[7]));
+			const auto &avocadoMaterial = m_MaterialRegistry.AddAndRetrieve("Avocado", std::make_shared<Material>("Avocado", glm::vec4(1.0f, 1.0f, 1.0f, 1.0f), 0.9f, 0.03f, m_Textures[0], m_Textures[1]));
+			const auto &stoneFloorMaterial = m_MaterialRegistry.AddAndRetrieve("Stone Floor", std::make_shared<Material>("Stone Floor", glm::vec4(1.0f, 1.0f, 1.0f, 1.0f), 0.8f, 0.05f, m_Textures[2], m_Textures[3]));
+			const auto &stoneFloor2Material = m_MaterialRegistry.AddAndRetrieve("Stone Floor 2", std::make_shared<Material>("Stone Floor 2", glm::vec4(0.4f, 0.15f, 0.0f, 1.0f), 1.0f, 0.0f, m_Textures[4], m_Textures[5]));
+			const auto &cerberusMaterial = m_MaterialRegistry.AddAndRetrieve("Cerberus", std::make_shared<Material>("Cerberus", glm::vec4(1.0f, 1.0f, 1.0f, 1.0f), 1.0f, 0.0f, m_Textures[6], m_Textures[7]));
 
 			m_SceneNodes.push_back(CreateOwner<Node>(Node{
-				.Position = glm::vec3(6.0f, 9.5f, 0.0f),
-				.Rotation = glm::vec3(0.0f),
-				.Scale = glm::vec3(50.0f),
-				.Mesh = m_Meshes["avocado"],
-				.Material = avocadoMaterial,
-				.Name = "Avocado"
-			}));
+					.Position = glm::vec3(6.0f, 9.5f, 0.0f),
+					.Rotation = glm::vec3(0.0f),
+					.Scale = glm::vec3(50.0f),
+					.Mesh = m_Meshes["avocado"],
+					.Material = avocadoMaterial,
+					.Name = "Avocado"}));
 
 			m_SceneNodes.push_back(CreateOwner<Node>(Node{
-				.Position = glm::vec3(2.0f, 0.0f, 0.0f),
-				.Rotation = glm::vec3(0.0f),
-				.Scale = glm::vec3(1.0f),
-				.Mesh = m_Meshes["cube"],
-				.Material = stoneFloorMaterial,
-				.Name = "Cube"
-			}));
+					.Position = glm::vec3(2.0f, 0.0f, 0.0f),
+					.Rotation = glm::vec3(0.0f),
+					.Scale = glm::vec3(1.0f),
+					.Mesh = m_Meshes["cube"],
+					.Material = stoneFloorMaterial,
+					.Name = "Cube"}));
 
 			m_SceneNodes.push_back(CreateOwner<Node>(Node{
-				.Position = glm::vec3(2.0f, 6.0f, 3.0f),
-				.Rotation = glm::vec3(0.0f),
-				.Scale = glm::vec3(1.0f),
-				.Mesh = m_Meshes["sphere"],
-				.Material = m_MaterialRegistry.Get("Avocado"),
-				.Name = "Sphere"
-			}));
+					.Position = glm::vec3(2.0f, 6.0f, 3.0f),
+					.Rotation = glm::vec3(0.0f),
+					.Scale = glm::vec3(1.0f),
+					.Mesh = m_Meshes["sphere"],
+					.Material = m_MaterialRegistry.Get("Avocado"),
+					.Name = "Sphere"}));
 
 			m_SceneNodes.push_back(CreateOwner<Node>(Node{
-				.Position = glm::vec3(2.0f, -10.0f, 3.0f),
-				.Rotation = glm::vec3(0.0f),
-				.Scale = glm::vec3(20.0f, 0.1f, 20.0f),
-				.Mesh = m_Meshes["cube"],
-				.Material = stoneFloor2Material,
-				.Name = "Floor"
-			}));
+					.Position = glm::vec3(2.0f, -10.0f, 3.0f),
+					.Rotation = glm::vec3(0.0f),
+					.Scale = glm::vec3(20.0f, 0.1f, 20.0f),
+					.Mesh = m_Meshes["cube"],
+					.Material = stoneFloor2Material,
+					.Name = "Floor"}));
 
-			m_SceneNodes.push_back( CreateOwner<Node>(Node{
-				.Position = glm::vec3(-8.0f, 10.0f, 8.0f),
-				.Rotation = glm::vec3(-1.6f, 1.4, 0.0),
-				.Scale = glm::vec3(8.0f),
-				.Mesh = m_Meshes["cerberus"],
-				.Material = cerberusMaterial,
-				.Name = "Revolver"
-			}));
-
+			m_SceneNodes.push_back(CreateOwner<Node>(Node{
+					.Position = glm::vec3(-8.0f, 10.0f, 8.0f),
+					.Rotation = glm::vec3(-1.6f, 1.4, 0.0),
+					.Scale = glm::vec3(8.0f),
+					.Mesh = m_Meshes["cerberus"],
+					.Material = cerberusMaterial,
+					.Name = "Revolver"}));
 		}
 
 		m_AssetsPanel = CreateOwner<AssetsPanel>(m_NotificationManager);
@@ -189,8 +182,8 @@ namespace Kerberos
 		m_IconPause = TextureImporter::ImportTexture("Assets/Editor/pause_button.png");
 		m_IconResume = TextureImporter::ImportTexture("Assets/Editor/outlined_play_button.png");
 	}
-	
-	void EditorLayer::OnDetach() 
+
+	void EditorLayer::OnDetach()
 	{
 		KBR_CORE_INFO("EditorLayer detached!");
 	}
@@ -204,8 +197,8 @@ namespace Kerberos
 
 		// Resize the output images and the camera if the viewport size has changed
 		const glm::vec2 outputSize = Renderer::GetOutputImageSize();
-		if (m_ViewportSize.x > 0.0f && m_ViewportSize.y > 0.0f && 
-			(static_cast<int>(outputSize.x) != static_cast<int>(m_ViewportSize.x) || static_cast<int>(outputSize.y) != static_cast<int>(m_ViewportSize.y)))
+		if (m_ViewportSize.x > 0.0f && m_ViewportSize.y > 0.0f &&
+				(static_cast<int>(outputSize.x) != static_cast<int>(m_ViewportSize.x) || static_cast<int>(outputSize.y) != static_cast<int>(m_ViewportSize.y)))
 		{
 			m_EditorCamera->SetViewportSize(m_ViewportSize.x, m_ViewportSize.y);
 			m_ActiveScene->OnViewportResize(static_cast<uint32_t>(m_ViewportSize.x), static_cast<uint32_t>(m_ViewportSize.y));
@@ -218,19 +211,19 @@ namespace Kerberos
 
 			switch (m_SceneState)
 			{
-				case SceneState::Edit:
-				case SceneState::Simulate:
-					m_EditorCamera->OnUpdate(deltaTime);
-					break;
-				case SceneState::Play:
-				{
-					/// Only update the camera when the viewport is focused
-					/*if (m_ViewportFocused)
-						m_CameraController.OnUpdate(deltaTime);*/
-					// TODO: Update the camera 
-					m_EditorCamera->OnUpdate(deltaTime);
-					break;
-				}
+			case SceneState::Edit:
+			case SceneState::Simulate:
+				m_EditorCamera->OnUpdate(deltaTime);
+				break;
+			case SceneState::Play:
+			{
+				/// Only update the camera when the viewport is focused
+				/*if (m_ViewportFocused)
+					m_CameraController.OnUpdate(deltaTime);*/
+				// TODO: Update the camera
+				m_EditorCamera->OnUpdate(deltaTime);
+				break;
+			}
 			}
 		}
 
@@ -241,15 +234,15 @@ namespace Kerberos
 
 			switch (m_SceneState)
 			{
-				case SceneState::Edit:
-					m_ActiveScene->OnUpdateEditor(deltaTime, *m_EditorCamera);
-					break;
-				case SceneState::Simulate:
-					m_ActiveScene->OnUpdateSimulation(deltaTime, *m_EditorCamera);
-					break;
-				case SceneState::Play:
-					m_ActiveScene->OnUpdateRuntime(deltaTime, *m_EditorCamera);
-					break;
+			case SceneState::Edit:
+				m_ActiveScene->OnUpdateEditor(deltaTime, *m_EditorCamera);
+				break;
+			case SceneState::Simulate:
+				m_ActiveScene->OnUpdateSimulation(deltaTime, *m_EditorCamera);
+				break;
+			case SceneState::Play:
+				m_ActiveScene->OnUpdateRuntime(deltaTime, *m_EditorCamera);
+				break;
 			}
 		}
 
@@ -262,7 +255,7 @@ namespace Kerberos
 		m_CameraEntity = m_ActiveScene->GetPrimaryCameraEntity();
 	}
 
-	void EditorLayer::OnEvent(Event& event)
+	void EditorLayer::OnEvent(Event &event)
 	{
 		m_EditorCamera->OnEvent(event);
 
@@ -285,7 +278,7 @@ namespace Kerberos
 
 		if (m_IsFullScreenPersistent)
 		{
-			const ImGuiViewport* viewport = ImGui::GetMainViewport();
+			const ImGuiViewport *viewport = ImGui::GetMainViewport();
 			ImGui::SetNextWindowPos(viewport->Pos);
 			ImGui::SetNextWindowSize(viewport->Size);
 			ImGui::SetNextWindowViewport(viewport->ID);
@@ -299,7 +292,7 @@ namespace Kerberos
 			windowFlags |= ImGuiWindowFlags_NoBackground;
 
 		// Keep window name constant to preserve dockspace layout across scene state changes
-		const char* dockspaceWindowName = "EditorDockSpace";
+		const char *dockspaceWindowName = "EditorDockSpace";
 
 		ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.0f, 0.0f));
 		ImGui::Begin(dockspaceWindowName, &dockspaceOpen, windowFlags);
@@ -308,7 +301,7 @@ namespace Kerberos
 		if (m_IsFullScreenPersistent)
 			ImGui::PopStyleVar(2);
 
-		const ImGuiIO& io = ImGui::GetIO();
+		const ImGuiIO &io = ImGui::GetIO();
 		if (io.ConfigFlags & ImGuiConfigFlags_DockingEnable)
 		{
 			const ImGuiID dockspaceId = ImGui::GetID("MyDockspace");
@@ -391,19 +384,19 @@ namespace Kerberos
 		m_HierarchyPanel.SetContext(m_ActiveScene);
 	}
 
-	void EditorLayer::HandleDragAndDrop() 
+	void EditorLayer::HandleDragAndDrop()
 	{
 		if (ImGui::BeginDragDropTarget())
 		{
-			if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload(assetBrowserItem))
+			if (const ImGuiPayload *payload = ImGui::AcceptDragDropPayload(assetBrowserItem))
 			{
-				const auto& path = static_cast<const char*>(payload->Data);
+				const auto &path = static_cast<const char *>(payload->Data);
 				KBR_EDITOR_INFO("Drag and drop payload: {0}", path);
 
 				const std::string message = "Drag and drop payload: " + std::string(path);
 				m_NotificationManager.AddNotification(message, Notification::Type::Info);
 
-				const AssetHandle assetHandle = *static_cast<AssetHandle*>(payload->Data);
+				const AssetHandle assetHandle = *static_cast<AssetHandle *>(payload->Data);
 				const AssetType assetType = AssetManager::GetAssetType(assetHandle);
 				if (assetType == AssetType::Scene)
 				{
@@ -412,9 +405,9 @@ namespace Kerberos
 				}
 			}
 
-			if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload(assetBrowserMesh))
+			if (const ImGuiPayload *payload = ImGui::AcceptDragDropPayload(assetBrowserMesh))
 			{
-				const AssetHandle handle = *static_cast<AssetHandle*>(payload->Data);
+				const AssetHandle handle = *static_cast<AssetHandle *>(payload->Data);
 				const AssetType assetType = AssetManager::GetAssetType(handle);
 
 				if (assetType == AssetType::Model)
@@ -425,7 +418,7 @@ namespace Kerberos
 				else if (assetType == AssetType::Mesh)
 				{
 					Entity meshEntity = m_ActiveScene->CreateEntity("Mesh");
-					auto& smc = meshEntity.AddComponent<StaticMeshComponent>();
+					auto &smc = meshEntity.AddComponent<StaticMeshComponent>();
 					smc.StaticMesh = AssetManager::ResolveMeshAsset(handle);
 					m_HierarchyPanel.SetSelectedEntity(meshEntity);
 				}
@@ -435,11 +428,11 @@ namespace Kerberos
 		}
 	}
 
-	void EditorLayer::HandleMousePicking() 
+	void EditorLayer::HandleMousePicking()
 	{
 		KBR_PROFILE_FUNCTION();
 
-		if (m_HoveredEntityDeletedLastFrame) 
+		if (m_HoveredEntityDeletedLastFrame)
 		{
 			m_HoveredEntityDeletedLastFrame = false;
 			return;
@@ -466,7 +459,7 @@ namespace Kerberos
 				}
 				else
 				{
-					m_HoveredEntity = Entity{ static_cast<entt::entity>(*pickedEntityID), m_ActiveScene.get() };
+					m_HoveredEntity = Entity{static_cast<entt::entity>(*pickedEntityID), m_ActiveScene.get()};
 				}
 			}
 		}
@@ -476,10 +469,10 @@ namespace Kerberos
 		}
 	}
 
-	void EditorLayer::NewProject() 
+	void EditorLayer::NewProject()
 	{
 		/// Choose location for the new project
-		//const std::string filepathString = FileDialog::SaveFile("Kerberos Project (*.kbrproj)\0*.kbrproj\0");
+		// const std::string filepathString = FileDialog::SaveFile("Kerberos Project (*.kbrproj)\0*.kbrproj\0");
 
 		const auto newProject = Project::New();
 
@@ -501,7 +494,7 @@ namespace Kerberos
 		m_AssetsPanel = CreateOwner<AssetsPanel>(m_NotificationManager);
 	}
 
-	void EditorLayer::OpenProject(const std::filesystem::path& filepath) 
+	void EditorLayer::OpenProject(const std::filesystem::path &filepath)
 	{
 		if (const auto project = Project::Load(filepath))
 		{
@@ -523,7 +516,7 @@ namespace Kerberos
 		return true;
 	}
 
-	bool EditorLayer::CanSaveScene() 
+	bool EditorLayer::CanSaveScene()
 	{
 		if (!m_ActiveScene)
 		{
@@ -589,7 +582,7 @@ namespace Kerberos
 		OpenScene(filepathString);
 	}
 
-	void EditorLayer::OpenScene(const std::filesystem::path& filepath)
+	void EditorLayer::OpenScene(const std::filesystem::path &filepath)
 	{
 		if (m_SceneState != SceneState::Edit)
 		{
@@ -614,14 +607,14 @@ namespace Kerberos
 		m_ActiveScene = m_EditorScene;
 	}
 
-	void EditorLayer::OpenScene(const Ref<Scene>& scene) 
+	void EditorLayer::OpenScene(const Ref<Scene> &scene)
 	{
-		const auto& [Type, Filepath] = Project::GetActive()->GetEditorAssetManager()->GetMetadata(scene->GetHandle());
+		const auto &[Type, Filepath] = Project::GetActive()->GetEditorAssetManager()->GetMetadata(scene->GetHandle());
 
 		OpenScene(Filepath);
 	}
 
-	void EditorLayer::NewScene() 
+	void EditorLayer::NewScene()
 	{
 		m_ActiveScene = CreateRef<Scene>();
 		m_ActiveScene->OnViewportResize(static_cast<uint32_t>(m_ViewportSize.x), static_cast<uint32_t>(m_ViewportSize.y));
@@ -639,7 +632,7 @@ namespace Kerberos
 
 		Application::Get().BlockEvents(!m_ViewportHovered);
 
-		m_ViewportSize = { ImGui::GetContentRegionAvail().x, ImGui::GetContentRegionAvail().y };
+		m_ViewportSize = {ImGui::GetContentRegionAvail().x, ImGui::GetContentRegionAvail().y};
 
 		const auto viewportImage = Renderer::GetCompositedOutputImageID();
 		ImGui::Image(viewportImage, ImVec2(m_ViewportSize.x, m_ViewportSize.y));
@@ -649,8 +642,8 @@ namespace Kerberos
 		HandleDragAndDrop();
 
 		/// Set the bounds of the viewport to the actual image item.
-		m_ViewportBounds[0] = { viewportMin.x, viewportMin.y };
-		m_ViewportBounds[1] = { viewportMax.x, viewportMax.y };
+		m_ViewportBounds[0] = {viewportMin.x, viewportMin.y};
+		m_ViewportBounds[1] = {viewportMax.x, viewportMax.y};
 
 		/// Gizmos
 		const bool gizmosEnabled = m_SceneState == SceneState::Edit || m_SceneState == SceneState::Simulate;
@@ -673,19 +666,19 @@ namespace Kerberos
 			const glm::mat4 cameraView = m_EditorCamera->GetViewMatrix();
 
 			/// Entity transform
-			auto& tc = selectedEntity.GetComponent<TransformComponent>();
+			auto &tc = selectedEntity.GetComponent<TransformComponent>();
 			auto transform = tc.GetTransform();
 
-			/// Snapping 
+			/// Snapping
 			const bool snap = Input::IsKeyPressed(Key::LeftControl);
 			float snapValue = 0.5f;
 			if (m_GizmoType == GizmoType::Rotate)
 				snapValue = 45.0f;
 
-			const float snapValues[3] = { snap ? snapValue : 0.0f, snap ? snapValue : 0.0f, snap ? snapValue : 0.0f };
+			const float snapValues[3] = {snap ? snapValue : 0.0f, snap ? snapValue : 0.0f, snap ? snapValue : 0.0f};
 
 			ImGuizmo::Manipulate(glm::value_ptr(cameraView), glm::value_ptr(cameraProjection),
-								 static_cast<ImGuizmo::OPERATION>(m_GizmoType), ImGuizmo::WORLD, glm::value_ptr(transform), nullptr, snapValues);
+													 static_cast<ImGuizmo::OPERATION>(m_GizmoType), ImGuizmo::WORLD, glm::value_ptr(transform), nullptr, snapValues);
 
 			if (ImGuizmo::IsUsing())
 			{
@@ -708,10 +701,10 @@ namespace Kerberos
 		constexpr ImGuiWindowFlags flags = ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse;
 
 		ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.0f, 0.0f, 0.0f, 0.0f));
-		const auto& colors = ImGui::GetStyle().Colors;
-		const auto& buttonHovered = colors[ImGuiCol_ButtonHovered];
+		const auto &colors = ImGui::GetStyle().Colors;
+		const auto &buttonHovered = colors[ImGuiCol_ButtonHovered];
 		ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(buttonHovered.x, buttonHovered.y, buttonHovered.z, 0.5f));
-		const auto& buttonActive = colors[ImGuiCol_ButtonActive];
+		const auto &buttonActive = colors[ImGuiCol_ButtonActive];
 		ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(buttonActive.x, buttonActive.y, buttonActive.z, 0.5f));
 
 		ImGui::Begin("Toolbar", nullptr, flags);
@@ -760,7 +753,7 @@ namespace Kerberos
 			constexpr ImGuiTableFlags tableFlags = ImGuiTableFlags_None;
 			ImGui::BeginTable("##ToolbarButtonTable", columns, tableFlags);
 
-			//ImGui::SetCursorPosX((ImGui::GetWindowContentRegionMax().x * 0.5f) - (size * 0.5f));
+			// ImGui::SetCursorPosX((ImGui::GetWindowContentRegionMax().x * 0.5f) - (size * 0.5f));
 
 			ImGui::TableNextColumn();
 
@@ -822,7 +815,7 @@ namespace Kerberos
 			{
 				if (ImGui::MenuItem("Exit"))
 				{
-					/// TODO: Show a confirmation dialog and whether to save the scene if there are unsaved changes 
+					/// TODO: Show a confirmation dialog and whether to save the scene if there are unsaved changes
 					Application::Get().Close();
 				}
 
@@ -854,15 +847,29 @@ namespace Kerberos
 			if (ImGui::BeginMenu("Edit"))
 			{
 				/// Todo: Implement undo/redo system
-				if (ImGui::MenuItem("Undo", "Ctrl+Z", false, false)) {}
-				if (ImGui::MenuItem("Redo", "Ctrl+Y", false, false)) {}
+				if (ImGui::MenuItem("Undo", "Ctrl+Z", false, false))
+				{
+				}
+				if (ImGui::MenuItem("Redo", "Ctrl+Y", false, false))
+				{
+				}
 				ImGui::Separator();
-				if (ImGui::MenuItem("Cut", "Ctrl+X", false, false)) {}
-				if (ImGui::MenuItem("Copy", "Ctrl+C", false, false)) {}
-				if (ImGui::MenuItem("Paste", "Ctrl+V", false, false)) {}
-				if (ImGui::MenuItem("Duplicate", "Ctrl+D", false, false)) {}
+				if (ImGui::MenuItem("Cut", "Ctrl+X", false, false))
+				{
+				}
+				if (ImGui::MenuItem("Copy", "Ctrl+C", false, false))
+				{
+				}
+				if (ImGui::MenuItem("Paste", "Ctrl+V", false, false))
+				{
+				}
+				if (ImGui::MenuItem("Duplicate", "Ctrl+D", false, false))
+				{
+				}
 				ImGui::Separator();
-				if (ImGui::MenuItem("Delete", "Del", false, false)) {}
+				if (ImGui::MenuItem("Delete", "Del", false, false))
+				{
+				}
 				ImGui::EndMenu();
 			}
 
@@ -960,7 +967,7 @@ namespace Kerberos
 		ImGui::Separator();
 
 		ImGui::Text("EditorCamera");
-		const auto& camPos = m_EditorCamera->GetPosition();
+		const auto &camPos = m_EditorCamera->GetPosition();
 		ImGui::Text("Position: (%.2f, %.2f, %.2f)", camPos.x, camPos.y, camPos.z);
 		ImGui::Text("Rotation: (Pitch: %.2f, Yaw: %.2f)", m_EditorCamera->GetPitch(), m_EditorCamera->GetYaw());
 		ImGui::Text("Distance: %.2f", m_EditorCamera->GetDistance());
@@ -1021,11 +1028,11 @@ namespace Kerberos
 		ImGui::Text("Light 2: (%.2f, %.2f, %.2f)", m_UniformDataParams.lights[2].x, m_UniformDataParams.lights[2].y, m_UniformDataParams.lights[2].z);
 		ImGui::DragFloat3("Light 4 Direction", glm::value_ptr(m_UniformDataParams.lights[3]), 0.1f);*/
 		ImGui::Text("Lighting settings");
-		float& exposure = Renderer::GetExposure();
+		float &exposure = Renderer::GetExposure();
 		ImGui::DragFloat("Exposure", &exposure, 0.1f, 0.1f, 10.0f);
-		float& gamma = Renderer::GetGamma();
+		float &gamma = Renderer::GetGamma();
 		ImGui::DragFloat("Gamma", &gamma, 0.1f, 0.1f, 10.0f);
-		//ImGui::DragFloat3("Ambient Light Color", glm::value_ptr(m_SceneUniformData.ambientLightColor), 0.01f, 0.0f, 1.0f);
+		// ImGui::DragFloat3("Ambient Light Color", glm::value_ptr(m_SceneUniformData.ambientLightColor), 0.01f, 0.0f, 1.0f);
 
 		ImGui::Separator();
 
@@ -1044,7 +1051,7 @@ namespace Kerberos
 					lightPosForShadowMapCalculation.z);*/
 
 		ImGui::Text("Depth Bias");
-		auto& [ConstantFactor, SlopeFactor, Clamp] = Renderer::GetShadowMapDepthBiasSettings();
+		auto &[ConstantFactor, SlopeFactor, Clamp] = Renderer::GetShadowMapDepthBiasSettings();
 		ImGui::DragFloat("Constant Factor", &ConstantFactor, 0.001f, 0.0f, 5.0f);
 		ImGui::DragFloat("Clamp", &Clamp, 0.001f, 0.0f, 1.0f);
 		ImGui::DragFloat("Slope Factor", &SlopeFactor, 0.01f, 0.0f, 10.0f);
@@ -1053,7 +1060,7 @@ namespace Kerberos
 
 		ImGui::Text("Font Atlas");
 		const uint64_t fontAtlasTextureID = VulkanContext::Get().GetImGuiRendererID(m_BasicFont->GetAtlasTexture());
-		ImGui::Image(fontAtlasTextureID, ImVec2{ 256, 256 }, ImVec2{ 0, 1 }, ImVec2{ 1, 0 });
+		ImGui::Image(fontAtlasTextureID, ImVec2{256, 256}, ImVec2{0, 1}, ImVec2{1, 0});
 
 		ImGui::Separator();
 
@@ -1063,7 +1070,7 @@ namespace Kerberos
 		ImGui::Checkbox("Display normals", &Renderer::GetDisplayDebugNormals());
 		ImGui::Checkbox("Display physics colliders", &Renderer::GetDisplayPhysicsColliders());
 
-		bool& useRayQueryBasedShadows = Renderer::GetUseRayQueryBasedShadows();
+		bool &useRayQueryBasedShadows = Renderer::GetUseRayQueryBasedShadows();
 		ImGui::Checkbox("Ray query based shadows", &useRayQueryBasedShadows);
 		if (useRayQueryBasedShadows)
 		{
@@ -1076,7 +1083,7 @@ namespace Kerberos
 			ImGui::Checkbox("Enable PCF", &Renderer::GetIsPCFEnabledForShadowMap());
 		}
 
-		bool& useGTAO = Renderer::GetUseGTAO();
+		bool &useGTAO = Renderer::GetUseGTAO();
 		ImGui::Checkbox("Use GTAO", &useGTAO);
 		if (useGTAO)
 		{
@@ -1084,7 +1091,7 @@ namespace Kerberos
 
 			ImGui::Checkbox("Blur GTAO image", &Renderer::GetUseBlurForGTAO());
 
-			GTAOConstants& gtaoConstants = Renderer::GetGTAOConstants();
+			GTAOConstants &gtaoConstants = Renderer::GetGTAOConstants();
 			ImGui::DragFloat("Radius", &gtaoConstants.radius, 0.01f, 0.01f, 10.0f);
 			ImGui::DragFloat("Falloff", &gtaoConstants.falloff, 0.01f, 0.01f, 10.0f);
 			ImGui::DragFloat("Sample Count", &gtaoConstants.sampleCount, 0.1f, 1.0f, 16.0f);
@@ -1093,16 +1100,16 @@ namespace Kerberos
 			ImGui::Unindent();
 		}
 
-		AntiAliasingMode& aaMode = Renderer::GetAntiAliasingMode();
-		const char* aaModeItems[] = { "None", "FXAA", "SMAA", "TAA" };
-		if (ImGui::Combo("Anti-aliasing mode", reinterpret_cast<int*>(&aaMode), aaModeItems, IM_ARRAYSIZE(aaModeItems)))
+		AntiAliasingMode &aaMode = Renderer::GetAntiAliasingMode();
+		const char *aaModeItems[] = {"None", "FXAA", "SMAA", "TAA"};
+		if (ImGui::Combo("Anti-aliasing mode", reinterpret_cast<int *>(&aaMode), aaModeItems, IM_ARRAYSIZE(aaModeItems)))
 		{
 			Renderer::GetAntiAliasingMode() = static_cast<AntiAliasingMode>(aaMode);
 		}
 
-		TonemappingOperator& tonemappingOperator = Renderer::GetTonemappingOperator();
-		const char* tonemappingOperatorItems[] = { "Uncharted 2", "Reinhard", "ACES", "ACES Fitted" };
-		if (ImGui::Combo("Tonemapping operator", reinterpret_cast<int*>(&tonemappingOperator), tonemappingOperatorItems, IM_ARRAYSIZE(tonemappingOperatorItems)))
+		TonemappingOperator &tonemappingOperator = Renderer::GetTonemappingOperator();
+		const char *tonemappingOperatorItems[] = {"Uncharted 2", "Reinhard", "ACES", "ACES Fitted"};
+		if (ImGui::Combo("Tonemapping operator", reinterpret_cast<int *>(&tonemappingOperator), tonemappingOperatorItems, IM_ARRAYSIZE(tonemappingOperatorItems)))
 		{
 			Renderer::GetTonemappingOperator() = static_cast<TonemappingOperator>(tonemappingOperator);
 		}
@@ -1113,9 +1120,9 @@ namespace Kerberos
 
 			ImGui::DragFloat("Bloom Intensity", &Renderer::GetBloomIntensity(), 0.01f, 0.0f, 1.0f);
 
-			BloomMode& bloomMode = Renderer::GetBloomMode();
-			const char* bloomModeItems[] = { "Legacy", "Bright-pass prefilter" };
-			if (ImGui::Combo("Bloom mode", reinterpret_cast<int*>(&bloomMode), bloomModeItems, IM_ARRAYSIZE(bloomModeItems)))
+			BloomMode &bloomMode = Renderer::GetBloomMode();
+			const char *bloomModeItems[] = {"Legacy", "Bright-pass prefilter"};
+			if (ImGui::Combo("Bloom mode", reinterpret_cast<int *>(&bloomMode), bloomModeItems, IM_ARRAYSIZE(bloomModeItems)))
 			{
 				Renderer::GetBloomMode() = static_cast<BloomMode>(bloomMode);
 			}
@@ -1163,12 +1170,12 @@ namespace Kerberos
 		ImGui::End();
 	}
 
-	void EditorLayer::CalculateEntityTransform(const Entity& entity) const 
+	void EditorLayer::CalculateEntityTransform(const Entity &entity) const
 	{
 		m_ActiveScene->CalculateEntityTransform(entity);
 	}
 
-	bool EditorLayer::OnKeyPressed(const KeyPressedEvent& event)
+	bool EditorLayer::OnKeyPressed(const KeyPressedEvent &event)
 	{
 		/// Shortcuts
 		if (event.GetRepeatCount() > 0)
@@ -1179,57 +1186,58 @@ namespace Kerberos
 
 		switch (event.GetKeyCode())
 		{
-			case Key::S:
-				if (ctrl && shift)
-				{
-					SaveSceneAs();
-				}
-				else if (ctrl)
-				{
-					SaveScene();
-				}
-				break;
-			case Key::N:
-				if (ctrl)
-				{
-					NewScene();
-				}
-				break;
-			case Key::O:
-				if (ctrl)
-				{
-					LoadScene();
-				}
-				break;
-
-				/// Gizmos
-			case Key::Q:
-				m_GizmoType = GizmoType::None;
-				break;
-			case Key::W:
-				m_GizmoType = GizmoType::Translate;
-				break;
-			case Key::E:
-				m_GizmoType = GizmoType::Scale;
-				break;
-			case Key::R:
-				m_GizmoType = GizmoType::Rotate;
-				break;
-			case Key::F: {
-				if (const Entity& entity = m_HierarchyPanel.GetSelectedEntity())
-				{
-					m_EditorCamera->Focus(entity.GetComponent<TransformComponent>().Translation);
-				}
-				break;
+		case Key::S:
+			if (ctrl && shift)
+			{
+				SaveSceneAs();
 			}
-			default:
-				break;
+			else if (ctrl)
+			{
+				SaveScene();
+			}
+			break;
+		case Key::N:
+			if (ctrl)
+			{
+				NewScene();
+			}
+			break;
+		case Key::O:
+			if (ctrl)
+			{
+				LoadScene();
+			}
+			break;
+
+			/// Gizmos
+		case Key::Q:
+			m_GizmoType = GizmoType::None;
+			break;
+		case Key::W:
+			m_GizmoType = GizmoType::Translate;
+			break;
+		case Key::E:
+			m_GizmoType = GizmoType::Scale;
+			break;
+		case Key::R:
+			m_GizmoType = GizmoType::Rotate;
+			break;
+		case Key::F:
+		{
+			if (const Entity &entity = m_HierarchyPanel.GetSelectedEntity())
+			{
+				m_EditorCamera->Focus(entity.GetComponent<TransformComponent>().Translation);
+			}
+			break;
+		}
+		default:
+			break;
 		}
 
 		return false;
 	}
 
-	bool EditorLayer::OnMouseButtonPressed(const MouseButtonPressedEvent& event)
+	bool EditorLayer::OnMouseButtonPressed(const MouseButtonPressedEvent &event)
 	{
 		/// Handle mouse picking
 		/// Only select the entity if we are not using the gizmos or the camera
@@ -1241,7 +1249,7 @@ namespace Kerberos
 		return false;
 	}
 
-	bool EditorLayer::OnWindowDrop(const WindowDropEvent& event) 
+	bool EditorLayer::OnWindowDrop(const WindowDropEvent &event)
 	{
 		/// TODO: Implement file dropping to load scenes or import models
 		throw std::logic_error("Not implemented");
