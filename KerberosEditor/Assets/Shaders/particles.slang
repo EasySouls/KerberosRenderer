@@ -1,6 +1,7 @@
 module particles;
 
-public struct Particle {
+public struct Particle
+{
     public float3 position;
     public float size;
     public float3 velocity;
@@ -20,13 +21,15 @@ public struct Particle {
     public uint texIndex;
 }
 
-public struct Counters {
+public struct Counters
+{
     public Atomic<uint> aliveCount;
     public Atomic<uint> deadCount;
     public Atomic<uint> spawnRequestCount;
 };
 
-public struct SpawnRequest {
+public struct SpawnRequest
+{
     public float3 emitterPosition;
     public uint spawnCount;
 
@@ -49,10 +52,14 @@ public struct SpawnRequest {
     public float2 subUVGrid;
 }
 
-public struct ParticleFrameData {
+public struct ParticleFrameData
+{
     public float4x4 viewProj;
     public float3 cameraUp;
     public float deltaTime;
     public float3 cameraRight;
     public float time;
+    public float3 camPos;
+    public float nearPlane;
+    public float farPlane;
 };

@@ -1,95 +1,106 @@
 #pragma once
 
-#include "Core/Core.hpp"
 #include "Buffer.hpp"
-#include "Vulkan.hpp"
-#include "DescriptorAllocator.hpp"
 #include "ComputePipeline.hpp"
+#include "Core/Core.hpp"
+#include "DescriptorAllocator.hpp"
 #include "GraphicsPipeline.hpp"
 #include "Textures/Texture2D.hpp"
+#include "Vulkan.hpp"
 
 #include <glm/vec3.hpp>
 #include <glm/vec4.hpp>
+#include <vector>
 #include <vma/vk_mem_alloc.h>
 
-#include <vector>
-
-namespace Kerberos
-{
+namespace Kerberos {
 
 class Scene;
 
 struct alignas(16) ParticleFrameData
 {
-	glm::mat4 ViewProj{ 0.0f };
-	glm::vec3 CameraUp{ 0.0f, 1.0f, 0.0f };
-	float     DeltaTime{ 0.0f };
-	glm::vec3 CameraRight{ 1.0f, 0.0f, 0.0f };
-	float     Time{ 0.0f };
+    glm::mat4 ViewProj{ 0.0f };
+    glm::vec3 CameraUp{ 0.0f, 1.0f, 0.0f };
+    float DeltaTime{ 0.0f };
+    glm::vec3 CameraRight{ 1.0f, 0.0f, 0.0f };
+    float Time{ 0.0f };
+    glm::vec3 CameraPosition{ 0.0f, 0.0f, 0.0f };
+    float NearPlane{ 0.1f };
+    float FarPlane{ 1000.0f };
 };
 
 class ParticleSystem
 {
 public:
-	ParticleSystem();
-	~ParticleSystem();
+    ParticleSystem();
+    ~ParticleSystem();
 
-	void Initialize(vk::Format colorFormat, vk::Format depthFormat, const Owner<DescriptorAllocator>& allocator);
+    void Initialize(vk::Format colorFormat,
+                    vk::Format depthFormat,
+                    vk::ImageView sceneDepthImageView,
+                    const Owner<DescriptorAllocator>& allocator);
 
-	void Update(const Ref<Scene>& scene, float dt, const vk::raii::CommandBuffer& cmd, uint32_t frameIndex, const ParticleFrameData& frameData, DescriptorAllocator& frameAllocator);
+    void Update(const Ref<Scene>& scene,
+                float dt,
+                const vk::raii::CommandBuffer& cmd,
+                uint32_t frameIndex,
+                const ParticleFrameData& frameData,
+                DescriptorAllocator& frameAllocator);
 
-	void RecordDraw(const vk::raii::CommandBuffer& cmd, uint32_t frameIndex) const;
-
-private:
-	void SetupDescriptors();
-	void SetupPipelines(vk::Format colorFormat, vk::Format depthFormat);
-
-	void AllocateParticleFrameBuffers();
-	void AllocateIndirectDrawBuffers();
-	void AllocateDescriptorBuffers();
-
-	void CreateDefaultParticleTexture();
+    void RecordDraw(const vk::raii::CommandBuffer& cmd, uint32_t frameIndex) const;
 
 private:
-	static constexpr size_t MaxParticles = 1'000'000;
+    void SetupDescriptors();
+    void SetupPipelines(vk::Format colorFormat, vk::Format depthFormat);
 
-	DescriptorAllocator* m_DescriptorAllocator = nullptr;
+    void AllocateParticleFrameBuffers();
+    void AllocateIndirectDrawBuffers();
+    void AllocateDescriptorBuffers();
 
-	StorageBuffer m_ParticlePoolBuffer;
-	StorageBuffer m_DeadListBuffer;
-	StorageBuffer m_AliveListBuffer;
-	StorageBuffer m_CountersBuffer;
+    void CreateDefaultParticleTexture();
 
-	struct VulkanBuffer
-	{
-		vk::Buffer Handle;
-		VmaAllocation allocation;
-		void* MappedData = nullptr;
-		vk::DeviceAddress DeviceAddress = 0;
-	};
-	std::vector<VulkanBuffer> m_ParticleFrameBuffers;
-	std::vector<VulkanBuffer> m_IndirectDrawBuffers;
-	std::vector<StorageBuffer> m_SpawnRequestBuffers;
+private:
+    static constexpr size_t MaxParticles = 1'000'000;
 
-	ShaderResourceSet m_ParticleSet;
-	std::vector<ShaderResourceSet> m_SpawnSets;
-	ShaderResourceSet m_TextureSet;
+    DescriptorAllocator* m_DescriptorAllocator = nullptr;
 
-	vk::raii::DescriptorSetLayout m_ParticleBuffersLayout = nullptr;
-	vk::raii::DescriptorSetLayout m_SpawnRequestsLayout = nullptr;
-	vk::raii::DescriptorSetLayout m_TextureLayout = nullptr;
+    StorageBuffer m_ParticlePoolBuffer;
+    StorageBuffer m_DeadListBuffer;
+    StorageBuffer m_AliveListBuffer;
+    StorageBuffer m_CountersBuffer;
 
-	vk::raii::PipelineLayout m_ComputePipelineLayout = nullptr;
-	vk::raii::PipelineLayout m_GraphicsPipelineLayout = nullptr;
+    struct VulkanBuffer
+    {
+        vk::Buffer Handle;
+        VmaAllocation allocation;
+        void* MappedData = nullptr;
+        vk::DeviceAddress DeviceAddress = 0;
+    };
+    std::vector<VulkanBuffer> m_ParticleFrameBuffers;
+    std::vector<VulkanBuffer> m_IndirectDrawBuffers;
+    std::vector<StorageBuffer> m_SpawnRequestBuffers;
 
-	vk::raii::Sampler m_ParticleSampler = nullptr;
+    ShaderResourceSet m_ParticleSet;
+    std::vector<ShaderResourceSet> m_SpawnSets;
+    ShaderResourceSet m_TextureSet;
 
-	Ref<Texture2D> m_DefaultParticleTexture = nullptr;
+    vk::raii::DescriptorSetLayout m_ParticleBuffersLayout = nullptr;
+    vk::raii::DescriptorSetLayout m_SpawnRequestsLayout = nullptr;
+    vk::raii::DescriptorSetLayout m_TextureLayout = nullptr;
 
-	Ref<ComputePipeline>	m_SpawnPipeline;
-	Ref<ComputePipeline>	m_PrepareSimulatePipeline;
-	Ref<ComputePipeline>	m_UpdatePipeline;
-	Ref<GraphicsPipeline>	m_RenderPipeline;
+    vk::raii::PipelineLayout m_ComputePipelineLayout = nullptr;
+    vk::raii::PipelineLayout m_GraphicsPipelineLayout = nullptr;
+
+    vk::raii::Sampler m_ParticleSampler = nullptr;
+    vk::raii::Sampler m_PointSampler = nullptr;
+    vk::ImageView m_SceneDepthImageView = nullptr;
+
+    Ref<Texture2D> m_DefaultParticleTexture = nullptr;
+
+    Ref<ComputePipeline> m_SpawnPipeline;
+    Ref<ComputePipeline> m_PrepareSimulatePipeline;
+    Ref<ComputePipeline> m_UpdatePipeline;
+    Ref<GraphicsPipeline> m_RenderPipeline;
 };
 
-}
+} // namespace Kerberos

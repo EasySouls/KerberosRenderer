@@ -1,24 +1,35 @@
 import particles;
 
-[vk::binding(0, 0)] StructuredBuffer<Particle> particlePool;
-[vk::binding(2, 0)] StructuredBuffer<uint> aliveList;
+[vk::binding(0, 0)]
+StructuredBuffer<Particle> particlePool;
+[vk::binding(2, 0)]
+StructuredBuffer<uint> aliveList;
 
-[vk::binding(1, 1)] ConstantBuffer<ParticleFrameData> scene;
+[vk::binding(1, 1)]
+ConstantBuffer<ParticleFrameData> scene;
 
-[vk::binding(0, 2)] Texture2D particleTexture;
-[vk::binding(1, 2)] SamplerState particleSampler;
+[vk::binding(0, 2)]
+Texture2D particleTexture;
+[vk::binding(1, 2)]
+SamplerState particleSampler;
+[vk::binding(2, 2)]
+Texture2D sceneDepthTexture;
+[vk::binding(3, 2)]
+SamplerState pointSampler;
 
-struct VertexOutput {
-    float4 position     : SV_Position;
-    float4 color        : COLOR;
-    float2 uv1          : TEXCOORD0; // UV for current frame
-    float2 uv2          : TEXCOORD1; // UV for next frame
-    float blendFactor   : BLEND;     // Transition between frames
+struct VertexOutput
+{
+    float4 position : SV_Position;
+    float4 color : COLOR;
+    float2 uv1 : TEXCOORD0;    // UV for current frame
+    float2 uv2 : TEXCOORD1;    // UV for next frame
+    float blendFactor : BLEND; // Transition between frames
+    float viewZ : VIEWZ;       // View space Z for depth sorting
 };
 
 static const float2 QUAD_POSITIONS[6] = {
-    float2(-0.5, -0.5), float2( 0.5, -0.5), float2(-0.5,  0.5),
-    float2( 0.5, -0.5), float2( 0.5,  0.5), float2(-0.5,  0.5)
+    float2(-0.5, -0.5), float2(0.5, -0.5), float2(-0.5, 0.5),
+    float2(0.5, -0.5), float2(0.5, 0.5), float2(-0.5, 0.5)
 };
 static const float2 QUAD_UVS[6] = {
     float2(0.0, 1.0), float2(1.0, 1.0), float2(0.0, 0.0),
@@ -26,7 +37,8 @@ static const float2 QUAD_UVS[6] = {
 };
 
 [shader("vertex")]
-VertexOutput vertexMain(uint vertexID: SV_VulkanVertexID, uint instanceID: SV_VulkanInstanceID) {
+VertexOutput vertexMain(uint vertexID: SV_VulkanVertexID, uint instanceID: SV_VulkanInstanceID)
+{
     VertexOutput output;
 
     uint poolIndex = aliveList[instanceID];
@@ -35,7 +47,7 @@ VertexOutput vertexMain(uint vertexID: SV_VulkanVertexID, uint instanceID: SV_Vu
     float age = 1.0 - (p.life / p.maxLife);
 
     uint columns = (uint)max(1.0, p.subUVGrid.x);
-    uint rows    = (uint)max(1.0, p.subUVGrid.y);
+    uint rows = (uint)max(1.0, p.subUVGrid.y);
     uint totalFrames = columns * rows;
 
     float frameProgress = age * (float)totalFrames;
@@ -57,20 +69,21 @@ VertexOutput vertexMain(uint vertexID: SV_VulkanVertexID, uint instanceID: SV_Vu
 
     float2 quadPos = QUAD_POSITIONS[vertexID] * p.size;
 
-    //quadPos.x *= p.frameAspect; // Adjust for frame aspect ratio
+    // quadPos.x *= p.frameAspect; // Adjust for frame aspect ratio
 
-    float3 worldPos = p.position 
-                    + (scene.cameraRight * quadPos.x) 
-                    + (scene.cameraUp * quadPos.y);
+    float3 worldPos = p.position + (scene.cameraRight * quadPos.x) + (scene.cameraUp * quadPos.y);
 
     output.position = mul(scene.viewProj, float4(worldPos, 1.0));
     output.color = p.color;
+
+    output.viewZ = length(worldPos - scene.camPos);
 
     return output;
 }
 
 [shader("fragment")]
-float4 fragmentMain(VertexOutput input) : SV_Target {
+float4 fragmentMain(VertexOutput input) : SV_Target
+{
     float4 texColor1 = particleTexture.Sample(particleSampler, input.uv1);
     float4 texColor2 = particleTexture.Sample(particleSampler, input.uv2);
     float4 blendedTexColor = lerp(texColor1, texColor2, input.blendFactor);
@@ -78,9 +91,19 @@ float4 fragmentMain(VertexOutput input) : SV_Target {
     float4 finalColor = blendedTexColor * input.color;
     // Premultiply alpha for correct blending
     finalColor.rgb *= finalColor.a;
-    //float4 finalColor = input.color;
+    // float4 finalColor = input.color;
 
-    if (finalColor.a < 0.01) discard;
+     //float2 screenUV = input.position.xy / input.position.w; // Assuming a screen resolution of 800x600 for this example
+     //float rawDepth = sceneDepthTexture.Sample(pointSampler, screenUV).r;
+     //float sceneLinearZ = scene.nearPlane * scene.farPlane / (scene.farPlane - rawDepth * (scene.farPlane - scene.nearPlane));
+
+     //float softnessDistance = 1.5; 
+     //// float depthFade = smoothstep(0.0, 1.0, (sceneLinearZ - input.viewZ) * 0.1);
+     //float depthFade = saturate((sceneLinearZ - input.viewZ) / softnessDistance);
+     //finalColor *= depthFade;
+
+    if (finalColor.a < 0.01)
+        discard;
 
     // The 0 alpha is important, because the alpha of every pass before the bloom pass
     // is considered to be the bloom mask, and we don't want to bloom the particles.

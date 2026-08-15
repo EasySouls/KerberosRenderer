@@ -110,14 +110,18 @@ namespace
 		.colorWriteMask = vk::ColorComponentFlagBits::eR | vk::ColorComponentFlagBits::eG | vk::ColorComponentFlagBits::eB | vk::ColorComponentFlagBits::eA
 	};
 
-	std::map<Kerberos::BlendMode, vk::PipelineColorBlendAttachmentState> s_BlendModeToVkBlendState
-	{
-		{ Kerberos::BlendMode::None, noBlendAttachment },
-		{ Kerberos::BlendMode::Additive, additiveBlendAttachment },
-		{ Kerberos::BlendMode::AlphaBlend, alphaBlendAttachment },
-		{ Kerberos::BlendMode::Multiplicative, multiplicativeBlendAttachment },
-		{ Kerberos::BlendMode::PremultipliedAlpha, premultipliedAlphaBlendAttachment }
-	};
+	constexpr std::array blendModeToVkBlendState{ noBlendAttachment,
+                                                  additiveBlendAttachment,
+                                                  alphaBlendAttachment,
+                                                  multiplicativeBlendAttachment,
+                                                  premultipliedAlphaBlendAttachment };
+
+	constexpr const vk::PipelineColorBlendAttachmentState& GetVkBlendState(Kerberos::BlendMode mode)
+    {
+        return blendModeToVkBlendState[static_cast<size_t>(mode)];
+    }
+
+
 }
 
 namespace Kerberos
@@ -212,7 +216,7 @@ namespace Kerberos
 		for (size_t i = 0; i < spec.ColorAttachmentFormats.size(); i++)
 		{
 			const auto blendMode = spec.BlendModes[i];
-			opaqueColorBlendAttachments[i] = s_BlendModeToVkBlendState[blendMode];
+			opaqueColorBlendAttachments[i] = GetVkBlendState(blendMode);
 		}
 
 		const vk::PipelineColorBlendStateCreateInfo colorBlending{

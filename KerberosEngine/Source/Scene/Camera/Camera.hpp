@@ -29,17 +29,17 @@ namespace Kerberos
 		virtual ~Camera() = default;
 
 		virtual void OnUpdate(float deltaTime) = 0;
-		virtual void OnEvent(Event& event) = 0;
+		virtual void OnEvent(Event &event) = 0;
 
-		virtual void SetPosition(const glm::vec3& position) = 0;
-		virtual void SetRotation(const glm::vec3& rotation) = 0;
+		virtual void SetPosition(const glm::vec3 &position) = 0;
+		virtual void SetRotation(const glm::vec3 &rotation) = 0;
 		virtual void Rotate(float pitch, float yaw) = 0;
-		virtual void Rotate(const glm::vec3& axis, float angle) = 0;
+		virtual void Rotate(const glm::vec3 &axis, float angle) = 0;
 
 		virtual float GetDistance() const = 0;
 		virtual void SetDistance(float distance) = 0;
 
-		virtual void Focus(const glm::vec3& focusPoint) = 0;
+		virtual void Focus(const glm::vec3 &focusPoint) = 0;
 
 		virtual void SetViewportSize(float width, float height) = 0;
 
@@ -55,20 +55,20 @@ namespace Kerberos
 
 		void SetIsInputBlocked(const bool isInputBlocked) { m_IsInputBlocked = isInputBlocked; }
 
-		virtual const glm::mat4& GetViewMatrix(Handedness handedness = Handedness::Right) const = 0;
-		virtual const glm::mat4& GetProjectionMatrix(Handedness handedness = Handedness::Right) const = 0;
+		virtual const glm::mat4 &GetViewMatrix(Handedness handedness = Handedness::Right) const = 0;
+		virtual const glm::mat4 &GetProjectionMatrix(Handedness handedness = Handedness::Right) const = 0;
 		virtual glm::mat4 GetViewProjectionMatrix(Handedness handedness = Handedness::Right) const = 0;
 
-		virtual std::pair<std::vector<glm::mat4>, glm::vec4> GetLightSpaceMatrices(const glm::vec3& lightDir, const std::function<glm::vec4(float)>& getCascadeSplits) const = 0;
+		virtual std::pair<std::vector<glm::mat4>, glm::vec4> GetLightSpaceMatrices(const glm::vec3 &lightDir, const std::function<glm::vec4(float)> &getCascadeSplits) const = 0;
 
 		virtual glm::vec3 GetUp() const = 0;
 		virtual glm::vec3 GetRight() const = 0;
 		virtual glm::vec3 GetForward() const = 0;
-		virtual const glm::vec3& GetPosition() const = 0;
+		virtual const glm::vec3 &GetPosition() const = 0;
 		virtual glm::quat GetOrientation() const = 0;
 		virtual float GetPitch() const = 0;
 		virtual float GetYaw() const = 0;
-		virtual const glm::vec3& GetFocalPoint() const = 0;
+		virtual const glm::vec3 &GetFocalPoint() const = 0;
 
 	protected:
 		bool IsInputBlocked() const { return m_IsInputBlocked; }
