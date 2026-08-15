@@ -370,3 +370,8 @@ build/
 
 # Editor cache
 KerberosEditor/Assets/Cache
+
+# Profiling files
+KerberosRenderer_StartupProfile.json
+KerberosRenderer_RuntimeProfile.json
+KerberosRenderer_ShutdownProfile.json
