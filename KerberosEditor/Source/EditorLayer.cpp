@@ -396,7 +396,7 @@ namespace Kerberos
 				const std::string message = "Drag and drop payload: " + std::string(path);
 				m_NotificationManager.AddNotification(message, Notification::Type::Info);
 
-				const AssetHandle assetHandle = *static_cast<AssetHandle *>(payload->Data);
+				const AssetHandle assetHandle = *static_cast<AssetHandle*>(payload->Data);
 				const AssetType assetType = AssetManager::GetAssetType(assetHandle);
 				if (assetType == AssetType::Scene)
 				{

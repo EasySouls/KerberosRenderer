@@ -26,6 +26,7 @@ struct alignas(16) ParticleFrameData
     float Time{ 0.0f };
     glm::vec3 CameraPosition{ 0.0f, 0.0f, 0.0f };
     float NearPlane{ 0.1f };
+    glm::vec2 ViewportSize{ 800.0f, 600.0f };
     float FarPlane{ 1000.0f };
 };
 
@@ -48,6 +49,8 @@ public:
                 DescriptorAllocator& frameAllocator);
 
     void RecordDraw(const vk::raii::CommandBuffer& cmd, uint32_t frameIndex) const;
+
+    void OnResize(uint32_t width, uint32_t height, vk::ImageView depthImageView);
 
 private:
     void SetupDescriptors();

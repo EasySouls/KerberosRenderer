@@ -744,6 +744,7 @@ void Renderer::RecordQueuedSceneRender(const vk::raii::CommandBuffer& cmd)
         .Time = time,
         .CameraPosition = s_Data->PendingRender.CameraPosition,
         .NearPlane = s_Data->PendingRender.NearPlane,
+        .ViewportSize = s_Data->OutputSize,
         .FarPlane = s_Data->PendingRender.FarPlane,
     };
     WriteGPUTimestamp(cmd, frameIndex, static_cast<uint32_t>(GPUTimestampQuery::ParticlesSimulateBegin));
@@ -1810,8 +1811,7 @@ void Renderer::CreateResources()
     auto& context = VulkanContext::Get();
     const auto& device = context.GetDevice();
 
-    constexpr vk::DeviceSize colliderLineBufferSize =
-        sizeof(LineVertex) * ColliderDebugHelpers::ColliderDebugMaxVertices;
+    constexpr vk::DeviceSize colliderLineBufferSize = sizeof(LineVertex) * ColliderDebugHelpers::ColliderDebugMaxVertices;
     for (auto& [Buffer, Memory, MappedData] : s_Data->ColliderLineBuffers) {
         CreateBuffer(device,
                      colliderLineBufferSize,
@@ -3575,6 +3575,8 @@ void Renderer::ResizeResources(const uint32_t width, const uint32_t height)
     }
 
     s_Data->OutputSize = { static_cast<float>(width), static_cast<float>(height) };
+
+    s_Data->ParticleSystem.OnResize(width, height, s_Data->DepthImage.ImageView);
 }
 
 void Renderer::RecompileShaders()

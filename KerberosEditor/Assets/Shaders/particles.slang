@@ -62,4 +62,5 @@ public struct ParticleFrameData
     public float3 camPos;
     public float nearPlane;
     public float farPlane;
+    public float2 viewportSize;
 };

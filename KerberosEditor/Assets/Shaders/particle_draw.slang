@@ -76,7 +76,7 @@ VertexOutput vertexMain(uint vertexID: SV_VulkanVertexID, uint instanceID: SV_Vu
     output.position = mul(scene.viewProj, float4(worldPos, 1.0));
     output.color = p.color;
 
-    output.viewZ = length(worldPos - scene.camPos);
+    output.viewZ = output.position.w;
 
     return output;
 }
@@ -89,18 +89,22 @@ float4 fragmentMain(VertexOutput input) : SV_Target
     float4 blendedTexColor = lerp(texColor1, texColor2, input.blendFactor);
 
     float4 finalColor = blendedTexColor * input.color;
+
+    float2 screenUV = input.position.xy / scene.viewportSize;
+    float rawDepth = sceneDepthTexture.SampleLevel(pointSampler, screenUV, 0).r;
+
+    float n = max(scene.nearPlane, 0.01);
+    float f = max(scene.farPlane, max(n + 0.01, 100));
+    // Convert raw depth to linear depth
+    float sceneLinearZ = n * f / (f - rawDepth * (f - n));
+
+    float softnessDistance = 0.1; 
+    float depthFade = saturate((sceneLinearZ - input.viewZ) / softnessDistance);
+    //float depthFade = smoothstep(0.0, 1.0, (sceneLinearZ - input.viewZ) * 0.1);
+    //finalColor *= depthFade;
+
     // Premultiply alpha for correct blending
     finalColor.rgb *= finalColor.a;
-    // float4 finalColor = input.color;
-
-     //float2 screenUV = input.position.xy / input.position.w; // Assuming a screen resolution of 800x600 for this example
-     //float rawDepth = sceneDepthTexture.Sample(pointSampler, screenUV).r;
-     //float sceneLinearZ = scene.nearPlane * scene.farPlane / (scene.farPlane - rawDepth * (scene.farPlane - scene.nearPlane));
-
-     //float softnessDistance = 1.5; 
-     //// float depthFade = smoothstep(0.0, 1.0, (sceneLinearZ - input.viewZ) * 0.1);
-     //float depthFade = saturate((sceneLinearZ - input.viewZ) / softnessDistance);
-     //finalColor *= depthFade;
 
     if (finalColor.a < 0.01)
         discard;

@@ -393,6 +393,12 @@ void ParticleSystem::RecordDraw(const vk::raii::CommandBuffer& cmd, const uint32
     EndRenderPassDebugLabel(cmd);
 }
 
+void ParticleSystem::OnResize(uint32_t /*width*/, uint32_t /*height*/, const vk::ImageView depthImageView)
+{
+    DescriptorWriter writer(m_TextureLayout, m_TextureSet);
+    writer.WriteSampledImage(2, depthImageView);
+}
+
 void ParticleSystem::SetupDescriptors()
 {
     auto& context = VulkanContext::Get();
@@ -510,9 +516,9 @@ void ParticleSystem::SetupDescriptors()
     constexpr vk::SamplerCreateInfo pointSamplerInfo{ .magFilter = vk::Filter::eNearest,
                                                       .minFilter = vk::Filter::eNearest,
                                                       .mipmapMode = vk::SamplerMipmapMode::eNearest,
-                                                      .addressModeU = vk::SamplerAddressMode::eRepeat,
-                                                      .addressModeV = vk::SamplerAddressMode::eRepeat,
-                                                      .addressModeW = vk::SamplerAddressMode::eRepeat,
+                                                      .addressModeU = vk::SamplerAddressMode::eClampToBorder,
+                                                      .addressModeV = vk::SamplerAddressMode::eClampToBorder,
+                                                      .addressModeW = vk::SamplerAddressMode::eClampToBorder,
                                                       .mipLodBias = 0.0f,
                                                       .anisotropyEnable = vk::False,
                                                       .maxAnisotropy = 1.0f,
