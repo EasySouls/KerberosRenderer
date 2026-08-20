@@ -19,7 +19,8 @@ namespace Kerberos
 		Sound,
 		Model,
 		Prefab,
-		Animation
+		Animation,
+		Skin
 	};
 
 	class Asset
@@ -61,6 +62,8 @@ namespace Kerberos
 				return "Prefab";
 			case AssetType::Animation:
 				return "Animation";
+            case AssetType::Skin:
+                return "Skin";
 		}
 
 		KBR_CORE_ASSERT(false, "Unknown Asset Type!");
@@ -87,6 +90,8 @@ namespace Kerberos
 			return AssetType::Prefab;
 		if (str == "Animation")
 			return AssetType::Animation;
+        if (str == "Skin")
+            return AssetType::Skin;
 
 		KBR_CORE_ASSERT(false, "Unknown Asset Type as string!");
 		return AssetType::Texture2D;

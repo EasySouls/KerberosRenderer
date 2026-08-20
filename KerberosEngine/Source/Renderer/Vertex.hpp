@@ -31,7 +31,7 @@ namespace Kerberos
 		}
 
 		static vk::VertexInputBindingDescription GetBindingDescription() {
-			return { 0, sizeof(Vertex), vk::VertexInputRate::eVertex };
+			return { .binding = 0, .stride = sizeof(Vertex), .inputRate = vk::VertexInputRate::eVertex };
 		}
 
 		static std::array<vk::VertexInputAttributeDescription, 4> GetAttributeDescriptions() {
@@ -68,7 +68,7 @@ namespace Kerberos
 		}
 
 		static vk::VertexInputBindingDescription GetBindingDescription() {
-			return { 0, sizeof(TextVertex), vk::VertexInputRate::eVertex };
+			return { .binding = 0, .stride = sizeof(TextVertex), .inputRate = vk::VertexInputRate::eVertex };
 		}
 
 		static std::array<vk::VertexInputAttributeDescription, 4> GetAttributeDescriptions() {
@@ -92,7 +92,7 @@ namespace Kerberos
 
 		static vk::VertexInputBindingDescription GetBindingDescription()
 		{
-			return { 0, sizeof(LineVertex), vk::VertexInputRate::eVertex };
+			return { .binding = 0, .stride = sizeof(LineVertex), .inputRate = vk::VertexInputRate::eVertex };
 		}
 
 		static std::array<vk::VertexInputAttributeDescription, 2> GetAttributeDescriptions()

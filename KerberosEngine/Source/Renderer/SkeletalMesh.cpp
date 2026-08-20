@@ -1,0 +1,51 @@
+#include "kbrpch.hpp"
+#include "SkeletalMesh.hpp"
+
+#include "Buffer.hpp"
+#include "Utils.hpp"
+
+namespace Kerberos 
+{
+
+SkeletalMesh::SkeletalMesh(const std::vector<Vertex>& vertices, const std::vector<uint32_t>& indices)
+    : m_Vertices(vertices), m_Indices(indices), m_VertexBuffer(vertices), m_IndexBuffer(indices)
+{
+    AABB boundingBox;
+
+    for (const auto& vertex : vertices) {
+        boundingBox.Min = glm::min(boundingBox.Min, vertex.Position);
+        boundingBox.Max = glm::max(boundingBox.Max, vertex.Position);
+    }
+    m_BoundingBox = boundingBox;
+}
+
+SkeletalMesh::SkeletalMesh(const std::string& name,
+                           const std::vector<Vertex>& vertices,
+                           const std::vector<uint32_t>& indices)
+    : SkeletalMesh(vertices, indices)
+{
+    m_Name = name;
+    SetDebugName(name);
+}
+
+void SkeletalMesh::Draw(const vk::CommandBuffer commandBuffer) const
+{
+    commandBuffer.bindVertexBuffers(0, *m_VertexBuffer.GetBuffer(), { 0 });
+    commandBuffer.bindIndexBuffer(m_IndexBuffer.GetBuffer(), 0, vk::IndexType::eUint32);
+    commandBuffer.drawIndexed(static_cast<uint32_t>(m_Indices.size()), 1, 0, 0, 0);
+}
+
+void SkeletalMesh::SetDebugName(const std::string& name) const
+{
+    const auto& context = VulkanContext::Get();
+
+    context.SetObjectDebugName(reinterpret_cast<uint64_t>(static_cast<VkBuffer>(*m_VertexBuffer.GetBuffer())),
+                               vk::ObjectType::eBuffer,
+                               name + "_VertexBuffer");
+
+    context.SetObjectDebugName(reinterpret_cast<uint64_t>(static_cast<VkBuffer>(*m_IndexBuffer.GetBuffer())),
+                               vk::ObjectType::eBuffer,
+                               name + "_IndexBuffer");
+}
+
+}
