@@ -4,6 +4,7 @@
 #include "Core/UUID.hpp"
 #include "Renderer/Vertex.hpp"
 #include "TextureImporter.hpp"
+#include "Serialization/PrefabSerializer.hpp"
 #include "Assets/EditorAssetManager.hpp"
 #include "Project/Project.hpp"
 
@@ -583,23 +584,53 @@ namespace Kerberos
 
 				// Export a prefab YAML with proper UUID-based entity references
 				std::filesystem::path prefabPath = exportFolder / (filepath.stem().string() + ".kbrprefab");
+				Ref<Prefab> existingPrefab = nullptr;
+				if (std::filesystem::exists(prefabPath))
+					existingPrefab = PrefabSerializer::DeserializePrefab(prefabPath);
+
 				// Generate UUIDs for each node (mapping nodeIndex -> UUID)
 				std::vector<UUID> nodeUUIDs;
 				nodeUUIDs.reserve(outNodes.size());
 				for (size_t i = 0; i < outNodes.size(); ++i)
 					nodeUUIDs.push_back(UUID());
-				
-				// Determine root entity (first node without parent or with parent index -1)
-				UUID rootEntityID = nodeUUIDs[0];
-				if (!outNodes.empty() && outNodes[0].ParentIndex >= 0 && static_cast<size_t>(outNodes[0].ParentIndex) < outNodes.size())
+
+				// Preserve UUIDs across re-imports when we can map nodes by stable index.
+				if (existingPrefab && existingPrefab->Entities.size() == outNodes.size())
 				{
-					// Find first node without a valid parent
 					for (size_t i = 0; i < outNodes.size(); ++i)
 					{
-						if (outNodes[i].ParentIndex < 0 || static_cast<size_t>(outNodes[i].ParentIndex) >= outNodes.size())
+						if (existingPrefab->Entities[i].ID.IsValid())
+							nodeUUIDs[i] = existingPrefab->Entities[i].ID;
+					}
+				}
+				
+				// Determine root entity (first node without parent or with parent index -1)
+				UUID rootEntityID = UUID::Invalid();
+				if (existingPrefab && existingPrefab->RootEntityID.IsValid())
+				{
+					for (const UUID uuid : nodeUUIDs)
+					{
+						if (uuid == existingPrefab->RootEntityID)
 						{
-							rootEntityID = nodeUUIDs[i];
+							rootEntityID = uuid;
 							break;
+						}
+					}
+				}
+
+				if (!rootEntityID.IsValid() && !outNodes.empty())
+				{
+					rootEntityID = nodeUUIDs[0];
+					if (outNodes[0].ParentIndex >= 0 && static_cast<size_t>(outNodes[0].ParentIndex) < outNodes.size())
+					{
+						// Find first node without a valid parent
+						for (size_t i = 0; i < outNodes.size(); ++i)
+						{
+							if (outNodes[i].ParentIndex < 0 || static_cast<size_t>(outNodes[i].ParentIndex) >= outNodes.size())
+							{
+								rootEntityID = nodeUUIDs[i];
+								break;
+							}
 						}
 					}
 				}
