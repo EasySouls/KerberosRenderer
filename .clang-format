@@ -49,6 +49,7 @@ IndentAccessModifiers: false
 
 # Namespaces
 NamespaceIndentation: None
+FixNamespaceComments: false
 
 # Includes
 SortIncludes: CaseSensitive
