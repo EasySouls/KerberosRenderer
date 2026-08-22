@@ -39,7 +39,6 @@ target_compile_definitions(KerberosEngine PUBLIC
     _CRT_SECURE_NO_WARNINGS
     GLFW_INCLUDE_NONE
     IMGUI_DOCKING_BRANCH
-    YAML_CPP_STATIC_DEFINE
     KBR_USE_MINIAUDIO
     $<$<CONFIG:Debug>:KBR_DEBUG>
     $<$<CONFIG:Release>:KBR_RELEASE>
@@ -63,7 +62,7 @@ target_link_libraries(KerberosEngine
     PRIVATE
         glfw
         imgui
-        yaml-cpp
+        yaml-cpp::yaml-cpp
         msdf-atlas-gen
         ImGuizmo
         assimp::assimp
