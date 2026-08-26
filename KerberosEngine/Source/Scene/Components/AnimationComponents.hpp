@@ -1,41 +1,37 @@
 #pragma once
 
-#include "Core/UUID.hpp"
 #include "Assets/Asset.hpp"
-#include "Scene/AABB.hpp"
+#include "Core/UUID.hpp"
 #include "Renderer/Material.hpp"
 #include "Renderer/SkeletalMesh.hpp"
+#include "Scene/AABB.hpp"
 
 #include <glm/mat4.hpp>
 
 #include <vector>
 
-namespace Kerberos
+namespace Kerberos {
+
+struct SkinComponent
 {
-class Texture2D;
+    AssetHandle SkeletonAsset = AssetHandle::Invalid();
+    std::vector<UUID> JointEntities;
+    std::vector<glm::mat4> JointMatrices;
+
+    SkinComponent() = default;
+    explicit SkinComponent(const AssetHandle& skeletonAsset) : SkeletonAsset(skeletonAsset) {}
+}
 
 struct SkeletalMeshComponent
 {
-    AssetHandle SkinAsset = AssetHandle::Invalid();
-    std::vector<UUID> Joints;
-
-    std::vector<glm::mat4> JointMatrices;
-
-    Ref<SkeletalMesh> Mesh = nullptr;
-    Ref<Material> MeshMaterial = nullptr;
+    AssetHandle MeshAsset = AssetHandle::Invalid();
+    AssetHandle SkeletonAsset = AssetHandle::Invalid();
+    AssetHandle MaterialAsset = AssetHandle::Invalid();
 
     AABB WorldAABB;
 
     bool Visible = true;
     bool CastShadows = true;
-
-    SkeletalMeshComponent() = default;
-
-    SkeletalMeshComponent(const Ref<SkeletalMesh>& mesh, const Ref<Material>& material)
-        : SkeletalMesh(mesh), MeshMaterial(material)
-    {
-    }
-    SkeletalMeshComponent(const SkeletalMeshComponent&) = default;
 };
 
 struct AnimationComponent

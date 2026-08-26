@@ -49,11 +49,25 @@ IndentAccessModifiers: false
 
 # Namespaces
 NamespaceIndentation: None
+CompactNamespaces: false
 FixNamespaceComments: false
 
 # Includes
 SortIncludes: CaseSensitive
 IncludeBlocks: Regroup
+
+IncludeCategories:
+  # Kerberos project headers
+  - Regex: '^"'
+    Priority: 1
+
+  # Third-party
+  - Regex: '^<(vulkan|glm|entt|Jolt|imgui)/'
+    Priority: 2
+
+  # Standard library / everything else
+  - Regex: '^<'
+    Priority: 3
 
 # Comments
 ReflowComments: true
