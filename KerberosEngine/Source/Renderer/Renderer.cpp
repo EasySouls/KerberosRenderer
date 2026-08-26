@@ -616,6 +616,10 @@ void Renderer::RecordQueuedSceneRender(const vk::raii::CommandBuffer& cmd)
     DescriptorAllocator& frameDescriptorAllocator = *s_Data->FrameDescriptorAllocators[frameIndex];
     frameDescriptorAllocator.Reset();
 
+    constexpr size_t frameArenaSize = 1024 * 256;       // 256 KB frame budget
+    std::array<std::byte, frameArenaSize> frameArenaBuffer;
+    std::pmr::monotonic_buffer_resource frameArena(frameArenaBuffer.data(), frameArenaBuffer.size());
+
     if (IsUsingAccelerationStructures()) {
         s_Data->RayTracingCache.BuildAccelerationStructures(s_Data->PendingRender.Scene, cmd, frameIndex);
 
@@ -634,7 +638,7 @@ void Renderer::RecordQueuedSceneRender(const vk::raii::CommandBuffer& cmd)
     }
 
     auto [allObjects, uniqueMaterials] =
-        GetRenderObjectsAndUniqueMaterialsFromScene(*s_Data->PendingRender.Scene.get());
+        GetRenderObjectsAndUniqueMaterialsFromScene(*s_Data->PendingRender.Scene.get(), &frameArena);
     const auto colliderLineVertices = s_Data->DisplayPhysicsColliders
                                           ? GetColliderLineVerticesFromScene(*s_Data->PendingRender.Scene.get())
                                           : std::vector<LineVertex>{};
@@ -650,7 +654,7 @@ void Renderer::RecordQueuedSceneRender(const vk::raii::CommandBuffer& cmd)
         UpdatePerObjectUniformBuffer(frameIndex, UBOIndex, Transform, *material, EntityID);
     }
 
-    std::vector<RenderObject> renderObjects;
+    RenderObjectContainer renderObjects;
     renderObjects.reserve(allObjects.size());
 
     if (!s_Data->UseFrustumCulling) {
@@ -666,7 +670,7 @@ void Renderer::RecordQueuedSceneRender(const vk::raii::CommandBuffer& cmd)
             frustum = Frustum::CreateFromViewProjection(s_Data->PendingRender.Projection * s_Data->PendingRender.View);
         }
 
-        renderObjects = FrustumCullRenderObjects(allObjects, frustum);
+        renderObjects = FrustumCullRenderObjects(allObjects, frustum, &frameArena);
 
         s_Data->FrozenFrustum = frustum;
     }
@@ -869,7 +873,7 @@ void Renderer::RecordQueuedSceneRender(const vk::raii::CommandBuffer& cmd)
 
     WriteGPUTimestamp(cmd, frameIndex, static_cast<uint32_t>(GPUTimestampQuery::ShadowBegin));
 
-    RenderShadowPass(cmd, frameIndex, allObjects);
+    RenderShadowPass(cmd, frameIndex, allObjects, &frameArena);
 
     WriteGPUTimestamp(cmd, frameIndex, static_cast<uint32_t>(GPUTimestampQuery::ShadowEnd));
 
@@ -1828,7 +1832,7 @@ void Renderer::CreateResources()
     s_Data->MousePickingReadback.TimelineSemaphore = vk::raii::Semaphore(device, timelineSemaphoreCreateInfo);
     context.SetObjectDebugName(s_Data->MousePickingReadback.TimelineSemaphore, "Mouse Picking Timeline Semaphore");
 
-    const auto queueFamilyInfo = context.GetQueueFamilyInfo();
+    const auto& queueFamilyInfo = context.GetQueueFamilyInfo();
     const auto queueFamilyProperties = context.GetPhysicalDevice().getQueueFamilyProperties();
 
     s_Data->SupportsGPUTimestamps = false;
@@ -4241,13 +4245,12 @@ static AABB CalculateWorldAABB(const AABB& localAABB, const glm::mat4& worldTran
     return worldAABB;
 }
 
-std::pair<std::vector<RenderObject>, std::set<Ref<Material>>>
-Renderer::GetRenderObjectsAndUniqueMaterialsFromScene(const Scene& scene)
+std::pair<std::pmr::vector<RenderObject>, std::pmr::set<Ref<Material>>> Renderer::GetRenderObjectsAndUniqueMaterialsFromScene(const Scene& scene, std::pmr::memory_resource* arena)
 {
     static uint32_t renderObjectCountFromLastFrame = 0;
 
-    std::vector<RenderObject> renderObjects;
-    std::set<Ref<Material>> uniqueMaterials;
+    std::pmr::vector<RenderObject> renderObjects(arena);
+    std::pmr::set<Ref<Material>> uniqueMaterials(arena);
     renderObjects.reserve(renderObjectCountFromLastFrame);
 
     uint32_t entityCount = 0;
@@ -4345,10 +4348,11 @@ std::vector<LineVertex> Renderer::GetColliderLineVerticesFromScene(const Scene& 
     return vertices;
 }
 
-std::vector<RenderObject> Renderer::FrustumCullRenderObjects(const std::vector<RenderObject>& renderObjects,
-                                                             const Frustum& frustum)
+Renderer::RenderObjectContainer Renderer::FrustumCullRenderObjects(const RenderObjectContainer& renderObjects,
+                                                                   const Frustum& frustum,
+                                                                   std::pmr::memory_resource* arena)
 {
-    std::vector<RenderObject> culledObjects;
+    RenderObjectContainer culledObjects(arena);
     culledObjects.reserve(renderObjects.size());
 
     for (const auto& renderObject : renderObjects) {
@@ -4362,7 +4366,8 @@ std::vector<RenderObject> Renderer::FrustumCullRenderObjects(const std::vector<R
 
 void Renderer::RenderShadowPass(const vk::raii::CommandBuffer& cmd,
                                 uint32_t frameIndex,
-                                const std::vector<RenderObject>& renderObjects)
+                                const RenderObjectContainer& renderObjects,
+                                std::pmr::memory_resource* arena)
 {
     vk::ImageMemoryBarrier2 barrier = { .srcStageMask = vk::PipelineStageFlagBits2::eEarlyFragmentTests |
                                                         vk::PipelineStageFlagBits2::eLateFragmentTests,
@@ -4429,7 +4434,7 @@ void Renderer::RenderShadowPass(const vk::raii::CommandBuffer& cmd,
 
         // Cull objects
         Frustum frustum = Frustum::CreateFromViewProjection(s_Data->SceneUniformData.lightSpaceMatrices[cascadeIndex]);
-        const std::vector<RenderObject> culledObjects = FrustumCullRenderObjects(renderObjects, frustum);
+        const RenderObjectContainer culledObjects = FrustumCullRenderObjects(renderObjects, frustum, arena);
 
         for (const auto& renderObject : culledObjects) {
             if (renderObject.Material != nullptr && renderObject.Material->IsTransparent())

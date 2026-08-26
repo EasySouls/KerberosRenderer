@@ -48,7 +48,7 @@ namespace Kerberos
 		return m_Materials.at(name);
 	}
 
-	void MaterialRegistry::SyncWithCurrentMaterials(const std::set<Ref<Material>>& currentMaterials)
+	void MaterialRegistry::SyncWithCurrentMaterials(const std::pmr::set<Ref<Material>>& currentMaterials)
 	{
 		// This way of clearing the registry is not ideal, as it will remove all materials that are not in the currentMaterials set, which breaks the engine
 		// for example, when assigning the DebugPink material to a mesh, when it doesn't have any.

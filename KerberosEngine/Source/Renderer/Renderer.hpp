@@ -9,6 +9,7 @@
 #include <set>
 #include <string_view>
 #include <vector>
+#include <memory_resource>
 
 namespace Kerberos {
 struct GPULight;
@@ -78,7 +79,7 @@ struct RenderObject
     uint32_t EntityID = 0;
     AABB WorldAABB{};
     uint32_t UBOIndex = 0;
-    std::string DebugName{};
+    std::string_view DebugName{};
 };
 
 struct GTAOConstants
@@ -214,17 +215,21 @@ private:
                                              const Material& material,
                                              uint32_t entityID);
 
+    using RenderObjectContainer = std::pmr::vector<RenderObject>;
+
     static std::vector<GPULight> GetLightsFromScene(const Scene& scene);
-    static std::pair<std::vector<RenderObject>, std::set<Ref<Material>>>
-    GetRenderObjectsAndUniqueMaterialsFromScene(const Scene& scene);
+    static std::pair<RenderObjectContainer, std::pmr::set<Ref<Material>>>
+    GetRenderObjectsAndUniqueMaterialsFromScene(const Scene& scene, std::pmr::memory_resource* arena);
     static std::vector<LineVertex> GetColliderLineVerticesFromScene(const Scene& scene);
 
-    static std::vector<RenderObject> FrustumCullRenderObjects(const std::vector<RenderObject>& renderObjects,
-                                                              const Frustum& frustum);
+    static RenderObjectContainer FrustumCullRenderObjects(const RenderObjectContainer& renderObjects,
+                                                          const Frustum& frustum,
+                                                          std::pmr::memory_resource* arena);
 
     static void RenderShadowPass(const vk::raii::CommandBuffer& cmd,
                                  uint32_t frameIndex,
-                                 const std::vector<RenderObject>& renderObjects);
+                                 const RenderObjectContainer& renderObjects,
+                                 std::pmr::memory_resource* arena);
 
     static void RenderParticles(const vk::raii::CommandBuffer& cmd, uint32_t frameIndex);
     static void RenderGrass(const vk::raii::CommandBuffer& cmd, uint32_t frameIndex);
