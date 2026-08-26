@@ -40,9 +40,6 @@ target_compile_definitions(KerberosEngine PUBLIC
     GLFW_INCLUDE_NONE
     IMGUI_DOCKING_BRANCH
     KBR_USE_MINIAUDIO
-    $<$<CONFIG:Debug>:KBR_DEBUG>
-    $<$<CONFIG:Release>:KBR_RELEASE>
-    $<$<CONFIG:Dist>:KBR_DIST>
 )
 
 # Enable these later, but a few libraries are compiled as part of the engine that have warnings

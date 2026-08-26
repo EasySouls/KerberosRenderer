@@ -1,5 +1,3 @@
-project(KerberosEditor)
-
 add_executable(KerberosEditor)
 
 file(GLOB_RECURSE EDITOR_SRC CMAKE_CONFIGURE_DEPENDS

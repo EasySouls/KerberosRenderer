@@ -36,6 +36,7 @@ namespace Kerberos
 			.parent_path()
 			.parent_path()
 			.parent_path()
+			.parent_path()
 			.append("KerberosEditor");
 
 		spec.WorkingDirectory = projectRoot;

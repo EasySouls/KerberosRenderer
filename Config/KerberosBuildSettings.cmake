@@ -1,49 +1,46 @@
+include_guard(GLOBAL)
+
 add_library(KerberosBuildSettings INTERFACE)
 
-# C++ standard
 target_compile_features(KerberosBuildSettings INTERFACE cxx_std_23)
 
-# Warnings
 target_compile_options(KerberosBuildSettings INTERFACE
-    $<$<CXX_COMPILER_ID:MSVC>:/W4 /MP /permissive->
-    $<$<CXX_COMPILER_ID:GNU>:-Wall -Wextra -Wpedantic>
-    $<$<CXX_COMPILER_ID:Clang>:-Wall -Wextra -Wpedantic>
+    $<$<CXX_COMPILER_ID:MSVC>:/W4>
+    $<$<CXX_COMPILER_ID:MSVC>:/MP>
+    $<$<CXX_COMPILER_ID:MSVC>:/permissive->
+    $<$<CXX_COMPILER_ID:GNU>:-Wall>
+    $<$<CXX_COMPILER_ID:GNU>:-Wextra>
+    $<$<CXX_COMPILER_ID:GNU>:-Wpedantic>
+    $<$<CXX_COMPILER_ID:Clang>:-Wall>
+    $<$<CXX_COMPILER_ID:Clang>:-Wextra>
+    $<$<CXX_COMPILER_ID:Clang>:-Wpedantic>
 )
 
-# Runtime selection (MSVC)
-if(MSVC)
-    target_compile_options(KerberosBuildSettings INTERFACE
-        $<$<CONFIG:Debug>:/MDd>
-        $<$<CONFIG:Release>:/MD>
-    )
-endif()
-
-# Definitions per config
 target_compile_definitions(KerberosBuildSettings INTERFACE
     $<$<CONFIG:Debug>:KBR_DEBUG>
     $<$<CONFIG:Release>:KBR_RELEASE>
     $<$<CONFIG:RelWithDebInfo>:KBR_RELEASE>
+    $<$<CONFIG:Dist>:KBR_DIST>
 )
 
-# Sanitizers / fuzzing instrumentation for Kerberos targets only
 if(KBR_ENABLE_ASAN)
     target_compile_options(KerberosBuildSettings INTERFACE
         $<$<CXX_COMPILER_ID:MSVC>:/fsanitize=address>
-        $<$<OR:$<CXX_COMPILER_ID:Clang>,$<CXX_COMPILER_ID:GNU>>:-fsanitize=address -fno-omit-frame-pointer>
+        $<$<OR:$<CXX_COMPILER_ID:Clang>,$<CXX_COMPILER_ID:GNU>>:-fsanitize=address>
+        $<$<OR:$<CXX_COMPILER_ID:Clang>,$<CXX_COMPILER_ID:GNU>>:-fno-omit-frame-pointer>
     )
     target_link_options(KerberosBuildSettings INTERFACE
         $<$<CXX_COMPILER_ID:MSVC>:/fsanitize=address>
-        $<$<OR:$<CXX_COMPILER_ID:Clang>,$<CXX_COMPILER_ID:GNU>>:-fsanitize=address -fno-omit-frame-pointer>
+        $<$<OR:$<CXX_COMPILER_ID:Clang>,$<CXX_COMPILER_ID:GNU>>:-fsanitize=address>
+        $<$<OR:$<CXX_COMPILER_ID:Clang>,$<CXX_COMPILER_ID:GNU>>:-fno-omit-frame-pointer>
     )
 endif()
 
 if(KBR_ENABLE_FUZZING)
     if(CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
-        # Keep normal app/link behavior by enabling instrumentation without
-        # linking libFuzzer's main entrypoint.
         target_compile_options(KerberosBuildSettings INTERFACE -fsanitize=fuzzer-no-link)
         target_link_options(KerberosBuildSettings INTERFACE -fsanitize=fuzzer-no-link)
     else()
-        message(WARNING "KBR_ENABLE_FUZZING is ON, but this project only enables fuzzing instrumentation with Clang.")
+        message(WARNING "KBR_ENABLE_FUZZING is ON, but fuzzing instrumentation is only supported with Clang.")
     endif()
 endif()

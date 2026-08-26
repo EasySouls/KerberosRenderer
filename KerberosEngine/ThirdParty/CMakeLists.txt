@@ -1,5 +1,9 @@
 set(BUILD_TESTING OFF CACHE BOOL "" FORCE)
 
+# These are source dependencies, so keep their build products out of the
+# default build unless one of our targets consumes them.
+set(BASISU_SSE OFF CACHE BOOL "Disable Basis Universal SSE support." FORCE)
+
 # Optional instrumentation for third-party libraries.
 # This is intentionally directory-scoped so it propagates into each vendor
 # subdirectory without patching upstream CMake files.
@@ -26,6 +30,7 @@ if(KBR_ENABLE_THIRDPARTY_INSTRUMENTATION)
 endif()
 
 # GLFW
+set(GLFW_LIBRARY_TYPE STATIC CACHE STRING "Build GLFW as a static library." FORCE)
 set(GLFW_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
 set(GLFW_BUILD_TESTS OFF CACHE BOOL "" FORCE)
 set(GLFW_BUILD_DOCS OFF CACHE BOOL "" FORCE)
@@ -34,6 +39,8 @@ add_subdirectory(GLFW EXCLUDE_FROM_ALL)
 # YAML-CPP
 set(YAML_CPP_BUILD_TESTS OFF CACHE BOOL "" FORCE)
 set(YAML_CPP_BUILD_TOOLS OFF CACHE BOOL "" FORCE)
+set(YAML_CPP_BUILD_CONTRIB OFF CACHE BOOL "" FORCE)
+set(YAML_BUILD_SHARED_LIBS OFF CACHE BOOL "Build yaml-cpp as a shared library." FORCE)
 set(YAML_MSVC_SHARED_RT ON CACHE BOOL "" FORCE)
 add_subdirectory(yaml-cpp EXCLUDE_FROM_ALL)
 
@@ -62,7 +69,7 @@ target_include_directories(ktx PUBLIC
 )
 
 # FreeType
-add_subdirectory(freetype)
+add_subdirectory(freetype EXCLUDE_FROM_ALL)
 add_library(Freetype::Freetype ALIAS freetype)
 
 # msdf-atlas-gen
@@ -84,6 +91,7 @@ set(ENTT_BUILD_TESTING OFF CACHE BOOL "" FORCE)
 add_subdirectory(entt EXCLUDE_FROM_ALL)
 
 # Jolt Physics
+set(JPH_BUILD_SHARED_LIBS OFF CACHE BOOL "Build Jolt as a shared library." FORCE)
 set(JPH_DEBUG_RENDERER ON CACHE BOOL "" FORCE)
 set(TARGET_UNIT_TESTS OFF CACHE BOOL "" FORCE)
 set(TARGET_HELLO_WORLD OFF CACHE BOOL "" FORCE)

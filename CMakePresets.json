@@ -1,23 +1,30 @@
 {
-  "version": 3,
+  "version": 6,
   "configurePresets": [
     {
-      "name": "vs2022",
-      "generator": "Visual Studio 17 2022",
-      "architecture": "x64",
-      "binaryDir": "build/vs2022"
-    },
-    {
-      "name": "vs2026",
-      "generator": "Visual Studio 18 2026",
-      "architecture": "x64",
-      "binaryDir": "build/vs2026",
+      "name": "windows-base",
+      "hidden": true,
       "cacheVariables": {
         "CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
+        "BUILD_SHARED_LIBS": "OFF",
         "KBR_ENABLE_ASAN": "OFF",
         "KBR_ENABLE_FUZZING": "OFF",
         "KBR_ENABLE_THIRDPARTY_INSTRUMENTATION": "OFF"
       }
+    },
+    {
+      "name": "vs2026",
+      "inherits": "windows-base",
+      "generator": "Visual Studio 18 2026",
+      "architecture": "x64",
+      "binaryDir": "${sourceDir}/out/build/vs2026"
+    },
+    {
+      "name": "vs2022",
+      "inherits": "windows-base",
+      "generator": "Visual Studio 17 2022",
+      "architecture": "x64",
+      "binaryDir": "${sourceDir}/out/build/vs2022"
     },
     {
       "name": "ninja-msvc-debug",
@@ -29,7 +36,6 @@
       },
       "binaryDir": "${sourceDir}/out/build/${presetName}",
       "cacheVariables": {
-        "CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
         "CMAKE_BUILD_TYPE": "Debug",
         "CMAKE_C_COMPILER": "cl",
         "CMAKE_CXX_COMPILER": "cl"
@@ -45,7 +51,6 @@
       },
       "binaryDir": "${sourceDir}/out/build/${presetName}",
       "cacheVariables": {
-        "CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
         "CMAKE_BUILD_TYPE": "Release",
         "CMAKE_C_COMPILER": "cl",
         "CMAKE_CXX_COMPILER": "cl"
@@ -57,7 +62,6 @@
       "generator": "Ninja",
       "binaryDir": "${sourceDir}/out/build/${presetName}",
       "cacheVariables": {
-        "CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
         "CMAKE_BUILD_TYPE": "Debug",
         "CMAKE_C_COMPILER": "clang-cl",
         "CMAKE_CXX_COMPILER": "clang-cl"
@@ -66,7 +70,7 @@
     {
       "name": "vs2026-asan",
       "inherits": "vs2026",
-      "binaryDir": "build/vs2026-asan",
+      "binaryDir": "${sourceDir}/out/build/vs2026-asan",
       "cacheVariables": {
         "KBR_ENABLE_ASAN": "ON",
         "KBR_ENABLE_FUZZING": "OFF",
