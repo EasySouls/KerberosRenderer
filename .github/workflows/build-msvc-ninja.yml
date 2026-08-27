@@ -13,7 +13,9 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
+        with:
+          submodules: 'recursive'
 
       - name: Setup MSVC Environment
         uses: ilammy/msvc-dev-cmd@v1
@@ -22,9 +24,9 @@ jobs:
         uses: jwlawson/actions-setup-cmake@v2
 
       - name: Setup sccache
-        uses: mozilla-actions/sccache-action@v0.0.8
+        uses: mozilla-actions/sccache-action@v0.0.11
         with:
-          version: "v0.8.1"
+          version: "v0.16.0"
 
       - name: Configure CMake
         env:
