@@ -37,7 +37,7 @@ private:
     std::filesystem::path m_AssetsRoot;
     std::unordered_set<std::string> m_SupportedExtensions;
     Callback m_Callback;
-    std::unique_ptr<filewatch::FileWatch<std::string>> m_Watch;
+    Owner<filewatch::FileWatch<std::string>> m_Watch;
     AssetEventDebouncer m_Debouncer;
     std::mutex m_Mutex;
     std::filesystem::path m_RenameSource;

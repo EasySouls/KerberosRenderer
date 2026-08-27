@@ -70,10 +70,10 @@ namespace Kerberos
 
 		std::filesystem::path m_AssetsRoot;
 		std::filesystem::path m_CacheRoot;
-		std::unique_ptr<AssetMetaService> m_MetaService;
+		Owner<AssetMetaService> m_MetaService;
 		ImporterRegistry m_ImporterRegistry;
-		std::unique_ptr<AssetBuildCoordinator> m_BuildCoordinator;
+		Owner<AssetBuildCoordinator> m_BuildCoordinator;
 		AssetFileWatchService m_FileWatch;
-		std::shared_ptr<std::atomic_bool> m_Lifetime = std::make_shared<std::atomic_bool>(true);
+		Ref<std::atomic_bool> m_Lifetime = CreateRef<std::atomic_bool>(true);
 	};
 }

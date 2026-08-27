@@ -95,7 +95,7 @@ namespace Kerberos
 		}
 
 		Material(std::string name, const glm::vec4 c, const float r, const float m,
-				 const std::shared_ptr<Texture2D>& albedoTex, const std::shared_ptr<Texture2D>& normalTex)
+				 const Ref<Texture2D>& albedoTex, const Ref<Texture2D>& normalTex)
 			: Name(std::move(name)), AlbedoTexture(albedoTex), NormalTexture(normalTex)
 		{
 			Params.RoughnessFactor = r;

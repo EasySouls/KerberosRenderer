@@ -46,7 +46,7 @@ void AssetFileWatchService::Start(std::filesystem::path assetsRoot,
     auto watchCallback = [this](const std::string& path, const filewatch::Event event) {
         OnFileEvent(path, event);
     };
-    m_Watch = std::make_unique<filewatch::FileWatch<std::string>>(m_AssetsRoot.string(), watchCallback);
+    m_Watch = CreateOwner<filewatch::FileWatch<std::string>>(m_AssetsRoot.string(), watchCallback);
 }
 
 void AssetFileWatchService::Stop()

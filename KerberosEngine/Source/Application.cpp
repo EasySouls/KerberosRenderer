@@ -46,7 +46,6 @@ namespace Kerberos
 		KBR_CORE_ASSERT(!s_Instance, "Application already exists!");
 		s_Instance = this;
 		m_RenderThreadId = std::this_thread::get_id();
-		m_RenderThreadId = std::this_thread::get_id();
 
 		m_Specification = spec;
 

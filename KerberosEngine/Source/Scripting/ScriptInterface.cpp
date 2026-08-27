@@ -95,7 +95,7 @@ namespace Kerberos
 		if (!componentTypeName)
 			return 0;
 
-		if (const std::shared_ptr<Scene> scene = ScriptEngine::GetSceneContext().lock())
+		if (const Ref<Scene> scene = ScriptEngine::GetSceneContext().lock())
 		{
 			const Entity entity = scene->GetEntityByUUID(UUID(entityID));
 			const std::string typeName(componentTypeName);
@@ -152,7 +152,7 @@ namespace Kerberos
 		if (!componentTypeName)
 			return;
 
-		if (const std::shared_ptr<Scene> scene = ScriptEngine::GetSceneContext().lock())
+		if (const Ref<Scene> scene = ScriptEngine::GetSceneContext().lock())
 		{
 			const Entity entity = scene->GetEntityByUUID(UUID(entityID));
 			const std::string typeName(componentTypeName);
@@ -171,7 +171,7 @@ namespace Kerberos
 
 		const std::string nameStr(name);
 
-		if (const std::shared_ptr<Scene> scene = ScriptEngine::GetSceneContext().lock())
+		if (const Ref<Scene> scene = ScriptEngine::GetSceneContext().lock())
 		{
 			if (const Entity entity = scene->FindEntityByName(nameStr))
 			{
@@ -184,7 +184,7 @@ namespace Kerberos
 	static uint64_t Entity_Instantiate(const char* name)
 	{
 		const std::string nameStr = name ? std::string(name) : "Entity";
-		if (const std::shared_ptr<Scene> scene = ScriptEngine::GetSceneContext().lock())
+		if (const Ref<Scene> scene = ScriptEngine::GetSceneContext().lock())
 		{
 			const Entity entity = scene->CreateEntity(nameStr);
 			return entity.GetUUID();

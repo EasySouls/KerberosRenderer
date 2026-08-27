@@ -7,7 +7,7 @@
 
 namespace Kerberos {
 
-void ImporterRegistry::Register(std::shared_ptr<IAssetImporter> importer)
+void ImporterRegistry::Register(Ref<IAssetImporter> importer)
 {
 	if (importer) {
 		std::unique_lock lock(m_Mutex);
@@ -15,7 +15,7 @@ void ImporterRegistry::Register(std::shared_ptr<IAssetImporter> importer)
 	}
 }
 
-std::shared_ptr<IAssetImporter> ImporterRegistry::Find(const std::string_view extension) const
+Ref<IAssetImporter> ImporterRegistry::Find(const std::string_view extension) const
 {
 	std::shared_lock lock(m_Mutex);
 	std::string normalized(extension);

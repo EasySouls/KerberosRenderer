@@ -91,7 +91,7 @@ namespace Kerberos
 		Owner<VulkanContext> m_VulkanContext;
 		Owner<AudioManager> m_AudioManager;
 
-		std::vector<std::unique_ptr<Layer>> m_Layers;
+		std::vector<Owner<Layer>> m_Layers;
 		float m_LastFrameTime = 0.0f;
 
 		bool m_IsRunning = true;

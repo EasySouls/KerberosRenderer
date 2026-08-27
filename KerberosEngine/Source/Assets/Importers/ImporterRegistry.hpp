@@ -12,11 +12,11 @@ namespace Kerberos {
 class ImporterRegistry
 {
 public:
-	void Register(std::shared_ptr<IAssetImporter> importer);
-	std::shared_ptr<IAssetImporter> Find(std::string_view extension) const;
+	void Register(Ref<IAssetImporter> importer);
+	Ref<IAssetImporter> Find(std::string_view extension) const;
 
 private:
-	std::vector<std::shared_ptr<IAssetImporter>> m_Importers;
+	std::vector<Ref<IAssetImporter>> m_Importers;
 	mutable std::shared_mutex m_Mutex;
 };
 

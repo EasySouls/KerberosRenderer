@@ -146,10 +146,9 @@ namespace Kerberos
 		std::error_code ec;
 		std::filesystem::create_directories(m_AssetsRoot, ec);
 		std::filesystem::create_directories(m_CacheRoot, ec);
-		m_MetaService = std::make_unique<AssetMetaService>(m_AssetsRoot);
-		m_ImporterRegistry.Register(std::make_shared<GltfPipelineImporter>());
-		m_BuildCoordinator = std::make_unique<AssetBuildCoordinator>(
-			m_AssetsRoot, m_CacheRoot, *m_MetaService, m_ImporterRegistry, &m_AssetRegistry);
+		m_MetaService = CreateOwner<AssetMetaService>(m_AssetsRoot);
+		m_ImporterRegistry.Register(CreateRef<GltfPipelineImporter>());
+		m_BuildCoordinator = CreateOwner<AssetBuildCoordinator>(m_AssetsRoot, m_CacheRoot, *m_MetaService, m_ImporterRegistry, &m_AssetRegistry);
 
 		std::unordered_set<std::string> extensions;
 		for (const auto& extension : assetExtensionMap | std::views::keys)
