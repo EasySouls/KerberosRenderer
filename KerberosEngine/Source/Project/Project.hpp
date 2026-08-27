@@ -56,8 +56,9 @@ namespace Kerberos
 		static void ReleaseActiveProjectResources();
 
 		Ref<AssetManagerBase> GetAssetManager() const { return m_AssetManager; }
-		Ref<EditorAssetManager> GetEditorAssetManager() const { return std::static_pointer_cast<EditorAssetManager>(m_AssetManager); }
-		Ref<RuntimeAssetManager> GetRuntimeAssetManager() const { return std::static_pointer_cast<RuntimeAssetManager>(m_AssetManager); }
+		Ref<EditorAssetManager> GetEditorAssetManager() const { return std::dynamic_pointer_cast<EditorAssetManager>(m_AssetManager); }
+		Ref<RuntimeAssetManager> GetRuntimeAssetManager() const { return std::dynamic_pointer_cast<RuntimeAssetManager>(m_AssetManager); }
+		Ref<RuntimeAssetManager> UseRuntimeAssetManager();
 
 	private:
 		ProjectInfo m_Info;

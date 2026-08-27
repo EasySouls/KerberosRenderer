@@ -45,6 +45,8 @@ namespace Kerberos
 	{
 		KBR_CORE_ASSERT(!s_Instance, "Application already exists!");
 		s_Instance = this;
+		m_RenderThreadId = std::this_thread::get_id();
+		m_RenderThreadId = std::this_thread::get_id();
 
 		m_Specification = spec;
 
@@ -248,6 +250,10 @@ namespace Kerberos
 
 			m_VulkanContext->RenderImGui();
 
+			// Upload jobs are the only worker-produced queue drained at the
+			// Vulkan boundary. Their callbacks run here, never on the producer
+			// thread, and own their captured staging data until completion.
+			ExecuteGPUUploadQueue();
 			m_VulkanContext->Draw();
 			m_VulkanContext->Present();
 		}
@@ -286,6 +292,19 @@ namespace Kerberos
 		m_MainThreadQueue.push(fn);
 	}
 
+	std::shared_future<void> Application::SubmitToGPUUploadQueue(GPUUploadJob job)
+	{
+		GPUUploadQueueEntry entry{ .Job = std::move(job) };
+		std::shared_future<void> completion = entry.Completion.get_future().share();
+
+		{
+			std::scoped_lock lock(m_GPUUploadQueueMutex);
+			m_GPUUploadQueue.push(std::move(entry));
+		}
+
+		return completion;
+	}
+
 	void Application::BlockEvents(const bool shouldBlock)
 	{
 		m_BlockEvents = shouldBlock;
@@ -304,6 +323,34 @@ namespace Kerberos
 			const auto fn = functions.front();
 			functions.pop();
 			fn();
+		}
+	}
+
+	void Application::ExecuteGPUUploadQueue()
+	{
+		KBR_CORE_ASSERT(std::this_thread::get_id() == m_RenderThreadId,
+			"GPU upload queue must be drained by the render thread");
+
+		std::queue<GPUUploadQueueEntry> uploads;
+		{
+			std::scoped_lock lock(m_GPUUploadQueueMutex);
+			uploads.swap(m_GPUUploadQueue);
+		}
+
+		while (!uploads.empty())
+		{
+			GPUUploadQueueEntry entry = std::move(uploads.front());
+			uploads.pop();
+
+			try
+			{
+				entry.Job(*m_VulkanContext);
+				entry.Completion.set_value();
+			}
+			catch (...)
+			{
+				entry.Completion.set_exception(std::current_exception());
+			}
 		}
 	}
 

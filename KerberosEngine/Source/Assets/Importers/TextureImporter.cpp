@@ -1,6 +1,7 @@
 #include "kbrpch.hpp"
 #include "TextureImporter.hpp"
 #include "Renderer/Textures/Texture2D.hpp"
+#include "Renderer/Textures/KTX2Encoder.hpp"
 #include "ImportUtils.hpp"
 #include "Utils/KtxConversion.hpp"
 
@@ -13,10 +14,15 @@ namespace
 
 	bool IsExtensionSupported(const std::filesystem::path& filepath)
 	{
-		const static std::unordered_set<std::string> supportedExtensions = { ".png", ".jpg", ".jpeg", ".ktx", ".ktx2" };
+		const static std::unordered_set<std::string> supportedExtensions = {
+			".png", ".jpg", ".jpeg", ".bmp", ".tga", ".gif", ".psd", ".hdr", ".pic", ".pnm",
+			".ktx", ".ktx2"
+		};
 
 		std::string extension = filepath.extension().string();
-		std::ranges::transform(extension, extension.begin(), ::tolower);
+		std::ranges::transform(extension, extension.begin(), [](unsigned char c) {
+			return static_cast<char>(std::tolower(c));
+		});
 		return supportedExtensions.contains(extension);
 	}
 }
@@ -74,6 +80,11 @@ namespace Kerberos
 		}
 
 		auto [spec, buffer] = LoadTextureData(filepath, true);
+		auto ktx2Filepath = filepath;
+		ktx2Filepath.replace_extension(".ktx2");
+		if (KTX2Encoder::EncodeIfNeeded(filepath, ktx2Filepath, spec, buffer))
+			return Texture2D::FromFile(ktx2Filepath);
+
 		auto texture = CreateRef<Texture2D>(spec, buffer);
 
 		const std::string name = filepath.filename().string();
@@ -84,7 +95,7 @@ namespace Kerberos
 
 	std::pair<TextureSpecification, Buffer> TextureImporter::LoadTextureData(const std::filesystem::path& filepath, const bool flip, const int desiredChannels)
 	{
-		int width, height, channels;
+		int width = 0, height = 0, channels = 0;
 
 		stbi_set_flip_vertically_on_load(flip);
 		Buffer data;
@@ -99,7 +110,8 @@ namespace Kerberos
 		stbi_uc* pixels = nullptr;
 		{
 			KBR_PROFILE_SCOPE("TextureImporter::ImportTexture - stbi_load");
-			pixels = stbi_load(filepath.string().c_str(), &width, &height, &channels, STBI_rgb_alpha);
+			const int requestedChannels = desiredChannels > 0 ? std::clamp(desiredChannels, 1, 4) : STBI_rgb_alpha;
+			pixels = stbi_load(filepath.string().c_str(), &width, &height, &channels, requestedChannels);
 		}
 
 		if (pixels == nullptr)
@@ -111,7 +123,7 @@ namespace Kerberos
 
 		KBR_CORE_ASSERT(width > 0 && height > 0, "TextureImporter::ImportTexture - failed to load texture with valid dimensions from filepath: {}", filepath.string());
 
-		constexpr int outputChannels = 4;
+		const int outputChannels = desiredChannels > 0 ? std::clamp(desiredChannels, 1, 4) : 4;
 		data.Size = static_cast<uint64_t>(width) * static_cast<uint64_t>(height) * outputChannels;
 		data.Allocate(data.Size);
 		std::memcpy(data.Data, pixels, data.Size);
@@ -120,7 +132,9 @@ namespace Kerberos
 		TextureSpecification spec;
 		spec.Width = width;
 		spec.Height = height;
-		spec.Format = ImageFormat::RGBA8;
+		spec.Format = outputChannels == 1 ? ImageFormat::R8 :
+			(outputChannels == 2 ? ImageFormat::RG8 :
+			(outputChannels == 3 ? ImageFormat::RGB8 : ImageFormat::RGBA8));
 
 		return std::make_pair(spec, std::move(data));
 	}

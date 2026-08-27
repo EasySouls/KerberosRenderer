@@ -5,6 +5,7 @@
 #include "Asset.hpp"
 #include "AssetMetadata.hpp"
 
+#include <string>
 namespace Kerberos
 {
 	class AssetRegistry
@@ -43,6 +44,7 @@ namespace Kerberos
 		auto end() const { return m_Registry.cend(); }
 
 	private:
+		static std::string NormalizePath(const std::filesystem::path& path);
 		std::map<AssetHandle, AssetMetadata> m_Registry;
 	};
 }

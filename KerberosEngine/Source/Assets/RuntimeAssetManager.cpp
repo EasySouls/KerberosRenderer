@@ -1,27 +1,56 @@
 #include "kbrpch.hpp"
 #include "RuntimeAssetManager.hpp"
+#include "Runtime/RuntimeAssetLoader.hpp"
 
-#include <stdexcept>
+#include <utility>
 
-namespace Kerberos
+namespace Kerberos {
+
+RuntimeAssetManager::RuntimeAssetManager(const AssetRegistry& registry,
+	std::filesystem::path assetRoot, std::filesystem::path libraryRoot)
 {
-	Ref<Asset> RuntimeAssetManager::GetAsset(AssetHandle handle)
-	{
-		throw std::runtime_error("RuntimeAssetManager::GetAsset is not implemented yet!");
-	}
+	Configure(registry, std::move(assetRoot), std::move(libraryRoot));
+}
 
-	bool RuntimeAssetManager::IsAssetHandleValid(AssetHandle handle) const
-	{
-		throw std::runtime_error("RuntimeAssetManager::IsAssetHandleValid is not implemented yet!");
-	}
+void RuntimeAssetManager::Configure(const AssetRegistry& registry,
+	std::filesystem::path assetRoot, std::filesystem::path libraryRoot)
+{
+	m_Registry = &registry;
+	m_Resolver.Configure(m_Registry, std::move(assetRoot), std::move(libraryRoot));
+	m_LoadedAssets.clear();
+}
 
-	bool RuntimeAssetManager::IsAssetLoaded(AssetHandle handle) const
-	{
-		throw std::runtime_error("RuntimeAssetManager::IsAssetLoaded is not implemented yet!");
-	}
+Ref<Asset> RuntimeAssetManager::GetAsset(AssetHandle handle)
+{
+	if (!IsAssetHandleValid(handle))
+		return nullptr;
+	if (const auto it = m_LoadedAssets.find(handle); it != m_LoadedAssets.end())
+		return it->second;
+	const auto location = m_Resolver.Resolve(handle);
+	if (!location)
+		return nullptr;
+	auto asset = RuntimeAssetLoader::Load(handle, location->Metadata, location->Path);
+	if (asset)
+		m_LoadedAssets.emplace(handle, asset);
+	return asset;
+}
 
-	AssetType RuntimeAssetManager::GetAssetType(AssetHandle handle) const
-	{
-		throw std::runtime_error("RuntimeAssetManager::GetAssetyType is not implemented yet!");
-	}
+bool RuntimeAssetManager::IsAssetHandleValid(const AssetHandle handle) const
+{
+	return handle.IsValid() && m_Registry && m_Registry->Contains(handle);
+}
+
+bool RuntimeAssetManager::IsAssetLoaded(const AssetHandle handle) const
+{
+	return handle.IsValid() && m_LoadedAssets.contains(handle);
+}
+
+AssetType RuntimeAssetManager::GetAssetType(const AssetHandle handle) const
+{
+	if (!handle.IsValid() || !m_Registry || !m_Registry->Contains(handle))
+		return AssetType::Texture2D;
+
+	return m_Registry->Get(handle).Type;
+}
+
 }

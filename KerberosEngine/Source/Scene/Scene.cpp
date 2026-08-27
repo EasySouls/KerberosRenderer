@@ -6,6 +6,7 @@
 #include "Components/PhysicsComponents.hpp"
 #include "Components/AudioComponents.hpp"
 #include "Components/ParticleComponents.hpp"
+#include "Components/AnimationComponents.hpp"
 #include "Application.hpp"
 #include "Assets/AssetManager.hpp"
 #include "Assets/Prefab.hpp"
@@ -217,63 +218,78 @@ Entity Scene::InstantiatePrefab(const AssetHandle prefabHandle, const std::strin
 		return {};
 	}
 
-	// Map old UUIDs from the prefab template to new instance UUIDs
-	std::unordered_map<UUID, UUID> uuidMapping;
-	std::unordered_map<UUID, Entity> entityMapping;
+	std::unordered_map<PrefabLocalIndex, Entity> entityMapping;
+	std::unordered_map<UUID, PrefabLocalIndex> legacyIndices;
 
 	const std::string resolvedRootName = rootName.empty() ? prefab->GetName() : rootName;
 
-	// First pass: create all entities with new UUIDs
-	for (const auto& prefabEntity : prefab->Entities)
+	for (PrefabLocalIndex i = 0; i < prefab->Entities.size(); ++i)
 	{
-		const UUID newUUID = UUID();
-		uuidMapping[prefabEntity.ID] = newUUID;
-
-		Entity newEntity = CreateEntityWithUUID(prefabEntity.Tag, newUUID);
-		entityMapping[prefabEntity.ID] = newEntity;
-
-		// Restore transform
+		const auto& prefabEntity = prefab->Entities[i];
+		const auto local = prefabEntity.LocalIndex == InvalidPrefabLocalIndex ? i : prefabEntity.LocalIndex;
+		if (prefabEntity.ID.IsValid()) legacyIndices[prefabEntity.ID] = local;
+		Entity newEntity = CreateEntity(prefabEntity.Name.empty() ? prefabEntity.Tag : prefabEntity.Name);
+		entityMapping[local] = newEntity;
 		auto& transform = newEntity.GetComponent<TransformComponent>();
-		transform.Translation = prefabEntity.Translation;
-		transform.Rotation = prefabEntity.EulerRotation;
-		transform.Scale = prefabEntity.Scale;
-
-		// If this entity has a static mesh, attempt to resolve and attach it
-		if (prefabEntity.HasStaticMesh && !prefabEntity.MeshAssetPath.empty())
-		{
-			// For now, we store asset paths as relative paths and need to resolve them
-			// TODO: implement proper asset path resolution
-			// For now, we just create the component without assets - they should be saved with handles instead
-			auto& smc = newEntity.AddComponent<StaticMeshComponent>();
-			// TODO: resolve mesh and material handles from paths
+		transform.Translation = prefabEntity.Transform.Translation;
+		transform.Rotation = prefabEntity.Transform.Rotation;
+		transform.Scale = prefabEntity.Transform.Scale;
+		transform.WorldTransform = glm::mat4(1.0f);
+		if (prefabEntity.SkeletalMesh) {
+			auto& c = newEntity.AddComponent<SkeletalMeshComponent>();
+			c.MeshAsset = prefabEntity.SkeletalMesh->MeshAsset; c.SkeletonAsset = prefabEntity.SkeletalMesh->SkeletonAsset;
+			c.MaterialAsset = prefabEntity.SkeletalMesh->MaterialAsset; c.Visible = prefabEntity.SkeletalMesh->Visible; c.CastShadows = prefabEntity.SkeletalMesh->CastShadows;
+		}
+		if (prefabEntity.Animation) {
+			auto& c = newEntity.AddComponent<AnimationComponent>();
+			c.AnimationAsset = prefabEntity.Animation->AnimationAsset; c.PlaybackSpeed = prefabEntity.Animation->PlaybackSpeed;
+			c.IsLooping = prefabEntity.Animation->Loop; c.IsPlaying = prefabEntity.Animation->AutoPlay; c.CurrentTime = 0.0f;
+		}
+		if (prefabEntity.Skin) {
+			auto& c = newEntity.AddComponent<SkinComponent>();
+			c.SkeletonAsset = prefabEntity.Skin->SkeletonAsset; c.JointMatrices.clear();
+		}
+		if (prefabEntity.RigidBody) {
+			auto& c = newEntity.AddComponent<RigidBody3DComponent>(*prefabEntity.RigidBody);
+			c.RuntimeBody = nullptr; c.IsDirty = true;
+		}
+		if (prefabEntity.BoxCollider) {
+			auto& c = newEntity.AddComponent<BoxCollider3DComponent>(*prefabEntity.BoxCollider);
+			c.RuntimeCollider = nullptr;
+		}
+		if (prefabEntity.SphereCollider) {
+			auto& c = newEntity.AddComponent<SphereCollider3DComponent>(*prefabEntity.SphereCollider);
+			c.RuntimeCollider = nullptr;
+		}
+		if (prefabEntity.CapsuleCollider) {
+			auto& c = newEntity.AddComponent<CapsuleCollider3DComponent>(*prefabEntity.CapsuleCollider);
+			c.RuntimeCollider = nullptr;
 		}
 	}
 
-	// Second pass: establish hierarchy relationships
-	for (const auto& prefabEntity : prefab->Entities)
+	for (size_t i = 0; i < prefab->Entities.size(); ++i)
 	{
-		const UUID oldUUID = prefabEntity.ID;
-		const UUID newUUID = uuidMapping[oldUUID];
-		Entity newEntity = entityMapping[oldUUID];
-
-		// Handle parent-child relationships
-		if (prefabEntity.Parent.IsValid() && uuidMapping.contains(prefabEntity.Parent))
+		const auto& prefabEntity = prefab->Entities[i];
+		const auto local = prefabEntity.LocalIndex == InvalidPrefabLocalIndex ? static_cast<PrefabLocalIndex>(i) : prefabEntity.LocalIndex;
+		Entity child = entityMapping[local];
+		auto parentLocal = prefabEntity.ParentLocalIndex;
+		if (parentLocal == InvalidPrefabLocalIndex && prefabEntity.Parent.IsValid() && legacyIndices.contains(prefabEntity.Parent))
+			parentLocal = legacyIndices[prefabEntity.Parent];
+		if (parentLocal != InvalidPrefabLocalIndex && entityMapping.contains(parentLocal))
+			SetParent(child, entityMapping[parentLocal], false);
+		if (child.HasComponent<SkinComponent>())
 		{
-			const UUID newParentUUID = uuidMapping[prefabEntity.Parent];
-			Entity parentEntity = GetEntityByUUID(newParentUUID);
-			if (parentEntity)
-			{
-				SetParent(newEntity, parentEntity, false);
-			}
+			for (auto joint : prefabEntity.Skin->JointEntityIndices)
+				if (entityMapping.contains(joint)) child.GetComponent<SkinComponent>().JointEntities.push_back(entityMapping[joint].GetUUID());
+			for (const auto& jointId : prefabEntity.Skin->JointEntityIDs)
+				if (legacyIndices.contains(jointId)) child.GetComponent<SkinComponent>().JointEntities.push_back(entityMapping[legacyIndices[jointId]].GetUUID());
 		}
-		else if (prefabEntity.Parent == prefab->RootEntityID || !prefabEntity.Parent.IsValid())
-		{
-			// This is a root-level entity in the prefab, mark it for later reparenting to the instance root
-		}
+		if (child.HasComponent<RigidBody3DComponent>()) child.GetComponent<RigidBody3DComponent>().RuntimeBody = nullptr;
 	}
 
-	// Find or identify the root entity in the new instance
-	Entity instanceRoot = entityMapping[prefab->RootEntityID];
+	PrefabLocalIndex rootLocal = prefab->RootLocalIndex;
+	if (rootLocal == InvalidPrefabLocalIndex && legacyIndices.contains(prefab->RootEntityID)) rootLocal = legacyIndices[prefab->RootEntityID];
+	Entity instanceRoot = entityMapping.contains(rootLocal) ? entityMapping[rootLocal] : Entity{};
 	if (instanceRoot)
 	{
 		// Rename the root to match the resolved name
@@ -1193,6 +1209,21 @@ Entity Scene::InstantiatePrefab(const AssetHandle prefabHandle, const std::strin
 
 	template <>
 	void Scene::OnComponentAdded<TransformComponent>(Entity, TransformComponent&)
+	{
+	}
+
+	template <>
+	void Scene::OnComponentAdded<SkinComponent>(Entity, SkinComponent&)
+	{
+	}
+
+	template <>
+	void Scene::OnComponentAdded<SkeletalMeshComponent>(Entity, SkeletalMeshComponent&)
+	{
+	}
+
+	template <>
+	void Scene::OnComponentAdded<AnimationComponent>(Entity, AnimationComponent&)
 	{
 	}
 

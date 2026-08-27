@@ -4,6 +4,7 @@
 
 #include <cstdint>
 #include <string>
+#include <vector>
 
 namespace Kerberos {
 
@@ -33,6 +34,8 @@ struct SubAssetMetaEntry
 
 struct AssetMetaFile
 {
+    static constexpr uint32_t CurrentSchemaVersion = 1;
+    uint32_t SchemaVersion = CurrentSchemaVersion;
     /* The source asset file handle */
     AssetHandle SourceHandle = AssetHandle::Invalid();
     ImporterType ImporterType = ImporterType::None;

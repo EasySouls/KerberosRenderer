@@ -609,9 +609,9 @@ namespace Kerberos
 
 	void EditorLayer::OpenScene(const Ref<Scene> &scene)
 	{
-		const auto &[Type, Filepath] = Project::GetActive()->GetEditorAssetManager()->GetMetadata(scene->GetHandle());
+        const auto& metadata = Project::GetActive()->GetEditorAssetManager()->GetMetadata(scene->GetHandle());
 
-		OpenScene(Filepath);
+		OpenScene(metadata.Filepath);
 	}
 
 	void EditorLayer::NewScene()

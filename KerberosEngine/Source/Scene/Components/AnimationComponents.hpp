@@ -6,7 +6,7 @@
 #include "Renderer/SkeletalMesh.hpp"
 #include "Scene/AABB.hpp"
 
-#include <glm/mat4.hpp>
+#include <glm/glm.hpp>
 
 #include <vector>
 
@@ -20,7 +20,7 @@ struct SkinComponent
 
     SkinComponent() = default;
     explicit SkinComponent(const AssetHandle& skeletonAsset) : SkeletonAsset(skeletonAsset) {}
-}
+};
 
 struct SkeletalMeshComponent
 {
@@ -39,8 +39,9 @@ struct AnimationComponent
     AssetHandle AnimationAsset = AssetHandle::Invalid();
 
     float CurrentTime = 0.0f;
+    float PlaybackSpeed = 1.0f;
     bool IsPlaying = false;
-    bool IsLooping = false;
+    bool IsLooping = true;
 };
 
 }

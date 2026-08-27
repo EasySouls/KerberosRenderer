@@ -731,9 +731,9 @@ void HierarchyPanel::DrawComponents(const Entity entity)
                             std::string materialLabel = "No material selected";
                             if (value != UUID::Invalid()) {
                                 const Ref<Material> material = AssetManager::GetAsset<Material>(UUID(value));
-                                const auto& [Type, Filepath] =
+                                const auto& metadata =
                                     Project::GetActive()->GetEditorAssetManager()->GetMetadata(material->GetHandle());
-                                materialLabel = Filepath.filename().string();
+                                materialLabel = metadata.Filepath.filename().string();
                             }
                             ImGui::Text("%s: %s", name.c_str(), materialLabel.c_str());
 
@@ -761,9 +761,9 @@ void HierarchyPanel::DrawComponents(const Entity entity)
                             if (value != UUID::Invalid()) {
                                 const Ref<Mesh> mesh = AssetManager::ResolveMeshAsset(UUID(value));
                                 if (mesh && AssetManager::IsAssetHandleValid(UUID(value))) {
-                                    const auto& [Type, Filepath] =
+                                    const auto& metadata =
                                         Project::GetActive()->GetEditorAssetManager()->GetMetadata(UUID(value));
-                                    meshLabel = Filepath.filename().string();
+                                    meshLabel = metadata.Filepath.filename().string();
                                 }
                             }
                             ImGui::Text("%s: %s", name.c_str(), meshLabel.c_str());
@@ -908,9 +908,9 @@ void HierarchyPanel::DrawComponents(const Entity entity)
                             std::string materialLabel = "No material selected";
                             if (value != UUID::Invalid()) {
                                 const Ref<Material> material = AssetManager::GetAsset<Material>(UUID(value));
-                                const auto& [Type, Filepath] =
+                                const auto& metadata =
                                     Project::GetActive()->GetEditorAssetManager()->GetMetadata(material->GetHandle());
-                                materialLabel = Filepath.filename().string();
+                                materialLabel = metadata.Filepath.filename().string();
                             }
                             ImGui::Text("%s: %s", fieldName.c_str(), materialLabel.c_str());
 
@@ -938,9 +938,9 @@ void HierarchyPanel::DrawComponents(const Entity entity)
                             if (value != UUID::Invalid()) {
                                 const Ref<Mesh> mesh = AssetManager::ResolveMeshAsset(UUID(value));
                                 if (mesh && AssetManager::IsAssetHandleValid(UUID(value))) {
-                                    const auto& [Type, Filepath] =
+                                    const auto& metadata =
                                         Project::GetActive()->GetEditorAssetManager()->GetMetadata(UUID(value));
-                                    meshLabel = Filepath.filename().string();
+                                    meshLabel = metadata.Filepath.filename().string();
                                 }
                             }
                             ImGui::Text("%s: %s", fieldName.c_str(), meshLabel.c_str());
@@ -1185,9 +1185,9 @@ void HierarchyPanel::DrawComponents(const Entity entity)
             std::string meshLabel = "None";
             if (staticMesh.StaticMesh) {
                 if (AssetManager::IsAssetHandleValid(staticMesh.StaticMesh->GetHandle())) {
-                    const auto& [Type, Filepath] =
+                    const auto& metadata =
                         Project::GetActive()->GetEditorAssetManager()->GetMetadata(staticMesh.StaticMesh->GetHandle());
-                    meshLabel = Filepath.filename().string();
+                    meshLabel = metadata.Filepath.filename().string();
                 }
                 else {
                     meshLabel = "Invalid Mesh";
@@ -1216,9 +1216,8 @@ void HierarchyPanel::DrawComponents(const Entity entity)
             std::string materialLabel = "None";
             if (staticMesh.MeshMaterial) {
                 if (AssetManager::IsAssetHandleValid(staticMesh.MeshMaterial->GetHandle())) {
-                    const auto& [Type, Filepath] = Project::GetActive()->GetEditorAssetManager()->GetMetadata(
-                        staticMesh.MeshMaterial->GetHandle());
-                    materialLabel = Filepath.filename().string();
+                    const auto& metadata = Project::GetActive()->GetEditorAssetManager()->GetMetadata(staticMesh.MeshMaterial->GetHandle());
+                    materialLabel = metadata.Filepath.filename().string();
                 }
                 else {
                     materialLabel = "Invalid Material";
@@ -1442,9 +1441,9 @@ void HierarchyPanel::DrawComponents(const Entity entity)
             std::string meshLabel = "None";
             if (collider.Mesh) {
                 if (AssetManager::IsAssetHandleValid(collider.Mesh->GetHandle())) {
-                    const auto& [Type, Filepath] =
+                    const auto& metadata =
                         Project::GetActive()->GetEditorAssetManager()->GetMetadata(collider.Mesh->GetHandle());
-                    meshLabel = Filepath.filename().string();
+                    meshLabel = metadata.Filepath.filename().string();
                 }
                 else {
                     meshLabel = "Invalid Mesh";
@@ -1761,9 +1760,8 @@ void HierarchyPanel::DrawComponents(const Entity entity)
 
             std::string textureLabel = "None";
             if (AssetManager::IsAssetHandleValid(particleEmitter.ParticleTexture)) {
-                const auto& [Type, Filepath] =
-                    Project::GetActive()->GetEditorAssetManager()->GetMetadata(particleEmitter.ParticleTexture);
-                textureLabel = Filepath.filename().string();
+                const auto& metadata = Project::GetActive()->GetEditorAssetManager()->GetMetadata(particleEmitter.ParticleTexture);
+                textureLabel = metadata.Filepath.filename().string();
             }
             else {
                 textureLabel = "Invalid Texture";

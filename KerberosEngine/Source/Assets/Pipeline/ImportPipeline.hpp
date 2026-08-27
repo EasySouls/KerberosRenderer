@@ -21,6 +21,7 @@ struct BuiltSubAsset
     AssetType Type;
     std::filesystem::path LibraryRelPath;
     std::string SubAssetKey;
+    std::vector<AssetHandle> Dependencies;
 };
 
 struct ImportResult

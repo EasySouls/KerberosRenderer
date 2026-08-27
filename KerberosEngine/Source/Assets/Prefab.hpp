@@ -1,44 +1,22 @@
 #pragma once
 
-#include "Assets/Asset.hpp"
-#include "Core/UUID.hpp"
-#include <string>
-#include <vector>
-#include <glm/glm.hpp>
+#include "Assets/Formats/PrefabAsset.hpp"
 
 namespace Kerberos
 {
-	struct PrefabEntityData
-	{
-		UUID ID;
-		std::string Tag;
-
-		glm::vec3 Translation = glm::vec3(0.0f);
-		glm::vec3 EulerRotation = glm::vec3(0.0f);
-		glm::vec3 Scale = glm::vec3(1.0f);
-
-		UUID Parent = UUID::Invalid();
-		std::vector<UUID> Children;
-
-		// Optional: StaticMeshComponent reference
-		std::string MeshAssetPath;
-		std::string MaterialAssetPath;
-		bool HasStaticMesh = false;
-	};
+	using PrefabEntityData = PrefabEntityTemplate;
 
 	class Prefab : public Asset
 	{
 	public:
-		Prefab() = default;
-		~Prefab() override = default;
-
 		AssetType GetType() override { return AssetType::Prefab; }
 
 		const std::string& GetName() const { return Name; }
 		void SetName(const std::string& name) { Name = name; }
 
 		std::string Name;
-		UUID RootEntityID = UUID::Invalid();
+		PrefabLocalIndex RootLocalIndex = InvalidPrefabLocalIndex;
+		UUID RootEntityID = UUID::Invalid(); // legacy prefab reference
 		std::vector<PrefabEntityData> Entities;
 	};
 }

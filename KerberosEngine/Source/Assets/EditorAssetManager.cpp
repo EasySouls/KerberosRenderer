@@ -2,15 +2,84 @@
 #include "EditorAssetManager.hpp"
 
 #include "Assets/Importers/AssetImporter.hpp"
+#include "Assets/Importers/IAssetImporter.hpp"
+#include "Assets/Importers/GltfSceneImporter.hpp"
+#include "Assets/Formats/NativeAssetSerializer.hpp"
 #include "Project/Project.hpp"
+#include "Application.hpp"
 #include "ModelLoader.hpp"
 
 #include <yaml-cpp/yaml.h>
+#include <algorithm>
+#include <cctype>
 #include <fstream>
 #include <map>
+#include <ranges>
 
 namespace Kerberos
 {
+	namespace
+	{
+		class GltfPipelineImporter final : public IAssetImporter
+		{
+		public:
+			bool SupportsExtension(const std::string_view extension) const override
+			{
+				return extension == ".gltf" || extension == ".glb";
+			}
+			ImportResult Import(const ImportContext& context) override
+			{
+				GltfSceneManifest manifest;
+				if (!GltfSceneImporter::Import(context.SourceAbsolutePath, context.CacheRootAbsolutePath, &manifest))
+					throw std::runtime_error("Failed to build glTF scene");
+				ImportResult result;
+				result.SourceHandle = context.Meta.SourceHandle.IsValid() ? context.Meta.SourceHandle : AssetHandle();
+				if (!result.SourceHandle.IsValid())
+					result.SourceHandle = AssetHandle();
+				std::error_code ec;
+				for (const auto& entry : std::filesystem::recursive_directory_iterator(context.CacheRootAbsolutePath, ec))
+				{
+					if (ec || !entry.is_regular_file() || entry.path().extension() != ".kbrmesh" && entry.path().extension() != ".kbrmaterial" && entry.path().extension() != ".kbrtexture" && entry.path().extension() != ".kbrskeleton" && entry.path().extension() != ".kbranimation" && entry.path().extension() != ".kbrprefab")
+						continue;
+					NativeAssetRecord record;
+					AssetType type = AssetType::Prefab;
+					if (entry.path().extension() == ".kbrmesh") {
+						type = AssetType::Mesh;
+						record.LocalKey = "mesh:" + entry.path().stem().string().substr(5);
+					} else {
+						if (!NativeAssetSerializer::DeserializeRecord(entry.path(), record))
+							continue;
+						if (record.Kind == "material") type = AssetType::Material;
+						else if (record.Kind == "texture") type = AssetType::Texture2D;
+						else if (record.Kind == "skeleton") type = AssetType::Skin;
+						else if (record.Kind == "animation") type = AssetType::Animation;
+					}
+					AssetHandle handle = AssetHandle::Invalid();
+					for (const auto& old : context.Meta.SubAssets)
+						if (old.LocalKey == record.LocalKey) { handle = old.Handle; break; }
+					if (!handle.IsValid()) handle = AssetHandle();
+					result.Outputs.push_back({ handle, type, std::filesystem::relative(entry.path(), context.CacheRootAbsolutePath, ec), record.LocalKey, {} });
+				}
+				for (auto& output : result.Outputs)
+				{
+					if (output.Type == AssetType::Material)
+					{
+						for (const auto& candidate : result.Outputs)
+							if (candidate.Type == AssetType::Texture2D && candidate.Handle.IsValid())
+								output.Dependencies.push_back(candidate.Handle);
+					}
+					else if (output.Type == AssetType::Prefab)
+					{
+						for (const auto& candidate : result.Outputs)
+							if (candidate.Type == AssetType::Mesh || candidate.Type == AssetType::Material || candidate.Type == AssetType::Skin || candidate.Type == AssetType::Animation)
+								if (candidate.Handle.IsValid()) output.Dependencies.push_back(candidate.Handle);
+					}
+				}
+				return result;
+			}
+			ImporterType Type() const override { return ImporterType::GLTFScene; }
+		};
+	}
 	static const std::map<std::string_view, AssetType> assetExtensionMap = {
 		{ ".png", AssetType::Texture2D },
 		{ ".jpg", AssetType::Texture2D },
@@ -32,7 +101,10 @@ namespace Kerberos
 
 	static AssetType AssetTypeFromFileExtension(const std::filesystem::path& filepath)
 	{
-		const std::string extension = filepath.extension().string();
+		std::string extension = filepath.extension().string();
+		std::ranges::transform(extension, extension.begin(), [](unsigned char c) {
+			return static_cast<char>(std::tolower(c));
+		});
 		const std::string_view extensionView(extension);
 
 		if (assetExtensionMap.contains(extensionView))
@@ -44,9 +116,14 @@ namespace Kerberos
 		return AssetType::Texture2D;
 	}
 
-	EditorAssetManager::EditorAssetManager()
+	EditorAssetManager::EditorAssetManager(const std::filesystem::path& assetsRoot, const std::filesystem::path& cacheRoot)
 	{
 		AssetImporter::Init();
+
+		if (!assetsRoot.empty())
+		{
+			ConfigurePipeline(assetsRoot, cacheRoot);
+		}
 
 		m_DefaultFont = CreateRef<Font>("InterRegular", "Assets/Fonts/Inter/Inter_18pt-Regular.ttf");
 
@@ -62,9 +139,98 @@ namespace Kerberos
 		m_DefaultCubeMesh = CreateRef<Mesh>(ModelLoader::LoadModel("Assets/Models/cube.gltf", None));
 	}
 
+	void EditorAssetManager::ConfigurePipeline(const std::filesystem::path& assetsRoot, const std::filesystem::path& cacheRoot)
+	{
+		m_AssetsRoot = std::filesystem::absolute(assetsRoot);
+		m_CacheRoot = cacheRoot.empty() ? m_AssetsRoot / "Cache" : std::filesystem::absolute(cacheRoot);
+		std::error_code ec;
+		std::filesystem::create_directories(m_AssetsRoot, ec);
+		std::filesystem::create_directories(m_CacheRoot, ec);
+		m_MetaService = std::make_unique<AssetMetaService>(m_AssetsRoot);
+		m_ImporterRegistry.Register(std::make_shared<GltfPipelineImporter>());
+		m_BuildCoordinator = std::make_unique<AssetBuildCoordinator>(
+			m_AssetsRoot, m_CacheRoot, *m_MetaService, m_ImporterRegistry, &m_AssetRegistry);
+
+		std::unordered_set<std::string> extensions;
+		for (const auto& extension : assetExtensionMap | std::views::keys)
+			extensions.emplace(extension);
+
+		const auto lifetime = m_Lifetime;
+
+		m_FileWatch.Start(m_AssetsRoot, extensions, [this, lifetime](const AssetFileEvent& event) {
+			Application::Get().SubmitToMainThreadQueue([this, lifetime, event] {
+				if (lifetime->load())
+					HandleAssetFileEvent(event);
+			});
+		});
+	}
+
+	void EditorAssetManager::EnsureAssetMetas() const
+    {
+		if (!m_MetaService || m_AssetsRoot.empty())
+			return;
+
+        constexpr AssetSourceScanner scanner;
+		const auto files = scanner.ScanForAssets(m_AssetsRoot, { ".gltf", ".glb" });
+		for (const auto& file : files)
+		{
+			auto meta = m_MetaService->EnsureMetaForSource(file);
+			const auto relativeFile = std::filesystem::relative(file, m_AssetsRoot);
+			if (!meta.SourceHandle.IsValid() &&
+				(m_AssetRegistry.ContainsPath(file) || m_AssetRegistry.ContainsPath(relativeFile)))
+			{
+				meta.SourceHandle = m_AssetRegistry.ContainsPath(file)
+					? m_AssetRegistry.GetHandle(file) : m_AssetRegistry.GetHandle(relativeFile);
+				m_MetaService->SaveMeta(file, meta);
+			}
+		}
+	}
+
+	std::vector<AssetBuildReport> EditorAssetManager::BuildAssets(const bool force) const
+    {
+		if (!m_BuildCoordinator || m_AssetsRoot.empty())
+			return {};
+        constexpr AssetSourceScanner scanner;
+		const auto files = scanner.ScanForAssets(m_AssetsRoot, { ".gltf", ".glb" });
+		return m_BuildCoordinator->BuildAll(files, force);
+	}
+
 	EditorAssetManager::~EditorAssetManager() 
 	{
+		m_Lifetime->store(false);
+		m_FileWatch.Stop();
 		KBR_CORE_TRACE("EditorAssetManager destructed");
+	}
+
+	void EditorAssetManager::HandleAssetFileEvent(const AssetFileEvent& event)
+	{
+		if (!m_BuildCoordinator)
+			return;
+
+		const auto relative = std::filesystem::relative(event.Path, m_AssetsRoot);
+		if (event.Type == AssetFileEventType::Removed)
+		{
+			if (m_AssetRegistry.ContainsPath(relative))
+			{
+				const auto handle = m_AssetRegistry.GetHandle(relative);
+				m_LoadedAssets.erase(handle);
+				m_AssetRegistry.Remove(handle);
+				SerializeAssetRegistry();
+			}
+			return;
+		}
+
+		if (event.Type == AssetFileEventType::Renamed &&
+			m_AssetRegistry.ContainsPath(std::filesystem::relative(event.OldPath, m_AssetsRoot)))
+		{
+			const auto handle = m_AssetRegistry.GetHandle(
+				std::filesystem::relative(event.OldPath, m_AssetsRoot));
+			m_AssetRegistry.Get(handle).Filepath = relative;
+		}
+
+		const auto report = m_BuildCoordinator->Build(event.Path, event.Type == AssetFileEventType::Modified);
+		if (report.Built)
+			SerializeAssetRegistry();
 	}
 
 	Ref<Asset> EditorAssetManager::GetAsset(const AssetHandle handle)
@@ -127,8 +293,7 @@ namespace Kerberos
 			KBR_CORE_ERROR("Invalid asset handle: {0}", handle);
 			throw std::runtime_error("Invalid asset handle when getting asset type!");
 		}
-		const auto& [Type, Filepath] = GetMetadata(handle);
-		return Type;
+		return GetMetadata(handle).Type;
 	}
 
 	AssetHandle EditorAssetManager::ImportAsset(const std::filesystem::path& filepath)
@@ -154,7 +319,7 @@ namespace Kerberos
 
 		/// Assign generated handle to asset
 		asset->GetHandle() = handle;
-		m_AssetRegistry[handle] = metadata;
+		m_AssetRegistry.Add(handle, metadata);
 		m_LoadedAssets[handle] = asset;
 
 		SerializeAssetRegistry();
@@ -191,12 +356,15 @@ namespace Kerberos
 
 	void EditorAssetManager::SerializeAssetRegistry()
 	{
-		const std::filesystem::path& assetDirectoryPath = Project::GetAssetDirectory();
+		const std::filesystem::path assetDirectoryPath = m_AssetsRoot.empty()
+			? (Project::GetProjectDirectory() / Project::GetAssetDirectory())
+			: m_AssetsRoot;
 		const std::filesystem::path assetRegistryPath = assetDirectoryPath / "AssetRegistry.kbrar";
 
 		YAML::Emitter out;
 		{
 			out << YAML::BeginMap;
+			out << YAML::Key << "SchemaVersion" << YAML::Value << 1;
 			out << YAML::Key << "AssetRegistry" << YAML::Value << YAML::BeginSeq;
 
 			for (const auto& [handle, metadata] : m_AssetRegistry)
@@ -205,6 +373,17 @@ namespace Kerberos
 				out << YAML::Key << "Handle" << YAML::Value << handle;
 				out << YAML::Key << "Type" << YAML::Value << AssetTypeToString(metadata.Type);
 				out << YAML::Key << "Path" << YAML::Value << metadata.Filepath.string();
+				if (!metadata.LibraryPath.empty())
+					out << YAML::Key << "LibraryPath" << YAML::Value << metadata.LibraryPath.string();
+				out << YAML::Key << "RootSourceHandle" << YAML::Value << static_cast<uint64_t>(metadata.RootSourceHandle);
+				out << YAML::Key << "ParentHandle" << YAML::Value << static_cast<uint64_t>(metadata.ParentHandle);
+				out << YAML::Key << "SubAssetKey" << YAML::Value << metadata.SubAssetKey;
+				out << YAML::Key << "ImportVersion" << YAML::Value << metadata.ImportVersion;
+				if (!metadata.Dependencies.empty()) {
+					out << YAML::Key << "Dependencies" << YAML::Value << YAML::BeginSeq;
+					for (const auto dependency : metadata.Dependencies) out << static_cast<uint64_t>(dependency);
+					out << YAML::EndSeq;
+				}
 				out << YAML::EndMap;
 			}
 
@@ -223,8 +402,15 @@ namespace Kerberos
 
 	bool EditorAssetManager::DeserializeAssetRegistry()
 	{
-		const std::filesystem::path& assetDirectoryPath = Project::GetAssetDirectory();
+		const std::filesystem::path assetDirectoryPath = m_AssetsRoot.empty()
+			? (Project::GetProjectDirectory() / Project::GetAssetDirectory())
+			: m_AssetsRoot;
 		const std::filesystem::path assetRegistryPath = assetDirectoryPath / "AssetRegistry.kbrar";
+		if (!std::filesystem::exists(assetRegistryPath))
+		{
+			KBR_CORE_INFO("No asset registry found; it will be created as assets are imported.");
+			return false;
+		}
 
 		YAML::Node data;
 		try
@@ -268,16 +454,19 @@ namespace Kerberos
 			const std::filesystem::path filepath = assetNode["Path"].as<std::string>();
 
 			const AssetType type = AssetTypeFromString(typeStr);
-			// TODO: This check is not needed when every asset type is supported
-			if (type == AssetType::Texture2D || type == AssetType::TextureCube || type == AssetType::Mesh || type == AssetType::Sound || type == AssetType::Model || type == AssetType::Material || type == AssetType::Prefab || type == AssetType::Animation)
-			{
-				m_AssetRegistry.Add(handle, { .Type = type, .Filepath = filepath });
-			}
-			else
-			{
-				KBR_CORE_WARN("Unsupported asset type: {0}", typeStr);
-				KBR_CORE_ASSERT(false, "Unsupported asset type");
-			}
+
+			AssetMetadata metadata{ .Type = type, .Filepath = filepath };
+			if (assetNode["LibraryPath"]) metadata.LibraryPath = assetNode["LibraryPath"].as<std::string>();
+			if (assetNode["RootSourceHandle"]) metadata.RootSourceHandle = AssetHandle(assetNode["RootSourceHandle"].as<uint64_t>());
+			if (assetNode["ParentHandle"]) metadata.ParentHandle = AssetHandle(assetNode["ParentHandle"].as<uint64_t>());
+			if (assetNode["SubAssetKey"]) metadata.SubAssetKey = assetNode["SubAssetKey"].as<std::string>();
+			if (assetNode["ImportVersion"]) metadata.ImportVersion = assetNode["ImportVersion"].as<uint64_t>();
+			if (assetNode["Dependencies"])
+				for (const auto& dependency : assetNode["Dependencies"])
+					metadata.Dependencies.push_back(AssetHandle(dependency.as<uint64_t>()));
+
+			m_AssetRegistry.Add(handle, metadata);
+
 		}
 
 		KBR_CORE_INFO("Asset registry loaded from {0}", assetRegistryPath.string());

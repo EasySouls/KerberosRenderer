@@ -25,9 +25,12 @@ namespace Kerberos
 
 			/// Initialize the asset manager for the project
 			/// TODO: Load Editor or Runtime Asset Manager based on the project type
-			const Ref<EditorAssetManager> editorAssetManager = CreateRef<EditorAssetManager>();
+			const auto assetsRoot = projectToLoad->m_ProjectDirectory / projectToLoad->m_Info.AssetDirectory;
+			const Ref<EditorAssetManager> editorAssetManager = CreateRef<EditorAssetManager>(assetsRoot, assetsRoot / "Cache");
 			s_ActiveProject->m_AssetManager = editorAssetManager;
 			editorAssetManager->DeserializeAssetRegistry();
+			editorAssetManager->EnsureAssetMetas();
+			editorAssetManager->BuildAssets();
 
 			return s_ActiveProject;
 		}
@@ -68,7 +71,20 @@ namespace Kerberos
 		m_Info = info;
 
 		/// The project info has changed, so we might need to update the assets
-		s_ActiveProject->m_AssetManager = CreateRef<EditorAssetManager>();
+		const auto assetsRoot = s_ActiveProject->m_ProjectDirectory / info.AssetDirectory;
+		s_ActiveProject->m_AssetManager = CreateRef<EditorAssetManager>(assetsRoot, assetsRoot / "Cache");
+		std::dynamic_pointer_cast<EditorAssetManager>(s_ActiveProject->m_AssetManager)->EnsureAssetMetas();
+	}
+
+	Ref<RuntimeAssetManager> Project::UseRuntimeAssetManager()
+	{
+		const auto editor = std::dynamic_pointer_cast<EditorAssetManager>(m_AssetManager);
+		if (!editor)
+			return std::dynamic_pointer_cast<RuntimeAssetManager>(m_AssetManager);
+		auto runtime = CreateRef<RuntimeAssetManager>(
+			editor->GetAssetRegistry(), editor->GetAssetsRoot(), editor->GetCacheRoot());
+		m_AssetManager = runtime;
+		return runtime;
 	}
 
 	void Project::ReleaseActiveProjectResources() 

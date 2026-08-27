@@ -14,6 +14,8 @@
 #include <queue>
 #include <functional>
 #include <filesystem>
+#include <future>
+#include <thread>
 
 
 struct GLFWwindow;
@@ -42,6 +44,11 @@ namespace Kerberos
 	class Application
 	{
 	public:
+		// GPU upload jobs are produced by workers but are always executed by the
+		// render thread with a live Vulkan context. Captures transfer ownership of
+		// any staging data to the queue until the returned completion is signaled.
+		using GPUUploadJob = std::function<void(VulkanContext&)>;
+
 		explicit Application(const ApplicationSpecification& spec);
 		virtual ~Application();
 
@@ -61,6 +68,7 @@ namespace Kerberos
 		void OnEvent(Event& event);
 
 		void SubmitToMainThreadQueue(const std::function<void()>& fn);
+		std::shared_future<void> SubmitToGPUUploadQueue(GPUUploadJob job);
 
 		void BlockEvents(bool shouldBlock);
 
@@ -72,6 +80,7 @@ namespace Kerberos
 
 	private:
 		void ExecuteMainThreadQueue();
+		void ExecuteGPUUploadQueue();
 
 		bool OnWindowClose(const WindowClosedEvent& event);
 
@@ -89,6 +98,16 @@ namespace Kerberos
 
 		std::queue<std::function<void()>> m_MainThreadQueue;
 		std::mutex m_QueueMutex;
+
+		struct GPUUploadQueueEntry
+		{
+			GPUUploadJob Job;
+			std::promise<void> Completion;
+		};
+
+		std::queue<GPUUploadQueueEntry> m_GPUUploadQueue;
+		std::mutex m_GPUUploadQueueMutex;
+		std::thread::id m_RenderThreadId;
 
 		bool m_BlockEvents = false;
 

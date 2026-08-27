@@ -11,33 +11,34 @@
 #include <type_traits>
 #include <memory>
 
-namespace Kerberos
+namespace Kerberos {
+
+class AssetManager
 {
-	class AssetManager
+public:
+	template<typename T>
+		requires std::is_base_of_v<Asset, T>
+	static Ref<T> GetAsset(const AssetHandle handle)
 	{
-	public:
-		template<typename T>
-			requires std::is_base_of_v<Asset, T>
-		static Ref<T> GetAsset(const AssetHandle handle)
-		{
-			const Ref<Asset> asset = Project::GetActive()->GetAssetManager()->GetAsset(handle);
-			return std::static_pointer_cast<T>(asset);
-		}
+		const Ref<Asset> asset = Project::GetActive()->GetAssetManager()->GetAsset(handle);
+		return std::static_pointer_cast<T>(asset);
+	}
 
-		static AssetType GetAssetType(const AssetHandle handle)
-		{
-			return Project::GetActive()->GetAssetManager()->GetAssetType(handle);
-		}
+	static AssetType GetAssetType(const AssetHandle handle)
+	{
+		return Project::GetActive()->GetAssetManager()->GetAssetType(handle);
+	}
 
-		static bool IsAssetHandleValid(const AssetHandle handle)
-		{
-			return Project::GetActive()->GetAssetManager()->IsAssetHandleValid(handle);
-		}
+	static bool IsAssetHandleValid(const AssetHandle handle)
+	{
+		return Project::GetActive()->GetAssetManager()->IsAssetHandleValid(handle);
+	}
 
-		static Ref<Mesh> ResolveMeshAsset(AssetHandle handle);
+	static Ref<Mesh> ResolveMeshAsset(AssetHandle handle);
 
-		static Ref<Texture2D> GetDefaultTexture2D();
-		static Ref<Mesh> GetDefaultCubeMesh();
-		static Ref<Font> GetDefaultFont();
-	};
+	static Ref<Texture2D> GetDefaultTexture2D();
+	static Ref<Mesh> GetDefaultCubeMesh();
+	static Ref<Font> GetDefaultFont();
+};
+
 }

@@ -1,6 +1,8 @@
 #include "kbrpch.hpp"
 #include "AssetRegistry.hpp"
+#include <algorithm>
 #include <ranges>
+#include <cctype>
 
 namespace Kerberos
 {
@@ -30,7 +32,11 @@ namespace Kerberos
 
 	size_t AssetRegistry::Remove(const AssetHandle handle)
 	{
-		return m_Registry.erase(handle);
+		const auto it = m_Registry.find(handle);
+		if (it == m_Registry.end())
+			return 0;
+		m_Registry.erase(it);
+		return 1;
 	}
 
 	void AssetRegistry::Clear()
@@ -45,28 +51,30 @@ namespace Kerberos
 
 	bool AssetRegistry::ContainsPath(const std::filesystem::path& path) const
 	{
-		for (const auto& [Type, Filepath] : m_Registry | std::views::values)
-		{
-			if (Filepath == path)
-			{
+		const auto normalized = NormalizePath(path);
+		for (const auto& [handle, metadata] : m_Registry)
+			if (NormalizePath(metadata.Filepath) == normalized)
 				return true;
-			}
-		}
-
 		return false;
 	}
 
 	AssetHandle AssetRegistry::GetHandle(const std::filesystem::path& path) const
 	{
-		for (const auto& [Handle, Metadata] : m_Registry)
-		{
-			if (Metadata.Filepath == path)
-			{
-				return Handle;
-			}
-		}
+		const auto normalized = NormalizePath(path);
+		for (const auto& [handle, metadata] : m_Registry)
+			if (NormalizePath(metadata.Filepath) == normalized)
+				return handle;
 
 		KBR_CORE_ERROR("AssetRegistry::GetHandle - no handle found for path: {}", path.string());
 		return AssetHandle::Invalid();
+	}
+
+	std::string AssetRegistry::NormalizePath(const std::filesystem::path& path)
+	{
+		std::string value = path.lexically_normal().generic_string();
+		std::ranges::transform(value, value.begin(), [](unsigned char c) {
+			return static_cast<char>(std::tolower(c));
+		});
+		return value;
 	}
 }

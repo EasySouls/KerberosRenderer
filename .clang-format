@@ -62,7 +62,7 @@ IncludeCategories:
     Priority: 1
 
   # Third-party
-  - Regex: '^<(vulkan|glm|entt|Jolt|imgui)/'
+  - Regex: '^<(vulkan|glm|entt|Jolt|imgui|filewatch)/'
     Priority: 2
 
   # Standard library / everything else

@@ -2,12 +2,14 @@
 
 #include "Assets/Asset.hpp"
 #include "Scene/Components.hpp"
+#include "Scene/Components/PhysicsComponents.hpp"
 
 #include <cstdint>
 #include <limits>
 #include <optional>
 #include <string>
 #include <vector>
+#include <glm/glm.hpp>
 
 namespace Kerberos {
 using PrefabLocalIndex = uint32_t;
@@ -17,6 +19,7 @@ struct SkinComponentTemplate
 {
     AssetHandle SkeletonAsset = AssetHandle::Invalid();
     std::vector<PrefabLocalIndex> JointEntityIndices; // prefab-local refs, remapped on instantiate
+    std::vector<UUID> JointEntityIDs; // legacy UUID refs
 };
 
 struct SkeletalMeshComponentTemplate
@@ -39,11 +42,17 @@ struct AnimationComponentTemplate
 struct PrefabEntityTemplate
 {
     PrefabLocalIndex LocalIndex = InvalidPrefabLocalIndex;
+    UUID ID = UUID::Invalid(); // legacy prefab reference
     std::string Name;
+    std::string Tag; // legacy name
     PrefabLocalIndex ParentLocalIndex = InvalidPrefabLocalIndex;
     std::vector<PrefabLocalIndex> Children;
+    UUID Parent = UUID::Invalid(); // legacy prefab reference
+    std::vector<UUID> ChildIDs; // legacy prefab references
 
     TransformComponent Transform;
+    glm::vec3 Translation = glm::vec3(0.0f);
+    glm::vec3 EulerRotation = glm::vec3(0.0f);
 
     std::optional<SkinComponentTemplate> Skin;
     std::optional<SkeletalMeshComponentTemplate> SkeletalMesh;
@@ -52,6 +61,11 @@ struct PrefabEntityTemplate
     std::optional<BoxCollider3DComponent> BoxCollider;
     std::optional<SphereCollider3DComponent> SphereCollider;
     std::optional<CapsuleCollider3DComponent> CapsuleCollider;
+
+    // Legacy static mesh fields are retained for old prefab files.
+    std::string MeshAssetPath;
+    std::string MaterialAssetPath;
+    bool HasStaticMesh = false;
 };
 
 class PrefabAsset : public Asset
