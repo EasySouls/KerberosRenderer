@@ -1,0 +1,40 @@
+name: Build Ninja MSVC with Sccache
+
+on:
+  push:
+    branches: [ "master" ]
+  pull_request:
+    branches: [ "master" ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup MSVC Environment
+        uses: ilammy/msvc-dev-cmd@v1
+
+      - name: Setup CMake and Ninja
+        uses: jwlawson/actions-setup-cmake@v2
+
+      - name: Setup sccache
+        uses: mozilla-actions/sccache-action@v0.0.8
+        with:
+          version: "v0.8.1"
+
+      - name: Configure CMake
+        env:
+          SCCACHE_GHA_ENABLED: "true"
+        run: >
+          cmake --preset ninja-msvc-release
+          -DCMAKE_C_COMPILER_LAUNCHER=sccache
+          -DCMAKE_CXX_COMPILER_LAUNCHER=sccache
+
+      - name: Build Project
+        env:
+          SCCACHE_GHA_ENABLED: "true"
+        run: cmake --build --preset ninja-msvc-release
