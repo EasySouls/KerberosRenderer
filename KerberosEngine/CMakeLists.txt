@@ -77,15 +77,19 @@ target_link_directories(KerberosEngine PRIVATE
 target_link_libraries(KerberosEngine PRIVATE
     ${KBR_VULKAN_DIR}/Lib/vulkan-1.lib
 
-    $<$<CONFIG:Debug>:${KBR_VULKAN_DIR}/Lib/shaderc_sharedd.lib>
-    $<$<CONFIG:Debug>:${KBR_VULKAN_DIR}/Lib/spirv-cross-cored.lib>
-    $<$<CONFIG:Debug>:${KBR_VULKAN_DIR}/Lib/spirv-cross-glsld.lib>
-    $<$<CONFIG:Debug>:${KBR_VULKAN_DIR}/Lib/slangd.lib>
+    $<$<CONFIG:Debug>:
+        ${KBR_VULKAN_DIR}/Lib/shaderc_sharedd.lib
+        ${KBR_VULKAN_DIR}/Lib/spirv-cross-cored.lib
+        ${KBR_VULKAN_DIR}/Lib/spirv-cross-glsld.lib
+        ${KBR_VULKAN_DIR}/Lib/slangd.lib
+    >
 
-    $<$<CONFIG:Release>:${KBR_VULKAN_DIR}/Lib/shaderc_shared.lib>
-    $<$<CONFIG:Release>:${KBR_VULKAN_DIR}/Lib/spirv-cross-core.lib>
-    $<$<CONFIG:Release>:${KBR_VULKAN_DIR}/Lib/spirv-cross-glsl.lib>
-    $<$<CONFIG:Release>:${KBR_VULKAN_DIR}/Lib/slang.lib>
+    $<$<NOT:$<CONFIG:Debug>>:
+        ${KBR_VULKAN_DIR}/Lib/shaderc_shared.lib
+        ${KBR_VULKAN_DIR}/Lib/spirv-cross-core.lib
+        ${KBR_VULKAN_DIR}/Lib/spirv-cross-glsl.lib
+        ${KBR_VULKAN_DIR}/Lib/slang.lib
+    >
 )
 
 # Windows system libs

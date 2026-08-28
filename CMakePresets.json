@@ -77,5 +77,25 @@
         "KBR_ENABLE_THIRDPARTY_INSTRUMENTATION": "OFF"
       }
     }
+  ],
+  "buildPresets": [
+    {
+      "name": "vs2026-debug",
+      "displayName": "VS2026 (Debug)",
+      "configurePreset": "vs2026",
+      "configuration": "Debug"
+    },
+    {
+      "name": "vs2026-release",
+      "displayName": "VS2026 (Release)",
+      "configurePreset": "vs2026",
+      "configuration": "Release"
+    },
+    {
+      "name": "vs2026-relwithdebinfo",
+      "displayName": "VS2026 (RelWithDebInfo)",
+      "configurePreset": "vs2026",
+      "configuration": "RelWithDebInfo"
+    }
   ]
 }
