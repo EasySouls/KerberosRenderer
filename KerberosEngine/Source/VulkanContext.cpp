@@ -905,8 +905,8 @@ namespace Kerberos
 		};
 
 		const vk::ValidationFeaturesEXT validationFeatures{
-			.enabledValidationFeatureCount = static_cast<uint32_t>(std::size(enabledValidationFeatures)),
-			.pEnabledValidationFeatures = enabledValidationFeatures
+			.enabledValidationFeatureCount = static_cast<uint32_t>(enabledValidationFeatures.size()),
+            .pEnabledValidationFeatures = enabledValidationFeatures.data()
 		};
 #else
         constexpr vk::ValidationFeaturesEXT validationFeatures{};
