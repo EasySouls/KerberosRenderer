@@ -3,7 +3,6 @@
 #include "Core/Core.hpp"
 #include "Renderer/Textures/Texture2D.hpp"
 #include "Renderer/Material.hpp"
-#include "Project/Project.hpp"
 #include "EditorWindow.hpp"
 #include "../Notification/NotificationManager.hpp"
 
@@ -11,9 +10,7 @@
 
 #include <filesystem>
 #include <map>
-#include <set>
 #include <unordered_map>
-#include <string_view>
 
 namespace Kerberos
 {
@@ -62,7 +59,7 @@ namespace Kerberos
 		void RenderMaterialEditors();
 		static void DrawMaterialTextureField(const char* label, Ref<Texture2D>& texture);
 
-		std::filesystem::path GetRelativePath(const std::filesystem::path& absolutePath);
+		std::filesystem::path GetRelativePath(const std::filesystem::path& absolutePath) const;
 
 		enum class MaterialPreviewMesh : uint8_t
 		{
@@ -86,33 +83,16 @@ namespace Kerberos
 
 		std::map<std::filesystem::path, Ref<Texture2D>> m_AssetImages;
 
-		struct TreeNode
+		struct ContentItem
 		{
 			std::filesystem::path Path;
 			AssetHandle Handle = AssetHandle::Invalid();
-
-			uint32_t Parent = static_cast<uint32_t>(-1);
-			std::map<std::filesystem::path, uint32_t> Children;
-
-			explicit TreeNode(std::filesystem::path path, const AssetHandle handle)
-				: Path(std::move(path)), Handle(handle)
-			{
-			}
+			bool IsDirectory = false;
 		};
 
-		std::vector<TreeNode> m_AssetTreeNodes;
-
-		enum class Mode : uint8_t
-		{
-			Asset = 0,
-			Filesystem = 1
-		};
-
-		Mode m_Mode = Mode::Filesystem;
+		std::vector<ContentItem> m_ContentItems;
 
 		std::unordered_map<std::string, MaterialEditorState> m_OpenMaterialEditors;
-
-		std::unordered_map<std::filesystem::path, std::filesystem::path> m_RelativePathCache;
 
 		NotificationManager m_NotificationManager;
 	};

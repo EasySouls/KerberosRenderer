@@ -18,14 +18,25 @@
 
 namespace Kerberos
 {
+	namespace
+	{
+		AssetHandle FindAssetHandle(const std::filesystem::path& path)
+		{
+			const auto relative = std::filesystem::relative(path, Project::GetAssetDirectory());
+			const auto& registry = Project::GetActive()->GetEditorAssetManager()->GetAssetRegistry();
+			for (const auto& [handle, metadata] : registry)
+				if (metadata.Filepath.lexically_normal() == relative.lexically_normal())
+					return handle;
+			return AssetHandle::Invalid();
+		}
+	}
+
 	AssetsPanel::AssetsPanel(NotificationManager notificationManager)
 		: m_AssetsDirectory(Project::GetAssetDirectory()), m_CurrentDirectory(m_AssetsDirectory), m_NotificationManager(
 			std::move(notificationManager))
 	{
 		m_FolderIcon = TextureImporter::ImportTexture("Assets/Editor/directory_icon.png");
 		m_FileIcon = TextureImporter::ImportTexture("Assets/Editor/file_icon.png");
-
-		m_AssetTreeNodes.emplace_back("/", AssetHandle::Invalid());
 
 		RefreshAssetTree();
 	}
@@ -46,27 +57,15 @@ namespace Kerberos
 			if (ImGui::Button("Back"))
 			{
 				m_CurrentDirectory = m_CurrentDirectory.parent_path();
-			}
-		}
-
-		if (m_Mode == Mode::Asset)
-		{
-			ImGui::SameLine();
-			if (ImGui::Button("Refresh"))
-			{
 				RefreshAssetTree();
 			}
-
-			ImGui::SameLine();
-			ImportAssetDialog();
 		}
 
-		const std::string modeLabel = m_Mode == Mode::Asset ? "Assets" : "Folders";
-		if (ImGui::Button(modeLabel.c_str()))
-		{
-			m_Mode = (m_Mode == Mode::Asset) ? Mode::Filesystem : Mode::Asset;
+		ImGui::SameLine();
+		if (ImGui::Button("Refresh"))
 			RefreshAssetTree();
-		}
+		ImGui::SameLine();
+		ImportAssetDialog();
 
 		static float padding = 16.0f;
 		static float thumbnailSize = 64.0f;
@@ -81,187 +80,59 @@ namespace Kerberos
 
 		ImGui::Columns(columns, nullptr, false);
 
-		if (m_Mode == Mode::Asset)
+		for (const auto& item : m_ContentItems)
 		{
-			KBR_PROFILE_SCOPE("AssetsPanel::OnImGuiRender - Asset Mode");
+			const auto& path = item.Path;
+			const std::string fileName = path.filename().string();
+			const auto relativePath = GetRelativePath(path);
 
-			TreeNode* node = m_AssetTreeNodes.data();
+			ImGui::PushID(relativePath.generic_string().c_str());
 
-			//auto currentDir = std::filesystem::relative(m_CurrentDirectory, Project::GetAssetDirectory());
-			for (const auto& p : m_CurrentDirectory)
+			ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.2f, 0.2f, 0.2f, 0.5f));
+
+			if (item.IsDirectory)
 			{
-				if (node->Path == m_CurrentDirectory)
-					break;
-
-				if (node->Children.contains(p))
-				{
-					node = &m_AssetTreeNodes[node->Children[p]];
-				}
-
-			}
-
-			for (const auto& [item, treeNodeIndex] : node->Children)
-			{
-				const bool isDirectory = std::filesystem::is_directory(Project::GetAssetDirectory() / item);
-
-				std::string itemStr = item.generic_string();
-
-				ImGui::PushID(itemStr.c_str());
-				// TODO: Get icon based on asset type
-
-				const Ref<Texture2D> icon = isDirectory ? m_FolderIcon : m_FileIcon;
-				ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0, 0, 0, 0));
-				const uint64_t iconRendererID = VulkanContext::Get().GetImGuiRendererID(icon);
-				ImGui::ImageButton(item.string().c_str(), iconRendererID, { thumbnailSize, thumbnailSize }, { 0, 1 }, { 1, 0 });
-
-				if (ImGui::IsItemHovered() && !isDirectory)
-				{
-					const AssetType assetType = AssetManager::GetAssetType(m_AssetTreeNodes[treeNodeIndex].Handle);
-					const std::string_view assetTypeStr = AssetTypeToString(assetType);
-
-					ImGui::BeginTooltip();
-					ImGui::Text("Name: %s", itemStr.c_str());
-					ImGui::Text("Type: %.*s", static_cast<int>(assetTypeStr.length()), assetTypeStr.data());
-					ImGui::EndTooltip();
-				}
-
-				if (ImGui::BeginPopupContextItem())
-				{
-					if (ImGui::MenuItem("Delete"))
-					{
-						const std::string itemPath = (m_CurrentDirectory / item).string();
-						if (FileOperations::Delete(itemPath.c_str()))
-						{
-							m_NotificationManager.AddNotification("Deleted: " + itemPath, Notification::Type::Info);
-						}
-						else 
-						{
-							m_NotificationManager.AddNotification("Failed to delete: " + itemPath, Notification::Type::Error);
-						}
-					}
-					ImGui::EndPopup();
-				}
-
-				if (!isDirectory)
-				{
-					const AssetHandle handle = m_AssetTreeNodes[treeNodeIndex].Handle;
-					HandleAssetDragAndDrop(handle, item.filename());
-				}
-
-
-				ImGui::PopStyleColor();
+				const uint64_t rendererID = VulkanContext::Get().GetImGuiRendererID(m_FolderIcon);
+				ImGui::ImageButton(fileName.c_str(), rendererID, { thumbnailSize, thumbnailSize }, { 0, 1 }, { 1, 0 });
 				if (ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left))
 				{
-					if (isDirectory)
-						m_CurrentDirectory /= item.filename();
+					m_CurrentDirectory = path;
+					RefreshAssetTree();
 				}
-
-				ImGui::TextWrapped("%s", itemStr.c_str());
-
-				ImGui::NextColumn();
-
-				ImGui::PopID();
+				ShowFolderContextMenu(path);
 			}
-		}
-		else
-		{
-			KBR_PROFILE_SCOPE("AssetsPanel::OnImGuiRender - Filesystem Mode");
-
-			for (const auto& entry : std::filesystem::directory_iterator(m_CurrentDirectory))
+			else
 			{
-				const std::filesystem::path& path = entry.path();
-				//const auto& relativePath = std::filesystem::relative(path, m_AssetsDirectory);
-				const auto& relativePath = GetRelativePath(path);
-				const std::string fileName = relativePath.filename().string();
-
-				ImGui::PushID(path.string().c_str());
-
-				ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.2f, 0.2f, 0.2f, 0.5f));
-
-				if (entry.is_directory())
+				const auto extension = path.extension().string();
+				const bool isImageFile = extension == ".png" || extension == ".jpg" || extension == ".jpeg" ||
+					extension == ".ktx" || extension == ".ktx2";
+				Ref<Texture2D> preview = m_FileIcon;
+				if (isImageFile)
 				{
-					const uint64_t folderRendererID = VulkanContext::Get().GetImGuiRendererID(m_FolderIcon);
-					ImGui::ImageButton(path.string().c_str(), folderRendererID, { thumbnailSize, thumbnailSize }, { 0, 1 }, { 1, 0 });
-					if (ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left))
-					{
-						m_CurrentDirectory /= path.filename();
-					}
-
-					ShowFolderContextMenu(path);
+					if (!m_AssetImages.contains(path))
+						m_AssetImages.emplace(path, TextureImporter::ImportTexture(path.string()));
+					if (m_AssetImages.at(path))
+						preview = m_AssetImages.at(path);
 				}
-				else
+				const uint64_t rendererID = VulkanContext::Get().GetImGuiRendererID(preview);
+				ImGui::ImageButton(fileName.c_str(), rendererID, { thumbnailSize, thumbnailSize }, { 0, 1 }, { 1, 0 });
+				const AssetHandle handle = item.Handle;
+				ShowFileContextMenu(path);
+				if (handle.IsValid())
+					HandleAssetDragAndDrop(handle, path.filename());
+				if (ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left))
 				{
-					const auto fileExtension = path.extension();
-					const bool isImageFile = (fileExtension == ".png" || fileExtension == ".jpg" || fileExtension == ".jpeg" || fileExtension == ".ktx" || fileExtension == ".ktx2");
-					if (isImageFile)
-					{
-						if (!m_AssetImages.contains(path))
-						{
-							/// Load the image and store it in the map
-							const std::string fullPath = path.string();
-							// TODO: Load them asynchronously and show a placeholder until loaded
-							m_AssetImages[path] = TextureImporter::ImportTexture(fullPath);
-						}
-
-						const uint64_t imageRendererID = VulkanContext::Get().GetImGuiRendererID(m_AssetImages[path]);
-						ImGui::ImageButton(path.string().c_str(), imageRendererID, { thumbnailSize, thumbnailSize }, { 0, 1 }, { 1, 0 });
-						if (ImGui::IsItemHovered())
-						{
-							ImGui::BeginTooltip();
-							ImGui::Text("%s", fileName.c_str());
-							ImGui::EndTooltip();
-						}
-					}
-					else
-					{
-						const uint64_t fileRendererID = VulkanContext::Get().GetImGuiRendererID(m_FileIcon);
-						ImGui::ImageButton(path.string().c_str(), fileRendererID, { thumbnailSize, thumbnailSize }, { 0, 1 }, { 1, 0 });
-
-						if (ImGui::IsItemHovered())
-						{
-							ImGui::BeginTooltip();
-							ImGui::Text("%s", fileName.c_str());
-							ImGui::EndTooltip();
-						}
-					}
-
-					ShowFileContextMenu(path);
-
-					if (ImGui::BeginDragDropSource(ImGuiDragDropFlags_None))
-					{
-						const auto itemPath = relativePath.string();
-
-						ImGui::SetDragDropPayload(assetBrowserItem, itemPath.c_str(), itemPath.size() + 1, ImGuiCond_Once);
-						ImGui::Text("%s", fileName.c_str());
-						ImGui::EndDragDropSource();
-					}
-
-					/// Open the file on double click
-					if (ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left))
-					{
-						if (path.extension() == ".kbrmat")
-						{
-							OpenMaterialEditor(path);
-						}
-						else
-						{
-							const bool opened = FileOperations::OpenFile(path.string().c_str());
-							if (!opened)
-							{
-								ImGui::Text("Could not open file: %s", fileName.c_str());
-							}
-						}
-					}
-
+					if ((handle.IsValid() && AssetManager::GetAssetType(handle) == AssetType::Material) ||
+						extension == ".kbrmat" || extension == ".kbrmaterial")
+						OpenMaterialEditor(path);
+					else if (!FileOperations::OpenFile(path.string().c_str()))
+						m_NotificationManager.AddNotification("Could not open file: " + path.string(), Notification::Type::Error);
 				}
-				ImGui::TextWrapped("%s", fileName.c_str());
-
-				ImGui::NextColumn();
-
-				ImGui::PopStyleColor();
-
-				ImGui::PopID();
 			}
+			ImGui::TextWrapped("%s", fileName.c_str());
+			ImGui::NextColumn();
+			ImGui::PopStyleColor();
+			ImGui::PopID();
 		}
 
 
@@ -340,12 +211,20 @@ namespace Kerberos
 				}
 				ImGui::CloseCurrentPopup();
 			}
+            constexpr const char* deleteFolderPopup = "DeleteFolderPopup";
 			if (ImGui::MenuItem("Delete Folder"))
 			{
-				// TODO: Add confirmation dialog!
-				std::filesystem::remove_all(path); // Use remove_all for directories
+                ImGui::OpenPopup(deleteFolderPopup);
+
 				ImGui::CloseCurrentPopup();
 			}
+            if (ImGui::BeginPopupModal(deleteFolderPopup)) { // TODO: Not working as expected, the popup doesn't show up
+                if (ImGui::Button("Confirm Delete")) {
+                    std::filesystem::remove_all(path);
+                }
+
+                ImGui::EndPopup();
+            }
 			ImGui::EndPopup();
 		}
 	}
@@ -412,33 +291,40 @@ namespace Kerberos
 	{
 		KBR_PROFILE_FUNCTION();
 
-		m_AssetTreeNodes.clear();
-		m_AssetTreeNodes.emplace_back("/", AssetHandle::Invalid());
-
-		const AssetRegistry& assetRegistry = Project::GetActive()->GetEditorAssetManager()->GetAssetRegistry();
-		for (const auto& [handle, metadata] : assetRegistry)
+		m_ContentItems.clear();
+		std::error_code error;
+		for (const auto& entry : std::filesystem::directory_iterator(
+			m_CurrentDirectory, std::filesystem::directory_options::skip_permission_denied, error))
 		{
-			uint32_t currentNodeIndex = 0;
-
-			for (const auto& p : metadata.Filepath)
+			if (error)
 			{
-				auto it = m_AssetTreeNodes[currentNodeIndex].Children.find(p.generic_string());
-				if (it != m_AssetTreeNodes[currentNodeIndex].Children.end())
-				{
-					currentNodeIndex = it->second;
-				}
-				else
-				{
-					TreeNode newNode(p, handle);
-					newNode.Parent = currentNodeIndex;
-					m_AssetTreeNodes.push_back(newNode);
-
-					m_AssetTreeNodes[currentNodeIndex].Children[p] = static_cast<uint32_t>(m_AssetTreeNodes.size()) - 1;
-					currentNodeIndex = static_cast<uint32_t>(m_AssetTreeNodes.size()) - 1;
-				}
-
+				error.clear();
+				continue;
 			}
+			const auto relative = std::filesystem::relative(entry.path(), m_AssetsDirectory, error);
+			if (error)
+			{
+				error.clear();
+				continue;
+			}
+			bool hidden = false;
+			for (const auto& component : relative)
+				hidden |= component.string().starts_with('.');
+			if (hidden || (entry.is_directory() && (entry.path().filename() == "Cache" ||
+				entry.path().filename() == "Staging")))
+				continue;
+
+			m_ContentItems.push_back({
+				entry.path(),
+				entry.is_regular_file() ? FindAssetHandle(entry.path()) : AssetHandle::Invalid(),
+				entry.is_directory()
+			});
 		}
+		std::ranges::sort(m_ContentItems, [](const ContentItem& left, const ContentItem& right) {
+			if (left.IsDirectory != right.IsDirectory)
+				return left.IsDirectory > right.IsDirectory;
+			return left.Path.filename().generic_string() < right.Path.filename().generic_string();
+		});
 	}
 
 	void AssetsPanel::OpenMaterialEditor(const std::filesystem::path& materialPath)
@@ -506,13 +392,9 @@ namespace Kerberos
 		}
 	}
 
-	std::filesystem::path AssetsPanel::GetRelativePath(const std::filesystem::path& absolutePath) 
-	{
-		if (!m_RelativePathCache.contains(absolutePath))
-		{
-			m_RelativePathCache[absolutePath] = std::filesystem::relative(absolutePath, m_AssetsDirectory);
-		}
-		return m_RelativePathCache[absolutePath];
+	std::filesystem::path AssetsPanel::GetRelativePath(const std::filesystem::path& absolutePath) const
+    {
+		return std::filesystem::relative(absolutePath, m_AssetsDirectory);
 	}
 
 	void AssetsPanel::RenderMaterialEditors()
@@ -689,6 +571,7 @@ namespace Kerberos
 		if (std::filesystem::exists(path) && std::filesystem::is_directory(path))
 		{
 			m_CurrentDirectory = path;
+			RefreshAssetTree();
 			return;
 		}
 
