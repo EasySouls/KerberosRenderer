@@ -28,9 +28,24 @@ namespace Kerberos
 			const auto assetsRoot = projectToLoad->m_ProjectDirectory / projectToLoad->m_Info.AssetDirectory;
 			const Ref<EditorAssetManager> editorAssetManager = CreateRef<EditorAssetManager>(assetsRoot, assetsRoot / "Cache");
 			s_ActiveProject->m_AssetManager = editorAssetManager;
+
 			editorAssetManager->DeserializeAssetRegistry();
 			editorAssetManager->EnsureAssetMetas();
-			editorAssetManager->BuildAssets();
+			const std::vector<AssetBuildReport> buildReports = editorAssetManager->BuildAssets();
+            for (const auto& report : buildReports) {
+                if (report.Warnings.size() > 0) {
+                    KBR_CORE_WARN("Asset build completed with warnings: {}", report.Source.string());
+                    for (const auto& warning : report.Warnings) {
+                        KBR_CORE_WARN("  - {}", warning);
+                    }
+                }
+                else if (report.Errors.size() > 0) {
+                    KBR_CORE_ERROR("Asset build failed with errors: {}", report.Source.string());
+                    for (const auto& error : report.Errors) {
+                        KBR_CORE_ERROR("  - {}", error);
+                    }
+                }
+            }
 
 			return s_ActiveProject;
 		}
