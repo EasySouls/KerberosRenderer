@@ -896,19 +896,21 @@ namespace Kerberos
 			}
 		}
 
+#ifdef KBR_DEBUG
 		// In debug mode, we would always like to see shader printf's and synchronization validation errors,
 		// the rest is enough to see when configured via the Vulkan Configurator
-		constexpr vk::ValidationFeatureEnableEXT enabledValidationFeatures[] = {
-#ifdef KBR_DEBUG
+		constexpr std::array<vk::ValidationFeatureEnableEXT, 2> enabledValidationFeatures = {
 			vk::ValidationFeatureEnableEXT::eDebugPrintf,
 			vk::ValidationFeatureEnableEXT::eSynchronizationValidation
-#endif
 		};
 
 		const vk::ValidationFeaturesEXT validationFeatures{
 			.enabledValidationFeatureCount = static_cast<uint32_t>(std::size(enabledValidationFeatures)),
 			.pEnabledValidationFeatures = enabledValidationFeatures
 		};
+#else
+        constexpr vk::ValidationFeaturesEXT validationFeatures{};
+#endif
 
 		constexpr uint32_t shaderDebugPrintfBufferSize = 1024 * 1024; // 1 MB
 
