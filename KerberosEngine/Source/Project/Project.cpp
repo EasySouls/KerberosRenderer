@@ -13,6 +13,8 @@ namespace Kerberos
 
 	Ref<Project> Project::Load(const std::filesystem::path& filepath)
 	{
+        KBR_PROFILE_FUNCTION();
+
 		const Ref<Project> projectToLoad = CreateRef<Project>();
 
 		const ProjectSerializer deserializer(projectToLoad);
@@ -55,6 +57,8 @@ namespace Kerberos
 
 	bool Project::SaveActive()
 	{
+        KBR_PROFILE_FUNCTION();
+
 		KBR_CORE_ASSERT(s_ActiveProject, "Active project has not been set!");
 
 		const auto savePath = GetActive()->m_ProjectDirectory / (GetActive()->m_Info.Name + ".kbrproj");
@@ -81,6 +85,8 @@ namespace Kerberos
 
 	void Project::SetInfo(const ProjectInfo& info)
 	{
+        KBR_PROFILE_FUNCTION();
+
 		KBR_CORE_ASSERT(s_ActiveProject, "Active project has not been set!");
 
 		m_Info = info;

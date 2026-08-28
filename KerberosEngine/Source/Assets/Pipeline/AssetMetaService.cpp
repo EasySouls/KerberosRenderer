@@ -13,6 +13,8 @@ AssetMetaService::AssetMetaService(std::filesystem::path assetsRoot) : m_AssetsR
 
 AssetMetaFile AssetMetaService::EnsureMetaForSource(const std::filesystem::path& sourcePath) 
 {
+    KBR_PROFILE_FUNCTION();
+
     if (!std::filesystem::is_regular_file(sourcePath)) {
         KBR_CORE_ERROR("Cannot create meta for missing source: {0}", sourcePath.string());
         return {};
@@ -35,6 +37,8 @@ AssetMetaFile AssetMetaService::EnsureMetaForSource(const std::filesystem::path&
 
 std::optional<AssetMetaFile> AssetMetaService::LoadMeta(const std::filesystem::path& sourcePath) const 
 {
+    KBR_PROFILE_FUNCTION();
+
     const auto metaPath = MetaPathFor(sourcePath);
     if (!std::filesystem::exists(metaPath)) {
         KBR_CORE_WARN("Meta file does not exist for source: {0}", sourcePath.string());
@@ -73,6 +77,8 @@ std::optional<AssetMetaFile> AssetMetaService::LoadMeta(const std::filesystem::p
 
 bool AssetMetaService::SaveMeta(const std::filesystem::path& sourcePath, const AssetMetaFile& meta) 
 {
+    KBR_PROFILE_FUNCTION();
+
     YAML::Emitter out;
     out << YAML::BeginMap
         << YAML::Key << "SchemaVersion" << YAML::Value << AssetMetaFile::CurrentSchemaVersion
@@ -94,6 +100,8 @@ bool AssetMetaService::SaveMeta(const std::filesystem::path& sourcePath, const A
 
 bool AssetMetaService::RebindMetaOnRename(const std::filesystem::path& oldPath, const std::filesystem::path& newPath) 
 {
+    KBR_PROFILE_FUNCTION();
+
     const auto oldMeta = MetaPathFor(oldPath);
     const auto newMeta = MetaPathFor(newPath);
     std::error_code ec;
@@ -112,12 +120,16 @@ bool AssetMetaService::RebindMetaOnRename(const std::filesystem::path& oldPath, 
 
 std::filesystem::path AssetMetaService::MetaPathFor(const std::filesystem::path& sourcePath) 
 {
+    KBR_PROFILE_FUNCTION();
+
     std::filesystem::path metaPath = sourcePath;
     return metaPath.replace_extension(".meta");
 }
 
 std::string AssetMetaService::ComputeSourceHash(const std::filesystem::path& sourcePath) 
 {
+    KBR_PROFILE_FUNCTION();
+
     std::ifstream file(sourcePath, std::ios::binary);
     if (!file.is_open()) return {};
     uint64_t hash = 14695981039346656037ull;
@@ -133,8 +145,10 @@ std::string AssetMetaService::ComputeSourceHash(const std::filesystem::path& sou
     return result.str();
 }
 
-bool AssetMetaService::WriteAtomic(const std::filesystem::path& filePath, const std::string& content) 
+bool AssetMetaService::WriteAtomic(const std::filesystem::path& filePath, const std::string& content) const
 {
+    KBR_PROFILE_FUNCTION();
+
     std::scoped_lock _(m_Mutex);
     std::error_code ec;
     std::filesystem::create_directories(filePath.parent_path(), ec);
@@ -160,6 +174,8 @@ bool AssetMetaService::WriteAtomic(const std::filesystem::path& filePath, const 
 
 std::optional<std::string> AssetMetaService::ReadFileText(const std::filesystem::path& path) const 
 {
+    KBR_PROFILE_FUNCTION();
+
     std::scoped_lock _(m_Mutex);
 
     std::ifstream file(path, std::ios::binary);

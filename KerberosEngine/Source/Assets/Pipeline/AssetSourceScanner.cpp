@@ -20,6 +20,8 @@ AssetSourceScanner::ScanResult AssetSourceScanner::Scan(const std::filesystem::p
                                                         const std::vector<std::string>& extensions,
                                                         const ScanOptions options)
 {
+    KBR_PROFILE_FUNCTION();
+
     ScanResult result;
 
     if (!std::filesystem::exists(directory) || !std::filesystem::is_directory(directory)) {

@@ -35,7 +35,7 @@ public:
     static std::string ComputeSourceHash(const std::filesystem::path& sourcePath);
 
 private:
-    bool WriteAtomic(const std::filesystem::path& filePath, const std::string& content);
+    bool WriteAtomic(const std::filesystem::path& filePath, const std::string& content) const;
     std::optional<std::string> ReadFileText(const std::filesystem::path& path) const;
 
 private:

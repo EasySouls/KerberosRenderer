@@ -48,6 +48,8 @@ namespace Kerberos
 
 	void EditorLayer::OnAttach()
 	{
+        KBR_PROFILE_FUNCTION();
+
 		KBR_CORE_INFO("EditorLayer attached!");
 
 		constexpr bool isTesting = true;
@@ -257,6 +259,8 @@ namespace Kerberos
 
 	void EditorLayer::OnEvent(Event &event)
 	{
+        KBR_PROFILE_FUNCTION();
+
 		m_EditorCamera->OnEvent(event);
 
 		m_HierarchyPanel.OnEvent(event);
@@ -271,6 +275,8 @@ namespace Kerberos
 
 	void EditorLayer::OnImGuiRender()
 	{
+        KBR_PROFILE_FUNCTION();
+
 		static bool dockspaceOpen = true;
 		static ImGuiDockNodeFlags dockspaceFlags = ImGuiDockNodeFlags_None;
 
@@ -386,6 +392,8 @@ namespace Kerberos
 
 	void EditorLayer::HandleDragAndDrop()
 	{
+        KBR_PROFILE_FUNCTION();
+
 		if (ImGui::BeginDragDropTarget())
 		{
 			if (const ImGuiPayload *payload = ImGui::AcceptDragDropPayload(assetBrowserItem))
@@ -471,6 +479,8 @@ namespace Kerberos
 
 	void EditorLayer::NewProject()
 	{
+        KBR_PROFILE_FUNCTION();
+
 		/// Choose location for the new project
 		// const std::string filepathString = FileDialog::SaveFile("Kerberos Project (*.kbrproj)\0*.kbrproj\0");
 
@@ -496,6 +506,8 @@ namespace Kerberos
 
 	void EditorLayer::OpenProject(const std::filesystem::path &filepath)
 	{
+        KBR_PROFILE_FUNCTION();
+
 		if (const auto project = Project::Load(filepath))
 		{
 			const auto startScenePath = Project::GetAssetDirectory() / project->GetInfo().StartScenePath;
@@ -507,6 +519,8 @@ namespace Kerberos
 
 	bool EditorLayer::OpenProject()
 	{
+        KBR_PROFILE_FUNCTION();
+
 		const std::string filepathString = FileDialog::OpenFile("Kerberos Project (*.kbrproj)\0*.kbrproj\0");
 
 		if (filepathString.empty())
@@ -539,6 +553,8 @@ namespace Kerberos
 
 	void EditorLayer::SaveScene()
 	{
+        KBR_PROFILE_FUNCTION();
+
 		const bool canSave = CanSaveScene();
 		if (!canSave)
 			return;
