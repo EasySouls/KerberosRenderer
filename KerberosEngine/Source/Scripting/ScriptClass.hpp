@@ -3,6 +3,7 @@
 #include <string>
 #include <array>
 #include <cstddef>
+#include <unordered_map>
 
 namespace Kerberos
 {

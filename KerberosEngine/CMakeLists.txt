@@ -6,19 +6,33 @@ add_subdirectory(ThirdParty)
 add_library(KerberosEngine STATIC)
 
 # Collect only Source files
-file(GLOB_RECURSE ENGINE_SRC CMAKE_CONFIGURE_DEPENDS
+file(GLOB_RECURSE ENGINE_REGULAR_SOURCES CMAKE_CONFIGURE_DEPENDS
     "${CMAKE_CURRENT_SOURCE_DIR}/Source/*.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/Source/*.h"
     "${CMAKE_CURRENT_SOURCE_DIR}/Source/*.hpp"
+)
+
+file (GLOB_RECURSE ENGINE_MODULE_SOURCES CMAKE_CONFIGURE_DEPENDS
+    "${CMAKE_CURRENT_SOURCE_DIR}/Source/*.cppm"
     "${CMAKE_CURRENT_SOURCE_DIR}/Source/*.ixx"
 )
 
-source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}/Source" PREFIX "Source" FILES ${ENGINE_SRC})
+source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}/Source" PREFIX "Source" FILES ${ENGINE_REGULAR_SOURCES})
 
-target_sources(KerberosEngine PRIVATE ${ENGINE_SRC})
+target_sources(KerberosEngine PRIVATE ${ENGINE_REGULAR_SOURCES})
 
-# Precompiled header
-target_precompile_headers(KerberosEngine PRIVATE Source/kbrpch.hpp)
+source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}/Source" PREFIX "Source" FILES ${ENGINE_MODULE_SOURCES})
+
+target_sources(KerberosEngine
+    PUBLIC
+    FILE_SET CXX_MODULES
+        BASE_DIRS "${CMAKE_CURRENT_SOURCE_DIR}/Source"
+        FILES ${ENGINE_MODULE_SOURCES})
+
+# Precompiled header is intentionally disabled during the mixed module/header migration.
+# Legacy TUs continue to use the old header path, while module TUs are kept isolated
+# from the legacy PCH to avoid duplicate standard-library and logger declarations.
+# target_precompile_headers(KerberosEngine PRIVATE Source/kbrpch.hpp)
 
 # Include directories
 target_include_directories(KerberosEngine
@@ -40,6 +54,7 @@ target_compile_definitions(KerberosEngine PUBLIC
     GLFW_INCLUDE_NONE
     IMGUI_DOCKING_BRANCH
     KBR_USE_MINIAUDIO
+    NOMINMAX
 )
 
 # Enable these later, but a few libraries are compiled as part of the engine that have warnings

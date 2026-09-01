@@ -3,6 +3,8 @@
 #include "Core/Core.hpp"
 #include "Assets/Asset.hpp"
 
+#include <string>
+
 namespace Kerberos
 {
 	class Sound : public Asset

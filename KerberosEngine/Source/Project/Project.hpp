@@ -27,28 +27,21 @@ namespace Kerberos
 		/**
 		* Returns the path to the active project's asset directory.
 		*/
-		static const std::filesystem::path& GetAssetDirectory()
-		{
-			KBR_CORE_ASSERT(s_ActiveProject, "An active project is not set!");
+		static const std::filesystem::path& GetAssetDirectory();
 
-			return s_ActiveProject->m_Info.AssetDirectory;
-		}
+        /**
+         * Returns the path to the active project's root directory.
+         */
+        static const std::filesystem::path& GetProjectDirectory();
 
-		static const std::filesystem::path& GetProjectDirectory()
-		{
-			KBR_CORE_ASSERT(s_ActiveProject, "An active project is not set!");
+        /**
+         * @brief Returns the full filesystem path for an asset within the active project.
+         * @param assetPath The path to the asset relative to the project's asset directory.
+         * @return The full filesystem path to the asset.
+         */
+        static std::filesystem::path GetAssetFileSystemPath(const std::filesystem::path& assetPath);
 
-			return s_ActiveProject->m_ProjectDirectory;
-		}
-
-		static std::filesystem::path GetAssetFileSystemPath(const std::filesystem::path& assetPath)
-		{
-			KBR_CORE_ASSERT(s_ActiveProject, "An active project is not set!");
-
-			return GetProjectDirectory() / GetAssetDirectory() / assetPath;
-		}
-
-		void SetInfo(const ProjectInfo& info);
+        void SetInfo(const ProjectInfo& info);
 
 		ProjectInfo& GetInfo() { return m_Info; }
 

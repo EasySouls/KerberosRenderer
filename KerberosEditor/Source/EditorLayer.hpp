@@ -19,6 +19,8 @@
 #include "Events/MouseButtonPressedEvent.hpp"
 #include "Events/WindowDropEvent.hpp"
 
+#include <glm/glm.hpp>
+
 #include <string>
 #include <vector>
 #include <array>
@@ -141,7 +143,7 @@ namespace Kerberos
 
 		Owner<Camera> m_EditorCamera = nullptr;
 		// Size of the ImGui viewport.
-		glm::vec2 m_ViewportSize{ 0.f };
+		glm::vec2 m_ViewportSize{ 0.0f };
 
 		std::unordered_map<std::string, Ref<Mesh>> m_Meshes;
 		std::optional<Mesh> m_SkyboxMesh;

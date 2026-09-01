@@ -1,12 +1,14 @@
 #include "AssetSourceScanner.hpp"
-
-#include "kbrpch.hpp"
+#include "Core/Core.hpp"
+#include "Profiling/Instrumentor.hpp"
 
 #include <algorithm>
 #include <string_view>
 #include <cctype>
 #include <unordered_set>
 #include <ranges>
+
+import Kerberos;
 
 namespace Kerberos {
 

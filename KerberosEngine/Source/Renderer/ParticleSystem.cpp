@@ -1,15 +1,18 @@
 #include "ParticleSystem.hpp"
+#include "Core/Core.hpp"
 
 #include "DescriptorManager.hpp"
 #include "DescriptorWriter.hpp"
 #include "Scene/Components/ParticleComponents.hpp"
 #include "Scene/Scene.hpp"
 #include "VulkanContext.hpp"
-#include "kbrpch.hpp"
+#include "Profiling/Instrumentor.hpp"
 
 #include <array>
 #include <format>
 #include <glm/gtc/random.hpp>
+
+import Kerberos;
 
 namespace {
 struct alignas(16) GPUParticle
@@ -231,11 +234,15 @@ void ParticleSystem::Update(const Ref<Scene>& scene,
 
             if (AssetManager::IsAssetHandleValid(lastTextureHandle)) {
                 const auto& texture = AssetManager::GetAsset<Texture2D>(lastTextureHandle);
-                KBR_CORE_ASSERT(texture, "Particle texture is invalid for entity {}", static_cast<uint64_t>(entity));
+                KBRAssert(texture != nullptr, "Particle texture is invalid for entity {}",static_cast<uint64_t>(entity));
 
                 float frameWidth = static_cast<float>(texture->width) / emitter.SubUVGrid.x;
                 float frameHeight = static_cast<float>(texture->height) / emitter.SubUVGrid.y;
                 float aspect = frameWidth / frameHeight;
+
+                KBRAssert(aspect > 0.0f,
+                          "Particle texture has invalid aspect ratio for entity {}",
+                          static_cast<uint64_t>(entity));
 
                 req.FrameAspect = aspect;
                 req.TextureIndex = 0; // TODO: Bindless
@@ -254,7 +261,7 @@ void ParticleSystem::Update(const Ref<Scene>& scene,
 
         std::memcpy(m_SpawnRequestBuffers[frameIndex].GetMappedData(), activeRequests.data(), dataSize);
 
-        // KBR_CORE_INFO("ParticleSystem: Spawning {} particles in {} requests", totalParticlesToSpawn, requestCount);
+        // Log::CoreInfo("ParticleSystem: Spawning {} particles in {} requests", totalParticlesToSpawn, requestCount);
 
         if (lastTextureHandle.IsValid()) {
             if (const auto& texture = AssetManager::GetAsset<Texture2D>(lastTextureHandle)) {
@@ -604,7 +611,7 @@ void ParticleSystem::AllocateParticleFrameBuffers()
                             &buffer,
                             &m_ParticleFrameBuffers[i].allocation,
                             nullptr) != VK_SUCCESS)
-            KBR_CORE_ASSERT(false, "Failed to create indirect draw buffer!");
+            KBRAssert(false, "Failed to create indirect draw buffer!");
 
         m_ParticleFrameBuffers[i].Handle = vk::Buffer(buffer);
         vmaMapMemory(VulkanContext::Get().GetAllocator().get(),
@@ -621,7 +628,7 @@ void ParticleSystem::AllocateParticleFrameBuffers()
 
 void ParticleSystem::AllocateDescriptorBuffers()
 {
-    KBR_CORE_ASSERT(*m_ParticleBuffersLayout != nullptr && *m_SpawnRequestsLayout != nullptr,
+    KBRAssert(*m_ParticleBuffersLayout != nullptr && *m_SpawnRequestsLayout != nullptr,
                     "Descriptor Set Layouts must be created before allocating descriptor buffers!");
 
     auto& context = VulkanContext::Get();
@@ -706,7 +713,7 @@ void ParticleSystem::AllocateDescriptorBuffers()
                             &buffer,
                             &m_DescriptorBuffers[i].allocation,
                             nullptr) != VK_SUCCESS)
-            KBR_CORE_ASSERT(false, "Failed to create indirect draw buffer!");
+            KBRAssert(false, "Failed to create indirect draw buffer!");
 
         m_DescriptorBuffers[i].Handle = vk::Buffer(buffer);
         vmaMapMemory(VulkanContext::Get().GetAllocator().get(),
@@ -843,7 +850,7 @@ void ParticleSystem::AllocateIndirectDrawBuffers()
                             &buffer,
                             &m_IndirectDrawBuffers[i].allocation,
                             nullptr) != VK_SUCCESS)
-            KBR_CORE_ASSERT(false, "Failed to create indirect draw buffer!");
+            KBRAssert(false, "Failed to create indirect draw buffer!");
 
         m_IndirectDrawBuffers[i].Handle = vk::Buffer(buffer);
         vmaMapMemory(VulkanContext::Get().GetAllocator().get(),

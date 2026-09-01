@@ -1,9 +1,11 @@
-#include "kbrpch.hpp"
 #include "VMA.hpp"
 #include "Utils/VulkanHelpers.hpp"
 
+
 #define VMA_IMPLEMENTATION
 #include "vma/vk_mem_alloc.h"
+
+import Kerberos;
 
 namespace Kerberos::VMA
 {
@@ -23,8 +25,8 @@ namespace Kerberos::VMA
 		VmaAllocator allocator;
 		if (const VkResult result = vmaCreateAllocator(&allocatorCi, &allocator); result != VK_SUCCESS)
 		{
-			KBR_CORE_ERROR("Failed to create vma allocator: {}", VulkanHelpers::VkResultToString(static_cast<vk::Result>(result)));
-			KBR_CORE_ASSERT(false, "Failed to create Vulkan Memory Allocator: {}", VulkanHelpers::VkResultToString(static_cast<vk::Result>(result)));
+			Log::CoreError("Failed to create vma allocator: {}", VulkanHelpers::VkResultToString(static_cast<vk::Result>(result)));
+			KBRAssert(false, "Failed to create Vulkan Memory Allocator: {}", VulkanHelpers::VkResultToString(static_cast<vk::Result>(result)));
 			return {};
 		}
 

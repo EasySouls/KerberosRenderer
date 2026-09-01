@@ -1,4 +1,3 @@
-#include "kbrpch.hpp"
 #include "MaterialImporter.hpp"
 #include "TextureImporter.hpp"
 #include "Assets/AssetManager.hpp"
@@ -8,6 +7,8 @@
 
 #include <yaml-cpp/yaml.h>
 #include <fstream>
+
+import Kerberos;
 
 namespace Kerberos
 {
@@ -27,7 +28,7 @@ namespace Kerberos
 		}
 		catch (const YAML::Exception& e)
 		{
-			KBR_CORE_ERROR("MaterialImporter::ImportMaterial - Failed to load yaml file: {}", e.what());
+			Log::CoreError("MaterialImporter::ImportMaterial - Failed to load yaml file: {}", e.what());
 			return nullptr;
 		}
 
@@ -71,14 +72,14 @@ namespace Kerberos
 			/*const AssetHandle textureHandle = assetManager->ImportAsset(resolvedPath);
 			if (!textureHandle.IsValid())
 			{
-				KBR_CORE_WARN("MaterialImporter::ImportMaterial - Failed to import texture: {}", resolvedPath.string());
+				Log::CoreWarn("MaterialImporter::ImportMaterial - Failed to import texture: {}", resolvedPath.string());
 				return nullptr;
 			}*/
 
 			const AssetHandle textureHandle = assetManager->ImportAsset(texturePath);
 			if (!textureHandle.IsValid())
 			{
-				KBR_CORE_WARN("MaterialImporter::ImportMaterial - Failed to import texture: {}", texturePath);
+				Log::CoreWarn("MaterialImporter::ImportMaterial - Failed to import texture: {}", texturePath);
 				return nullptr;
 			}
 
@@ -136,7 +137,7 @@ namespace Kerberos
 		std::ofstream file(filepath);
 		if (!file.is_open())
 		{
-			KBR_CORE_ERROR("MaterialImporter::SaveMaterial - Failed to open file for writing: {}", filepath.string());
+			Log::CoreError("MaterialImporter::SaveMaterial - Failed to open file for writing: {}", filepath.string());
 			return false;
 		}
 

@@ -1,7 +1,8 @@
-#include "kbrpch.hpp"
 #include "MeshImporter.hpp"
 
 #include <fstream>
+
+import Kerberos;
 
 namespace Kerberos
 {
@@ -15,7 +16,7 @@ namespace Kerberos
 		std::ifstream in(filepath, std::ios::binary);
 		if (!in.is_open())
 		{
-			KBR_CORE_ERROR("MeshImporter: failed to open mesh file {}", filepath.string());
+			Log::CoreError("MeshImporter: failed to open mesh file {}", filepath.string());
 			return nullptr;
 		}
 

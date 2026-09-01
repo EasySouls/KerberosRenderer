@@ -1,6 +1,9 @@
-#include "kbrpch.hpp"
 #include "Project.hpp"
+#include "Core/Core.hpp"
+#include "Profiling/Instrumentor.hpp"
 #include "Serialization/ProjectSerializer.hpp"
+
+import Kerberos;
 
 namespace Kerberos
 {
@@ -23,7 +26,7 @@ namespace Kerberos
 			const auto absolutePath = std::filesystem::absolute(filepath);
 			projectToLoad->m_ProjectDirectory = absolutePath.parent_path();
 			s_ActiveProject = projectToLoad;
-			KBR_CORE_INFO("Project is loaded from {}", absolutePath.string());
+			Log::CoreInfo("Project is loaded from {}", absolutePath.string());
 
 			/// Initialize the asset manager for the project
 			/// TODO: Load Editor or Runtime Asset Manager based on the project type
@@ -36,15 +39,15 @@ namespace Kerberos
 			const std::vector<AssetBuildReport> buildReports = editorAssetManager->BuildAssets();
             for (const auto& report : buildReports) {
                 if (report.Warnings.size() > 0) {
-                    KBR_CORE_WARN("Asset build completed with warnings: {}", report.Source.string());
+                    Log::CoreWarn("Asset build completed with warnings: {}", report.Source.string());
                     for (const auto& warning : report.Warnings) {
-                        KBR_CORE_WARN("  - {}", warning);
+                        Log::CoreWarn("  - {}", warning);
                     }
                 }
                 else if (report.Errors.size() > 0) {
-                    KBR_CORE_ERROR("Asset build failed with errors: {}", report.Source.string());
+                    Log::CoreError("Asset build failed with errors: {}", report.Source.string());
                     for (const auto& error : report.Errors) {
-                        KBR_CORE_ERROR("  - {}", error);
+                        Log::CoreError("  - {}", error);
                     }
                 }
             }
@@ -59,7 +62,7 @@ namespace Kerberos
 	{
         KBR_PROFILE_FUNCTION();
 
-		KBR_CORE_ASSERT(s_ActiveProject, "Active project has not been set!");
+		KBRAssert(s_ActiveProject != nullptr, "Active project has not been set!");
 
 		const auto savePath = GetActive()->m_ProjectDirectory / (GetActive()->m_Info.Name + ".kbrproj");
 
@@ -67,7 +70,7 @@ namespace Kerberos
 		if (serializer.Serialize(savePath))
 		{
 			s_ActiveProject->m_ProjectDirectory = savePath.parent_path();
-			KBR_CORE_INFO("Project is saved to {}", std::filesystem::absolute(savePath).string());
+			Log::CoreInfo("Project is saved to {}", std::filesystem::absolute(savePath).string());
 
 			if (const auto editorAssetManager = std::dynamic_pointer_cast<EditorAssetManager>(s_ActiveProject->m_AssetManager))
 			{
@@ -78,16 +81,37 @@ namespace Kerberos
 		}
 		else
 		{
-			KBR_CORE_WARN("Could not save project to {}", std::filesystem::absolute(savePath).string());
+			Log::CoreWarn("Could not save project to {}", std::filesystem::absolute(savePath).string());
 			return false;
 		}
 	}
 
-	void Project::SetInfo(const ProjectInfo& info)
+    const std::filesystem::path& Project::GetAssetDirectory()
+    {
+        KBRAssert(s_ActiveProject != nullptr, "An active project is not set!");
+
+        return s_ActiveProject->m_Info.AssetDirectory;
+    }
+
+    const std::filesystem::path& Project::GetProjectDirectory()
+    {
+        KBRAssert(s_ActiveProject != nullptr, "An active project is not set!");
+
+        return s_ActiveProject->m_ProjectDirectory;
+    }
+
+    std::filesystem::path Project::GetAssetFileSystemPath(const std::filesystem::path& assetPath)
+    {
+        KBRAssert(s_ActiveProject != nullptr, "An active project is not set!");
+
+        return GetProjectDirectory() / GetAssetDirectory() / assetPath;
+    }
+
+    void Project::SetInfo(const ProjectInfo& info)
 	{
         KBR_PROFILE_FUNCTION();
 
-		KBR_CORE_ASSERT(s_ActiveProject, "Active project has not been set!");
+		KBRAssert(s_ActiveProject != nullptr, "Active project has not been set!");
 
 		m_Info = info;
 

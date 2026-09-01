@@ -10,12 +10,13 @@
 #include "Scripting/ScriptEngine.hpp"
 #include "Scripting/ScriptUtils.hpp"
 #include "SerializationUtils.hpp"
-#include "kbrpch.hpp"
 
 #include <glm/glm.hpp>
 
 #include <fstream>
 #include <yaml-cpp/yaml.h>
+
+import Kerberos;
 
 namespace Kerberos {
 
@@ -380,7 +381,7 @@ void SceneSerializer::Serialize(const std::filesystem::path& filepath) const
         std::error_code ec;
         std::filesystem::create_directories(parentDir, ec);
         if (ec) {
-            KBR_CORE_ERROR("Could not create directory {0}: {1}", parentDir.string(), ec.message());
+            Log::CoreError("Could not create directory {0}: {1}", parentDir.string(), ec.message());
         }
     }
 
@@ -389,7 +390,7 @@ void SceneSerializer::Serialize(const std::filesystem::path& filepath) const
         fileOut.close();
     }
     else {
-        KBR_CORE_ERROR("Could not open file {0} for writing!", filepath.string());
+        Log::CoreError("Could not open file {0} for writing!", filepath.string());
     }
 }
 
@@ -406,7 +407,7 @@ bool SceneSerializer::Deserialize(const std::filesystem::path& filepath) const
 
     YAML::Node data = YAML::Load(stream.str());
     if (!data["Scene"]) {
-        KBR_CORE_ERROR("Invalid Scene file {0}", filepath.string());
+        Log::CoreError("Invalid Scene file {0}", filepath.string());
         return false;
     }
 
@@ -632,7 +633,7 @@ bool SceneSerializer::Deserialize(const std::filesystem::path& filepath) const
                     staticMesh.StaticMesh = AssetManager::ResolveMeshAsset(meshHandle);
                 }
                 else {
-                    KBR_CORE_WARN("AssetHandle for mesh is invalid, using default cube mesh.");
+                    Log::CoreWarn("AssetHandle for mesh is invalid, using default cube mesh.");
                     staticMesh.StaticMesh = AssetManager::GetDefaultCubeMesh();
                 }
             }

@@ -1,9 +1,10 @@
-#include "kbrpch.hpp"
 #include "PrefabSerializer.hpp"
 
 #include <yaml-cpp/yaml.h>
 #include <fstream>
 #include <unordered_map>
+
+import Kerberos;
 
 namespace Kerberos
 {
@@ -96,7 +97,7 @@ namespace Kerberos
 		if (!std::filesystem::exists(filepath)) return nullptr;
 		YAML::Node root;
 		try { root = YAML::LoadFile(filepath.string()); }
-		catch (const YAML::Exception& e) { KBR_CORE_ERROR("Prefab YAML parse failed: {}", e.what()); return nullptr; }
+		catch (const YAML::Exception& e) { Log::CoreError("Prefab YAML parse failed: {}", e.what()); return nullptr; }
 		if (!root["Prefab"] || !root["Entities"]) return nullptr;
 
 		auto prefab = CreateRef<Prefab>();

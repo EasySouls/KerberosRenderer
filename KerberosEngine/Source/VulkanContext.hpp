@@ -10,6 +10,7 @@
 #include <optional>
 #include <vector>
 #include <type_traits>
+#include <functional>
 
 
 struct GLFWwindow;

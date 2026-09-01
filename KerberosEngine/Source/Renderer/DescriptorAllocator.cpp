@@ -1,7 +1,8 @@
-#include "kbrpch.hpp"
 #include "DescriptorAllocator.hpp"
 
 #include "VulkanContext.hpp"
+
+import Kerberos;
 
 namespace Kerberos
 {
@@ -25,7 +26,7 @@ namespace Kerberos
 
 			VkBuffer buffer = nullptr;
 			if (vmaCreateBuffer(VulkanContext::Get().GetAllocator().get(), &bufferInfo, &allocInfo, &buffer, &m_Allocation, nullptr) != VK_SUCCESS)
-				KBR_CORE_ASSERT(false, "Failed to create descriptor buffer!");
+				KBRAssert(false, "Failed to create descriptor buffer!");
 
 			m_Handle = vk::Buffer(buffer);
 			vmaMapMemory(VulkanContext::Get().GetAllocator().get(), m_Allocation, &m_MappedData);
@@ -99,7 +100,7 @@ namespace Kerberos
 			{
 				m_AllocationDebugNames[m_CurrentOffset] = debugName;
 
-				KBR_CORE_TRACE("Descriptor Allocator: Bound '{}' at offset {} (size {})", debugName, m_CurrentOffset, layoutSize);
+				Kerberos::Log::CoreTrace("Descriptor Allocator: Bound '{}' at offset {} (size {})", debugName, m_CurrentOffset, layoutSize);
 			}
 #endif
 		}

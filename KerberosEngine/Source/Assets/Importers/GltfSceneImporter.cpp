@@ -1,4 +1,3 @@
-#include "kbrpch.hpp"
 #include "Assets/Importers/GltfSceneImporter.hpp"
 #include "Assets/Formats/NativeAssetSerializer.hpp"
 #include "Assets/Asset.hpp"
@@ -7,6 +6,8 @@
 #include <tinygltf/tiny_gltf.h>
 #include <algorithm>
 #include <sstream>
+
+import Kerberos;
 
 namespace Kerberos {
 
@@ -117,13 +118,13 @@ bool WriteMesh(const std::filesystem::path& root, const size_t mesh, const size_
     const auto path = root / "Meshes" / ("mesh_" + std::to_string(mesh) + "_" + std::to_string(primitive) + ".kbrmesh");
     std::filesystem::create_directories(path.parent_path(), ec);
     if (ec) {
-        KBR_CORE_ERROR("Failed to create directories for mesh: {}", ec.message());
+        Log::CoreError("Failed to create directories for mesh: {}", ec.message());
         return false;
     }
 
     const bool success = NativeAssetSerializer::SerializeMesh(payload, path);
     if (!success) {
-        KBR_CORE_ERROR("Failed to serialize mesh to path: {}", path.string());
+        Log::CoreError("Failed to serialize mesh to path: {}", path.string());
         return false;
     }
 
@@ -141,12 +142,12 @@ bool GltfSceneImporter::Import(const std::filesystem::path& source, const std::f
                                 : ext == ".gltf" ? loader.LoadASCIIFromFile(&model, &error, &warning, source.string()) : false;
 
     if (!warning.empty()) 
-        KBR_CORE_WARN("glTF scene import warning: {}", warning);
+        Log::CoreWarn("glTF scene import warning: {}", warning);
 
     if (!loaded)
     { 
         if (!error.empty()) 
-            KBR_CORE_ERROR("glTF scene import error: {}", error);
+            Log::CoreError("glTF scene import error: {}", error);
 
         return false;
     }

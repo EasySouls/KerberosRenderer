@@ -1,14 +1,16 @@
 #ifdef KBR_PLATFORM_WINDOWS
-#include "kbrpch.hpp"
 #include "Utils/SystemOperations.hpp"
 
+#include <Windows.h>
 #include <commdlg.h>
+
 #include <GLFW/glfw3.h>
 #define GLFW_EXPOSE_NATIVE_WIN32
 #include <GLFW/glfw3native.h>
 
 #include "Application.hpp"
 
+import Kerberos;
 
 namespace Kerberos
 {
@@ -67,7 +69,7 @@ namespace Kerberos
 	{
 		if (!path || path[0] == '\0')
 		{
-			KBR_CORE_WARN("FileOperations::OpenFile called with an empty path.");
+			Log::CoreWarn("FileOperations::OpenFile called with an empty path.");
 			return false;
 		}
 
@@ -86,7 +88,7 @@ namespace Kerberos
 		}
 
 		DWORD error = GetLastError();
-		KBR_CORE_ERROR("Failed to open file: {0}, Error code: {1}", path, error);
+		Log::CoreError("Failed to open file: {0}, Error code: {1}", path, error);
 
 		return false;
 	}
@@ -95,7 +97,7 @@ namespace Kerberos
 	{
 		if (!path || path[0] == '\0')
 		{
-			KBR_CORE_WARN("FileOperations::DeleteFile called with an empty path.");
+			Log::CoreWarn("FileOperations::DeleteFile called with an empty path.");
 			return false;
 		}
 		if (std::remove(path) == 0)
@@ -103,7 +105,7 @@ namespace Kerberos
 			return true;
 		}
 
-		KBR_CORE_ERROR("Failed to delete file: {0}", path);
+		Log::CoreError("Failed to delete file: {0}", path);
 		return false;
 	}
 
@@ -111,7 +113,7 @@ namespace Kerberos
 	{
 		if (!path || path[0] == '\0')
 		{
-			KBR_CORE_WARN("FileOperations::RevealInFileExplorer called with an empty path.");
+			Log::CoreWarn("FileOperations::RevealInFileExplorer called with an empty path.");
 			return false;
 		}
 		std::string params = "/select,\"";
@@ -132,7 +134,7 @@ namespace Kerberos
 			return true;
 		}
 		DWORD error = GetLastError();
-		KBR_CORE_ERROR("Failed to reveal file in explorer: {0}, Error code: {1}", path, error);
+		Log::CoreError("Failed to reveal file in explorer: {0}, Error code: {1}", path, error);
 		return false;
 	}
 }

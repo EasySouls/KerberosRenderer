@@ -1,11 +1,9 @@
-#include "kbrpch.hpp"
 #include "SkyboxUtils.hpp"
 
 #include "Vulkan.hpp"
 #include "VulkanContext.hpp"
 #include "Shaders/Shader.hpp"
 #include "Utils.hpp"
-#include "Logging/Log.hpp"
 
 #include <glm/glm.hpp>
 
@@ -13,6 +11,8 @@
 #include <numbers>
 
 #include "Vertex.hpp"
+
+import Kerberos;
 
 namespace Kerberos::SkyboxUtils
 {
@@ -340,7 +340,7 @@ namespace Kerberos::SkyboxUtils
 
 		auto tEnd = std::chrono::high_resolution_clock::now();
 		auto tDiff = std::chrono::duration<double, std::milli>(tEnd - tStart).count();
-		KBR_CORE_INFO("Generating BRDF LUT took {} ms", tDiff);
+		Log::CoreInfo("Generating BRDF LUT took {} ms", tDiff);
 	}
 
 	void GenerateIrradianceCube(TextureCube& irradianceTexture, const vk::DescriptorImageInfo& envMapDescriptor, const Mesh& cubeMesh) 
@@ -898,7 +898,7 @@ namespace Kerberos::SkyboxUtils
 
 		auto tEnd = std::chrono::high_resolution_clock::now();
 		auto tDiff = std::chrono::duration<double, std::milli>(tEnd - tStart).count();
-		KBR_CORE_INFO("Generating irradiance cube with {} mip levels took {} ms", numMips, tDiff);
+		Log::CoreInfo("Generating irradiance cube with {} mip levels took {} ms", numMips, tDiff);
 	}
 
 	void GeneratePrefilteredEnvMap(TextureCube& prefilteredEnvMap, const vk::DescriptorImageInfo& envMapDescriptor,
@@ -1457,7 +1457,7 @@ namespace Kerberos::SkyboxUtils
 
 		auto tEnd = std::chrono::high_resolution_clock::now();
 		auto tDiff = std::chrono::duration<double, std::milli>(tEnd - tStart).count();
-		KBR_CORE_INFO("Generating pre-filtered enivornment cube with {} mip levels took {} ms", numMips, tDiff);
+		Log::CoreInfo("Generating pre-filtered enivornment cube with {} mip levels took {} ms", numMips, tDiff);
 	}
 
 }

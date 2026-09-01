@@ -1,11 +1,11 @@
-#include "kbrpch.hpp"
 #include "MaterialRegistry.hpp"
 
 #include <ranges>
 
 #include "VulkanContext.hpp"
-#include "Logging/Log.hpp"
 #include "TextureManager.hpp"
+
+import Kerberos;
 
 namespace Kerberos 
 {
@@ -19,7 +19,7 @@ namespace Kerberos
 	void MaterialRegistry::Add(const std::string& name, const Material& mat) 
 	{
 		if (m_Materials.contains(name)) {
-			KBR_CORE_ERROR("Material with name {} already exists!", name);
+			Log::CoreError("Material with name {} already exists!", name);
 		}
 
 		m_Materials[name] = std::make_shared<Material>(mat);
@@ -28,7 +28,7 @@ namespace Kerberos
 	void MaterialRegistry::Add(const std::string& name, const Ref<Material>& mat)
 	{
 		if (m_Materials.contains(name)) {
-			KBR_CORE_ERROR("Material with name {} already exists!", name);
+			Log::CoreError("Material with name {} already exists!", name);
 		}
 
 		m_Materials[name] = mat;
@@ -91,7 +91,7 @@ namespace Kerberos
 	{
 		const auto& mat = m_Materials.at(name);
 		if (mat == nullptr) {
-			KBR_CORE_ERROR("Material with name {} doesn't exist in the registry!", name);
+			Log::CoreError("Material with name {} doesn't exist in the registry!", name);
 		}
 		return mat;
 	}
@@ -100,7 +100,7 @@ namespace Kerberos
 	{
 		auto& mat = m_Materials[name];
 		if (mat == nullptr) {
-			KBR_CORE_ERROR("Material with name {} doesn't exist in the registry!", name);
+			Log::CoreError("Material with name {} doesn't exist in the registry!", name);
 		}
 		return mat;
 	}

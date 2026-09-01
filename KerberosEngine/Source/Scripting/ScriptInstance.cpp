@@ -1,8 +1,9 @@
-#include "kbrpch.hpp"
 #include "ScriptInstance.hpp"
 
 #include "ScriptClass.hpp"
 #include "ScriptEngine.hpp"
+
+import Kerberos;
 
 namespace Kerberos
 {
@@ -16,7 +17,7 @@ namespace Kerberos
 			static_cast<uint64_t>(m_EntityID),
 			m_ScriptClass->GetFullName());
 
-		KBR_CORE_ASSERT(created, "Failed to create managed instance for entity!");
+		KBRAssert(created, "Failed to create managed instance for entity!");
 
 		/// Set initial field values after creating the instance
 		IntializeFieldValues(initialFieldValues);
@@ -60,7 +61,7 @@ namespace Kerberos
 	{
 		if (!m_ScriptClass->m_SerializedFields.contains(name))
 		{
-			KBR_CORE_ASSERT(false, "Field {0} not found in class {1}", name, m_ScriptClass->GetFullName());
+			KBRAssert(false, "Field {0} not found in class {1}", name, m_ScriptClass->GetFullName());
 			return false;
 		}
 
@@ -73,7 +74,7 @@ namespace Kerberos
 	{
 		if (!m_ScriptClass->m_SerializedFields.contains(name))
 		{
-			KBR_CORE_ASSERT(false, "Field {0} not found in class {1}", name, m_ScriptClass->GetFullName());
+			KBRAssert(false, "Field {0} not found in class {1}", name, m_ScriptClass->GetFullName());
 			return;
 		}
 

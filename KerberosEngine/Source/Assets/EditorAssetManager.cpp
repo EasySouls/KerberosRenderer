@@ -1,20 +1,26 @@
-#include "kbrpch.hpp"
 #include "EditorAssetManager.hpp"
+#include "Core/Core.hpp"
 
 #include "Assets/Importers/AssetImporter.hpp"
 #include "Assets/Importers/IAssetImporter.hpp"
 #include "Assets/Importers/GltfSceneImporter.hpp"
 #include "Assets/Formats/NativeAssetSerializer.hpp"
+#include "Profiling/Instrumentor.hpp"
 #include "Project/Project.hpp"
 #include "Application.hpp"
 #include "ModelLoader.hpp"
 
 #include <yaml-cpp/yaml.h>
+
 #include <algorithm>
 #include <cctype>
 #include <fstream>
 #include <map>
 #include <ranges>
+#include <cerrno>
+#include <system_error>
+
+import Kerberos;
 
 namespace Kerberos
 {
@@ -112,7 +118,7 @@ namespace Kerberos
 			return assetExtensionMap.at(extensionView);
 		}
 
-		KBR_CORE_WARN("Unknown asset type for file: {0}", filepath.string());
+		Log::CoreWarn("Unknown asset type for file: {0}", filepath.string());
 		return AssetType::Texture2D;
 	}
 
@@ -202,7 +208,7 @@ namespace Kerberos
 	{
 		m_Lifetime->store(false);
 		m_FileWatch.Stop();
-		KBR_CORE_TRACE("EditorAssetManager destructed");
+		Log::CoreTrace("EditorAssetManager destructed");
 	}
 
 	void EditorAssetManager::HandleAssetFileEvent(const AssetFileEvent& event)
@@ -256,7 +262,7 @@ namespace Kerberos
 			asset = AssetImporter::ImportAsset(handle, metadata);
 			if (!asset)
 			{
-				KBR_CORE_ERROR("Asset import failed!");
+				Log::CoreError("Asset import failed!");
 				return nullptr;
 			}
 
@@ -281,7 +287,7 @@ namespace Kerberos
 		if (!isInAssetRegistry)
 		{
 			// TODO: Uncomment this when done with GLTF loading
-			//KBR_CORE_WARN("Asset handle is not in asset registry: {}", handle);
+			//Log::CoreWarn("Asset handle is not in asset registry: {}", handle);
 			return false;
 		}
 
@@ -299,7 +305,7 @@ namespace Kerberos
 
 		if (!IsAssetHandleValid(handle))
 		{
-			KBR_CORE_ERROR("Invalid asset handle: {0}", handle);
+			Log::CoreError("Invalid asset handle: {0}", handle);
 			throw std::runtime_error("Invalid asset handle when getting asset type!");
 		}
 		return GetMetadata(handle).Type;
@@ -324,7 +330,7 @@ namespace Kerberos
 		const Ref<Asset> asset = AssetImporter::ImportAsset(handle, metadata);
 		if (!asset)
 		{
-			KBR_CORE_ERROR("Failed to import asset: {0}", filepath.string());
+			Log::CoreError("Failed to import asset: {0}", filepath.string());
 			return AssetHandle::Invalid();
 		}
 
@@ -345,7 +351,7 @@ namespace Kerberos
 
 	Ref<Mesh> EditorAssetManager::GetDefaultCubeMesh() const
 	{
-		KBR_CORE_ASSERT(m_DefaultCubeMesh, "Default cube mesh has not been loaded");
+		KBRAssert(m_DefaultCubeMesh != nullptr, "Default cube mesh has not been loaded");
 
 		// TODO: Package a cube.gltf alongside the editor or create a mesh programmatically
 		return m_DefaultCubeMesh;
@@ -353,14 +359,14 @@ namespace Kerberos
 
 	Ref<Texture2D> EditorAssetManager::GetDefaultColorTexture() const 
 	{
-		KBR_CORE_ASSERT(m_DefaultColorTexture, "Default color texture has not been loaded");
+		KBRAssert(m_DefaultColorTexture != nullptr, "Default color texture has not been loaded");
 
 		return m_DefaultColorTexture;
 	}
 
 	Ref<Font> EditorAssetManager::GetDefaultFont() const 
 	{
-		KBR_CORE_ASSERT(m_DefaultFont, "Default font has not been loaded");
+		KBRAssert(m_DefaultFont != nullptr, "Default font has not been loaded");
 
 		return m_DefaultFont;
 	}
@@ -407,7 +413,9 @@ namespace Kerberos
 		std::ofstream file(assetRegistryPath);
 		if (!file.is_open())
 		{
-			KBR_CORE_ERROR("Could not open asset registry file for writing: {0}", assetRegistryPath.string());
+            std::error_code ec(errno, std::generic_category());
+
+			Log::CoreError("Could not open asset registry file for writing: {0}. Reason: {1} (Error code: {2})", assetRegistryPath.string(), ec.message(), ec.value());
 			return;
 		}
 		file << out.c_str();
@@ -423,7 +431,7 @@ namespace Kerberos
 		const std::filesystem::path assetRegistryPath = assetDirectoryPath / "AssetRegistry.kbrar";
 		if (!std::filesystem::exists(assetRegistryPath))
 		{
-			KBR_CORE_INFO("No asset registry found; it will be created as assets are imported.");
+			Log::CoreInfo("No asset registry found; it will be created as assets are imported.");
 			return false;
 		}
 
@@ -434,8 +442,8 @@ namespace Kerberos
 		}
 		catch (const YAML::Exception& e)
 		{
-			KBR_CORE_ERROR("Failed to load asset registry: {0}", e.what());
-			KBR_CORE_ASSERT(false, "Failed to load asset registry");
+			Log::CoreError("Failed to load asset registry: {0}", e.what());
+			KBRAssert(false, "Failed to load asset registry");
 			return false;
 		}
 
@@ -446,13 +454,13 @@ namespace Kerberos
 		}
 		catch (const YAML::BadSubscript& e)
 		{
-			KBR_CORE_WARN("Registry was empty: {0}", e.what());
+			Log::CoreWarn("Registry was empty: {0}", e.what());
 			return false;
 		}
 
 		if (!registryNode)
 		{
-			KBR_CORE_ERROR("Invalid asset registry file: {0}", assetRegistryPath.string());
+			Log::CoreError("Invalid asset registry file: {0}", assetRegistryPath.string());
 			return false;
 		}
 
@@ -460,8 +468,8 @@ namespace Kerberos
 		{
 			if (!assetNode["Handle"] || !assetNode["Type"] || !assetNode["Path"])
 			{
-				KBR_CORE_ERROR("Invalid asset entry in registry: {0}", assetRegistryPath.string());
-				KBR_CORE_ASSERT(false, "Invalid asset entry in registry");
+				Log::CoreError("Invalid asset entry in registry: {0}", assetRegistryPath.string());
+				KBRAssert(false, "Invalid asset entry in registry");
 				continue;
 			}
 			const AssetHandle handle = AssetHandle(assetNode["Handle"].as<uint64_t>());
@@ -484,7 +492,7 @@ namespace Kerberos
 
 		}
 
-		KBR_CORE_INFO("Asset registry loaded from {0}", assetRegistryPath.string());
+		Log::CoreInfo("Asset registry loaded from {0}", assetRegistryPath.string());
 
 		return true;
 	}

@@ -1,10 +1,11 @@
-#include "kbrpch.hpp"
 #include "GraphicsPipeline.hpp"
 
 #include "Vertex.hpp"
 #include "VulkanContext.hpp"
 
 #include <map>
+
+import Kerberos;
 
 namespace 
 {
@@ -17,7 +18,7 @@ namespace
 		if (topology == PrimitiveTopology::LineList)
 			return vk::PrimitiveTopology::eLineList;
 
-		KBR_CORE_ASSERT(false, "Unknown primitive topology!");
+		KBRAssert(false, "Unknown primitive topology!");
 		return vk::PrimitiveTopology::eTriangleList;
 	}
 
@@ -32,7 +33,7 @@ namespace
 		if (cullMode == CullMode::None)
 			return vk::CullModeFlagBits::eNone;
 
-		KBR_CORE_ASSERT(false, "Unknown cull mode!");
+		KBRAssert(false, "Unknown cull mode!");
 		return vk::CullModeFlagBits::eNone;
 	}
 
@@ -57,7 +58,7 @@ namespace
 		if (compareOp == DepthTestFunc::Always)
 			return vk::CompareOp::eAlways;
 
-		KBR_CORE_ASSERT(false, "Unknown depth test function!");
+		KBRAssert(false, "Unknown depth test function!");
 		return vk::CompareOp::eAlways;
 	}
 
@@ -135,25 +136,25 @@ namespace Kerberos
 
 	void GraphicsPipeline::Bind(const vk::raii::CommandBuffer& cmd) const 
 	{
-		KBR_CORE_ASSERT(m_Pipeline != nullptr, "Pipeline is null!");
+		KBRAssert(m_Pipeline != nullptr, "Pipeline is null!");
 
 		cmd.bindPipeline(vk::PipelineBindPoint::eGraphics, m_Pipeline);
 	}
 
 	void GraphicsPipeline::Recompile() 
 	{
-		KBR_CORE_ASSERT(m_Pipeline != nullptr, "Pipeline not created yet!");
-		KBR_CORE_ASSERT(m_Specification.Shader, "Shader is null!");
+		KBRAssert(m_Pipeline != nullptr, "Pipeline not created yet!");
+		KBRAssert(m_Specification.Shader != nullptr, "Shader is null!");
 
 		const auto result = m_Specification.Shader->Recompile();
 		if (!result) 
 		{
-			KBR_CORE_ERROR("Failed to recompile shader for graphics pipeline: {}", m_Specification.Name);
+			Log::CoreError("Failed to recompile shader for graphics pipeline: {}", m_Specification.Name);
 			return;
 		}
 		if (!*result)
 		{
-			KBR_CORE_INFO("Shader for graphics pipeline '{}' is already up to date. No recompilation needed.", m_Specification.Name);
+			Log::CoreInfo("Shader for graphics pipeline '{}' is already up to date. No recompilation needed.", m_Specification.Name);
 			return;
 		}
 
@@ -162,9 +163,9 @@ namespace Kerberos
 
 	void GraphicsPipeline::CreatePipeline(const GraphicsPipelineSpecification& spec)
 	{
-		KBR_CORE_ASSERT(spec.BlendModes.size() == spec.ColorAttachmentFormats.size(), "Blend modes size must match color attachment formats size!");
-		KBR_CORE_ASSERT(spec.Shader, "Shader is null!");
-		KBR_CORE_ASSERT(spec.PipelineLayout, "Pipeline layout is null!");
+		KBRAssert(spec.BlendModes.size() == spec.ColorAttachmentFormats.size(), "Blend modes size must match color attachment formats size!");
+		KBRAssert(spec.Shader != nullptr, "Shader is null!");
+		KBRAssert(spec.PipelineLayout, "Pipeline layout is null!");
 
 		auto& context = VulkanContext::Get();
 		const auto& device = context.GetDevice();
@@ -179,7 +180,7 @@ namespace Kerberos
 		vk::SampleCountFlagBits sampleCount = spec.SampleCount;
 		if (const auto maxSampleCount = context.GetMaxMSAASamples(); sampleCount > maxSampleCount)
 		{
-			KBR_CORE_WARN("Pipeline created with more sample count than the maximum!");
+			Log::CoreWarn("Pipeline created with more sample count than the maximum!");
 			sampleCount = maxSampleCount;
 		}
 
@@ -256,7 +257,7 @@ namespace Kerberos
 			}
 			if (shaderStageIndex == -1)
 			{
-				KBR_CORE_ERROR("Failed to find shader stage for specialization constant in pipeline: {}", spec.Name);
+				Log::CoreError("Failed to find shader stage for specialization constant in pipeline: {}", spec.Name);
 				return;
 			}
 			shaderStages[shaderStageIndex].pSpecializationInfo = &specInfo;
@@ -302,13 +303,13 @@ namespace Kerberos
 
 			if (specInfo.mapEntryCount > 0)
 			{
-				KBR_CORE_ASSERT(specInfo.pMapEntries != nullptr, "Specialization map entries pointer is null!");
+				KBRAssert(specInfo.pMapEntries != nullptr, "Specialization map entries pointer is null!");
 				ownedMapEntries.assign(specInfo.pMapEntries, specInfo.pMapEntries + specInfo.mapEntryCount);
 			}
 
 			if (specInfo.dataSize > 0)
 			{
-				KBR_CORE_ASSERT(specInfo.pData != nullptr, "Specialization data pointer is null!");
+				KBRAssert(specInfo.pData != nullptr, "Specialization data pointer is null!");
 				ownedData.resize(specInfo.dataSize);
 				std::memcpy(ownedData.data(), specInfo.pData, specInfo.dataSize);
 			}

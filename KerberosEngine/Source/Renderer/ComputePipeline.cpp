@@ -1,8 +1,9 @@
-#include "kbrpch.hpp"
 #include "ComputePipeline.hpp"
 
 #include "Vertex.hpp"
 #include "VulkanContext.hpp"
+
+import Kerberos;
 
 namespace Kerberos
 {
@@ -15,25 +16,25 @@ namespace Kerberos
 
 	void ComputePipeline::Bind(const vk::raii::CommandBuffer& cmd) const
 	{
-		KBR_CORE_ASSERT(m_Pipeline != nullptr, "Pipeline is null!");
+		KBRAssert(m_Pipeline != nullptr, "Pipeline is null!");
 
 		cmd.bindPipeline(vk::PipelineBindPoint::eCompute, m_Pipeline);
 	}
 
 	void ComputePipeline::Recompile()
 	{
-		KBR_CORE_ASSERT(m_Pipeline != nullptr, "Pipeline not created yet!");
-		KBR_CORE_ASSERT(m_Specification.Shader, "Shader is null!");
+		KBRAssert(m_Pipeline != nullptr, "Pipeline not created yet!");
+		KBRAssert(m_Specification.Shader != nullptr, "Shader is null!");
 
 		const auto result = m_Specification.Shader->Recompile();
 		if (!result)
 		{
-			KBR_CORE_ERROR("Failed to recompile shader for compute pipeline: {}", m_Specification.Name);
+			Log::CoreError("Failed to recompile shader for compute pipeline: {}", m_Specification.Name);
 			return;
 		}
 		if (!*result)
 		{
-			KBR_CORE_INFO("Shader for compute pipeline '{}' is already up to date. No recompilation needed.", m_Specification.Name);
+			Log::CoreInfo("Shader for compute pipeline '{}' is already up to date. No recompilation needed.", m_Specification.Name);
 			return;
 		}
 
@@ -42,14 +43,14 @@ namespace Kerberos
 
 	void ComputePipeline::CreatePipeline(const ComputePipelineSpecification& spec)
 	{
-		KBR_CORE_ASSERT(spec.Shader, "Shader is null!");
-		KBR_CORE_ASSERT(spec.PipelineLayout, "Pipeline layout is null!");
+		KBRAssert(spec.Shader != nullptr, "Shader is null!");
+		KBRAssert(spec.PipelineLayout, "Pipeline layout is null!");
 
 		auto& context = VulkanContext::Get();
 		const auto& device = context.GetDevice();
 
 		std::vector<vk::PipelineShaderStageCreateInfo> shaderStages = spec.Shader->GetPipelineShaderStageCreateInfo();
-		KBR_CORE_ASSERT(shaderStages.size() == 1, "Compute pipeline must have exactly one shader stage!");
+		KBRAssert(shaderStages.size() == 1, "Compute pipeline must have exactly one shader stage!");
 
 		for (const auto& [shaderStage, specInfo] : spec.SpecializationMapEntries)
 		{
@@ -64,7 +65,7 @@ namespace Kerberos
 			}
 			if (shaderStageIndex == -1)
 			{
-				KBR_CORE_ERROR("Failed to find shader stage for specialization constant in pipeline: {}", spec.Name);
+				Log::CoreError("Failed to find shader stage for specialization constant in pipeline: {}", spec.Name);
 				return;
 			}
 			shaderStages[shaderStageIndex].pSpecializationInfo = &specInfo;
@@ -100,13 +101,13 @@ namespace Kerberos
 
 			if (specInfo.mapEntryCount > 0)
 			{
-				KBR_CORE_ASSERT(specInfo.pMapEntries != nullptr, "Specialization map entries pointer is null!");
+				KBRAssert(specInfo.pMapEntries != nullptr, "Specialization map entries pointer is null!");
 				ownedMapEntries.assign(specInfo.pMapEntries, specInfo.pMapEntries + specInfo.mapEntryCount);
 			}
 
 			if (specInfo.dataSize > 0)
 			{
-				KBR_CORE_ASSERT(specInfo.pData != nullptr, "Specialization data pointer is null!");
+				KBRAssert(specInfo.pData != nullptr, "Specialization data pointer is null!");
 				ownedData.resize(specInfo.dataSize);
 				std::memcpy(ownedData.data(), specInfo.pData, specInfo.dataSize);
 			}

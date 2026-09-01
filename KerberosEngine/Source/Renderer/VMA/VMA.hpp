@@ -1,9 +1,9 @@
 #pragma once
 
 #include "Core/Scoped.hpp"
+#include "Vulkan.hpp"
 
 #include <vma/vk_mem_alloc.h>
-#include <vulkan/vulkan.hpp>
 
 namespace Kerberos::VMA
 {

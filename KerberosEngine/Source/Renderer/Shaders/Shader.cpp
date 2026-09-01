@@ -1,14 +1,17 @@
-#include "kbrpch.hpp"
 #include "Shader.hpp"
+#include "Core/Core.hpp"
 
 #include "IO.hpp"
 #include "VulkanContext.hpp"
 #include "SlangCompiler.hpp"
-#include "Logging/Log.hpp"
+#include "Profiling/Instrumentor.hpp"
 
 #include <spirv_cross/spirv_cross.hpp>
 
 #include <format>
+#include <iostream>
+
+import Kerberos;
 
 namespace Kerberos
 {
@@ -44,7 +47,7 @@ namespace Kerberos
 			case spv::ExecutionModelFragment:               return vk::ShaderStageFlagBits::eFragment;
 			case spv::ExecutionModelGLCompute:              return vk::ShaderStageFlagBits::eCompute;
 			default:
-				KBR_CORE_ERROR("Unsupported SPIR-V execution model: {}", static_cast<int>(model));
+				Log::CoreError("Unsupported SPIR-V execution model: {}", static_cast<int>(model));
 				return vk::ShaderStageFlagBits::eVertex;
 		}
 	}
@@ -89,7 +92,7 @@ namespace Kerberos
 				default: break;
 			}
 
-			KBR_CORE_INFO("{0}Member: {1}{2}, Type: {3}, Offset: {4}, Size: {5}",
+			Log::CoreInfo("{0}Member: {1}{2}, Type: {3}, Offset: {4}, Size: {5}",
 						  indent, memberName, arrayInfo, typeName, offset, memberSize);
 
 			if (memberType.basetype == spirv_cross::SPIRType::Struct)
@@ -133,18 +136,18 @@ namespace Kerberos
 			const std::filesystem::file_time_type cachedModTime = std::filesystem::last_write_time(cachedSpirvPath);
 			if (cachedModTime >= sourceModTime) 
 			{
-				KBR_CORE_INFO("Loading cached SPIR-V for shader: {}", filepath.filename().string());
+				Log::CoreInfo("Loading cached SPIR-V for shader: {}", filepath.filename().string());
 				needsCompilation = false;
 			} 
 			else 
 			{
-				KBR_CORE_INFO("Cached SPIR-V is outdated. Recompiling shader: {}", filepath.filename().string());
+				Log::CoreInfo("Cached SPIR-V is outdated. Recompiling shader: {}", filepath.filename().string());
 				needsCompilation = true;
 			}
 		} 
 		else 
 		{
-			KBR_CORE_INFO("No cached SPIR-V found. Compiling shader: {}", filepath.filename().string());
+			Log::CoreInfo("No cached SPIR-V found. Compiling shader: {}", filepath.filename().string());
 			needsCompilation = true;
 			
 		}
@@ -160,12 +163,12 @@ namespace Kerberos
 			}
 			catch (const CompilationFailedException& e)
 			{
-				KBR_CORE_ERROR("Shader compilation failed for '{}': {}", filepath.filename().string(), e.what());
+				Log::CoreError("Shader compilation failed for '{}': {}", filepath.filename().string(), e.what());
 				throw;
 			}
 			catch (const std::exception& e)
 			{
-				KBR_CORE_ERROR("Failed to compile shader '{}': {}", filepath.filename().string(), e.what());
+				Log::CoreError("Failed to compile shader '{}': {}", filepath.filename().string(), e.what());
 				throw;
 			}
 		}
@@ -178,7 +181,7 @@ namespace Kerberos
 		
 		if (m_SpirvCode.empty()) 
 		{
-			KBR_CORE_ERROR("Failed to load SPIR-V code for shader: {}", filepath.filename().string());
+			Log::CoreError("Failed to load SPIR-V code for shader: {}", filepath.filename().string());
 			throw std::runtime_error("Failed to load SPIR-V code");
 		}
 
@@ -208,13 +211,13 @@ namespace Kerberos
 			const auto spirvCode = SlangCompiler::CompileToSpirv(m_Filepath);
 			if (spirvCode.empty()) 
 			{
-				KBR_CORE_ERROR("Recompilation produced empty SPIR-V code for shader: {}", m_Filepath.filename().string());
+				Log::CoreError("Recompilation produced empty SPIR-V code for shader: {}", m_Filepath.filename().string());
 				return std::unexpected("Recompilation produced empty SPIR-V code");
 			}
 
 			if (spirvCode == m_SpirvCode)
 			{
-				KBR_CORE_INFO("Shader '{}' is already up to date. No recompilation needed.", m_Filepath.filename().string());
+				Log::CoreInfo("Shader '{}' is already up to date. No recompilation needed.", m_Filepath.filename().string());
 				return false;
 			}
 
@@ -238,12 +241,12 @@ namespace Kerberos
 		}
 		catch (const CompilationFailedException& e) 
 		{
-			KBR_CORE_ERROR("Shader recompilation failed for '{}': {}", m_Filepath.filename().string(), e.what());
+			Log::CoreError("Shader recompilation failed for '{}': {}", m_Filepath.filename().string(), e.what());
 			return std::unexpected("Shader recompilation failed");
 		} 
 		catch (const std::exception& e) 
 		{
-			KBR_CORE_ERROR("Failed to recompile shader '{}': {}", m_Filepath.filename().string(), e.what());
+			Log::CoreError("Failed to recompile shader '{}': {}", m_Filepath.filename().string(), e.what());
 			return std::unexpected("Failed to recompile shader");
 		}
 
@@ -273,7 +276,7 @@ namespace Kerberos
 		const Compiler compiler(m_SpirvCode);
 		const ShaderResources resources = compiler.get_shader_resources();
 
-		KBR_CORE_INFO("Reflecting shader {}", m_Name);
+		Log::CoreInfo("Reflecting shader {}", m_Name);
 
 		const auto entryPoints = compiler.get_entry_points_and_stages();
 
@@ -285,22 +288,22 @@ namespace Kerberos
 		for (const auto& [name, execution_model] : entryPoints) {
 			const vk::ShaderStageFlagBits stage = ExecutionModelToShaderStage(execution_model);
 			stageEntries.push_back({ .stage = stage, .entryPoint = name });
-			KBR_CORE_INFO("  Entry point: {0}, Stage: {1}", name, vk::to_string(stage));
+			Log::CoreInfo("  Entry point: {0}, Stage: {1}", name, vk::to_string(stage));
 		}
 
-		KBR_CORE_INFO(" Uniform Buffers: {0}", resources.uniform_buffers.size());
+		Log::CoreInfo(" Uniform Buffers: {0}", resources.uniform_buffers.size());
 		for (const Resource& resource : resources.uniform_buffers) {
 			const SPIRType& bufferType = compiler.get_type(resource.base_type_id);
 			const uint32_t set = compiler.get_decoration(resource.id, spv::DecorationDescriptorSet);
 			const uint32_t binding = compiler.get_decoration(resource.id, spv::DecorationBinding);
 			const size_t bufferSize = compiler.get_declared_struct_size(bufferType);
 
-			KBR_CORE_INFO("  Name: {0}, Set: {1}, Binding: {2}, Size: {3}", resource.name, set, binding, bufferSize);
+			Log::CoreInfo("  Name: {0}, Set: {1}, Binding: {2}, Size: {3}", resource.name, set, binding, bufferSize);
 
 			ReflectStructMembers(compiler, resource.base_type_id, threeSpaces);
 		}
 
-		KBR_CORE_INFO(" Storage Buffers: {0}", resources.storage_buffers.size());
+		Log::CoreInfo(" Storage Buffers: {0}", resources.storage_buffers.size());
 		for (const Resource& resource : resources.storage_buffers)
 		{
 			const SPIRType& bufferType = compiler.get_type(resource.base_type_id);
@@ -308,20 +311,20 @@ namespace Kerberos
 			const uint32_t binding = compiler.get_decoration(resource.id, spv::DecorationBinding);
 			const size_t bufferSize = compiler.get_declared_struct_size_runtime_array(bufferType, 0);
 
-			KBR_CORE_INFO("  Name: {0}, Set: {1}, Binding: {2}, Base Size: {3}", resource.name, set, binding, bufferSize);
+			Log::CoreInfo("  Name: {0}, Set: {1}, Binding: {2}, Base Size: {3}", resource.name, set, binding, bufferSize);
 
 			ReflectStructMembers(compiler, resource.base_type_id, threeSpaces);
 		}
 
 		auto reflectImageSampler = [&](const auto& resourceList, const char* label)
 		{
-			KBR_CORE_INFO(" {0}: {1}", label, resourceList.size());
+			Log::CoreInfo(" {0}: {1}", label, resourceList.size());
 			for (const Resource& resource : resourceList)
 			{
 				const uint32_t set = compiler.get_decoration(resource.id, spv::DecorationDescriptorSet);
 				const uint32_t binding = compiler.get_decoration(resource.id, spv::DecorationBinding);
 				const uint32_t count = GetDescriptorArraySize(compiler, resource);
-				KBR_CORE_INFO("  Name: {0}, Set: {1}, Binding: {2}, Count: {3}", resource.name, set, binding, count);
+				Log::CoreInfo("  Name: {0}, Set: {1}, Binding: {2}, Count: {3}", resource.name, set, binding, count);
 			}
 		};
 
@@ -329,7 +332,7 @@ namespace Kerberos
 		reflectImageSampler(resources.separate_images, "Images");
 		reflectImageSampler(resources.separate_samplers, "Samplers");
 
-		KBR_CORE_INFO(" Storage Images: {0}", resources.storage_images.size());
+		Log::CoreInfo(" Storage Images: {0}", resources.storage_images.size());
 		for (const Resource& resource : resources.storage_images) {
 			const uint32_t set = compiler.get_decoration(resource.id, spv::DecorationDescriptorSet);
 			const uint32_t binding = compiler.get_decoration(resource.id, spv::DecorationBinding);
@@ -343,26 +346,26 @@ namespace Kerberos
 				case spv::DimCube: dimStr = "Cube"; break;
 				default:           dimStr = "Unknown"; break;
 			}
-			KBR_CORE_INFO("  Name: {0}, Set: {1}, Binding: {2}, Type: {3} Image", resource.name, set, binding, dimStr);
+			Log::CoreInfo("  Name: {0}, Set: {1}, Binding: {2}, Type: {3} Image", resource.name, set, binding, dimStr);
 		}
 
-		KBR_CORE_INFO(" Push Constant Buffers: {0}", resources.push_constant_buffers.size());
+		Log::CoreInfo(" Push Constant Buffers: {0}", resources.push_constant_buffers.size());
 		for (const Resource& resource : resources.push_constant_buffers) {
 			auto activeRanges = compiler.get_active_buffer_ranges(resource.id);
 
 			for (const auto& range : activeRanges)
 			{
-				KBR_CORE_INFO("  Name: {0}, Active Offset: {1}, Active Size: {2}", resource.name, range.offset, range.range);
+				Log::CoreInfo("  Name: {0}, Active Offset: {1}, Active Size: {2}", resource.name, range.offset, range.range);
 			}
 
 			ReflectStructMembers(compiler, resource.base_type_id, threeSpaces);
 		}
 
-		KBR_CORE_INFO(" Acceleration Structures: {0}", resources.acceleration_structures.size());
+		Log::CoreInfo(" Acceleration Structures: {0}", resources.acceleration_structures.size());
 		for (const Resource& resource : resources.acceleration_structures) {
 			const uint32_t set = compiler.get_decoration(resource.id, spv::DecorationDescriptorSet);
 			const uint32_t binding = compiler.get_decoration(resource.id, spv::DecorationBinding);
-			KBR_CORE_INFO("  Name: {0}, Set: {1}, Binding: {2}", resource.name, set, binding);
+			Log::CoreInfo("  Name: {0}, Set: {1}, Binding: {2}", resource.name, set, binding);
 		}
 
 		return stageEntries;

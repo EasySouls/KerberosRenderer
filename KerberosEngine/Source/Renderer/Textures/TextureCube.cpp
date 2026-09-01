@@ -1,4 +1,3 @@
-#include "kbrpch.hpp"
 #include "TextureCube.hpp"
 #include "VulkanContext.hpp"
 
@@ -6,6 +5,8 @@
 #include "Utils.hpp"
 #include "Utils/KtxConversion.hpp"
 #include "KTX2Loader.hpp"
+
+import Kerberos;
 
 namespace Kerberos {
 
@@ -17,7 +18,7 @@ static ktxResult LoadKTXFile(const std::filesystem::path& filepath, ktxTexture2*
 
 TextureCube::TextureCube(const CubemapData& data)
 {
-	KBR_CORE_ASSERT(false, "TextureCube::TextureCube - CubemapData constructor is not implemented yet");
+	KBRAssert(false, "TextureCube::TextureCube - CubemapData constructor is not implemented yet");
 }
 
 TextureCube::TextureCube(const std::filesystem::path& filepath)
@@ -26,7 +27,7 @@ TextureCube::TextureCube(const std::filesystem::path& filepath)
 	std::ranges::transform(extension, extension.begin(), [](unsigned char c) {
 		return static_cast<char>(std::tolower(c));
 	});
-	KBR_CORE_ASSERT(extension == ".ktx" || extension == ".ktx2", "TextureCube::TextureCube - only KTX files are supported in this constructor");
+	KBRAssert(extension == ".ktx" || extension == ".ktx2", "TextureCube::TextureCube - only KTX files are supported in this constructor");
 
 	ktxTexture2* ktxTex = nullptr;
 
@@ -39,7 +40,8 @@ TextureCube::TextureCube(const std::filesystem::path& filepath)
 		if (!std::filesystem::exists(newFilePath))
 		{
 			const Process::ProcessResult result = KtxConversion::ConvertKtxToKtx2(filepath);
-			KBR_CORE_ASSERT(
+
+			KBRAssert(
 				result.Succeeded,
 				"TextureCube::TextureCube - failed to convert KTX to KTX2 for file: {} (started: {}, exit code: {}, error code: {}, error: {})",
 				filepath.string(),
@@ -50,15 +52,15 @@ TextureCube::TextureCube(const std::filesystem::path& filepath)
 		}
 		
 		ktxResult result = LoadKTXFile(newFilePath, &ktxTex);
-		KBR_CORE_ASSERT(result == KTX_SUCCESS, "TextureCube::TextureCube - Failed to load KTX file after converting it: {}", newFilePath.string());
+		KBRAssert(result == KTX_SUCCESS, "TextureCube::TextureCube - Failed to load KTX file after converting it: {}", newFilePath.string());
 	}
 	else
 	{
 		ktxResult result = KTX2Loader::Load(filepath, &ktxTex) ? KTX_SUCCESS : KTX_FILE_DATA_ERROR;
-		KBR_CORE_ASSERT(result == KTX_SUCCESS, "TextureCube::TextureCube - Failed to load KTX file: {}", filepath.string());
+		KBRAssert(result == KTX_SUCCESS, "TextureCube::TextureCube - Failed to load KTX file: {}", filepath.string());
 	}
 
-	KBR_CORE_ASSERT(ktxTex != nullptr, "TextureCube::TextureCube - ktxTexture2 is null after loading KTX file: {}", filepath.string());
+	KBRAssert(ktxTex != nullptr, "TextureCube::TextureCube - ktxTexture2 is null after loading KTX file: {}", filepath.string());
 
 	vk::ImageUsageFlags  imageUsageFlags = vk::ImageUsageFlagBits::eSampled;
 	vk::ImageLayout      imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal;
@@ -108,7 +110,7 @@ TextureCube::TextureCube(const std::filesystem::path& filepath)
 		{
 			ktx_size_t offset;
 			KTX_error_code res = ktxTexture_GetImageOffset((ktxTexture*)ktxTex, level, 0, face, &offset);
-			KBR_CORE_ASSERT(res == KTX_SUCCESS, "TextureCube::TextureCube - Failed to get image offset for level {} face {}", level, face);
+			KBRAssert(res == KTX_SUCCESS, "TextureCube::TextureCube - Failed to get image offset for level {} face {}", level, face);
 			vk::BufferImageCopy bufferCopyRegion{
 				.bufferOffset = offset,
 				.imageSubresource = {
@@ -215,7 +217,7 @@ TextureCube::TextureCube(const std::filesystem::path& filepath)
 
 TextureCube::~TextureCube() 
 {
-	KBR_CORE_TRACE("Destroying TextureCube: {}", GetHandle());
+	Log::CoreTrace("Destroying TextureCube: {}", GetHandle());
 }
 
 Ref<TextureCube> TextureCube::FromData(const CubemapData& data)

@@ -1,11 +1,13 @@
 #include "AssetMetaService.hpp"
-
-#include "kbrpch.hpp"
+#include "Core/Core.hpp"
+#include "Profiling/Instrumentor.hpp"
 
 #include <yaml-cpp/yaml.h>
 #include <fstream>
 #include <iomanip>
 #include <sstream>
+
+import Kerberos;
 
 namespace Kerberos {
 
@@ -16,12 +18,12 @@ AssetMetaFile AssetMetaService::EnsureMetaForSource(const std::filesystem::path&
     KBR_PROFILE_FUNCTION();
 
     if (!std::filesystem::is_regular_file(sourcePath)) {
-        KBR_CORE_ERROR("Cannot create meta for missing source: {0}", sourcePath.string());
+        Log::CoreError("Cannot create meta for missing source: {0}", sourcePath.string());
         return {};
     }
     const auto metaResult = LoadMeta(sourcePath);
     if (!metaResult.has_value()) {
-        KBR_CORE_WARN("Meta file missing or invalid for source: {0}. Creating new meta.", sourcePath.string());
+        Log::CoreWarn("Meta file missing or invalid for source: {0}. Creating new meta.", sourcePath.string());
 
         AssetMetaFile newMeta;
         newMeta.SourceHandle = AssetHandle();
@@ -30,7 +32,7 @@ AssetMetaFile AssetMetaService::EnsureMetaForSource(const std::filesystem::path&
         return newMeta;
     }
 
-    KBR_CORE_ASSERT(metaResult.has_value(), "Meta file should exist for source: {0}", sourcePath.string());
+    KBRAssert(metaResult.has_value(), "Meta file should exist for source: {0}", sourcePath.string());
 
     return metaResult.value();
 }
@@ -41,7 +43,7 @@ std::optional<AssetMetaFile> AssetMetaService::LoadMeta(const std::filesystem::p
 
     const auto metaPath = MetaPathFor(sourcePath);
     if (!std::filesystem::exists(metaPath)) {
-        KBR_CORE_WARN("Meta file does not exist for source: {0}", sourcePath.string());
+        Log::CoreWarn("Meta file does not exist for source: {0}", sourcePath.string());
         return std::nullopt;
     }
 
@@ -70,7 +72,7 @@ std::optional<AssetMetaFile> AssetMetaService::LoadMeta(const std::filesystem::p
         }
         return meta;
     } catch (const YAML::Exception& e) {
-        KBR_CORE_WARN("Invalid meta file {0}: {1}", metaPath.string(), e.what());
+        Log::CoreWarn("Invalid meta file {0}: {1}", metaPath.string(), e.what());
         return std::nullopt;
     }
 }
@@ -180,7 +182,7 @@ std::optional<std::string> AssetMetaService::ReadFileText(const std::filesystem:
 
     std::ifstream file(path, std::ios::binary);
     if (!file.is_open()) {
-        KBR_CORE_ERROR("Failed to open file for reading: {0}", path.string());
+        Log::CoreError("Failed to open file for reading: {0}", path.string());
         return std::nullopt;
     }
     std::string content((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());

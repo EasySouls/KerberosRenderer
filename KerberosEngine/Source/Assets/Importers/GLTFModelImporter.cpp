@@ -1,5 +1,4 @@
 #include "GLTFModelImporter.hpp"
-#include "kbrpch.hpp"
 
 #include "Core/UUID.hpp"
 #include "Renderer/Vertex.hpp"
@@ -18,11 +17,13 @@
 #include <limits>
 #include <unordered_map>
 
+import Kerberos;
+
 namespace Kerberos
 {
 	namespace
 	{
-		static bool IsKtxData(const unsigned char* bytes, const int size)
+		bool IsKtxData(const unsigned char* bytes, const int size)
 		{
 			static constexpr unsigned char ktx1Magic[] = {
 				0xAB, 0x4B, 0x54, 0x58, 0x20, 0x31, 0x31, 0xBB, 0x0D, 0x0A, 0x1A, 0x0A
@@ -82,10 +83,10 @@ namespace Kerberos
 			return tinygltf::LoadImageData(image, imageIdx, err, warn, reqWidth, reqHeight, bytes, size, nullptr);
 		}
 
-		static glm::vec3 ReadVec3(const tinygltf::Model& model, const tinygltf::Accessor& accessor, size_t index)
+        glm::vec3 ReadVec3(const tinygltf::Model& model, const tinygltf::Accessor& accessor, size_t index)
 		{
-			KBR_CORE_ASSERT(accessor.type == TINYGLTF_TYPE_VEC3, "Accessor type must be vec3");
-			KBR_CORE_ASSERT(accessor.componentType == TINYGLTF_COMPONENT_TYPE_FLOAT, "Accessor component type must be float");
+			KBRAssert(accessor.type == TINYGLTF_TYPE_VEC3, "Accessor type must be vec3");
+			KBRAssert(accessor.componentType == TINYGLTF_COMPONENT_TYPE_FLOAT, "Accessor component type must be float");
 
 			const tinygltf::BufferView& view = model.bufferViews[accessor.bufferView];
 			const tinygltf::Buffer& buffer = model.buffers[view.buffer];
@@ -96,10 +97,10 @@ namespace Kerberos
 			return { f[0], f[1], f[2] };
 		}
 
-		static glm::vec4 ReadVec4(const tinygltf::Model& model, const tinygltf::Accessor& accessor, size_t index)
+        glm::vec4 ReadVec4(const tinygltf::Model& model, const tinygltf::Accessor& accessor, size_t index)
 		{
-			KBR_CORE_ASSERT(accessor.type == TINYGLTF_TYPE_VEC4, "Accessor type must be vec4");
-			KBR_CORE_ASSERT(accessor.componentType == TINYGLTF_COMPONENT_TYPE_FLOAT, "Accessor component type must be float");
+			KBRAssert(accessor.type == TINYGLTF_TYPE_VEC4, "Accessor type must be vec4");
+			KBRAssert(accessor.componentType == TINYGLTF_COMPONENT_TYPE_FLOAT, "Accessor component type must be float");
 
 			const tinygltf::BufferView& view = model.bufferViews[accessor.bufferView];
 			const tinygltf::Buffer& buffer = model.buffers[view.buffer];
@@ -110,10 +111,10 @@ namespace Kerberos
 			return { f[0], f[1], f[2], f[3] };
 		}
 
-		static glm::vec2 ReadVec2(const tinygltf::Model& model, const tinygltf::Accessor& accessor, size_t index)
+        glm::vec2 ReadVec2(const tinygltf::Model& model, const tinygltf::Accessor& accessor, size_t index)
 		{
-			KBR_CORE_ASSERT(accessor.type == TINYGLTF_TYPE_VEC2, "Accessor type must be vec2");
-			KBR_CORE_ASSERT(accessor.componentType == TINYGLTF_COMPONENT_TYPE_FLOAT, "Accessor component type must be float");
+			KBRAssert(accessor.type == TINYGLTF_TYPE_VEC2, "Accessor type must be vec2");
+			KBRAssert(accessor.componentType == TINYGLTF_COMPONENT_TYPE_FLOAT, "Accessor component type must be float");
 
 			const tinygltf::BufferView& view = model.bufferViews[accessor.bufferView];
 			const tinygltf::Buffer& buffer = model.buffers[view.buffer];
@@ -124,7 +125,7 @@ namespace Kerberos
 			return { f[0], f[1] };
 		}
 
-		static void GenerateTangentsForVertices(std::vector<Vertex>& vertices, const std::vector<uint32_t>& indices)
+        void GenerateTangentsForVertices(std::vector<Vertex>& vertices, const std::vector<uint32_t>& indices)
 		{
 			if (vertices.empty() || indices.size() < 3)
 				return;
@@ -193,7 +194,7 @@ namespace Kerberos
 			}
 		}
 
-		static std::vector<uint32_t> ReadIndices(const tinygltf::Model& model, const tinygltf::Accessor& accessor)
+        std::vector<uint32_t> ReadIndices(const tinygltf::Model& model, const tinygltf::Accessor& accessor)
 		{
 			const tinygltf::BufferView& view = model.bufferViews[accessor.bufferView];
 			const tinygltf::Buffer& buffer = model.buffers[view.buffer];
@@ -232,7 +233,7 @@ namespace Kerberos
 			return indices;
 		}
 
-		static std::filesystem::path ResolveTexturePath(const std::filesystem::path& modelPath, const std::string& uri)
+        std::filesystem::path ResolveTexturePath(const std::filesystem::path& modelPath, const std::string& uri)
 		{
 			if (uri.empty())
 				return {};
@@ -260,7 +261,7 @@ namespace Kerberos
 			const tinygltf::Image& image = gltfModel.images[texture.source];
 			if (image.uri.empty())
 			{
-				KBR_CORE_WARN("Embedded glTF image detected for texture index {}. File-backed import only is currently supported.", textureIndex);
+				Log::CoreWarn("Embedded glTF image detected for texture index {}. File-backed import only is currently supported.", textureIndex);
 				return nullptr;
 			}
 
@@ -274,7 +275,7 @@ namespace Kerberos
 			return loadedTexture;
 		}
 
-		static ModelAnimationPath ToAnimationPath(const std::string& path)
+        ModelAnimationPath ToAnimationPath(const std::string& path)
 		{
 			if (path == "translation")
 				return ModelAnimationPath::Translation;
@@ -308,9 +309,9 @@ namespace Kerberos
 			throw std::runtime_error("Unsupported glTF extension: " + filepath.extension().string());
 
 		if (!warn.empty())
-			KBR_CORE_WARN("glTF loader warning: {}", warn);
+			Log::CoreWarn("glTF loader warning: {}", warn);
 		if (!err.empty())
-			KBR_CORE_ERROR("glTF loader error: {}", err);
+			Log::CoreError("glTF loader error: {}", err);
 		if (!ok)
 			throw std::runtime_error("Failed to import glTF file: " + filepath.string());
 
@@ -374,7 +375,7 @@ namespace Kerberos
 				const tinygltf::Primitive& primitive = sourceMesh.primitives[primitiveIndex];
 				if (primitive.mode != TINYGLTF_MODE_TRIANGLES)
 				{
-					KBR_CORE_WARN("Skipping non-triangle glTF primitive in mesh '{}'", sourceMesh.name);
+					Log::CoreWarn("Skipping non-triangle glTF primitive in mesh '{}'", sourceMesh.name);
 					continue;
 				}
 
@@ -520,7 +521,7 @@ namespace Kerberos
 					std::ofstream mout(meshPath, std::ios::binary);
 					if (!mout.is_open())
 					{
-						KBR_CORE_ERROR("Failed to write mesh file: {}", meshPath.string());
+						Log::CoreError("Failed to write mesh file: {}", meshPath.string());
 						continue;
 					}
 
@@ -701,7 +702,7 @@ namespace Kerberos
 			}
 			catch (const std::exception& e)
 			{
-				KBR_CORE_ERROR("GLTF import export error: {}", e.what());
+				Log::CoreError("GLTF import export error: {}", e.what());
 			}
 		}
 

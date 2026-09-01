@@ -1,8 +1,6 @@
-#include "kbrpch.hpp"
 
 #include "ScriptInterface.hpp"
 
-#include "Logging/Log.hpp"
 #include "Input/InputSystem.hpp"
 #include "Input/KeyCodes.hpp"
 #include "Scene/Scene.hpp"
@@ -20,6 +18,8 @@
 
 #include <memory>
 
+
+import Kerberos;
 
 namespace Kerberos
 {
@@ -87,7 +87,7 @@ namespace Kerberos
 	static void NativeLog(const char* message)
 	{
 		if (message)
-			KBR_CORE_INFO("C# Log: {0}", message);
+			Kerberos::Log::CoreInfo("C# Log: {0}", message);
 	}
 
 	static uint8_t Entity_HasComponent(const uint64_t entityID, const char* componentTypeName)
@@ -143,7 +143,7 @@ namespace Kerberos
 		if (typeName == "AudioListenerComponent")
 			return [](Entity entity) { return entity.AddComponent<AudioListenerComponent>(); };
 
-		KBR_CORE_ASSERT(false, "Unknown component type: {0}", typeName);
+		KBRAssert(false, "Unknown component type: {0}", typeName);
 		return nullptr;
 	}
 
@@ -210,7 +210,7 @@ namespace Kerberos
 			const auto& ownedScene = scene.lock();
 			if (!ownedScene)
 			{
-				KBR_CORE_ERROR("Failed to set translation for entity ID: {}. Scene context is not valid.", entityID);
+				Kerberos::Log::CoreError("Failed to set translation for entity ID: {}. Scene context is not valid.", entityID);
 				return;
 			}
 
@@ -243,7 +243,7 @@ namespace Kerberos
 			const auto& ownedScene = scene.lock();
 			if (!ownedScene)
 			{
-				KBR_CORE_ERROR("Failed to set rotation for entity ID: {}. Scene context is not valid.", entityID);
+				Kerberos::Log::CoreError("Failed to set rotation for entity ID: {}. Scene context is not valid.", entityID);
 				return;
 			}
 
@@ -276,7 +276,7 @@ namespace Kerberos
 			const auto& ownedScene = scene.lock();
 			if (!ownedScene)
 			{
-				KBR_CORE_ERROR("Failed to set scale for entity ID: {}. Scene context is not valid.", entityID);
+				Kerberos::Log::CoreError("Failed to set scale for entity ID: {}. Scene context is not valid.", entityID);
 				return;
 			}
 
@@ -297,7 +297,7 @@ namespace Kerberos
 		const Ref<Scene> currentScene = scene.lock();
 		const Entity entity = currentScene->GetEntityByUUID(UUID(entityID));
 
-		KBR_CORE_ASSERT(entity.HasComponent<StaticMeshComponent>(), "Entity doesn't have a StaticMeshComponent.");
+		KBRAssert(entity.HasComponent<StaticMeshComponent>(), "Entity doesn't have a StaticMeshComponent.");
 
 		const StaticMeshComponent& staticMeshComponent = entity.GetComponent<StaticMeshComponent>();
 		*outMesh = staticMeshComponent.StaticMesh->GetHandle();
@@ -309,14 +309,14 @@ namespace Kerberos
 		const Ref<Scene> currentScene = scene.lock();
 		const Entity entity = currentScene->GetEntityByUUID(UUID(entityID));
 
-		KBR_CORE_ASSERT(entity.HasComponent<StaticMeshComponent>(), "Entity doesn't have a StaticMeshComponent.");
+		KBRAssert(entity.HasComponent<StaticMeshComponent>(), "Entity doesn't have a StaticMeshComponent.");
 		// TODO: when using asset handles for assets, simply set it, maybe check if correct
 
 		StaticMeshComponent& staticMeshComponent = entity.GetComponent<StaticMeshComponent>();
 		const Ref<Mesh> mesh = AssetManager::ResolveMeshAsset(AssetHandle(meshRef));
 		if (!mesh)
 		{
-			KBR_CORE_WARN("Failed to set static mesh for entity ID: {}, mesh asset ID: {}", entityID, meshRef);
+			Kerberos::Log::CoreWarn("Failed to set static mesh for entity ID: {}, mesh asset ID: {}", entityID, meshRef);
 		}
 		staticMeshComponent.StaticMesh = mesh;
 	}
@@ -339,7 +339,7 @@ namespace Kerberos
 			const Ref<Scene> currentScene = scene.lock();
 			if (!currentScene)
 			{
-				KBR_CORE_ERROR("Failed to set rigidbody velocity for entity ID: {}. Scene context is not valid.", entityID);
+				Kerberos::Log::CoreError("Failed to set rigidbody velocity for entity ID: {}. Scene context is not valid.", entityID);
 				return;
 			}
 
@@ -365,10 +365,10 @@ namespace Kerberos
 			const Ref<Scene> currentScene = scene.lock();
 			const Entity entity = currentScene->GetEntityByUUID(UUID(entityID));
 
-			KBR_CORE_ASSERT(entity.HasComponent<RigidBody3DComponent>(), "Entity doesn't have a Rigidbody3DComponent.");
+			KBRAssert(entity.HasComponent<RigidBody3DComponent>(), "Entity doesn't have a Rigidbody3DComponent.");
 
 			const RigidBody3DComponent& rb3d = entity.GetComponent<RigidBody3DComponent>();
-			KBR_CORE_ASSERT(rb3d.RuntimeBody, "Rigidbody3DComponent doesn't have a runtime body.");
+			KBRAssert(rb3d.RuntimeBody, "Rigidbody3DComponent doesn't have a runtime body.");
 
 			const JPH::Body* body = static_cast<JPH::Body*>(rb3d.RuntimeBody);
 			const JPH::BodyID& bodyId = body->GetID();
@@ -387,10 +387,10 @@ namespace Kerberos
 			const Ref<Scene> currentScene = scene.lock();
 			const Entity entity = currentScene->GetEntityByUUID(UUID(entityID));
 
-			KBR_CORE_ASSERT(entity.HasComponent<RigidBody3DComponent>(), "Entity doesn't have a Rigidbody3DComponent.");
+			KBRAssert(entity.HasComponent<RigidBody3DComponent>(), "Entity doesn't have a Rigidbody3DComponent.");
 
 			const RigidBody3DComponent& rb3D = entity.GetComponent<RigidBody3DComponent>();
-			KBR_CORE_ASSERT(rb3D.RuntimeBody, "Rigidbody3DComponent doesn't have a runtime body.");
+			KBRAssert(rb3D.RuntimeBody, "Rigidbody3DComponent doesn't have a runtime body.");
 
 			const JPH::Body* body = static_cast<JPH::Body*>(rb3D.RuntimeBody);
 			const JPH::BodyID& bodyId = body->GetID();

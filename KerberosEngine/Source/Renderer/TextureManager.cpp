@@ -1,8 +1,9 @@
-#include "kbrpch.hpp"
 #include "TextureManager.hpp"
 
 #include "VulkanContext.hpp"
 #include "Assets/AssetManager.hpp"
+
+import Kerberos;
 
 namespace Kerberos
 {
@@ -155,7 +156,7 @@ namespace Kerberos
 	{
 		if (handle == AssetHandle::Invalid())
 		{
-			KBR_CORE_ASSERT(false, "Texture handle is invalid {0}", handle);
+			KBRAssert(false, "Texture handle is invalid {0}", handle);
 			return GetWhiteTexture();
 		}
 
@@ -166,7 +167,7 @@ namespace Kerberos
 		const Ref<Texture2D> texture = AssetManager::GetAsset<Texture2D>(handle);
 		if (!texture)
 		{
-			KBR_CORE_ASSERT(false, "Texture not found for handle: {0}", handle);
+			KBRAssert(false, "Texture not found for handle: {0}", handle);
 			return GetWhiteTexture();
 		}
 
@@ -187,55 +188,55 @@ namespace Kerberos
 
 	vk::DescriptorSetLayout TextureManager::GetGlobalDescriptorSetLayout() const 
 	{
-		KBR_CORE_ASSERT(m_DescriptorSetLayout != nullptr, "Global descriptor set layout is not initialized!");
+		KBRAssert(m_DescriptorSetLayout != nullptr, "Global descriptor set layout is not initialized!");
 		return m_DescriptorSetLayout;
 	}
 
 	vk::DescriptorSet TextureManager::GetGlobalDescriptorSet() const
 	{
-		KBR_CORE_ASSERT(m_GlobalDescriptorSet != nullptr, "Global descriptor set is not initialized!");
+		KBRAssert(m_GlobalDescriptorSet != nullptr, "Global descriptor set is not initialized!");
 		return m_GlobalDescriptorSet;
 	}
 
 	uint32_t TextureManager::GetWhiteTexture()
 	{
-		KBR_CORE_ASSERT(m_WhiteTexture != nullptr, "White texture is not initialized!");
+		KBRAssert(m_WhiteTexture != nullptr, "White texture is not initialized!");
 		return GetTextureIndex(m_WhiteTexture->GetHandle());
 	}
 
 	uint32_t TextureManager::GetBlackTexture() 
 	{
-		KBR_CORE_ASSERT(m_BlackTexture != nullptr, "Black texture is not initialized!");
+		KBRAssert(m_BlackTexture != nullptr, "Black texture is not initialized!");
 		return GetTextureIndex(m_BlackTexture->GetHandle());
 	}
 
 	uint32_t TextureManager::GetDefaultNormalTexture()
 	{
-		KBR_CORE_ASSERT(m_DefaultNormalTexture != nullptr, "Default normal texture is not initialized!");
+		KBRAssert(m_DefaultNormalTexture != nullptr, "Default normal texture is not initialized!");
 		return GetTextureIndex(m_DefaultNormalTexture->GetHandle());
 	}
 
 	uint32_t TextureManager::GetDefaultRoughnessTexture() 
 	{
-		KBR_CORE_ASSERT(m_DefaultRoughnessTexture != nullptr, "Default roughness texture is not initialized!");
+		KBRAssert(m_DefaultRoughnessTexture != nullptr, "Default roughness texture is not initialized!");
 		return GetTextureIndex(m_DefaultRoughnessTexture->GetHandle());
 	}
 
 	uint32_t TextureManager::GetDefaultMetallicTexture() 
 	{
-		KBR_CORE_ASSERT(m_DefaultMetallicTexture != nullptr, "Default metallic texture is not initialized!");
+		KBRAssert(m_DefaultMetallicTexture != nullptr, "Default metallic texture is not initialized!");
 		return GetTextureIndex(m_DefaultMetallicTexture->GetHandle());
 	}
 
 	uint32_t TextureManager::GetDefaultAOTexture() 
 	{
-		KBR_CORE_ASSERT(m_DefaultAOTexture != nullptr, "Default AO texture is not initialized!");
+		KBRAssert(m_DefaultAOTexture != nullptr, "Default AO texture is not initialized!");
 		return GetTextureIndex(m_DefaultAOTexture->GetHandle());
 	}
 
 	uint32_t TextureManager::GetDefaultEmissiveTexture()
 	{
-		KBR_CORE_ASSERT(m_DefaultEmissiveTexture != nullptr, "Default emissive texture is not initialized!");
+		KBRAssert(m_DefaultEmissiveTexture != nullptr, "Default emissive texture is not initialized!");
 		return GetTextureIndex(m_DefaultEmissiveTexture->GetHandle());
 	}
 
@@ -249,7 +250,7 @@ namespace Kerberos
 	{
 		if (m_FreeSlots.empty())
 		{
-			KBR_CORE_ERROR("No free texture slots available!");
+			Log::CoreError("No free texture slots available!");
 			throw std::runtime_error("No free texture slots available!");
 		}
 

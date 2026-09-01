@@ -1,4 +1,3 @@
-#include "kbrpch.hpp"
 #include "RuntimeAssetLoader.hpp"
 
 #include "Assets/Formats/NativeAssetSerializer.hpp"
@@ -10,6 +9,8 @@
 #include <fstream>
 #include <limits>
 #include <utility>
+
+import Kerberos;
 
 namespace Kerberos {
 
@@ -106,7 +107,7 @@ Ref<Asset> RuntimeAssetLoader::Load(const AssetHandle handle,
 		case AssetType::Model:
 			return LoadSceneManifest(handle, path);
 		default:
-			KBR_CORE_WARN("Runtime asset type {} has no native loader: {}", AssetTypeToString(metadata.Type), path.string());
+			Log::CoreWarn("Runtime asset type {} has no native loader: {}", AssetTypeToString(metadata.Type), path.string());
 			return nullptr;
 	}
 }

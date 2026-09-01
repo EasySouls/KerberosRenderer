@@ -1,14 +1,18 @@
-#include "kbrpch.hpp"
 #include "TextureImporter.hpp"
+#include "Core/Core.hpp"
 #include "Renderer/Textures/Texture2D.hpp"
 #include "Renderer/Textures/KTX2Encoder.hpp"
-#include "ImportUtils.hpp"
+#include "Profiling/Instrumentor.hpp"
 #include "Utils/KtxConversion.hpp"
+#include "ImportUtils.hpp"
 
 #include <stb_image.h>
 
 #include <unordered_set>
 #include <algorithm>
+
+import Kerberos;
+
 namespace 
 {
 
@@ -41,8 +45,8 @@ namespace Kerberos
 		const auto extension = filepath.extension();
 		if (!IsExtensionSupported(filepath))
 		{
-			KBR_CORE_ERROR("TextureImporter::ImportTexture - unsupported texture file format: {}", extension.string());
-			KBR_CORE_ASSERT(false, "TextureImporter::ImportTexture - unsupported texture file format: {}", extension.string());
+			Log::CoreError("TextureImporter::ImportTexture - unsupported texture file format: {}", extension.string());
+            KBRAssert(false, "TextureImporter::ImportTexture - unsupported texture file format: {}", extension.string());
 			return nullptr;
 		}
 
@@ -57,7 +61,7 @@ namespace Kerberos
 				{
 					const auto currentDir = std::filesystem::current_path();
 					const Process::ProcessResult result = KtxConversion::ConvertKtxToKtx2(filepath, true);
-					KBR_CORE_ASSERT(
+					KBRAssert(
 						result.Succeeded,
 						"TextureImporter::ImportTexture - failed to convert KTX to KTX2 for file: {} (started: {}, exit code: {}, error code: {}, error: {})",
 						filepath.string(),
@@ -102,8 +106,8 @@ namespace Kerberos
 
 		if (!std::filesystem::exists(filepath))
 		{
-			KBR_CORE_ERROR("TextureImporter::ImportTexture - file does not exist: {}", filepath.string());
-			KBR_CORE_ASSERT(false, "TextureImporter::ImportTexture - file does not exist: {}", filepath.string());
+			Log::CoreError("TextureImporter::ImportTexture - file does not exist: {}", filepath.string());
+			KBRAssert(false, "TextureImporter::ImportTexture - file does not exist: {}", filepath.string());
 			return std::make_pair(TextureSpecification{}, Buffer{});
 		}
 
@@ -116,12 +120,12 @@ namespace Kerberos
 
 		if (pixels == nullptr)
 		{
-			KBR_CORE_ERROR("TextureImporter::ImportTexture - failed to load texture from filepath: {}", filepath.string());
-			KBR_CORE_ASSERT(false, "TextureImporter::ImportTexture - stbi_load returned null data for filepath: {}", filepath.string());
+			Log::CoreError("TextureImporter::ImportTexture - failed to load texture from filepath: {}", filepath.string());
+			KBRAssert(false, "TextureImporter::ImportTexture - stbi_load returned null data for filepath: {}", filepath.string());
 			return std::make_pair(TextureSpecification{}, Buffer{});
 		}
 
-		KBR_CORE_ASSERT(width > 0 && height > 0, "TextureImporter::ImportTexture - failed to load texture with valid dimensions from filepath: {}", filepath.string());
+		KBRAssert(width > 0 && height > 0, "TextureImporter::ImportTexture - failed to load texture with valid dimensions from filepath: {}", filepath.string());
 
 		const int outputChannels = desiredChannels > 0 ? std::clamp(desiredChannels, 1, 4) : 4;
 		data.Size = static_cast<uint64_t>(width) * static_cast<uint64_t>(height) * outputChannels;

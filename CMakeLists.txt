@@ -1,6 +1,31 @@
 cmake_minimum_required(VERSION 3.30)
 
+if(NOT DEFINED CMAKE_CXX_COMPILER_CLANG_SCAN_DEPS AND CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
+    # Attempt to find the scanner in the system path or compiler directory
+    find_program(CMAKE_CXX_COMPILER_CLANG_SCAN_DEPS NAMES clang-scan-deps clang-scan-deps.exe)
+    
+    if(CMAKE_CXX_COMPILER_CLANG_SCAN_DEPS)
+        message(STATUS "Found clang-scan-deps: ${CMAKE_CXX_COMPILER_CLANG_SCAN_DEPS}")
+    else()
+        message(FATAL_ERROR "clang-scan-deps NOT FOUND! C++20 Modules cannot be compiled. Ensure LLVM bin folder is in your PATH.")
+    endif()
+endif()
+
 project(KerberosRenderer LANGUAGES CXX)
+
+message(STATUS "--- MODULE DIAGNOSTICS ---")
+message(STATUS "CMake Version:      ${CMAKE_VERSION}")
+message(STATUS "Compiler ID:        ${CMAKE_CXX_COMPILER_ID}")
+message(STATUS "Compiler Version:   ${CMAKE_CXX_COMPILER_VERSION}")
+message(STATUS "Simulated MSVC:     ${CMAKE_CXX_SIMULATE_VERSION}")
+message(STATUS "ScanDeps Tool:      ${CMAKE_CXX_COMPILER_CLANG_SCAN_DEPS}")
+message(STATUS "Internal Scanner:   ${CMAKE_CXX_SCANDEP_SOURCE}")
+message(STATUS "Compiler Launcher:  ${CMAKE_CXX_COMPILER_LAUNCHER}")
+message(STATUS "--------------------------")
+
+set(CMAKE_CXX_STANDARD 23)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS OFF)
 
 set_property(GLOBAL PROPERTY USE_FOLDERS ON)
 

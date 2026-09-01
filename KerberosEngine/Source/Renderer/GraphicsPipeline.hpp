@@ -2,6 +2,7 @@
 
 #include "Vulkan.hpp"
 #include "Shaders/Shader.hpp"
+#include "Core/Core.hpp"
 
 #include <string>
 #include <vector>

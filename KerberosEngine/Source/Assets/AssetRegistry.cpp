@@ -1,8 +1,12 @@
-#include "kbrpch.hpp"
 #include "AssetRegistry.hpp"
+#include "Core/Core.hpp"
+#include "Profiling/Instrumentor.hpp"
+
 #include <algorithm>
 #include <ranges>
 #include <cctype>
+
+import Kerberos;
 
 namespace Kerberos
 {
@@ -15,7 +19,7 @@ namespace Kerberos
 
 	AssetMetadata& AssetRegistry::Get(const AssetHandle handle)
 	{
-		KBR_CORE_ASSERT(m_Registry.contains(handle), "AssetRegistry::Get - registry doesn't contain AssetHandle {}", static_cast<uint64_t>(handle));
+		KBRAssert(m_Registry.contains(handle), "AssetRegistry::Get - registry doesn't contain AssetHandle {}", static_cast<uint64_t>(handle));
 
 		return m_Registry.at(handle);
 	}
@@ -69,7 +73,7 @@ namespace Kerberos
 			if (NormalizePath(metadata.Filepath) == normalized)
 				return handle;
 
-		KBR_CORE_ERROR("AssetRegistry::GetHandle - no handle found for path: {}", path.string());
+		Log::CoreError("AssetRegistry::GetHandle - no handle found for path: {}", path.string());
 		return AssetHandle::Invalid();
 	}
 

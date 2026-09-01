@@ -1,4 +1,3 @@
-#include "kbrpch.hpp"
 #include "FirstPersonCamera.hpp"
 
 #include <algorithm>
@@ -8,6 +7,8 @@
 #include "Events/MouseButtonReleasedEvent.hpp"
 #include "Input/InputSystem.hpp"
 #include "Renderer/Renderer.hpp"
+
+import Kerberos;
 
 namespace Kerberos
 {

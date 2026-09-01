@@ -1,4 +1,3 @@
-#include "kbrpch.hpp"
 #include "AssetImporter.hpp"
 
 #include "CubemapImporter.hpp"
@@ -10,6 +9,8 @@
 #include "PrefabImporter.hpp"
 #include "SoundImporter.hpp"
 #include "Assets/Asset.hpp"
+
+import Kerberos;
 
 namespace Kerberos
 {
@@ -47,11 +48,13 @@ namespace Kerberos
 				break;
 			case AssetType::Animation:
 				// TODO: Implement AnimationImporter
-				KBR_CORE_WARN("Animation import not yet implemented");
+				Log::CoreWarn("Animation import not yet implemented");
 				break;
-		}
+            case AssetType::Skin:
+                break;
+        }
 
-		KBR_CORE_ASSERT(false, "Unsupported asset type by AssetImporter!");
+		KBRAssert(false, "Unsupported asset type by AssetImporter!");
 		return nullptr;
 	}
 

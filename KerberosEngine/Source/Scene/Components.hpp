@@ -2,11 +2,9 @@
 
 #include <string>
 
-#define GLM_FORCE_DEPTH_ZERO_TO_ONE
 #include <glm/ext/matrix_transform.hpp>
 #include <glm/glm.hpp>
 
-#define GLM_ENABLE_EXPERIMENTAL
 #include "Assets/Asset.hpp"
 #include "Assets/AssetManager.hpp"
 #include "Core/UUID.hpp"

@@ -87,7 +87,7 @@ namespace Kerberos
 		glm::vec3 m_Position = { 0.0f, 0.0f, 0.0f };
 		glm::vec3 m_FocalPoint = { 0.0f, 0.0f, 0.0f };
 
-		glm::vec2 m_InitialMousePosition = { 0.0f, 0.0f };
+		glm::vec2 m_InitialMousePosition{ 0.0f, 0.0f };
 
 		float m_Distance = 5.0f;
 		float m_Pitch = 0.0f;

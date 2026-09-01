@@ -5,7 +5,6 @@
 #include "Assets/Importers/TextureImporter.hpp"
 #include "Events/KeyPressedEvent.hpp"
 #include "Input/InputSystem.hpp"
-#include "Logging/Log.hpp"
 #include "Scene/Components.hpp"
 #include "Scene/Components/AudioComponents.hpp"
 #include "Scene/Components/ParticleComponents.hpp"
@@ -20,6 +19,8 @@
 #include <imgui/imgui_internal.h>
 
 #include <filesystem>
+
+import Kerberos;
 
 namespace Kerberos {
 
@@ -742,7 +743,7 @@ void HierarchyPanel::DrawComponents(const Entity entity)
                                     const AssetHandle handle = *static_cast<AssetHandle*>(payload->Data);
                                     if (const AssetType assetType = AssetManager::GetAssetType(handle);
                                         assetType != AssetType::Material) {
-                                        KBR_EDITOR_ERROR("Asset is not a material: {0}", handle);
+                                        Log::EditorError("Asset is not a material: {0}", handle);
                                         m_NotificationManager.AddNotification("Asset is not a material",
                                                                               Notification::Type::Error);
                                         ImGui::EndDragDropTarget();
@@ -773,7 +774,7 @@ void HierarchyPanel::DrawComponents(const Entity entity)
                                     const AssetHandle handle = *static_cast<AssetHandle*>(payload->Data);
                                     if (const AssetType assetType = AssetManager::GetAssetType(handle);
                                         assetType != AssetType::Mesh && assetType != AssetType::Model) {
-                                        KBR_EDITOR_ERROR("Asset is not a mesh or model: {0}", handle);
+                                        Log::EditorError("Asset is not a mesh or model: {0}", handle);
                                         m_NotificationManager.AddNotification("Asset is not a mesh or model",
                                                                               Notification::Type::Error);
                                         ImGui::EndDragDropTarget();
@@ -782,7 +783,7 @@ void HierarchyPanel::DrawComponents(const Entity entity)
                                     }
                                     const Ref<Mesh> newMesh = AssetManager::ResolveMeshAsset(handle);
                                     if (!newMesh) {
-                                        KBR_EDITOR_ERROR("Could not resolve mesh from asset: {0}", handle);
+                                        Log::EditorError("Could not resolve mesh from asset: {0}", handle);
                                         m_NotificationManager.AddNotification(
                                             "Could not resolve mesh from selected asset", Notification::Type::Error);
                                         ImGui::EndDragDropTarget();
@@ -919,7 +920,7 @@ void HierarchyPanel::DrawComponents(const Entity entity)
                                     const AssetHandle handle = *static_cast<AssetHandle*>(payload->Data);
                                     if (const AssetType assetType = AssetManager::GetAssetType(handle);
                                         assetType != AssetType::Material) {
-                                        KBR_EDITOR_ERROR("Asset is not a material: {0}", handle);
+                                        Log::EditorError("Asset is not a material: {0}", handle);
                                         m_NotificationManager.AddNotification("Asset is not a material",
                                                                               Notification::Type::Error);
                                         ImGui::EndDragDropTarget();
@@ -950,7 +951,7 @@ void HierarchyPanel::DrawComponents(const Entity entity)
                                     const AssetHandle handle = *static_cast<AssetHandle*>(payload->Data);
                                     if (const AssetType assetType = AssetManager::GetAssetType(handle);
                                         assetType != AssetType::Mesh && assetType != AssetType::Model) {
-                                        KBR_EDITOR_ERROR("Asset is not a mesh or model: {0}", handle);
+                                        Log::EditorError("Asset is not a mesh or model: {0}", handle);
                                         m_NotificationManager.AddNotification("Asset is not a mesh or model",
                                                                               Notification::Type::Error);
                                         ImGui::EndDragDropTarget();
@@ -959,7 +960,7 @@ void HierarchyPanel::DrawComponents(const Entity entity)
                                     }
                                     const Ref<Mesh> newMesh = AssetManager::ResolveMeshAsset(handle);
                                     if (!newMesh) {
-                                        KBR_EDITOR_ERROR("Could not resolve mesh from asset: {0}", handle);
+                                        Log::EditorError("Could not resolve mesh from asset: {0}", handle);
                                         m_NotificationManager.AddNotification(
                                             "Could not resolve mesh from selected asset", Notification::Type::Error);
                                         ImGui::EndDragDropTarget();
@@ -1166,13 +1167,13 @@ void HierarchyPanel::DrawComponents(const Entity entity)
                     const AssetHandle handle = *static_cast<AssetHandle*>(payload->Data);
                     if (const AssetType assetType = AssetManager::GetAssetType(handle);
                         assetType != AssetType::Mesh && assetType != AssetType::Model) {
-                        KBR_EDITOR_ERROR("Asset is not a mesh: {0}", handle);
+                        Log::EditorError("Asset is not a mesh: {0}", handle);
                         m_NotificationManager.AddNotification("Asset is not a mesh", Notification::Type::Error);
                         return;
                     }
                     const Ref<Mesh> mesh = AssetManager::ResolveMeshAsset(handle);
                     if (!mesh) {
-                        KBR_EDITOR_ERROR("Could not resolve mesh from asset: {0}", handle);
+                        Log::EditorError("Could not resolve mesh from asset: {0}", handle);
                         m_NotificationManager.AddNotification("Could not resolve mesh from selected asset",
                                                               Notification::Type::Error);
                         return;
@@ -1203,7 +1204,7 @@ void HierarchyPanel::DrawComponents(const Entity entity)
                     const AssetHandle handle = *static_cast<AssetHandle*>(payload->Data);
                     if (const AssetType assetType = AssetManager::GetAssetType(handle);
                         assetType != AssetType::Material) {
-                        KBR_EDITOR_ERROR("Asset is not a material: {0}", handle);
+                        Log::EditorError("Asset is not a material: {0}", handle);
                         m_NotificationManager.AddNotification("Asset is not a material", Notification::Type::Error);
                         return;
                     }
@@ -1498,7 +1499,7 @@ void HierarchyPanel::DrawComponents(const Entity entity)
                 if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload(assetBrowserTextureCube)) {
                     const AssetHandle handle = *static_cast<AssetHandle*>(payload->Data);
                     if (AssetManager::GetAssetType(handle) != AssetType::TextureCube) {
-                        KBR_EDITOR_ERROR("Asset is not a texture: {0}", handle);
+                        Log::EditorError("Asset is not a texture: {0}", handle);
                         m_NotificationManager.AddNotification("Asset is not a cubemap", Notification::Type::Error);
                         return;
                     }
@@ -1566,7 +1567,7 @@ void HierarchyPanel::DrawComponents(const Entity entity)
                     if (AssetManager::GetAssetType(handle) !=
                         AssetType::Texture2D) // TODO: Change to font type when it exists
                     {
-                        KBR_EDITOR_ERROR("Asset is not a texture: {0}", handle);
+                        Log::EditorError("Asset is not a texture: {0}", handle);
                         m_NotificationManager.AddNotification("Asset is not a font", Notification::Type::Error);
                         return;
                     }
@@ -1611,7 +1612,7 @@ void HierarchyPanel::DrawComponents(const Entity entity)
                 if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload(assetBrowserAudio)) {
                     const AssetHandle handle = *static_cast<AssetHandle*>(payload->Data);
                     if (AssetManager::GetAssetType(handle) != AssetType::Sound) {
-                        KBR_EDITOR_ERROR("Asset is not a sound: {0}", handle);
+                        Log::EditorError("Asset is not a sound: {0}", handle);
                         m_NotificationManager.AddNotification("Asset is not a sound", Notification::Type::Error);
                         return;
                     }
@@ -1662,7 +1663,7 @@ void HierarchyPanel::DrawComponents(const Entity entity)
                 if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload(assetBrowserAudio)) {
                     const AssetHandle handle = *static_cast<AssetHandle*>(payload->Data);
                     if (AssetManager::GetAssetType(handle) != AssetType::Sound) {
-                        KBR_EDITOR_ERROR("Asset is not a sound: {0}", handle);
+                        Log::EditorError("Asset is not a sound: {0}", handle);
                         m_NotificationManager.AddNotification("Asset is not a sound", Notification::Type::Error);
                         return;
                     }
@@ -1773,13 +1774,13 @@ void HierarchyPanel::DrawComponents(const Entity entity)
                     const AssetHandle handle = *static_cast<AssetHandle*>(payload->Data);
                     if (const AssetType assetType = AssetManager::GetAssetType(handle);
                         assetType != AssetType::Texture2D) {
-                        KBR_EDITOR_ERROR("Asset is not a texture: {0}", handle);
+                        Log::EditorError("Asset is not a texture: {0}", handle);
                         m_NotificationManager.AddNotification("Asset is not a texture", Notification::Type::Error);
                         return;
                     }
                     const Ref<Texture2D> texture = AssetManager::GetAsset<Texture2D>(handle);
                     if (!texture) {
-                        KBR_EDITOR_ERROR("Could not resolve texture from asset: {0}", handle);
+                        Log::EditorError("Could not resolve texture from asset: {0}", handle);
                         m_NotificationManager.AddNotification("Could not resolve texture from selected asset",
                                                               Notification::Type::Error);
                         return;

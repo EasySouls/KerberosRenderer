@@ -1,9 +1,10 @@
-#include "kbrpch.hpp"
 #include "GrassSystem.hpp"
 
 #include "VulkanContext.hpp"
 #include "Utils.hpp"
 #include "Shaders/SlangCompiler.hpp"
+
+import Kerberos;
 
 namespace
 {
@@ -104,7 +105,7 @@ namespace Kerberos
 
         VkBuffer buffer = nullptr;
         if (vmaCreateBuffer(allocator, &bufferInfo, &allocInfo, &buffer, &m_ChunkBuffer.allocation, nullptr) != VK_SUCCESS)
-            KBR_CORE_ASSERT(false, "Failed to create Grass Chunk SSBO!");
+            KBRAssert(false, "Failed to create Grass Chunk SSBO!");
 
         m_ChunkBuffer.Handle = vk::Buffer(buffer);
         vmaMapMemory(allocator, m_ChunkBuffer.allocation, &m_ChunkBuffer.MappedData);

@@ -4,7 +4,6 @@
 #include "Events/Event.hpp"
 #include "Events/WindowClosedEvent.hpp"
 #include "Audio/AudioManager.hpp"
-#include "Logging/Log.hpp"
 #include "Core/Core.hpp"
 #include "Layer.hpp"
 
@@ -27,12 +26,8 @@ namespace Kerberos
 		int Count = 0;
 		char** Args = nullptr;
 
-		const char* operator[](const int index) const
-		{
-			KBR_CORE_ASSERT(index < Count, "Wrong index into ApplicationCommandLineArgs");
-			return Args[index];
-		}
-	};
+		const char* operator[](int index) const;
+    };
 
 	struct ApplicationSpecification
 	{

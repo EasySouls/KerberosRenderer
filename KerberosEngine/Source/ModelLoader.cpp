@@ -1,4 +1,3 @@
-#include "kbrpch.hpp"
 #include "ModelLoader.hpp"
 
 #define TINYGLTF_IMPLEMENTATION
@@ -7,6 +6,8 @@
 #include <tiny_gltf.h>
 
 #include <iostream>
+
+import Kerberos;
 
 namespace Kerberos
 {
@@ -101,21 +102,21 @@ namespace Kerberos
 		}
 		else 
 		{
-			KBR_CORE_ERROR("Unsupported file format: {0}", path.extension().string());
+			Log::CoreError("Unsupported file format: {0}", path.extension().string());
 			throw std::runtime_error("Unsupported file format: " + path.extension().string());
 		}
 
 		if (!warn.empty())
 		{
-			KBR_CORE_WARN("GLTF Warning: {0}", warn);
+			Log::CoreWarn("GLTF Warning: {0}", warn);
 		}
 		if (!err.empty())
 		{
-			KBR_CORE_ERROR("GLTF Error: {0}", err);
+			Log::CoreError("GLTF Error: {0}", err);
 		}
 		if (!ret)
 		{
-			KBR_CORE_ASSERT(false, "Failed to load glTF model: {0}", path.string());
+			KBRAssert(false, "Failed to load glTF model: {0}", path.string());
 			throw std::runtime_error("Failed to load glTF model: " + path.string());
 		}
 

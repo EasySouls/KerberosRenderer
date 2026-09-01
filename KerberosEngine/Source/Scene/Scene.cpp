@@ -1,6 +1,6 @@
-#include "kbrpch.hpp"
 
 #include "Scene.hpp"
+#include "Core/Core.hpp"
 #include "Entity.hpp"
 #include "Components.hpp"
 #include "Components/PhysicsComponents.hpp"
@@ -13,11 +13,14 @@
 #include "Renderer/Renderer.hpp"
 #include "Scripting/ScriptEngine.hpp"
 #include "Physics/Jolt/Utils.hpp"
+#include "Profiling/Instrumentor.hpp"
 
 #include <glm/gtx/matrix_decompose.hpp>
 
 #include <utility>
 
+
+import Kerberos;
 
 #define USE_MAP_FOR_UUID 1
 
@@ -201,20 +204,20 @@ Entity Scene::InstantiatePrefab(const AssetHandle prefabHandle, const std::strin
 
 	if (!prefabHandle.IsValid())
 	{
-		KBR_CORE_ERROR("Cannot instantiate prefab with invalid handle.");
+		Kerberos::Log::CoreError("Cannot instantiate prefab with invalid handle.");
 		return {};
 	}
 
 	if (AssetManager::GetAssetType(prefabHandle) != AssetType::Prefab)
 	{
-		KBR_CORE_ERROR("Asset {} is not a prefab asset.", prefabHandle);
+		Kerberos::Log::CoreError("Asset {} is not a prefab asset.", prefabHandle);
 		return {};
 	}
 
 	const Ref<Prefab> prefab = AssetManager::GetAsset<Prefab>(prefabHandle);
 	if (!prefab)
 	{
-		KBR_CORE_ERROR("Failed to load prefab asset: {}", prefabHandle);
+		Kerberos::Log::CoreError("Failed to load prefab asset: {}", prefabHandle);
 		return {};
 	}
 
@@ -472,20 +475,20 @@ Entity Scene::InstantiatePrefab(const AssetHandle prefabHandle, const std::strin
 	{
 		if (!modelHandle.IsValid())
 		{
-			KBR_CORE_ERROR("Cannot instantiate model with invalid handle.");
+			Kerberos::Log::CoreError("Cannot instantiate model with invalid handle.");
 			return {};
 		}
 
 		if (AssetManager::GetAssetType(modelHandle) != AssetType::Model)
 		{
-			KBR_CORE_ERROR("Asset {} is not a model asset.", modelHandle);
+			Kerberos::Log::CoreError("Asset {} is not a model asset.", modelHandle);
 			return {};
 		}
 
 		const Ref<Model> model = AssetManager::GetAsset<Model>(modelHandle);
 		if (!model)
 		{
-			KBR_CORE_ERROR("Failed to load model asset: {}", modelHandle);
+			Kerberos::Log::CoreError("Failed to load model asset: {}", modelHandle);
 			return {};
 		}
 
@@ -688,13 +691,13 @@ Entity Scene::InstantiatePrefab(const AssetHandle prefabHandle, const std::strin
 
 	const PhysicsSystem& Scene::GetPhysicsSystem() const
 	{
-		KBR_CORE_ASSERT(m_PhysicsSystem, "Physics system is not initialized");
+		KBRAssert(m_PhysicsSystem, "Physics system is not initialized");
 		return *m_PhysicsSystem;
 	}
 
 	PhysicsSystem& Scene::GetPhysicsSystem()
 	{
-		KBR_CORE_ASSERT(m_PhysicsSystem, "Physics system is not initialized");
+		KBRAssert(m_PhysicsSystem, "Physics system is not initialized");
 		return *m_PhysicsSystem;
 	}
 
@@ -1103,7 +1106,7 @@ Entity Scene::InstantiatePrefab(const AssetHandle prefabHandle, const std::strin
 			{
 				if (found)
 				{
-					KBR_CORE_WARN("Multiple directional lights found in the scene. Using the first one found as sunlight.");
+					Kerberos::Log::CoreWarn("Multiple directional lights found in the scene. Using the first one found as sunlight.");
 					break;
 				}
 
@@ -1315,7 +1318,7 @@ Entity Scene::InstantiatePrefab(const AssetHandle prefabHandle, const std::strin
 		const auto& smc = entity.GetComponent<StaticMeshComponent>();
 		if (smc.StaticMesh == nullptr)
 		{
-			KBR_CORE_WARN("MeshCollider3DComponent on entity {} does not have a valid static mesh!", entity.GetComponent<TagComponent>().Tag);
+			Kerberos::Log::CoreWarn("MeshCollider3DComponent on entity {} does not have a valid static mesh!", entity.GetComponent<TagComponent>().Tag);
 			return;
 		}
 

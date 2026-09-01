@@ -1,10 +1,11 @@
-#include "kbrpch.hpp"
 #include "ScriptUtils.hpp"
 
 #include "ScriptClass.hpp"
 
 #include <unordered_map>
 #include <string_view>
+
+import Kerberos;
 
 using namespace std::literals;
 
@@ -39,7 +40,7 @@ namespace Kerberos
 		if (s_ScriptFieldTypeMap.contains(typeName))
 			return s_ScriptFieldTypeMap.at(typeName);
 
-		KBR_CORE_WARN("Unrecognized .NET field type: {0}", typeName);
+		Kerberos::Log::CoreWarn("Unrecognized .NET field type: {0}", typeName);
 		return ScriptFieldType::Char;
 	}
 
@@ -68,7 +69,7 @@ namespace Kerberos
 			case ScriptFieldType::AssetHandle:	return "AssetHandle"sv;
 		}
 
-		KBR_CORE_ASSERT(false, "Unknown script field type!");
+		KBRAssert(false, "Unknown script field type!");
 		return ""sv;
 	}
 
@@ -94,7 +95,7 @@ namespace Kerberos
 		if (type == "TextureRef"sv)	return ScriptFieldType::TextureRef;
 		if (type == "AssetHandle"sv)	return ScriptFieldType::AssetHandle;
 
-		KBR_CORE_ASSERT(false, "Unknown script field type!");
+		KBRAssert(false, "Unknown script field type!");
 		return ScriptFieldType::Int;
 	}
 }

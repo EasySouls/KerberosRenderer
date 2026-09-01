@@ -1,9 +1,13 @@
+
 #ifdef KBR_PLATFORM_WINDOWS
-#include "kbrpch.hpp"
 #include "Utils/Process.hpp"
 
+#include <Windows.h>
 
 #include <format>
+#include <filesystem>
+
+import Kerberos;
 
 namespace
 {

@@ -1,4 +1,3 @@
-#include "kbrpch.hpp"
 #include "Texture2D.hpp"
 
 #include <ktx.h>
@@ -8,6 +7,8 @@
 #include "KTX2Loader.hpp"
 #include "KTX2FormatSelector.hpp"
 #include "VulkanContext.hpp"
+
+import Kerberos;
 
 namespace Kerberos {
 
@@ -44,11 +45,11 @@ Texture2D::Texture2D(const TextureSpecification& spec, const Buffer& buffer)
 
 	if (memReqs.size == 0) 
 	{
-		KBR_CORE_ERROR("Texture2D::Texture2D - failed to create staging buffer for texture upload, memory requirements size is 0");
+		Log::CoreError("Texture2D::Texture2D - failed to create staging buffer for texture upload, memory requirements size is 0");
 		return;
 	}
 
-	KBR_CORE_ASSERT(memReqs.size >= buffer.Size, "Texture2D::Texture2D - staging buffer memory requirements size ({}) is smaller than buffer size ({}), cannot copy data", memReqs.size, buffer.Size);
+	KBRAssert(memReqs.size >= buffer.Size, "Texture2D::Texture2D - staging buffer memory requirements size ({}) is smaller than buffer size ({}), cannot copy data", memReqs.size, buffer.Size);
 
 	vk::MemoryAllocateInfo memAllocInfo{
 		.allocationSize = memReqs.size,
@@ -167,7 +168,7 @@ Texture2D::Texture2D(const std::filesystem::path& filepath)
 	std::ranges::transform(extension, extension.begin(), [](unsigned char c) {
 		return static_cast<char>(std::tolower(c));
 	});
-	KBR_CORE_ASSERT(extension == ".ktx" || extension == ".ktx2", "Texture2D::Texture2D - only KTX files are supported in this constructor");
+	KBRAssert(extension == ".ktx" || extension == ".ktx2", "Texture2D::Texture2D - only KTX files are supported in this constructor");
 	
 	vk::ImageUsageFlags  imageUsageFlags = vk::ImageUsageFlagBits::eSampled;
 	vk::ImageLayout      imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal;
@@ -183,7 +184,7 @@ Texture2D::Texture2D(const std::filesystem::path& filepath)
 		if (!std::filesystem::exists(newFilePath))
 		{
 			const Process::ProcessResult result = KtxConversion::ConvertKtxToKtx2(filepath);
-			KBR_CORE_ASSERT(
+			KBRAssert(
 				result.Succeeded,
 				"Texture2D::Texture2D - failed to convert KTX to KTX2 for file: {} (started: {}, exit code: {}, error code: {}, error: {})",
 				filepath.string(),
@@ -194,15 +195,15 @@ Texture2D::Texture2D(const std::filesystem::path& filepath)
 		}
 		
 		ktxResult result = LoadKTXFile(newFilePath, &ktxTex);
-		KBR_CORE_ASSERT(result == KTX_SUCCESS, "Texture2D::Texture2D - Failed to load KTX file after converting it: {}", newFilePath.string());
+		KBRAssert(result == KTX_SUCCESS, "Texture2D::Texture2D - Failed to load KTX file after converting it: {}", newFilePath.string());
 	}
 	else
 	{
 		ktxResult result = KTX2Loader::Load(filepath, &ktxTex) ? KTX_SUCCESS : KTX_FILE_DATA_ERROR;
-		KBR_CORE_ASSERT(result == KTX_SUCCESS, "Texture2D::Texture2D - Failed to load KTX file: {}", filepath.string());
+		KBRAssert(result == KTX_SUCCESS, "Texture2D::Texture2D - Failed to load KTX file: {}", filepath.string());
 	}
 
-	KBR_CORE_ASSERT(ktxTex != nullptr, "Texture2D::Texture2D - ktxTexture2 pointer is null after loading KTX file: {}", filepath.string());
+	KBRAssert(ktxTex != nullptr, "Texture2D::Texture2D - ktxTexture2 pointer is null after loading KTX file: {}", filepath.string());
 
 	auto& context = VulkanContext::Get();
 	const auto& device = context.GetDevice();
@@ -249,7 +250,7 @@ Texture2D::Texture2D(const std::filesystem::path& filepath)
 	for (uint32_t i = 0; i < mipLevels; i++) {
 		ktx_size_t offset;
 		KTX_error_code res = ktxTexture_GetImageOffset(reinterpret_cast<ktxTexture*>(ktxTex), i, 0, 0, &offset);
-		KBR_CORE_ASSERT(res == KTX_SUCCESS, "Texture2D::Texture2D - Failed to get image offset for mip level {}", i);
+		KBRAssert(res == KTX_SUCCESS, "Texture2D::Texture2D - Failed to get image offset for mip level {}", i);
 		vk::BufferImageCopy bufferCopyRegion{
 			.bufferOffset = offset,
 			.imageSubresource = {
@@ -352,7 +353,7 @@ Texture2D::Texture2D(const std::filesystem::path& filepath)
 
 Texture2D::~Texture2D() 
 {
-	KBR_CORE_TRACE("Destroying Texture2D: {}", GetHandle());
+	Log::CoreTrace("Destroying Texture2D: {}", GetHandle());
 }
 
 Ref<Texture2D> Texture2D::FromBuffer(const TextureSpecification& spec, const Buffer& buffer) 

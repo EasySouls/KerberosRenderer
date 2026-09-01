@@ -18,13 +18,14 @@
 #include "TextureManager.hpp"
 #include "Utils.hpp"
 #include "VulkanContext.hpp"
-#include "kbrpch.hpp"
 
 #include <algorithm>
 #include <cmath>
 #include <glm/gtc/matrix_inverse.hpp>
 #include <limits>
 #include <numbers>
+
+import Kerberos;
 
 namespace {
 using namespace Kerberos;
@@ -483,8 +484,8 @@ static Owner<RendererData> s_Data = nullptr;
 
 void Renderer::Init()
 {
-    KBR_CORE_ASSERT(s_Data == nullptr, "Renderer is already initialized!");
-    KBR_CORE_INFO("Initializing Renderer...");
+    KBRAssert(s_Data == nullptr, "Renderer is already initialized!");
+    Log::CoreInfo("Initializing Renderer...");
 
     s_Data = CreateOwner<RendererData>();
 
@@ -493,12 +494,12 @@ void Renderer::Init()
         s_Data->FrameDescriptorAllocators[i] = CreateOwner<DescriptorAllocator>(1000);
     }
 
-    KBR_CORE_INFO("Size of SceneUniformData: {} bytes", sizeof(SceneUniformData));
-    KBR_CORE_INFO("Size of GlobalLighting: {} bytes", sizeof(GlobalLighting));
-    KBR_CORE_INFO("Size of PerObjectData: {} bytes", sizeof(PerObjectData));
-    KBR_CORE_INFO("Size of SkyboxData: {} bytes", sizeof(SkyboxData));
-    KBR_CORE_INFO("Size of GTAOConstants: {} bytes", sizeof(GTAOConstants));
-    KBR_CORE_INFO("Size of material UniformBlock: {} bytes", sizeof(Material::UniformBlock));
+    Log::CoreInfo("Size of SceneUniformData: {} bytes", sizeof(SceneUniformData));
+    Log::CoreInfo("Size of GlobalLighting: {} bytes", sizeof(GlobalLighting));
+    Log::CoreInfo("Size of PerObjectData: {} bytes", sizeof(PerObjectData));
+    Log::CoreInfo("Size of SkyboxData: {} bytes", sizeof(SkyboxData));
+    Log::CoreInfo("Size of GTAOConstants: {} bytes", sizeof(GTAOConstants));
+    Log::CoreInfo("Size of material UniformBlock: {} bytes", sizeof(Material::UniformBlock));
 
     CreateDefaultMaterials();
 
@@ -512,7 +513,7 @@ void Renderer::Init()
 
 void Renderer::Shutdown()
 {
-    KBR_CORE_ASSERT(s_Data, "Renderer not initialized!");
+    KBRAssert(s_Data != nullptr, "Renderer not initialized!");
 
     VulkanContext::Get().WaitIdle();
 
@@ -584,7 +585,7 @@ void Renderer::RenderScene(
     const float nearPlane,
     const float farPlane)
 {
-    KBR_CORE_ASSERT(!s_Data->PendingRender.IsValid, "Scene has already been queued for rendering!");
+    KBRAssert(!s_Data->PendingRender.IsValid, "Scene has already been queued for rendering!");
 
     glm::mat4 invView = glm::inverse(view);
 
@@ -603,7 +604,7 @@ void Renderer::RenderScene(
 
 void Renderer::RecordQueuedSceneRender(const vk::raii::CommandBuffer& cmd)
 {
-    KBR_CORE_ASSERT(s_Data->PendingRender.IsValid, "No pending scene render to record!");
+    KBRAssert(s_Data->PendingRender.IsValid, "No pending scene render to record!");
 
     if (!s_Data->PendingRender.IsValid || !s_Data->PendingRender.Scene)
         return;
@@ -1433,7 +1434,7 @@ void Renderer::RecordQueuedSceneRender(const vk::raii::CommandBuffer& cmd)
 
         WriteGPUTimestamp(cmd, frameIndex, static_cast<uint32_t>(GPUTimestampQuery::OpaqueEnd));
 
-        KBR_CORE_TRACE("Opaque pass done!");
+        Log::CoreTrace("Opaque pass done!");
     }
 
     RenderParticles(cmd, frameIndex);
@@ -1559,7 +1560,7 @@ void Renderer::RecordQueuedSceneRender(const vk::raii::CommandBuffer& cmd)
 
         WriteGPUTimestamp(cmd, frameIndex, static_cast<uint32_t>(GPUTimestampQuery::TransparentEnd));
 
-        KBR_CORE_TRACE("Transparent pass done!");
+        Log::CoreTrace("Transparent pass done!");
     }
 
     if (s_Data->DisplayPhysicsColliders && !colliderLineVertices.empty()) {
@@ -1726,7 +1727,7 @@ void Renderer::RecordQueuedSceneRender(const vk::raii::CommandBuffer& cmd)
 
         WriteGPUTimestamp(cmd, frameIndex, static_cast<uint32_t>(GPUTimestampQuery::TransparencyResolveEnd));
 
-        KBR_CORE_TRACE("Transparency resolve pass done!");
+        Log::CoreTrace("Transparency resolve pass done!");
     }
 
     ApplyBloom(cmd, currentImage);
@@ -1758,7 +1759,7 @@ void Renderer::RecordQueuedSceneRender(const vk::raii::CommandBuffer& cmd)
                                                     .pImageMemoryBarriers = &barrier };
         cmd.pipelineBarrier2(dependencyInfo);
 
-        KBR_CORE_TRACE("Resolve image transitioned for ImGui!");
+        Log::CoreTrace("Resolve image transitioned for ImGui!");
     }
 
     WriteGPUTimestamp(cmd, frameIndex, static_cast<uint32_t>(GPUTimestampQuery::FrameEnd));
@@ -1770,8 +1771,6 @@ void Renderer::RecordQueuedSceneRender(const vk::raii::CommandBuffer& cmd)
 
 void Renderer::CreateDefaultMaterials()
 {
-    KBR_CORE_ASSERT(s_Data, "Renderer not initialized!");
-
     s_Data->MaterialRegistry.Add("Gold",
                                  CreateRef<Material>("Gold", glm::vec4(1.0f, 0.765557f, 0.336057f, 1.0f), 0.1f, 1.0f));
     s_Data->MaterialRegistry.Add(
@@ -1797,8 +1796,6 @@ void Renderer::CreateDefaultMaterials()
 
 void Renderer::CreateResources()
 {
-    KBR_CORE_ASSERT(s_Data, "Renderer not initialized!");
-
     // TODO: Set default skybox texture if none is set by the user
     /*s_Data->Skybox.SkyboxTexture = TextureCube::FromFile(
         "assets/textures/hdr/pisa_cube.ktx",
@@ -2822,7 +2819,7 @@ void Renderer::CreateResources()
             vk::FormatFeatureFlagBits::eColorAttachment | vk::FormatFeatureFlagBits::eSampledImage);
 
         // Sanity check
-        KBR_CORE_ASSERT(s_Data->CompositeImage.Format == s_Data->ResolveImage.Format,
+        KBRAssert(s_Data->CompositeImage.Format == s_Data->ResolveImage.Format,
                         "FXAA composite image format does not match resolve image format!");
 
         CreateFXAAImage(initialImageWidth, initialImageHeight);
@@ -3070,7 +3067,7 @@ void Renderer::CreateResources()
 
 void Renderer::ResizeResources(const uint32_t width, const uint32_t height)
 {
-    KBR_CORE_ASSERT(s_Data, "Renderer not initialized!");
+    KBRAssert(s_Data != nullptr, "Renderer not initialized!");
 
     // Resize the color and depth image, the shadowmap image can keep its size
     auto& context = VulkanContext::Get();
@@ -3567,7 +3564,7 @@ void Renderer::ResizeResources(const uint32_t width, const uint32_t height)
 
     // Recreate descriptor set for the output image for ImGui rendering
     {
-        KBR_CORE_ASSERT(s_Data->LinearSampler != nullptr && s_Data->CompositeImage.ImageView != nullptr,
+        KBRAssert(s_Data->LinearSampler != nullptr && s_Data->CompositeImage.ImageView != nullptr,
                         "Sampler and image view has to be initialized to create an ImGui descriptor set");
 
         s_Data->ColorOutputDescriptorSet =
@@ -3633,63 +3630,63 @@ void Renderer::RecompileShaders()
 
 glm::vec3 Renderer::GetLightPositionForShadowMapCalculation()
 {
-    KBR_CORE_ASSERT(s_Data, "Renderer not initialized!");
+    KBRAssert(s_Data != nullptr, "Renderer not initialized!");
 
     return s_Data->ShadowMap.LightPosForCalculation;
 }
 
 DepthBias& Renderer::GetShadowMapDepthBiasSettings()
 {
-    KBR_CORE_ASSERT(s_Data, "Renderer not initialized!");
+    KBRAssert(s_Data != nullptr, "Renderer not initialized!");
 
     return s_Data->DepthBias;
 }
 
 bool& Renderer::GetIsPCFEnabledForShadowMap()
 {
-    KBR_CORE_ASSERT(s_Data, "Renderer not initialized!");
+    KBRAssert(s_Data != nullptr, "Renderer not initialized!");
 
     return s_Data->ShadowMap.EnablePCF;
 }
 
 bool& Renderer::GetDisplayDebugNormals()
 {
-    KBR_CORE_ASSERT(s_Data, "Renderer not initialized!");
+    KBRAssert(s_Data != nullptr, "Renderer not initialized!");
 
     return s_Data->DisplayDebugNormals;
 }
 
 bool& Renderer::GetDisplayPhysicsColliders()
 {
-    KBR_CORE_ASSERT(s_Data, "Renderer not initialized!");
+    KBRAssert(s_Data != nullptr, "Renderer not initialized!");
 
     return s_Data->DisplayPhysicsColliders;
 }
 
 bool& Renderer::GetDisplaySkybox()
 {
-    KBR_CORE_ASSERT(s_Data, "Renderer not initialized!");
+    KBRAssert(s_Data != nullptr, "Renderer not initialized!");
 
     return s_Data->Skybox.ShowSkybox;
 }
 
 bool& Renderer::GetUseRayQueryBasedShadows()
 {
-    KBR_CORE_ASSERT(s_Data, "Renderer not initialized!");
+    KBRAssert(s_Data != nullptr, "Renderer not initialized!");
 
     return s_Data->UseRayQueryBasedShadows;
 }
 
 bool& Renderer::GetUseRayQueryBasedSoftShadows()
 {
-    KBR_CORE_ASSERT(s_Data, "Renderer not initialized!");
+    KBRAssert(s_Data != nullptr, "Renderer not initialized!");
 
     return s_Data->UseRayQueryBasedSoftShadows;
 }
 
 bool& Renderer::GetUseGTAO()
 {
-    KBR_CORE_ASSERT(s_Data, "Renderer not initialized!");
+    KBRAssert(s_Data != nullptr, "Renderer not initialized!");
 
     return s_Data->UseGTAO;
 }
@@ -3706,14 +3703,14 @@ GTAOConstants& Renderer::GetGTAOConstants()
 
 float& Renderer::GetGamma()
 {
-    KBR_CORE_ASSERT(s_Data, "Renderer not initialized!");
+    KBRAssert(s_Data != nullptr, "Renderer not initialized!");
 
     return s_Data->GlobalLightingData.gamma;
 }
 
 float& Renderer::GetExposure()
 {
-    KBR_CORE_ASSERT(s_Data, "Renderer not initialized!");
+    KBRAssert(s_Data != nullptr, "Renderer not initialized!");
 
     return s_Data->GlobalLightingData.exposure;
 }
@@ -3741,7 +3738,7 @@ uint32_t Renderer::GetBloomMipLevels()
 void Renderer::SetBloomMipLevels(uint32_t levels)
 {
     if (levels > BloomData::MaxMipLevels) {
-        KBR_CORE_WARN("Attempted to set bloom mip levels to {}, which exceeds the maximum of {}. Clamping to maximum.",
+        Log::CoreWarn("Attempted to set bloom mip levels to {}, which exceeds the maximum of {}. Clamping to maximum.",
                       levels,
                       BloomData::MaxMipLevels);
         levels = BloomData::MaxMipLevels;
@@ -3751,43 +3748,31 @@ void Renderer::SetBloomMipLevels(uint32_t levels)
 
 float& Renderer::GetBloomIntensity()
 {
-    KBR_CORE_ASSERT(s_Data, "Renderer not initialized!");
-
     return s_Data->Bloom.Intensity;
 }
 
 BloomMode& Renderer::GetBloomMode()
 {
-    KBR_CORE_ASSERT(s_Data, "Renderer not initialized!");
-
     return s_Data->Bloom.Mode;
 }
 
 float& Renderer::GetBloomThreshold()
 {
-    KBR_CORE_ASSERT(s_Data, "Renderer not initialized!");
-
     return s_Data->Bloom.Threshold;
 }
 
 float& Renderer::GetBloomKnee()
 {
-    KBR_CORE_ASSERT(s_Data, "Renderer not initialized!");
-
     return s_Data->Bloom.Knee;
 }
 
 float& Renderer::GetBloomMaxBrightness()
 {
-    KBR_CORE_ASSERT(s_Data, "Renderer not initialized!");
-
     return s_Data->Bloom.MaxBrightness;
 }
 
 TonemappingOperator& Renderer::GetTonemappingOperator()
 {
-    KBR_CORE_ASSERT(s_Data, "Renderer not initialized!");
-
     return s_Data->TonemappingOperator;
 }
 
@@ -3818,14 +3803,12 @@ uint32_t Renderer::GetCulledObjectCount()
 
 glm::vec2 Renderer::GetOutputImageSize()
 {
-    KBR_CORE_ASSERT(s_Data, "Renderer not initialized!");
-
     return s_Data->OutputSize;
 }
 
 uint64_t Renderer::GetCompositedOutputImageID()
 {
-    KBR_CORE_ASSERT(s_Data->ColorOutputDescriptorSet,
+    KBRAssert(s_Data->ColorOutputDescriptorSet,
                     "ImGui descriptor set is not created for composited color output image!");
 
     return reinterpret_cast<uint64_t>(static_cast<VkDescriptorSet>(s_Data->ColorOutputDescriptorSet));
@@ -3833,8 +3816,8 @@ uint64_t Renderer::GetCompositedOutputImageID()
 
 uint64_t Renderer::GetShadowMapDepthImageID(uint32_t index)
 {
-    KBR_CORE_ASSERT(index < s_Data->ShadowMapDescriptorSet.size(), "Out of bounds index for shadow map depth image!");
-    KBR_CORE_ASSERT(s_Data->ShadowMapDescriptorSet[index],
+    KBRAssert(index < s_Data->ShadowMapDescriptorSet.size(), "Out of bounds index for shadow map depth image!");
+    KBRAssert(s_Data->ShadowMapDescriptorSet[index],
                     std::format("ImGui descriptor set is not created for shadow map depth image {}!", index));
 
     return reinterpret_cast<uint64_t>(static_cast<VkDescriptorSet>(s_Data->ShadowMapDescriptorSet[index]));
@@ -3842,7 +3825,7 @@ uint64_t Renderer::GetShadowMapDepthImageID(uint32_t index)
 
 void Renderer::RequestMousePickingPixel(const uint32_t x, const uint32_t y)
 {
-    KBR_CORE_ASSERT(s_Data, "Renderer not initialized!");
+    KBRAssert(s_Data != nullptr, "Renderer not initialized!");
 
     if (x >= static_cast<uint32_t>(s_Data->OutputSize.x) || y >= static_cast<uint32_t>(s_Data->OutputSize.y))
         return;
@@ -3853,14 +3836,14 @@ void Renderer::RequestMousePickingPixel(const uint32_t x, const uint32_t y)
 
 std::optional<uint32_t> Renderer::GetMousePickingEntityID()
 {
-    KBR_CORE_ASSERT(s_Data, "Renderer not initialized!");
+    KBRAssert(s_Data != nullptr, "Renderer not initialized!");
 
     return s_Data->MousePickingReadback.LatestEntityID;
 }
 
 bool Renderer::ConsumePendingMousePickingTimelineSignal(vk::Semaphore& semaphore, uint64_t& value)
 {
-    KBR_CORE_ASSERT(s_Data, "Renderer not initialized!");
+    KBRAssert(s_Data != nullptr, "Renderer not initialized!");
 
     if (s_Data->MousePickingReadback.PendingTimelineSignalValue == 0 ||
         s_Data->MousePickingReadback.TimelineSemaphore == nullptr)
@@ -3874,22 +3857,16 @@ bool Renderer::ConsumePendingMousePickingTimelineSignal(vk::Semaphore& semaphore
 
 GPUTimings Renderer::GetLatestGPUTimings()
 {
-    KBR_CORE_ASSERT(s_Data, "Renderer not initialized!");
-
     return s_Data->LatestGPUTimings;
 }
 
 RenderStatistics Renderer::GetLatestRenderStatistics()
 {
-    KBR_CORE_ASSERT(s_Data, "Renderer not initialized!");
-
     return s_Data->LatestRenderStatistics;
 }
 
 PipelineStatistics Renderer::GetLatestPipelineStatistics()
 {
-    KBR_CORE_ASSERT(s_Data, "Renderer not initialized!");
-
     return s_Data->LatestPipelineStatistics;
 }
 
@@ -3969,25 +3946,25 @@ void Renderer::ResolveGPUTimings(const uint32_t frameIndex)
 void Renderer::ResetQueryPools(const vk::raii::CommandBuffer& cmd, const uint32_t frameIndex)
 {
     if (s_Data->SupportsGPUTimestamps) {
-        KBR_CORE_ASSERT(frameIndex < s_Data->GPUTimestampQueryPools.size(),
+        KBRAssert(frameIndex < s_Data->GPUTimestampQueryPools.size(),
                         "Current frame index exceeds GPU Timestamp Query Pools size!");
-        KBR_CORE_ASSERT(s_Data->GPUTimestampQueryPools[frameIndex] != nullptr,
+        KBRAssert(s_Data->GPUTimestampQueryPools[frameIndex] != nullptr,
                         "GPU Timestamp Query Pool for current frame is null!");
 
         cmd.resetQueryPool(
             s_Data->GPUTimestampQueryPools[frameIndex], 0, static_cast<uint32_t>(GPUTimestampQuery::Count));
     }
     if (s_Data->SupportsPipelineStatistics) {
-        KBR_CORE_ASSERT(frameIndex < s_Data->PipelineStatisticsQueryPools.size(),
+        KBRAssert(frameIndex < s_Data->PipelineStatisticsQueryPools.size(),
                         "Current frame index exceeds Pipeline Statistics Query Pools size!");
-        KBR_CORE_ASSERT(s_Data->PipelineStatisticsQueryPools[frameIndex] != nullptr,
+        KBRAssert(s_Data->PipelineStatisticsQueryPools[frameIndex] != nullptr,
                         "Pipeline Statistics Query Pool for current frame is null!");
 
         cmd.resetQueryPool(s_Data->PipelineStatisticsQueryPools[frameIndex], 0, 2);
 
-        KBR_CORE_ASSERT(frameIndex < s_Data->MeshPipelineStatisticsQueryPools.size(),
+        KBRAssert(frameIndex < s_Data->MeshPipelineStatisticsQueryPools.size(),
                         "Current frame index exceeds Mesh Pipeline Statistics Query Pools size!");
-        KBR_CORE_ASSERT(s_Data->MeshPipelineStatisticsQueryPools[frameIndex] != nullptr,
+        KBRAssert(s_Data->MeshPipelineStatisticsQueryPools[frameIndex] != nullptr,
                         "Mesh Pipeline Statistics Query Pool for current frame is null!");
 
         cmd.resetQueryPool(s_Data->MeshPipelineStatisticsQueryPools[frameIndex], 0, 1);
@@ -3999,14 +3976,14 @@ void Renderer::ResolvePipelineStatistics(const uint32_t frameIndex)
     if (!s_Data->SupportsPipelineStatistics)
         return;
 
-    KBR_CORE_ASSERT(frameIndex < s_Data->PipelineStatisticsQueryPools.size(),
+    KBRAssert(frameIndex < s_Data->PipelineStatisticsQueryPools.size(),
                     "Current frame index exceeds Pipeline Statistics Query Pools size!");
-    KBR_CORE_ASSERT(s_Data->PipelineStatisticsQueryPools[frameIndex] != nullptr,
+    KBRAssert(s_Data->PipelineStatisticsQueryPools[frameIndex] != nullptr,
                     "Pipeline Statistics Query Pool for current frame is null!");
 
-    KBR_CORE_ASSERT(frameIndex < s_Data->MeshPipelineStatisticsQueryPools.size(),
+    KBRAssert(frameIndex < s_Data->MeshPipelineStatisticsQueryPools.size(),
                     "Current frame index exceeds Mesh Pipeline Statistics Query Pools size!");
-    KBR_CORE_ASSERT(s_Data->MeshPipelineStatisticsQueryPools[frameIndex] != nullptr,
+    KBRAssert(s_Data->MeshPipelineStatisticsQueryPools[frameIndex] != nullptr,
                     "Mesh Pipeline Statistics Query Pool for current frame is null!");
 
     // Traditional pipeline statistics
@@ -4027,7 +4004,7 @@ void Renderer::ResolvePipelineStatistics(const uint32_t frameIndex)
 
     // On the first VulkanContext::GetMaxFramesInFlight calls, this will return NotReady
     if (result != vk::Result::eSuccess && result != vk::Result::eNotReady) {
-        KBR_CORE_ERROR("Failed to retrieve pipeline statistics query results: {}", vk::to_string(result));
+        Log::CoreError("Failed to retrieve pipeline statistics query results: {}", vk::to_string(result));
         return;
     }
 
@@ -4051,7 +4028,7 @@ void Renderer::ResolvePipelineStatistics(const uint32_t frameIndex)
 
     // On the first VulkanContext::GetMaxFramesInFlight calls, this will return NotReady
     if (result != vk::Result::eSuccess && result != vk::Result::eNotReady) {
-        KBR_CORE_ERROR("Failed to retrieve mesh pipeline statistics query results: {}", vk::to_string(result));
+        Log::CoreError("Failed to retrieve mesh pipeline statistics query results: {}", vk::to_string(result));
         return;
     }
 
@@ -4062,8 +4039,6 @@ void Renderer::ResolvePipelineStatistics(const uint32_t frameIndex)
 
 void Renderer::UpdateLights(const uint32_t currentImage, const std::vector<GPULight>& sceneLights)
 {
-    KBR_CORE_ASSERT(s_Data, "Renderer not initialized!");
-
     std::memcpy(s_Data->UniformBuffers[currentImage].globalLighting->GetMappedData(),
                 &s_Data->GlobalLightingData,
                 sizeof(GlobalLighting));
@@ -4081,8 +4056,6 @@ void Renderer::UpdateSceneUniformBuffers(const uint32_t currentImage,
                                          const uint32_t lightCount,
                                          const float deltaTime)
 {
-    KBR_CORE_ASSERT(s_Data, "Renderer not initialized!");
-
     const glm::mat4& projection = mainCamera->GetProjectionMatrix();
     const glm::mat4& view = mainCamera->GetViewMatrix();
     const glm::vec3 camPos = mainCamera->GetPosition();
@@ -4102,14 +4075,12 @@ void Renderer::UpdateSceneUniformBuffers(const uint32_t currentImage,
                                          const glm::mat4& view,
                                          const glm::mat4& projection,
                                          const glm::vec3& camPos,
-                                         uint32_t temporalIndex,
+                                         uint32_t /*temporalIndex*/,
                                          const std::vector<glm::mat4>& lightSpaceMatrices,
                                          const glm::vec4& cascadeSplits,
                                          const uint32_t lightCount,
                                          const float deltaTime)
 {
-    KBR_CORE_ASSERT(s_Data, "Renderer not initialized!");
-
     s_Data->SceneUniformData.projection = projection;
     s_Data->SceneUniformData.view = view;
     s_Data->SceneUniformData.camPos = camPos;
@@ -4130,7 +4101,7 @@ void Renderer::UpdateSceneUniformBuffers(const uint32_t currentImage,
     }
 
     if (s_Data->SceneUniformData.lightSpaceMatrices.size() != lightSpaceMatrices.size()) {
-        KBR_CORE_ERROR("Number of light space matrices exceeds the maximum supported count of {}",
+        Log::CoreError("Number of light space matrices exceeds the maximum supported count of {}",
                        s_Data->SceneUniformData.lightSpaceMatrices.size());
     }
 
@@ -4157,8 +4128,6 @@ void Renderer::UpdatePerObjectUniformBuffer(const uint32_t currentImage,
                                             const Material& material,
                                             const uint32_t entityID)
 {
-    KBR_CORE_ASSERT(s_Data, "Renderer not initialized!");
-
     s_Data->PerObjectData = {
         .model = model, .worldNormal = glm::inverseTranspose(model), .material = material.Params, .entityID = entityID
     };
@@ -5239,8 +5208,6 @@ void Renderer::ApplyBloom(const vk::raii::CommandBuffer& cmd, const uint32_t fra
 
 glm::mat4 Renderer::CalculateLightSpaceMatrix()
 {
-    KBR_CORE_ASSERT(s_Data, "Renderer not initialized!");
-
     constexpr float nearPlane = 0.1f;
     constexpr float farPlane = 100.0f;
     constexpr float orthoSize = 20.0f;
@@ -5635,7 +5602,7 @@ void Renderer::SetupDescriptors()
 
 void Renderer::CreateSkyboxResources()
 {
-    KBR_CORE_ASSERT(s_Data->Skybox.SkyboxTexture != nullptr,
+    KBRAssert(s_Data->Skybox.SkyboxTexture != nullptr,
                     "Skybox texture has to be set before creating skybox resources");
 
     // TODO: Set default skybox texture if none is set by the user
@@ -5661,11 +5628,11 @@ void Renderer::CreateSkyboxResources()
 
 void Renderer::CreateTransparencyResources(const uint32_t width, const uint32_t height)
 {
-    KBR_CORE_ASSERT(s_Data->Transparency.AccumulationImage.Format != vk::Format::eUndefined,
+    KBRAssert(s_Data->Transparency.AccumulationImage.Format != vk::Format::eUndefined,
                     "Accumulation format has to be set before creating transparency resources");
-    KBR_CORE_ASSERT(s_Data->Transparency.RevealageImage.Format != vk::Format::eUndefined,
+    KBRAssert(s_Data->Transparency.RevealageImage.Format != vk::Format::eUndefined,
                     "Revealage format has to be set before creating transparency resources");
-    KBR_CORE_ASSERT(s_Data->Transparency.DistortionImage.Format != vk::Format::eUndefined,
+    KBRAssert(s_Data->Transparency.DistortionImage.Format != vk::Format::eUndefined,
                     "Distortion format has to be set before creating transparency resources");
 
     auto& context = VulkanContext::Get();
@@ -5781,7 +5748,7 @@ void Renderer::CreateTransparencyResources(const uint32_t width, const uint32_t 
 
 void Renderer::SetupTransparencyDescriptors()
 {
-    KBR_CORE_ASSERT(s_Data->DescriptorPool != nullptr,
+    KBRAssert(s_Data->DescriptorPool != nullptr,
                     "Descriptor pool has to be created before setting up transparency descriptors");
 
     auto& context = VulkanContext::Get();
@@ -5907,11 +5874,11 @@ void Renderer::SetupTransparencyDescriptors()
 
 void Renderer::CreateGTAOImage(const uint32_t width, const uint32_t height)
 {
-    KBR_CORE_ASSERT(s_Data->GTAOImage.Format != vk::Format::eUndefined,
+    KBRAssert(s_Data->GTAOImage.Format != vk::Format::eUndefined,
                     "GTAO image format has to be set before creating GTAO image!");
-    KBR_CORE_ASSERT(s_Data->GTAOScratchImage.Format != vk::Format::eUndefined,
+    KBRAssert(s_Data->GTAOScratchImage.Format != vk::Format::eUndefined,
                     "GTAO scratch image format has to be set before creating GTAO image!");
-    KBR_CORE_ASSERT(s_Data->GTAOImage.Format == s_Data->GTAOScratchImage.Format,
+    KBRAssert(s_Data->GTAOImage.Format == s_Data->GTAOScratchImage.Format,
                     "GTAO image format must be the same as GTAO scratch image format!");
 
     auto& context = VulkanContext::Get();
@@ -5966,11 +5933,11 @@ void Renderer::CreateGTAOImage(const uint32_t width, const uint32_t height)
 
 void Renderer::SetupGTAODescriptors()
 {
-    KBR_CORE_ASSERT(s_Data->DescriptorPool != nullptr,
+    KBRAssert(s_Data->DescriptorPool != nullptr,
                     "Descriptor pool has to be created before setting up GTAO descriptors");
-    KBR_CORE_ASSERT(s_Data->DescriptorSetLayouts.gtao != nullptr,
+    KBRAssert(s_Data->DescriptorSetLayouts.gtao != nullptr,
                     "GTAO descriptor set layout has to be created before setting up GTAO descriptors");
-    KBR_CORE_ASSERT(s_Data->DescriptorSetLayouts.crossBilateralBlur != nullptr,
+    KBRAssert(s_Data->DescriptorSetLayouts.crossBilateralBlur != nullptr,
                     "Cross-bilateral blur descriptor set layout has to be created before setting up GTAO descriptors");
 
     auto& context = VulkanContext::Get();
@@ -6137,7 +6104,7 @@ void Renderer::SetupGTAODescriptors()
 
 void Renderer::CreateTonemappedImage(const uint32_t width, const uint32_t height)
 {
-    KBR_CORE_ASSERT(s_Data->TonemappedImage.Format != vk::Format::eUndefined,
+    KBRAssert(s_Data->TonemappedImage.Format != vk::Format::eUndefined,
                     "Tonemapped image format has to be set before creating tonemapped image!");
 
     auto& context = VulkanContext::Get();
@@ -6170,7 +6137,7 @@ void Renderer::CreateTonemappedImage(const uint32_t width, const uint32_t height
 
 void Renderer::CreateFXAAImage(const uint32_t width, const uint32_t height)
 {
-    KBR_CORE_ASSERT(s_Data->CompositeImage.Format != vk::Format::eUndefined,
+    KBRAssert(s_Data->CompositeImage.Format != vk::Format::eUndefined,
                     "Composite image format has to be set before creating composite image!");
 
     auto& context = VulkanContext::Get();
@@ -6203,9 +6170,9 @@ void Renderer::CreateFXAAImage(const uint32_t width, const uint32_t height)
 
 void Renderer::SetupTonemappingResolveDescriptors()
 {
-    KBR_CORE_ASSERT(s_Data->DescriptorPool != nullptr,
+    KBRAssert(s_Data->DescriptorPool != nullptr,
                     "Descriptor pool has to be created before setting up tonemapping descriptors");
-    KBR_CORE_ASSERT(
+    KBRAssert(
         s_Data->DescriptorSetLayouts.tonemappingResolve != nullptr,
         "Tonemapping resolve descriptor set layout has to be created before setting up tonemapping descriptors");
 
@@ -6278,9 +6245,9 @@ void Renderer::SetupTonemappingResolveDescriptors()
 
 void Renderer::SetupFXAADescriptors()
 {
-    KBR_CORE_ASSERT(s_Data->DescriptorPool != nullptr,
+    KBRAssert(s_Data->DescriptorPool != nullptr,
                     "Descriptor pool has to be created before setting up FXAA descriptors");
-    KBR_CORE_ASSERT(s_Data->DescriptorSetLayouts.fxaa != nullptr,
+    KBRAssert(s_Data->DescriptorSetLayouts.fxaa != nullptr,
                     "FXAA descriptor set layout has to be created before setting up FXAA descriptors");
 
     auto& context = VulkanContext::Get();
@@ -6351,7 +6318,7 @@ void Renderer::SetupFXAADescriptors()
 
 void Renderer::CreateBloomImage(const uint32_t width, const uint32_t height)
 {
-    KBR_CORE_ASSERT(s_Data->Bloom.Format != vk::Format::eUndefined,
+    KBRAssert(s_Data->Bloom.Format != vk::Format::eUndefined,
                     "Bloom image format has to be set before creating bloom resources!");
 
     const uint32_t bloomWidth = width / 2;
@@ -6568,8 +6535,6 @@ void Renderer::CreateBloomResources(const uint32_t width, const uint32_t height)
 
 void Renderer::CreateSMAATextures()
 {
-    KBR_CORE_ASSERT(s_Data, "Renderer not initialized!");
-
     auto& context = VulkanContext::Get();
     const auto& device = context.GetDevice();
 
@@ -6838,9 +6803,9 @@ void Renderer::CreateSMAADescriptorSetAndPipelineLayouts()
 
 void Renderer::CreateSMAAImages(const uint32_t width, const uint32_t height)
 {
-    KBR_CORE_ASSERT(s_Data->SMAAResources.EdgesImage.Format != vk::Format::eUndefined,
+    KBRAssert(s_Data->SMAAResources.EdgesImage.Format != vk::Format::eUndefined,
                     "SMAA edge detection image format has to be set before creating SMAA images!");
-    KBR_CORE_ASSERT(s_Data->SMAAResources.BlendImage.Format != vk::Format::eUndefined,
+    KBRAssert(s_Data->SMAAResources.BlendImage.Format != vk::Format::eUndefined,
                     "SMAA blend image format has to be set before creating SMAA images!");
 
     auto& context = VulkanContext::Get();
@@ -6895,7 +6860,7 @@ void Renderer::CreateSMAAImages(const uint32_t width, const uint32_t height)
 
 void Renderer::SetupSMAADescriptors()
 {
-    KBR_CORE_ASSERT(s_Data->DescriptorPool != nullptr,
+    KBRAssert(s_Data->DescriptorPool != nullptr,
                     "Descriptor pool has to be created before setting up transparency descriptors");
 
     auto& context = VulkanContext::Get();

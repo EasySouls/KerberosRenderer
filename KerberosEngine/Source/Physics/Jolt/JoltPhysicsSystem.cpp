@@ -1,6 +1,6 @@
-#include "kbrpch.hpp"
 
 #include "JoltPhysicsSystem.hpp"
+#include "Core/Core.hpp"
 #include "Physics/PhysicsSystem.hpp"
 #include "BodyActivationListener.hpp"
 #include "ContactListener.hpp"
@@ -10,6 +10,7 @@
 #include "Scene/Entity.hpp"
 #include "Scene/Scene.hpp"
 #include "Scene/Components/PhysicsComponents.hpp"
+#include "Profiling/Instrumentor.hpp"
 
 #include <Jolt/Jolt.h>
 #include <Jolt/Core/TempAllocator.h>
@@ -28,6 +29,8 @@
 #include "Jolt/Physics/Collision/RayCast.h"
 #include "Jolt/Physics/Collision/CastResult.h"
 
+
+import Kerberos;
 
 namespace Kerberos
 {
@@ -192,7 +195,7 @@ namespace Kerberos
 			const UUID entityId = m_BodyIDToEntityID.at(bodyId);
 			if (!entityId.IsValid())
 			{
-				KBR_CORE_ASSERT(false, "Invalid body ID in raycast hit!");
+				KBRAssert(false, "Invalid body ID in raycast hit!");
 				return false;
 			}
 
@@ -225,8 +228,8 @@ namespace Kerberos
 	{
 		KBR_PROFILE_FUNCTION();
 
-		KBR_CORE_ASSERT(!m_Scene.expired(), "Scene is not initialized!");
-		KBR_CORE_ASSERT(m_JoltSystem, "Jolt Physics System is not initialized!");
+		KBRAssert(!m_Scene.expired(), "Scene is not initialized!");
+		KBRAssert(m_JoltSystem, "Jolt Physics System is not initialized!");
 
 		// Handle entities with rigidbodies but no physics body created yet
 		const auto newBodies = m_Scene.lock()->m_Registry.view<RigidBody3DComponent, TransformComponent>(/*entt::exclude<>*/);
@@ -275,8 +278,8 @@ namespace Kerberos
 
 	void JoltPhysicsSystem::SyncTransforms() const
 	{
-		KBR_CORE_ASSERT(!m_Scene.expired(), "Scene is not initialized!");
-		KBR_CORE_ASSERT(m_JoltSystem, "Jolt Physics System is not initialized!");
+		KBRAssert(!m_Scene.expired(), "Scene is not initialized!");
+		KBRAssert(m_JoltSystem, "Jolt Physics System is not initialized!");
 
 		const auto view = m_Scene.lock()->m_Registry.view<RigidBody3DComponent, TransformComponent>();
 		for (const auto e : view)
@@ -462,7 +465,7 @@ namespace Kerberos
 		const JPH::ShapeSettings::ShapeResult compoundResult = compoundSettings.Create();
 		if (compoundResult.HasError())
 		{
-			KBR_CORE_ERROR("Jolt: failed to create compound shape for entity {}: {}", entity.GetName(), compoundResult.GetError().c_str());
+			Kerberos::Log::CoreError("Jolt: failed to create compound shape for entity {}: {}", entity.GetName(), compoundResult.GetError().c_str());
 			return nullptr;
 		}
 		return compoundResult.Get();

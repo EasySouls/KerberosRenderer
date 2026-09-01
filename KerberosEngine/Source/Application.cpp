@@ -1,4 +1,3 @@
-#include "kbrpch.hpp"
 #include "Application.hpp"
 
 #include "Events/KeyPressedEvent.hpp"
@@ -13,7 +12,6 @@
 #include "Events/WindowResizedEvent.hpp"
 #include "Renderer/Renderer.hpp"
 #include "Scripting/ScriptEngine.hpp"
-#include "Logging/Log.hpp"
 
 #include <GLFW/glfw3.h>
 
@@ -22,6 +20,8 @@
 #include <filesystem>
 
 #include "imgui.h"
+
+import Kerberos;
 
 
 #ifdef KBR_PLATFORM_WINDOWS
@@ -38,12 +38,18 @@ namespace Kerberos
 
 	static void GLFWErrorCallback(const int error, const char* description)
 	{
-		KBR_CORE_ERROR("GLFW Error ({0}): {1}", error, description);
+		Log::CoreError("GLFW Error ({0}): {1}", error, description);
 	}
+
+    const char* ApplicationCommandLineArgs::operator[](const int index) const
+    {
+        KBRAssert(index < Count, "Wrong index into ApplicationCommandLineArgs");
+        return Args[index];
+    }
 
 	Application::Application(const ApplicationSpecification& spec)
 	{
-		KBR_CORE_ASSERT(!s_Instance, "Application already exists!");
+		KBRAssert(!s_Instance, "Application already exists!");
 		s_Instance = this;
 		m_RenderThreadId = std::this_thread::get_id();
 
@@ -52,13 +58,15 @@ namespace Kerberos
 		/// Set the working directory
 		if (!spec.WorkingDirectory.empty())
 		{
+			KBRAssert(std::filesystem::exists(std::filesystem::current_path()), "Working directory does not exist");
+
 			std::filesystem::current_path(spec.WorkingDirectory);
-			KBR_CORE_INFO("Working directory set to: {0}", std::filesystem::current_path().string());
+			Log::CoreInfo("Working directory set to: {0}", std::filesystem::current_path().string());
 		}
 		else
 		{
 			m_Specification.WorkingDirectory = std::filesystem::current_path();
-			KBR_CORE_WARN("No working directory specified, using current path: {0}", std::filesystem::current_path().string());
+			Log::CoreWarn("No working directory specified, using current path: {0}", std::filesystem::current_path().string());
 		}
 
 		m_AudioManager.reset(AudioManager::Create());
@@ -88,7 +96,7 @@ namespace Kerberos
 		{
 			const auto& app = *static_cast<Application*>(glfwGetWindowUserPointer(window));
 
-			KBR_CORE_INFO("Framebuffer resized: ({}, {})", width, height);
+			Log::CoreInfo("Framebuffer resized: ({}, {})", width, height);
 			app.m_VulkanContext->FramebufferResized(static_cast<uint32_t>(width), static_cast<uint32_t>(height));
 		});
 
@@ -327,7 +335,7 @@ namespace Kerberos
 
 	void Application::ExecuteGPUUploadQueue()
 	{
-		KBR_CORE_ASSERT(std::this_thread::get_id() == m_RenderThreadId,
+		KBRAssert(std::this_thread::get_id() == m_RenderThreadId,
 			"GPU upload queue must be drained by the render thread");
 
 		std::queue<GPUUploadQueueEntry> uploads;

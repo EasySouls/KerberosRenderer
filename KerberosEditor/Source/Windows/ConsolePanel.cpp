@@ -1,10 +1,11 @@
 #include "ConsolePanel.hpp"
 
-#include "Logging/Log.hpp"
-
 #include <imgui/imgui.h>
+#include  <spdlog/spdlog.h>
 
 #include <mutex>
+
+import Kerberos;
 
 namespace Kerberos
 {

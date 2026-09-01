@@ -1,4 +1,3 @@
-#include "kbrpch.hpp"
 #include "VulkanContext.hpp"
 
 #include "Renderer/Textures/Texture.hpp"
@@ -10,7 +9,6 @@
 #include "backends/imgui_impl_vulkan.h"
 
 #include "Utils.hpp"
-#include "logging/Log.hpp"
 #include "Renderer/Renderer.hpp"
 
 #define VK_USE_PLATFORM_WIN32_KHR
@@ -20,6 +18,8 @@
 #include <GLFW/glfw3native.h>
 
 #include "ImGuizmo.h"
+
+import Kerberos;
 
 static constexpr std::array validationLayers = {
 	"VK_LAYER_KHRONOS_validation"
@@ -59,61 +59,65 @@ static VKAPI_ATTR vk::Bool32 VKAPI_CALL DebugCallback(
 	const vk::DebugUtilsMessageTypeFlagsEXT type,
 	const vk::DebugUtilsMessengerCallbackDataEXT* pCallbackData,
 	void*)
+
 {
+    const char* messageIdName = pCallbackData->pMessageIdName ? pCallbackData->pMessageIdName : "No message ID name";
+	const char* message = pCallbackData->pMessage ? pCallbackData->pMessage : "No message";
+
 	if (type & vk::DebugUtilsMessageTypeFlagBitsEXT::eGeneral) {
 		if (severity & vk::DebugUtilsMessageSeverityFlagBitsEXT::eVerbose) {
-			KBR_CORE_TRACE("General|Verbose: {}|{}: {}", pCallbackData->messageIdNumber, pCallbackData->pMessageIdName, pCallbackData->pMessage);
+			Kerberos::Log::CoreTrace("General|Verbose: {}|{}: {}", pCallbackData->messageIdNumber, messageIdName, message);
 		}
 		else if (severity & vk::DebugUtilsMessageSeverityFlagBitsEXT::eInfo) {
-			KBR_CORE_INFO("General|Info: {}|{}: {}", pCallbackData->messageIdNumber, pCallbackData->pMessageIdName, pCallbackData->pMessage);
+			Kerberos::Log::CoreInfo("General|Info: {}|{}: {}", pCallbackData->messageIdNumber, messageIdName, message);
 		}
 		else if (severity & vk::DebugUtilsMessageSeverityFlagBitsEXT::eWarning) {
-			KBR_CORE_WARN("General|Warning: {}|{}: {}", pCallbackData->messageIdNumber, pCallbackData->pMessageIdName, pCallbackData->pMessage);
+			Kerberos::Log::CoreWarn("General|Warning: {}|{}: {}", pCallbackData->messageIdNumber, messageIdName, message);
 		}
 		else if (severity & vk::DebugUtilsMessageSeverityFlagBitsEXT::eError) {
-			KBR_CORE_ERROR("General|Error: {}|{}: {}", pCallbackData->messageIdNumber, pCallbackData->pMessageIdName, pCallbackData->pMessage);
+			Kerberos::Log::CoreError("General|Error: {}|{}: {}", pCallbackData->messageIdNumber, messageIdName, message);
 		}
 	}
 	else if (type & vk::DebugUtilsMessageTypeFlagBitsEXT::eValidation) {
 		if (severity & vk::DebugUtilsMessageSeverityFlagBitsEXT::eVerbose) {
-			KBR_CORE_TRACE("Validation|Verbose: {}|{}: {}", pCallbackData->messageIdNumber, pCallbackData->pMessageIdName, pCallbackData->pMessage);
+			Kerberos::Log::CoreTrace("Validation|Verbose: {}|{}: {}", pCallbackData->messageIdNumber, messageIdName, message);
 		}
 		else if (severity & vk::DebugUtilsMessageSeverityFlagBitsEXT::eInfo) {
-			KBR_CORE_INFO("Validation|Info: {}|{}: {}", pCallbackData->messageIdNumber, pCallbackData->pMessageIdName, pCallbackData->pMessage);
+			Kerberos::Log::CoreInfo("Validation|Info: {}|{}: {}", pCallbackData->messageIdNumber, messageIdName, message);
 		}
 		else if (severity & vk::DebugUtilsMessageSeverityFlagBitsEXT::eWarning) {
-			KBR_CORE_WARN("Validation|Warning: {}|{}: {}", pCallbackData->messageIdNumber, pCallbackData->pMessageIdName, pCallbackData->pMessage);
+			Kerberos::Log::CoreWarn("Validation|Warning: {}|{}: {}", pCallbackData->messageIdNumber, messageIdName, message);
 		}
 		else if (severity & vk::DebugUtilsMessageSeverityFlagBitsEXT::eError) {
-			KBR_CORE_ERROR("Validation|Error: {}|{}: {}", pCallbackData->messageIdNumber, pCallbackData->pMessageIdName, pCallbackData->pMessage);
+			Kerberos::Log::CoreError("Validation|Error: {}|{}: {}", pCallbackData->messageIdNumber, messageIdName, message);
 		}
 	}
 	else if (type & vk::DebugUtilsMessageTypeFlagBitsEXT::ePerformance) {
 		if (severity & vk::DebugUtilsMessageSeverityFlagBitsEXT::eVerbose) {
-			KBR_CORE_TRACE("Performance|Verbose: {}|{}: {}", pCallbackData->messageIdNumber, pCallbackData->pMessageIdName, pCallbackData->pMessage);
+			Kerberos::Log::CoreTrace("Performance|Verbose: {}|{}: {}", pCallbackData->messageIdNumber, messageIdName, message);
 		}
 		else if (severity & vk::DebugUtilsMessageSeverityFlagBitsEXT::eInfo) {
-			KBR_CORE_INFO("Performance|Info: {}|{}: {}", pCallbackData->messageIdNumber, pCallbackData->pMessageIdName, pCallbackData->pMessage);
+			Kerberos::Log::CoreInfo("Performance|Info: {}|{}: {}", pCallbackData->messageIdNumber, messageIdName, message);
 		}
 		else if (severity & vk::DebugUtilsMessageSeverityFlagBitsEXT::eWarning) {
-			KBR_CORE_WARN("Performance|Warning: {}|{}: {}", pCallbackData->messageIdNumber, pCallbackData->pMessageIdName, pCallbackData->pMessage);
+			Kerberos::Log::CoreWarn("Performance|Warning: {}|{}: {}", pCallbackData->messageIdNumber, messageIdName, message);
 		}
 		else if (severity & vk::DebugUtilsMessageSeverityFlagBitsEXT::eError) {
-			KBR_CORE_ERROR("Performance|Error: {}|{}: {}", pCallbackData->messageIdNumber, pCallbackData->pMessageIdName, pCallbackData->pMessage);
+			Kerberos::Log::CoreError("Performance|Error: {}|{}: {}", pCallbackData->messageIdNumber, messageIdName, message);
 		}
 	}
 	else if (type & vk::DebugUtilsMessageTypeFlagBitsEXT::eDeviceAddressBinding) {
 		if (severity & vk::DebugUtilsMessageSeverityFlagBitsEXT::eVerbose) {
-			KBR_CORE_TRACE("DeviceAddressBinding|Verbose: {}|{}: {}", pCallbackData->messageIdNumber, pCallbackData->pMessageIdName, pCallbackData->pMessage);
+			Kerberos::Log::CoreTrace("DeviceAddressBinding|Verbose: {}|{}: {}", pCallbackData->messageIdNumber, messageIdName, message);
 		}
 		else if (severity & vk::DebugUtilsMessageSeverityFlagBitsEXT::eInfo) {
-			KBR_CORE_INFO("DeviceAddressBinding|Info: {}|{}: {}", pCallbackData->messageIdNumber, pCallbackData->pMessageIdName, pCallbackData->pMessage);
+			Kerberos::Log::CoreInfo("DeviceAddressBinding|Info: {}|{}: {}", pCallbackData->messageIdNumber, messageIdName, message);
 		}
 		else if (severity & vk::DebugUtilsMessageSeverityFlagBitsEXT::eWarning) {
-			KBR_CORE_WARN("DeviceAddressBinding|Warning: {}|{}: {}", pCallbackData->messageIdNumber, pCallbackData->pMessageIdName, pCallbackData->pMessage);
+			Kerberos::Log::CoreWarn("DeviceAddressBinding|Warning: {}|{}: {}", pCallbackData->messageIdNumber, messageIdName, message);
 		}
 		else if (severity & vk::DebugUtilsMessageSeverityFlagBitsEXT::eError) {
-			KBR_CORE_ERROR("DeviceAddressBinding|Error: {}|{}: {}", pCallbackData->messageIdNumber, pCallbackData->pMessageIdName, pCallbackData->pMessage);
+			Kerberos::Log::CoreError("DeviceAddressBinding|Error: {}|{}: {}", pCallbackData->messageIdNumber, messageIdName, message);
 		}
 	}
 	//std::cerr << "validation layer: type " << to_string(type) << " msg: " << pCallbackData->pMessage << "\n\n";
@@ -346,7 +350,7 @@ namespace Kerberos
 		}
 		else 
 		{
-			KBR_CORE_ASSERT(false, "Unsupported operation type!");
+			KBRAssert(false, "Unsupported operation type!");
 			throw std::invalid_argument("unsupported operation type!");
 		}
 
@@ -375,7 +379,7 @@ namespace Kerberos
 		};
 		queue.submit(submitInfo, *oneTimeFence);
 		const vk::Result result = m_Device.waitForFences(*oneTimeFence, vk::True, UINT64_MAX);
-		KBR_CORE_ASSERT(result == vk::Result::eSuccess, "Failed to wait for fence!");
+		KBRAssert(result == vk::Result::eSuccess, "Failed to wait for fence!");
 	}
 
 	vk::raii::CommandBuffer VulkanContext::BeginSingleTimeCommands(OperationType type) const 
@@ -395,7 +399,7 @@ namespace Kerberos
 		}
 		else
 		{
-			KBR_CORE_ASSERT(false, "Unsupported operation type!");
+			KBRAssert(false, "Unsupported operation type!");
 			throw std::invalid_argument("unsupported operation type!");
 		}
 
@@ -430,7 +434,7 @@ namespace Kerberos
 		}
 		else
 		{
-			KBR_CORE_ASSERT(false, "Unsupported operation type!");
+			KBRAssert(false, "Unsupported operation type!");
 			throw std::invalid_argument("unsupported operation type!");
 		}
 
@@ -445,7 +449,7 @@ namespace Kerberos
 		};
 		queue.submit(submitInfo, *oneTimeFence);
 		const vk::Result result = m_Device.waitForFences(*oneTimeFence, vk::True, UINT64_MAX);
-		KBR_CORE_ASSERT(result == vk::Result::eSuccess, "Failed to wait for fence!");
+		KBRAssert(result == vk::Result::eSuccess, "Failed to wait for fence!");
 	}
 
 	void VulkanContext::CopyBuffer(
@@ -975,11 +979,11 @@ namespace Kerberos
 		for (const vk::raii::PhysicalDevice& device : devices)
 		{
 			const auto deviceProperties = device.getProperties2().properties;
-			KBR_CORE_INFO("Evaluating GPU: {}", deviceProperties.deviceName.data());
+			Log::CoreInfo("Evaluating GPU: {}", deviceProperties.deviceName.data());
 
 			if (deviceProperties.apiVersion < VK_API_VERSION_1_3)
 			{
-				KBR_CORE_WARN("  -> Rejected: Vulkan 1.3 not supported.");
+				Log::CoreWarn("  -> Rejected: Vulkan 1.3 not supported.");
 				continue;
 			}
 
@@ -993,7 +997,7 @@ namespace Kerberos
 
 			if (!hasGraphics)
 			{
-				KBR_CORE_WARN("  -> Rejected: No graphics queue family found.");
+				Log::CoreWarn("  -> Rejected: No graphics queue family found.");
 				continue;
 			}
 
@@ -1008,7 +1012,7 @@ namespace Kerberos
 
 				if (it == availableExtensions.end())
 				{
-					KBR_CORE_WARN("  -> Rejected: Missing required extension '{}'", requiredExt);
+					Log::CoreWarn("  -> Rejected: Missing required extension '{}'", requiredExt);
 					missingRequired = true;
 					break;
 				}
@@ -1019,14 +1023,14 @@ namespace Kerberos
 
 			if (!features2.features.geometryShader)
 			{
-				KBR_CORE_WARN("  -> Rejected: Missing required feature 'geometryShader'");
+				Log::CoreWarn("  -> Rejected: Missing required feature 'geometryShader'");
 				continue;
 			}
 
 			m_PhysicalDevice = device;
 			m_MaxMSAASamples = GetMaxUsableSampleCount(m_PhysicalDevice);
 			m_PhysicalDeviceName = deviceProperties.deviceName.data();
-			KBR_CORE_INFO("Selected GPU: {}", m_PhysicalDeviceName);
+			Log::CoreInfo("Selected GPU: {}", m_PhysicalDeviceName);
 
 			m_ActiveDeviceExtensions.assign(requiredDeviceExtensions.begin(), requiredDeviceExtensions.end());
 
@@ -1040,7 +1044,7 @@ namespace Kerberos
 				if (it != availableExtensions.end())
 				{
 					m_ActiveDeviceExtensions.push_back(optExt);
-					KBR_CORE_TRACE("  -> Enabled optional extension: {}", optExt);
+					Log::CoreTrace("  -> Enabled optional extension: {}", optExt);
 				}
 			}
 
@@ -1313,7 +1317,7 @@ namespace Kerberos
 			 ? m_Device.getQueue(m_QueueFamilyInfo.transfer.value(), 0)
 			 : m_GraphicsQueue;
 	
-		 KBR_CORE_INFO(
+		 Log::CoreInfo(
 			 "Queue families selected \n\tgraphics: {}, \n\tpresent: {}, \n\tcompute: {}, \n\ttransfer: {}, \n\tseparateCompute: {}, \n\tseparateTransfer: {}, \n\tdedicatedTransfer: {}",
 			 m_QueueFamilyInfo.graphics,
 			 m_QueueFamilyInfo.present,
@@ -1340,9 +1344,9 @@ namespace Kerberos
 
 	void VulkanContext::CreateAllocator()
 	{
-		KBR_CORE_ASSERT(m_Instance != nullptr, "VkInstance has to be initialized to create allocator!");
-		KBR_CORE_ASSERT(m_PhysicalDevice != nullptr, "VkPhysicalDevice has to be initialized to create allocator!");
-		KBR_CORE_ASSERT(m_Device != nullptr, "VkDevice has to be initialized to create allocator!");
+		KBRAssert(m_Instance != nullptr, "VkInstance has to be initialized to create allocator!");
+		KBRAssert(m_PhysicalDevice != nullptr, "VkPhysicalDevice has to be initialized to create allocator!");
+		KBRAssert(m_Device != nullptr, "VkDevice has to be initialized to create allocator!");
 
 		m_Allocator = VMA::CreateAllocator(m_Instance, m_PhysicalDevice, m_Device);
 	}
@@ -1495,7 +1499,7 @@ namespace Kerberos
 
 	void VulkanContext::CreateSyncObjects()
 	{
-		KBR_CORE_ASSERT(m_PresentCompleteSemaphores.empty() && m_RenderFinishedSemaphores.empty() && m_InFlightFences.empty(), "Sync objects are not empty!");
+		KBRAssert(m_PresentCompleteSemaphores.empty() && m_RenderFinishedSemaphores.empty() && m_InFlightFences.empty(), "Sync objects are not empty!");
 
 		for (size_t i = 0; i < m_SwapChainImages.size(); i++)
 		{
@@ -1820,7 +1824,7 @@ namespace Kerberos
 		io.Fonts->AddFontFromFileTTF("Assets/Fonts/Inter/Inter_18pt-Regular.ttf", scaledFontSize, &fontConfig);
 		ImFont* interRegular = io.Fonts->AddFontFromFileTTF("Assets/Fonts/Inter/Inter_18pt-Regular.ttf", baseFontSize, &fontConfig);
 
-		KBR_CORE_ASSERT(interRegular != nullptr, "Failed to load font!");
+		KBRAssert(interRegular != nullptr, "Failed to load font!");
 		io.FontDefault = interRegular;
 	}
 

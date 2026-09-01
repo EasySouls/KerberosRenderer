@@ -1,9 +1,12 @@
-#include "kbrpch.hpp"
 #include "RayTracingSceneCache.hpp"
+#include "Core/Core.hpp"
 
 #include "Core/Timer.hpp"
 #include "Scene/Scene.hpp"
 #include "Scene/Entity.hpp"
+#include "Profiling/Instrumentor.hpp"
+
+import Kerberos;
 
 namespace
 {
@@ -68,7 +71,7 @@ namespace Kerberos
 	{
         KBR_PROFILE_FUNCTION();
 
-		KBR_CORE_ASSERT(scene, "Scene cannot be null!");
+		KBRAssert(scene != nullptr, "Scene cannot be null!");
 
         auto& context = VulkanContext::Get();
         const auto& device = context.GetDevice();
@@ -86,7 +89,7 @@ namespace Kerberos
 
 			if (!meshRef)
             {
-                KBR_CORE_WARN("Entity {} has a StaticMeshComponent with a null StaticMesh reference. Skipping acceleration structure build for this entity.", static_cast<uint32_t>(entity));
+                Log::CoreWarn("Entity {} has a StaticMeshComponent with a null StaticMesh reference. Skipping acceleration structure build for this entity.", static_cast<uint32_t>(entity));
                 continue;
 			}
 
@@ -217,7 +220,7 @@ namespace Kerberos
 
 	void RayTracingSceneCache::BuildBLAS(const vk::raii::CommandBuffer& cmd, Mesh* mesh)
     {
-		KBR_CORE_ASSERT(mesh, "Mesh cannot be null!");
+		KBRAssert(mesh, "Mesh cannot be null!");
 
 		auto& context = VulkanContext::Get();
 		const auto& device = context.GetDevice();

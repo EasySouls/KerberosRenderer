@@ -1,5 +1,6 @@
 #include "EditorLayer.hpp"
 
+#include "Core/Timer.hpp"
 #include "VulkanContext.hpp"
 #include "IO.hpp"
 #include "Renderer/Renderer.hpp"
@@ -14,7 +15,6 @@
 #include "Scene/Camera/FirstPersonCamera.hpp"
 #include "Serialization/SceneSerializer.hpp"
 #include "Input/KeyCodes.hpp"
-#include "Logging/Log.hpp"
 #include "Scripting/ScriptEngine.hpp"
 
 #include <glm/gtc/matrix_inverse.hpp>
@@ -25,7 +25,7 @@
 #include <limits>
 #include <ranges>
 
-#include "Core/Timer.hpp"
+import Kerberos;
 
 namespace Kerberos
 {
@@ -50,7 +50,7 @@ namespace Kerberos
 	{
         KBR_PROFILE_FUNCTION();
 
-		KBR_CORE_INFO("EditorLayer attached!");
+		Log::EditorInfo("EditorLayer attached!");
 
 		constexpr bool isTesting = true;
 		if (isTesting)
@@ -94,8 +94,9 @@ namespace Kerberos
 		m_ViewportSize = {1280.0f, 720.0f};
 
 		{
-			Timer timer("Loading sample assets", [](const TimerData &data)
-									{ KBR_EDITOR_INFO("Loading sample meshes and textures took {} ms!", data.DurationMs); });
+			Timer timer("Loading sample assets", [](const TimerData &data) {
+                Log::EditorInfo("Loading sample meshes and textures took {} ms!", data.DurationMs);
+            });
 
 			constexpr GLTFLoadingFlags loadingFlags = GLTFLoadingFlags::None;
 
@@ -105,7 +106,7 @@ namespace Kerberos
 			m_Meshes["sphere"] = CreateRef<Mesh>(ModelLoader::LoadModel("assets/models/sphere.gltf", loadingFlags));
 			m_Meshes["cerberus"] = CreateRef<Mesh>(ModelLoader::LoadModel("assets/models/cerberus/cerberus.gltf", loadingFlags));
 
-			KBR_EDITOR_INFO("Loaded {} mesh(es)!", m_Meshes.size());
+			Log::EditorInfo("Loaded {} mesh(es)!", m_Meshes.size());
 
 			const std::vector<std::pair<std::string, vk::Format>> textureFiles = {
 					{"assets/models/avocado/Avocado_baseColor.ktx2", vk::Format::eR8G8B8A8Srgb},
@@ -129,7 +130,7 @@ namespace Kerberos
 				m_Textures.push_back(texture);
 			}
 
-			KBR_EDITOR_INFO("Loaded {} texture(s)!", m_Textures.size());
+			Log::EditorInfo("Loaded {} texture(s)!", m_Textures.size());
 
 			const auto &avocadoMaterial = m_MaterialRegistry.AddAndRetrieve("Avocado", std::make_shared<Material>("Avocado", glm::vec4(1.0f, 1.0f, 1.0f, 1.0f), 0.9f, 0.03f, m_Textures[0], m_Textures[1]));
 			const auto &stoneFloorMaterial = m_MaterialRegistry.AddAndRetrieve("Stone Floor", std::make_shared<Material>("Stone Floor", glm::vec4(1.0f, 1.0f, 1.0f, 1.0f), 0.8f, 0.05f, m_Textures[2], m_Textures[3]));
@@ -187,7 +188,7 @@ namespace Kerberos
 
 	void EditorLayer::OnDetach()
 	{
-		KBR_CORE_INFO("EditorLayer detached!");
+        Log::EditorInfo("EditorLayer detached!");
 	}
 
 	void EditorLayer::OnUpdate(const float deltaTime)
@@ -399,7 +400,7 @@ namespace Kerberos
 			if (const ImGuiPayload *payload = ImGui::AcceptDragDropPayload(assetBrowserItem))
 			{
 				const auto &path = static_cast<const char *>(payload->Data);
-				KBR_EDITOR_INFO("Drag and drop payload: {0}", path);
+				Log::EditorInfo("Drag and drop payload: {0}", path);
 
 				const std::string message = "Drag and drop payload: " + std::string(path);
 				m_NotificationManager.AddNotification(message, Notification::Type::Info);
@@ -612,7 +613,7 @@ namespace Kerberos
 
 		if (!serializer.Deserialize(filepath))
 		{
-			KBR_EDITOR_ERROR("Failed to load scene from {0}", filepath.string());
+            Log::EditorInfo("Failed to load scene from {0}", filepath.string());
 			return;
 		}
 
@@ -1285,7 +1286,7 @@ namespace Kerberos
 			return "Scale";
 		}
 
-		KBR_CORE_ASSERT(false, "Invalid gizmo type");
+		KBRAssert(false, "Invalid gizmo type");
 		return "";
 	}
 

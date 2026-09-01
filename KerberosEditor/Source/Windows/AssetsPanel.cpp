@@ -1,7 +1,7 @@
 #include "AssetsPanel.hpp"
 
 #include "AssetConstants.hpp"
-#include "Logging/Log.hpp"
+#include "Assets/Asset.hpp"
 #include "Assets/AssetManager.hpp"
 #include "Assets/Importers/MaterialImporter.hpp"
 #include "Assets/Importers/TextureImporter.hpp"
@@ -15,6 +15,7 @@
 
 #include "VulkanContext.hpp"
 
+import Kerberos;
 
 namespace Kerberos
 {
@@ -268,7 +269,7 @@ namespace Kerberos
 					const std::filesystem::path assetPath = std::filesystem::relative(materialPath, Project::GetProjectDirectory());
 					if (!MaterialImporter::SaveMaterial(assetPath, material))
 					{
-						KBR_CORE_ERROR("Could not create material file at path: {0}", materialPathStr);
+						Log::EditorError("Could not create material file at path: {0}", materialPathStr);
 					}
 					else
 					{
@@ -277,7 +278,7 @@ namespace Kerberos
 				}
 				else
 				{
-					KBR_CORE_ERROR("Material creation cancelled or invalid path.");
+					Log::EditorError("Material creation cancelled or invalid path.");
 				}
 
 				ImGui::CloseCurrentPopup();
@@ -505,7 +506,7 @@ namespace Kerberos
 					}
 					else
 					{
-						KBR_CORE_ERROR("Asset must be located inside the Assets directory: {0}", assetPath.string());
+						Log::EditorError("Asset must be located inside the Assets directory: {0}", assetPath.string());
 						m_NotificationManager.AddNotification(
 							"Asset must be located inside the Assets directory: " + assetPath.string(),
 							Notification::Type::Error
@@ -514,7 +515,7 @@ namespace Kerberos
 				}
 				else
 				{
-					KBR_CORE_ERROR("File does not exist: {0}", assetPath.string());
+					Log::EditorError("File does not exist: {0}", assetPath.string());
 				}
 			}
 		}
@@ -575,7 +576,7 @@ namespace Kerberos
 			return;
 		}
 
-		KBR_CORE_ERROR("Invalid directory path: {0}", path.string());
+		Log::EditorError("Invalid directory path: {0}", path.string());
 	}
 
 	void AssetsPanel::OnEvent(Event& event)

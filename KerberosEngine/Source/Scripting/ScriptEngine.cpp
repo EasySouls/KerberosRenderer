@@ -1,4 +1,3 @@
-#include "kbrpch.hpp"
 #include "ScriptEngine.hpp"
 
 #include "Scripting/ScriptInterface.hpp"
@@ -33,6 +32,8 @@ using dotnet_string = std::wstring;
 #define DOTNET_STR(s) s
 using dotnet_string = std::string;
 #endif
+
+import Kerberos;
 
 using namespace std::literals;
 
@@ -147,7 +148,7 @@ namespace Kerberos
 		int rc = get_hostfxr_path(buffer, &bufferSize, nullptr);
 		if (rc != 0)
 		{
-			KBR_CORE_ERROR("Failed to find hostfxr library. Ensure .NET SDK is installed. Error: 0x{:x}", rc);
+			Log::CoreError("Failed to find hostfxr library. Ensure .NET SDK is installed. Error: 0x{:x}", rc);
 			return false;
 		}
 
@@ -155,7 +156,7 @@ namespace Kerberos
 		void* lib = LoadLibraryHelper(buffer);
 		if (!lib)
 		{
-			KBR_CORE_ERROR("Failed to load hostfxr library");
+			Log::CoreError("Failed to load hostfxr library");
 			return false;
 		}
 
@@ -215,7 +216,7 @@ namespace Kerberos
 	{
 		Timer reloadAssemblyTimer("Reload Assembly", [&](const TimerData& data)
 		{
-			KBR_CORE_INFO("Reloading C# assemblies took {:.2f} ms", data.DurationMs);
+			Log::CoreInfo("Reloading C# assemblies took {:.2f} ms", data.DurationMs);
 		});
 
 		LoadAssembly(s_ScriptData->CoreAssemblyPath);
@@ -242,7 +243,7 @@ namespace Kerberos
 
 		if (!ClassExists(scriptComponent.ClassName))
 		{
-			KBR_CORE_ERROR("Script class '{0}' does not exist!", scriptComponent.ClassName);
+			Log::CoreError("Script class '{0}' does not exist!", scriptComponent.ClassName);
 			return;
 		}
 
@@ -266,8 +267,8 @@ namespace Kerberos
 
 	void ScriptEngine::OnUpdateEntity(const Entity entity, const float deltaTime)
 	{
-		KBR_CORE_ASSERT(entity.HasComponent<ScriptComponent>(), "Entity does not have a ScriptComponent!");
-		KBR_CORE_ASSERT(s_ScriptData->EntityInstances.contains(entity.GetUUID()), "No script instance found for entity!");
+		KBRAssert(entity.HasComponent<ScriptComponent>(), "Entity does not have a ScriptComponent!");
+		KBRAssert(s_ScriptData->EntityInstances.contains(entity.GetUUID()), "No script instance found for entity!");
 
 		s_ScriptData->EntityInstances[entity.GetUUID()]->InvokeOnUpdate(deltaTime);
 	}
@@ -277,7 +278,7 @@ namespace Kerberos
 		if (!entity.HasComponent<ScriptComponent>())
 			return;
 
-		KBR_CORE_ASSERT(s_ScriptData->EntityInstances.contains(entity.GetUUID()), "No script instance found for entity!");
+		KBRAssert(s_ScriptData->EntityInstances.contains(entity.GetUUID()), "No script instance found for entity!");
 
 		switch (event.EventType)
 		{
@@ -300,7 +301,7 @@ namespace Kerberos
 
 	void ScriptEngine::CreateScriptFieldInitializers(const Entity entity, const std::string& className)
 	{
-		KBR_CORE_ASSERT(ClassExists(className), "Script class doesn't exist!");
+		KBRAssert(ClassExists(className), "Script class doesn't exist!");
 
 		const UUID entityID = entity.GetUUID();
 		const std::string_view currentClassName = entity.GetComponent<ScriptComponent>().ClassName;
@@ -328,9 +329,9 @@ namespace Kerberos
 	{
 		const std::string& dstClassName = dstEntity.GetComponent<ScriptComponent>().ClassName;
 
-		KBR_CORE_ASSERT(srcEntity.HasComponent<ScriptComponent>(), "Source entity does not have a ScriptComponent!");
-		KBR_CORE_ASSERT(dstEntity.HasComponent<ScriptComponent>(), "Destination entity does not have a ScriptComponent!");
-		KBR_CORE_ASSERT(srcEntity.GetComponent<ScriptComponent>().ClassName == dstClassName, "Script initializers can only be copied between entities of the same script class!");
+		KBRAssert(srcEntity.HasComponent<ScriptComponent>(), "Source entity does not have a ScriptComponent!");
+		KBRAssert(dstEntity.HasComponent<ScriptComponent>(), "Destination entity does not have a ScriptComponent!");
+		KBRAssert(srcEntity.GetComponent<ScriptComponent>().ClassName == dstClassName, "Script initializers can only be copied between entities of the same script class!");
 
 		CreateScriptFieldInitializers(dstEntity, dstClassName);
 
@@ -350,7 +351,7 @@ namespace Kerberos
 		if (!s_ScriptData->EntityFieldInitializers.contains(entityID))
 		{
 			const std::string_view entityName = entity.GetName();
-			KBR_CORE_TRACE("No field initializers found for entity {}"sv, entityName);
+			Log::CoreTrace("No field initializers found for entity {}"sv, entityName);
 
 			return s_ScriptData->EntityFieldInitializers[entityID];
 		}
@@ -375,35 +376,35 @@ namespace Kerberos
 
 	bool ScriptEngine::CreateManagedInstance(const uint64_t entityID, const std::string& className)
 	{
-		KBR_CORE_ASSERT(s_ScriptData->ManagedCreateInstance, "ManagedCreateInstance function pointer is null!");
+		KBRAssert(s_ScriptData->ManagedCreateInstance, "ManagedCreateInstance function pointer is null!");
 
 		return s_ScriptData->ManagedCreateInstance(entityID, className.c_str()) != 0;
 	}
 
 	void ScriptEngine::DestroyManagedInstance(const uint64_t entityID)
 	{
-		KBR_CORE_ASSERT(s_ScriptData->ManagedDestroyInstance, "ManagedDestroyInstance function pointer is null!");
+		KBRAssert(s_ScriptData->ManagedDestroyInstance, "ManagedDestroyInstance function pointer is null!");
 		
 		s_ScriptData->ManagedDestroyInstance(entityID);
 	}
 
 	bool ScriptEngine::InvokeManagedOnCreate(const uint64_t entityID)
 	{
-		KBR_CORE_ASSERT(s_ScriptData->ManagedInvokeOnCreate, "ManagedInvokeOnCreate function pointer is null!");
+		KBRAssert(s_ScriptData->ManagedInvokeOnCreate, "ManagedInvokeOnCreate function pointer is null!");
 
 		return s_ScriptData->ManagedInvokeOnCreate(entityID) != 0;
 	}
 
 	bool ScriptEngine::InvokeManagedOnUpdate(const uint64_t entityID, const float deltaTime)
 	{
-		KBR_CORE_ASSERT(s_ScriptData->ManagedInvokeOnUpdate, "ManagedInvokeOnUpdate function pointer is null!");
+		KBRAssert(s_ScriptData->ManagedInvokeOnUpdate, "ManagedInvokeOnUpdate function pointer is null!");
 		
 		return s_ScriptData->ManagedInvokeOnUpdate(entityID, deltaTime) != 0;
 	}
 
 	bool ScriptEngine::InvokeManagedOnCollisionEnter(const uint64_t entityID, const CollisionEvent& event)
 	{
-		KBR_CORE_ASSERT(s_ScriptData->ManagedInvokeOnCollisionEnter, "ManagedInvokeOnCollisionEnter function pointer is null!");
+		KBRAssert(s_ScriptData->ManagedInvokeOnCollisionEnter, "ManagedInvokeOnCollisionEnter function pointer is null!");
 
 		const ScriptCollisionPayload payload = BuildScriptCollisionPayload(entityID, event);
 		return s_ScriptData->ManagedInvokeOnCollisionEnter(entityID, &payload) != 0;
@@ -411,7 +412,7 @@ namespace Kerberos
 
 	bool ScriptEngine::InvokeManagedOnCollisionPersist(const uint64_t entityID, const CollisionEvent& event)
 	{
-		KBR_CORE_ASSERT(s_ScriptData->ManagedInvokeOnCollisionPersist, "ManagedInvokeOnCollisionPersist function pointer is null!");
+		KBRAssert(s_ScriptData->ManagedInvokeOnCollisionPersist, "ManagedInvokeOnCollisionPersist function pointer is null!");
 
 		const ScriptCollisionPayload payload = BuildScriptCollisionPayload(entityID, event);
 		return s_ScriptData->ManagedInvokeOnCollisionPersist(entityID, &payload) != 0;
@@ -419,7 +420,7 @@ namespace Kerberos
 
 	bool ScriptEngine::InvokeManagedOnCollisionExit(const uint64_t entityID, const CollisionEvent& event)
 	{
-		KBR_CORE_ASSERT(s_ScriptData->ManagedInvokeOnCollisionExit, "ManagedInvokeOnCollisionExit function pointer is null!");
+		KBRAssert(s_ScriptData->ManagedInvokeOnCollisionExit, "ManagedInvokeOnCollisionExit function pointer is null!");
 
 		const ScriptCollisionPayload payload = BuildScriptCollisionPayload(entityID, event);
 		return s_ScriptData->ManagedInvokeOnCollisionExit(entityID, &payload) != 0;
@@ -427,21 +428,21 @@ namespace Kerberos
 
 	bool ScriptEngine::GetManagedFieldValue(const uint64_t entityID, const std::string& fieldName, void* outValue, const int bufferSize)
 	{
-		KBR_CORE_ASSERT(s_ScriptData->ManagedGetFieldValue, "ManagedGetFieldValue function pointer is null!");
+		KBRAssert(s_ScriptData->ManagedGetFieldValue, "ManagedGetFieldValue function pointer is null!");
 
 		return s_ScriptData->ManagedGetFieldValue(entityID, fieldName.c_str(), outValue, bufferSize) != 0;
 	}
 
 	bool ScriptEngine::SetManagedFieldValue(const uint64_t entityID, const std::string& fieldName, void* value, const int valueSize)
 	{
-		KBR_CORE_ASSERT(s_ScriptData->ManagedSetFieldValue, "ManagedSetFieldValue function pointer is null!");
+		KBRAssert(s_ScriptData->ManagedSetFieldValue, "ManagedSetFieldValue function pointer is null!");
 
 		return s_ScriptData->ManagedSetFieldValue(entityID, fieldName.c_str(), value, valueSize) != 0;
 	}
 
 	void ScriptEngine::SetManagedNativeCallbacks(void* callbackTable)
 	{
-		KBR_CORE_ASSERT(s_ScriptData->ManagedSetNativeCallbacks, "ManagedSetNativeCallbacks function pointer is null!");
+		KBRAssert(s_ScriptData->ManagedSetNativeCallbacks, "ManagedSetNativeCallbacks function pointer is null!");
 
 		s_ScriptData->ManagedSetNativeCallbacks(callbackTable);
 	}
@@ -450,11 +451,11 @@ namespace Kerberos
 	{
 		if (!LoadHostFxr())
 		{
-			KBR_CORE_ASSERT(false, "Failed to load hostfxr");
+			KBRAssert(false, "Failed to load hostfxr");
 			return;
 		}
 
-		KBR_CORE_INFO("Successfully loaded .NET hostfxr");
+		Log::CoreInfo("Successfully loaded .NET hostfxr");
 	}
 
 	void ScriptEngine::ShutdownDotNet()
@@ -478,8 +479,8 @@ namespace Kerberos
 
 		if (!std::filesystem::exists(runtimeConfigPath))
 		{
-			KBR_CORE_ERROR("Runtime config not found: {}", runtimeConfigPath);
-			KBR_CORE_ASSERT(false, "Runtime config not found!");
+			Log::CoreError("Runtime config not found: {}", runtimeConfigPath);
+			KBRAssert(false, "Runtime config not found!");
 			return;
 		}
 
@@ -495,8 +496,8 @@ namespace Kerberos
 		int rc = s_ScriptData->InitForConfigFn(configPath.c_str(), nullptr, &s_ScriptData->HostContext);
 		if (rc != 0 && rc != 1) // 0 = success, 1 = already initialized (secondary context)
 		{
-			KBR_CORE_ERROR("Failed to initialize .NET runtime. Error: 0x{:x}", rc);
-			KBR_CORE_ASSERT(false, "Failed to initialize .NET runtime!");
+			Log::CoreError("Failed to initialize .NET runtime. Error: 0x{:x}", rc);
+			KBRAssert(false, "Failed to initialize .NET runtime!");
 			return;
 		}
 
@@ -508,15 +509,15 @@ namespace Kerberos
 
 		if (rc != 0 || !s_ScriptData->LoadAssemblyFn)
 		{
-			KBR_CORE_ERROR("Failed to get load_assembly_and_get_function_pointer delegate. Error: 0x{:x}", rc);
-			KBR_CORE_ASSERT(false, "Failed to get .NET runtime delegate!");
+			Log::CoreError("Failed to get load_assembly_and_get_function_pointer delegate. Error: 0x{:x}", rc);
+			KBRAssert(false, "Failed to get .NET runtime delegate!");
 			return;
 		}
 
 		/// Load managed function pointers from the bridge
 		LoadManagedFunctions();
 
-		KBR_CORE_INFO("Successfully loaded .NET assembly: {}", assemblyPath);
+		Log::CoreInfo("Successfully loaded .NET assembly: {}", assemblyPath);
 	}
 
 	void ScriptEngine::LoadAssemblyClasses()
@@ -525,7 +526,7 @@ namespace Kerberos
 
 		if (!s_ScriptData->LoadAssemblyClasses)
 		{
-			KBR_CORE_ERROR("LoadAssemblyClasses managed function not loaded!");
+			Log::CoreError("LoadAssemblyClasses managed function not loaded!");
 			return;
 		}
 
@@ -533,7 +534,7 @@ namespace Kerberos
 		const int result = s_ScriptData->LoadAssemblyClasses(assemblyPath.c_str());
 		if (!result)
 		{
-			KBR_CORE_ERROR("Failed to load assembly classes from {}", assemblyPath);
+			Log::CoreError("Failed to load assembly classes from {}", assemblyPath);
 			return;
 		}
 
@@ -551,7 +552,7 @@ namespace Kerberos
 		for (int i = 0; i < classCount; i++)
 		{
 			std::string fullName = nameBuffers[i];
-			KBR_CORE_TRACE("Loaded C# class: {}", fullName);
+			Log::CoreTrace("Loaded C# class: {}", fullName);
 
 			/// Parse namespace and class name from full name (e.g. "Kerberos.Source.Kerberos.Player" -> ns="Kerberos.Source.Kerberos", name="Player")
 			std::string nameSpace;
@@ -588,7 +589,7 @@ namespace Kerberos
 				const std::string fieldName = fieldNameBuffers[j];
 				const std::string fieldTypeName = fieldTypeBuffers[j];
 
-				KBR_CORE_TRACE("\tPublic field: {0}, type: {1}", fieldName, fieldTypeName);
+				Log::CoreTrace("\tPublic field: {0}, type: {1}", fieldName, fieldTypeName);
 
 				const ScriptFieldType fieldType = ScriptUtils::DotNetTypeToScriptFieldType(fieldTypeName);
 				const ScriptField fieldInfo = { .Name = fieldName, .Type = fieldType };
@@ -619,8 +620,8 @@ namespace Kerberos
 
 		if (rc != 0)
 		{
-			KBR_CORE_ASSERT(false, "Failed to load managed function {}.{}. Error: 0x{:x}", typeName, methodName, rc);
-			KBR_CORE_ERROR("Failed to load managed function {}.{}. Error: 0x{:x}", typeName, methodName, rc);
+			KBRAssert(false, "Failed to load managed function {}.{}. Error: 0x{:x}", typeName, methodName, rc);
+			Log::CoreError("Failed to load managed function {}.{}. Error: 0x{:x}", typeName, methodName, rc);
 		}
 
 		return fn;
@@ -661,7 +662,7 @@ namespace Kerberos
 			case filewatch::Event::renamed_new: return "renamed new"sv;
 		}
 
-		KBR_CORE_ASSERT(false, "Unknown filewatch::Event");
+		KBRAssert(false, "Unknown filewatch::Event");
 		return "Unknown"sv;
 	}
 
@@ -669,7 +670,7 @@ namespace Kerberos
 	{
 		const std::string extension = std::filesystem::path(path).extension().string();
 		if (extension == ".dll") {
-			KBR_CORE_INFO("Assembly file {0}: {1}", FileWatchEventToString(changeType), path);
+			Log::CoreInfo("Assembly file {0}: {1}", FileWatchEventToString(changeType), path);
 			Application::Get().SubmitToMainThreadQueue([]() {
 				ReloadAssembly();
 			});
