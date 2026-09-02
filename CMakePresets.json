@@ -28,6 +28,7 @@
     },
     {
       "name": "ninja-msvc-debug",
+      "inherits": "windows-base",
       "displayName": "Ninja + MSVC (Debug)",
       "generator": "Ninja",
       "architecture": {
@@ -43,6 +44,7 @@
     },
     {
       "name": "ninja-msvc-release",
+      "inherits": "windows-base",
       "displayName": "Ninja + MSVC (Release)",
       "generator": "Ninja",
       "architecture": {
@@ -57,12 +59,53 @@
       }
     },
     {
+      "name": "ninja-msvc-relwithdebinfo",
+      "inherits": "windows-base",
+      "displayName": "Ninja + MSVC (RelWihDebInfo)",
+      "generator": "Ninja",
+      "architecture": {
+        "value": "x64",
+        "strategy": "external"
+      },
+      "binaryDir": "${sourceDir}/out/build/${presetName}",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "RelWithDebInfo",
+        "CMAKE_C_COMPILER": "cl",
+        "CMAKE_CXX_COMPILER": "cl"
+      }
+    },
+    {
       "name": "ninja-clang-debug",
+      "inherits": "windows-base",
       "displayName": "Ninja (Clang-CL Debug)",
       "generator": "Ninja",
       "binaryDir": "${sourceDir}/out/build/${presetName}",
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Debug",
+        "CMAKE_C_COMPILER": "clang-cl",
+        "CMAKE_CXX_COMPILER": "clang-cl"
+      }
+    },
+    {
+      "name": "ninja-clang-release",
+      "inherits": "windows-base",
+      "displayName": "Ninja (Clang-CL Release)",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/out/build/${presetName}",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "CMAKE_C_COMPILER": "clang-cl",
+        "CMAKE_CXX_COMPILER": "clang-cl"
+      }
+    },
+    {
+      "name": "ninja-clang-relwithdebinfo",
+      "inherits": "windows-base",
+      "displayName": "Ninja (Clang-CL RelWithDebInfo)",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/out/build/${presetName}",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "RelWithDebInfo",
         "CMAKE_C_COMPILER": "clang-cl",
         "CMAKE_CXX_COMPILER": "clang-cl"
       }
@@ -95,6 +138,42 @@
       "name": "vs2026-relwithdebinfo",
       "displayName": "VS2026 (RelWithDebInfo)",
       "configurePreset": "vs2026",
+      "configuration": "RelWithDebInfo"
+    },
+    {
+      "name": "ninja-msvc-debug",
+      "displayName": "MSVC Ninja Debug",
+      "configurePreset": "ninja-msvc-debug",
+      "configuration": "Debug"
+    },
+    {
+      "name": "ninja-msvc-release",
+      "displayName": "MSVC Ninja Release",
+      "configurePreset": "ninja-msvc-release",
+      "configuration": "Release"
+    },
+    {
+      "name": "ninja-msvc-relwithdebinfo",
+      "displayName": "MSVC Ninja RelWithDebInfo",
+      "configurePreset": "ninja-msvc-relwithdebinfo",
+      "configuration": "RelWithDebInfo"
+    },
+    {
+      "name": "clangcl-debug",
+      "displayName": "ClangCL Debug",
+      "configurePreset": "ninja-clang-debug",
+      "configuration": "Debug"
+    },
+    {
+      "name": "clangcl-release",
+      "displayName": "ClangCL Release",
+      "configurePreset": "ninja-clang-release",
+      "configuration": "Release"
+    },
+    {
+      "name": "clangcl-relwithdebinfo",
+      "displayName": "ClangCL RelWithDebInfo",
+      "configurePreset": "ninja-clang-relwithdebinfo",
       "configuration": "RelWithDebInfo"
     }
   ]
