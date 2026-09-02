@@ -32,11 +32,19 @@ target_compile_options(KerberosBuildSettings INTERFACE
 )
 
 target_compile_definitions(KerberosBuildSettings INTERFACE
+    # Keep MSVC's debug preprocessor environment identical for module producers
+    # and consumers. Some third-party CMake code adds _DEBUG to engine flags.
+    $<$<AND:$<CONFIG:Debug>,$<CXX_COMPILER_ID:MSVC>>:_DEBUG>
     $<$<CONFIG:Debug>:KBR_DEBUG>
     $<$<CONFIG:Release>:KBR_RELEASE>
     $<$<CONFIG:RelWithDebInfo>:KBR_RELEASE>
     $<$<CONFIG:Dist>:KBR_DIST>
 )
+
+if(MSVC)
+    add_compile_options(/FC)
+    add_compile_options(/EHsc)
+endif()
 
 if(KBR_ENABLE_ASAN)
     target_compile_options(KerberosBuildSettings INTERFACE
