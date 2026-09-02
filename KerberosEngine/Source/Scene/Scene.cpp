@@ -48,7 +48,7 @@ namespace Kerberos
 		ScriptEngine::OnRuntimeStart(shared_from_this());
 
 		/// Instantiate all scripts
-		m_Registry.view<ScriptComponent>().each([this](auto enttId, ScriptComponent& script) {
+		m_Registry.view<ScriptComponent>().each([this](auto enttId, [[maybe_unused]] ScriptComponent& script) {
 			const Entity entity{ enttId, this };
 			ScriptEngine::OnCreateEntity(entity);
 		});
@@ -596,7 +596,7 @@ Entity Scene::InstantiatePrefab(const AssetHandle prefabHandle, const std::strin
 #endif
 	}
 
-	void Scene::SetParent(const Entity child, const Entity parent, bool keepWorldTransform)
+	void Scene::SetParent(const Entity child, const Entity parent, [[maybe_unused]] bool keepWorldTransform)
 	{
 		RemoveParent(child);
 
@@ -798,7 +798,7 @@ Entity Scene::InstantiatePrefab(const AssetHandle prefabHandle, const std::strin
 	}
 
 
-	void Scene::Render2DRuntime(const SceneCamera* mainCamera, const glm::mat4& mainCameraTransform, const float dt)
+	void Scene::Render2DRuntime([[maybe_unused]] const SceneCamera* mainCamera, [[maybe_unused]] const glm::mat4& mainCameraTransform, [[maybe_unused]] const float dt)
 	{
 		//Renderer2D::BeginScene(*mainCamera, mainCameraTransform);
 
@@ -813,7 +813,7 @@ Entity Scene::InstantiatePrefab(const AssetHandle prefabHandle, const std::strin
 		//Renderer2D::EndScene();
 	}
 
-	void Scene::Render3DRuntime(const SceneCamera* mainCamera, const glm::mat4& mainCameraTransform, const float dt)
+	void Scene::Render3DRuntime([[maybe_unused]] const SceneCamera* mainCamera, [[maybe_unused]] const glm::mat4& mainCameraTransform, [[maybe_unused]] const float dt)
 	{
 		KBR_PROFILE_FUNCTION();
 #pragma region old_rendering_code
@@ -1200,7 +1200,7 @@ Entity Scene::InstantiatePrefab(const AssetHandle prefabHandle, const std::strin
 	}
 
 	template <>
-	void Scene::OnComponentAdded<CameraComponent>(Entity entity, CameraComponent& component)
+	void Scene::OnComponentAdded<CameraComponent>([[maybe_unused]] Entity entity, CameraComponent& component)
 	{
 		component.Camera.SetViewportSize(m_ViewportWidth, m_ViewportHeight);
 	}

@@ -117,7 +117,7 @@ namespace Kerberos
 			app.OnEvent(event);
 		});
 
-		glfwSetKeyCallback(m_Window, [](GLFWwindow* window, const int key, const int scancode, const int action, const int mods)
+		glfwSetKeyCallback(m_Window, [](GLFWwindow* window, const int key, const int /*scancode*/, const int action, const int /*mods*/)
 		{
 			auto& app = *static_cast<Application*>(glfwGetWindowUserPointer(window));
 
@@ -157,7 +157,7 @@ namespace Kerberos
 			app.OnEvent(event);
 		});
 
-		glfwSetMouseButtonCallback(m_Window, [](GLFWwindow* window, const int button, const int action, const int mods)
+		glfwSetMouseButtonCallback(m_Window, [](GLFWwindow* window, const int button, const int action, const int /*mods*/)
 		{
 			auto& app = *static_cast<Application*>(glfwGetWindowUserPointer(window));
 			switch (action)

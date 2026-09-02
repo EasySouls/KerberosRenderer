@@ -16,9 +16,9 @@ namespace Kerberos
 		return new MiniaudioAudioManager();
 #elif defined(KBR_PLATFORM_WINDOWS)
 		return new XAudio2AudioManager();
-#endif
-
+#else
 		KBRAssert(false, "No AudioManager implementation for this platform!");
 		return nullptr;
+#endif
 	}
 }

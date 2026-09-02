@@ -469,7 +469,7 @@ namespace Kerberos
 		return s_StringReturnBuffer.c_str();
 	}
 
-	static void TextComponent_SetFontPath(const uint64_t entityID, const char* fontPath)
+	static void TextComponent_SetFontPath([[maybe_unused]] const uint64_t entityID, const char* fontPath)
 	{
 		if (!fontPath)
 			return;

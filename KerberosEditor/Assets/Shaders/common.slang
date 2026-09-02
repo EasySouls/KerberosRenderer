@@ -36,8 +36,9 @@ public struct PerObject
     public float4x4 model;
     public float4x4 worldNormal;
     public Material material;
+    float _Padding1;
     public uint entityID;
-    private float3 _Padding;
+    float3 _Padding2;
 };
 
 public struct GlobalLighting

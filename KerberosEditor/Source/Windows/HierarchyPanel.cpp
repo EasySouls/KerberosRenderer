@@ -304,6 +304,7 @@ bool HierarchyPanel::OnKeyPressed(const KeyPressedEvent& event)
         return false;
 
     const bool ctrl = Input::IsKeyPressed(Key::LeftControl) || Input::IsKeyPressed(Key::RightControl);
+    [[maybe_unused]]
     const bool shift = Input::IsKeyPressed(Key::LeftShift) || Input::IsKeyPressed(Key::RightShift);
 
     switch (event.GetKeyCode()) {

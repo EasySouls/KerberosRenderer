@@ -123,7 +123,7 @@ namespace Kerberos
 
         if (instancesCache.AllocatedInstances < instancesCache.InstanceData.size())
         {
-            instancesCache.AllocatedInstances = instancesCache.InstanceData.size();
+            instancesCache.AllocatedInstances = static_cast<uint32_t>(instancesCache.InstanceData.size());
             instancesCache.Buffer = nullptr;
             instancesCache.Memory = nullptr;
 
@@ -213,7 +213,7 @@ namespace Kerberos
 		return *m_TLASCache[frameIndex].Handle;
 	}
 
-	void RayTracingSceneCache::UpdateTLAS(const Ref<Scene>& scene) 
+	void RayTracingSceneCache::UpdateTLAS([[maybe_unused]] const Ref<Scene>& scene)
     {
 		
 	}

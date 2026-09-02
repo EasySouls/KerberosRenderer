@@ -28,9 +28,9 @@ Texture2D::Texture2D(const TextureSpecification& spec, const Buffer& buffer)
 	width = spec.Width;
 	height = spec.Height;
 	mipLevels = 1; // TODO: Parameterize
-	constexpr vk::ImageUsageFlags imageUsageFlags = vk::ImageUsageFlagBits::eSampled; // TODO: Parameterize
-	const vk::Format format = KTX2FormatSelector::Select(spec.Format);
-	constexpr vk::ImageLayout imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal; // TODO: Parameterize
+	format = KTX2FormatSelector::Select(spec.Format);
+	imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal; // TODO: Parameterize
+	usageFlags = vk::ImageUsageFlagBits::eSampled; // TODO: Parameterize
 
 	// Create a host-visible staging buffer that contains the raw image data
 	vk::BufferCreateInfo bufferCreateInfo{
@@ -95,7 +95,7 @@ Texture2D::Texture2D(const TextureSpecification& spec, const Buffer& buffer)
 		.arrayLayers = 1,
 		.samples = vk::SampleCountFlagBits::e1,
 		.tiling = vk::ImageTiling::eOptimal,
-		.usage = imageUsageFlags,
+		.usage = usageFlags,
 		.sharingMode = vk::SharingMode::eExclusive,
 		.initialLayout = vk::ImageLayout::eUndefined,
 	};
@@ -170,8 +170,8 @@ Texture2D::Texture2D(const std::filesystem::path& filepath)
 	});
 	KBRAssert(extension == ".ktx" || extension == ".ktx2", "Texture2D::Texture2D - only KTX files are supported in this constructor");
 	
-	vk::ImageUsageFlags  imageUsageFlags = vk::ImageUsageFlagBits::eSampled;
-	vk::ImageLayout      imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal;
+	usageFlags = vk::ImageUsageFlagBits::eSampled;
+	imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal;
 
 	ktxTexture2* ktxTex = nullptr;
 
@@ -212,7 +212,7 @@ Texture2D::Texture2D(const std::filesystem::path& filepath)
 	height = ktxTex->baseHeight;
 	mipLevels = ktxTex->numLevels;
 
-	const vk::Format format = static_cast<vk::Format>(ktxTex->vkFormat);
+	format = static_cast<vk::Format>(ktxTex->vkFormat);
 
 	ktx_uint8_t* ktxTextureData = ktxTex->pData;
 	ktx_size_t ktxTextureSize = ktxTex->dataSize;
@@ -277,7 +277,7 @@ Texture2D::Texture2D(const std::filesystem::path& filepath)
 		.arrayLayers = 1,
 		.samples = vk::SampleCountFlagBits::e1,
 		.tiling = vk::ImageTiling::eOptimal,
-		.usage = imageUsageFlags,
+		.usage = usageFlags,
 		.sharingMode = vk::SharingMode::eExclusive,
 		.initialLayout = vk::ImageLayout::eUndefined,
 	};
@@ -318,7 +318,6 @@ Texture2D::Texture2D(const std::filesystem::path& filepath)
 			bufferCopyRegions);
 
 		// Change texture image layout to shader read after all mip levels have been copied
-		this->imageLayout = imageLayout;
 		context.TransitionImageLayout(
 			copyCmd,
 			image,

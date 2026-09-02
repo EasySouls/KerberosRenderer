@@ -579,7 +579,7 @@ namespace Kerberos
 		Log::EditorError("Invalid directory path: {0}", path.string());
 	}
 
-	void AssetsPanel::OnEvent(Event& event)
+	void AssetsPanel::OnEvent([[maybe_unused]] Event& event)
 	{
 		
 	}

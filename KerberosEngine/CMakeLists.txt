@@ -38,9 +38,10 @@ target_sources(KerberosEngine
 target_include_directories(KerberosEngine
     PUBLIC
         ${CMAKE_CURRENT_SOURCE_DIR}/Source
+    SYSTEM PUBLIC
         ${CMAKE_CURRENT_SOURCE_DIR}/ThirdParty
         ${KBR_VULKAN_DIR}/Include # This shouldn't be public in the future
-    PRIVATE
+    SYSTEM PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/ThirdParty/imgui
         ${CMAKE_CURRENT_SOURCE_DIR}/ThirdParty/glm
         ${CMAKE_CURRENT_SOURCE_DIR}/ThirdParty/ktx/lib/include

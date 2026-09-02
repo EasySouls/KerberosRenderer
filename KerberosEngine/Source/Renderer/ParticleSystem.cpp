@@ -38,6 +38,7 @@ struct alignas(16) GPUParticle
 
     float FrameAspect;
     uint32_t TextureIndex;
+    uint8_t _Pad[8];
 };
 
 struct alignas(16) SpawnRequest
@@ -171,7 +172,7 @@ void ParticleSystem::Update(const Ref<Scene>& scene,
                             const vk::raii::CommandBuffer& cmd,
                             const uint32_t frameIndex,
                             const ParticleFrameData& frameData,
-                            DescriptorAllocator& frameAllocator)
+                            [[maybe_unused]] DescriptorAllocator& frameAllocator)
 {
     KBR_PROFILE_FUNCTION();
 
@@ -645,7 +646,7 @@ void ParticleSystem::AllocateDescriptorBuffers()
         writer.Flush();
     }
 
-    const uint32_t framesInFlight = VulkanContext::Get().GetMaxFramesInFlight();
+    const uint32_t framesInFlight = context.GetMaxFramesInFlight();
     m_SpawnSets.resize(framesInFlight);
 
     for (uint32_t i = 0; i < framesInFlight; ++i) {

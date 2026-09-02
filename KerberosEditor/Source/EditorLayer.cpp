@@ -1266,7 +1266,7 @@ namespace Kerberos
 		return false;
 	}
 
-	bool EditorLayer::OnWindowDrop(const WindowDropEvent &event)
+	bool EditorLayer::OnWindowDrop([[maybe_unused]] const WindowDropEvent &event)
 	{
 		/// TODO: Implement file dropping to load scenes or import models
 		throw std::logic_error("Not implemented");

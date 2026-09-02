@@ -91,7 +91,7 @@ namespace Kerberos
 		return 0.0f;
 	}
 
-	void EditorCamera::SetMoveSpeed(const float speed)
+	void EditorCamera::SetMoveSpeed(const float /*speed*/)
 	{
 	}
 
@@ -131,7 +131,7 @@ namespace Kerberos
 		const glm::vec4 cascadeSplits = getCascadeSplits(m_FarClip);
 
 		std::vector<glm::mat4> matrices;
-		for (size_t i = 0; i < 3 + 1; ++i)
+		for (uint32_t i = 0; i < 3 + 1; ++i)
 		{
 			if (i == 0)
 			{
@@ -325,7 +325,7 @@ namespace Kerberos
 		{
 			center += glm::vec3(v);
 		}
-		center /= corners.size();
+		center /= static_cast<float>(corners.size());
 
 		const auto lightView = glm::lookAt(center + lightDir, center, glm::vec3(0.0f, 1.0f, 0.0f));
 

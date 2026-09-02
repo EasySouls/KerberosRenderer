@@ -16,7 +16,7 @@ static ktxResult LoadKTXFile(const std::filesystem::path& filepath, ktxTexture2*
 	return result;
 }
 
-TextureCube::TextureCube(const CubemapData& data)
+TextureCube::TextureCube([[maybe_unused]] const CubemapData& data)
 {
 	KBRAssert(false, "TextureCube::TextureCube - CubemapData constructor is not implemented yet");
 }
@@ -62,8 +62,8 @@ TextureCube::TextureCube(const std::filesystem::path& filepath)
 
 	KBRAssert(ktxTex != nullptr, "TextureCube::TextureCube - ktxTexture2 is null after loading KTX file: {}", filepath.string());
 
-	vk::ImageUsageFlags  imageUsageFlags = vk::ImageUsageFlagBits::eSampled;
-	vk::ImageLayout      imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal;
+	usageFlags = vk::ImageUsageFlagBits::eSampled;
+	imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal;
 
 	auto& context = VulkanContext::Get();
 	const auto& device = context.GetDevice();
@@ -71,7 +71,7 @@ TextureCube::TextureCube(const std::filesystem::path& filepath)
 	width = ktxTex->baseWidth;
 	height = ktxTex->baseHeight;
 	mipLevels = ktxTex->numLevels;
-	const vk::Format format = static_cast<vk::Format>(ktxTex->vkFormat);
+	format = static_cast<vk::Format>(ktxTex->vkFormat);
 
 	ktx_uint8_t* ktxTextureData = ktxTex->pData;
 	ktx_size_t ktxTextureSize = ktxTex->dataSize;
@@ -139,7 +139,7 @@ TextureCube::TextureCube(const std::filesystem::path& filepath)
 		.arrayLayers = 6,
 		.samples = vk::SampleCountFlagBits::e1,
 		.tiling = vk::ImageTiling::eOptimal,
-		.usage = imageUsageFlags,
+		.usage = usageFlags,
 		.sharingMode = vk::SharingMode::eExclusive,
 		.initialLayout = vk::ImageLayout::eUndefined,
 	};
@@ -182,7 +182,6 @@ TextureCube::TextureCube(const std::filesystem::path& filepath)
 			bufferCopyRegions);
 
 		// Change texture image layout to shader read after all mip levels have been copied
-		this->imageLayout = imageLayout;
 		context.TransitionImageLayout(
 			copyCmd,
 			image,

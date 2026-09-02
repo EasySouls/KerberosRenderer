@@ -33,7 +33,7 @@ namespace Kerberos
 		vk::DeviceAddress m_DeviceAddress = 0;
 		void* m_MappedData = nullptr;
 		vk::DeviceSize m_OffsetAlignment = 0;
-		uint32_t m_CurrentOffset = 0;
+		uint64_t m_CurrentOffset = 0;
 
 #ifdef KBR_DEBUG
 		std::map<vk::DeviceSize, std::string> m_AllocationDebugNames;

@@ -105,11 +105,11 @@ namespace Kerberos
 		return 0.0f;
 	}
 
-	void FirstPersonCamera::SetDistance(const float distance)
+	void FirstPersonCamera::SetDistance([[maybe_unused]] const float distance)
 	{
 	}
 
-	void FirstPersonCamera::Focus(const glm::vec3& focusPoint)
+	void FirstPersonCamera::Focus([[maybe_unused]] const glm::vec3& focusPoint)
 	{
 	}
 
@@ -195,7 +195,7 @@ namespace Kerberos
 		const glm::vec4 cascadeSplits = getCascadeSplits(m_FarClip);
 
 		std::vector<glm::mat4> matrices;
-		for (size_t i = 0; i < 3 + 1; ++i)
+		for (uint32_t i = 0; i < 3 + 1; ++i)
 		{
 			if (i == 0)
 			{
@@ -353,7 +353,7 @@ namespace Kerberos
 		{
 			center += glm::vec3(v);
 		}
-		center /= corners.size();
+		center /= static_cast<float>(corners.size());
 
 		glm::vec3 lightUp = glm::vec3(0.0f, 1.0f, 0.0f);
 		if (glm::abs(glm::dot(lightDir, lightUp)) > 0.99f)

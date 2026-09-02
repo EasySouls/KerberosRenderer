@@ -21,6 +21,11 @@
 
 import Kerberos;
 
+#ifdef _MSC_VER
+	// vk::EXTDescriptorBufferExtensionName is deprecated
+	#pragma warning(disable : 4996)
+#endif
+
 static constexpr std::array validationLayers = {
 	"VK_LAYER_KHRONOS_validation"
 };
@@ -741,7 +746,7 @@ namespace Kerberos
 		return m_PhysicalDevice.getProperties2().properties.limits.maxSamplerAnisotropy;
 	}
 
-	void VulkanContext::FramebufferResized(uint32_t width, uint32_t height)
+	void VulkanContext::FramebufferResized(uint32_t /*width*/, uint32_t /*height*/)
 	{
 		m_FramebufferResized = true;
 	}
@@ -1088,6 +1093,7 @@ namespace Kerberos
 
 	bool VulkanContext::UseDescriptorBuffers() const
 	{
+
 		return IsExtensionActive(vk::EXTDescriptorBufferExtensionName);
 	}
 

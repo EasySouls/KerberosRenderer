@@ -10,8 +10,8 @@ namespace Kerberos::Physics {
 
 JPH::ValidateResult ContactListener::OnContactValidate(const JPH::Body& inBody1,
                                       const JPH::Body& inBody2,
-                                      JPH::RVec3Arg inBaseOffset,
-                                      const JPH::CollideShapeResult& inCollisionResult)
+                                      JPH::RVec3Arg /*inBaseOffset*/,
+                                      const JPH::CollideShapeResult& /*inCollisionResult*/)
 {
     Log::CoreTrace("Contact validate callback: {} - {}", inBody1.GetID().GetIndex(), inBody2.GetID().GetIndex());
 
@@ -22,7 +22,7 @@ JPH::ValidateResult ContactListener::OnContactValidate(const JPH::Body& inBody1,
 void ContactListener::OnContactAdded(const JPH::Body& inBody1,
                     const JPH::Body& inBody2,
                     const JPH::ContactManifold& inManifold,
-                    JPH::ContactSettings& ioSettings)
+                    JPH::ContactSettings& /*ioSettings*/)
 {
     Log::CoreTrace("A contact was added: {} - {}", inBody1.GetID().GetIndex(), inBody2.GetID().GetIndex());
 
@@ -45,7 +45,7 @@ void ContactListener::OnContactAdded(const JPH::Body& inBody1,
 void ContactListener::OnContactPersisted(const JPH::Body& inBody1,
                         const JPH::Body& inBody2,
                         const JPH::ContactManifold& inManifold,
-                        JPH::ContactSettings& ioSettings)
+                        JPH::ContactSettings& /*ioSettings*/)
 {
     Log::CoreTrace("A contact was persisted: {} - {}", inBody1.GetID().GetIndex(), inBody2.GetID().GetIndex());
 

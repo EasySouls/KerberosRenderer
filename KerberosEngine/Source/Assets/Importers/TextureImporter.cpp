@@ -33,7 +33,7 @@ namespace
 
 namespace Kerberos
 {
-	Ref<Texture2D> TextureImporter::ImportTexture(AssetHandle handle, const AssetMetadata& metadata)
+	Ref<Texture2D> TextureImporter::ImportTexture(AssetHandle /*handle*/, const AssetMetadata& metadata)
 	{
 		return ImportTexture(metadata.Filepath);
 	}

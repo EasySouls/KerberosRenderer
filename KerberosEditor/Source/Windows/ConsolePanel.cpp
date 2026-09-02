@@ -64,7 +64,7 @@ namespace Kerberos
 		ImGui::End();
 	}
 
-	void ConsolePanel::OnEvent(Event& event) 
+	void ConsolePanel::OnEvent([[maybe_unused]] Event& event)
 	{
 	}
 }

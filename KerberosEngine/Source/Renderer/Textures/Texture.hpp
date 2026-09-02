@@ -45,6 +45,8 @@ protected:
 public:
 	vk::raii::Image         image = nullptr;
 	vk::ImageLayout         imageLayout{};
+	vk::ImageUsageFlags		usageFlags{};
+	vk::Format				format{};
 	vk::raii::DeviceMemory  deviceMemory = nullptr;
 	vk::raii::ImageView     view = nullptr;
 	uint32_t                width = 0;

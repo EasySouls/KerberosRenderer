@@ -25,6 +25,8 @@
 #include <limits>
 #include <numbers>
 
+#include "Material.hpp"
+
 import Kerberos;
 
 namespace {
@@ -147,8 +149,9 @@ struct PerObjectData
     alignas(16) glm::mat4 model{ 0.f };
     alignas(16) glm::mat4 worldNormal{ 0.f };
     alignas(16) Material::UniformBlock material;
+    uint8_t _Padding1[4];
     alignas(16) uint32_t entityID = std::numeric_limits<uint32_t>::max();
-    alignas(16) glm::vec3 _Padding{ 0.0f };
+    uint8_t _Padding2[12];
 };
 
 struct SkyboxData
@@ -760,8 +763,6 @@ void Renderer::RecordQueuedSceneRender(const vk::raii::CommandBuffer& cmd)
                                   particleFrameData,
                                   frameDescriptorAllocator);
     WriteGPUTimestamp(cmd, frameIndex, static_cast<uint32_t>(GPUTimestampQuery::ParticlesSimulateEnd));
-
-    const Ref<Scene>& scene = s_Data->PendingRender.Scene;
 
     // Depth Pre-pass
     {
@@ -3018,7 +3019,7 @@ void Renderer::CreateResources()
             resolveImageBarrier, compositeImageBarrier, colorOutputImageBarrier, bloomImageBarrier
         };
         const vk::DependencyInfo dependencyInfo = { .dependencyFlags = {},
-                                                    .imageMemoryBarrierCount = barriers.size(),
+                                                    .imageMemoryBarrierCount = static_cast<uint32_t>(barriers.size()),
                                                     .pImageMemoryBarriers = barriers.data() };
 
         const auto cmd = context.BeginSingleTimeCommands();
@@ -4248,7 +4249,7 @@ std::pair<std::pmr::vector<RenderObject>, std::pmr::set<Ref<Material>>> Renderer
             uniqueMaterials.insert(renderObject.Material);
     }
 
-    renderObjectCountFromLastFrame = renderObjects.size();
+    renderObjectCountFromLastFrame = static_cast<uint32_t>(renderObjects.size());
 
     return { renderObjects, uniqueMaterials };
 }

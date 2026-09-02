@@ -12,7 +12,7 @@ import Kerberos;
 
 namespace Kerberos
 {
-	Ref<TextureCube> CubemapImporter::ImportCubemap(AssetHandle handle, const AssetMetadata& metadata)
+	Ref<TextureCube> CubemapImporter::ImportCubemap(AssetHandle /*handle*/, const AssetMetadata& metadata)
 	{
 		return ImportCubemap(metadata.Filepath);
 	}

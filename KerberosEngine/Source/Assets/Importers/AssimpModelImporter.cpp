@@ -15,7 +15,7 @@ import Kerberos;
 
 namespace Kerberos
 {
-	Ref<Mesh> AssimpModelImporter::ImportModel(AssetHandle handle, const AssetMetadata& metadata)
+	Ref<Mesh> AssimpModelImporter::ImportModel(AssetHandle /*handle*/, const AssetMetadata& metadata)
 	{
 		return ImportModel(metadata.Filepath);
 	}
@@ -89,6 +89,8 @@ namespace Kerberos
 		ProcessMaterials(scene, loadingInfo);
 
 		ProcessMeshes(scene, loadingInfo);
+
+		return loadingInfo;
 	}
 
 	void AssimpModelImporter::ProcessMaterials(const aiScene* scene, ModelLoadingInfo& info)

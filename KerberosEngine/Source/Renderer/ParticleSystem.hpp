@@ -28,6 +28,7 @@ struct alignas(16) ParticleFrameData
     float NearPlane{ 0.1f };
     glm::vec2 ViewportSize{ 800.0f, 600.0f };
     float FarPlane{ 1000.0f };
+    uint8_t _pad[4];
 };
 
 class ParticleSystem

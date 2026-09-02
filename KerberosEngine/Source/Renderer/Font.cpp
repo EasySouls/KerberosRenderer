@@ -6,12 +6,21 @@
 #undef INFINITE
 #include "Profiling/Instrumentor.hpp"
 
+#ifdef _MSC_VER
+	#pragma warning(push)
+	#pragma warning(disable : 4505)
+#endif
+
 #include <msdfgen.h>
 #include "ext/import-font.h"
 #include <msdf-atlas-gen/msdf-atlas-gen.h>
 #include <msdf-atlas-gen/msdf-atlas-gen/FontGeometry.h>
 #include <msdf-atlas-gen/msdf-atlas-gen/GlyphGeometry.h>
 #include "msdf-atlas-gen/AtlasGenerator.h"
+
+#ifdef _MSC_VER
+#pragma warning(pop)
+#endif
 
 #include <algorithm>
 #include <thread>
@@ -29,7 +38,14 @@ namespace Kerberos
 	template<typename T, typename S, int N, msdf_atlas::GeneratorFunction<S, N> GenFunc>
 	static Ref<Texture2D> GenerateAtlas(const std::vector<msdf_atlas::GlyphGeometry>& glyphs, int width, int height)
 	{
+#ifdef _MSC_VER
+	#pragma warning(push)
+	#pragma warning(disable : 4458)
+#endif
 		msdf_atlas::ImmediateAtlasGenerator<S, N, GenFunc, msdf_atlas::BitmapAtlasStorage<T, N>> generator(width, height);
+#ifdef _MSC_VER
+	#pragma warning(pop)
+#endif
 
 		msdf_atlas::GeneratorAttributes genAttributes;
 		genAttributes.config.overlapSupport = true;
@@ -115,6 +131,7 @@ namespace Kerberos
 
 		m_MSDFData->FontGeometry = msdf_atlas::FontGeometry(&m_MSDFData->Glyphs);
 		int glyphsLoaded = m_MSDFData->FontGeometry.loadCharset(font, fontScale, charset);
+		Log::CoreDebug("{} glyphs loaded from font {}", glyphsLoaded, m_Name);
 
 		msdf_atlas::TightAtlasPacker atlasPacker;
 		atlasPacker.setPixelRange(2.0);

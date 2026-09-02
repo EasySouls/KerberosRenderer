@@ -32,7 +32,7 @@ namespace Kerberos
 		InitDescriptorBuffer();
 	}
 
-	void GrassSystem::RecordDraw(const vk::raii::CommandBuffer& cmd, uint32_t frameIndex, const GrassConstants& constants)
+	void GrassSystem::RecordDraw(const vk::raii::CommandBuffer& cmd, uint32_t /*frameIndex*/, const GrassConstants& constants)
 	{
 		SetDefaultGraphicsState(cmd);
 

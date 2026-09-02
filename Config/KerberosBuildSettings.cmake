@@ -6,14 +6,29 @@ target_compile_features(KerberosBuildSettings INTERFACE cxx_std_23)
 
 target_compile_options(KerberosBuildSettings INTERFACE
     $<$<CXX_COMPILER_ID:MSVC>:/W4>
+    $<$<CXX_COMPILER_ID:MSVC>:/WX>
     $<$<CXX_COMPILER_ID:MSVC>:/MP>
     $<$<CXX_COMPILER_ID:MSVC>:/permissive->
+
+    $<$<CXX_COMPILER_ID:MSVC>:/w15038> # C5038: member initialization order
+    $<$<CXX_COMPILER_ID:MSVC>:/w14265> # C4265: missing virtual destructor
+    $<$<CXX_COMPILER_ID:MSVC>:/w14266> # C4266: hidden virtual functions
+    $<$<CXX_COMPILER_ID:MSVC>:/w14062> # C4062: unhandled enum in switch
+#    $<$<CXX_COMPILER_ID:MSVC>:/w14625> # C4625: copy ctor was implicitly defined as deleted
+#    $<$<CXX_COMPILER_ID:MSVC>:/w14626> # C4626: assignment operator was implicitly defined as deleted
+    $<$<CXX_COMPILER_ID:MSVC>:/w15266> # C5266: 'const' qualifier on return type has no effect
+
+    $<$<CXX_COMPILER_ID:MSVC>:/wd4068> # C4068: unknown pragma
+
     $<$<CXX_COMPILER_ID:GNU>:-Wall>
     $<$<CXX_COMPILER_ID:GNU>:-Wextra>
+    $<$<CXX_COMPILER_ID:GNU>:-Werror>
     $<$<CXX_COMPILER_ID:GNU>:-Wpedantic>
+
     $<$<CXX_COMPILER_ID:Clang>:-Wall>
     $<$<CXX_COMPILER_ID:Clang>:-Wextra>
     $<$<CXX_COMPILER_ID:Clang>:-Wpedantic>
+    $<$<CXX_COMPILER_ID:Clang>:-Werror>
 )
 
 target_compile_definitions(KerberosBuildSettings INTERFACE

@@ -394,7 +394,7 @@ void SceneSerializer::Serialize(const std::filesystem::path& filepath) const
     }
 }
 
-void SceneSerializer::SerializeRuntime(const std::filesystem::path& filepath)
+void SceneSerializer::SerializeRuntime([[maybe_unused]] const std::filesystem::path& filepath)
 {
     throw std::logic_error("Not implemented");
 }
@@ -702,7 +702,7 @@ bool SceneSerializer::Deserialize(const std::filesystem::path& filepath) const
     return true;
 }
 
-bool SceneSerializer::DeserializeRuntime(const std::filesystem::path& filepath) const
+bool SceneSerializer::DeserializeRuntime([[maybe_unused]] const std::filesystem::path& filepath) const
 {
     throw std::logic_error("Not implemented");
 }

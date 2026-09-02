@@ -1,9 +1,27 @@
 #include "VMA.hpp"
 #include "Utils/VulkanHelpers.hpp"
 
+#ifdef _MSC_VER
+	#pragma warning(push, 0)
+#endif
+
+#if defined(__clang__) || defined(__GNUC__)
+	#pragma GCC diagnostic push
+	#pragma GCC diagnostic ignored "-Wall"
+	#pragma GCC diagnostic ignored "-Wextra"
+	#pragma GCC diagnostic ignored "-Wpedantic"
+#endif
 
 #define VMA_IMPLEMENTATION
 #include "vma/vk_mem_alloc.h"
+
+#ifdef _MSC_VER
+	#pragma warning(pop)
+#endif
+
+#if defined(__clang__) || defined(__GNUC__)
+	#pragma GCC diagnostic pop
+#endif
 
 import Kerberos;
 
