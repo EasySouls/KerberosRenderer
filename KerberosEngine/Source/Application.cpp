@@ -12,6 +12,7 @@
 #include "Events/WindowResizedEvent.hpp"
 #include "Renderer/Renderer.hpp"
 #include "Scripting/ScriptEngine.hpp"
+#include "Profiling/TracyInstrumentation.hpp"
 
 #include <GLFW/glfw3.h>
 
@@ -235,6 +236,7 @@ namespace Kerberos
 	{
 		while (!glfwWindowShouldClose(m_Window) && m_IsRunning)
 		{
+			KBR_TRACY_SCOPE("Application::Run frame");
 			glfwPollEvents();
 
 			const float time = static_cast<float>(glfwGetTime());
@@ -263,6 +265,7 @@ namespace Kerberos
 			ExecuteGPUUploadQueue();
 			m_VulkanContext->Draw();
 			m_VulkanContext->Present();
+			KBR_TRACY_FRAME_MARK();
 		}
 	}
 

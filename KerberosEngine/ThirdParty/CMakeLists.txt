@@ -1,5 +1,11 @@
 set(BUILD_TESTING OFF CACHE BOOL "" FORCE)
 
+if(KBR_ENABLE_TRACY)
+    set(TRACY_ENABLE ON CACHE BOOL "Enable Tracy profiling." FORCE)
+    set(TRACY_STATIC ON CACHE BOOL "Build Tracy as a static library." FORCE)
+    add_subdirectory(tracy EXCLUDE_FROM_ALL)
+endif()
+
 # These are source dependencies, so keep their build products out of the
 # default build unless one of our targets consumes them.
 set(BASISU_SSE OFF CACHE BOOL "Disable Basis Universal SSE support." FORCE)

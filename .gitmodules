@@ -26,3 +26,6 @@
 [submodule "KerberosEngine/ThirdParty/entt"]
 	path = KerberosEngine/ThirdParty/entt
 	url = https://github.com/skypjack/entt.git
+[submodule "KerberosEngine/ThirdParty/tracy"]
+	path = KerberosEngine/ThirdParty/tracy
+	url = https://github.com/wolfpld/tracy.git

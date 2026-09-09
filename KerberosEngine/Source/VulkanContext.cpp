@@ -696,6 +696,10 @@ namespace Kerberos
 		};
 
 		m_Device.setDebugUtilsObjectNameEXT(nameInfo);
+#else
+		(void)objectHandle;
+		(void)objectType;
+		(void)name;
 #endif
 	}
 
@@ -703,6 +707,9 @@ namespace Kerberos
 	{
 #ifdef KBR_DEBUG
 		vmaSetAllocationName(m_Allocator.get(), allocation, name.c_str());
+#else
+		(void)allocation;
+		(void)name;
 #endif
 	}
 

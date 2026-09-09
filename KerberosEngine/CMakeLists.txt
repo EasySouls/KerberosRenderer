@@ -58,6 +58,11 @@ target_compile_definitions(KerberosEngine PUBLIC
     NOMINMAX
 )
 
+if(KBR_ENABLE_TRACY)
+    target_compile_definitions(KerberosEngine PUBLIC KBR_ENABLE_TRACY)
+    target_link_libraries(KerberosEngine PUBLIC Tracy::TracyClient)
+endif()
+
 # Enable these later, but a few libraries are compiled as part of the engine that have warnings
 #target_compile_options(KerberosEngine PRIVATE
 #    $<$<CXX_COMPILER_ID:MSVC>:/Wall /W4 /WX /MP /permissive->

@@ -38,6 +38,7 @@ option(KBR_ENABLE_FUZZING "Enable libFuzzer instrumentation for Kerberos targets
 option(KBR_ENABLE_THIRDPARTY_INSTRUMENTATION
        "Enable selected sanitizer/fuzz instrumentation for third-party targets too."
        OFF)
+option(KBR_ENABLE_TRACY "Enable Tracy client profiling instrumentation." OFF)
 
 if(MSVC)
     # Use the DLL runtime consistently for the engine and static third-party

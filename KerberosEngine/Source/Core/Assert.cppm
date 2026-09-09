@@ -38,6 +38,9 @@ inline void KBRAssert(const bool condition, const std::source_location& loc = st
         Log::CoreCritical("ASSERTION FAILED in {} ({}:{})", loc.function_name(), loc.file_name(), loc.line());
         DebugBreak();
     }
+#else
+    (void)condition;
+    (void)loc;
 #endif
 }
 
@@ -51,6 +54,10 @@ inline void KBRAssert(const bool condition,
             "ASSERTION FAILED in {} ({}:{}): {}", loc.function_name(), loc.file_name(), loc.line(), message);
         DebugBreak();
     }
+#else
+    (void)condition;
+    (void)message;
+    (void)loc;
 #endif
 }
 
@@ -69,6 +76,10 @@ void KBRAssert(const bool condition,
                           msg);
         DebugBreak();
     }
+#else
+    (void)condition;
+    (void)format;
+    (static_cast<void>(args), ...);
 #endif
 }
 

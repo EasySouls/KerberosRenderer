@@ -102,6 +102,8 @@ namespace Kerberos
 
 				Kerberos::Log::CoreTrace("Descriptor Allocator: Bound '{}' at offset {} (size {})", debugName, m_CurrentOffset, layoutSize);
 			}
+#else
+			(void)debugName;
 #endif
 		}
 		else

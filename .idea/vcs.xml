@@ -14,6 +14,7 @@
     <mapping directory="$PROJECT_DIR$/KerberosEngine/ThirdParty/msdf-atlas-gen" vcs="Git" />
     <mapping directory="$PROJECT_DIR$/KerberosEngine/ThirdParty/msdf-atlas-gen/artery-font-format" vcs="Git" />
     <mapping directory="$PROJECT_DIR$/KerberosEngine/ThirdParty/msdf-atlas-gen/msdfgen" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/KerberosEngine/ThirdParty/tracy" vcs="Git" />
     <mapping directory="$PROJECT_DIR$/KerberosEngine/ThirdParty/yaml-cpp" vcs="Git" />
   </component>
 </project>

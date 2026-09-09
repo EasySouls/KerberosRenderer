@@ -119,6 +119,15 @@
         "KBR_ENABLE_FUZZING": "OFF",
         "KBR_ENABLE_THIRDPARTY_INSTRUMENTATION": "OFF"
       }
+    },
+    {
+      "name": "vs2026-tracy-relwithdebinfo",
+      "inherits": "vs2026",
+      "displayName": "VS2026 Tracy (RelWithDebInfo)",
+      "binaryDir": "${sourceDir}/out/build/vs2026-tracy-relwithdebinfo",
+      "cacheVariables": {
+        "KBR_ENABLE_TRACY": "ON"
+      }
     }
   ],
   "buildPresets": [
@@ -174,6 +183,12 @@
       "name": "clangcl-relwithdebinfo",
       "displayName": "ClangCL RelWithDebInfo",
       "configurePreset": "ninja-clang-relwithdebinfo",
+      "configuration": "RelWithDebInfo"
+    },
+    {
+      "name": "vs2026-tracy-relwithdebinfo",
+      "displayName": "VS2026 Tracy (RelWithDebInfo)",
+      "configurePreset": "vs2026-tracy-relwithdebinfo",
       "configuration": "RelWithDebInfo"
     }
   ]
