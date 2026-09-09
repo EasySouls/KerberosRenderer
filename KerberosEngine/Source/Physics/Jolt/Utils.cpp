@@ -68,7 +68,7 @@ JPH::ObjectLayer GetObjectLayerFromComponent(const RigidBody3DComponent& rb)
 
  void ApplyJoltTransformToEntity(glm::mat4& worldTransform, const JPH::Body& body, TransformComponent& tc)
 {
-    KBR_PROFILE_FUNCTION();
+    KBR_TRACY_FUNCTION();
 
     /// TODO: Update the transform, rotation and scale of the entity, not its world transform
 

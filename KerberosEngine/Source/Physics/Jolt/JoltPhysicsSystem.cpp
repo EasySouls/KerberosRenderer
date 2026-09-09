@@ -41,7 +41,7 @@ namespace Kerberos
 
 	void JoltPhysicsSystem::Initialize(const Ref<Scene>& scene)
 	{
-		KBR_PROFILE_FUNCTION();
+		KBR_TRACY_FUNCTION();
 
 		m_Scene = scene;
 
@@ -125,7 +125,7 @@ namespace Kerberos
 
 	void JoltPhysicsSystem::Update(const float deltaTime)
 	{
-		KBR_PROFILE_FUNCTION();
+		KBR_TRACY_FUNCTION();
 
 		UpdateAndCreatePhysicsBodies();
 
@@ -226,7 +226,7 @@ namespace Kerberos
 
 	void JoltPhysicsSystem::UpdateAndCreatePhysicsBodies()
 	{
-		KBR_PROFILE_FUNCTION();
+		KBR_TRACY_FUNCTION();
 
 		KBRAssert(!m_Scene.expired(), "Scene is not initialized!");
 		KBRAssert(m_JoltSystem, "Jolt Physics System is not initialized!");
@@ -494,7 +494,7 @@ namespace Kerberos
 
 	void JoltPhysicsSystem::Cleanup()
 	{
-		KBR_PROFILE_FUNCTION();
+		KBR_TRACY_FUNCTION();
 
 		//const auto view = m_Scene->m_Registry.view<RigidBody3DComponent>();
 		//for (const auto e : view)

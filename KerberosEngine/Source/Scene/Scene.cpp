@@ -40,7 +40,7 @@ namespace Kerberos
 
 	void Scene::OnRuntimeStart()
 	{
-		KBR_PROFILE_FUNCTION();
+		KBR_TRACY_FUNCTION();
 
 		m_PhysicsSystem->Initialize(shared_from_this());
 		m_PhysicsSystem->Update(0.0f); // Sync physics bodies with transforms before scripts run for the first time
@@ -94,7 +94,7 @@ namespace Kerberos
 
 	void Scene::OnUpdateRuntime(const float ts, const Camera& camera)
 	{
-		KBR_PROFILE_FUNCTION();
+		KBR_TRACY_FUNCTION();
 
 		if (!m_IsScenePaused)
 		{
@@ -200,7 +200,7 @@ namespace Kerberos
 
 Entity Scene::InstantiatePrefab(const AssetHandle prefabHandle, const std::string& rootName)
 {
-	KBR_PROFILE_FUNCTION();
+	KBR_TRACY_FUNCTION();
 
 	if (!prefabHandle.IsValid())
 	{
@@ -341,7 +341,7 @@ Entity Scene::InstantiatePrefab(const AssetHandle prefabHandle, const std::strin
 
 	Entity Scene::DuplicateEntity(const Entity entity, const bool duplicateChildren)
 	{
-		KBR_PROFILE_FUNCTION();
+		KBR_TRACY_FUNCTION();
 
 		const std::string name = entity.GetComponent<TagComponent>().Tag;
 		const std::string newName = name + " Copy";
@@ -576,7 +576,7 @@ Entity Scene::InstantiatePrefab(const AssetHandle prefabHandle, const std::strin
 
 	Entity Scene::GetEntityByUUID(const UUID uuid) const
 	{
-		KBR_PROFILE_FUNCTION();
+		KBR_TRACY_FUNCTION();
 
 #if USE_MAP_FOR_UUID
 
@@ -617,7 +617,7 @@ Entity Scene::InstantiatePrefab(const AssetHandle prefabHandle, const std::strin
 
 	Entity Scene::GetParent(const Entity child) const
 	{
-		KBR_PROFILE_FUNCTION();
+		KBR_TRACY_FUNCTION();
 
 		const auto& childHierarchy = child.GetComponent<HierarchyComponent>();
 		if (childHierarchy.Parent.IsValid())
@@ -629,7 +629,7 @@ Entity Scene::InstantiatePrefab(const AssetHandle prefabHandle, const std::strin
 
 	void Scene::RemoveParent(const Entity child)
 	{
-		KBR_PROFILE_FUNCTION();
+		KBR_TRACY_FUNCTION();
 
 		auto& childHierarchy = child.GetComponent<HierarchyComponent>();
 		if (childHierarchy.Parent.IsValid())
@@ -652,7 +652,7 @@ Entity Scene::InstantiatePrefab(const AssetHandle prefabHandle, const std::strin
 
 	std::vector<Entity> Scene::GetChildren(const Entity parent) const
 	{
-		KBR_PROFILE_FUNCTION();
+		KBR_TRACY_FUNCTION();
 
 		const auto& parentHierarchy = parent.GetComponent<HierarchyComponent>();
 
@@ -815,7 +815,7 @@ Entity Scene::InstantiatePrefab(const AssetHandle prefabHandle, const std::strin
 
 	void Scene::Render3DRuntime([[maybe_unused]] const SceneCamera* mainCamera, [[maybe_unused]] const glm::mat4& mainCameraTransform, [[maybe_unused]] const float dt)
 	{
-		KBR_PROFILE_FUNCTION();
+		KBR_TRACY_FUNCTION();
 #pragma region old_rendering_code
 		//DirectionalLightComponent* dlc = nullptr;
 		//const auto sunView = m_Registry.view<DirectionalLightComponent, TransformComponent>();
@@ -1041,10 +1041,10 @@ Entity Scene::InstantiatePrefab(const AssetHandle prefabHandle, const std::strin
 
 	void Scene::UpdateScripts(float ts)
 	{
-		KBR_PROFILE_FUNCTION();
+		KBR_TRACY_FUNCTION();
 
 		{
-			KBR_PROFILE_SCOPE("Scene::UpdateScripts - Native scripts update");
+			KBR_TRACY_SCOPE("Scene::UpdateScripts - Native scripts update");
 
 			m_Registry.view<NativeScriptComponent>().each([this]([[maybe_unused]] auto entity, [[maybe_unused]] const NativeScriptComponent& script)
 			{
@@ -1060,7 +1060,7 @@ Entity Scene::InstantiatePrefab(const AssetHandle prefabHandle, const std::strin
 		}
 
 		{
-			KBR_PROFILE_SCOPE("Scene::UpdateScripts - C# scripts update");
+			KBR_TRACY_SCOPE("Scene::UpdateScripts - C# scripts update");
 
 			m_Registry.view<ScriptComponent>().each([this, ts](auto id, [[maybe_unused]] const ScriptComponent& script)
 			{
@@ -1134,7 +1134,7 @@ Entity Scene::InstantiatePrefab(const AssetHandle prefabHandle, const std::strin
 
 	void Scene::CalculateEntityTransforms()
 	{
-		KBR_PROFILE_FUNCTION();
+		KBR_TRACY_FUNCTION();
 
 		const auto view = m_Registry.view<TransformComponent>();
 		for (const auto id : view)

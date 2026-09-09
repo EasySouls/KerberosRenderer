@@ -16,7 +16,7 @@ namespace Kerberos
 
 	Ref<Project> Project::Load(const std::filesystem::path& filepath)
 	{
-        KBR_PROFILE_FUNCTION();
+        KBR_TRACY_FUNCTION();
 
 		const Ref<Project> projectToLoad = CreateRef<Project>();
 
@@ -60,7 +60,7 @@ namespace Kerberos
 
 	bool Project::SaveActive()
 	{
-        KBR_PROFILE_FUNCTION();
+        KBR_TRACY_FUNCTION();
 
 		KBRAssert(s_ActiveProject != nullptr, "Active project has not been set!");
 
@@ -109,7 +109,7 @@ namespace Kerberos
 
     void Project::SetInfo(const ProjectInfo& info)
 	{
-        KBR_PROFILE_FUNCTION();
+        KBR_TRACY_FUNCTION();
 
 		KBRAssert(s_ActiveProject != nullptr, "Active project has not been set!");
 

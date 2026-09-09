@@ -77,7 +77,7 @@ namespace Kerberos
 	Font::Font(std::string name, const std::filesystem::path& filepath)
 		: m_Name(std::move(name)), m_Filepath(filepath), m_MSDFData(new MSDFData{})
 	{
-		KBR_PROFILE_FUNCTION();
+		KBR_TRACY_FUNCTION();
 
 		Timer timer("Font::Font", [&](const TimerData& data) {
 			Log::CoreInfo("Timer: Loading font {0} from {1} took {2}ms", m_Name, filepath.string(), data.DurationMs);

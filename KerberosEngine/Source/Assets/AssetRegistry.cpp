@@ -55,7 +55,7 @@ namespace Kerberos
 
 	bool AssetRegistry::ContainsPath(const std::filesystem::path& path) const
 	{
-        KBR_PROFILE_FUNCTION();
+        KBR_TRACY_FUNCTION();
 
 		const auto normalized = NormalizePath(path);
 		for (const auto& metadata : m_Registry | std::views::values)
@@ -66,7 +66,7 @@ namespace Kerberos
 
 	AssetHandle AssetRegistry::GetHandle(const std::filesystem::path& path) const
 	{
-        KBR_PROFILE_FUNCTION();
+        KBR_TRACY_FUNCTION();
 
 		const auto normalized = NormalizePath(path);
 		for (const auto& [handle, metadata] : m_Registry)
@@ -79,7 +79,7 @@ namespace Kerberos
 
 	std::string AssetRegistry::NormalizePath(const std::filesystem::path& path)
 	{
-        KBR_PROFILE_FUNCTION();
+        KBR_TRACY_FUNCTION();
 
 		std::string value = path.lexically_normal().generic_string();
 		std::ranges::transform(value, value.begin(), [](unsigned char c) {

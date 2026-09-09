@@ -48,7 +48,7 @@ namespace Kerberos
 
 	void EditorLayer::OnAttach()
 	{
-        KBR_PROFILE_FUNCTION();
+        KBR_TRACY_FUNCTION();
 
 		Log::EditorInfo("EditorLayer attached!");
 
@@ -193,7 +193,7 @@ namespace Kerberos
 
 	void EditorLayer::OnUpdate(const float deltaTime)
 	{
-		KBR_PROFILE_FUNCTION();
+		KBR_TRACY_FUNCTION();
 
 		m_Fps = 1.0f / deltaTime;
 		m_Time += deltaTime;
@@ -208,7 +208,7 @@ namespace Kerberos
 		}
 
 		{
-			KBR_PROFILE_SCOPE("EditorCamera::OnUpdate");
+			KBR_TRACY_SCOPE("EditorCamera::OnUpdate");
 
 			m_EditorCamera->SetIsInputBlocked(m_DoesImGuiWantInput);
 
@@ -231,7 +231,7 @@ namespace Kerberos
 		}
 
 		{
-			KBR_PROFILE_SCOPE("Scene::OnUpdate");
+			KBR_TRACY_SCOPE("Scene::OnUpdate");
 
 			m_ActiveScene->CalculateEntityTransforms();
 
@@ -250,7 +250,7 @@ namespace Kerberos
 		}
 
 		{
-			KBR_PROFILE_SCOPE("HandleMousePicking");
+			KBR_TRACY_SCOPE("HandleMousePicking");
 
 			HandleMousePicking();
 		}
@@ -260,7 +260,7 @@ namespace Kerberos
 
 	void EditorLayer::OnEvent(Event &event)
 	{
-        KBR_PROFILE_FUNCTION();
+        KBR_TRACY_FUNCTION();
 
 		m_EditorCamera->OnEvent(event);
 
@@ -276,7 +276,7 @@ namespace Kerberos
 
 	void EditorLayer::OnImGuiRender()
 	{
-        KBR_PROFILE_FUNCTION();
+        KBR_TRACY_FUNCTION();
 
 		static bool dockspaceOpen = true;
 		static ImGuiDockNodeFlags dockspaceFlags = ImGuiDockNodeFlags_None;
@@ -393,7 +393,7 @@ namespace Kerberos
 
 	void EditorLayer::HandleDragAndDrop()
 	{
-        KBR_PROFILE_FUNCTION();
+        KBR_TRACY_FUNCTION();
 
 		if (ImGui::BeginDragDropTarget())
 		{
@@ -439,7 +439,7 @@ namespace Kerberos
 
 	void EditorLayer::HandleMousePicking()
 	{
-		KBR_PROFILE_FUNCTION();
+		KBR_TRACY_FUNCTION();
 
 		if (m_HoveredEntityDeletedLastFrame)
 		{
@@ -480,7 +480,7 @@ namespace Kerberos
 
 	void EditorLayer::NewProject()
 	{
-        KBR_PROFILE_FUNCTION();
+        KBR_TRACY_FUNCTION();
 
 		/// Choose location for the new project
 		// const std::string filepathString = FileDialog::SaveFile("Kerberos Project (*.kbrproj)\0*.kbrproj\0");
@@ -507,7 +507,7 @@ namespace Kerberos
 
 	void EditorLayer::OpenProject(const std::filesystem::path &filepath)
 	{
-        KBR_PROFILE_FUNCTION();
+        KBR_TRACY_FUNCTION();
 
 		if (const auto project = Project::Load(filepath))
 		{
@@ -520,7 +520,7 @@ namespace Kerberos
 
 	bool EditorLayer::OpenProject()
 	{
-        KBR_PROFILE_FUNCTION();
+        KBR_TRACY_FUNCTION();
 
 		const std::string filepathString = FileDialog::OpenFile("Kerberos Project (*.kbrproj)\0*.kbrproj\0");
 
@@ -554,7 +554,7 @@ namespace Kerberos
 
 	void EditorLayer::SaveScene()
 	{
-        KBR_PROFILE_FUNCTION();
+        KBR_TRACY_FUNCTION();
 
 		const bool canSave = CanSaveScene();
 		if (!canSave)

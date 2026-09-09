@@ -174,7 +174,7 @@ void ParticleSystem::Update(const Ref<Scene>& scene,
                             const ParticleFrameData& frameData,
                             [[maybe_unused]] DescriptorAllocator& frameAllocator)
 {
-    KBR_PROFILE_FUNCTION();
+    KBR_TRACY_FUNCTION();
 
     BeginRenderPassDebugLabel(cmd, "Particle System Compute Update Passes");
 

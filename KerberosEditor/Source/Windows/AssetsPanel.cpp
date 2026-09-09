@@ -290,7 +290,7 @@ namespace Kerberos
 
 	void AssetsPanel::RefreshAssetTree()
 	{
-		KBR_PROFILE_FUNCTION();
+		KBR_TRACY_FUNCTION();
 
 		m_ContentItems.clear();
 		std::error_code error;

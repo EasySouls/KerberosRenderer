@@ -40,7 +40,7 @@ namespace Kerberos
 
 	Ref<Texture2D> TextureImporter::ImportTexture(const std::filesystem::path& filepath)
 	{
-		KBR_PROFILE_FUNCTION();
+		KBR_TRACY_FUNCTION();
 
 		const auto extension = filepath.extension();
 		if (!IsExtensionSupported(filepath))
@@ -113,7 +113,7 @@ namespace Kerberos
 
 		stbi_uc* pixels = nullptr;
 		{
-			KBR_PROFILE_SCOPE("TextureImporter::ImportTexture - stbi_load");
+			KBR_TRACY_SCOPE("TextureImporter::ImportTexture - stbi_load");
 			const int requestedChannels = desiredChannels > 0 ? std::clamp(desiredChannels, 1, 4) : STBI_rgb_alpha;
 			pixels = stbi_load(filepath.string().c_str(), &width, &height, &channels, requestedChannels);
 		}

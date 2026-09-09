@@ -204,7 +204,7 @@ namespace Kerberos
 
 	std::expected<bool, std::string> Shader::Recompile() 
 	{
-		KBR_PROFILE_FUNCTION();
+		KBR_TRACY_FUNCTION();
 
 		try 
 		{

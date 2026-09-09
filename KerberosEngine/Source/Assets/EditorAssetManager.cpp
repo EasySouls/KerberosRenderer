@@ -172,7 +172,7 @@ namespace Kerberos
 
 	void EditorAssetManager::EnsureAssetMetas() const
     {
-        KBR_PROFILE_FUNCTION();
+        KBR_TRACY_FUNCTION();
 
 		if (!m_MetaService || m_AssetsRoot.empty())
 			return;
@@ -195,7 +195,7 @@ namespace Kerberos
 
 	std::vector<AssetBuildReport> EditorAssetManager::BuildAssets(const bool force) const
     {
-        KBR_PROFILE_FUNCTION();
+        KBR_TRACY_FUNCTION();
 
 		if (!m_BuildCoordinator || m_AssetsRoot.empty())
 			return {};
@@ -213,7 +213,7 @@ namespace Kerberos
 
 	void EditorAssetManager::HandleAssetFileEvent(const AssetFileEvent& event)
 	{
-        KBR_PROFILE_FUNCTION();
+        KBR_TRACY_FUNCTION();
 
 		if (!m_BuildCoordinator)
 			return;
@@ -246,7 +246,7 @@ namespace Kerberos
 
 	Ref<Asset> EditorAssetManager::GetAsset(const AssetHandle handle)
 	{
-        KBR_PROFILE_FUNCTION();
+        KBR_TRACY_FUNCTION();
 
 		if (!IsAssetHandleValid(handle))
 			return nullptr;
@@ -301,7 +301,7 @@ namespace Kerberos
 
 	AssetType EditorAssetManager::GetAssetType(AssetHandle handle) const
 	{
-        KBR_PROFILE_FUNCTION();
+        KBR_TRACY_FUNCTION();
 
 		if (!IsAssetHandleValid(handle))
 		{
@@ -313,7 +313,7 @@ namespace Kerberos
 
 	AssetHandle EditorAssetManager::ImportAsset(const std::filesystem::path& filepath)
 	{
-        KBR_PROFILE_FUNCTION();
+        KBR_TRACY_FUNCTION();
 
 		/// If the asset is already in the registry, return its handle
 		if (m_AssetRegistry.ContainsPath(filepath))
@@ -373,7 +373,7 @@ namespace Kerberos
 
 	void EditorAssetManager::SerializeAssetRegistry()
 	{
-        KBR_PROFILE_FUNCTION();
+        KBR_TRACY_FUNCTION();
 
 		const std::filesystem::path assetDirectoryPath = m_AssetsRoot.empty()
 			? (Project::GetProjectDirectory() / Project::GetAssetDirectory())
@@ -423,7 +423,7 @@ namespace Kerberos
 
 	bool EditorAssetManager::DeserializeAssetRegistry()
 	{
-        KBR_PROFILE_FUNCTION();
+        KBR_TRACY_FUNCTION();
 
 		const std::filesystem::path assetDirectoryPath = m_AssetsRoot.empty()
 			? (Project::GetProjectDirectory() / Project::GetAssetDirectory())

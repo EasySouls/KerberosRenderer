@@ -22,7 +22,7 @@ AssetSourceScanner::ScanResult AssetSourceScanner::Scan(const std::filesystem::p
                                                         const std::vector<std::string>& extensions,
                                                         const ScanOptions options)
 {
-    KBR_PROFILE_FUNCTION();
+    KBR_TRACY_FUNCTION();
 
     ScanResult result;
 

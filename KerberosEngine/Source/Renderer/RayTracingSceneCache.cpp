@@ -69,7 +69,7 @@ namespace Kerberos
 
 	void RayTracingSceneCache::BuildAccelerationStructures(const Ref<Scene>& scene, const vk::raii::CommandBuffer& cmd, const uint32_t frameIndex)
 	{
-        KBR_PROFILE_FUNCTION();
+        KBR_TRACY_FUNCTION();
 
 		KBRAssert(scene != nullptr, "Scene cannot be null!");
 
