@@ -2,7 +2,7 @@
 #include "Core/Core.hpp"
 #include "Renderer/Textures/Texture2D.hpp"
 #include "Renderer/Textures/KTX2Encoder.hpp"
-#include "Profiling/Instrumentor.hpp"
+#include "Profiling/Profilers.hpp"
 #include "Utils/KtxConversion.hpp"
 #include "ImportUtils.hpp"
 

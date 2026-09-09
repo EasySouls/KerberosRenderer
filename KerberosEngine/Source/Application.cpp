@@ -12,7 +12,7 @@
 #include "Events/WindowResizedEvent.hpp"
 #include "Renderer/Renderer.hpp"
 #include "Scripting/ScriptEngine.hpp"
-#include "Profiling/TracyInstrumentation.hpp"
+#include "Profiling/Profilers.hpp"
 
 #include <GLFW/glfw3.h>
 

@@ -32,4 +32,4 @@
 
 #include "Core/Core.hpp"
 #include "Core/UUID.hpp"
-#include "Profiling/Instrumentor.hpp"
+#include "Profiling/Profilers.hpp"

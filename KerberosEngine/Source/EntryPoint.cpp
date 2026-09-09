@@ -1,6 +1,6 @@
 #include "EntryPoint.hpp"
 
-#include "Profiling/Instrumentor.hpp"
+#include "Profiling/Profilers.hpp"
 #include "Logging/CrashHandler.hpp"
 
 import Kerberos;

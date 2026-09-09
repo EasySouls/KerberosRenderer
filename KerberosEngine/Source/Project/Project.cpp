@@ -1,6 +1,6 @@
 #include "Project.hpp"
 #include "Core/Core.hpp"
-#include "Profiling/Instrumentor.hpp"
+#include "Profiling/Profilers.hpp"
 #include "Serialization/ProjectSerializer.hpp"
 
 import Kerberos;

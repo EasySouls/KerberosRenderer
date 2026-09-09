@@ -4,7 +4,7 @@
 #include "IO.hpp"
 #include "VulkanContext.hpp"
 #include "SlangCompiler.hpp"
-#include "Profiling/Instrumentor.hpp"
+#include "Profiling/Profilers.hpp"
 
 #include <spirv_cross/spirv_cross.hpp>
 

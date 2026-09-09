@@ -5,7 +5,7 @@
 #include "Assets/Importers/IAssetImporter.hpp"
 #include "Assets/Importers/GltfSceneImporter.hpp"
 #include "Assets/Formats/NativeAssetSerializer.hpp"
-#include "Profiling/Instrumentor.hpp"
+#include "Profiling/Profilers.hpp"
 #include "Project/Project.hpp"
 #include "Application.hpp"
 #include "ModelLoader.hpp"

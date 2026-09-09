@@ -1,6 +1,6 @@
 #include "AssetSourceScanner.hpp"
 #include "Core/Core.hpp"
-#include "Profiling/Instrumentor.hpp"
+#include "Profiling/Profilers.hpp"
 
 #include <algorithm>
 #include <string_view>

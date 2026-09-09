@@ -1,5 +1,5 @@
 #include "Utils.hpp"
-#include "Profiling/Instrumentor.hpp"
+#include "Profiling/Profilers.hpp"
 
 #include "Layers.hpp"
 #include "Core/Core.hpp"

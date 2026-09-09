@@ -4,7 +4,7 @@
 #include "Core/Timer.hpp"
 
 #undef INFINITE
-#include "Profiling/Instrumentor.hpp"
+#include "Profiling/Profilers.hpp"
 
 #ifdef _MSC_VER
 	#pragma warning(push)

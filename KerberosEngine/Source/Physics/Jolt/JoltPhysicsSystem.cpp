@@ -10,7 +10,7 @@
 #include "Scene/Entity.hpp"
 #include "Scene/Scene.hpp"
 #include "Scene/Components/PhysicsComponents.hpp"
-#include "Profiling/Instrumentor.hpp"
+#include "Profiling/Profilers.hpp"
 
 #include <Jolt/Jolt.h>
 #include <Jolt/Core/TempAllocator.h>

@@ -8,7 +8,7 @@
 #include "AssetConstants.hpp"
 #include "Assets/AssetManager.hpp"
 #include "Assets/Importers/TextureImporter.hpp"
-#include "Profiling/Instrumentor.hpp"
+#include "Profiling/Profilers.hpp"
 #include "Input/InputSystem.hpp"
 #include "Utils/SystemOperations.hpp"
 #include "ModelLoader.hpp"

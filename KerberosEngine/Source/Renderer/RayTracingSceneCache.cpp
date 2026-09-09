@@ -4,7 +4,7 @@
 #include "Core/Timer.hpp"
 #include "Scene/Scene.hpp"
 #include "Scene/Entity.hpp"
-#include "Profiling/Instrumentor.hpp"
+#include "Profiling/Profilers.hpp"
 
 import Kerberos;
 

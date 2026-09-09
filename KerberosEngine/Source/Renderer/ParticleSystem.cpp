@@ -6,7 +6,7 @@
 #include "Scene/Components/ParticleComponents.hpp"
 #include "Scene/Scene.hpp"
 #include "VulkanContext.hpp"
-#include "Profiling/Instrumentor.hpp"
+#include "Profiling/Profilers.hpp"
 
 #include <array>
 #include <format>

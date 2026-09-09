@@ -13,7 +13,7 @@
 #include "Renderer/Renderer.hpp"
 #include "Scripting/ScriptEngine.hpp"
 #include "Physics/Jolt/Utils.hpp"
-#include "Profiling/Instrumentor.hpp"
+#include "Profiling/Profilers.hpp"
 
 #include <glm/gtx/matrix_decompose.hpp>
 

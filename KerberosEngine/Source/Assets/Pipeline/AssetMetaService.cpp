@@ -1,6 +1,6 @@
 #include "AssetMetaService.hpp"
 #include "Core/Core.hpp"
-#include "Profiling/Instrumentor.hpp"
+#include "Profiling/Profilers.hpp"
 
 #include <yaml-cpp/yaml.h>
 #include <fstream>
