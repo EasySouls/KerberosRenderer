@@ -17,7 +17,10 @@ AssetBuildReport AssetBuildCoordinator::Build(const std::filesystem::path& sourc
     KBR_TRACY_FUNCTION();
 
     std::scoped_lock lock(m_BuildMutex);
-    AssetBuildReport report; report.Source = source;
+
+    AssetBuildReport report;
+    report.Source = source;
+
     std::error_code ec;
     if (!std::filesystem::is_regular_file(source, ec)) 
     { 
@@ -44,7 +47,8 @@ AssetBuildReport AssetBuildCoordinator::Build(const std::filesystem::path& sourc
     }
     if (report.Reason == AssetStaleReason::None) 
     { 
-        report.Built = true; return report; 
+        report.Built = true;
+        return report;
     }
 
     AssetBuildTransaction transaction(m_CacheRoot, source.stem().string());

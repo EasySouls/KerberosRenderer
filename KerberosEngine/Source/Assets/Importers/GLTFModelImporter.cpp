@@ -250,7 +250,7 @@ namespace Kerberos
 			return texturePath.lexically_normal();
 		}
 
-		static Ref<Texture2D> LoadTextureFromTextureInfo(
+        Ref<Texture2D> LoadTextureFromTextureInfo(
 			const tinygltf::Model& gltfModel,
 			const int textureIndex,
 			const std::filesystem::path& modelPath,
@@ -268,7 +268,7 @@ namespace Kerberos
 			const tinygltf::Image& image = gltfModel.images[texture.source];
 			if (image.uri.empty())
 			{
-				Log::CoreWarn("Embedded glTF image detected for texture index {}. File-backed import only is currently supported.", textureIndex);
+				Log::CoreWarn("Embedded glTF image detected for texture index {}. Only file-backed import is supported currently.", textureIndex);
 				return nullptr;
 			}
 

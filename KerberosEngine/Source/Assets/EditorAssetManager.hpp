@@ -15,7 +15,6 @@
 
 namespace Kerberos
 {
-
 	class EditorAssetManager final : public AssetManagerBase
 	{
 	public:

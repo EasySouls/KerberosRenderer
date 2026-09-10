@@ -1,10 +1,12 @@
-#include "Assets/Importers/GltfSceneImporter.hpp"
+#include "Assets/Importers/GLTFSceneImporter.hpp"
 #include "Assets/Formats/NativeAssetSerializer.hpp"
 #include "Assets/Asset.hpp"
 #include "Assets/Pipeline/ImportPipeline.hpp"
 #include "Profiling/Profilers.hpp"
 
 #include <tinygltf/tiny_gltf.h>
+#include <ktx.h>
+
 #include <algorithm>
 #include <sstream>
 
@@ -136,14 +138,78 @@ bool WriteMesh(const std::filesystem::path& root, const size_t mesh, const size_
     return true;
 }
 
+bool IsKtxData(const unsigned char* bytes, const int size)
+{
+    static constexpr unsigned char ktx1Magic[] = {
+        0xAB, 0x4B, 0x54, 0x58, 0x20, 0x31, 0x31, 0xBB, 0x0D, 0x0A, 0x1A, 0x0A
+    };
+    static constexpr unsigned char ktx2Magic[] = {
+        0xAB, 0x4B, 0x54, 0x58, 0x20, 0x32, 0x30, 0xBB, 0x0D, 0x0A, 0x1A, 0x0A
+    };
+
+    return bytes && size >= static_cast<int>(sizeof(ktx1Magic))
+           && (std::memcmp(bytes, ktx1Magic, sizeof(ktx1Magic)) == 0
+               || std::memcmp(bytes, ktx2Magic, sizeof(ktx2Magic)) == 0);
 }
 
-bool GltfSceneImporter::Import(const std::filesystem::path& source, const std::filesystem::path& outputDirectory,
+bool LoadImageDataWithKtxFallback(
+        tinygltf::Image* image,
+        const int imageIdx,
+        std::string* err,
+        std::string* warn,
+        const int reqWidth,
+        const int reqHeight,
+        const unsigned char* bytes,
+        const int size,
+        const void* userData)
+    {
+        (void)userData;
+
+        if (IsKtxData(bytes, size))
+        {
+            ktxTexture* ktxTexture = nullptr;
+            const ktxResult result = ktxTexture_CreateFromMemory(bytes, static_cast<ktx_size_t>(size), KTX_TEXTURE_CREATE_LOAD_IMAGE_DATA_BIT, &ktxTexture);
+            if (result != KTX_SUCCESS || !ktxTexture)
+            {
+                if (err)
+                    (*err) += "Failed to load KTX image data for image[" + std::to_string(imageIdx) + "].\n";
+                return false;
+            }
+
+            if ((reqWidth > 0 && static_cast<int>(ktxTexture->baseWidth) != reqWidth)
+                || (reqHeight > 0 && static_cast<int>(ktxTexture->baseHeight) != reqHeight))
+            {
+                if (warn)
+                {
+                    (*warn) += "KTX image dimensions do not match the glTF image request for image[" + std::to_string(imageIdx) + "].\n";
+                }
+            }
+
+            image->width = static_cast<int>(ktxTexture->baseWidth);
+            image->height = static_cast<int>(ktxTexture->baseHeight);
+            image->as_is = true;
+            image->image.resize(static_cast<size_t>(size));
+            std::memcpy(image->image.data(), bytes, static_cast<size_t>(size));
+
+            ktxTexture_Destroy(ktxTexture);
+            return true;
+        }
+
+        return tinygltf::LoadImageData(image, imageIdx, err, warn, reqWidth, reqHeight, bytes, size, nullptr);
+    }
+}
+
+bool GLTFSceneImporter::Import(const std::filesystem::path& source, const std::filesystem::path& outputDirectory,
                                GltfSceneManifest* output)
 {
     KBR_TRACY_FUNCTION();
 
-    tinygltf::Model model; tinygltf::TinyGLTF loader; std::string error, warning;
+    tinygltf::Model model;
+    tinygltf::TinyGLTF loader;
+    std::string error, warning;
+
+    loader.SetImageLoader(LoadImageDataWithKtxFallback, nullptr);
+
     const auto ext = source.extension().string();
     bool loaded = ext == ".glb" ? loader.LoadBinaryFromFile(&model, &error, &warning, source.string())
                                 : ext == ".gltf" ? loader.LoadASCIIFromFile(&model, &error, &warning, source.string()) : false;

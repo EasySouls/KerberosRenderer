@@ -6,7 +6,7 @@
 
 namespace Kerberos
 {
-    class GltfSceneImporter
+    class GLTFSceneImporter
     {
     public:
         /// Parses a glTF/GLB file and writes a deterministic CPU-only scene cache.

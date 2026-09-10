@@ -3,7 +3,7 @@
 
 #include "Assets/Importers/AssetImporter.hpp"
 #include "Assets/Importers/IAssetImporter.hpp"
-#include "Assets/Importers/GltfSceneImporter.hpp"
+#include "Assets/Importers/GLTFSceneImporter.hpp"
 #include "Assets/Formats/NativeAssetSerializer.hpp"
 #include "Profiling/Profilers.hpp"
 #include "Project/Project.hpp"
@@ -20,74 +20,13 @@
 #include <cerrno>
 #include <system_error>
 
+#include "Importers/GLTFPipelineImporter.hpp"
+
 import Kerberos;
 
 namespace Kerberos
 {
-	namespace
-	{
-		class GltfPipelineImporter final : public IAssetImporter
-		{
-		public:
-			bool SupportsExtension(const std::string_view extension) const override
-			{
-				return extension == ".gltf" || extension == ".glb";
-			}
-			ImportResult Import(const ImportContext& context) override
-			{
-				KBR_TRACY_FUNCTION();
 
-				GltfSceneManifest manifest;
-				if (!GltfSceneImporter::Import(context.SourceAbsolutePath, context.CacheRootAbsolutePath, &manifest))
-					throw std::runtime_error("Failed to build glTF scene");
-				ImportResult result;
-				result.SourceHandle = context.Meta.SourceHandle.IsValid() ? context.Meta.SourceHandle : AssetHandle();
-				if (!result.SourceHandle.IsValid())
-					result.SourceHandle = AssetHandle();
-				std::error_code ec;
-				for (const auto& entry : std::filesystem::recursive_directory_iterator(context.CacheRootAbsolutePath, ec))
-				{
-					if (ec || !entry.is_regular_file() || entry.path().extension() != ".kbrmesh" && entry.path().extension() != ".kbrmaterial" && entry.path().extension() != ".kbrtexture" && entry.path().extension() != ".kbrskeleton" && entry.path().extension() != ".kbranimation" && entry.path().extension() != ".kbrprefab")
-						continue;
-					NativeAssetRecord record;
-					AssetType type = AssetType::Prefab;
-					if (entry.path().extension() == ".kbrmesh") {
-						type = AssetType::Mesh;
-						record.LocalKey = "mesh:" + entry.path().stem().string().substr(5);
-					} else {
-						if (!NativeAssetSerializer::DeserializeRecord(entry.path(), record))
-							continue;
-						if (record.Kind == "material") type = AssetType::Material;
-						else if (record.Kind == "texture") type = AssetType::Texture2D;
-						else if (record.Kind == "skeleton") type = AssetType::Skin;
-						else if (record.Kind == "animation") type = AssetType::Animation;
-					}
-					AssetHandle handle = AssetHandle::Invalid();
-					for (const auto& old : context.Meta.SubAssets)
-						if (old.LocalKey == record.LocalKey) { handle = old.Handle; break; }
-					if (!handle.IsValid()) handle = AssetHandle();
-					result.Outputs.push_back({ handle, type, std::filesystem::relative(entry.path(), context.CacheRootAbsolutePath, ec), record.LocalKey, {} });
-				}
-				for (auto& output : result.Outputs)
-				{
-					if (output.Type == AssetType::Material)
-					{
-						for (const auto& candidate : result.Outputs)
-							if (candidate.Type == AssetType::Texture2D && candidate.Handle.IsValid())
-								output.Dependencies.push_back(candidate.Handle);
-					}
-					else if (output.Type == AssetType::Prefab)
-					{
-						for (const auto& candidate : result.Outputs)
-							if (candidate.Type == AssetType::Mesh || candidate.Type == AssetType::Material || candidate.Type == AssetType::Skin || candidate.Type == AssetType::Animation)
-								if (candidate.Handle.IsValid()) output.Dependencies.push_back(candidate.Handle);
-					}
-				}
-				return result;
-			}
-			ImporterType Type() const override { return ImporterType::GLTFScene; }
-		};
-	}
 	static const std::map<std::string_view, AssetType> assetExtensionMap = {
 		{ ".png", AssetType::Texture2D },
 		{ ".jpg", AssetType::Texture2D },
@@ -159,7 +98,7 @@ namespace Kerberos
 		std::filesystem::create_directories(m_AssetsRoot, ec);
 		std::filesystem::create_directories(m_CacheRoot, ec);
 		m_MetaService = CreateOwner<AssetMetaService>(m_AssetsRoot);
-		m_ImporterRegistry.Register(CreateRef<GltfPipelineImporter>());
+		m_ImporterRegistry.Register(CreateRef<GLTFPipelineImporter>());
 		m_BuildCoordinator = CreateOwner<AssetBuildCoordinator>(m_AssetsRoot, m_CacheRoot, *m_MetaService, m_ImporterRegistry, &m_AssetRegistry);
 
 		std::unordered_set<std::string> extensions;
