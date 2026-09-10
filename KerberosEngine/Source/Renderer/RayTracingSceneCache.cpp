@@ -220,6 +220,8 @@ namespace Kerberos
 
 	void RayTracingSceneCache::BuildBLAS(const vk::raii::CommandBuffer& cmd, Mesh* mesh)
     {
+	    KBR_TRACY_FUNCTION();
+
 		KBRAssert(mesh, "Mesh cannot be null!");
 
 		auto& context = VulkanContext::Get();

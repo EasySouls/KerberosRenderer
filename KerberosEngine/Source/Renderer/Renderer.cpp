@@ -18,6 +18,7 @@
 #include "TextureManager.hpp"
 #include "Utils.hpp"
 #include "VulkanContext.hpp"
+#include "Profiling/Profilers.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -34,6 +35,8 @@ using namespace Kerberos;
 
 glm::mat4 GetWorldTransformWithoutScale(const TransformComponent& transform)
 {
+    KBR_TRACY_FUNCTION();
+
     const glm::vec3 position = glm::vec3(transform.WorldTransform[3]);
 
     glm::mat3 rotation = glm::mat3(transform.WorldTransform);
@@ -487,6 +490,8 @@ static Owner<RendererData> s_Data = nullptr;
 
 void Renderer::Init()
 {
+    KBR_TRACY_FUNCTION();
+
     KBRAssert(s_Data == nullptr, "Renderer is already initialized!");
     Log::CoreInfo("Initializing Renderer...");
 
@@ -516,6 +521,8 @@ void Renderer::Init()
 
 void Renderer::Shutdown()
 {
+    KBR_TRACY_FUNCTION();
+
     KBRAssert(s_Data != nullptr, "Renderer not initialized!");
 
     VulkanContext::Get().WaitIdle();
@@ -545,6 +552,8 @@ void Renderer::Shutdown()
 
 void Renderer::RenderSceneEditor(const Ref<Scene>& scene, const Camera& camera, const float dt)
 {
+    KBR_TRACY_FUNCTION();
+
     RenderScene(
         scene,
         camera.GetViewMatrix(),
@@ -563,6 +572,8 @@ void Renderer::RenderSceneRuntime(const Ref<Scene>& scene,
                                   const glm::mat4& mainCameraTransform,
                                   const float dt)
 {
+    KBR_TRACY_FUNCTION();
+
     const glm::vec3 camPos = mainCameraTransform[3];
     RenderScene(
         scene,
@@ -588,6 +599,8 @@ void Renderer::RenderScene(
     const float nearPlane,
     const float farPlane)
 {
+    KBR_TRACY_FUNCTION();
+
     KBRAssert(!s_Data->PendingRender.IsValid, "Scene has already been queued for rendering!");
 
     glm::mat4 invView = glm::inverse(view);
@@ -607,6 +620,8 @@ void Renderer::RenderScene(
 
 void Renderer::RecordQueuedSceneRender(const vk::raii::CommandBuffer& cmd)
 {
+    KBR_TRACY_FUNCTION();
+
     KBRAssert(s_Data->PendingRender.IsValid, "No pending scene render to record!");
 
     if (!s_Data->PendingRender.IsValid || !s_Data->PendingRender.Scene)
@@ -3068,6 +3083,8 @@ void Renderer::CreateResources()
 
 void Renderer::ResizeResources(const uint32_t width, const uint32_t height)
 {
+    KBR_TRACY_FUNCTION();
+
     KBRAssert(s_Data != nullptr, "Renderer not initialized!");
 
     // Resize the color and depth image, the shadowmap image can keep its size
@@ -3583,6 +3600,8 @@ void Renderer::ResizeResources(const uint32_t width, const uint32_t height)
 
 void Renderer::RecompileShaders()
 {
+    KBR_TRACY_FUNCTION();
+
     VulkanContext::Get().WaitIdle();
 
     if (const auto& shadowMapPipeline = s_Data->ShadowMap.Pipeline)
@@ -3882,6 +3901,8 @@ void Renderer::WriteGPUTimestamp(const vk::raii::CommandBuffer& cmd, const uint3
 
 void Renderer::ResolveGPUTimings(const uint32_t frameIndex)
 {
+    KBR_TRACY_FUNCTION();
+
     if (!s_Data->SupportsGPUTimestamps || frameIndex >= s_Data->GPUTimestampQueryPools.size() ||
         s_Data->GPUTimestampQueryPools[frameIndex] == nullptr) {
         s_Data->LatestGPUTimings.IsValid = false;
@@ -3974,6 +3995,8 @@ void Renderer::ResetQueryPools(const vk::raii::CommandBuffer& cmd, const uint32_
 
 void Renderer::ResolvePipelineStatistics(const uint32_t frameIndex)
 {
+    KBR_TRACY_FUNCTION();
+
     if (!s_Data->SupportsPipelineStatistics)
         return;
 
@@ -4040,6 +4063,8 @@ void Renderer::ResolvePipelineStatistics(const uint32_t frameIndex)
 
 void Renderer::UpdateLights(const uint32_t currentImage, const std::vector<GPULight>& sceneLights)
 {
+    KBR_TRACY_FUNCTION();
+
     std::memcpy(s_Data->UniformBuffers[currentImage].globalLighting->GetMappedData(),
                 &s_Data->GlobalLightingData,
                 sizeof(GlobalLighting));
@@ -4057,6 +4082,8 @@ void Renderer::UpdateSceneUniformBuffers(const uint32_t currentImage,
                                          const uint32_t lightCount,
                                          const float deltaTime)
 {
+    KBR_TRACY_FUNCTION();
+
     const glm::mat4& projection = mainCamera->GetProjectionMatrix();
     const glm::mat4& view = mainCamera->GetViewMatrix();
     const glm::vec3 camPos = mainCamera->GetPosition();
@@ -4082,6 +4109,8 @@ void Renderer::UpdateSceneUniformBuffers(const uint32_t currentImage,
                                          const uint32_t lightCount,
                                          const float deltaTime)
 {
+    KBR_TRACY_FUNCTION();
+
     s_Data->SceneUniformData.projection = projection;
     s_Data->SceneUniformData.view = view;
     s_Data->SceneUniformData.camPos = camPos;
@@ -4129,6 +4158,8 @@ void Renderer::UpdatePerObjectUniformBuffer(const uint32_t currentImage,
                                             const Material& material,
                                             const uint32_t entityID)
 {
+    KBR_TRACY_FUNCTION();
+
     s_Data->PerObjectData = {
         .model = model, .worldNormal = glm::inverseTranspose(model), .material = material.Params, .entityID = entityID
     };
@@ -4141,6 +4172,8 @@ void Renderer::UpdatePerObjectUniformBuffer(const uint32_t currentImage,
 
 std::vector<GPULight> Renderer::GetLightsFromScene(const Scene& scene)
 {
+    KBR_TRACY_FUNCTION();
+
     std::vector<GPULight> sceneLights;
 
     const auto pointLightView = scene.m_Registry.view<PointLightComponent, TransformComponent>();
@@ -4189,6 +4222,8 @@ std::vector<GPULight> Renderer::GetLightsFromScene(const Scene& scene)
 
 static AABB CalculateWorldAABB(const AABB& localAABB, const glm::mat4& worldTransform)
 {
+    KBR_TRACY_FUNCTION();
+
     AABB worldAABB;
 
     const glm::mat3 rotScaleMatrix = glm::mat3(worldTransform);
@@ -4217,6 +4252,8 @@ static AABB CalculateWorldAABB(const AABB& localAABB, const glm::mat4& worldTran
 
 std::pair<std::pmr::vector<RenderObject>, std::pmr::set<Ref<Material>>> Renderer::GetRenderObjectsAndUniqueMaterialsFromScene(const Scene& scene, std::pmr::memory_resource* arena)
 {
+    KBR_TRACY_FUNCTION();
+
     static uint32_t renderObjectCountFromLastFrame = 0;
 
     std::pmr::vector<RenderObject> renderObjects(arena);
@@ -4256,6 +4293,8 @@ std::pair<std::pmr::vector<RenderObject>, std::pmr::set<Ref<Material>>> Renderer
 
 std::vector<LineVertex> Renderer::GetColliderLineVerticesFromScene(const Scene& scene)
 {
+    KBR_TRACY_FUNCTION();
+
     std::vector<LineVertex> vertices;
     vertices.reserve(4096);
 
@@ -4322,6 +4361,8 @@ Renderer::RenderObjectContainer Renderer::FrustumCullRenderObjects(const RenderO
                                                                    const Frustum& frustum,
                                                                    std::pmr::memory_resource* arena)
 {
+    KBR_TRACY_FUNCTION();
+
     RenderObjectContainer culledObjects(arena);
     culledObjects.reserve(renderObjects.size());
 
@@ -4339,6 +4380,8 @@ void Renderer::RenderShadowPass(const vk::raii::CommandBuffer& cmd,
                                 const RenderObjectContainer& renderObjects,
                                 std::pmr::memory_resource* arena)
 {
+    KBR_TRACY_FUNCTION();
+
     vk::ImageMemoryBarrier2 barrier = { .srcStageMask = vk::PipelineStageFlagBits2::eEarlyFragmentTests |
                                                         vk::PipelineStageFlagBits2::eLateFragmentTests,
                                         .srcAccessMask = vk::AccessFlagBits2::eDepthStencilAttachmentWrite,
@@ -4428,6 +4471,8 @@ void Renderer::RenderShadowPass(const vk::raii::CommandBuffer& cmd,
 
 void Renderer::RenderParticles(const vk::raii::CommandBuffer& cmd, const uint32_t frameIndex)
 {
+    KBR_TRACY_FUNCTION();
+
     WriteGPUTimestamp(cmd, frameIndex, static_cast<uint32_t>(GPUTimestampQuery::ParticlesDrawBegin));
 
     // Transition depth attachment to read-only optimal
@@ -4519,6 +4564,8 @@ void Renderer::RenderParticles(const vk::raii::CommandBuffer& cmd, const uint32_
 
 void Renderer::RenderGrass(const vk::raii::CommandBuffer& cmd, const uint32_t frameIndex)
 {
+    KBR_TRACY_FUNCTION();
+
     WriteGPUTimestamp(cmd, frameIndex, static_cast<uint32_t>(GPUTimestampQuery::GrassBegin));
 
     vk::RenderingAttachmentInfo colorAttachmentInfo{
@@ -4571,6 +4618,8 @@ void Renderer::RenderGrass(const vk::raii::CommandBuffer& cmd, const uint32_t fr
 
 void Renderer::ApplyTonemapping(const vk::raii::CommandBuffer& cmd, uint32_t frameIndex)
 {
+    KBR_TRACY_FUNCTION();
+
     WriteGPUTimestamp(cmd, frameIndex, static_cast<uint32_t>(GPUTimestampQuery::TonemappingPassBegin));
 
     const uint32_t outputWidth = static_cast<uint32_t>(s_Data->OutputSize.x);
@@ -4678,6 +4727,8 @@ void Renderer::ApplyTonemapping(const vk::raii::CommandBuffer& cmd, uint32_t fra
 
 void Renderer::ApplyAntiAliasing(const vk::raii::CommandBuffer& cmd, const uint32_t frameIndex)
 {
+    KBR_TRACY_FUNCTION();
+
     WriteGPUTimestamp(cmd, frameIndex, static_cast<uint32_t>(GPUTimestampQuery::AntialiasingPassBegin));
 
     {
@@ -4761,6 +4812,8 @@ void Renderer::ApplyFXAA(const vk::raii::CommandBuffer& cmd,
                          const vk::Rect2D& renderArea,
                          const vk::Viewport& viewport)
 {
+    KBR_TRACY_FUNCTION();
+
     vk::RenderingAttachmentInfo compositeAttachmentInfo{ .imageView = s_Data->CompositeImage.ImageView,
                                                          .imageLayout = vk::ImageLayout::eColorAttachmentOptimal,
                                                          .loadOp = vk::AttachmentLoadOp::eClear,
@@ -4798,6 +4851,8 @@ void Renderer::ApplyNoOpPostProcessing(const vk::raii::CommandBuffer& cmd,
                                        const vk::Rect2D& renderArea,
                                        const vk::Viewport& viewport)
 {
+    KBR_TRACY_FUNCTION();
+
     vk::RenderingAttachmentInfo compositeAttachmentInfo{ .imageView = s_Data->CompositeImage.ImageView,
                                                          .imageLayout = vk::ImageLayout::eColorAttachmentOptimal,
                                                          .loadOp = vk::AttachmentLoadOp::eClear,
@@ -4835,6 +4890,8 @@ void Renderer::ApplySMAA(const vk::raii::CommandBuffer& cmd,
                          const vk::Rect2D& renderArea,
                          const vk::Viewport& viewport)
 {
+    KBR_TRACY_FUNCTION();
+
     // Tonemapped image is already shader read-only optimal and composite image is already color attachment optimal
 
     SMAAData::PushConstants smaaPushConstants;
@@ -5055,6 +5112,8 @@ void Renderer::ApplySMAA(const vk::raii::CommandBuffer& cmd,
 
 void Renderer::ApplyBloom(const vk::raii::CommandBuffer& cmd, const uint32_t frameIndex)
 {
+    KBR_TRACY_FUNCTION();
+
     WriteGPUTimestamp(cmd, frameIndex, static_cast<uint32_t>(GPUTimestampQuery::BloomPassBegin));
 
     {
@@ -5209,6 +5268,8 @@ void Renderer::ApplyBloom(const vk::raii::CommandBuffer& cmd, const uint32_t fra
 
 glm::mat4 Renderer::CalculateLightSpaceMatrix()
 {
+    KBR_TRACY_FUNCTION();
+
     constexpr float nearPlane = 0.1f;
     constexpr float farPlane = 100.0f;
     constexpr float orthoSize = 20.0f;
@@ -5249,6 +5310,8 @@ glm::mat4 Renderer::CalculateLightSpaceMatrix()
 
 void Renderer::HandleMousePickingReadback(const vk::raii::CommandBuffer& cmd)
 {
+    KBR_TRACY_FUNCTION();
+
     const auto& device = VulkanContext::Get().GetDevice();
     const uint64_t completedTimelineValue =
         s_Data->MousePickingReadback.TimelineSemaphore != nullptr

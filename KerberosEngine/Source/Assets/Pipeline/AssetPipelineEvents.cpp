@@ -1,5 +1,7 @@
 #include "AssetPipelineEvents.hpp"
 
+#include "Profiling/Profilers.hpp"
+
 #include <ranges>
 
 namespace Kerberos {
@@ -42,6 +44,8 @@ void AssetEventDebouncer::Stop()
 
 void AssetEventDebouncer::Run(const std::stop_token& token)
 {
+    KBR_TRACY_FUNCTION();
+
     while (!token.stop_requested())
     {
         std::unique_lock lock(m_Mutex);

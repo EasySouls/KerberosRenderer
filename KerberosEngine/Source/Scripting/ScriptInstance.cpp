@@ -2,6 +2,7 @@
 
 #include "ScriptClass.hpp"
 #include "ScriptEngine.hpp"
+#include "Profiling/Profilers.hpp"
 
 import Kerberos;
 
@@ -12,6 +13,8 @@ namespace Kerberos
 	ScriptInstance::ScriptInstance(const Ref<ScriptClass>& scriptClass, const Entity entity, const std::unordered_map<std::string, ScriptFieldInitializer>& initialFieldValues)
 		: m_Entity(entity), m_EntityID(entity.GetUUID()), m_ScriptClass(scriptClass)
 	{
+		KBR_TRACY_FUNCTION();
+
 		/// Create managed instance via the ScriptGlue bridge
 		const bool created = ScriptEngine::CreateManagedInstance(
 			static_cast<uint64_t>(m_EntityID),

@@ -5,6 +5,8 @@
 #include "VulkanContext.hpp"
 #include "TextureManager.hpp"
 
+#include "Profiling/Profilers.hpp"
+
 import Kerberos;
 
 namespace Kerberos 
@@ -50,6 +52,8 @@ namespace Kerberos
 
 	void MaterialRegistry::SyncWithCurrentMaterials(const std::pmr::set<Ref<Material>>& currentMaterials)
 	{
+		KBR_TRACY_FUNCTION();
+
 		// This way of clearing the registry is not ideal, as it will remove all materials that are not in the currentMaterials set, which breaks the engine
 		// for example, when assigning the DebugPink material to a mesh, when it doesn't have any.
 		// For now, just keep adding any new materials, and do not remove them.
@@ -81,6 +85,8 @@ namespace Kerberos
 
 	void MaterialRegistry::ResolveAllMaterialIndices(TextureManager& textureManager)
 	{
+		KBR_TRACY_FUNCTION();
+
 		for (const auto& material : m_Materials | std::views::values)
 		{
 			material->ResolveIndices(textureManager);

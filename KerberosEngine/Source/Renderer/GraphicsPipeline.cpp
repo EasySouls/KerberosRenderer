@@ -3,6 +3,8 @@
 #include "Vertex.hpp"
 #include "VulkanContext.hpp"
 
+#include "Profiling/Profilers.hpp"
+
 #include <map>
 
 import Kerberos;
@@ -130,6 +132,8 @@ namespace Kerberos
 	GraphicsPipeline::GraphicsPipeline(GraphicsPipelineSpecification spec) 
 		: m_Specification(std::move(spec))
 	{
+		KBR_TRACY_FUNCTION();
+
 		StoreSpecializationData();
 		CreatePipeline(m_Specification);
 	}
@@ -143,6 +147,8 @@ namespace Kerberos
 
 	void GraphicsPipeline::Recompile() 
 	{
+		KBR_TRACY_FUNCTION();
+
 		KBRAssert(m_Pipeline != nullptr, "Pipeline not created yet!");
 		KBRAssert(m_Specification.Shader != nullptr, "Shader is null!");
 

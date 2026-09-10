@@ -1,6 +1,5 @@
 #include "EditorLayer.hpp"
 
-#include "Core/Timer.hpp"
 #include "VulkanContext.hpp"
 #include "IO.hpp"
 #include "Renderer/Renderer.hpp"
@@ -11,7 +10,6 @@
 #include "Profiling/Profilers.hpp"
 #include "Input/InputSystem.hpp"
 #include "Utils/SystemOperations.hpp"
-#include "ModelLoader.hpp"
 #include "Scene/Camera/FirstPersonCamera.hpp"
 #include "Serialization/SceneSerializer.hpp"
 #include "Input/KeyCodes.hpp"
@@ -43,7 +41,6 @@ namespace Kerberos
 
 	EditorLayer::~EditorLayer()
 	{
-		m_SceneNodes.clear();
 	}
 
 	void EditorLayer::OnAttach()
@@ -92,91 +89,6 @@ namespace Kerberos
 		m_EditorCamera->SetRotation(glm::vec3(0.0f, 90.0f, 0.0f));
 
 		m_ViewportSize = {1280.0f, 720.0f};
-
-		{
-			Timer timer("Loading sample assets", [](const TimerData &data) {
-                Log::EditorInfo("Loading sample meshes and textures took {} ms!", data.DurationMs);
-            });
-
-			constexpr GLTFLoadingFlags loadingFlags = GLTFLoadingFlags::None;
-
-			// Load models
-			m_Meshes["avocado"] = CreateRef<Mesh>(ModelLoader::LoadModel("assets/models/avocado/Avocado.gltf", loadingFlags));
-			m_Meshes["cube"] = CreateRef<Mesh>(ModelLoader::LoadModel("assets/models/cube.gltf", loadingFlags));
-			m_Meshes["sphere"] = CreateRef<Mesh>(ModelLoader::LoadModel("assets/models/sphere.gltf", loadingFlags));
-			m_Meshes["cerberus"] = CreateRef<Mesh>(ModelLoader::LoadModel("assets/models/cerberus/cerberus.gltf", loadingFlags));
-
-			Log::EditorInfo("Loaded {} mesh(es)!", m_Meshes.size());
-
-			const std::vector<std::pair<std::string, vk::Format>> textureFiles = {
-					{"assets/models/avocado/Avocado_baseColor.ktx2", vk::Format::eR8G8B8A8Srgb},
-					{"assets/models/avocado/Avocado_normal.ktx2", vk::Format::eR8G8B8A8Unorm},
-					{"assets/textures/stonefloor01_color_rgba.ktx", vk::Format::eR8G8B8A8Srgb},
-					{"assets/textures/stonefloor01_normal_rgba.ktx", vk::Format::eR8G8B8A8Unorm},
-					{"assets/textures/stonefloor02_color_rgba.ktx", vk::Format::eR8G8B8A8Srgb},
-					{"assets/textures/stonefloor02_normal_rgba.ktx", vk::Format::eR8G8B8A8Unorm},
-
-					{"assets/models/cerberus/albedo.ktx", vk::Format::eR8G8B8A8Unorm},
-					{"assets/models/cerberus/normal.ktx", vk::Format::eR8G8B8A8Unorm},
-					{"assets/models/cerberus/ao.ktx", vk::Format::eR8Unorm},
-					{"assets/models/cerberus/metallic.ktx", vk::Format::eR8Unorm},
-					{"assets/models/cerberus/roughness.ktx", vk::Format::eR8Unorm},
-			};
-
-			m_Textures.reserve(textureFiles.size());
-			for (const auto &filepath : textureFiles | std::views::keys)
-			{
-				auto texture = Texture2D::FromFile(filepath);
-				m_Textures.push_back(texture);
-			}
-
-			Log::EditorInfo("Loaded {} texture(s)!", m_Textures.size());
-
-			const auto &avocadoMaterial = m_MaterialRegistry.AddAndRetrieve("Avocado", std::make_shared<Material>("Avocado", glm::vec4(1.0f, 1.0f, 1.0f, 1.0f), 0.9f, 0.03f, m_Textures[0], m_Textures[1]));
-			const auto &stoneFloorMaterial = m_MaterialRegistry.AddAndRetrieve("Stone Floor", std::make_shared<Material>("Stone Floor", glm::vec4(1.0f, 1.0f, 1.0f, 1.0f), 0.8f, 0.05f, m_Textures[2], m_Textures[3]));
-			const auto &stoneFloor2Material = m_MaterialRegistry.AddAndRetrieve("Stone Floor 2", std::make_shared<Material>("Stone Floor 2", glm::vec4(0.4f, 0.15f, 0.0f, 1.0f), 1.0f, 0.0f, m_Textures[4], m_Textures[5]));
-			const auto &cerberusMaterial = m_MaterialRegistry.AddAndRetrieve("Cerberus", std::make_shared<Material>("Cerberus", glm::vec4(1.0f, 1.0f, 1.0f, 1.0f), 1.0f, 0.0f, m_Textures[6], m_Textures[7]));
-
-			m_SceneNodes.push_back(CreateOwner<Node>(Node{
-					.Position = glm::vec3(6.0f, 9.5f, 0.0f),
-					.Rotation = glm::vec3(0.0f),
-					.Scale = glm::vec3(50.0f),
-					.Mesh = m_Meshes["avocado"],
-					.Material = avocadoMaterial,
-					.Name = "Avocado"}));
-
-			m_SceneNodes.push_back(CreateOwner<Node>(Node{
-					.Position = glm::vec3(2.0f, 0.0f, 0.0f),
-					.Rotation = glm::vec3(0.0f),
-					.Scale = glm::vec3(1.0f),
-					.Mesh = m_Meshes["cube"],
-					.Material = stoneFloorMaterial,
-					.Name = "Cube"}));
-
-			m_SceneNodes.push_back(CreateOwner<Node>(Node{
-					.Position = glm::vec3(2.0f, 6.0f, 3.0f),
-					.Rotation = glm::vec3(0.0f),
-					.Scale = glm::vec3(1.0f),
-					.Mesh = m_Meshes["sphere"],
-					.Material = m_MaterialRegistry.Get("Avocado"),
-					.Name = "Sphere"}));
-
-			m_SceneNodes.push_back(CreateOwner<Node>(Node{
-					.Position = glm::vec3(2.0f, -10.0f, 3.0f),
-					.Rotation = glm::vec3(0.0f),
-					.Scale = glm::vec3(20.0f, 0.1f, 20.0f),
-					.Mesh = m_Meshes["cube"],
-					.Material = stoneFloor2Material,
-					.Name = "Floor"}));
-
-			m_SceneNodes.push_back(CreateOwner<Node>(Node{
-					.Position = glm::vec3(-8.0f, 10.0f, 8.0f),
-					.Rotation = glm::vec3(-1.6f, 1.4, 0.0),
-					.Scale = glm::vec3(8.0f),
-					.Mesh = m_Meshes["cerberus"],
-					.Material = cerberusMaterial,
-					.Name = "Revolver"}));
-		}
 
 		m_AssetsPanel = CreateOwner<AssetsPanel>(m_NotificationManager);
 
@@ -573,6 +485,8 @@ namespace Kerberos
 
 	void EditorLayer::SaveSceneAs()
 	{
+		KBR_TRACY_FUNCTION();
+
 		const bool canSave = CanSaveScene();
 		if (!canSave)
 			return;
@@ -591,6 +505,8 @@ namespace Kerberos
 
 	void EditorLayer::LoadScene()
 	{
+		KBR_TRACY_FUNCTION();
+
 		const std::string filepathString = FileDialog::OpenFile("Kerberos Scene (*.kerberos)\0*.kerberos\0");
 
 		if (filepathString.empty())
@@ -601,6 +517,8 @@ namespace Kerberos
 
 	void EditorLayer::OpenScene(const std::filesystem::path &filepath)
 	{
+		KBR_TRACY_FUNCTION();
+
 		if (m_SceneState != SceneState::Edit)
 		{
 			OnSceneStop();
@@ -626,6 +544,8 @@ namespace Kerberos
 
 	void EditorLayer::OpenScene(const Ref<Scene> &scene)
 	{
+		KBR_TRACY_FUNCTION();
+
         const auto& metadata = Project::GetActive()->GetEditorAssetManager()->GetMetadata(scene->GetHandle());
 
 		OpenScene(metadata.Filepath);
@@ -633,6 +553,8 @@ namespace Kerberos
 
 	void EditorLayer::NewScene()
 	{
+		KBR_TRACY_FUNCTION();
+
 		m_ActiveScene = CreateRef<Scene>();
 		m_ActiveScene->OnViewportResize(static_cast<uint32_t>(m_ViewportSize.x), static_cast<uint32_t>(m_ViewportSize.y));
 		m_HierarchyPanel.SetContext(m_ActiveScene);
@@ -640,6 +562,8 @@ namespace Kerberos
 
 	void EditorLayer::DrawViewport()
 	{
+		KBR_TRACY_FUNCTION();
+
 		ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.0f, 0.0f));
 		ImGui::Begin("Viewport");
 		ImGui::PopStyleVar();
@@ -715,6 +639,8 @@ namespace Kerberos
 
 	void EditorLayer::DrawUIToolbar()
 	{
+		KBR_TRACY_FUNCTION();
+
 		constexpr ImGuiWindowFlags flags = ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse;
 
 		ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.0f, 0.0f, 0.0f, 0.0f));
@@ -826,6 +752,8 @@ namespace Kerberos
 
 	void EditorLayer::DrawMenuBar()
 	{
+		KBR_TRACY_FUNCTION();
+
 		if (ImGui::BeginMenuBar())
 		{
 			if (ImGui::BeginMenu("File"))
@@ -921,6 +849,8 @@ namespace Kerberos
 
 	void EditorLayer::DrawDebugWindow() const
 	{
+		KBR_TRACY_FUNCTION();
+
 		ImGui::Begin("Debug");
 
 		ImGui::Text("Time: %.2f seconds", m_Time);
@@ -1189,6 +1119,8 @@ namespace Kerberos
 
 	void EditorLayer::CalculateEntityTransform(const Entity &entity) const
 	{
+		KBR_TRACY_FUNCTION();
+
 		m_ActiveScene->CalculateEntityTransform(entity);
 	}
 

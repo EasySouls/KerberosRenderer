@@ -99,6 +99,8 @@ namespace Kerberos
 
 	std::pair<TextureSpecification, Buffer> TextureImporter::LoadTextureData(const std::filesystem::path& filepath, const bool flip, const int desiredChannels)
 	{
+		KBR_TRACY_FUNCTION();
+
 		int width = 0, height = 0, channels = 0;
 
 		stbi_set_flip_vertically_on_load(flip);

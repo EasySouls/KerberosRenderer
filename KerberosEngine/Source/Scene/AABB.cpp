@@ -32,6 +32,8 @@ namespace Kerberos
 
 	bool IsAABBInsideFrustum(const AABB& aabb, const Frustum& frustum)
 	{
+		KBR_TRACY_FUNCTION();
+
 		for (const auto& [Normal, Distance] : frustum.Planes)
 		{
 			glm::vec3 positiveVertex = aabb.Min;

@@ -17,6 +17,8 @@ void ImporterRegistry::Register(Ref<IAssetImporter> importer)
 
 Ref<IAssetImporter> ImporterRegistry::Find(const std::string_view extension) const
 {
+	KBR_TRACY_FUNCTION();
+
 	std::shared_lock lock(m_Mutex);
 	std::string normalized(extension);
 	if (!normalized.empty() && normalized.front() != '.')

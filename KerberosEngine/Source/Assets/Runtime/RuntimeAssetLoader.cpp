@@ -4,6 +4,7 @@
 #include "Assets/Model.hpp"
 #include "Renderer/Mesh.hpp"
 #include "Renderer/Vertex.hpp"
+#include "Profiling/Profilers.hpp"
 
 #include <cstring>
 #include <fstream>
@@ -28,6 +29,8 @@ bool Read(std::istream& stream, T& value)
 
 Ref<Mesh> LoadMesh(AssetHandle handle, const std::filesystem::path& path)
 {
+	KBR_TRACY_FUNCTION();
+
 	NativeMeshPayload native;
 	if (NativeAssetSerializer::DeserializeMesh(path, native))
 	{
@@ -77,6 +80,8 @@ Ref<Mesh> LoadMesh(AssetHandle handle, const std::filesystem::path& path)
 
 Ref<Model> LoadSceneManifest(AssetHandle handle, const std::filesystem::path& path)
 {
+	KBR_TRACY_FUNCTION();
+
 	GltfSceneManifest manifest;
 	if (!NativeAssetSerializer::DeserializeSceneManifest(path, manifest))
 		return nullptr;
@@ -100,6 +105,8 @@ Ref<Model> LoadSceneManifest(AssetHandle handle, const std::filesystem::path& pa
 Ref<Asset> RuntimeAssetLoader::Load(const AssetHandle handle,
 	const AssetMetadata& metadata, const std::filesystem::path& path)
 {
+	KBR_TRACY_FUNCTION();
+
 	switch (metadata.Type)
 	{
 		case AssetType::Mesh:

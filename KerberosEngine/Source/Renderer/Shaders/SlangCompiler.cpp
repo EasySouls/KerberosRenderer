@@ -1,5 +1,7 @@
 #include "SlangCompiler.hpp"
 
+#include "Profiling/Profilers.hpp"
+
 #include <slang/slang-com-ptr.h>
 #include <slang/slang.h>
 
@@ -22,6 +24,8 @@ static Slang::ComPtr<slang::IGlobalSession> GetGlobalSession()
 
 std::vector<uint32_t> SlangCompiler::CompileToSpirv(const std::filesystem::path& filepath, const std::vector<ShaderEntryPoint>& entryPoints)
 {
+	KBR_TRACY_FUNCTION();
+
 	using namespace slang;
 
 	const Slang::ComPtr<IGlobalSession> globalSession = GetGlobalSession();

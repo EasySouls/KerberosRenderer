@@ -5,6 +5,8 @@ namespace Kerberos {
 
 Ref<Mesh> AssetManager::ResolveMeshAsset(const AssetHandle handle)
 {
+	KBR_TRACY_FUNCTION();
+
 	if (!handle.IsValid() || !IsAssetHandleValid(handle))
 		return nullptr;
 

@@ -1,15 +1,13 @@
 #include "VulkanContext.hpp"
 
 #include "Renderer/Textures/Texture.hpp"
-#include <algorithm>
-#include <iostream>
+#include "Renderer/Renderer.hpp"
+#include "Profiling/Profilers.hpp"
+#include "Utils.hpp"
 
 #include "imgui.h"
 #include "backends/imgui_impl_glfw.h"
 #include "backends/imgui_impl_vulkan.h"
-
-#include "Utils.hpp"
-#include "Renderer/Renderer.hpp"
 
 #define VK_USE_PLATFORM_WIN32_KHR
 #define GLFW_INCLUDE_VULKAN
@@ -18,6 +16,9 @@
 #include <GLFW/glfw3native.h>
 
 #include "ImGuizmo.h"
+
+#include <algorithm>
+#include <iostream>
 
 import Kerberos;
 
@@ -137,6 +138,8 @@ namespace Kerberos
 	VulkanContext::VulkanContext(GLFWwindow* window)
 		: m_Window(window)
 	{
+		KBR_TRACY_FUNCTION();
+
 		if (s_Instance != nullptr)
 		{
 			throw std::runtime_error("VulkanContext instance already exists!");
@@ -188,6 +191,7 @@ namespace Kerberos
 
 	void VulkanContext::Draw()
 	{
+		KBR_TRACY_FUNCTION();
 		const vk::Result fenceResult = m_Device.waitForFences(*m_InFlightFences[m_FrameIndex], vk::True, UINT64_MAX);
 		if (fenceResult != vk::Result::eSuccess)
 		{
@@ -256,6 +260,8 @@ namespace Kerberos
 
 	void VulkanContext::Present()
 	{
+		KBR_TRACY_FUNCTION();
+
 		const ImGuiIO& io = ImGui::GetIO();
 		if (io.ConfigFlags & ImGuiConfigFlags_ViewportsEnable)
 		{
@@ -292,6 +298,8 @@ namespace Kerberos
 
 	vk::raii::CommandBuffer VulkanContext::BeginSingleTimeCommands() const
 	{
+		KBR_TRACY_FUNCTION();
+
 		const vk::CommandBufferAllocateInfo allocInfo{
 			.commandPool = *m_GraphicsCommandPool,
 			.level = vk::CommandBufferLevel::ePrimary,
@@ -310,6 +318,8 @@ namespace Kerberos
 		const vk::raii::Semaphore* signalTimelineSemaphore,
 		const uint64_t signalTimelineValue) const
 	{
+		KBR_TRACY_FUNCTION();
+
 		commandBuffer.end();
 
 		vk::TimelineSemaphoreSubmitInfo timelineSemaphoreSubmitInfo;
@@ -336,6 +346,8 @@ namespace Kerberos
 
 	void VulkanContext::Submit(const OperationType type, const std::function<void(const vk::raii::CommandBuffer&)>& cmd) const 
 	{
+		KBR_TRACY_FUNCTION();
+
 		vk::CommandPool commandPool;
 		vk::Queue queue;
 		if (type == OperationType::Graphics)
@@ -389,6 +401,8 @@ namespace Kerberos
 
 	vk::raii::CommandBuffer VulkanContext::BeginSingleTimeCommands(OperationType type) const 
 	{
+		KBR_TRACY_FUNCTION();
+
 		vk::CommandPool commandPool;
 		if (type == OperationType::Graphics)
 		{
@@ -424,6 +438,8 @@ namespace Kerberos
 
 	void VulkanContext::EndSingleTimeCommands(const vk::raii::CommandBuffer& commandBuffer, const OperationType type) const 
 	{
+		KBR_TRACY_FUNCTION();
+
 		vk::Queue queue;
 		if (type == OperationType::Graphics)
 		{
@@ -465,6 +481,8 @@ namespace Kerberos
 		const vk::raii::Semaphore* signalSemaphore
 	) const
 	{
+		KBR_TRACY_FUNCTION();
+
 		const vk::CommandPool cmdPool = m_QueueFamilyInfo.HasSeparateTransferQueue() ? *m_TransferCommandPool : *m_GraphicsCommandPool;
 		const vk::CommandBufferAllocateInfo allocInfo{
 			.commandPool = cmdPool,
@@ -494,6 +512,8 @@ namespace Kerberos
 
 	void VulkanContext::TransitionImageLayout(const vk::raii::Image& image, const vk::ImageLayout oldLayout, const vk::ImageLayout newLayout, const uint32_t mipLevels) const
 	{
+		KBR_TRACY_FUNCTION();
+
 		const auto commandBuffer = BeginSingleTimeCommands();
 
 		vk::ImageMemoryBarrier2 barrier = {
@@ -544,6 +564,8 @@ namespace Kerberos
 	                                          vk::ImageLayout oldLayout, vk::ImageLayout newLayout, const vk::ImageSubresourceRange& subresourceRange,
 	                                          vk::PipelineStageFlags2 srcStageMask, vk::PipelineStageFlags2 dstStageMask) const
 	{
+		KBR_TRACY_FUNCTION();
+
 		vk::ImageMemoryBarrier2 barrier = {
 			.oldLayout = oldLayout,
 			.newLayout = newLayout,
@@ -682,6 +704,8 @@ namespace Kerberos
 
 	void VulkanContext::WaitIdle() const
 	{
+		KBR_TRACY_FUNCTION();
+
 		m_Device.waitIdle();
 	}
 
@@ -760,6 +784,8 @@ namespace Kerberos
 
 	void VulkanContext::RecordCommandBuffer(const uint32_t imageIndex) const
 	{
+		KBR_TRACY_FUNCTION();
+
 		m_CommandBuffers[m_FrameIndex].begin({});
 
 		Renderer::RecordQueuedSceneRender(m_CommandBuffers[m_FrameIndex]);
@@ -1586,6 +1612,8 @@ namespace Kerberos
 
 	void VulkanContext::RecreateSwapchain()
 	{
+		KBR_TRACY_FUNCTION();
+
 		int width = 0, height = 0;
 		glfwGetFramebufferSize(m_Window, &width, &height);
 		while (width == 0 || height == 0) {
@@ -1613,6 +1641,8 @@ namespace Kerberos
 		const vk::PipelineStageFlags2 dstStageMask,
 		const vk::ImageAspectFlagBits aspectFlags
 	) const {
+		KBR_TRACY_FUNCTION();
+
 		vk::ImageMemoryBarrier2 barrier = {
 			.srcStageMask = srcStageMask,
 			.srcAccessMask = srcAccessMask,
@@ -1644,6 +1674,8 @@ namespace Kerberos
 	vk::DescriptorSet VulkanContext::GenerateImGuiDescriptorSet(const vk::raii::Sampler& sampler,
 																const vk::raii::ImageView& imageView, vk::ImageLayout imageLayout)
 	{
+		KBR_TRACY_FUNCTION();
+
 		return ImGui_ImplVulkan_AddTexture(
 			static_cast<VkSampler>(*sampler),
 			static_cast<VkImageView>(*imageView),

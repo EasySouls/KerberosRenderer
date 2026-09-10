@@ -5,6 +5,8 @@ namespace Kerberos
 {
 	void Frustum::Update(const glm::mat4& viewProj)
 	{
+		KBR_TRACY_FUNCTION();
+
 		Planes[0].Normal.x = viewProj[0][3] + viewProj[0][0];
 		Planes[0].Normal.y = viewProj[1][3] + viewProj[1][0];
         Planes[0].Normal.z = viewProj[2][3] + viewProj[2][0];
@@ -43,6 +45,8 @@ namespace Kerberos
 
 	Frustum Frustum::CreateFromViewProjection(const glm::mat4& viewProj)
 	{
+		KBR_TRACY_FUNCTION();
+
 		Frustum frustum;
 		frustum.Update(viewProj);
 		return frustum;
@@ -50,6 +54,8 @@ namespace Kerberos
 
 	std::vector<glm::vec4> GetFrustumCornersWorldSpace(const glm::mat4& projview)
 	{
+		KBR_TRACY_FUNCTION();
+
 		const auto inv = glm::inverse(projview);
 
 		std::vector<glm::vec4> frustumCorners;

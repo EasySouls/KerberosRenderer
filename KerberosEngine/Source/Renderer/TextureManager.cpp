@@ -3,6 +3,8 @@
 #include "VulkanContext.hpp"
 #include "Assets/AssetManager.hpp"
 
+#include "Profiling/Profilers.hpp"
+
 import Kerberos;
 
 namespace Kerberos
@@ -22,6 +24,8 @@ namespace Kerberos
 
 	void TextureManager::Initialize()
 	{
+		KBR_TRACY_FUNCTION();
+
 		constexpr TextureSpecification whiteSpec{
 			.Width = 1,
 			.Height = 1,
@@ -154,6 +158,8 @@ namespace Kerberos
 
 	uint32_t TextureManager::GetTextureIndex(AssetHandle handle)
 	{
+		KBR_TRACY_FUNCTION();
+
 		if (handle == AssetHandle::Invalid())
 		{
 			KBRAssert(false, "Texture handle is invalid {0}", handle);
@@ -261,6 +267,8 @@ namespace Kerberos
 
 	void TextureManager::UpdateGlobalDescriptorSet(const uint32_t index, const vk::ImageView imageView) const
 	{
+		KBR_TRACY_FUNCTION();
+
 		const vk::DescriptorImageInfo imageInfo{
 			.sampler = nullptr,
 			.imageView = imageView,

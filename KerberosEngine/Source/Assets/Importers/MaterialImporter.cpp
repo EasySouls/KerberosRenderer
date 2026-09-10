@@ -4,6 +4,7 @@
 #include "Assets/EditorAssetManager.hpp"
 #include "Project/Project.hpp"
 #include "Serialization/SerializationUtils.hpp"
+#include "Profiling/Profilers.hpp"
 
 #include <yaml-cpp/yaml.h>
 #include <fstream>
@@ -19,6 +20,8 @@ namespace Kerberos
 
 	Ref<Material> MaterialImporter::ImportMaterial(const std::filesystem::path& filepath)
 	{
+		KBR_TRACY_FUNCTION();
+
 		const auto& absolutePath = std::filesystem::absolute(filepath);
 
 		YAML::Node node;
@@ -97,6 +100,8 @@ namespace Kerberos
 
 	bool MaterialImporter::SaveMaterial(const std::filesystem::path& filepath, const Material& material)
 	{
+		KBR_TRACY_FUNCTION();
+
 		auto texturePathFor = [&](const Ref<Texture2D>& texture) -> std::string
 		{
 			if (!texture || !texture->GetHandle().IsValid())

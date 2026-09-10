@@ -7,6 +7,7 @@
 #include "KTX2Loader.hpp"
 #include "KTX2FormatSelector.hpp"
 #include "VulkanContext.hpp"
+#include "Profiling/Profilers.hpp"
 
 import Kerberos;
 
@@ -14,12 +15,16 @@ namespace Kerberos {
 
 static ktxResult LoadKTXFile(const std::filesystem::path& filepath, ktxTexture2** target)
 {
+	KBR_TRACY_FUNCTION();
+
 	const ktxResult result = ktxTexture2_CreateFromNamedFile(filepath.string().c_str(), KTX_TEXTURE_CREATE_LOAD_IMAGE_DATA_BIT, target);
 	return result;
 }
 
 Texture2D::Texture2D(const TextureSpecification& spec, const Buffer& buffer)
 {
+	KBR_TRACY_FUNCTION();
+
 	m_Specification = spec;
 
 	auto& context = VulkanContext::Get();
@@ -164,6 +169,8 @@ Texture2D::Texture2D(const TextureSpecification& spec, const Buffer& buffer)
 
 Texture2D::Texture2D(const std::filesystem::path& filepath) 
 {
+	KBR_TRACY_FUNCTION();
+
 	auto extension = filepath.extension().string();
 	std::ranges::transform(extension, extension.begin(), [](unsigned char c) {
 		return static_cast<char>(std::tolower(c));

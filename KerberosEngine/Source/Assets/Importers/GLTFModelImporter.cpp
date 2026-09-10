@@ -6,6 +6,7 @@
 #include "Serialization/PrefabSerializer.hpp"
 #include "Assets/EditorAssetManager.hpp"
 #include "Project/Project.hpp"
+#include "Profiling/Profilers.hpp"
 
 #include <glm/gtx/matrix_decompose.hpp>
 #include <glm/gtx/norm.hpp>
@@ -127,6 +128,8 @@ namespace Kerberos
 
         void GenerateTangentsForVertices(std::vector<Vertex>& vertices, const std::vector<uint32_t>& indices)
 		{
+			KBR_TRACY_FUNCTION();
+
 			if (vertices.empty() || indices.size() < 3)
 				return;
 
@@ -235,6 +238,8 @@ namespace Kerberos
 
         std::filesystem::path ResolveTexturePath(const std::filesystem::path& modelPath, const std::string& uri)
 		{
+			KBR_TRACY_FUNCTION();
+
 			if (uri.empty())
 				return {};
 
@@ -251,6 +256,8 @@ namespace Kerberos
 			const std::filesystem::path& modelPath,
 			std::unordered_map<std::string, Ref<Texture2D>>& textureCache)
 		{
+			KBR_TRACY_FUNCTION();
+
 			if (textureIndex < 0 || textureIndex >= static_cast<int>(gltfModel.textures.size()))
 				return nullptr;
 
@@ -294,6 +301,8 @@ namespace Kerberos
 
 	Ref<Model> GLTFModelImporter::ImportModel(const std::filesystem::path& filepath)
 	{
+		KBR_TRACY_FUNCTION();
+
 		tinygltf::Model gltfModel;
 		tinygltf::TinyGLTF loader;
 		loader.SetImageLoader(LoadImageDataWithKtxFallback, nullptr);

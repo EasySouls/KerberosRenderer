@@ -3,6 +3,8 @@
 #include "Vertex.hpp"
 #include "VulkanContext.hpp"
 
+#include "Profiling/Profilers.hpp"
+
 import Kerberos;
 
 namespace Kerberos
@@ -10,6 +12,8 @@ namespace Kerberos
 	ComputePipeline::ComputePipeline(ComputePipelineSpecification spec)
 		: m_Specification(std::move(spec))
 	{
+		KBR_TRACY_FUNCTION();
+
 		StoreSpecializationData();
 		CreatePipeline(m_Specification);
 	}

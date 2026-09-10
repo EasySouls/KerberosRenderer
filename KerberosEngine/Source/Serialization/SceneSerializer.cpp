@@ -10,6 +10,7 @@
 #include "Scripting/ScriptEngine.hpp"
 #include "Scripting/ScriptUtils.hpp"
 #include "SerializationUtils.hpp"
+#include "Profiling/Profilers.hpp"
 
 #include <glm/glm.hpp>
 
@@ -22,6 +23,8 @@ namespace Kerberos {
 
 static void SerializeEntity(YAML::Emitter& out, const Entity entity)
 {
+    KBR_TRACY_FUNCTION();
+
     out << YAML::BeginMap;
 
     out << YAML::Key << "Entity" << YAML::Value << entity.GetUUID();
@@ -362,6 +365,8 @@ static void SerializeEntity(YAML::Emitter& out, const Entity entity)
 
 void SceneSerializer::Serialize(const std::filesystem::path& filepath) const
 {
+    KBR_TRACY_FUNCTION();
+
     YAML::Emitter out;
     out << YAML::BeginMap;
     out << YAML::Key << "Scene" << YAML::Value << m_Scene->GetName();
@@ -401,6 +406,8 @@ void SceneSerializer::SerializeRuntime([[maybe_unused]] const std::filesystem::p
 
 bool SceneSerializer::Deserialize(const std::filesystem::path& filepath) const
 {
+    KBR_TRACY_FUNCTION();
+
     const std::ifstream inFile(filepath);
     std::stringstream stream;
     stream << inFile.rdbuf();

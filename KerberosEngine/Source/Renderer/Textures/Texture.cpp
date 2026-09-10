@@ -69,6 +69,8 @@ void CreateImage(
 	vk::raii::Image& image,
 	vk::raii::DeviceMemory& imageMemory)
 {
+	KBR_TRACY_FUNCTION();
+
 	const vk::ImageCreateInfo imageInfo{
 		.imageType = vk::ImageType::e2D,
 		.format = format,
@@ -105,6 +107,8 @@ vk::raii::ImageView CreateImageView(
 	const uint32_t mipLevels
 )
 {
+	KBR_TRACY_FUNCTION();
+
 	const vk::ImageViewCreateInfo viewInfo{
 		.flags = {},
 		.image = image,

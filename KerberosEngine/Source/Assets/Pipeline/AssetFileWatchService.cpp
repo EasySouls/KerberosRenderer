@@ -27,6 +27,8 @@ AssetFileWatchService::~AssetFileWatchService()
 void AssetFileWatchService::Start(std::filesystem::path assetsRoot,
     const std::unordered_set<std::string>& supportedExtensions, Callback callback)
 {
+    KBR_TRACY_FUNCTION();
+
     Stop();
     m_AssetsRoot = Normalize(std::move(assetsRoot));
     m_SupportedExtensions.clear();
@@ -60,17 +62,23 @@ void AssetFileWatchService::Stop()
 void AssetFileWatchService::Reload(std::filesystem::path assetsRoot,
     std::unordered_set<std::string> supportedExtensions)
 {
+    KBR_TRACY_FUNCTION();
+
     auto callback = m_Callback;
     Start(std::move(assetsRoot), std::move(supportedExtensions), std::move(callback));
 }
 
 std::filesystem::path AssetFileWatchService::Normalize(const std::filesystem::path& path)
 {
+    KBR_TRACY_FUNCTION();
+
     return std::filesystem::absolute(path).lexically_normal();
 }
 
 bool AssetFileWatchService::IsWatchedPath(const std::filesystem::path& path) const
 {
+    KBR_TRACY_FUNCTION();
+
     const auto relative = path.lexically_relative(m_AssetsRoot);
     if (relative.empty() || relative == ".")
         return false;
@@ -89,6 +97,8 @@ bool AssetFileWatchService::IsWatchedPath(const std::filesystem::path& path) con
 void AssetFileWatchService::OnFileEvent(const std::filesystem::path& path,
     const filewatch::Event event)
 {
+    KBR_TRACY_FUNCTION();
+
     const auto absolute = Normalize(m_AssetsRoot / path);
     if (!IsWatchedPath(absolute))
     {

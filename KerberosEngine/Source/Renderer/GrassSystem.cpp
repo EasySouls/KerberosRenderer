@@ -4,6 +4,8 @@
 #include "Utils.hpp"
 #include "Shaders/SlangCompiler.hpp"
 
+#include "Profiling/Profilers.hpp"
+
 import Kerberos;
 
 namespace
@@ -24,6 +26,8 @@ namespace Kerberos
 
 	void GrassSystem::Init(const Owner<DescriptorAllocator>& allocator)
 	{
+		KBR_TRACY_FUNCTION();
+
         m_DescriptorAllocator = allocator.get();
 
 		InitGrassDataBuffer();
@@ -34,6 +38,8 @@ namespace Kerberos
 
 	void GrassSystem::RecordDraw(const vk::raii::CommandBuffer& cmd, uint32_t /*frameIndex*/, const GrassConstants& constants)
 	{
+		KBR_TRACY_FUNCTION();
+
 		SetDefaultGraphicsState(cmd);
 
 		constexpr std::array unusedStages = {
@@ -157,6 +163,8 @@ namespace Kerberos
 
     void GrassSystem::InitShaderObjects()
     {
+		KBR_TRACY_FUNCTION();
+
         auto& context = VulkanContext::Get();
         const auto& device = context.GetDevice();
 

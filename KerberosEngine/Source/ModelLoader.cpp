@@ -1,5 +1,7 @@
 #include "ModelLoader.hpp"
 
+#include "Profiling/Profilers.hpp"
+
 #define TINYGLTF_IMPLEMENTATION
 #define STB_IMAGE_IMPLEMENTATION
 #define STB_IMAGE_WRITE_IMPLEMENTATION
@@ -13,6 +15,8 @@ namespace Kerberos
 {
 	static void GenerateTangentsForVertices(std::vector<Vertex>& vertices, const std::vector<uint32_t>& indices)
 	{
+		KBR_TRACY_FUNCTION();
+
 		const size_t vertexCount = vertices.size();
 
 		std::vector<glm::vec3> tan1(vertexCount, glm::vec3(0.0f));
@@ -82,6 +86,8 @@ namespace Kerberos
 
 	Mesh ModelLoader::LoadModel(const std::filesystem::path& path, GLTFLoadingFlags flags)
 	{
+		KBR_TRACY_FUNCTION();
+
 		tinygltf::Model model;
 		tinygltf::TinyGLTF loader;
 		std::string err;

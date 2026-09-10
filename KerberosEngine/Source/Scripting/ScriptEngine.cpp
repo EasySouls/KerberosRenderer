@@ -10,6 +10,7 @@
 #include "Application.hpp"
 #include "Project/Project.hpp"
 #include "Core/Timer.hpp"
+#include "Profiling/Profilers.hpp"
 
 #include <dotnet/include/nethost.h>
 #include <dotnet/include/hostfxr.h>
@@ -169,6 +170,8 @@ namespace Kerberos
 
 	static dotnet_string ToDotNetString(const std::string& str)
 	{
+		KBR_TRACY_FUNCTION();
+
 #ifdef _WIN32
 		if (str.empty()) return {};
 		const int sizeNeeded = MultiByteToWideChar(CP_UTF8, 0, str.c_str(), static_cast<int>(str.size()), nullptr, 0);
@@ -186,6 +189,8 @@ namespace Kerberos
 
 	void ScriptEngine::Init()
 	{
+		KBR_TRACY_FUNCTION();
+
 		s_ScriptData = new ScriptEngineData();
 
 		InitDotNet();
@@ -214,6 +219,8 @@ namespace Kerberos
 
 	void ScriptEngine::ReloadAssembly()
 	{
+		KBR_TRACY_FUNCTION();
+
 		Timer reloadAssemblyTimer("Reload Assembly", [&](const TimerData& data)
 		{
 			Log::CoreInfo("Reloading C# assemblies took {:.2f} ms", data.DurationMs);
@@ -239,6 +246,8 @@ namespace Kerberos
 
 	void ScriptEngine::OnCreateEntity(const Entity entity)
 	{
+		KBR_TRACY_FUNCTION();
+
 		auto& scriptComponent = entity.GetComponent<ScriptComponent>();
 
 		if (!ClassExists(scriptComponent.ClassName))
@@ -267,6 +276,8 @@ namespace Kerberos
 
 	void ScriptEngine::OnUpdateEntity(const Entity entity, const float deltaTime)
 	{
+		KBR_TRACY_FUNCTION();
+
 		KBRAssert(entity.HasComponent<ScriptComponent>(), "Entity does not have a ScriptComponent!");
 		KBRAssert(s_ScriptData->EntityInstances.contains(entity.GetUUID()), "No script instance found for entity!");
 
@@ -275,6 +286,8 @@ namespace Kerberos
 
 	void ScriptEngine::OnCollision(const Entity entity, const CollisionEvent& event) 
 	{
+		KBR_TRACY_FUNCTION();
+
 		if (!entity.HasComponent<ScriptComponent>())
 			return;
 
@@ -301,6 +314,8 @@ namespace Kerberos
 
 	void ScriptEngine::CreateScriptFieldInitializers(const Entity entity, const std::string& className)
 	{
+		KBR_TRACY_FUNCTION();
+
 		KBRAssert(ClassExists(className), "Script class doesn't exist!");
 
 		const UUID entityID = entity.GetUUID();
@@ -327,6 +342,8 @@ namespace Kerberos
 
 	void ScriptEngine::CopyScriptFieldInitializers(const Entity srcEntity, const Entity dstEntity) 
 	{
+		KBR_TRACY_FUNCTION();
+
 		const std::string& dstClassName = dstEntity.GetComponent<ScriptComponent>().ClassName;
 
 		KBRAssert(srcEntity.HasComponent<ScriptComponent>(), "Source entity does not have a ScriptComponent!");
@@ -469,6 +486,8 @@ namespace Kerberos
 
 	void ScriptEngine::LoadAssembly(const std::filesystem::path& assemblyPath)
 	{
+		KBR_TRACY_FUNCTION();
+
 		s_ScriptData->CoreAssemblyPath = assemblyPath;
 
 		/// Derive the runtime config path from the assembly path
@@ -522,6 +541,8 @@ namespace Kerberos
 
 	void ScriptEngine::LoadAssemblyClasses()
 	{
+		KBR_TRACY_FUNCTION();
+
 		s_ScriptData->EntityClasses.clear();
 
 		if (!s_ScriptData->LoadAssemblyClasses)
@@ -605,6 +626,8 @@ namespace Kerberos
 	template<typename T>
 	T ScriptEngine::LoadManagedFunction(const char* typeName, const char* methodName)
 	{
+		KBR_TRACY_FUNCTION();
+
 		T fn = nullptr;
 		const dotnet_string assemblyPath = ToDotNetString(s_ScriptData->CoreAssemblyPath.string());
 		const dotnet_string type = ToDotNetString(typeName);
@@ -629,6 +652,8 @@ namespace Kerberos
 
 	void ScriptEngine::LoadManagedFunctions()
 	{
+		KBR_TRACY_FUNCTION();
+
 		const char* glueType = "Kerberos.Source.ScriptGlue, KerberosScriptCoreLib";
 		const char* callbacksType = "Kerberos.Source.InternalCalls, KerberosScriptCoreLib";
 
@@ -668,6 +693,8 @@ namespace Kerberos
 
 	void ScriptEngine::OnAssemblyFileChanged(const std::string& path, const filewatch::Event changeType)
 	{
+		KBR_TRACY_FUNCTION();
+
 		const std::string extension = std::filesystem::path(path).extension().string();
 		if (extension == ".dll") {
 			Log::CoreInfo("Assembly file {0}: {1}", FileWatchEventToString(changeType), path);

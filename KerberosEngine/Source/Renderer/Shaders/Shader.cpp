@@ -116,6 +116,8 @@ namespace Kerberos
 	Shader::Shader(const std::filesystem::path& filepath, std::string name)
 		: m_Name(std::move(name))
 	{
+		KBR_TRACY_FUNCTION();
+
 		Utils::CreateCacheDirectoryIfNeeded();
 
 		std::filesystem::path shadersPath = std::filesystem::path("assets") / "shaders";
@@ -271,6 +273,8 @@ namespace Kerberos
 
 	std::vector<ShaderStageEntry> Shader::Reflect()
 	{
+		KBR_TRACY_FUNCTION();
+
 		using namespace spirv_cross;
 
 		const Compiler compiler(m_SpirvCode);

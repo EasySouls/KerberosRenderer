@@ -163,6 +163,8 @@ namespace Kerberos
 	bool JoltPhysicsSystem::Raycast(const glm::vec3& origin, const glm::vec3& direction, const float maxDistance,
 		RaycastHit& outHit) const 
 	{
+		KBR_TRACY_FUNCTION();
+
 		if (maxDistance <= 0.0f)
 		{
 			return false;
@@ -182,9 +184,7 @@ namespace Kerberos
 			JPH::Vec3(normalizedDirection.x, normalizedDirection.y, normalizedDirection.z) * maxDistance
 		};
 
-		JPH::RayCastResult hit;
-
-		if (m_JoltSystem->GetNarrowPhaseQuery().CastRay(ray, hit))
+		if (JPH::RayCastResult hit; m_JoltSystem->GetNarrowPhaseQuery().CastRay(ray, hit))
 		{
 			const JPH::Vec3 joltPoint = ray.GetPointOnRay(hit.mFraction);
 			const glm::vec3 point = Physics::Utils::ToGlmVec3(joltPoint);
@@ -278,6 +278,8 @@ namespace Kerberos
 
 	void JoltPhysicsSystem::SyncTransforms() const
 	{
+		KBR_TRACY_FUNCTION();
+
 		KBRAssert(!m_Scene.expired(), "Scene is not initialized!");
 		KBRAssert(m_JoltSystem, "Jolt Physics System is not initialized!");
 
@@ -337,6 +339,8 @@ namespace Kerberos
 
 	void JoltPhysicsSystem::CreatePhysicsBody(const Entity& entity)
 	{
+		KBR_TRACY_FUNCTION();
+
 		auto& rigidBody = entity.GetComponent<RigidBody3DComponent>();
 		auto& transform = entity.GetComponent<TransformComponent>();
 

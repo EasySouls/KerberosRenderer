@@ -1,6 +1,8 @@
 #include "MiniaudioAudioManager.hpp"
 #include "Application.hpp"
 
+#include "Profiling/Profilers.hpp"
+
 #include <memory>
 #include <ranges>
 
@@ -15,6 +17,8 @@ namespace Kerberos
 
 	void MiniaudioAudioManager::Init()
 	{
+		KBR_TRACY_FUNCTION();
+
 		if (ma_engine_init(nullptr, &m_Engine) != MA_SUCCESS)
 		{
 			Log::CoreError("Failed to initialize miniaudio engine");
@@ -25,6 +29,8 @@ namespace Kerberos
 
 	void MiniaudioAudioManager::Update()
 	{
+		KBR_TRACY_FUNCTION();
+
 		// Cleanup finished sounds
 		for (auto it = m_PlayingSounds.begin(); it != m_PlayingSounds.end(); )
 		{
@@ -43,6 +49,8 @@ namespace Kerberos
 
 	void MiniaudioAudioManager::Shutdown()
 	{
+		KBR_TRACY_FUNCTION();
+
 		for (const auto& sound : m_PlayingSounds | std::views::values)
 		{
 			ma_sound_stop(sound);
@@ -56,6 +64,8 @@ namespace Kerberos
 
 	Ref<Sound> MiniaudioAudioManager::Load(const std::filesystem::path& filepath)
 	{
+		KBR_TRACY_FUNCTION();
+
 		// Create Sound asset and remember mapping to filepath
 		const std::string soundName = filepath.stem().string();
 		Sound sound{ soundName };
@@ -70,6 +80,8 @@ namespace Kerberos
 
 	void MiniaudioAudioManager::Play(const std::filesystem::path& filepath)
 	{
+		KBR_TRACY_FUNCTION();
+
 		const auto it = m_FilepathToUUID.find(filepath);
 		if (it == m_FilepathToUUID.end())
 		{
@@ -110,6 +122,8 @@ namespace Kerberos
 
 	void MiniaudioAudioManager::Play(const UUID& soundID)
 	{
+		KBR_TRACY_FUNCTION();
+
 		auto it = m_FilepathToUUID.end();
 		// find filepath by reverse lookup in m_FilepathToUUID
 		for (const auto& [path, uuid] : m_FilepathToUUID)
@@ -130,6 +144,8 @@ namespace Kerberos
 
 	void MiniaudioAudioManager::Stop(const UUID& soundID)
 	{
+		KBR_TRACY_FUNCTION();
+
 		const auto it = m_PlayingSounds.find(soundID);
 		if (it == m_PlayingSounds.end() || it->second == nullptr)
 		{

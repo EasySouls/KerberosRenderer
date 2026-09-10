@@ -10,6 +10,7 @@
 #include "Scene/Components.hpp"
 #include "Scene/Components/PhysicsComponents.hpp"
 #include "Scene/Components/AudioComponents.hpp"
+#include "Profiling/Profilers.hpp"
 
 #include <glm/glm.hpp>
 
@@ -87,11 +88,13 @@ namespace Kerberos
 	static void NativeLog(const char* message)
 	{
 		if (message)
-			Kerberos::Log::CoreInfo("C# Log: {0}", message);
+			Log::CoreInfo("C# Log: {0}", message);
 	}
 
 	static uint8_t Entity_HasComponent(const uint64_t entityID, const char* componentTypeName)
 	{
+		KBR_TRACY_FUNCTION();
+
 		if (!componentTypeName)
 			return 0;
 
@@ -108,6 +111,8 @@ namespace Kerberos
 
 	static auto AddComponentTypeByName(const std::string& qualifiedTypeName) -> std::function<void(Entity)>
 	{
+		KBR_TRACY_FUNCTION();
+
 		const std::string typeName = qualifiedTypeName.substr(qualifiedTypeName.find_last_of('.') + 1);
 
 		if (typeName == "SpriteRendererComponent")
@@ -149,6 +154,8 @@ namespace Kerberos
 
 	static void Entity_AddComponent(const uint64_t entityID, const char* componentTypeName)
 	{
+		KBR_TRACY_FUNCTION();
+
 		if (!componentTypeName)
 			return;
 
@@ -166,6 +173,8 @@ namespace Kerberos
 
 	static uint64_t Entity_FindEntityByName(const char* name)
 	{
+		KBR_TRACY_FUNCTION();
+
 		if (!name)
 			return UUID::Invalid();
 
@@ -183,6 +192,8 @@ namespace Kerberos
 
 	static uint64_t Entity_Instantiate(const char* name)
 	{
+		KBR_TRACY_FUNCTION();
+
 		const std::string nameStr = name ? std::string(name) : "Entity";
 		if (const Ref<Scene> scene = ScriptEngine::GetSceneContext().lock())
 		{
@@ -194,6 +205,8 @@ namespace Kerberos
 
 	static void TransformComponent_GetTranslation(const uint64_t entityID, glm::vec3* outTranslation)
 	{
+		KBR_TRACY_FUNCTION();
+
 		const std::weak_ptr<Scene>& scene = ScriptEngine::GetSceneContext();
 		if (outTranslation)
 		{
@@ -204,6 +217,8 @@ namespace Kerberos
 
 	static void TransformComponent_SetTranslation(const uint64_t entityID, const glm::vec3* translation)
 	{
+		KBR_TRACY_FUNCTION();
+
 		if (translation)
 		{
 			const std::weak_ptr<Scene>& scene = ScriptEngine::GetSceneContext();
@@ -227,6 +242,8 @@ namespace Kerberos
 
 	static void TransformComponent_GetRotation(const uint64_t entityID, glm::vec3* outRotation)
 	{
+		KBR_TRACY_FUNCTION();
+
 		const std::weak_ptr<Scene>& scene = ScriptEngine::GetSceneContext();
 		if (outRotation)
 		{
@@ -237,6 +254,8 @@ namespace Kerberos
 
 	static void TransformComponent_SetRotation(const uint64_t entityID, const glm::vec3* rotation)
 	{
+		KBR_TRACY_FUNCTION();
+
 		if (rotation)
 		{
 			const WeakRef<Scene>& scene = ScriptEngine::GetSceneContext();
@@ -260,6 +279,8 @@ namespace Kerberos
 
 	static void TransformComponent_GetScale(const uint64_t entityID, glm::vec3* outScale)
 	{
+		KBR_TRACY_FUNCTION();
+
 		const std::weak_ptr<Scene>& scene = ScriptEngine::GetSceneContext();
 		if (outScale)
 		{
@@ -270,6 +291,8 @@ namespace Kerberos
 
 	static void TransformComponent_SetScale(const uint64_t entityID, const glm::vec3* scale)
 	{
+		KBR_TRACY_FUNCTION();
+
 		if (scale)
 		{
 			const WeakRef<Scene>& scene = ScriptEngine::GetSceneContext();
@@ -293,6 +316,8 @@ namespace Kerberos
 
 	static void StaticMeshComponent_GetMesh(const uint64_t entityID, uint64_t* outMesh)
 	{
+		KBR_TRACY_FUNCTION();
+
 		const std::weak_ptr<Scene>& scene = ScriptEngine::GetSceneContext();
 		const Ref<Scene> currentScene = scene.lock();
 		const Entity entity = currentScene->GetEntityByUUID(UUID(entityID));
@@ -305,6 +330,8 @@ namespace Kerberos
 
 	static void StaticMeshComponent_SetMesh(const uint64_t entityID, const uint64_t meshRef)
 	{
+		KBR_TRACY_FUNCTION();
+
 		const std::weak_ptr<Scene>& scene = ScriptEngine::GetSceneContext();
 		const Ref<Scene> currentScene = scene.lock();
 		const Entity entity = currentScene->GetEntityByUUID(UUID(entityID));
@@ -323,6 +350,8 @@ namespace Kerberos
 
 	static void Rigidbody3DComponent_GetVelocity(const uint64_t entityID, glm::vec3* outVelocity)
 	{
+		KBR_TRACY_FUNCTION();
+
 		const std::weak_ptr<Scene>& scene = ScriptEngine::GetSceneContext();
 		if (outVelocity)
 		{
@@ -333,6 +362,8 @@ namespace Kerberos
 
 	static void Rigidbody3DComponent_SetVelocity(const uint64_t entityID, const glm::vec3* velocity)
 	{
+		KBR_TRACY_FUNCTION();
+
 		if (velocity)
 		{
 			const std::weak_ptr<Scene>& scene = ScriptEngine::GetSceneContext();
@@ -359,6 +390,8 @@ namespace Kerberos
 
 	static void Rigidbody3DComponent_ApplyImpulse(const uint64_t entityID, const glm::vec3* force)
 	{
+		KBR_TRACY_FUNCTION();
+
 		if (force)
 		{
 			const std::weak_ptr<Scene>& scene = ScriptEngine::GetSceneContext();
@@ -381,6 +414,8 @@ namespace Kerberos
 
 	static void Rigidbody3DComponent_ApplyImpulseAtPoint(const uint64_t entityID, const glm::vec3* force, const glm::vec3* inPoint)
 	{
+		KBR_TRACY_FUNCTION();
+
 		if (force)
 		{
 			const std::weak_ptr<Scene>& scene = ScriptEngine::GetSceneContext();
@@ -406,6 +441,8 @@ namespace Kerberos
 
 	static const char* TextComponent_GetText(const uint64_t entityID)
 	{
+		KBR_TRACY_FUNCTION();
+
 		const std::weak_ptr<Scene>& scene = ScriptEngine::GetSceneContext();
 		const Entity entity = scene.lock()->GetEntityByUUID(UUID(entityID));
 		const TextComponent& textComponent = entity.GetComponent<TextComponent>();
@@ -415,6 +452,8 @@ namespace Kerberos
 
 	static void TextComponent_SetText(const uint64_t entityID, const char* text)
 	{
+		KBR_TRACY_FUNCTION();
+
 		if (!text)
 			return;
 
@@ -427,6 +466,8 @@ namespace Kerberos
 
 	static void TextComponent_GetColor(const uint64_t entityID, glm::vec4* outColor)
 	{
+		KBR_TRACY_FUNCTION();
+
 		if (!outColor)
 			return;
 
@@ -437,6 +478,8 @@ namespace Kerberos
 
 	static void TextComponent_SetColor(const uint64_t entityID, const glm::vec4* color)
 	{
+		KBR_TRACY_FUNCTION();
+
 		if (!color)
 			return;
 
@@ -447,6 +490,8 @@ namespace Kerberos
 
 	static float TextComponent_GetFontSize(const uint64_t entityID)
 	{
+		KBR_TRACY_FUNCTION();
+
 		const std::weak_ptr<Scene>& scene = ScriptEngine::GetSceneContext();
 		const float fontSize = scene.lock()->GetEntityByUUID(UUID(entityID)).GetComponent<TextComponent>().FontSize;
 		return fontSize;
@@ -454,6 +499,8 @@ namespace Kerberos
 
 	static void TextComponent_SetFontSize(const uint64_t entityID, const float fontSize)
 	{
+		KBR_TRACY_FUNCTION();
+
 		const std::weak_ptr<Scene>& scene = ScriptEngine::GetSceneContext();
 		float& currentFontSize = scene.lock()->GetEntityByUUID(UUID(entityID)).GetComponent<TextComponent>().FontSize;
 		currentFontSize = fontSize;
@@ -461,6 +508,8 @@ namespace Kerberos
 
 	static const char* TextComponent_GetFontPath(const uint64_t entityID)
 	{
+		KBR_TRACY_FUNCTION();
+
 		const std::weak_ptr<Scene>& scene = ScriptEngine::GetSceneContext();
 		const Entity entity = scene.lock()->GetEntityByUUID(UUID(entityID));
 
@@ -471,6 +520,8 @@ namespace Kerberos
 
 	static void TextComponent_SetFontPath([[maybe_unused]] const uint64_t entityID, const char* fontPath)
 	{
+		KBR_TRACY_FUNCTION();
+
 		if (!fontPath)
 			return;
 
@@ -479,6 +530,8 @@ namespace Kerberos
 
 	static void AudioSource2DComponent_Play(const uint64_t entityID)
 	{
+		KBR_TRACY_FUNCTION();
+
 		const std::weak_ptr<Scene>& scene = ScriptEngine::GetSceneContext();
 		const Entity entity = scene.lock()->GetEntityByUUID(UUID(entityID));
 
@@ -489,6 +542,8 @@ namespace Kerberos
 
 	static void AudioSource2DComponent_Stop(const uint64_t entityID)
 	{
+		KBR_TRACY_FUNCTION();
+
 		const std::weak_ptr<Scene>& scene = ScriptEngine::GetSceneContext();
 		const Entity entity = scene.lock()->GetEntityByUUID(UUID(entityID));
 
@@ -499,6 +554,8 @@ namespace Kerberos
 
 	static float AudioSource2DComponent_GetVolume(const uint64_t entityID)
 	{
+		KBR_TRACY_FUNCTION();
+
 		const std::weak_ptr<Scene>& scene = ScriptEngine::GetSceneContext();
 		const Entity entity = scene.lock()->GetEntityByUUID(UUID(entityID));
 
@@ -508,6 +565,8 @@ namespace Kerberos
 
 	static void AudioSource2DComponent_SetVolume(const uint64_t entityID, const float volume)
 	{
+		KBR_TRACY_FUNCTION();
+
 		const std::weak_ptr<Scene>& scene = ScriptEngine::GetSceneContext();
 		const Entity entity = scene.lock()->GetEntityByUUID(UUID(entityID));
 
@@ -518,6 +577,8 @@ namespace Kerberos
 
 	static void AudioSource2DComponent_SetLooping(const uint64_t entityID, const uint8_t loop)
 	{
+		KBR_TRACY_FUNCTION();
+
 		const std::weak_ptr<Scene>& scene = ScriptEngine::GetSceneContext();
 		const Entity entity = scene.lock()->GetEntityByUUID(UUID(entityID));
 
@@ -527,6 +588,8 @@ namespace Kerberos
 
 	static uint8_t AudioSource2DComponent_IsLooping(const uint64_t entityID)
 	{
+		KBR_TRACY_FUNCTION();
+
 		const std::weak_ptr<Scene>& scene = ScriptEngine::GetSceneContext();
 		const Entity entity = scene.lock()->GetEntityByUUID(UUID(entityID));
 
@@ -536,6 +599,8 @@ namespace Kerberos
 
 	static void AudioSource3DComponent_Play(const uint64_t entityID)
 	{
+		KBR_TRACY_FUNCTION();
+
 		const std::weak_ptr<Scene>& scene = ScriptEngine::GetSceneContext();
 		const Entity entity = scene.lock()->GetEntityByUUID(UUID(entityID));
 
@@ -546,6 +611,8 @@ namespace Kerberos
 
 	static void AudioSource3DComponent_Stop(const uint64_t entityID)
 	{
+		KBR_TRACY_FUNCTION();
+
 		const std::weak_ptr<Scene>& scene = ScriptEngine::GetSceneContext();
 		const Entity entity = scene.lock()->GetEntityByUUID(UUID(entityID));
 
@@ -556,6 +623,8 @@ namespace Kerberos
 
 	static float AudioSource3DComponent_GetVolume(const uint64_t entityID)
 	{
+		KBR_TRACY_FUNCTION();
+
 		const std::weak_ptr<Scene>& scene = ScriptEngine::GetSceneContext();
 		const Entity entity = scene.lock()->GetEntityByUUID(UUID(entityID));
 
@@ -565,6 +634,8 @@ namespace Kerberos
 
 	static void AudioSource3DComponent_SetVolume(const uint64_t entityID, const float volume)
 	{
+		KBR_TRACY_FUNCTION();
+
 		const std::weak_ptr<Scene>& scene = ScriptEngine::GetSceneContext();
 		const Entity entity = scene.lock()->GetEntityByUUID(UUID(entityID));
 
@@ -575,6 +646,8 @@ namespace Kerberos
 
 	static void AudioSource3DComponent_SetLooping(const uint64_t entityID, const uint8_t loop)
 	{
+		KBR_TRACY_FUNCTION();
+
 		const std::weak_ptr<Scene>& scene = ScriptEngine::GetSceneContext();
 		const Entity entity = scene.lock()->GetEntityByUUID(UUID(entityID));
 
@@ -584,6 +657,8 @@ namespace Kerberos
 
 	static uint8_t AudioSource3DComponent_IsLooping(const uint64_t entityID)
 	{
+		KBR_TRACY_FUNCTION();
+
 		const std::weak_ptr<Scene>& scene = ScriptEngine::GetSceneContext();
 		const Entity entity = scene.lock()->GetEntityByUUID(UUID(entityID));
 
@@ -593,6 +668,8 @@ namespace Kerberos
 
 	static uint8_t Physics_Raycast(const glm::vec3* origin, const glm::vec3* direction, const float maxDistance, glm::vec3* outHitPoint, glm::vec3* outHitNormal, uint64_t* outEntityID)
 	{
+		KBR_TRACY_FUNCTION();
+
 		if (!origin || !direction || !outHitPoint || !outHitNormal)
 			return 0;
 
@@ -632,6 +709,8 @@ namespace Kerberos
 
 	void ScriptInterface::RegisterFunctions()
 	{
+		KBR_TRACY_FUNCTION();
+
 		/// Register component types for HasComponent checks
 		RegisterComponent<TransformComponent>("Kerberos.Source.Kerberos.Scene.TransformComponent");
 		RegisterComponent<TagComponent>("Kerberos.Source.Kerberos.Scene.TagComponent");

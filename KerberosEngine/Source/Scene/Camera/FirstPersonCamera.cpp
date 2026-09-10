@@ -7,6 +7,7 @@
 #include "Events/MouseButtonReleasedEvent.hpp"
 #include "Input/InputSystem.hpp"
 #include "Renderer/Renderer.hpp"
+#include "Profiling/Profilers.hpp"
 
 import Kerberos;
 
@@ -21,6 +22,8 @@ namespace Kerberos
 
 	void FirstPersonCamera::OnUpdate(const float deltaTime)
 	{
+		KBR_TRACY_FUNCTION();
+
 		if (IsInputBlocked())
 			return;
 

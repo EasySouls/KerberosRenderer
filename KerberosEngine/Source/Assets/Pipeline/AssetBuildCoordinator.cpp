@@ -14,6 +14,8 @@ AssetBuildCoordinator::AssetBuildCoordinator(std::filesystem::path assetsRoot,
 
 AssetBuildReport AssetBuildCoordinator::Build(const std::filesystem::path& source, const bool force)
 {
+    KBR_TRACY_FUNCTION();
+
     std::scoped_lock lock(m_BuildMutex);
     AssetBuildReport report; report.Source = source;
     std::error_code ec;
@@ -129,6 +131,8 @@ AssetBuildReport AssetBuildCoordinator::Build(const std::filesystem::path& sourc
 
 std::future<AssetBuildReport> AssetBuildCoordinator::BuildAsync(std::filesystem::path source, const bool force)
 {
+    KBR_TRACY_FUNCTION();
+
     return std::async(std::launch::async, [this, source = std::move(source), force] { 
         return Build(source, force); 
     });
@@ -136,6 +140,8 @@ std::future<AssetBuildReport> AssetBuildCoordinator::BuildAsync(std::filesystem:
 
 std::vector<AssetBuildReport> AssetBuildCoordinator::BuildAll(const std::vector<std::filesystem::path>& sources, const bool force)
 {
+    KBR_TRACY_FUNCTION();
+
     std::vector<AssetBuildReport> reports;
     reports.reserve(sources.size());
     for (const auto& source : sources)

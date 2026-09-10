@@ -12,6 +12,7 @@
 #include "Scripting/ScriptClass.hpp"
 #include "Scripting/ScriptEngine.hpp"
 #include "Scripting/ScriptInstance.hpp"
+#include "Profiling/Profilers.hpp"
 #include "VulkanContext.hpp"
 
 #include <glm/gtc/type_ptr.hpp>
@@ -19,6 +20,7 @@
 #include <imgui/imgui_internal.h>
 
 #include <filesystem>
+
 
 import Kerberos;
 
@@ -55,6 +57,8 @@ void HierarchyPanel::SetContext(const Ref<Scene>& context)
 
 void HierarchyPanel::OnImGuiRender()
 {
+    KBR_TRACY_FUNCTION();
+
     ImGui::Begin("Hierarchy");
 
     const bool dragDropTargetActive = HandleHierarchyPanelDragAndDrop();
@@ -330,6 +334,8 @@ bool HierarchyPanel::OnKeyPressed(const KeyPressedEvent& event)
 
 bool HierarchyPanel::HandleHierarchyPanelDragAndDrop()
 {
+    KBR_TRACY_FUNCTION();
+
     if (!ImGui::BeginDragDropTarget())
         return false;
 

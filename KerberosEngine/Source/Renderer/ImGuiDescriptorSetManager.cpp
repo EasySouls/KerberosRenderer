@@ -23,6 +23,8 @@ namespace Kerberos
 
 	vk::DescriptorSet ImGuiDescriptorSetManager::GetDescriptorSetForTexture(const Ref<Texture2D>& texture)
 	{
+		KBR_TRACY_FUNCTION();
+
 		const auto it = m_TextureDescriptorSets.find(texture);
 		if (it != m_TextureDescriptorSets.end())
 			return it->second;

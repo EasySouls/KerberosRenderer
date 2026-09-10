@@ -1,4 +1,5 @@
 #include "ProjectSerializer.hpp"
+#include "Profiling/Profilers.hpp"
 
 #include <yaml-cpp/yaml.h>
 
@@ -15,6 +16,8 @@ namespace Kerberos
 
 	bool ProjectSerializer::Serialize(const std::filesystem::path& filepath) const
 	{
+		KBR_TRACY_FUNCTION();
+
 		const auto& info = m_Project->GetInfo();
 
 		YAML::Emitter out;
@@ -43,6 +46,8 @@ namespace Kerberos
 
 	bool ProjectSerializer::Deserialize(const std::filesystem::path& filepath) const
 	{
+		KBR_TRACY_FUNCTION();
+
 		auto& info = m_Project->GetInfo();
 
 		YAML::Node data;

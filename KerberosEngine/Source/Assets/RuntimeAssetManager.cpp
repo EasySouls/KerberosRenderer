@@ -9,6 +9,8 @@ namespace Kerberos {
 RuntimeAssetManager::RuntimeAssetManager(const AssetRegistry& registry,
 	std::filesystem::path assetRoot, std::filesystem::path libraryRoot)
 {
+	KBR_TRACY_FUNCTION();
+
 	Configure(registry, std::move(assetRoot), std::move(libraryRoot));
 }
 
@@ -22,6 +24,8 @@ void RuntimeAssetManager::Configure(const AssetRegistry& registry,
 
 Ref<Asset> RuntimeAssetManager::GetAsset(AssetHandle handle)
 {
+	KBR_TRACY_FUNCTION();
+
 	if (!IsAssetHandleValid(handle))
 		return nullptr;
 	if (const auto it = m_LoadedAssets.find(handle); it != m_LoadedAssets.end())

@@ -16,6 +16,8 @@ namespace Kerberos::KTX2Loader
 
 	bool Load(const std::filesystem::path& filepath, ktxTexture2** texture)
 	{
+		KBR_TRACY_FUNCTION();
+
 		if (!texture || !IsKTX2(filepath))
 			return false;
 		*texture = nullptr;

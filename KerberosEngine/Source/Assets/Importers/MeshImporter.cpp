@@ -1,5 +1,7 @@
 #include "MeshImporter.hpp"
 
+#include "Profiling/Profilers.hpp"
+
 #include <fstream>
 
 import Kerberos;
@@ -13,6 +15,8 @@ namespace Kerberos
 
 	Ref<Mesh> MeshImporter::ImportMesh(const std::filesystem::path& filepath)
 	{
+		KBR_TRACY_FUNCTION();
+
 		std::ifstream in(filepath, std::ios::binary);
 		if (!in.is_open())
 		{

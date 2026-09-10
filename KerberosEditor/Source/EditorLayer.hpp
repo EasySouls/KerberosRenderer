@@ -7,27 +7,18 @@
 #include "Windows/HierarchyPanel.hpp"
 #include "Windows/ConsolePanel.hpp"
 
-#include "Renderer/Mesh.hpp"
 #include "Renderer/Textures/Texture2D.hpp"
-#include "Renderer/Textures/TextureCube.hpp"
 #include "Buffer.hpp"
-#include "Renderer/Material.hpp"
 #include "Core/Core.hpp"
-#include "Scene/Node.hpp"
 #include "Scene/Camera/Camera.hpp"
-#include "Renderer/MaterialRegistry.hpp"
 #include "Events/MouseButtonPressedEvent.hpp"
 #include "Events/WindowDropEvent.hpp"
 
 #include <glm/glm.hpp>
 
 #include <string>
-#include <vector>
 #include <array>
 #include <memory>
-#include <optional>
-#include <unordered_map>
-
 
 
 namespace Kerberos
@@ -144,14 +135,6 @@ namespace Kerberos
 		Owner<Camera> m_EditorCamera = nullptr;
 		// Size of the ImGui viewport.
 		glm::vec2 m_ViewportSize{ 0.0f };
-
-		std::unordered_map<std::string, Ref<Mesh>> m_Meshes;
-		std::optional<Mesh> m_SkyboxMesh;
-		std::vector<Ref<Texture2D>> m_Textures;
-
-		std::vector<Owner<Node>> m_SceneNodes;
-
-		MaterialRegistry m_MaterialRegistry;
 	};
 
 }

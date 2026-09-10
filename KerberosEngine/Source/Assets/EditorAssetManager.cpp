@@ -35,6 +35,8 @@ namespace Kerberos
 			}
 			ImportResult Import(const ImportContext& context) override
 			{
+				KBR_TRACY_FUNCTION();
+
 				GltfSceneManifest manifest;
 				if (!GltfSceneImporter::Import(context.SourceAbsolutePath, context.CacheRootAbsolutePath, &manifest))
 					throw std::runtime_error("Failed to build glTF scene");
@@ -124,6 +126,8 @@ namespace Kerberos
 
 	EditorAssetManager::EditorAssetManager(const std::filesystem::path& assetsRoot, const std::filesystem::path& cacheRoot)
 	{
+		KBR_TRACY_FUNCTION();
+
 		AssetImporter::Init();
 
 		if (!assetsRoot.empty())
@@ -147,6 +151,8 @@ namespace Kerberos
 
 	void EditorAssetManager::ConfigurePipeline(const std::filesystem::path& assetsRoot, const std::filesystem::path& cacheRoot)
 	{
+		KBR_TRACY_FUNCTION();
+
 		m_AssetsRoot = std::filesystem::absolute(assetsRoot);
 		m_CacheRoot = cacheRoot.empty() ? m_AssetsRoot / "Cache" : std::filesystem::absolute(cacheRoot);
 		std::error_code ec;

@@ -1,4 +1,5 @@
 #include "PrefabSerializer.hpp"
+#include "Profiling/Profilers.hpp"
 
 #include <yaml-cpp/yaml.h>
 #include <fstream>
@@ -25,6 +26,8 @@ namespace Kerberos
 
 	bool PrefabSerializer::SerializePrefab(const Ref<Prefab>& prefab, const std::filesystem::path& filepath)
 	{
+		KBR_TRACY_FUNCTION();
+
 		if (!prefab) return false;
 		YAML::Emitter out;
 		out << YAML::BeginMap << YAML::Key << "Prefab" << YAML::Value << YAML::BeginMap;
@@ -94,6 +97,8 @@ namespace Kerberos
 
 	Ref<Prefab> PrefabSerializer::DeserializePrefab(const std::filesystem::path& filepath)
 	{
+		KBR_TRACY_FUNCTION();
+
 		if (!std::filesystem::exists(filepath)) return nullptr;
 		YAML::Node root;
 		try { root = YAML::LoadFile(filepath.string()); }

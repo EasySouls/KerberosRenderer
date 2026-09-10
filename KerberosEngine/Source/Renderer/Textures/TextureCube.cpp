@@ -5,6 +5,7 @@
 #include "Utils.hpp"
 #include "Utils/KtxConversion.hpp"
 #include "KTX2Loader.hpp"
+#include "Profiling/Profilers.hpp"
 
 import Kerberos;
 
@@ -23,6 +24,8 @@ TextureCube::TextureCube([[maybe_unused]] const CubemapData& data)
 
 TextureCube::TextureCube(const std::filesystem::path& filepath)
 {
+	KBR_TRACY_FUNCTION();
+
 	auto extension = filepath.extension().string();
 	std::ranges::transform(extension, extension.begin(), [](unsigned char c) {
 		return static_cast<char>(std::tolower(c));

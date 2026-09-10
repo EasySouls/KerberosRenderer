@@ -2,12 +2,16 @@
 
 #include "VulkanContext.hpp"
 
+#include "Profiling/Profilers.hpp"
+
 import Kerberos;
 
 namespace Kerberos
 {
 	DescriptorAllocator::DescriptorAllocator(const uint32_t maxSets, vk::DeviceSize bufferHeapSize)
 	{
+		KBR_TRACY_FUNCTION();
+
 		auto& context = VulkanContext::Get();
 		const auto& device = context.GetDevice();
 		const auto& physicalDevice = context.GetPhysicalDevice();
@@ -64,6 +68,8 @@ namespace Kerberos
 
 	DescriptorAllocator::~DescriptorAllocator()
 	{
+		KBR_TRACY_FUNCTION();
+
 		const auto& allocator = VulkanContext::Get().GetAllocator().get();
 
 		vmaUnmapMemory(allocator, m_Allocation);
@@ -72,6 +78,8 @@ namespace Kerberos
 
 	ShaderResourceSet DescriptorAllocator::Allocate(const vk::raii::DescriptorSetLayout& layout, const std::string& debugName)
 	{
+		KBR_TRACY_FUNCTION();
+
 		ShaderResourceSet set{};
 
 		auto& context = VulkanContext::Get();

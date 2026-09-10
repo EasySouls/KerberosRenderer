@@ -2,6 +2,7 @@
 #include "Assets/Formats/NativeAssetSerializer.hpp"
 #include "Assets/Asset.hpp"
 #include "Assets/Pipeline/ImportPipeline.hpp"
+#include "Profiling/Profilers.hpp"
 
 #include <tinygltf/tiny_gltf.h>
 #include <algorithm>
@@ -76,6 +77,8 @@ AssetHandle Handle(const ImportContext* context, const std::string& key)
 bool WriteRecord(const std::filesystem::path& root, const std::string& folder, const std::string& key,
                  const std::string& kind, const uint32_t index, const std::string& data)
 {
+    KBR_TRACY_FUNCTION();
+
     std::error_code ec;
     const auto path = root / folder / (key.substr(key.find(':') + 1) + ".kbr" + kind);
     std::filesystem::create_directories(path.parent_path(), ec);
@@ -84,6 +87,8 @@ bool WriteRecord(const std::filesystem::path& root, const std::string& folder, c
 
 bool WriteMesh(const std::filesystem::path& root, const size_t mesh, const size_t primitive, const tinygltf::Model& model, const tinygltf::Primitive& p)
 {
+    KBR_TRACY_FUNCTION();
+
     NativeMeshPayload payload;
     const auto it = p.attributes.find("POSITION");
     if (it != p.attributes.end()) {
@@ -136,6 +141,8 @@ bool WriteMesh(const std::filesystem::path& root, const size_t mesh, const size_
 bool GltfSceneImporter::Import(const std::filesystem::path& source, const std::filesystem::path& outputDirectory,
                                GltfSceneManifest* output)
 {
+    KBR_TRACY_FUNCTION();
+
     tinygltf::Model model; tinygltf::TinyGLTF loader; std::string error, warning;
     const auto ext = source.extension().string();
     bool loaded = ext == ".glb" ? loader.LoadBinaryFromFile(&model, &error, &warning, source.string())

@@ -4,6 +4,7 @@
 #include "VulkanContext.hpp"
 #include "Shaders/Shader.hpp"
 #include "Utils.hpp"
+#include "Profiling/Profilers.hpp"
 
 #include <glm/glm.hpp>
 
@@ -18,6 +19,8 @@ namespace Kerberos::SkyboxUtils
 {
 	void GenerateBRDFLUT(Texture2D& texture) 
 	{
+		KBR_TRACY_FUNCTION();
+
 		auto tStart = std::chrono::high_resolution_clock::now();
 
 		// R16G16 is supported pretty much everywhere
@@ -345,6 +348,8 @@ namespace Kerberos::SkyboxUtils
 
 	void GenerateIrradianceCube(TextureCube& irradianceTexture, const vk::DescriptorImageInfo& envMapDescriptor, const Mesh& cubeMesh) 
 	{
+		KBR_TRACY_FUNCTION();
+
 		auto tStart = std::chrono::high_resolution_clock::now();
 
 		auto& context = VulkanContext::Get();
@@ -904,6 +909,8 @@ namespace Kerberos::SkyboxUtils
 	void GeneratePrefilteredEnvMap(TextureCube& prefilteredEnvMap, const vk::DescriptorImageInfo& envMapDescriptor,
 		const Mesh& cubeMesh) 
 	{
+		KBR_TRACY_FUNCTION();
+
 		auto tStart = std::chrono::high_resolution_clock::now();
 
 		auto& context = VulkanContext::Get();

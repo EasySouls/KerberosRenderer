@@ -290,4 +290,5 @@ private:
     static void CreateSMAAImages(uint32_t width, uint32_t height);
     static void SetupSMAADescriptors();
 };
-} // namespace Kerberos
+
+}

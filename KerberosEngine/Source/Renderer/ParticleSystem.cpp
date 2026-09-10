@@ -98,6 +98,8 @@ ParticleSystem::ParticleSystem()
       ,
       m_IndirectDrawBuffers(VulkanContext::Get().GetMaxFramesInFlight())
 {
+    KBR_TRACY_FUNCTION();
+
     const auto& context = VulkanContext::Get();
 
     AllocateParticleFrameBuffers();
@@ -157,6 +159,8 @@ void ParticleSystem::Initialize(const vk::Format colorFormat,
                                 const vk::ImageView sceneDepthImageView,
                                 const Owner<DescriptorAllocator>& allocator)
 {
+    KBR_TRACY_FUNCTION();
+
     m_DescriptorAllocator = allocator.get();
     m_SceneDepthImageView = sceneDepthImageView;
 
@@ -369,6 +373,8 @@ void ParticleSystem::Update(const Ref<Scene>& scene,
 
 void ParticleSystem::RecordDraw(const vk::raii::CommandBuffer& cmd, const uint32_t frameIndex) const
 {
+    KBR_TRACY_FUNCTION();
+
     BeginRenderPassDebugLabel(cmd, "Particle Render Pass");
 
     cmd.bindPipeline(vk::PipelineBindPoint::eGraphics, m_RenderPipeline->GetVulkanPipeline());

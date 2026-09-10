@@ -1,4 +1,5 @@
 #include "ContactListener.hpp"
+#include "Profiling/Profilers.hpp"
 
 #include <Jolt/Jolt.h>
 #include "Jolt/Physics/Collision/ContactListener.h"
@@ -13,6 +14,8 @@ JPH::ValidateResult ContactListener::OnContactValidate(const JPH::Body& inBody1,
                                       JPH::RVec3Arg /*inBaseOffset*/,
                                       const JPH::CollideShapeResult& /*inCollisionResult*/)
 {
+    KBR_TRACY_FUNCTION();
+
     Log::CoreTrace("Contact validate callback: {} - {}", inBody1.GetID().GetIndex(), inBody2.GetID().GetIndex());
 
     /// Allows you to ignore a contact before it is created (using layers to not make objects collide is cheaper!)
@@ -24,6 +27,8 @@ void ContactListener::OnContactAdded(const JPH::Body& inBody1,
                     const JPH::ContactManifold& inManifold,
                     JPH::ContactSettings& /*ioSettings*/)
 {
+    KBR_TRACY_FUNCTION();
+
     Log::CoreTrace("A contact was added: {} - {}", inBody1.GetID().GetIndex(), inBody2.GetID().GetIndex());
 
     const JPH::Vec3& joltContactPoint = inManifold.GetWorldSpaceContactPointOn1(0);
@@ -47,6 +52,8 @@ void ContactListener::OnContactPersisted(const JPH::Body& inBody1,
                         const JPH::ContactManifold& inManifold,
                         JPH::ContactSettings& /*ioSettings*/)
 {
+    KBR_TRACY_FUNCTION();
+
     Log::CoreTrace("A contact was persisted: {} - {}", inBody1.GetID().GetIndex(), inBody2.GetID().GetIndex());
 
     const JPH::Vec3& joltContactPoint = inManifold.GetWorldSpaceContactPointOn1(0);
@@ -67,6 +74,8 @@ void ContactListener::OnContactPersisted(const JPH::Body& inBody1,
 
 void ContactListener::OnContactRemoved(const JPH::SubShapeIDPair& inSubShapePair)
 {
+    KBR_TRACY_FUNCTION();
+
     Log::CoreTrace("A contact was removed: {} - {}",
                              inSubShapePair.GetBody1ID().GetIndex(),
                              inSubShapePair.GetBody2ID().GetIndex());
@@ -93,6 +102,8 @@ std::vector<CollisionEvent> ContactListener::GetCollisionEventsAndResetQueue()
 
 UUID ContactListener::GetAndCacheEntityID(const JPH::Body& body)
 {
+    KBR_TRACY_FUNCTION();
+
     const uint64_t entityId = body.GetUserData();
     KBRAssert(entityId != 0, "Entity ID has not been set on JPH::Body!");
 

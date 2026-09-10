@@ -38,6 +38,8 @@ namespace Kerberos
 	template<typename T, typename S, int N, msdf_atlas::GeneratorFunction<S, N> GenFunc>
 	static Ref<Texture2D> GenerateAtlas(const std::vector<msdf_atlas::GlyphGeometry>& glyphs, int width, int height)
 	{
+		KBR_TRACY_FUNCTION();
+
 #ifdef _MSC_VER
 	#pragma warning(push)
 	#pragma warning(disable : 4458)

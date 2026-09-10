@@ -23,6 +23,8 @@ namespace Kerberos
 	{
 		AssetHandle FindAssetHandle(const std::filesystem::path& path)
 		{
+			KBR_TRACY_FUNCTION();
+
 			const auto relative = std::filesystem::relative(path, Project::GetAssetDirectory());
 			const auto& registry = Project::GetActive()->GetEditorAssetManager()->GetAssetRegistry();
 			for (const auto& [handle, metadata] : registry)
@@ -45,6 +47,8 @@ namespace Kerberos
 
 	void AssetsPanel::OnImGuiRender()
 	{
+		KBR_TRACY_FUNCTION();
+
 		ImGui::Begin("Assets");
 
 		//const auto& relativeDir = std::filesystem::relative(m_CurrentDirectory, m_AssetsDirectory);
@@ -395,11 +399,15 @@ namespace Kerberos
 
 	std::filesystem::path AssetsPanel::GetRelativePath(const std::filesystem::path& absolutePath) const
     {
+		KBR_TRACY_FUNCTION();
+
 		return std::filesystem::relative(absolutePath, m_AssetsDirectory);
 	}
 
 	void AssetsPanel::RenderMaterialEditors()
 	{
+		KBR_TRACY_FUNCTION();
+
 		for (auto it = m_OpenMaterialEditors.begin(); it != m_OpenMaterialEditors.end();)
 		{
 			auto& [key, state] = *it;
@@ -490,6 +498,8 @@ namespace Kerberos
 
 	void AssetsPanel::ImportAssetDialog()
 	{
+		KBR_TRACY_FUNCTION();
+
 		if (ImGui::Button("Import Asset"))
 		{
 			const std::string filePath = FileDialog::OpenFile("All Files (*.*)\0*.*\0");
@@ -523,6 +533,8 @@ namespace Kerberos
 
 	void AssetsPanel::HandleAssetDragAndDrop(const AssetHandle handle, const std::filesystem::path& filename)
 	{
+		KBR_TRACY_FUNCTION();
+
 		if (ImGui::BeginDragDropSource())
 		{
 			const AssetType assetType = Project::GetActive()->GetEditorAssetManager()->GetAssetType(handle);
@@ -569,6 +581,8 @@ namespace Kerberos
 
 	void AssetsPanel::SetCurrentDir(const std::filesystem::path& path)
 	{
+		KBR_TRACY_FUNCTION();
+
 		if (std::filesystem::exists(path) && std::filesystem::is_directory(path))
 		{
 			m_CurrentDirectory = path;

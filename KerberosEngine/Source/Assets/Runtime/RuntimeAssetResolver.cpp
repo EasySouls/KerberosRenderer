@@ -9,6 +9,8 @@ namespace Kerberos {
 RuntimeAssetResolver::RuntimeAssetResolver(const AssetRegistry* registry,
 	std::filesystem::path assetRoot, std::filesystem::path libraryRoot)
 {
+	KBR_TRACY_FUNCTION();
+
 	Configure(registry, std::move(assetRoot), std::move(libraryRoot));
 }
 
@@ -22,6 +24,8 @@ void RuntimeAssetResolver::Configure(const AssetRegistry* registry,
 
 std::optional<RuntimeAssetLocation> RuntimeAssetResolver::Resolve(const AssetHandle handle) const
 {
+	KBR_TRACY_FUNCTION();
+
 	if (!m_Registry || !handle.IsValid() || !m_Registry->Contains(handle))
 		return std::nullopt;
 

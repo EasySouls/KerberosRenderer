@@ -9,6 +9,8 @@ namespace Kerberos::KTX2Encoder {
 bool Encode(const std::filesystem::path& outputPath,
 	const TextureSpecification& specification, const Buffer& pixels)
 {
+	KBR_TRACY_FUNCTION();
+
 	const vk::Format format = KTX2FormatSelector::Select(specification.Format);
 	if (!KTX2FormatSelector::IsSupported(format) || !pixels.Data || pixels.Size == 0)
 		return false;

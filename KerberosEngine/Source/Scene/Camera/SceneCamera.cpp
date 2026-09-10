@@ -43,6 +43,8 @@ namespace Kerberos
 
 	void SceneCamera::RecalculateProjection()
 	{
+		KBR_TRACY_FUNCTION();
+
 		if (m_ProjectionType == ProjectionType::Orthographic)
 		{
 			const float orthoLeft = -m_OrthoSize * m_AspectRatio * 0.5f;

@@ -9,6 +9,7 @@
 #include "PrefabImporter.hpp"
 #include "SoundImporter.hpp"
 #include "Assets/Asset.hpp"
+#include "Profiling/Profilers.hpp"
 
 import Kerberos;
 
@@ -21,6 +22,8 @@ namespace Kerberos
 
 	Ref<Asset> AssetImporter::ImportAsset(const AssetHandle handle, const AssetMetadata& metadata)
 	{
+		KBR_TRACY_FUNCTION();
+
 		switch (metadata.Type)
 		{
 			case AssetType::Texture2D:
@@ -61,6 +64,8 @@ namespace Kerberos
 
 	std::future<Ref<Asset>> AssetImporter::ImportAssetAsync(AssetHandle handle, const AssetMetadata& metadata) 
 	{
+		KBR_TRACY_FUNCTION();
+
 		return std::async(std::launch::async, ImportAsset, handle, metadata);
 	}
 }

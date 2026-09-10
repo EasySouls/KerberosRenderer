@@ -50,6 +50,8 @@ namespace Kerberos
 
 	Application::Application(const ApplicationSpecification& spec)
 	{
+		KBR_TRACY_FUNCTION();
+
 		KBRAssert(!s_Instance, "Application already exists!");
 		s_Instance = this;
 		m_RenderThreadId = std::this_thread::get_id();
@@ -218,6 +220,8 @@ namespace Kerberos
 
 	Application::~Application()
 	{
+		KBR_TRACY_FUNCTION();
+
 		for (const auto& layer : m_Layers)
 		{
 			layer->OnDetach();
@@ -234,6 +238,8 @@ namespace Kerberos
 
 	void Application::Run() 
 	{
+		KBR_TRACY_FUNCTION();
+
 		while (!glfwWindowShouldClose(m_Window) && m_IsRunning)
 		{
 			KBR_TRACY_SCOPE("Application::Run frame");
@@ -276,6 +282,8 @@ namespace Kerberos
 
 	void Application::OnEvent(Event& event) 
 	{
+		KBR_TRACY_FUNCTION();
+
 		EventDispatcher dispatcher(event);
 		dispatcher.Dispatch<WindowClosedEvent>(KBR_BIND_FN(Application::OnWindowClose));
 		// dispatcher.Dispatch<WindowResizeEvent>(KBR_BIND_FN(Application::OnWindowResize));
@@ -297,6 +305,8 @@ namespace Kerberos
 
 	void Application::SubmitToMainThreadQueue(const std::function<void()>& fn) 
 	{
+		KBR_TRACY_FUNCTION();
+
 		std::scoped_lock lock(m_QueueMutex);
 
 		m_MainThreadQueue.push(fn);
@@ -304,6 +314,8 @@ namespace Kerberos
 
 	std::shared_future<void> Application::SubmitToGPUUploadQueue(GPUUploadJob job)
 	{
+		KBR_TRACY_FUNCTION();
+
 		GPUUploadQueueEntry entry{ .Job = std::move(job) };
 		std::shared_future<void> completion = entry.Completion.get_future().share();
 
@@ -322,6 +334,8 @@ namespace Kerberos
 
 	void Application::ExecuteMainThreadQueue() 
 	{
+		KBR_TRACY_FUNCTION();
+
 		std::queue<std::function<void()>> functions;
 		{
 			std::scoped_lock lock(m_QueueMutex);
@@ -338,6 +352,8 @@ namespace Kerberos
 
 	void Application::ExecuteGPUUploadQueue()
 	{
+		KBR_TRACY_FUNCTION();
+
 		KBRAssert(std::this_thread::get_id() == m_RenderThreadId,
 			"GPU upload queue must be drained by the render thread");
 

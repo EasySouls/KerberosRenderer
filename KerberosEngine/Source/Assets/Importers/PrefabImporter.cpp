@@ -1,6 +1,8 @@
 #include "PrefabImporter.hpp"
 #include "Serialization/PrefabSerializer.hpp"
 
+#include "Profiling/Profilers.hpp"
+
 import Kerberos;
 
 namespace Kerberos
@@ -12,6 +14,8 @@ namespace Kerberos
 
 	Ref<Prefab> PrefabImporter::ImportPrefab(const std::filesystem::path& filepath)
 	{
+		KBR_TRACY_FUNCTION();
+
 		Ref<Prefab> prefab = PrefabSerializer::DeserializePrefab(filepath);
 		if (!prefab)
 		{

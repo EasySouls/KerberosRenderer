@@ -8,6 +8,8 @@ namespace Kerberos {
 AssetBuildTransaction::AssetBuildTransaction(std::filesystem::path outputRoot, std::string name)
     : m_OutputRoot(std::move(outputRoot))
 {
+    KBR_TRACY_FUNCTION();
+
     const auto stamp = std::chrono::steady_clock::now().time_since_epoch().count();
     m_StagingRoot = m_OutputRoot / (".kbr-build-" + std::move(name) + "-" + std::to_string(stamp));
     std::error_code ec;
@@ -24,6 +26,8 @@ AssetBuildTransaction::~AssetBuildTransaction()
 
 bool AssetBuildTransaction::Commit(std::string* error)
 {
+    KBR_TRACY_FUNCTION();
+
     if (m_StagingRoot.empty()) 
     { 
         if (error) 
@@ -74,6 +78,8 @@ bool AssetBuildTransaction::Commit(std::string* error)
 
 void AssetBuildTransaction::Rollback() const
 {
+    KBR_TRACY_FUNCTION();
+
     if (!m_StagingRoot.empty())
     {
         std::error_code ec;

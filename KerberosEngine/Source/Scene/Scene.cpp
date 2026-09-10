@@ -78,11 +78,15 @@ namespace Kerberos
 
 	void Scene::OnUpdateEditor(const float ts, const Camera& camera)
 	{
+		KBR_TRACY_FUNCTION();
+
 		Render3DEditor(camera, ts);
 	}
 
 	void Scene::OnUpdateSimulation(const float ts, const Camera& camera)
 	{
+		KBR_TRACY_FUNCTION();
+
 		/// If the scene is paused, do not update the physics system, but still render the scene
 		if (!m_IsScenePaused)
 		{
@@ -204,20 +208,20 @@ Entity Scene::InstantiatePrefab(const AssetHandle prefabHandle, const std::strin
 
 	if (!prefabHandle.IsValid())
 	{
-		Kerberos::Log::CoreError("Cannot instantiate prefab with invalid handle.");
+		Log::CoreError("Cannot instantiate prefab with invalid handle.");
 		return {};
 	}
 
 	if (AssetManager::GetAssetType(prefabHandle) != AssetType::Prefab)
 	{
-		Kerberos::Log::CoreError("Asset {} is not a prefab asset.", prefabHandle);
+		Log::CoreError("Asset {} is not a prefab asset.", prefabHandle);
 		return {};
 	}
 
 	const Ref<Prefab> prefab = AssetManager::GetAsset<Prefab>(prefabHandle);
 	if (!prefab)
 	{
-		Kerberos::Log::CoreError("Failed to load prefab asset: {}", prefabHandle);
+		Log::CoreError("Failed to load prefab asset: {}", prefabHandle);
 		return {};
 	}
 
@@ -308,6 +312,8 @@ Entity Scene::InstantiatePrefab(const AssetHandle prefabHandle, const std::strin
 
 	void Scene::DestroyEntity(const Entity entity)
 	{
+		KBR_TRACY_FUNCTION();
+
 		const entt::entity enttId = static_cast<entt::entity>(entity);
 		if (const auto it = std::ranges::find(m_RootEntities, enttId); it != m_RootEntities.end())
 		{
@@ -473,22 +479,24 @@ Entity Scene::InstantiatePrefab(const AssetHandle prefabHandle, const std::strin
 
 	Entity Scene::InstantiateModelAsset(const AssetHandle modelHandle, const std::string& rootName)
 	{
+		KBR_TRACY_FUNCTION();
+
 		if (!modelHandle.IsValid())
 		{
-			Kerberos::Log::CoreError("Cannot instantiate model with invalid handle.");
+			Log::CoreError("Cannot instantiate model with invalid handle.");
 			return {};
 		}
 
 		if (AssetManager::GetAssetType(modelHandle) != AssetType::Model)
 		{
-			Kerberos::Log::CoreError("Asset {} is not a model asset.", modelHandle);
+			Log::CoreError("Asset {} is not a model asset.", modelHandle);
 			return {};
 		}
 
 		const Ref<Model> model = AssetManager::GetAsset<Model>(modelHandle);
 		if (!model)
 		{
-			Kerberos::Log::CoreError("Failed to load model asset: {}", modelHandle);
+			Log::CoreError("Failed to load model asset: {}", modelHandle);
 			return {};
 		}
 
@@ -598,6 +606,8 @@ Entity Scene::InstantiatePrefab(const AssetHandle prefabHandle, const std::strin
 
 	void Scene::SetParent(const Entity child, const Entity parent, [[maybe_unused]] bool keepWorldTransform)
 	{
+		KBR_TRACY_FUNCTION();
+
 		RemoveParent(child);
 
 		if (const auto it = std::ranges::find(m_RootEntities, static_cast<entt::entity>(child)); it != m_RootEntities.end())
@@ -667,6 +677,8 @@ Entity Scene::InstantiatePrefab(const AssetHandle prefabHandle, const std::strin
 
 	void Scene::OnViewportResize(const uint32_t width, const uint32_t height)
 	{
+		KBR_TRACY_FUNCTION();
+
 		m_ViewportHeight = height;
 		m_ViewportWidth = width;
 
@@ -703,6 +715,8 @@ Entity Scene::InstantiatePrefab(const AssetHandle prefabHandle, const std::strin
 
 	void Scene::CopyEntityRecursive(const Ref<Scene>& other, const entt::entity sourceEntity, const Ref<Scene>& newScene, const entt::entity parentNewEntity)
 	{
+		KBR_TRACY_FUNCTION();
+
 		auto& sourceRegistry = other->m_Registry;
 
 		const UUID sourceID = sourceRegistry.get<IDComponent>(sourceEntity).ID;

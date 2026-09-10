@@ -12,6 +12,8 @@ AssetStaleReason AssetStalenessEvaluator::Evaluate(
 	const bool registryComplete,
 	const bool forceRebuild)
 {
+	KBR_TRACY_FUNCTION();
+
 	if (forceRebuild)
 		return AssetStaleReason::Forced;
 	if (!std::filesystem::exists(sourcePath))

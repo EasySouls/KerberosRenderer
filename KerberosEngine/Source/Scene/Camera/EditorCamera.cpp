@@ -15,6 +15,8 @@ namespace Kerberos
 
 	void EditorCamera::OnUpdate(const float)
 	{
+		KBR_TRACY_FUNCTION();
+
 		if (IsInputBlocked())
 			return;
 

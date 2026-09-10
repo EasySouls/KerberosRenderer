@@ -25,6 +25,8 @@ void DescriptorWriter::WriteStorageBuffer(const uint32_t binding,
                                           const vk::DeviceSize size,
                                           const vk::DeviceSize offset)
 {
+    KBR_TRACY_FUNCTION();
+
     auto& context = VulkanContext::Get();
     const auto& device = context.GetDevice();
 
@@ -58,6 +60,8 @@ void DescriptorWriter::WriteUniformBuffer(const uint32_t binding,
                                           const vk::DeviceSize size,
                                           const vk::DeviceSize offset)
 {
+    KBR_TRACY_FUNCTION();
+
     auto& context = VulkanContext::Get();
     const auto& device = context.GetDevice();
 
@@ -90,6 +94,8 @@ void DescriptorWriter::WriteSampledImage(const uint32_t binding,
                                          const vk::ImageView& imageView,
                                          const vk::ImageLayout layout)
 {
+    KBR_TRACY_FUNCTION();
+
     auto& context = VulkanContext::Get();
     const auto& device = context.GetDevice();
 
@@ -119,6 +125,8 @@ void DescriptorWriter::WriteSampledImage(const uint32_t binding,
 
 void DescriptorWriter::WriteSampler(const uint32_t binding, const vk::Sampler& sampler)
 {
+    KBR_TRACY_FUNCTION();
+
     auto& context = VulkanContext::Get();
     const auto& device = context.GetDevice();
 
@@ -150,6 +158,8 @@ void DescriptorWriter::WriteSampler(const uint32_t binding, const vk::Sampler& s
 
 void DescriptorWriter::Flush()
 {
+    KBR_TRACY_FUNCTION();
+
     if (!m_UseDescriptorBuffers && !m_Writes.empty()) {
         VulkanContext::Get().GetDevice().updateDescriptorSets(m_Writes, nullptr);
 

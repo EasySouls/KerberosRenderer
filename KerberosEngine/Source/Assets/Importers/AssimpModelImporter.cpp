@@ -3,6 +3,7 @@
 #include "AssimpModelImporter.hpp"
 #include "TextureImporter.hpp"
 #include "Renderer/Vertex.hpp"
+#include "Profiling/Profilers.hpp"
 
 #include <Assimp/scene.h>
 #include <Assimp/postprocess.h>
@@ -22,6 +23,8 @@ namespace Kerberos
 
 	Ref<Mesh> AssimpModelImporter::ImportModel(const std::filesystem::path& filepath)
 	{
+		KBR_TRACY_FUNCTION();
+
 		const auto res = LoadModel(filepath);
 
 		if (!res)
@@ -52,6 +55,8 @@ namespace Kerberos
 
 	std::expected<AssimpModelImporter::ModelLoadingInfo, AssimpModelImporter::ModelLoadingError> AssimpModelImporter::LoadModel(const std::filesystem::path& path)
 	{
+		KBR_TRACY_FUNCTION();
+
 		Timer timer("Model Loading", [&](const TimerData& data)
 		{
 			Log::CoreInfo("Loading model from {} took {:.2f} ms", path.string(), data.DurationMs);
@@ -95,6 +100,8 @@ namespace Kerberos
 
 	void AssimpModelImporter::ProcessMaterials(const aiScene* scene, ModelLoadingInfo& info)
 	{
+		KBR_TRACY_FUNCTION();
+
 		Log::CoreTrace("Loading {} materials...", scene->mNumMaterials);
 		info.materials.reserve(scene->mNumMaterials);
 
@@ -152,6 +159,8 @@ namespace Kerberos
 
 	void AssimpModelImporter::ProcessMeshes(const aiScene* scene, ModelLoadingInfo& info)
 	{
+		KBR_TRACY_FUNCTION();
+
 		// This map will hold all the geometry, grouped by material index.
 		std::map<uint32_t, std::vector<aiMesh*>> meshesByMaterial;
 
