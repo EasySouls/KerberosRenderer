@@ -78,10 +78,14 @@ struct alignas(16) SpawnRequest
 struct Counters
 {
     uint32_t DeadCount;
-    uint32_t AliveCount;
-    uint32_t SpawnRequestCount;
-    uint32_t IndirectDrawCount;
+    uint32_t ActiveCount;
+    uint32_t NextActiveCount;
+    uint32_t ActiveListIndex;
 };
+
+constexpr vk::DeviceSize DispatchIndirectOffset = 0;
+constexpr vk::DeviceSize DrawIndirectOffset = 16;
+constexpr vk::DeviceSize IndirectBufferSize = DrawIndirectOffset + sizeof(VkDrawIndirectCommand);
 } // namespace
 
 namespace Kerberos {
@@ -89,7 +93,7 @@ namespace Kerberos {
 
 ParticleSystem::ParticleSystem()
     : m_ParticlePoolBuffer(sizeof(GPUParticle) * MaxParticles), m_DeadListBuffer(sizeof(uint32_t) * MaxParticles),
-      m_AliveListBuffer(sizeof(uint32_t) * MaxParticles), m_CountersBuffer(sizeof(Counters)),
+      m_CountersBuffer(sizeof(Counters)),
       m_ParticleFrameBuffers(VulkanContext::Get().GetMaxFramesInFlight())
 #if USING_MANUAL_DESCRIPTOR_ALLOCATION
       ,
@@ -101,6 +105,9 @@ ParticleSystem::ParticleSystem()
     KBR_TRACY_FUNCTION();
 
     const auto& context = VulkanContext::Get();
+
+    m_ActiveListBuffers.emplace_back(sizeof(uint32_t) * MaxParticles);
+    m_ActiveListBuffers.emplace_back(sizeof(uint32_t) * MaxParticles);
 
     AllocateParticleFrameBuffers();
     AllocateIndirectDrawBuffers();
@@ -117,15 +124,19 @@ ParticleSystem::ParticleSystem()
     context.SetObjectDebugName(m_ParticlePoolBuffer.GetBuffer(), "Particle Pool Buffer");
     context.SetObjectDebugName(m_DeadListBuffer.GetBufferMemory(), "Particle Dead List Buffer Memory");
     context.SetObjectDebugName(m_DeadListBuffer.GetBuffer(), "Particle Dead List Buffer");
-    context.SetObjectDebugName(m_AliveListBuffer.GetBufferMemory(), "Particle Alive List Buffer Memory");
-    context.SetObjectDebugName(m_AliveListBuffer.GetBuffer(), "Particle Alive List Buffer");
+    for (uint32_t i = 0; i < m_ActiveListBuffers.size(); ++i) {
+        context.SetObjectDebugName(m_ActiveListBuffers[i].GetBufferMemory(),
+                                   std::format("Particle Active List {} Buffer Memory", i));
+        context.SetObjectDebugName(m_ActiveListBuffers[i].GetBuffer(),
+                                   std::format("Particle Active List {} Buffer", i));
+    }
     context.SetObjectDebugName(m_CountersBuffer.GetBufferMemory(), "Particle Counters Buffer Memory");
     context.SetObjectDebugName(m_CountersBuffer.GetBuffer(), "Particle Counters Buffer");
 
     constexpr Counters counters = { .DeadCount = static_cast<uint32_t>(MaxParticles),
-                                    .AliveCount = 0,
-                                    .SpawnRequestCount = 0,
-                                    .IndirectDrawCount = 0 };
+                                    .ActiveCount = 0,
+                                    .NextActiveCount = 0,
+                                    .ActiveListIndex = 0 };
     std::memcpy(m_CountersBuffer.GetMappedData(), &counters, sizeof(Counters));
 
     std::memset(m_ParticlePoolBuffer.GetMappedData(), 0, m_ParticlePoolBuffer.GetBufferSize());
@@ -134,6 +145,8 @@ ParticleSystem::ParticleSystem()
     for (uint32_t i = 0; i < MaxParticles; ++i)
         deadList[i] = i;
     std::memcpy(m_DeadListBuffer.GetMappedData(), deadList.data(), sizeof(uint32_t) * MaxParticles);
+    for (const auto& activeList : m_ActiveListBuffers)
+        std::memset(activeList.GetMappedData(), 0, activeList.GetBufferSize());
 }
 
 ParticleSystem::~ParticleSystem()
@@ -328,35 +341,52 @@ void ParticleSystem::Update(const Ref<Scene>& scene,
         EndRenderPassDebugLabel(cmd);
     }
 
-    // Simulate pass
-    {
-        BeginRenderPassDebugLabel(cmd, "Particle Simulate Pass");
-
-        cmd.bindPipeline(vk::PipelineBindPoint::eCompute, m_UpdatePipeline->GetVulkanPipeline());
-        constexpr uint32_t workGroupSize = 256;
-        cmd.dispatch((MaxParticles + (workGroupSize - 1)) / workGroupSize, 1, 1);
-
-        // Ensure Simulate writes finish before the Graphics pipeline reads them.
-        // We are waiting on writes to the AliveList, ParticlePool, and IndirectCommand buffers.
-        vk::MemoryBarrier2 barrier{
-            .srcStageMask = vk::PipelineStageFlagBits2::eComputeShader,
-            .srcAccessMask = vk::AccessFlagBits2::eShaderWrite,
-            .dstStageMask = vk::PipelineStageFlagBits2::eComputeShader,
-            .dstAccessMask = vk::AccessFlagBits2::eShaderRead | vk::AccessFlagBits2::eShaderRead,
-        };
-        cmd.pipelineBarrier2({ .memoryBarrierCount = 1, .pMemoryBarriers = &barrier });
-
-        EndRenderPassDebugLabel(cmd);
-    }
-
-    // Prepare simulation pass
+    // Prepare the indirect dispatch and clear the output active-list count. Emit has already
+    // appended newly spawned particles to the current active list.
     {
         BeginRenderPassDebugLabel(cmd, "Particle Prepare Simulation Pass");
 
         cmd.bindPipeline(vk::PipelineBindPoint::eCompute, m_PrepareSimulatePipeline->GetVulkanPipeline());
         cmd.dispatch(1, 1, 1);
 
-        // Ensure Prepare writes to Indirect Buffer and Counters finish before Simulate
+        vk::MemoryBarrier2 barrier{
+            .srcStageMask = vk::PipelineStageFlagBits2::eComputeShader,
+            .srcAccessMask = vk::AccessFlagBits2::eShaderRead | vk::AccessFlagBits2::eShaderWrite,
+            .dstStageMask = vk::PipelineStageFlagBits2::eComputeShader | vk::PipelineStageFlagBits2::eDrawIndirect,
+            .dstAccessMask = vk::AccessFlagBits2::eShaderRead | vk::AccessFlagBits2::eShaderWrite |
+                             vk::AccessFlagBits2::eIndirectCommandRead,
+        };
+        cmd.pipelineBarrier2({ .memoryBarrierCount = 1, .pMemoryBarriers = &barrier });
+
+        EndRenderPassDebugLabel(cmd);
+    }
+
+    // Simulate only the active index list. The dispatch count is generated on the GPU.
+    {
+        BeginRenderPassDebugLabel(cmd, "Particle Simulate Pass");
+
+        cmd.bindPipeline(vk::PipelineBindPoint::eCompute, m_UpdatePipeline->GetVulkanPipeline());
+        cmd.dispatchIndirect(m_IndirectDrawBuffers[frameIndex].Handle, DispatchIndirectOffset);
+
+        // Ensure simulation writes finish before compaction is published.
+        vk::MemoryBarrier2 barrier{
+            .srcStageMask = vk::PipelineStageFlagBits2::eComputeShader,
+            .srcAccessMask = vk::AccessFlagBits2::eShaderWrite,
+            .dstStageMask = vk::PipelineStageFlagBits2::eComputeShader,
+            .dstAccessMask = vk::AccessFlagBits2::eShaderRead | vk::AccessFlagBits2::eShaderWrite,
+        };
+        cmd.pipelineBarrier2({ .memoryBarrierCount = 1, .pMemoryBarriers = &barrier });
+
+        EndRenderPassDebugLabel(cmd);
+    }
+
+    // Publish the compacted list and indirect draw count for this frame.
+    {
+        BeginRenderPassDebugLabel(cmd, "Particle Finalize Simulation Pass");
+
+        cmd.bindPipeline(vk::PipelineBindPoint::eCompute, m_FinalizeSimulatePipeline->GetVulkanPipeline());
+        cmd.dispatch(1, 1, 1);
+
         vk::MemoryBarrier2 barrier{
             .srcStageMask = vk::PipelineStageFlagBits2::eComputeShader,
             .srcAccessMask = vk::AccessFlagBits2::eShaderWrite,
@@ -402,7 +432,10 @@ void ParticleSystem::RecordDraw(const vk::raii::CommandBuffer& cmd, const uint32
 
 #endif
 
-    cmd.drawIndirect(m_IndirectDrawBuffers[frameIndex].Handle, 0, 1, sizeof(vk::DrawIndirectCommand));
+    cmd.drawIndirect(m_IndirectDrawBuffers[frameIndex].Handle,
+                     DrawIndirectOffset,
+                     1,
+                     sizeof(vk::DrawIndirectCommand));
 
     EndRenderPassDebugLabel(cmd);
 }
@@ -418,7 +451,7 @@ void ParticleSystem::SetupDescriptors()
     auto& context = VulkanContext::Get();
     const auto& device = context.GetDevice();
 
-    // SET 0: Particle Buffers (5 Storage Buffers)
+    // SET 0: Particle pool, dead list, ping-ponged active lists, and counters.
     const std::vector<vk::DescriptorSetLayoutBinding> particleBindings = {
         { .binding = 0,
           .descriptorType = vk::DescriptorType::eStorageBuffer,
@@ -431,11 +464,15 @@ void ParticleSystem::SetupDescriptors()
         { .binding = 2,
           .descriptorType = vk::DescriptorType::eStorageBuffer,
           .descriptorCount = 1,
-          .stageFlags = vk::ShaderStageFlagBits::eCompute | vk::ShaderStageFlagBits::eVertex }, // AliveList
+          .stageFlags = vk::ShaderStageFlagBits::eCompute | vk::ShaderStageFlagBits::eVertex }, // Active list A
         { .binding = 3,
           .descriptorType = vk::DescriptorType::eStorageBuffer,
           .descriptorCount = 1,
-          .stageFlags = vk::ShaderStageFlagBits::eCompute }, // Counters
+          .stageFlags = vk::ShaderStageFlagBits::eCompute | vk::ShaderStageFlagBits::eVertex }, // Counters
+        { .binding = 4,
+          .descriptorType = vk::DescriptorType::eStorageBuffer,
+          .descriptorCount = 1,
+          .stageFlags = vk::ShaderStageFlagBits::eCompute | vk::ShaderStageFlagBits::eVertex }, // Active list B
     };
 
     m_ParticleBuffersLayout = DescriptorManager::CreateDescriptorSetLayout(particleBindings);
@@ -566,6 +603,15 @@ void ParticleSystem::SetupPipelines(vk::Format colorFormat, vk::Format depthForm
 
     m_PrepareSimulatePipeline = CreateRef<ComputePipeline>(prepareSimulatePipelineSpec);
 
+    ComputePipelineSpecification finalizeSimulatePipelineSpec{};
+    finalizeSimulatePipelineSpec.Name = "Particle Finalize Simulate Pipeline";
+    finalizeSimulatePipelineSpec.Shader =
+        CreateRef<Shader>("particle_finalize_simulation", "Particle Finalize Simulation");
+    finalizeSimulatePipelineSpec.PipelineLayout = m_ComputePipelineLayout;
+    finalizeSimulatePipelineSpec.UsingDescriptorBuffers = context.UseDescriptorBuffers();
+
+    m_FinalizeSimulatePipeline = CreateRef<ComputePipeline>(finalizeSimulatePipelineSpec);
+
     ComputePipelineSpecification updatePipelineSpec{};
     updatePipelineSpec.Name = "Particle Update Pipeline";
     updatePipelineSpec.Shader = CreateRef<Shader>("particle_simulate", "Particle Simulate");
@@ -647,8 +693,9 @@ void ParticleSystem::AllocateDescriptorBuffers()
         DescriptorWriter writer(m_ParticleBuffersLayout, m_ParticleSet);
         writer.WriteStorageBuffer(0, m_ParticlePoolBuffer.GetBuffer(), m_ParticlePoolBuffer.GetBufferSize());
         writer.WriteStorageBuffer(1, m_DeadListBuffer.GetBuffer(), m_DeadListBuffer.GetBufferSize());
-        writer.WriteStorageBuffer(2, m_AliveListBuffer.GetBuffer(), m_AliveListBuffer.GetBufferSize());
+        writer.WriteStorageBuffer(2, m_ActiveListBuffers[0].GetBuffer(), m_ActiveListBuffers[0].GetBufferSize());
         writer.WriteStorageBuffer(3, m_CountersBuffer.GetBuffer(), m_CountersBuffer.GetBufferSize());
+        writer.WriteStorageBuffer(4, m_ActiveListBuffers[1].GetBuffer(), m_ActiveListBuffers[1].GetBufferSize());
         writer.Flush();
     }
 
@@ -662,7 +709,7 @@ void ParticleSystem::AllocateDescriptorBuffers()
         DescriptorWriter writer(m_SpawnRequestsLayout, m_SpawnSets[i]);
         writer.WriteStorageBuffer(0, m_SpawnRequestBuffers[i].GetBuffer(), m_SpawnRequestBuffers[i].GetBufferSize());
         writer.WriteUniformBuffer(1, m_ParticleFrameBuffers[i].Handle, sizeof(ParticleFrameData));
-        writer.WriteStorageBuffer(2, m_IndirectDrawBuffers[i].Handle, sizeof(VkDrawIndirectCommand));
+        writer.WriteStorageBuffer(2, m_IndirectDrawBuffers[i].Handle, IndirectBufferSize);
         writer.Flush();
     }
 
@@ -765,8 +812,8 @@ void ParticleSystem::AllocateDescriptorBuffers()
         writeStorageBuffer(m_ParticleBuffersLayout,
                            2,
                            m_ParticleBufferOffset,
-                           m_AliveListBuffer.GetBuffer(),
-                           m_AliveListBuffer.GetBufferSize());
+                           m_ActiveListBuffers[0].GetBuffer(),
+                           m_ActiveListBuffers[0].GetBufferSize());
         writeStorageBuffer(m_ParticleBuffersLayout,
                            3,
                            m_ParticleBufferOffset,
@@ -775,8 +822,8 @@ void ParticleSystem::AllocateDescriptorBuffers()
         writeStorageBuffer(m_ParticleBuffersLayout,
                            4,
                            m_ParticleBufferOffset,
-                           m_IndirectDrawBuffers[i].Handle,
-                           sizeof(VkDrawIndirectCommand));
+                           m_ActiveListBuffers[1].GetBuffer(),
+                           m_ActiveListBuffers[1].GetBufferSize());
 
         writeStorageBuffer(m_SpawnRequestsLayout,
                            0,
@@ -795,6 +842,20 @@ void ParticleSystem::AllocateDescriptorBuffers()
         device.getDescriptorEXT(frameGetInfo,
                                 descBufferProps.uniformBufferDescriptorSize,
                                 mappedPtr + m_SpawnBufferOffset + frameBindingOffset);
+
+        const vk::DeviceSize indirectBindingOffset = m_SpawnRequestsLayout.getBindingOffsetEXT(2);
+        const vk::DescriptorAddressInfoEXT indirectAddrInfo{
+            .address = device.getBufferAddress({ .buffer = m_IndirectDrawBuffers[i].Handle }),
+            .range = IndirectBufferSize,
+            .format = vk::Format::eUndefined
+        };
+        const vk::DescriptorGetInfoEXT indirectGetInfo{
+            .type = vk::DescriptorType::eStorageBuffer,
+            .data = vk::DescriptorDataEXT(&indirectAddrInfo)
+        };
+        device.getDescriptorEXT(indirectGetInfo,
+                                descBufferProps.storageBufferDescriptorSize,
+                                mappedPtr + m_SpawnBufferOffset + indirectBindingOffset);
 
         const vk::DeviceSize textureBindingOffset = m_TextureLayout.getBindingOffsetEXT(0);
 
@@ -843,7 +904,7 @@ void ParticleSystem::AllocateIndirectDrawBuffers()
     for (uint32_t i = 0; i < context.GetMaxFramesInFlight(); ++i) {
         VkBufferCreateInfo bufferInfo{};
         bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-        bufferInfo.size = sizeof(VkDrawIndirectCommand);
+        bufferInfo.size = IndirectBufferSize;
         bufferInfo.usage = VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
                            VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT;
         bufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
@@ -870,10 +931,14 @@ void ParticleSystem::AllocateIndirectDrawBuffers()
         context.SetObjectDebugName(m_IndirectDrawBuffers[i].allocation,
                                    std::format("Particle Indirect Draw Buffer Allocation {}", i));
 
+        constexpr VkDispatchIndirectCommand dispatchCommand{ .x = 1, .y = 1, .z = 1 };
         constexpr VkDrawIndirectCommand drawCommand{
             .vertexCount = 6, .instanceCount = 0, .firstVertex = 0, .firstInstance = 0
         };
-        std::memcpy(m_IndirectDrawBuffers[i].MappedData, &drawCommand, sizeof(drawCommand));
+        std::memcpy(m_IndirectDrawBuffers[i].MappedData, &dispatchCommand, sizeof(dispatchCommand));
+        std::memcpy(static_cast<uint8_t*>(m_IndirectDrawBuffers[i].MappedData) + DrawIndirectOffset,
+                    &drawCommand,
+                    sizeof(drawCommand));
     }
 }
 } // namespace Kerberos

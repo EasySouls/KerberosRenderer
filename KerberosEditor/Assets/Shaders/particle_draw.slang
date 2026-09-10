@@ -3,7 +3,11 @@ import particles;
 [vk::binding(0, 0)]
 StructuredBuffer<Particle> particlePool;
 [vk::binding(2, 0)]
-StructuredBuffer<uint> aliveList;
+StructuredBuffer<uint> activeListA;
+[vk::binding(3, 0)]
+StructuredBuffer<uint> counters;
+[vk::binding(4, 0)]
+StructuredBuffer<uint> activeListB;
 
 [vk::binding(1, 1)]
 ConstantBuffer<ParticleFrameData> scene;
@@ -41,7 +45,7 @@ VertexOutput vertexMain(uint vertexID: SV_VulkanVertexID, uint instanceID: SV_Vu
 {
     VertexOutput output;
 
-    uint poolIndex = aliveList[instanceID];
+    uint poolIndex = counters[3] == 0 ? activeListA[instanceID] : activeListB[instanceID];
     Particle p = particlePool[poolIndex];
 
     float age = 1.0 - (p.life / p.maxLife);

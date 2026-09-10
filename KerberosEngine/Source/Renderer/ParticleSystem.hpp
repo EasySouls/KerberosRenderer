@@ -70,7 +70,7 @@ private:
 
     StorageBuffer m_ParticlePoolBuffer;
     StorageBuffer m_DeadListBuffer;
-    StorageBuffer m_AliveListBuffer;
+    std::vector<StorageBuffer> m_ActiveListBuffers;
     StorageBuffer m_CountersBuffer;
 
     struct VulkanBuffer
@@ -104,6 +104,7 @@ private:
     Ref<ComputePipeline> m_SpawnPipeline;
     Ref<ComputePipeline> m_PrepareSimulatePipeline;
     Ref<ComputePipeline> m_UpdatePipeline;
+    Ref<ComputePipeline> m_FinalizeSimulatePipeline;
     Ref<GraphicsPipeline> m_RenderPipeline;
 };
 

@@ -23,9 +23,10 @@ public struct Particle
 
 public struct Counters
 {
-    public Atomic<uint> aliveCount;
     public Atomic<uint> deadCount;
-    public Atomic<uint> spawnRequestCount;
+    public Atomic<uint> activeCount;
+    public Atomic<uint> nextActiveCount;
+    public Atomic<uint> activeListIndex;
 };
 
 public struct SpawnRequest
