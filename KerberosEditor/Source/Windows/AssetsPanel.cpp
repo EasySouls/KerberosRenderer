@@ -30,6 +30,7 @@ namespace Kerberos
 			for (const auto& [handle, metadata] : registry)
 				if (metadata.Filepath.lexically_normal() == relative.lexically_normal())
 					return handle;
+
 			return AssetHandle::Invalid();
 		}
 	}
@@ -85,9 +86,8 @@ namespace Kerberos
 
 		ImGui::Columns(columns, nullptr, false);
 
-		for (const auto& item : m_ContentItems)
+		for (const auto& [path, handle, isDirectory] : m_ContentItems)
 		{
-			const auto& path = item.Path;
 			const std::string fileName = path.filename().string();
 			const auto relativePath = GetRelativePath(path);
 
@@ -95,7 +95,7 @@ namespace Kerberos
 
 			ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.2f, 0.2f, 0.2f, 0.5f));
 
-			if (item.IsDirectory)
+			if (isDirectory)
 			{
 				const uint64_t rendererID = VulkanContext::Get().GetImGuiRendererID(m_FolderIcon);
 				ImGui::ImageButton(fileName.c_str(), rendererID, { thumbnailSize, thumbnailSize }, { 0, 1 }, { 1, 0 });
@@ -121,7 +121,6 @@ namespace Kerberos
 				}
 				const uint64_t rendererID = VulkanContext::Get().GetImGuiRendererID(preview);
 				ImGui::ImageButton(fileName.c_str(), rendererID, { thumbnailSize, thumbnailSize }, { 0, 1 }, { 1, 0 });
-				const AssetHandle handle = item.Handle;
 				ShowFileContextMenu(path);
 				if (handle.IsValid())
 					HandleAssetDragAndDrop(handle, path.filename());
@@ -158,8 +157,7 @@ namespace Kerberos
 			ImGui::Separator();
 			if (ImGui::MenuItem("Open"))
 			{
-				const bool success = FileOperations::OpenFile(path.string().c_str());
-				if (!success)
+				if (!FileOperations::OpenFile(path.string().c_str()))
 				{
 					m_NotificationManager.AddNotification("Could not open file: " + path.string(), Notification::Type::Error);
 				}
@@ -167,8 +165,7 @@ namespace Kerberos
 			}
 			if (ImGui::MenuItem("Reveal in Explorer"))
 			{
-				const bool success = FileOperations::RevealInFileExplorer(path.string().c_str());
-				if (!success)
+				if (!FileOperations::RevealInFileExplorer(path.string().c_str()))
 				{
 					m_NotificationManager.AddNotification("Could not reveal file in explorer: " + path.string(), Notification::Type::Error);
 				}
@@ -209,8 +206,7 @@ namespace Kerberos
 			}
 			if (ImGui::MenuItem("Reveal in Explorer"))
 			{
-				const bool success = FileOperations::RevealInFileExplorer(path.string().c_str());
-				if (!success)
+				if (!FileOperations::RevealInFileExplorer(path.string().c_str()))
 				{
 					m_NotificationManager.AddNotification("Could not reveal folder in explorer: " + path.string(), Notification::Type::Error);
 				}
@@ -297,18 +293,21 @@ namespace Kerberos
 		KBR_TRACY_FUNCTION();
 
 		m_ContentItems.clear();
-		std::error_code error;
-		for (const auto& entry : std::filesystem::directory_iterator(
-			m_CurrentDirectory, std::filesystem::directory_options::skip_permission_denied, error))
+
+		for (std::error_code error;
+			const auto& entry : std::filesystem::directory_iterator(
+			     m_CurrentDirectory, std::filesystem::directory_options::skip_permission_denied, error))
 		{
 			if (error)
 			{
+				Log::EditorError("Failed to get file entry: {}", error.message());
 				error.clear();
 				continue;
 			}
 			const auto relative = std::filesystem::relative(entry.path(), m_AssetsDirectory, error);
 			if (error)
 			{
+				Log::EditorError("Failed to get relative path to file: {}, {}", entry.path().string(), error.message());
 				error.clear();
 				continue;
 			}
@@ -320,9 +319,9 @@ namespace Kerberos
 				continue;
 
 			m_ContentItems.push_back({
-				entry.path(),
-				entry.is_regular_file() ? FindAssetHandle(entry.path()) : AssetHandle::Invalid(),
-				entry.is_directory()
+				.Path = entry.path(),
+				.Handle = entry.is_regular_file() ? FindAssetHandle(entry.path()) : AssetHandle::Invalid(),
+				.IsDirectory = entry.is_directory()
 			});
 		}
 		std::ranges::sort(m_ContentItems, [](const ContentItem& left, const ContentItem& right) {
