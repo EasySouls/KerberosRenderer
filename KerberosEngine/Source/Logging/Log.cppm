@@ -306,3 +306,24 @@ struct std::formatter<Kerberos::UUID> : std::formatter<std::string>
         return std::formatter<std::string>::format(std::format("{}", static_cast<uint64_t>(uuid)), ctx);
     }
 };
+
+template <>
+struct std::formatter<const wchar_t*> : std::formatter<std::string>
+{
+    auto format(const wchar_t* wstr, std::format_context& ctx) const
+    {
+        if (!wstr) {
+            return std::formatter<std::string>::format("null", ctx);
+        }
+
+        const int size_needed = WideCharToMultiByte(CP_UTF8, 0, wstr, -1, nullptr, 0, nullptr, nullptr);
+        if (size_needed <= 0) {
+            return std::formatter<std::string>::format("", ctx);
+        }
+
+        std::string narrowStr(size_needed - 1, '\0');
+        WideCharToMultiByte(CP_UTF8, 0, wstr, -1, narrowStr.data(), size_needed - 1, nullptr, nullptr);
+
+        return std::formatter<std::string>::format(narrowStr, ctx);
+    }
+};
