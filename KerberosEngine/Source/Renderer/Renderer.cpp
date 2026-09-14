@@ -19,6 +19,7 @@
 #include "Utils.hpp"
 #include "VulkanContext.hpp"
 #include "Profiling/Profilers.hpp"
+#include "Upscaling/FSR/FSR3Upscaler.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -455,12 +456,22 @@ struct RendererData
     ParticleSystem ParticleSystem{};
     GrassSystem GrassSystem{};
 
+    /**
+     * Size of the viewport, and the final image presented to the swapchain
+     */
     glm::vec2 OutputSize{ 1280.0f, 720.0f };
+
+    /**
+     * The size we are rendering at. Can be lower than the `OutputSize` if using upscaling.
+     */
+    glm::vec2 RenderSize{ 1280.0f, 720.0f };
 
     constexpr static uint32_t TemporalSequenceLength = 8;
 
     vk::ImageLayout GTAOImageLayout = vk::ImageLayout::eUndefined;
     bool PreviousUseGTAO = true;
+
+    Owner<IUpscaler> Upscaler = nullptr;
 
     // Settings
     bool DisplayDebugNormals = false;
@@ -517,6 +528,19 @@ void Renderer::Init()
     s_Data->TextureManager.Initialize();
 
     CreateResources();
+
+    auto& context = VulkanContext::Get();
+    const auto& device = context.GetDevice();
+
+    s_Data->Upscaler = CreateOwner<FSR3Upscaler>(device);
+    const UpscalerCreateInfo upscalerCreateInfo{
+        .displayWidth = static_cast<uint32_t>(s_Data->OutputSize.x),
+        .displayHeight = static_cast<uint32_t>(s_Data->OutputSize.y),
+        .renderWidth = static_cast<uint32_t>(s_Data->RenderSize.x),
+        .renderHeight = static_cast<uint32_t>(s_Data->RenderSize.y),
+        .maxUpscaleRatio = 3.0f
+    };
+    s_Data->Upscaler->Initialize(upscalerCreateInfo);
 }
 
 void Renderer::Shutdown()
@@ -1751,6 +1775,8 @@ void Renderer::RecordQueuedSceneRender(const vk::raii::CommandBuffer& cmd)
     ApplyTonemapping(cmd, currentImage);
 
     ApplyAntiAliasing(cmd, currentImage);
+
+    ApplyUpscaling(cmd, currentImage);
 
     HandleMousePickingReadback(cmd);
 
@@ -3095,6 +3121,14 @@ void Renderer::ResizeResources(const uint32_t width, const uint32_t height)
 
     device.waitIdle();
 
+    // Handle the resize first in the upscaler, so we know what will be the render size
+    s_Data->Upscaler->Resize(width, height);
+    const float upscaleRatio = s_Data->Upscaler->GetInverseUpscaleRatio();
+    s_Data->RenderSize = { static_cast<uint32_t>(width * upscaleRatio), static_cast<uint32_t>(height * upscaleRatio) };
+
+    const uint32_t renderWidth = static_cast<uint32_t>(s_Data->RenderSize.x);
+    const uint32_t renderHeight = static_cast<uint32_t>(s_Data->RenderSize.y);
+
     // Destroy old resources
     VulkanContext::DestroyImGuiDescriptorSet(s_Data->ColorOutputDescriptorSet);
 
@@ -3140,15 +3174,15 @@ void Renderer::ResizeResources(const uint32_t width, const uint32_t height)
 
     // Recreate resources with new size
 
-    CreateTonemappedImage(width, height);
+    CreateTonemappedImage(renderWidth, renderHeight);
 
-    CreateFXAAImage(width, height);
+    CreateFXAAImage(renderWidth, renderHeight);
 
-    CreateBloomImage(width, height);
+    CreateBloomImage(renderWidth, renderHeight);
 
     CreateImage(device,
-                width,
-                height,
+                renderWidth,
+                renderHeight,
                 mipLevels,
                 vk::SampleCountFlagBits::e1,
                 s_Data->ResolveImage.Format,
@@ -3167,8 +3201,8 @@ void Renderer::ResizeResources(const uint32_t width, const uint32_t height)
     context.SetObjectDebugName(s_Data->ResolveImage.ImageView, "Resolve Image View");
 
     CreateImage(device,
-                width,
-                height,
+                renderWidth,
+                renderHeight,
                 mipLevels,
                 vk::SampleCountFlagBits::e1,
                 s_Data->ColorImage.Format,
@@ -3193,8 +3227,8 @@ void Renderer::ResizeResources(const uint32_t width, const uint32_t height)
                                "Color Attachment Image View");
 
     CreateImage(device,
-                width,
-                height,
+                renderWidth,
+                renderHeight,
                 mipLevels,
                 vk::SampleCountFlagBits::e1,
                 s_Data->PickingImage.Format,
@@ -3220,8 +3254,8 @@ void Renderer::ResizeResources(const uint32_t width, const uint32_t height)
                                "Picking Attachment Image View");
 
     CreateImage(device,
-                width,
-                height,
+                renderWidth,
+                renderHeight,
                 mipLevels,
                 vk::SampleCountFlagBits::e1,
                 s_Data->DepthImage.Format,
@@ -3247,8 +3281,8 @@ void Renderer::ResizeResources(const uint32_t width, const uint32_t height)
                                "Depth Attachment Image View");
 
     CreateImage(device,
-                width,
-                height,
+                renderWidth,
+                renderHeight,
                 mipLevels,
                 vk::SampleCountFlagBits::e1,
                 s_Data->NormalImage.Format,
@@ -3265,12 +3299,11 @@ void Renderer::ResizeResources(const uint32_t width, const uint32_t height)
         device, s_Data->NormalImage.Image, s_Data->NormalImage.Format, vk::ImageAspectFlagBits::eColor, mipLevels);
 
     context.SetObjectDebugName(s_Data->NormalImage.ImageView, "Normal Attachment Image View");
+    CreateTransparencyResources(renderWidth, renderHeight);
 
-    CreateTransparencyResources(width, height);
+    CreateGTAOImage(renderWidth, renderHeight);
 
-    CreateGTAOImage(width, height);
-
-    CreateSMAAImages(width, height);
+    CreateSMAAImages(renderWidth, renderHeight);
 
     SetupTonemappingResolveDescriptors();
     SetupFXAADescriptors();
@@ -3595,7 +3628,7 @@ void Renderer::ResizeResources(const uint32_t width, const uint32_t height)
 
     s_Data->OutputSize = { static_cast<float>(width), static_cast<float>(height) };
 
-    s_Data->ParticleSystem.OnResize(width, height, s_Data->DepthImage.ImageView);
+    s_Data->ParticleSystem.OnResize(renderWidth, renderHeight, s_Data->DepthImage.ImageView);
 }
 
 void Renderer::RecompileShaders()
@@ -5108,6 +5141,23 @@ void Renderer::ApplySMAA(const vk::raii::CommandBuffer& cmd,
 
         EndRenderPassDebugLabel(cmd);
     }
+}
+
+void Renderer::ApplyUpscaling(const vk::raii::CommandBuffer &cmd, uint32_t frameIndex)
+{
+    KBR_TRACY_FUNCTION();
+
+    IUpscaler& upscaler = *s_Data->Upscaler;
+
+    const UpscalerFrame frameInfo {
+
+    };
+    upscaler.BeginFrame(frameInfo);
+
+    const UpscalerDispatchInfo dispatchInfo {
+        .cameraFovAngleVertical = s_Data->SceneUniformData.cameraFovAngleVertical,
+    };
+    upscaler.Dispatch(dispatchInfo);
 }
 
 void Renderer::ApplyBloom(const vk::raii::CommandBuffer& cmd, const uint32_t frameIndex)

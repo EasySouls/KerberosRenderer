@@ -250,6 +250,8 @@ private:
                           const vk::Rect2D& renderArea,
                           const vk::Viewport& viewport);
 
+    static void ApplyUpscaling(const vk::raii::CommandBuffer& cmd, uint32_t frameIndex);
+
     static void ApplyBloom(const vk::raii::CommandBuffer& cmd, uint32_t frameIndex);
 
     static void WriteGPUTimestamp(const vk::raii::CommandBuffer& cmd, uint32_t frameIndex, uint32_t index);

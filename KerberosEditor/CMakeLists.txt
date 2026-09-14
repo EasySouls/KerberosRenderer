@@ -31,4 +31,10 @@ if(WIN32)
     )
 endif()
 
+add_custom_command(TARGET KerberosEditor POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        "${FIDELITYFX_VK_DLL}"
+        "$<TARGET_FILE_DIR:KerberosEditor>"
+)
+
 set_target_properties(KerberosEditor PROPERTIES FOLDER "KerberosEditor")

@@ -3,6 +3,8 @@ project(KerberosEngine)
 # Add third party first
 add_subdirectory(ThirdParty)
 
+include("${CMAKE_SOURCE_DIR}/Config/FidelityFX.cmake")
+
 add_library(KerberosEngine STATIC)
 
 # Collect only Source files
@@ -72,6 +74,9 @@ endif()
 
 # Link engine build settings
 target_link_libraries(KerberosEngine PRIVATE KerberosBuildSettings)
+
+# Link the custom FidelityFX target
+target_link_libraries(KerberosEngine PRIVATE Kerberos::FidelityFX)
 
 # Link third party
 target_link_libraries(KerberosEngine
