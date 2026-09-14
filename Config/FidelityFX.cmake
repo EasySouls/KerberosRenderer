@@ -12,6 +12,8 @@ set(FIDELITYFX_INCLUDE_DIR
 
 set(FIDELITYFX_VK_DLL
         "${FIDELITYFX_BIN_ROOT}/amd_fidelityfx_vk.dll"
+        CACHE FILEPATH
+        "FidelityFX Vulkan runtime DLL"
 )
 
 set(FIDELITYFX_VK_LIB
@@ -33,11 +35,14 @@ if (NOT EXISTS "${FIDELITYFX_VK_LIB}")
 endif()
 
 
-add_library(Kerberos::FidelityFX STATIC IMPORTED GLOBAL)
+add_library(Kerberos::FidelityFX SHARED IMPORTED GLOBAL)
 
 set_target_properties(Kerberos::FidelityFX PROPERTIES
-        IMPORTED_LOCATION
+        IMPORTED_IMPLIB
         "${FIDELITYFX_VK_LIB}"
+
+        IMPORTED_LOCATION
+        "${FIDELITYFX_VK_DLL}"
 
         INTERFACE_INCLUDE_DIRECTORIES
         "${FIDELITYFX_INCLUDE_DIR}"
@@ -49,4 +54,3 @@ add_custom_target(KerberosFidelityFXRuntime ALL
         "${FIDELITYFX_VK_DLL}"
         "$<TARGET_FILE_DIR:KerberosEngine>/amd_fidelityfx_vk.dll"
 )
-

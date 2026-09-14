@@ -33,8 +33,9 @@ endif()
 
 add_custom_command(TARGET KerberosEditor POST_BUILD
         COMMAND ${CMAKE_COMMAND} -E copy_if_different
-        "${FIDELITYFX_VK_DLL}"
-        "$<TARGET_FILE_DIR:KerberosEditor>"
+            "${FIDELITYFX_VK_DLL}"
+            "$<TARGET_FILE_DIR:KerberosEditor>/amd_fidelityfx_vk.dll"
+        VERBATIM
 )
 
 set_target_properties(KerberosEditor PROPERTIES FOLDER "KerberosEditor")

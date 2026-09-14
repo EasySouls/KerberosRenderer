@@ -6,6 +6,7 @@ add_subdirectory(ThirdParty)
 include("${CMAKE_SOURCE_DIR}/Config/FidelityFX.cmake")
 
 add_library(KerberosEngine STATIC)
+add_dependencies(KerberosEngine KerberosFidelityFXRuntime)
 
 # Collect only Source files
 file(GLOB_RECURSE ENGINE_REGULAR_SOURCES CMAKE_CONFIGURE_DEPENDS
