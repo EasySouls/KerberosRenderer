@@ -284,6 +284,6 @@ namespace Kerberos
 		static VulkanContext* s_Instance;
 	};
 
-	void BeginRenderPassDebugLabel(const vk::raii::CommandBuffer& cmd, const std::string_view labelName);
+	void BeginRenderPassDebugLabel(const vk::raii::CommandBuffer& cmd, std::string_view labelName);
 	void EndRenderPassDebugLabel(const vk::raii::CommandBuffer& cmd);
 } 

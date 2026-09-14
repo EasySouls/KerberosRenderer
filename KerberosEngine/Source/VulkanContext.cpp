@@ -1278,6 +1278,7 @@ namespace Kerberos
 		 features.features.samplerAnisotropy = true;
 		 features.features.pipelineStatisticsQuery = true;
 		 features.features.shaderInt64 = m_SupportedFeatures.get<vk::PhysicalDeviceFeatures2>().features.shaderInt64;
+         features.features.shaderInt16 = m_SupportedFeatures.get<vk::PhysicalDeviceFeatures2>().features.shaderInt16;
 		 features.features.robustBufferAccess = false;
 		 features.features.fullDrawIndexUint32 = false;
 		 features.features.imageCubeArray = false;
@@ -1297,7 +1298,6 @@ namespace Kerberos
 		 features.features.textureCompressionASTC_LDR = false;
 		 features.features.textureCompressionBC = false;
 		 features.features.occlusionQueryPrecise = false;
-		 features.features.shaderInt16 = false;
 		 features.features.shaderResourceMinLod = false;
 		 features.features.sparseBinding = false;
 		 features.features.sparseResidencyBuffer = false;
