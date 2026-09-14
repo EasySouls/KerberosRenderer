@@ -489,7 +489,7 @@ struct RendererData
     uint32_t VisibleObjectCount = 0;
     uint32_t CulledObjectCount = 0;
 
-    AntiAliasingMode AntiAliasingMode = AntiAliasingMode::FXAA;
+    AntiAliasingMode AntiAliasingMode = AntiAliasingMode::SMAA;
     TonemappingOperator TonemappingOperator = TonemappingOperator::ACES;
 };
 
