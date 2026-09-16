@@ -1,5 +1,6 @@
 #pragma once
 
+#include "DescriptorAllocator.hpp"
 #include "Scene/Camera/EditorCamera.hpp"
 #include "Scene/Scene.hpp"
 #include "Upscaling/UpscalerTypes.hpp"
@@ -129,8 +130,7 @@ public:
                                    const Camera& mainCamera,
                                    const glm::mat4& mainCameraTransform,
                                    float dt);
-    static void
-    RenderScene(const Ref<Scene>& scene,
+    static void RenderScene(const Ref<Scene>& scene,
                 const glm::mat4& view,
                 const glm::mat4& projection,
                 const glm::vec3& camPos,
@@ -139,6 +139,7 @@ public:
                 float dt,
                 float nearPlane,
                 float farPlane);
+    
     static void RecordQueuedSceneRender(const vk::raii::CommandBuffer& cmd);
 
     static void ResizeResources(uint32_t width, uint32_t height);
@@ -238,7 +239,46 @@ private:
                                  const RenderObjectContainer& renderObjects,
                                  std::pmr::memory_resource* arena);
 
+    static void UpdateParticles(const vk::raii::CommandBuffer& cmd,
+                                uint32_t frameIndex,
+                                DescriptorAllocator& frameDescriptorAllocator,
+                                float& time);
+
+    static void RenderPrePass(const vk::raii::CommandBuffer& cmd,
+                              uint32_t frameIndex,
+                              std::vector<RenderObject, std::pmr::polymorphic_allocator<RenderObject>> renderObjects,
+                              uint32_t currentImage);
+
+    static void RenderGTAO(const vk::raii::CommandBuffer& cmd, uint32_t frameIndex, uint32_t currentImage);
+
+    static void RenderOpaque(const vk::raii::CommandBuffer& cmd,
+                             uint32_t frameIndex,
+                             std::vector<RenderObject, std::pmr::polymorphic_allocator<RenderObject>> renderObjects,
+                             uint32_t currentImage,
+                             vk::Viewport viewport,
+                             vk::Rect2D renderArea);
+
+    static void RenderTransparent(const vk::raii::CommandBuffer& cmd,
+                      uint32_t frameIndex,
+                      std::vector<RenderObject, std::pmr::polymorphic_allocator<RenderObject>> renderObjects,
+                      uint32_t currentImage,
+                      vk::Viewport viewport,
+                      vk::Rect2D renderArea);
+
+    static void RenderPhysicsColliders(const vk::raii::CommandBuffer& cmd,
+                                       std::vector<LineVertex> colliderLineVertices,
+                                       uint32_t currentImage,
+                                       vk::Viewport viewport,
+                                       vk::Rect2D renderArea);
+
+    static void ResolveTransparencyPass(const vk::raii::CommandBuffer& cmd,
+                                        uint32_t frameIndex,
+                                        uint32_t currentImage,
+                                        vk::Viewport viewport,
+                                        vk::Rect2D renderArea);
+
     static void RenderParticles(const vk::raii::CommandBuffer& cmd, uint32_t frameIndex);
+
     static void RenderGrass(const vk::raii::CommandBuffer& cmd, uint32_t frameIndex);
 
     static void ApplyTonemapping(const vk::raii::CommandBuffer& cmd, uint32_t frameIndex);
