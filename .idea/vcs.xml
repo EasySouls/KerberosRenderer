@@ -3,6 +3,7 @@
   <component name="VcsDirectoryMappings">
     <mapping directory="" vcs="Git" />
     <mapping directory="$PROJECT_DIR$/KerberosEngine/ThirdParty/Assimp" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/KerberosEngine/ThirdParty/FidelityFX-SDK" vcs="Git" />
     <mapping directory="$PROJECT_DIR$/KerberosEngine/ThirdParty/ImGuizmo" vcs="Git" />
     <mapping directory="$PROJECT_DIR$/KerberosEngine/ThirdParty/JoltPhysics" vcs="Git" />
     <mapping directory="$PROJECT_DIR$/KerberosEngine/ThirdParty/entt" vcs="Git" />

@@ -2,6 +2,7 @@
 
 #include "Scene/Camera/EditorCamera.hpp"
 #include "Scene/Scene.hpp"
+#include "Upscaling/UpscalerTypes.hpp"
 #include "Vulkan.hpp"
 
 #include <functional>
@@ -41,6 +42,7 @@ struct GPUTimings
     float AmbientOcclusionPassMilliseconds = 0.0f;
     float TonemappingPassMilliseconds = 0.0f;
     float AntialiasingPassMilliseconds = 0.0f;
+    float UpscalingPassMilliseconds = 0.0f;
     bool IsValid = false;
 };
 
@@ -172,8 +174,13 @@ public:
     static uint32_t GetAllObjectCount();
     static uint32_t GetVisibleObjectCount();
     static uint32_t GetCulledObjectCount();
+    static UpscalerType GetUpscalingMode();
+    static void SetUpscalingMode(UpscalerType mode);
+    static UpscalerQuality GetUpscalingQuality();
+    static void SetUpscalingQuality(UpscalerQuality quality);
 
     static glm::vec2 GetOutputImageSize();
+    static glm::vec2 GetRenderImageSize();
 
     static uint64_t GetCompositedOutputImageID();
     static uint64_t GetShadowMapDepthImageID(uint32_t index);
@@ -250,6 +257,8 @@ private:
                           const vk::Rect2D& renderArea,
                           const vk::Viewport& viewport);
 
+    static void ApplyUpscaling(const vk::raii::CommandBuffer& cmd, uint32_t frameIndex);
+
     static void ApplyBloom(const vk::raii::CommandBuffer& cmd, uint32_t frameIndex);
 
     static void WriteGPUTimestamp(const vk::raii::CommandBuffer& cmd, uint32_t frameIndex, uint32_t index);
@@ -284,6 +293,7 @@ private:
 
     static void CreateTonemappedImage(uint32_t width, uint32_t height);
     static void SetupTonemappingResolveDescriptors();
+    static void CreateOutputImage(uint32_t width, uint32_t height);
 
     static void CreateSMAATextures();
     static void CreateSMAADescriptorSetAndPipelineLayouts();

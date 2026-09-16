@@ -92,7 +92,7 @@ namespace Kerberos
 				default: break;
 			}
 
-			Log::CoreInfo("{0}Member: {1}{2}, Type: {3}, Offset: {4}, Size: {5}",
+			Log::CoreDebug("{0}Member: {1}{2}, Type: {3}, Offset: {4}, Size: {5}",
 						  indent, memberName, arrayInfo, typeName, offset, memberSize);
 
 			if (memberType.basetype == spirv_cross::SPIRType::Struct)
@@ -280,7 +280,7 @@ namespace Kerberos
 		const Compiler compiler(m_SpirvCode);
 		const ShaderResources resources = compiler.get_shader_resources();
 
-		Log::CoreInfo("Reflecting shader {}", m_Name);
+		Log::CoreDebug("Reflecting shader {}", m_Name);
 
 		const auto entryPoints = compiler.get_entry_points_and_stages();
 
@@ -292,22 +292,22 @@ namespace Kerberos
 		for (const auto& [name, execution_model] : entryPoints) {
 			const vk::ShaderStageFlagBits stage = ExecutionModelToShaderStage(execution_model);
 			stageEntries.push_back({ .stage = stage, .entryPoint = name });
-			Log::CoreInfo("  Entry point: {0}, Stage: {1}", name, vk::to_string(stage));
+			Log::CoreDebug("  Entry point: {0}, Stage: {1}", name, vk::to_string(stage));
 		}
 
-		Log::CoreInfo(" Uniform Buffers: {0}", resources.uniform_buffers.size());
+		Log::CoreDebug(" Uniform Buffers: {0}", resources.uniform_buffers.size());
 		for (const Resource& resource : resources.uniform_buffers) {
 			const SPIRType& bufferType = compiler.get_type(resource.base_type_id);
 			const uint32_t set = compiler.get_decoration(resource.id, spv::DecorationDescriptorSet);
 			const uint32_t binding = compiler.get_decoration(resource.id, spv::DecorationBinding);
 			const size_t bufferSize = compiler.get_declared_struct_size(bufferType);
 
-			Log::CoreInfo("  Name: {0}, Set: {1}, Binding: {2}, Size: {3}", resource.name, set, binding, bufferSize);
+			Log::CoreDebug("  Name: {0}, Set: {1}, Binding: {2}, Size: {3}", resource.name, set, binding, bufferSize);
 
 			ReflectStructMembers(compiler, resource.base_type_id, threeSpaces);
 		}
 
-		Log::CoreInfo(" Storage Buffers: {0}", resources.storage_buffers.size());
+		Log::CoreDebug(" Storage Buffers: {0}", resources.storage_buffers.size());
 		for (const Resource& resource : resources.storage_buffers)
 		{
 			const SPIRType& bufferType = compiler.get_type(resource.base_type_id);
@@ -315,20 +315,20 @@ namespace Kerberos
 			const uint32_t binding = compiler.get_decoration(resource.id, spv::DecorationBinding);
 			const size_t bufferSize = compiler.get_declared_struct_size_runtime_array(bufferType, 0);
 
-			Log::CoreInfo("  Name: {0}, Set: {1}, Binding: {2}, Base Size: {3}", resource.name, set, binding, bufferSize);
+			Log::CoreDebug("  Name: {0}, Set: {1}, Binding: {2}, Base Size: {3}", resource.name, set, binding, bufferSize);
 
 			ReflectStructMembers(compiler, resource.base_type_id, threeSpaces);
 		}
 
 		auto reflectImageSampler = [&](const auto& resourceList, const char* label)
 		{
-			Log::CoreInfo(" {0}: {1}", label, resourceList.size());
+			Log::CoreDebug(" {0}: {1}", label, resourceList.size());
 			for (const Resource& resource : resourceList)
 			{
 				const uint32_t set = compiler.get_decoration(resource.id, spv::DecorationDescriptorSet);
 				const uint32_t binding = compiler.get_decoration(resource.id, spv::DecorationBinding);
 				const uint32_t count = GetDescriptorArraySize(compiler, resource);
-				Log::CoreInfo("  Name: {0}, Set: {1}, Binding: {2}, Count: {3}", resource.name, set, binding, count);
+				Log::CoreDebug("  Name: {0}, Set: {1}, Binding: {2}, Count: {3}", resource.name, set, binding, count);
 			}
 		};
 
@@ -336,7 +336,7 @@ namespace Kerberos
 		reflectImageSampler(resources.separate_images, "Images");
 		reflectImageSampler(resources.separate_samplers, "Samplers");
 
-		Log::CoreInfo(" Storage Images: {0}", resources.storage_images.size());
+		Log::CoreDebug(" Storage Images: {0}", resources.storage_images.size());
 		for (const Resource& resource : resources.storage_images) {
 			const uint32_t set = compiler.get_decoration(resource.id, spv::DecorationDescriptorSet);
 			const uint32_t binding = compiler.get_decoration(resource.id, spv::DecorationBinding);
@@ -350,26 +350,26 @@ namespace Kerberos
 				case spv::DimCube: dimStr = "Cube"; break;
 				default:           dimStr = "Unknown"; break;
 			}
-			Log::CoreInfo("  Name: {0}, Set: {1}, Binding: {2}, Type: {3} Image", resource.name, set, binding, dimStr);
+			Log::CoreDebug("  Name: {0}, Set: {1}, Binding: {2}, Type: {3} Image", resource.name, set, binding, dimStr);
 		}
 
-		Log::CoreInfo(" Push Constant Buffers: {0}", resources.push_constant_buffers.size());
+		Log::CoreDebug(" Push Constant Buffers: {0}", resources.push_constant_buffers.size());
 		for (const Resource& resource : resources.push_constant_buffers) {
 			auto activeRanges = compiler.get_active_buffer_ranges(resource.id);
 
 			for (const auto& range : activeRanges)
 			{
-				Log::CoreInfo("  Name: {0}, Active Offset: {1}, Active Size: {2}", resource.name, range.offset, range.range);
+				Log::CoreDebug("  Name: {0}, Active Offset: {1}, Active Size: {2}", resource.name, range.offset, range.range);
 			}
 
 			ReflectStructMembers(compiler, resource.base_type_id, threeSpaces);
 		}
 
-		Log::CoreInfo(" Acceleration Structures: {0}", resources.acceleration_structures.size());
+		Log::CoreDebug(" Acceleration Structures: {0}", resources.acceleration_structures.size());
 		for (const Resource& resource : resources.acceleration_structures) {
 			const uint32_t set = compiler.get_decoration(resource.id, spv::DecorationDescriptorSet);
 			const uint32_t binding = compiler.get_decoration(resource.id, spv::DecorationBinding);
-			Log::CoreInfo("  Name: {0}, Set: {1}, Binding: {2}", resource.name, set, binding);
+			Log::CoreDebug("  Name: {0}, Set: {1}, Binding: {2}", resource.name, set, binding);
 		}
 
 		return stageEntries;

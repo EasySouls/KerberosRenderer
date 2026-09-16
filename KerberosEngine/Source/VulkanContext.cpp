@@ -18,6 +18,7 @@
 #include "ImGuizmo.h"
 
 #include <algorithm>
+#include <stacktrace>
 #include <iostream>
 
 import Kerberos;
@@ -82,6 +83,7 @@ static VKAPI_ATTR vk::Bool32 VKAPI_CALL DebugCallback(
 		}
 		else if (severity & vk::DebugUtilsMessageSeverityFlagBitsEXT::eError) {
 			Kerberos::Log::CoreError("General|Error: {}|{}: {}", pCallbackData->messageIdNumber, messageIdName, message);
+            Kerberos::Log::CoreDebug("{}", std::stacktrace::current());
 		}
 	}
 	else if (type & vk::DebugUtilsMessageTypeFlagBitsEXT::eValidation) {
@@ -96,6 +98,7 @@ static VKAPI_ATTR vk::Bool32 VKAPI_CALL DebugCallback(
 		}
 		else if (severity & vk::DebugUtilsMessageSeverityFlagBitsEXT::eError) {
 			Kerberos::Log::CoreError("Validation|Error: {}|{}: {}", pCallbackData->messageIdNumber, messageIdName, message);
+            Kerberos::Log::CoreDebug("{}", std::stacktrace::current());
 		}
 	}
 	else if (type & vk::DebugUtilsMessageTypeFlagBitsEXT::ePerformance) {
@@ -110,6 +113,7 @@ static VKAPI_ATTR vk::Bool32 VKAPI_CALL DebugCallback(
 		}
 		else if (severity & vk::DebugUtilsMessageSeverityFlagBitsEXT::eError) {
 			Kerberos::Log::CoreError("Performance|Error: {}|{}: {}", pCallbackData->messageIdNumber, messageIdName, message);
+            Kerberos::Log::CoreDebug("{}", std::stacktrace::current());
 		}
 	}
 	else if (type & vk::DebugUtilsMessageTypeFlagBitsEXT::eDeviceAddressBinding) {
@@ -124,6 +128,7 @@ static VKAPI_ATTR vk::Bool32 VKAPI_CALL DebugCallback(
 		}
 		else if (severity & vk::DebugUtilsMessageSeverityFlagBitsEXT::eError) {
 			Kerberos::Log::CoreError("DeviceAddressBinding|Error: {}|{}: {}", pCallbackData->messageIdNumber, messageIdName, message);
+            Kerberos::Log::CoreDebug("{}", std::stacktrace::current());
 		}
 	}
 	//std::cerr << "validation layer: type " << to_string(type) << " msg: " << pCallbackData->pMessage << "\n\n";
@@ -1278,6 +1283,7 @@ namespace Kerberos
 		 features.features.samplerAnisotropy = true;
 		 features.features.pipelineStatisticsQuery = true;
 		 features.features.shaderInt64 = m_SupportedFeatures.get<vk::PhysicalDeviceFeatures2>().features.shaderInt64;
+         features.features.shaderInt16 = m_SupportedFeatures.get<vk::PhysicalDeviceFeatures2>().features.shaderInt16;
 		 features.features.robustBufferAccess = false;
 		 features.features.fullDrawIndexUint32 = false;
 		 features.features.imageCubeArray = false;
@@ -1297,7 +1303,6 @@ namespace Kerberos
 		 features.features.textureCompressionASTC_LDR = false;
 		 features.features.textureCompressionBC = false;
 		 features.features.occlusionQueryPrecise = false;
-		 features.features.shaderInt16 = false;
 		 features.features.shaderResourceMinLod = false;
 		 features.features.sparseBinding = false;
 		 features.features.sparseResidencyBuffer = false;

@@ -19,12 +19,15 @@
 #include "Utils.hpp"
 #include "VulkanContext.hpp"
 #include "Profiling/Profilers.hpp"
+#include "Upscaling/FSR/FSR3Upscaler.hpp"
+#include "Upscaling/Native/NativeUpscaler.hpp"
 
 #include <algorithm>
 #include <cmath>
 #include <glm/gtc/matrix_inverse.hpp>
 #include <limits>
 #include <numbers>
+#include <unordered_map>
 
 #include "Material.hpp"
 
@@ -129,6 +132,8 @@ struct SceneUniformData
 {
     glm::mat4 projection{ 0.f };
     glm::mat4 view{ 0.f };
+    glm::mat4 previousProjection{ 0.f };
+    glm::mat4 previousView{ 0.f };
     std::array<glm::mat4, ShadowMap::CascadeCount> lightSpaceMatrices{ glm::mat4(0.0f) };
     glm::vec4 cascadeSplits{ 0.f };
     alignas(16) glm::vec3 camPos{ 0.f };
@@ -150,6 +155,7 @@ struct GlobalLighting
 struct PerObjectData
 {
     alignas(16) glm::mat4 model{ 0.f };
+    alignas(16) glm::mat4 previousModel{ 0.f };
     alignas(16) glm::mat4 worldNormal{ 0.f };
     alignas(16) Material::UniformBlock material;
     uint8_t _Padding1[4];
@@ -345,6 +351,8 @@ enum class GPUTimestampQuery : uint32_t
     TonemappingPassEnd,
     AntialiasingPassBegin,
     AntialiasingPassEnd,
+    UpscalingPassBegin,
+    UpscalingPassEnd,
     FrameEnd,
     Count
 };
@@ -380,10 +388,13 @@ struct RendererData
     ImageData TonemappedImage;
     ImageData CompositeImage;
     ImageData PickingImage;
+    ImageData MotionImage;
     ImageData GTAOImage;
     ImageData GTAOScratchImage;
+    ImageData OutputImage;
 
     vk::ImageLayout PickingImageLayout = vk::ImageLayout::eUndefined;
+    vk::ImageLayout OutputImageLayout = vk::ImageLayout::eUndefined;
 
     vk::raii::PipelineLayout PBRPipelineLayout = nullptr;
     Ref<GraphicsPipeline> DepthPrePassPipeline = nullptr;
@@ -437,6 +448,10 @@ struct RendererData
     std::array<vk::DescriptorSet, ShadowMap::CascadeCount> ShadowMapDescriptorSet = { nullptr };
 
     PendingSceneRender PendingRender{};
+    std::unordered_map<uint32_t, glm::mat4> PreviousObjectTransforms;
+    glm::mat4 PreviousView{ 1.0f };
+    glm::mat4 PreviousProjection{ 1.0f };
+    bool HasTemporalHistory = false;
 
     MousePickingReadback MousePickingReadback{};
 
@@ -455,12 +470,24 @@ struct RendererData
     ParticleSystem ParticleSystem{};
     GrassSystem GrassSystem{};
 
+    /**
+     * Size of the viewport, and the final image presented to the swapchain
+     */
     glm::vec2 OutputSize{ 1280.0f, 720.0f };
+
+    /**
+     * The size we are rendering at. Can be lower than the `OutputSize` if using upscaling.
+     */
+    glm::vec2 RenderSize{ 1280.0f, 720.0f };
 
     constexpr static uint32_t TemporalSequenceLength = 8;
 
     vk::ImageLayout GTAOImageLayout = vk::ImageLayout::eUndefined;
     bool PreviousUseGTAO = true;
+
+    Owner<IUpscaler> Upscaler = nullptr;
+    UpscalerQuality UpscalingQuality = UpscalerQuality::Balanced;
+    UpscalerType UpscalingMode = UpscalerType::Native;
 
     // Settings
     bool DisplayDebugNormals = false;
@@ -478,7 +505,7 @@ struct RendererData
     uint32_t VisibleObjectCount = 0;
     uint32_t CulledObjectCount = 0;
 
-    AntiAliasingMode AntiAliasingMode = AntiAliasingMode::FXAA;
+    AntiAliasingMode AntiAliasingMode = AntiAliasingMode::SMAA;
     TonemappingOperator TonemappingOperator = TonemappingOperator::ACES;
 };
 
@@ -516,6 +543,34 @@ void Renderer::Init()
 
     s_Data->TextureManager.Initialize();
 
+    auto& context = VulkanContext::Get();
+    const auto& device = context.GetDevice();
+
+    const auto physicalDevice = context.GetPhysicalDevice();
+    s_Data->Upscaler = CreateOwner<FSR3Upscaler>(
+        *device,
+        *physicalDevice,
+        vkGetDeviceProcAddr);
+
+    const UpscalerCreateInfo upscalerCreateInfo{
+        .displayWidth = static_cast<uint32_t>(s_Data->OutputSize.x),
+        .displayHeight = static_cast<uint32_t>(s_Data->OutputSize.y),
+        .quality = s_Data->UpscalingQuality,
+    };
+    s_Data->Upscaler->Initialize(upscalerCreateInfo);
+    s_Data->UpscalingMode = UpscalerType::FSR3;
+
+    if (!static_cast<FSR3Upscaler*>(s_Data->Upscaler.get())->IsInitialized())
+    {
+        Log::CoreWarn("FidelityFX FSR3 is unavailable; using the native presentation path.");
+        s_Data->Upscaler = CreateOwner<NativeUpscaler>(*device);
+        s_Data->Upscaler->Initialize(upscalerCreateInfo);
+        s_Data->UpscalingMode = UpscalerType::Native;
+    }
+    const float upscaleRatio = s_Data->Upscaler->GetInverseUpscaleRatio();
+    s_Data->RenderSize = { static_cast<uint32_t>(s_Data->OutputSize.x * upscaleRatio),
+                           static_cast<uint32_t>(s_Data->OutputSize.y * upscaleRatio) };
+
     CreateResources();
 }
 
@@ -544,7 +599,10 @@ void Renderer::Shutdown()
             Memory.unmapMemory();
             MappedData = nullptr;
         }
+
     }
+    
+    s_Data->Upscaler->Release();
 
     s_Data.reset();
     s_Data = nullptr;
@@ -631,6 +689,24 @@ void Renderer::RecordQueuedSceneRender(const vk::raii::CommandBuffer& cmd)
     const uint32_t frameIndex = context.GetCurrentFrameIndex();
     const uint32_t frameCount = context.GetFrameCount();
     const uint32_t temporalIndex = frameCount % RendererData::TemporalSequenceLength + 1;
+
+    const UpscalerFrame upscalerFrame{
+        .frameIndex = frameCount,
+        .jitterX = 0.0f,
+        .jitterY = 0.0f,
+        .deltaTime = s_Data->PendingRender.DeltaTime,
+        .resetHistory = !s_Data->HasTemporalHistory
+    };
+    s_Data->Upscaler->BeginFrame(upscalerFrame);
+    const glm::vec2 jitter = s_Data->Upscaler->GetJitterOffset();
+    const glm::mat4 previousView = s_Data->HasTemporalHistory ? s_Data->PreviousView : s_Data->PendingRender.View;
+    const glm::mat4 previousProjection =
+        s_Data->HasTemporalHistory ? s_Data->PreviousProjection : s_Data->PendingRender.Projection;
+    glm::mat4 currentProjection = s_Data->PendingRender.Projection;
+    currentProjection[2][0] += 2.0f * jitter.x / s_Data->RenderSize.x;
+    currentProjection[2][1] += 2.0f * jitter.y / s_Data->RenderSize.y;
+    s_Data->PreviousView = s_Data->PendingRender.View;
+    s_Data->PreviousProjection = currentProjection;
 
     DescriptorAllocator& frameDescriptorAllocator = *s_Data->FrameDescriptorAllocators[frameIndex];
     frameDescriptorAllocator.Reset();
@@ -746,9 +822,11 @@ void Renderer::RecordQueuedSceneRender(const vk::raii::CommandBuffer& cmd)
     const uint32_t lightCount = static_cast<uint32_t>(gpuLights.size());
 
     UpdateLights(currentImage, gpuLights);
+    s_Data->SceneUniformData.previousView = previousView;
+    s_Data->SceneUniformData.previousProjection = previousProjection;
     UpdateSceneUniformBuffers(currentImage,
                               s_Data->PendingRender.View,
-                              s_Data->PendingRender.Projection,
+                              currentProjection,
                               s_Data->PendingRender.CameraPosition,
                               temporalIndex,
                               lightSpaceMatrices,
@@ -767,7 +845,7 @@ void Renderer::RecordQueuedSceneRender(const vk::raii::CommandBuffer& cmd)
         .Time = time,
         .CameraPosition = s_Data->PendingRender.CameraPosition,
         .NearPlane = s_Data->PendingRender.NearPlane,
-        .ViewportSize = s_Data->OutputSize,
+        .ViewportSize = s_Data->RenderSize,
         .FarPlane = s_Data->PendingRender.FarPlane,
     };
     WriteGPUTimestamp(cmd, frameIndex, static_cast<uint32_t>(GPUTimestampQuery::ParticlesSimulateBegin));
@@ -784,14 +862,16 @@ void Renderer::RecordQueuedSceneRender(const vk::raii::CommandBuffer& cmd)
         WriteGPUTimestamp(cmd, frameIndex, static_cast<uint32_t>(GPUTimestampQuery::DepthPrePassBegin));
 
         const vk::ImageMemoryBarrier2 depthBarrier = {
-            .srcStageMask =
-                vk::PipelineStageFlagBits2::eEarlyFragmentTests | vk::PipelineStageFlagBits2::eLateFragmentTests,
-            .srcAccessMask = vk::AccessFlagBits2::eDepthStencilAttachmentWrite,
+            .srcStageMask = s_Data->HasTemporalHistory
+                                ? vk::PipelineStageFlagBits2::eComputeShader
+                                : vk::PipelineStageFlagBits2::eTopOfPipe,
+            .srcAccessMask = s_Data->HasTemporalHistory ? vk::AccessFlagBits2::eShaderRead : vk::AccessFlags2{},
             .dstStageMask =
                 vk::PipelineStageFlagBits2::eEarlyFragmentTests | vk::PipelineStageFlagBits2::eLateFragmentTests,
             .dstAccessMask =
                 vk::AccessFlagBits2::eDepthStencilAttachmentRead | vk::AccessFlagBits2::eDepthStencilAttachmentWrite,
-            .oldLayout = vk::ImageLayout::eUndefined,
+            .oldLayout = s_Data->HasTemporalHistory ? vk::ImageLayout::eShaderReadOnlyOptimal
+                                                     : vk::ImageLayout::eUndefined,
             .newLayout = vk::ImageLayout::eDepthAttachmentOptimal,
             .srcQueueFamilyIndex = vk::QueueFamilyIgnored,
             .dstQueueFamilyIndex = vk::QueueFamilyIgnored,
@@ -804,11 +884,13 @@ void Renderer::RecordQueuedSceneRender(const vk::raii::CommandBuffer& cmd)
         };
 
         const vk::ImageMemoryBarrier2 normalBarrier = {
-            .srcStageMask = vk::PipelineStageFlagBits2::eColorAttachmentOutput,
-            .srcAccessMask = vk::AccessFlagBits2::eColorAttachmentWrite,
+            .srcStageMask = s_Data->HasTemporalHistory ? vk::PipelineStageFlagBits2::eFragmentShader
+                                                        : vk::PipelineStageFlagBits2::eTopOfPipe,
+            .srcAccessMask = s_Data->HasTemporalHistory ? vk::AccessFlagBits2::eShaderRead : vk::AccessFlags2{},
             .dstStageMask = vk::PipelineStageFlagBits2::eColorAttachmentOutput,
             .dstAccessMask = vk::AccessFlagBits2::eColorAttachmentRead | vk::AccessFlagBits2::eColorAttachmentWrite,
-            .oldLayout = vk::ImageLayout::eUndefined,
+            .oldLayout = s_Data->HasTemporalHistory ? vk::ImageLayout::eShaderReadOnlyOptimal
+                                                     : vk::ImageLayout::eUndefined,
             .newLayout = vk::ImageLayout::eColorAttachmentOptimal,
             .srcQueueFamilyIndex = vk::QueueFamilyIgnored,
             .dstQueueFamilyIndex = vk::QueueFamilyIgnored,
@@ -819,8 +901,26 @@ void Renderer::RecordQueuedSceneRender(const vk::raii::CommandBuffer& cmd)
                                   .baseArrayLayer = 0,
                                   .layerCount = 1 }
         };
+        const vk::ImageMemoryBarrier2 motionBarrier = {
+            .srcStageMask = s_Data->HasTemporalHistory ? vk::PipelineStageFlagBits2::eComputeShader
+                                                        : vk::PipelineStageFlagBits2::eTopOfPipe,
+            .srcAccessMask = s_Data->HasTemporalHistory ? vk::AccessFlagBits2::eShaderRead : vk::AccessFlags2{},
+            .dstStageMask = vk::PipelineStageFlagBits2::eColorAttachmentOutput,
+            .dstAccessMask = vk::AccessFlagBits2::eColorAttachmentRead | vk::AccessFlagBits2::eColorAttachmentWrite,
+            .oldLayout = s_Data->HasTemporalHistory ? vk::ImageLayout::eShaderReadOnlyOptimal
+                                                     : vk::ImageLayout::eUndefined,
+            .newLayout = vk::ImageLayout::eColorAttachmentOptimal,
+            .srcQueueFamilyIndex = vk::QueueFamilyIgnored,
+            .dstQueueFamilyIndex = vk::QueueFamilyIgnored,
+            .image = s_Data->MotionImage.Image,
+            .subresourceRange = { .aspectMask = vk::ImageAspectFlagBits::eColor,
+                                  .baseMipLevel = 0,
+                                  .levelCount = 1,
+                                  .baseArrayLayer = 0,
+                                  .layerCount = 1 }
+        };
 
-        const std::array barriers = { depthBarrier, normalBarrier };
+        const std::array barriers = { depthBarrier, normalBarrier, motionBarrier };
 
         const vk::DependencyInfo dependencyInfo = { .dependencyFlags = {},
                                                     .imageMemoryBarrierCount = static_cast<uint32_t>(barriers.size()),
@@ -841,22 +941,29 @@ void Renderer::RecordQueuedSceneRender(const vk::raii::CommandBuffer& cmd)
                                                           .storeOp = vk::AttachmentStoreOp::eStore,
                                                           .clearValue = vk::ClearColorValue{
                                                               std::array{ 0.5f, 0.5f, 1.0f, 1.0f } } };
+        vk::RenderingAttachmentInfo motionAttachmentInfo{ .imageView = s_Data->MotionImage.ImageView,
+                                                          .imageLayout = vk::ImageLayout::eColorAttachmentOptimal,
+                                                          .loadOp = vk::AttachmentLoadOp::eClear,
+                                                          .storeOp = vk::AttachmentStoreOp::eStore,
+                                                          .clearValue = vk::ClearColorValue{
+                                                              std::array{ 0.0f, 0.0f, 0.0f, 0.0f } } };
+        const std::array colorAttachments = { normalAttachmentInfo, motionAttachmentInfo };
 
         const vk::Viewport viewport{ .x = 0.0f,
                                      .y = 0.0f,
-                                     .width = s_Data->OutputSize.x,
-                                     .height = s_Data->OutputSize.y,
+                                     .width = s_Data->RenderSize.x,
+                                     .height = s_Data->RenderSize.y,
                                      .minDepth = 0.0f,
                                      .maxDepth = 1.0f };
 
         const vk::Rect2D renderArea{ .offset = vk::Offset2D{ .x = 0, .y = 0 },
-                                     .extent = vk::Extent2D{ .width = static_cast<uint32_t>(s_Data->OutputSize.x),
-                                                             .height = static_cast<uint32_t>(s_Data->OutputSize.y) } };
+                                     .extent = vk::Extent2D{ .width = static_cast<uint32_t>(s_Data->RenderSize.x),
+                                                             .height = static_cast<uint32_t>(s_Data->RenderSize.y) } };
 
         const vk::RenderingInfo depthPrePassRenderingInfo{ .renderArea = renderArea,
                                                            .layerCount = 1,
-                                                           .colorAttachmentCount = 1,
-                                                           .pColorAttachments = &normalAttachmentInfo,
+                                                           .colorAttachmentCount = static_cast<uint32_t>(colorAttachments.size()),
+                                                           .pColorAttachments = colorAttachments.data(),
                                                            .pDepthAttachment = &depthAttachmentInfo };
 
         BeginRenderPassDebugLabel(cmd, "Depth Pre-Pass");
@@ -988,8 +1095,8 @@ void Renderer::RecordQueuedSceneRender(const vk::raii::CommandBuffer& cmd)
                                    { s_Data->DescriptorSets[currentImage].gtao },
                                    {});
 
-            const uint32_t groupX = (static_cast<uint32_t>(s_Data->OutputSize.x) + 7) / 8;
-            const uint32_t groupY = (static_cast<uint32_t>(s_Data->OutputSize.y) + 7) / 8;
+            const uint32_t groupX = (static_cast<uint32_t>(s_Data->RenderSize.x) + 7) / 8;
+            const uint32_t groupY = (static_cast<uint32_t>(s_Data->RenderSize.y) + 7) / 8;
 
             cmd.dispatch(groupX, groupY, 1);
 
@@ -1052,7 +1159,7 @@ void Renderer::RecordQueuedSceneRender(const vk::raii::CommandBuffer& cmd)
                                        {});
 
                 CrossBilateralBlurConstants pushConstants;
-                pushConstants.inverseViewportSize = glm::vec2(1.0f) / s_Data->OutputSize;
+                pushConstants.inverseViewportSize = glm::vec2(1.0f) / s_Data->RenderSize;
                 pushConstants.direction = { 1.0f, 0.0f };
                 cmd.pushConstants<CrossBilateralBlurConstants>(
                     *s_Data->CrossBilateralBlurPipelineLayout, vk::ShaderStageFlagBits::eCompute, 0, { pushConstants });
@@ -1339,14 +1446,14 @@ void Renderer::RecordQueuedSceneRender(const vk::raii::CommandBuffer& cmd)
 
     const vk::Viewport viewport{ .x = 0.0f,
                                  .y = 0.0f,
-                                 .width = s_Data->OutputSize.x,
-                                 .height = s_Data->OutputSize.y,
+                                 .width = s_Data->RenderSize.x,
+                                 .height = s_Data->RenderSize.y,
                                  .minDepth = 0.0f,
                                  .maxDepth = 1.0f };
 
     const vk::Rect2D renderArea{ .offset = vk::Offset2D{ .x = 0, .y = 0 },
-                                 .extent = vk::Extent2D{ .width = static_cast<uint32_t>(s_Data->OutputSize.x),
-                                                         .height = static_cast<uint32_t>(s_Data->OutputSize.y) } };
+                                 .extent = vk::Extent2D{ .width = static_cast<uint32_t>(s_Data->RenderSize.x),
+                                                         .height = static_cast<uint32_t>(s_Data->RenderSize.y) } };
 
     // Render opaque objects
     {
@@ -1752,34 +1859,40 @@ void Renderer::RecordQueuedSceneRender(const vk::raii::CommandBuffer& cmd)
 
     ApplyAntiAliasing(cmd, currentImage);
 
+    ApplyUpscaling(cmd, currentImage);
+
     HandleMousePickingReadback(cmd);
 
+    // Temporarily not needed, since the upscaling pass already transitions the resolve image to shader read optimal,
+    // but if we move the tonemapping pass after the upscaling pass, we might need it again.
+    
     // Transition composite image layout for shader read in ImGui
-    {
-        vk::ImageMemoryBarrier2 barrier = { .srcStageMask = vk::PipelineStageFlagBits2::eColorAttachmentOutput,
-                                            .srcAccessMask = vk::AccessFlagBits2::eColorAttachmentWrite,
-                                            .dstStageMask = vk::PipelineStageFlagBits2::eFragmentShader,
-                                            .dstAccessMask = vk::AccessFlagBits2::eShaderRead,
-                                            .oldLayout = vk::ImageLayout::eColorAttachmentOptimal,
-                                            .newLayout = vk::ImageLayout::eShaderReadOnlyOptimal,
-                                            .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-                                            .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-                                            .image = s_Data->CompositeImage.Image,
-                                            .subresourceRange = { .aspectMask = vk::ImageAspectFlagBits::eColor,
-                                                                  .baseMipLevel = 0,
-                                                                  .levelCount = 1,
-                                                                  .baseArrayLayer = 0,
-                                                                  .layerCount = 1 } };
-        const vk::DependencyInfo dependencyInfo = { .dependencyFlags = {},
-                                                    .imageMemoryBarrierCount = 1,
-                                                    .pImageMemoryBarriers = &barrier };
-        cmd.pipelineBarrier2(dependencyInfo);
+    //{
+    //    vk::ImageMemoryBarrier2 barrier = { .srcStageMask = vk::PipelineStageFlagBits2::eColorAttachmentOutput,
+    //                                        .srcAccessMask = vk::AccessFlagBits2::eColorAttachmentWrite,
+    //                                        .dstStageMask = vk::PipelineStageFlagBits2::eFragmentShader,
+    //                                        .dstAccessMask = vk::AccessFlagBits2::eShaderRead,
+    //                                        .oldLayout = vk::ImageLayout::eColorAttachmentOptimal,
+    //                                        .newLayout = vk::ImageLayout::eShaderReadOnlyOptimal,
+    //                                        .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+    //                                        .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+    //                                        .image = s_Data->CompositeImage.Image,
+    //                                        .subresourceRange = { .aspectMask = vk::ImageAspectFlagBits::eColor,
+    //                                                              .baseMipLevel = 0,
+    //                                                              .levelCount = 1,
+    //                                                              .baseArrayLayer = 0,
+    //                                                              .layerCount = 1 } };
+    //    const vk::DependencyInfo dependencyInfo = { .dependencyFlags = {},
+    //                                                .imageMemoryBarrierCount = 1,
+    //                                                .pImageMemoryBarriers = &barrier };
+    //    cmd.pipelineBarrier2(dependencyInfo);
 
-        Log::CoreTrace("Resolve image transitioned for ImGui!");
-    }
+    //    Log::CoreTrace("Resolve image transitioned for ImGui!");
+    //}
 
     WriteGPUTimestamp(cmd, frameIndex, static_cast<uint32_t>(GPUTimestampQuery::FrameEnd));
 
+    s_Data->HasTemporalHistory = true;
     cmd.endQuery(s_Data->PipelineStatisticsQueryPools[frameIndex], 1);
 
     s_Data->PendingRender.IsValid = false;
@@ -2279,14 +2392,18 @@ void Renderer::CreateResources()
                                                                   vk::ImageTiling::eOptimal,
                                                                   vk::FormatFeatureFlagBits::eColorAttachment |
                                                                       vk::FormatFeatureFlagBits::eTransferSrc);
+        s_Data->MotionImage.Format = context.FindSupportedFormat(
+            { vk::Format::eR16G16Sfloat },
+            vk::ImageTiling::eOptimal,
+            vk::FormatFeatureFlagBits::eColorAttachment | vk::FormatFeatureFlagBits::eSampledImage);
 
         s_Data->ResolveImage.Format = context.FindSupportedFormat(
             { vk::Format::eR16G16B16A16Sfloat, vk::Format::eR32G32B32A32Sfloat },
             vk::ImageTiling::eOptimal,
             vk::FormatFeatureFlagBits::eColorAttachment | vk::FormatFeatureFlagBits::eSampledImage);
 
-        constexpr uint32_t initialImageWidth = 1920;
-        constexpr uint32_t initialImageHeight = 1080;
+        const uint32_t initialImageWidth = static_cast<uint32_t>(s_Data->RenderSize.x);
+        const uint32_t initialImageHeight = static_cast<uint32_t>(s_Data->RenderSize.y);
         constexpr uint32_t mipLevels = 1;
 
         CreateImage(device,
@@ -2439,6 +2556,24 @@ void Renderer::CreateResources()
 
         context.SetObjectDebugName(s_Data->NormalImage.ImageView, "Normal Attachment Image View");
 
+        CreateImage(device,
+                    initialImageWidth,
+                    initialImageHeight,
+                    mipLevels,
+                    vk::SampleCountFlagBits::e1,
+                    s_Data->MotionImage.Format,
+                    vk::ImageTiling::eOptimal,
+                    vk::ImageUsageFlagBits::eColorAttachment | vk::ImageUsageFlagBits::eSampled,
+                    vk::MemoryPropertyFlagBits::eDeviceLocal,
+                    s_Data->MotionImage.Image,
+                    s_Data->MotionImage.ImageMemory);
+
+        context.SetObjectDebugName(s_Data->MotionImage.Image, "Motion Vector Image");
+        context.SetObjectDebugName(s_Data->MotionImage.ImageMemory, "Motion Vector Image Memory");
+        s_Data->MotionImage.ImageView = CreateImageView(
+            device, s_Data->MotionImage.Image, s_Data->MotionImage.Format, vk::ImageAspectFlagBits::eColor, mipLevels);
+        context.SetObjectDebugName(s_Data->MotionImage.ImageView, "Motion Vector Image View");
+
         // This is called here, since the normal and depth image has to be valid for the descriptor writes
         SetupGTAODescriptors();
 
@@ -2476,8 +2611,8 @@ void Renderer::CreateResources()
         depthPrepassPipelineSpec.EnableDepthTest = true;
         depthPrepassPipelineSpec.EnableDepthWrite = true;
         depthPrepassPipelineSpec.DepthTestFunc = DepthTestFunc::LessOrEqual;
-        depthPrepassPipelineSpec.BlendModes = { BlendMode::None };
-        depthPrepassPipelineSpec.ColorAttachmentFormats = { s_Data->NormalImage.Format };
+        depthPrepassPipelineSpec.BlendModes = { BlendMode::None, BlendMode::None };
+        depthPrepassPipelineSpec.ColorAttachmentFormats = { s_Data->NormalImage.Format, s_Data->MotionImage.Format };
         depthPrepassPipelineSpec.DepthAttachmentFormat = s_Data->DepthImage.Format;
         depthPrepassPipelineSpec.DynamicStates = commonDynamicStates;
 
@@ -2619,8 +2754,8 @@ void Renderer::CreateResources()
             vk::FormatFeatureFlagBits::eColorAttachment | vk::FormatFeatureFlagBits::eColorAttachmentBlend |
                 vk::FormatFeatureFlagBits::eSampledImage);
 
-        constexpr uint32_t initialImageWidth = 1920;
-        constexpr uint32_t initialImageHeight = 1080;
+        const uint32_t initialImageWidth = static_cast<uint32_t>(s_Data->RenderSize.x);
+        const uint32_t initialImageHeight = static_cast<uint32_t>(s_Data->RenderSize.y);
 
         CreateTransparencyResources(initialImageWidth, initialImageHeight);
 
@@ -2654,7 +2789,7 @@ void Renderer::CreateResources()
 
     // Has to be created before setting up transparency descriptors, since currently the resolve pass does the
     // tonemapping
-    CreateBloomResources(static_cast<uint32_t>(s_Data->OutputSize.x), static_cast<uint32_t>(s_Data->OutputSize.y));
+    CreateBloomResources(static_cast<uint32_t>(s_Data->RenderSize.x), static_cast<uint32_t>(s_Data->RenderSize.y));
 
     SetupTransparencyDescriptors();
 
@@ -2749,8 +2884,8 @@ void Renderer::CreateResources()
 
         s_Data->TonemappedImage.Format = s_Data->ResolveImage.Format;
 
-        constexpr uint32_t initialImageWidth = 1920;
-        constexpr uint32_t initialImageHeight = 1080;
+        const uint32_t initialImageWidth = static_cast<uint32_t>(s_Data->RenderSize.x);
+        const uint32_t initialImageHeight = static_cast<uint32_t>(s_Data->RenderSize.y);
 
         CreateTonemappedImage(initialImageWidth, initialImageHeight);
         SetupTonemappingResolveDescriptors();
@@ -2779,8 +2914,8 @@ void Renderer::CreateResources()
 
     // Create fxaa pipeline resources
     {
-        constexpr uint32_t initialImageWidth = 1920;
-        constexpr uint32_t initialImageHeight = 1080;
+        const uint32_t initialImageWidth = static_cast<uint32_t>(s_Data->RenderSize.x);
+        const uint32_t initialImageHeight = static_cast<uint32_t>(s_Data->RenderSize.y);
 
         std::vector<vk::DescriptorSetLayoutBinding> bindings = {
             vk::DescriptorSetLayoutBinding{ // Scene color with Luma
@@ -2832,13 +2967,17 @@ void Renderer::CreateResources()
         s_Data->CompositeImage.Format = context.FindSupportedFormat(
             { vk::Format::eR16G16B16A16Sfloat, vk::Format::eR32G32B32A32Sfloat },
             vk::ImageTiling::eOptimal,
-            vk::FormatFeatureFlagBits::eColorAttachment | vk::FormatFeatureFlagBits::eSampledImage);
+            vk::FormatFeatureFlagBits::eColorAttachment | vk::FormatFeatureFlagBits::eSampledImage |
+                vk::FormatFeatureFlagBits::eStorageImage);
+        s_Data->OutputImage.Format = s_Data->CompositeImage.Format;
 
         // Sanity check
         KBRAssert(s_Data->CompositeImage.Format == s_Data->ResolveImage.Format,
                         "FXAA composite image format does not match resolve image format!");
 
         CreateFXAAImage(initialImageWidth, initialImageHeight);
+        CreateOutputImage(static_cast<uint32_t>(s_Data->OutputSize.x),
+                          static_cast<uint32_t>(s_Data->OutputSize.y));
         SetupFXAADescriptors();
 
         Ref<Shader> fxaaShader = CreateRef<Shader>("fxaa", "FXAA");
@@ -2897,8 +3036,8 @@ void Renderer::CreateResources()
             vk::ImageTiling::eOptimal,
             vk::FormatFeatureFlagBits::eColorAttachment | vk::FormatFeatureFlagBits::eSampledImage);
 
-        constexpr uint32_t initialImageWidth = 1920;
-        constexpr uint32_t initialImageHeight = 1080;
+        const uint32_t initialImageWidth = static_cast<uint32_t>(s_Data->RenderSize.x);
+        const uint32_t initialImageHeight = static_cast<uint32_t>(s_Data->RenderSize.y);
 
         CreateSMAADescriptorSetAndPipelineLayouts();
         CreateSMAAImages(initialImageWidth, initialImageHeight);
@@ -3049,7 +3188,7 @@ void Renderer::CreateResources()
     // Create descriptor set for the output image for ImGui rendering
     {
         s_Data->ColorOutputDescriptorSet =
-            VulkanContext::GenerateImGuiDescriptorSet(s_Data->LinearSampler, s_Data->CompositeImage.ImageView);
+            VulkanContext::GenerateImGuiDescriptorSet(s_Data->LinearSampler, s_Data->OutputImage.ImageView);
 
         context.SetObjectDebugName(
             reinterpret_cast<uint64_t>(static_cast<VkDescriptorSet>(s_Data->ColorOutputDescriptorSet)),
@@ -3095,6 +3234,26 @@ void Renderer::ResizeResources(const uint32_t width, const uint32_t height)
 
     device.waitIdle();
 
+    // Handle the resize first in the upscaler, so we know what will be the render size
+    s_Data->Upscaler->Resize(width, height);
+    if (const auto fsrUpscaler = dynamic_cast<FSR3Upscaler*>(s_Data->Upscaler.get());
+        fsrUpscaler != nullptr && !fsrUpscaler->IsInitialized())
+    {
+        Log::CoreWarn("FidelityFX FSR3 resize failed; falling back to native presentation.");
+        s_Data->Upscaler = CreateOwner<NativeUpscaler>(*device);
+        s_Data->Upscaler->Initialize({
+            .displayWidth = width,
+            .displayHeight = height,
+            .quality = s_Data->UpscalingQuality
+        });
+        s_Data->UpscalingMode = UpscalerType::Native;
+    }
+    const float upscaleRatio = s_Data->Upscaler->GetInverseUpscaleRatio();
+    s_Data->RenderSize = { static_cast<uint32_t>(width * upscaleRatio), static_cast<uint32_t>(height * upscaleRatio) };
+
+    const uint32_t renderWidth = static_cast<uint32_t>(s_Data->RenderSize.x);
+    const uint32_t renderHeight = static_cast<uint32_t>(s_Data->RenderSize.y);
+
     // Destroy old resources
     VulkanContext::DestroyImGuiDescriptorSet(s_Data->ColorOutputDescriptorSet);
 
@@ -3122,9 +3281,15 @@ void Renderer::ResizeResources(const uint32_t width, const uint32_t height)
     s_Data->CompositeImage.ImageView.clear();
     s_Data->CompositeImage.Image.clear();
     s_Data->CompositeImage.ImageMemory.clear();
+    s_Data->OutputImage.ImageView.clear();
+    s_Data->OutputImage.Image.clear();
+    s_Data->OutputImage.ImageMemory.clear();
     s_Data->NormalImage.ImageView.clear();
     s_Data->NormalImage.Image.clear();
     s_Data->NormalImage.ImageMemory.clear();
+    s_Data->MotionImage.ImageView.clear();
+    s_Data->MotionImage.Image.clear();
+    s_Data->MotionImage.ImageMemory.clear();
     s_Data->GTAOImage.ImageView.clear();
     s_Data->GTAOImage.Image.clear();
     s_Data->GTAOImage.ImageMemory.clear();
@@ -3140,15 +3305,16 @@ void Renderer::ResizeResources(const uint32_t width, const uint32_t height)
 
     // Recreate resources with new size
 
-    CreateTonemappedImage(width, height);
+    CreateTonemappedImage(renderWidth, renderHeight);
 
-    CreateFXAAImage(width, height);
+    CreateFXAAImage(renderWidth, renderHeight);
+    CreateOutputImage(width, height);
 
-    CreateBloomImage(width, height);
+    CreateBloomImage(renderWidth, renderHeight);
 
     CreateImage(device,
-                width,
-                height,
+                renderWidth,
+                renderHeight,
                 mipLevels,
                 vk::SampleCountFlagBits::e1,
                 s_Data->ResolveImage.Format,
@@ -3167,8 +3333,8 @@ void Renderer::ResizeResources(const uint32_t width, const uint32_t height)
     context.SetObjectDebugName(s_Data->ResolveImage.ImageView, "Resolve Image View");
 
     CreateImage(device,
-                width,
-                height,
+                renderWidth,
+                renderHeight,
                 mipLevels,
                 vk::SampleCountFlagBits::e1,
                 s_Data->ColorImage.Format,
@@ -3193,8 +3359,8 @@ void Renderer::ResizeResources(const uint32_t width, const uint32_t height)
                                "Color Attachment Image View");
 
     CreateImage(device,
-                width,
-                height,
+                renderWidth,
+                renderHeight,
                 mipLevels,
                 vk::SampleCountFlagBits::e1,
                 s_Data->PickingImage.Format,
@@ -3220,8 +3386,8 @@ void Renderer::ResizeResources(const uint32_t width, const uint32_t height)
                                "Picking Attachment Image View");
 
     CreateImage(device,
-                width,
-                height,
+                renderWidth,
+                renderHeight,
                 mipLevels,
                 vk::SampleCountFlagBits::e1,
                 s_Data->DepthImage.Format,
@@ -3247,8 +3413,8 @@ void Renderer::ResizeResources(const uint32_t width, const uint32_t height)
                                "Depth Attachment Image View");
 
     CreateImage(device,
-                width,
-                height,
+                renderWidth,
+                renderHeight,
                 mipLevels,
                 vk::SampleCountFlagBits::e1,
                 s_Data->NormalImage.Format,
@@ -3265,12 +3431,24 @@ void Renderer::ResizeResources(const uint32_t width, const uint32_t height)
         device, s_Data->NormalImage.Image, s_Data->NormalImage.Format, vk::ImageAspectFlagBits::eColor, mipLevels);
 
     context.SetObjectDebugName(s_Data->NormalImage.ImageView, "Normal Attachment Image View");
+    CreateImage(device,
+                renderWidth,
+                renderHeight,
+                mipLevels,
+                vk::SampleCountFlagBits::e1,
+                s_Data->MotionImage.Format,
+                vk::ImageTiling::eOptimal,
+                vk::ImageUsageFlagBits::eColorAttachment | vk::ImageUsageFlagBits::eSampled,
+                vk::MemoryPropertyFlagBits::eDeviceLocal,
+                s_Data->MotionImage.Image,
+                s_Data->MotionImage.ImageMemory);
+    s_Data->MotionImage.ImageView = CreateImageView(
+        device, s_Data->MotionImage.Image, s_Data->MotionImage.Format, vk::ImageAspectFlagBits::eColor, mipLevels);
+    CreateTransparencyResources(renderWidth, renderHeight);
 
-    CreateTransparencyResources(width, height);
+    CreateGTAOImage(renderWidth, renderHeight);
 
-    CreateGTAOImage(width, height);
-
-    CreateSMAAImages(width, height);
+    CreateSMAAImages(renderWidth, renderHeight);
 
     SetupTonemappingResolveDescriptors();
     SetupFXAADescriptors();
@@ -3582,11 +3760,11 @@ void Renderer::ResizeResources(const uint32_t width, const uint32_t height)
 
     // Recreate descriptor set for the output image for ImGui rendering
     {
-        KBRAssert(s_Data->LinearSampler != nullptr && s_Data->CompositeImage.ImageView != nullptr,
+        KBRAssert(s_Data->LinearSampler != nullptr && s_Data->OutputImage.ImageView != nullptr,
                         "Sampler and image view has to be initialized to create an ImGui descriptor set");
 
         s_Data->ColorOutputDescriptorSet =
-            VulkanContext::GenerateImGuiDescriptorSet(s_Data->LinearSampler, s_Data->CompositeImage.ImageView);
+                VulkanContext::GenerateImGuiDescriptorSet(s_Data->LinearSampler, s_Data->OutputImage.ImageView);
         context.SetObjectDebugName(
             reinterpret_cast<uint64_t>(static_cast<VkDescriptorSet>(s_Data->ColorOutputDescriptorSet)),
             vk::ObjectType::eDescriptorSet,
@@ -3594,8 +3772,10 @@ void Renderer::ResizeResources(const uint32_t width, const uint32_t height)
     }
 
     s_Data->OutputSize = { static_cast<float>(width), static_cast<float>(height) };
+    s_Data->HasTemporalHistory = false;
+    s_Data->PreviousObjectTransforms.clear();
 
-    s_Data->ParticleSystem.OnResize(width, height, s_Data->DepthImage.ImageView);
+    s_Data->ParticleSystem.OnResize(renderWidth, renderHeight, s_Data->DepthImage.ImageView);
 }
 
 void Renderer::RecompileShaders()
@@ -3821,9 +4001,52 @@ uint32_t Renderer::GetCulledObjectCount()
     return s_Data->CulledObjectCount;
 }
 
+UpscalerType Renderer::GetUpscalingMode()
+{
+    return s_Data->UpscalingMode;
+}
+
+void Renderer::SetUpscalingMode(const UpscalerType mode)
+{
+    VulkanContext::Get().WaitIdle();
+
+    s_Data->UpscalingMode = mode;
+
+    s_Data->Upscaler = CreateUpscaler(mode);
+
+    const UpscalerCreateInfo upscalerCreateInfo{ .displayWidth = static_cast<uint32_t>(s_Data->OutputSize.x),
+                                                 .displayHeight = static_cast<uint32_t>(s_Data->OutputSize.y),
+                                                 .quality = s_Data->UpscalingQuality };
+    s_Data->Upscaler->Initialize(upscalerCreateInfo);
+
+    ResizeResources(static_cast<uint32_t>(s_Data->OutputSize.x), static_cast<uint32_t>(s_Data->OutputSize.y));
+}
+
+UpscalerQuality Renderer::GetUpscalingQuality()
+{
+    return s_Data->UpscalingQuality;
+}
+
+
+void Renderer::SetUpscalingQuality(const UpscalerQuality quality)
+{
+    VulkanContext::Get().WaitIdle();
+
+    s_Data->UpscalingQuality = quality;
+
+    s_Data->Upscaler->SetQuality(quality);
+
+    ResizeResources(static_cast<uint32_t>(s_Data->OutputSize.x), static_cast<uint32_t>(s_Data->OutputSize.y));
+}
+
 glm::vec2 Renderer::GetOutputImageSize()
 {
     return s_Data->OutputSize;
+}
+
+glm::vec2 Renderer::GetRenderImageSize()
+{
+    return s_Data->RenderSize;
 }
 
 uint64_t Renderer::GetCompositedOutputImageID()
@@ -3850,7 +4073,13 @@ void Renderer::RequestMousePickingPixel(const uint32_t x, const uint32_t y)
     if (x >= static_cast<uint32_t>(s_Data->OutputSize.x) || y >= static_cast<uint32_t>(s_Data->OutputSize.y))
         return;
 
-    s_Data->MousePickingReadback.RequestedPixel = { x, y };
+    const glm::vec2 scale = s_Data->RenderSize / s_Data->OutputSize;
+    s_Data->MousePickingReadback.RequestedPixel = {
+        std::min(static_cast<uint32_t>(static_cast<float>(x) * scale.x),
+                 static_cast<uint32_t>(s_Data->RenderSize.x) - 1),
+        std::min(static_cast<uint32_t>(static_cast<float>(y) * scale.y),
+                 static_cast<uint32_t>(s_Data->RenderSize.y) - 1)
+    };
     s_Data->MousePickingReadback.RequestPending = true;
 }
 
@@ -3962,6 +4191,8 @@ void Renderer::ResolveGPUTimings(const uint32_t frameIndex)
         toMilliseconds(GPUTimestampQuery::AntialiasingPassBegin, GPUTimestampQuery::AntialiasingPassEnd);
     s_Data->LatestGPUTimings.TonemappingPassMilliseconds =
         toMilliseconds(GPUTimestampQuery::TonemappingPassBegin, GPUTimestampQuery::TonemappingPassEnd);
+    s_Data->LatestGPUTimings.UpscalingPassMilliseconds =
+        toMilliseconds(GPUTimestampQuery::UpscalingPassBegin, GPUTimestampQuery::UpscalingPassEnd);
     s_Data->LatestGPUTimings.IsValid = true;
 }
 
@@ -4116,7 +4347,7 @@ void Renderer::UpdateSceneUniformBuffers(const uint32_t currentImage,
     s_Data->SceneUniformData.camPos = camPos;
     s_Data->SceneUniformData.cascadeSplits = cascadeSplits;
     s_Data->SceneUniformData.lightCount = lightCount;
-    s_Data->SceneUniformData.viewportSize = s_Data->OutputSize;
+    s_Data->SceneUniformData.viewportSize = s_Data->RenderSize;
 
     s_Data->SceneUniformData.cameraRight = glm::vec4(view[0][0], view[1][0], view[2][0], 0.0f);
     s_Data->SceneUniformData.cameraUp = glm::vec4(view[0][1], view[1][1], view[2][1], 0.0f);
@@ -4146,7 +4377,7 @@ void Renderer::UpdateSceneUniformBuffers(const uint32_t currentImage,
 
     s_Data->GTAOData.projectionMatrix = projection;
     s_Data->GTAOData.invProjectionMatrix = glm::inverse(projection);
-    s_Data->GTAOData.viewportSize = s_Data->OutputSize;
+    s_Data->GTAOData.viewportSize = s_Data->RenderSize;
     s_Data->GTAOData.temporalIndex = 1.0f;
     // s_Data->GTAOData.temporalIndex = static_cast<float>(temporalIndex); // TODO: Add temporal-spatial denoiser
     std::memcpy(s_Data->UniformBuffers[currentImage].gtao->GetMappedData(), &s_Data->GTAOData, sizeof(GTAOConstants));
@@ -4161,7 +4392,19 @@ void Renderer::UpdatePerObjectUniformBuffer(const uint32_t currentImage,
     KBR_TRACY_FUNCTION();
 
     s_Data->PerObjectData = {
-        .model = model, .worldNormal = glm::inverseTranspose(model), .material = material.Params, .entityID = entityID
+        .model = model,
+        .previousModel = [&]() {
+            const auto [it, inserted] = s_Data->PreviousObjectTransforms.emplace(entityID, model);
+            if (inserted)
+                return model;
+
+            const glm::mat4 previous = it->second;
+            it->second = model;
+            return previous;
+        }(),
+        .worldNormal = glm::inverseTranspose(model),
+        .material = material.Params,
+        .entityID = entityID
     };
 
     char* data = static_cast<char*>(s_Data->UniformBuffers[currentImage].perObject->GetMappedData());
@@ -4511,13 +4754,13 @@ void Renderer::RenderParticles(const vk::raii::CommandBuffer& cmd, const uint32_
     };
 
     const vk::Rect2D renderArea{ .offset = vk::Offset2D{ .x = 0, .y = 0 },
-                                 .extent = vk::Extent2D{ .width = static_cast<uint32_t>(s_Data->OutputSize.x),
-                                                         .height = static_cast<uint32_t>(s_Data->OutputSize.y) } };
+                                 .extent = vk::Extent2D{ .width = static_cast<uint32_t>(s_Data->RenderSize.x),
+                                                         .height = static_cast<uint32_t>(s_Data->RenderSize.y) } };
 
     const vk::Viewport viewport{ .x = 0.0f,
                                  .y = 0.0f,
-                                 .width = s_Data->OutputSize.x,
-                                 .height = s_Data->OutputSize.y,
+                                 .width = s_Data->RenderSize.x,
+                                 .height = s_Data->RenderSize.y,
                                  .minDepth = 0.0f,
                                  .maxDepth = 1.0f };
 
@@ -4583,13 +4826,13 @@ void Renderer::RenderGrass(const vk::raii::CommandBuffer& cmd, const uint32_t fr
     };
 
     const vk::Rect2D renderArea{ .offset = vk::Offset2D{ .x = 0, .y = 0 },
-                                 .extent = vk::Extent2D{ .width = static_cast<uint32_t>(s_Data->OutputSize.x),
-                                                         .height = static_cast<uint32_t>(s_Data->OutputSize.y) } };
+                                 .extent = vk::Extent2D{ .width = static_cast<uint32_t>(s_Data->RenderSize.x),
+                                                         .height = static_cast<uint32_t>(s_Data->RenderSize.y) } };
 
     const vk::Viewport viewport{ .x = 0.0f,
                                  .y = 0.0f,
-                                 .width = s_Data->OutputSize.x,
-                                 .height = s_Data->OutputSize.y,
+                                 .width = s_Data->RenderSize.x,
+                                 .height = s_Data->RenderSize.y,
                                  .minDepth = 0.0f,
                                  .maxDepth = 1.0f };
 
@@ -4622,8 +4865,8 @@ void Renderer::ApplyTonemapping(const vk::raii::CommandBuffer& cmd, uint32_t fra
 
     WriteGPUTimestamp(cmd, frameIndex, static_cast<uint32_t>(GPUTimestampQuery::TonemappingPassBegin));
 
-    const uint32_t outputWidth = static_cast<uint32_t>(s_Data->OutputSize.x);
-    const uint32_t outputHeight = static_cast<uint32_t>(s_Data->OutputSize.y);
+    const uint32_t outputWidth = static_cast<uint32_t>(s_Data->RenderSize.x);
+    const uint32_t outputHeight = static_cast<uint32_t>(s_Data->RenderSize.y);
     if (outputWidth == 0 || outputHeight == 0) {
         WriteGPUTimestamp(cmd, frameIndex, static_cast<uint32_t>(GPUTimestampQuery::TonemappingPassEnd));
         return;
@@ -4709,7 +4952,7 @@ void Renderer::ApplyTonemapping(const vk::raii::CommandBuffer& cmd, uint32_t fra
                            {});
 
     TonemappingResolvePushConstants tonemappingConstants;
-    tonemappingConstants.inverseScreenSize = glm::vec2(1.0f) / s_Data->OutputSize;
+    tonemappingConstants.inverseScreenSize = glm::vec2(1.0f) / s_Data->RenderSize;
     tonemappingConstants.bloomIntensity = s_Data->Bloom.Intensity;
     tonemappingConstants.tonemapOperator = static_cast<float>(s_Data->TonemappingOperator);
     tonemappingConstants.needsLuma = (s_Data->AntiAliasingMode == AntiAliasingMode::FXAA) ? 1u : 0u;
@@ -4775,8 +5018,8 @@ void Renderer::ApplyAntiAliasing(const vk::raii::CommandBuffer& cmd, const uint3
         cmd.pipelineBarrier2(dependencyInfo);
     }
 
-    const uint32_t outputWidth = static_cast<uint32_t>(s_Data->OutputSize.x);
-    const uint32_t outputHeight = static_cast<uint32_t>(s_Data->OutputSize.y);
+    const uint32_t outputWidth = static_cast<uint32_t>(s_Data->RenderSize.x);
+    const uint32_t outputHeight = static_cast<uint32_t>(s_Data->RenderSize.y);
 
     const vk::Rect2D renderArea{ .offset = vk::Offset2D{ .x = 0, .y = 0 },
                                  .extent = vk::Extent2D{ .width = outputWidth, .height = outputHeight } };
@@ -4831,7 +5074,7 @@ void Renderer::ApplyFXAA(const vk::raii::CommandBuffer& cmd,
     cmd.setScissor(0, renderArea);
 
     FXAAPushConstants fxaaConstants;
-    fxaaConstants.inverseViewportSize = glm::vec2(1.0f) / s_Data->OutputSize;
+    fxaaConstants.inverseViewportSize = glm::vec2(1.0f) / s_Data->RenderSize;
 
     s_Data->FXAAPipeline->Bind(cmd);
 
@@ -4870,7 +5113,7 @@ void Renderer::ApplyNoOpPostProcessing(const vk::raii::CommandBuffer& cmd,
     cmd.setScissor(0, renderArea);
 
     FXAAPushConstants fxaaConstants;
-    fxaaConstants.inverseViewportSize = glm::vec2(1.0f) / s_Data->OutputSize;
+    fxaaConstants.inverseViewportSize = glm::vec2(1.0f) / s_Data->RenderSize;
 
     s_Data->NoopPostProcessPipeline->Bind(cmd);
 
@@ -4895,8 +5138,8 @@ void Renderer::ApplySMAA(const vk::raii::CommandBuffer& cmd,
     // Tonemapped image is already shader read-only optimal and composite image is already color attachment optimal
 
     SMAAData::PushConstants smaaPushConstants;
-    smaaPushConstants.InverseViewportSize = glm::vec2(1.0f) / s_Data->OutputSize;
-    smaaPushConstants.ViewportSize = s_Data->OutputSize;
+    smaaPushConstants.InverseViewportSize = glm::vec2(1.0f) / s_Data->RenderSize;
+    smaaPushConstants.ViewportSize = s_Data->RenderSize;
 
     // Transfer edges image to color attachment optimal for the edge detection pass
     {
@@ -5110,6 +5353,181 @@ void Renderer::ApplySMAA(const vk::raii::CommandBuffer& cmd,
     }
 }
 
+void Renderer::ApplyUpscaling(const vk::raii::CommandBuffer &cmd, uint32_t frameIndex)
+{
+    KBR_TRACY_FUNCTION();
+
+    WriteGPUTimestamp(cmd, frameIndex, static_cast<uint32_t>(GPUTimestampQuery::UpscalingPassBegin));
+
+    const vk::ImageMemoryBarrier2 compositeBarrier{
+        .srcStageMask = vk::PipelineStageFlagBits2::eColorAttachmentOutput,
+        .srcAccessMask = vk::AccessFlagBits2::eColorAttachmentWrite,
+        .dstStageMask = vk::PipelineStageFlagBits2::eComputeShader,
+        .dstAccessMask = vk::AccessFlagBits2::eShaderRead,
+        .oldLayout = vk::ImageLayout::eColorAttachmentOptimal,
+        .newLayout = vk::ImageLayout::eShaderReadOnlyOptimal,
+        .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+        .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+        .image = s_Data->CompositeImage.Image,
+        .subresourceRange = { .aspectMask = vk::ImageAspectFlagBits::eColor,
+                              .baseMipLevel = 0,
+                              .levelCount = 1,
+                              .baseArrayLayer = 0,
+                              .layerCount = 1 }
+    };
+    const vk::ImageMemoryBarrier2 motionBarrier{
+        .srcStageMask = vk::PipelineStageFlagBits2::eColorAttachmentOutput,
+        .srcAccessMask = vk::AccessFlagBits2::eColorAttachmentWrite,
+        .dstStageMask = vk::PipelineStageFlagBits2::eComputeShader,
+        .dstAccessMask = vk::AccessFlagBits2::eShaderRead,
+        .oldLayout = vk::ImageLayout::eColorAttachmentOptimal,
+        .newLayout = vk::ImageLayout::eShaderReadOnlyOptimal,
+        .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+        .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+        .image = s_Data->MotionImage.Image,
+        .subresourceRange = { .aspectMask = vk::ImageAspectFlagBits::eColor,
+                              .baseMipLevel = 0,
+                              .levelCount = 1,
+                              .baseArrayLayer = 0,
+                              .layerCount = 1 }
+    };
+    const vk::ImageMemoryBarrier2 outputBarrier{
+        .srcStageMask = s_Data->OutputImageLayout == vk::ImageLayout::eUndefined
+                            ? vk::PipelineStageFlagBits2::eTopOfPipe
+                            : vk::PipelineStageFlagBits2::eFragmentShader,
+        .srcAccessMask = s_Data->OutputImageLayout == vk::ImageLayout::eUndefined
+                             ? vk::AccessFlags2{}
+                             : vk::AccessFlagBits2::eShaderRead,
+        .dstStageMask = vk::PipelineStageFlagBits2::eComputeShader | vk::PipelineStageFlagBits2::eTransfer,
+        .dstAccessMask = vk::AccessFlagBits2::eShaderStorageWrite | vk::AccessFlagBits2::eTransferWrite,
+        .oldLayout = s_Data->OutputImageLayout,
+        .newLayout = vk::ImageLayout::eGeneral,
+        .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+        .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+        .image = s_Data->OutputImage.Image,
+        .subresourceRange = { .aspectMask = vk::ImageAspectFlagBits::eColor,
+                              .baseMipLevel = 0,
+                              .levelCount = 1,
+                              .baseArrayLayer = 0,
+                              .layerCount = 1 }
+    };
+    const vk::ImageMemoryBarrier2 depthInputBarrier{
+        .srcStageMask = s_Data->UseGTAO ? vk::PipelineStageFlagBits2::eComputeShader
+                                        : (vk::PipelineStageFlagBits2::eEarlyFragmentTests |
+                                           vk::PipelineStageFlagBits2::eLateFragmentTests),
+        .srcAccessMask = s_Data->UseGTAO ? vk::AccessFlagBits2::eShaderRead
+                                         : vk::AccessFlagBits2::eDepthStencilAttachmentWrite,
+        .dstStageMask = vk::PipelineStageFlagBits2::eComputeShader,
+        .dstAccessMask = vk::AccessFlagBits2::eShaderRead,
+        .oldLayout = s_Data->UseGTAO ? vk::ImageLayout::eShaderReadOnlyOptimal
+                                     : vk::ImageLayout::eDepthAttachmentOptimal,
+        .newLayout = vk::ImageLayout::eShaderReadOnlyOptimal,
+        .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+        .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+        .image = s_Data->DepthImage.Image,
+        .subresourceRange = { .aspectMask = vk::ImageAspectFlagBits::eDepth,
+                              .baseMipLevel = 0,
+                              .levelCount = 1,
+                              .baseArrayLayer = 0,
+                              .layerCount = 1 }
+    };
+    const vk::ImageMemoryBarrier2 normalInputBarrier{
+        .srcStageMask = s_Data->UseGTAO ? vk::PipelineStageFlagBits2::eFragmentShader
+                                        : vk::PipelineStageFlagBits2::eColorAttachmentOutput,
+        .srcAccessMask = s_Data->UseGTAO ? vk::AccessFlagBits2::eShaderRead
+                                         : vk::AccessFlagBits2::eColorAttachmentWrite,
+        .dstStageMask = vk::PipelineStageFlagBits2::eComputeShader,
+        .dstAccessMask = vk::AccessFlagBits2::eShaderRead,
+        .oldLayout = s_Data->UseGTAO ? vk::ImageLayout::eShaderReadOnlyOptimal
+                                     : vk::ImageLayout::eColorAttachmentOptimal,
+        .newLayout = vk::ImageLayout::eShaderReadOnlyOptimal,
+        .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+        .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+        .image = s_Data->NormalImage.Image,
+        .subresourceRange = { .aspectMask = vk::ImageAspectFlagBits::eColor,
+                              .baseMipLevel = 0,
+                              .levelCount = 1,
+                              .baseArrayLayer = 0,
+                              .layerCount = 1 }
+    };
+    const std::array barriers = {
+        compositeBarrier, motionBarrier, outputBarrier, depthInputBarrier, normalInputBarrier
+    };
+    cmd.pipelineBarrier2({ .imageMemoryBarrierCount = static_cast<uint32_t>(barriers.size()),
+                           .pImageMemoryBarriers = barriers.data() });
+
+    const float cameraFovAngleVertical = 2.0f * std::atan(1.0f / std::abs(s_Data->SceneUniformData.projection[1][1]));
+    KBRAssert(cameraFovAngleVertical > 0.0f && cameraFovAngleVertical < glm::pi<float>(), "Invalid camera field of view, has to be between 0 and π");
+
+    const UpscalerDispatchInfo dispatchInfo{
+        .commandBuffer = cmd,
+        .inputColor = {
+            .image = s_Data->CompositeImage.Image,
+            .view = s_Data->CompositeImage.ImageView,
+            .format = s_Data->CompositeImage.Format,
+            .usage = vk::ImageUsageFlagBits::eColorAttachment | vk::ImageUsageFlagBits::eSampled,
+            .width = static_cast<uint32_t>(s_Data->RenderSize.x),
+            .height = static_cast<uint32_t>(s_Data->RenderSize.y),
+            .currentLayout = vk::ImageLayout::eShaderReadOnlyOptimal
+        },
+        .inputDepth = {
+            .image = s_Data->DepthImage.Image,
+            .view = s_Data->DepthImage.ImageView,
+            .format = s_Data->DepthImage.Format,
+            .usage = vk::ImageUsageFlagBits::eDepthStencilAttachment | vk::ImageUsageFlagBits::eSampled,
+            .width = static_cast<uint32_t>(s_Data->RenderSize.x),
+            .height = static_cast<uint32_t>(s_Data->RenderSize.y),
+            .currentLayout = vk::ImageLayout::eShaderReadOnlyOptimal
+        },
+        .inputMotionVectors = {
+            .image = s_Data->MotionImage.Image,
+            .view = s_Data->MotionImage.ImageView,
+            .format = s_Data->MotionImage.Format,
+            .usage = vk::ImageUsageFlagBits::eColorAttachment | vk::ImageUsageFlagBits::eSampled,
+            .width = static_cast<uint32_t>(s_Data->RenderSize.x),
+            .height = static_cast<uint32_t>(s_Data->RenderSize.y),
+            .currentLayout = vk::ImageLayout::eShaderReadOnlyOptimal
+        },
+        .outputColor = {
+            .image = s_Data->OutputImage.Image,
+            .view = s_Data->OutputImage.ImageView,
+            .format = s_Data->OutputImage.Format,
+            .usage = vk::ImageUsageFlagBits::eStorage | vk::ImageUsageFlagBits::eSampled |
+                     vk::ImageUsageFlagBits::eTransferDst,
+            .width = static_cast<uint32_t>(s_Data->OutputSize.x),
+            .height = static_cast<uint32_t>(s_Data->OutputSize.y),
+            .currentLayout = vk::ImageLayout::eGeneral
+        },
+        .cameraNear = s_Data->PendingRender.NearPlane,
+        .cameraFar = s_Data->PendingRender.FarPlane,
+        .cameraFovAngleVertical = cameraFovAngleVertical,
+        .viewSpaceToMetersFactor = 1.0f
+    };
+
+    s_Data->Upscaler->Dispatch(dispatchInfo);
+
+    const vk::ImageMemoryBarrier2 finalBarrier{
+        .srcStageMask = vk::PipelineStageFlagBits2::eComputeShader | vk::PipelineStageFlagBits2::eTransfer,
+        .srcAccessMask = vk::AccessFlagBits2::eShaderStorageWrite | vk::AccessFlagBits2::eTransferWrite,
+        .dstStageMask = vk::PipelineStageFlagBits2::eFragmentShader,
+        .dstAccessMask = vk::AccessFlagBits2::eShaderRead,
+        .oldLayout = vk::ImageLayout::eGeneral,
+        .newLayout = vk::ImageLayout::eShaderReadOnlyOptimal,
+        .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+        .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+        .image = s_Data->OutputImage.Image,
+        .subresourceRange = { .aspectMask = vk::ImageAspectFlagBits::eColor,
+                              .baseMipLevel = 0,
+                              .levelCount = 1,
+                              .baseArrayLayer = 0,
+                              .layerCount = 1 }
+    };
+    cmd.pipelineBarrier2({ .imageMemoryBarrierCount = 1, .pImageMemoryBarriers = &finalBarrier });
+    s_Data->OutputImageLayout = vk::ImageLayout::eShaderReadOnlyOptimal;
+
+    WriteGPUTimestamp(cmd, frameIndex, static_cast<uint32_t>(GPUTimestampQuery::UpscalingPassEnd));
+}
+
 void Renderer::ApplyBloom(const vk::raii::CommandBuffer& cmd, const uint32_t frameIndex)
 {
     KBR_TRACY_FUNCTION();
@@ -5178,7 +5596,7 @@ void Renderer::ApplyBloom(const vk::raii::CommandBuffer& cmd, const uint32_t fra
                                {});
 
         BloomData::DownsamplePushConstants pushConstants;
-        pushConstants.srcTexelSize = 1.0f / s_Data->OutputSize;
+        pushConstants.srcTexelSize = 1.0f / s_Data->RenderSize;
         pushConstants.enablePrefilter = (s_Data->Bloom.Mode == BloomMode::BrightPassPrefilter) ? 1u : 0u;
         pushConstants.threshold = std::max(s_Data->Bloom.Threshold, 0.0f);
         pushConstants.knee = std::clamp(s_Data->Bloom.Knee, 0.0f, pushConstants.threshold + 1.0f);
@@ -5352,8 +5770,8 @@ void Renderer::HandleMousePickingReadback(const vk::raii::CommandBuffer& cmd)
         cmd.pipelineBarrier2(toTransferDependencyInfo);
         s_Data->PickingImageLayout = vk::ImageLayout::eTransferSrcOptimal;
 
-        const uint32_t outputWidth = static_cast<uint32_t>(s_Data->OutputSize.x);
-        const uint32_t outputHeight = static_cast<uint32_t>(s_Data->OutputSize.y);
+        const uint32_t outputWidth = static_cast<uint32_t>(s_Data->RenderSize.x);
+        const uint32_t outputHeight = static_cast<uint32_t>(s_Data->RenderSize.y);
 
         if (outputWidth == 0 || outputHeight == 0 || s_Data->MousePickingReadback.RequestedPixel.x >= outputWidth ||
             s_Data->MousePickingReadback.RequestedPixel.y >= outputHeight) {
@@ -6230,6 +6648,39 @@ void Renderer::CreateFXAAImage(const uint32_t width, const uint32_t height)
                                                        vk::ImageAspectFlagBits::eColor,
                                                        mipLevels);
     context.SetObjectDebugName(s_Data->CompositeImage.ImageView, "Composite Image View");
+}
+
+void Renderer::CreateOutputImage(const uint32_t width, const uint32_t height)
+{
+    KBRAssert(s_Data->OutputImage.Format != vk::Format::eUndefined,
+              "Output image format has to be set before creating output image!");
+
+    auto& context = VulkanContext::Get();
+    const auto& device = context.GetDevice();
+    constexpr uint32_t mipLevels = 1;
+
+    CreateImage(device,
+                width,
+                height,
+                mipLevels,
+                vk::SampleCountFlagBits::e1,
+                s_Data->OutputImage.Format,
+                vk::ImageTiling::eOptimal,
+                vk::ImageUsageFlagBits::eStorage | vk::ImageUsageFlagBits::eSampled |
+                    vk::ImageUsageFlagBits::eTransferDst,
+                vk::MemoryPropertyFlagBits::eDeviceLocal,
+                s_Data->OutputImage.Image,
+                s_Data->OutputImage.ImageMemory);
+
+    context.SetObjectDebugName(s_Data->OutputImage.Image, "Upscaler Output Image");
+    context.SetObjectDebugName(s_Data->OutputImage.ImageMemory, "Upscaler Output Image Memory");
+    s_Data->OutputImage.ImageView = CreateImageView(device,
+                                                    s_Data->OutputImage.Image,
+                                                    s_Data->OutputImage.Format,
+                                                    vk::ImageAspectFlagBits::eColor,
+                                                    mipLevels);
+    context.SetObjectDebugName(s_Data->OutputImage.ImageView, "Upscaler Output Image View");
+    s_Data->OutputImageLayout = vk::ImageLayout::eUndefined;
 }
 
 void Renderer::SetupTonemappingResolveDescriptors()

@@ -13,6 +13,7 @@
 #include "Scene/Camera/FirstPersonCamera.hpp"
 #include "Serialization/SceneSerializer.hpp"
 #include "Input/KeyCodes.hpp"
+#include "Renderer/Upscaling/UpscalerTypes.hpp"
 #include "Scripting/ScriptEngine.hpp"
 
 #include <glm/gtc/matrix_inverse.hpp>
@@ -873,6 +874,7 @@ namespace Kerberos
 			ImGui::Text("Ambient Occlusion: %.3f ms", gpuTimings.AmbientOcclusionPassMilliseconds);
 			ImGui::Text("Antialiasing: %.3f ms", gpuTimings.AntialiasingPassMilliseconds);
 			ImGui::Text("Tonemapping: %.3f ms", gpuTimings.TonemappingPassMilliseconds);
+			ImGui::Text("Upscaling: %.3f ms", gpuTimings.UpscalingPassMilliseconds);
 		}
 		else
 		{
@@ -944,10 +946,12 @@ namespace Kerberos
 
 		const std::string activeGizmoTypeString = GetActiveGizmoTypeString();
 		ImGui::Text("Gizmo Type: %s", activeGizmoTypeString.c_str());
-		ImGui::Text("Viewport size: %.2f x %.2f", m_ViewportSize.x, m_ViewportSize.y);
+        ImGui::Text("Viewport size: %.2f x %.2f", m_ViewportSize.x, m_ViewportSize.y);
 		ImGui::Text("Viewport Focused: %s", m_ViewportFocused ? "Yes" : "No");
 		ImGui::Text("Viewport Hovered: %s", m_ViewportHovered ? "Yes" : "No");
 		ImGui::Text("ImGui Capturing Input: %s", m_DoesImGuiWantInput ? "Yes" : "No");
+        const glm::vec2 renderImageSize = Renderer::GetRenderImageSize();
+        ImGui::Text("Render image size: %.2f x %.2f", renderImageSize.x, renderImageSize.y);
 
 		std::string hoveredEntityName = "None";
 		if (m_HoveredEntity)
@@ -1030,7 +1034,34 @@ namespace Kerberos
 			ImGui::Checkbox("Enable PCF", &Renderer::GetIsPCFEnabledForShadowMap());
 		}
 
-		bool &useGTAO = Renderer::GetUseGTAO();
+		UpscalerType upscalingMode = Renderer::GetUpscalingMode();
+		const char *upscalingModeItems[] = {"Disabled", "FSR3"};
+		if (ImGui::Combo("Upscaling mode", reinterpret_cast<int*>(&upscalingMode), upscalingModeItems, IM_ARRAYSIZE(upscalingModeItems)))
+		{
+            Renderer::SetUpscalingMode(static_cast<UpscalerType>(upscalingMode));
+		}
+        if (upscalingMode != UpscalerType::Native) 
+		{
+            ImGui::Indent();
+
+            UpscalerQuality upscalingQuality = Renderer::GetUpscalingQuality();
+            const char* upscalingModeQualityItems[] = { "Ultra Quality", "Quality", "Balanced", "Performance", "Ultra Performance" };
+            if (ImGui::Combo("Quality",
+                             reinterpret_cast<int*>(&upscalingQuality),
+                             upscalingModeQualityItems,
+                             IM_ARRAYSIZE(upscalingModeQualityItems))) {
+                Renderer::SetUpscalingQuality(static_cast<UpscalerQuality>(upscalingQuality));
+            }
+
+			ImGui::Unindent();
+        }
+        /*if (upscalingMode == UpscalerType::FSR3) {
+            ImGui::Indent();
+            ImGui::Checkbox("Use FSR3 Auto Exposure", &Renderer::GetUseFSR3AutoExposure());
+            ImGui::Unindent();
+        }*/
+
+		bool& useGTAO = Renderer::GetUseGTAO();
 		ImGui::Checkbox("Use GTAO", &useGTAO);
 		if (useGTAO)
 		{

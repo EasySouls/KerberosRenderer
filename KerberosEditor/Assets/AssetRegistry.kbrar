@@ -98,6 +98,14 @@ AssetRegistry:
     ParentHandle: 641661085910201849
     SubAssetKey: mesh:24_0
     ImportVersion: 1
+  - Handle: 162149534054231477
+    Type: Texture2D
+    Path: Textures\28.kbrtexture
+    LibraryPath: Textures\28.kbrtexture
+    RootSourceHandle: 3592214733151679049
+    ParentHandle: 3592214733151679049
+    SubAssetKey: texture:28
+    ImportVersion: 1
   - Handle: 182895270603300950
     Type: Mesh
     Path: Meshes\mesh_8_0.kbrmesh
@@ -148,6 +156,14 @@ AssetRegistry:
     RootSourceHandle: 8858309372063028477
     ParentHandle: 8858309372063028477
     SubAssetKey: mesh:12_1
+    ImportVersion: 1
+  - Handle: 223317500553490292
+    Type: Texture2D
+    Path: Textures\37.kbrtexture
+    LibraryPath: Textures\37.kbrtexture
+    RootSourceHandle: 3592214733151679049
+    ParentHandle: 3592214733151679049
+    SubAssetKey: texture:37
     ImportVersion: 1
   - Handle: 253151789714416420
     Type: Mesh
@@ -278,6 +294,14 @@ AssetRegistry:
     RootSourceHandle: 7563732692318888728
     ParentHandle: 7563732692318888728
     SubAssetKey: mesh:28_0
+    ImportVersion: 1
+  - Handle: 534126962233704142
+    Type: Texture2D
+    Path: Textures\7.kbrtexture
+    LibraryPath: Textures\7.kbrtexture
+    RootSourceHandle: 3592214733151679049
+    ParentHandle: 3592214733151679049
+    SubAssetKey: texture:7
     ImportVersion: 1
   - Handle: 555328399036624013
     Type: Material
@@ -714,6 +738,14 @@ AssetRegistry:
     ParentHandle: 7563732692318888728
     SubAssetKey: material:60
     ImportVersion: 1
+  - Handle: 1233990748962907759
+    Type: Texture2D
+    Path: Textures\48.kbrtexture
+    LibraryPath: Textures\48.kbrtexture
+    RootSourceHandle: 3592214733151679049
+    ParentHandle: 3592214733151679049
+    SubAssetKey: texture:48
+    ImportVersion: 1
   - Handle: 1252974150601696823
     Type: Material
     Path: Materials\38.kbrmaterial
@@ -786,6 +818,64 @@ AssetRegistry:
     ParentHandle: 14244998688843197978
     SubAssetKey: mesh:20_0
     ImportVersion: 1
+  - Handle: 1351790369370411745
+    Type: Material
+    Path: Materials\8.kbrmaterial
+    LibraryPath: Materials\8.kbrmaterial
+    RootSourceHandle: 3592214733151679049
+    ParentHandle: 3592214733151679049
+    SubAssetKey: material:8
+    ImportVersion: 1
+    Dependencies:
+      - 17892572518878110509
+      - 4571490681262020291
+      - 4386830571018427890
+      - 9602914115203217070
+      - 9406601308357270012
+      - 9102511368109540745
+      - 3415265635022088886
+      - 10841134288657483234
+      - 7332298763032844378
+      - 6047068936498750292
+      - 8863549481084937987
+      - 17726121017710461372
+      - 3416222974438391443
+      - 16878825194290081402
+      - 4554272302379809908
+      - 15924157504918349308
+      - 18331464464310536425
+      - 2292989877418582707
+      - 1682051905634216147
+      - 9277846854264864933
+      - 3015329744583186767
+      - 162149534054231477
+      - 6630376773198558818
+      - 7562076932231910568
+      - 6309849053699577800
+      - 17618622406135231047
+      - 4647536863688545021
+      - 9997316614826821060
+      - 9832897256245327273
+      - 16103123452814638429
+      - 11274486374346585378
+      - 223317500553490292
+      - 3486779317052954359
+      - 13106449264185906434
+      - 5061839277828279224
+      - 1656676577746460656
+      - 18325670982947397201
+      - 7479338102868726026
+      - 9802067281274391955
+      - 7031739123983710582
+      - 2417652750706186624
+      - 6913098452901030745
+      - 10765384177709001448
+      - 1233990748962907759
+      - 10604242247912031542
+      - 13832073643189579980
+      - 534126962233704142
+      - 5734159455103572291
+      - 4618149021998797964
   - Handle: 1396678405898452838
     Type: Mesh
     Path: Meshes\mesh_35_0.kbrmesh
@@ -960,12 +1050,36 @@ AssetRegistry:
     ParentHandle: 14244998688843197978
     SubAssetKey: mesh:44_0
     ImportVersion: 1
+  - Handle: 1656676577746460656
+    Type: Texture2D
+    Path: Textures\40.kbrtexture
+    LibraryPath: Textures\40.kbrtexture
+    RootSourceHandle: 3592214733151679049
+    ParentHandle: 3592214733151679049
+    SubAssetKey: texture:40
+    ImportVersion: 1
   - Handle: 1672875355237592228
     Type: Model
     Path: Models\deferred_floor.gltf
     RootSourceHandle: 1672875355237592228
     ParentHandle: 0
     SubAssetKey: ""
+    ImportVersion: 1
+  - Handle: 1673791072952261535
+    Type: Mesh
+    Path: Meshes\mesh_0_4.kbrmesh
+    LibraryPath: Meshes\mesh_0_4.kbrmesh
+    RootSourceHandle: 3592214733151679049
+    ParentHandle: 3592214733151679049
+    SubAssetKey: mesh:0_4
+    ImportVersion: 1
+  - Handle: 1682051905634216147
+    Type: Texture2D
+    Path: Textures\25.kbrtexture
+    LibraryPath: Textures\25.kbrtexture
+    RootSourceHandle: 3592214733151679049
+    ParentHandle: 3592214733151679049
+    SubAssetKey: texture:25
     ImportVersion: 1
   - Handle: 1687949602749028080
     Type: Material
@@ -1185,6 +1299,64 @@ AssetRegistry:
     ParentHandle: 6532463041022503106
     SubAssetKey: material:1
     ImportVersion: 1
+  - Handle: 2053644066673746009
+    Type: Material
+    Path: Materials\11.kbrmaterial
+    LibraryPath: Materials\11.kbrmaterial
+    RootSourceHandle: 3592214733151679049
+    ParentHandle: 3592214733151679049
+    SubAssetKey: material:11
+    ImportVersion: 1
+    Dependencies:
+      - 17892572518878110509
+      - 4571490681262020291
+      - 4386830571018427890
+      - 9602914115203217070
+      - 9406601308357270012
+      - 9102511368109540745
+      - 3415265635022088886
+      - 10841134288657483234
+      - 7332298763032844378
+      - 6047068936498750292
+      - 8863549481084937987
+      - 17726121017710461372
+      - 3416222974438391443
+      - 16878825194290081402
+      - 4554272302379809908
+      - 15924157504918349308
+      - 18331464464310536425
+      - 2292989877418582707
+      - 1682051905634216147
+      - 9277846854264864933
+      - 3015329744583186767
+      - 162149534054231477
+      - 6630376773198558818
+      - 7562076932231910568
+      - 6309849053699577800
+      - 17618622406135231047
+      - 4647536863688545021
+      - 9997316614826821060
+      - 9832897256245327273
+      - 16103123452814638429
+      - 11274486374346585378
+      - 223317500553490292
+      - 3486779317052954359
+      - 13106449264185906434
+      - 5061839277828279224
+      - 1656676577746460656
+      - 18325670982947397201
+      - 7479338102868726026
+      - 9802067281274391955
+      - 7031739123983710582
+      - 2417652750706186624
+      - 6913098452901030745
+      - 10765384177709001448
+      - 1233990748962907759
+      - 10604242247912031542
+      - 13832073643189579980
+      - 534126962233704142
+      - 5734159455103572291
+      - 4618149021998797964
   - Handle: 2068421370982456561
     Type: Material
     Path: Materials\97.kbrmaterial
@@ -1317,6 +1489,14 @@ AssetRegistry:
     ParentHandle: 0
     SubAssetKey: ""
     ImportVersion: 1
+  - Handle: 2220153872577626798
+    Type: Mesh
+    Path: Meshes\mesh_0_0.kbrmesh
+    LibraryPath: Meshes\mesh_0_0.kbrmesh
+    RootSourceHandle: 3592214733151679049
+    ParentHandle: 3592214733151679049
+    SubAssetKey: mesh:0_0
+    ImportVersion: 1
   - Handle: 2225178927655953355
     Type: Material
     Path: Materials\11.kbrmaterial
@@ -1356,6 +1536,14 @@ AssetRegistry:
     RootSourceHandle: 7563732692318888728
     ParentHandle: 7563732692318888728
     SubAssetKey: mesh:51_0
+    ImportVersion: 1
+  - Handle: 2292989877418582707
+    Type: Texture2D
+    Path: Textures\24.kbrtexture
+    LibraryPath: Textures\24.kbrtexture
+    RootSourceHandle: 3592214733151679049
+    ParentHandle: 3592214733151679049
+    SubAssetKey: texture:24
     ImportVersion: 1
   - Handle: 2297052780689181307
     Type: Mesh
@@ -1420,6 +1608,64 @@ AssetRegistry:
     ParentHandle: 7563732692318888728
     SubAssetKey: material:28
     ImportVersion: 1
+  - Handle: 2385003743927989712
+    Type: Material
+    Path: Materials\7.kbrmaterial
+    LibraryPath: Materials\7.kbrmaterial
+    RootSourceHandle: 3592214733151679049
+    ParentHandle: 3592214733151679049
+    SubAssetKey: material:7
+    ImportVersion: 1
+    Dependencies:
+      - 17892572518878110509
+      - 4571490681262020291
+      - 4386830571018427890
+      - 9602914115203217070
+      - 9406601308357270012
+      - 9102511368109540745
+      - 3415265635022088886
+      - 10841134288657483234
+      - 7332298763032844378
+      - 6047068936498750292
+      - 8863549481084937987
+      - 17726121017710461372
+      - 3416222974438391443
+      - 16878825194290081402
+      - 4554272302379809908
+      - 15924157504918349308
+      - 18331464464310536425
+      - 2292989877418582707
+      - 1682051905634216147
+      - 9277846854264864933
+      - 3015329744583186767
+      - 162149534054231477
+      - 6630376773198558818
+      - 7562076932231910568
+      - 6309849053699577800
+      - 17618622406135231047
+      - 4647536863688545021
+      - 9997316614826821060
+      - 9832897256245327273
+      - 16103123452814638429
+      - 11274486374346585378
+      - 223317500553490292
+      - 3486779317052954359
+      - 13106449264185906434
+      - 5061839277828279224
+      - 1656676577746460656
+      - 18325670982947397201
+      - 7479338102868726026
+      - 9802067281274391955
+      - 7031739123983710582
+      - 2417652750706186624
+      - 6913098452901030745
+      - 10765384177709001448
+      - 1233990748962907759
+      - 10604242247912031542
+      - 13832073643189579980
+      - 534126962233704142
+      - 5734159455103572291
+      - 4618149021998797964
   - Handle: 2397074169659106255
     Type: Material
     Path: Materials\1.kbrmaterial
@@ -1459,6 +1705,14 @@ AssetRegistry:
     ParentHandle: 7563732692318888728
     SubAssetKey: material:124
     ImportVersion: 1
+  - Handle: 2417652750706186624
+    Type: Texture2D
+    Path: Textures\45.kbrtexture
+    LibraryPath: Textures\45.kbrtexture
+    RootSourceHandle: 3592214733151679049
+    ParentHandle: 3592214733151679049
+    SubAssetKey: texture:45
+    ImportVersion: 1
   - Handle: 2427978123451676349
     Type: Mesh
     Path: Meshes\mesh_77_2.kbrmesh
@@ -1467,6 +1721,64 @@ AssetRegistry:
     ParentHandle: 7563732692318888728
     SubAssetKey: mesh:77_2
     ImportVersion: 1
+  - Handle: 2430472383928565410
+    Type: Material
+    Path: Materials\18.kbrmaterial
+    LibraryPath: Materials\18.kbrmaterial
+    RootSourceHandle: 3592214733151679049
+    ParentHandle: 3592214733151679049
+    SubAssetKey: material:18
+    ImportVersion: 1
+    Dependencies:
+      - 17892572518878110509
+      - 4571490681262020291
+      - 4386830571018427890
+      - 9602914115203217070
+      - 9406601308357270012
+      - 9102511368109540745
+      - 3415265635022088886
+      - 10841134288657483234
+      - 7332298763032844378
+      - 6047068936498750292
+      - 8863549481084937987
+      - 17726121017710461372
+      - 3416222974438391443
+      - 16878825194290081402
+      - 4554272302379809908
+      - 15924157504918349308
+      - 18331464464310536425
+      - 2292989877418582707
+      - 1682051905634216147
+      - 9277846854264864933
+      - 3015329744583186767
+      - 162149534054231477
+      - 6630376773198558818
+      - 7562076932231910568
+      - 6309849053699577800
+      - 17618622406135231047
+      - 4647536863688545021
+      - 9997316614826821060
+      - 9832897256245327273
+      - 16103123452814638429
+      - 11274486374346585378
+      - 223317500553490292
+      - 3486779317052954359
+      - 13106449264185906434
+      - 5061839277828279224
+      - 1656676577746460656
+      - 18325670982947397201
+      - 7479338102868726026
+      - 9802067281274391955
+      - 7031739123983710582
+      - 2417652750706186624
+      - 6913098452901030745
+      - 10765384177709001448
+      - 1233990748962907759
+      - 10604242247912031542
+      - 13832073643189579980
+      - 534126962233704142
+      - 5734159455103572291
+      - 4618149021998797964
   - Handle: 2435069181121664750
     Type: Mesh
     Path: Meshes\mesh_1_0.kbrmesh
@@ -1851,6 +2163,65 @@ AssetRegistry:
     ParentHandle: 7563732692318888728
     SubAssetKey: material:20
     ImportVersion: 1
+  - Handle: 2615862006419889280
+    Type: Prefab
+    Path: Prefabs\0.kbrprefab
+    LibraryPath: Prefabs\0.kbrprefab
+    RootSourceHandle: 3592214733151679049
+    ParentHandle: 3592214733151679049
+    SubAssetKey: prefab:0
+    ImportVersion: 1
+    Dependencies:
+      - 10051159133574294442
+      - 6349103434357564142
+      - 7305894499464846406
+      - 2053644066673746009
+      - 18089760612083291288
+      - 6320926565740111627
+      - 18012873507129192588
+      - 16744270478953138166
+      - 16085830695486284805
+      - 2810746752824269533
+      - 2430472383928565410
+      - 4385168756168433571
+      - 8736502972250848634
+      - 16716218856421156534
+      - 9369297552604712732
+      - 12231249857721946300
+      - 13346781592115606968
+      - 16445993165995195148
+      - 4756831789259088058
+      - 12381593450151428241
+      - 17396761942409581284
+      - 15529083784331757630
+      - 2385003743927989712
+      - 1351790369370411745
+      - 3635508589860200677
+      - 2220153872577626798
+      - 5612235856839324777
+      - 14325903939470384668
+      - 6560070729656261243
+      - 1673791072952261535
+      - 15777906348711328762
+      - 12205787463978693335
+      - 5720632228471702554
+      - 13742802974986305692
+      - 14581236797814382098
+      - 14879467559709340461
+      - 3292115844336249506
+      - 5986402957627556839
+      - 3874674024455554238
+      - 7140830431065720594
+      - 10332089540996564903
+      - 5482688447636322377
+      - 3471778696746152796
+      - 11451186213160227890
+      - 13346003504517060693
+      - 5326613399001570374
+      - 11483929653628971340
+      - 13613779281806729955
+      - 7644080631679312852
+      - 6698001431423713801
   - Handle: 2624266670421651651
     Type: Mesh
     Path: Meshes\mesh_7_0.kbrmesh
@@ -1937,6 +2308,64 @@ AssetRegistry:
     ParentHandle: 15699797043758853420
     SubAssetKey: texture:0
     ImportVersion: 1
+  - Handle: 2810746752824269533
+    Type: Material
+    Path: Materials\17.kbrmaterial
+    LibraryPath: Materials\17.kbrmaterial
+    RootSourceHandle: 3592214733151679049
+    ParentHandle: 3592214733151679049
+    SubAssetKey: material:17
+    ImportVersion: 1
+    Dependencies:
+      - 17892572518878110509
+      - 4571490681262020291
+      - 4386830571018427890
+      - 9602914115203217070
+      - 9406601308357270012
+      - 9102511368109540745
+      - 3415265635022088886
+      - 10841134288657483234
+      - 7332298763032844378
+      - 6047068936498750292
+      - 8863549481084937987
+      - 17726121017710461372
+      - 3416222974438391443
+      - 16878825194290081402
+      - 4554272302379809908
+      - 15924157504918349308
+      - 18331464464310536425
+      - 2292989877418582707
+      - 1682051905634216147
+      - 9277846854264864933
+      - 3015329744583186767
+      - 162149534054231477
+      - 6630376773198558818
+      - 7562076932231910568
+      - 6309849053699577800
+      - 17618622406135231047
+      - 4647536863688545021
+      - 9997316614826821060
+      - 9832897256245327273
+      - 16103123452814638429
+      - 11274486374346585378
+      - 223317500553490292
+      - 3486779317052954359
+      - 13106449264185906434
+      - 5061839277828279224
+      - 1656676577746460656
+      - 18325670982947397201
+      - 7479338102868726026
+      - 9802067281274391955
+      - 7031739123983710582
+      - 2417652750706186624
+      - 6913098452901030745
+      - 10765384177709001448
+      - 1233990748962907759
+      - 10604242247912031542
+      - 13832073643189579980
+      - 534126962233704142
+      - 5734159455103572291
+      - 4618149021998797964
   - Handle: 2820150906398696424
     Type: Prefab
     Path: Prefabs\0.kbrprefab
@@ -2096,6 +2525,14 @@ AssetRegistry:
     RootSourceHandle: 0
     ParentHandle: 0
     SubAssetKey: ""
+    ImportVersion: 1
+  - Handle: 3015329744583186767
+    Type: Texture2D
+    Path: Textures\27.kbrtexture
+    LibraryPath: Textures\27.kbrtexture
+    RootSourceHandle: 3592214733151679049
+    ParentHandle: 3592214733151679049
+    SubAssetKey: texture:27
     ImportVersion: 1
   - Handle: 3029088774030921175
     Type: Material
@@ -2386,6 +2823,14 @@ AssetRegistry:
     ParentHandle: 0
     SubAssetKey: ""
     ImportVersion: 1
+  - Handle: 3292115844336249506
+    Type: Mesh
+    Path: Meshes\mesh_12_0.kbrmesh
+    LibraryPath: Meshes\mesh_12_0.kbrmesh
+    RootSourceHandle: 3592214733151679049
+    ParentHandle: 3592214733151679049
+    SubAssetKey: mesh:12_0
+    ImportVersion: 1
   - Handle: 3320227881202605909
     Type: Mesh
     Path: Meshes\mesh_73_0.kbrmesh
@@ -2434,6 +2879,22 @@ AssetRegistry:
     ParentHandle: 8858309372063028477
     SubAssetKey: material:2
     ImportVersion: 1
+  - Handle: 3415265635022088886
+    Type: Texture2D
+    Path: Textures\14.kbrtexture
+    LibraryPath: Textures\14.kbrtexture
+    RootSourceHandle: 3592214733151679049
+    ParentHandle: 3592214733151679049
+    SubAssetKey: texture:14
+    ImportVersion: 1
+  - Handle: 3416222974438391443
+    Type: Texture2D
+    Path: Textures\2.kbrtexture
+    LibraryPath: Textures\2.kbrtexture
+    RootSourceHandle: 3592214733151679049
+    ParentHandle: 3592214733151679049
+    SubAssetKey: texture:2
+    ImportVersion: 1
   - Handle: 3420994376372366335
     Type: Material
     Path: Assets\Materials\cerberus.kbrmat
@@ -2456,6 +2917,22 @@ AssetRegistry:
     RootSourceHandle: 15527510207928805383
     ParentHandle: 15527510207928805383
     SubAssetKey: mesh:1_0
+    ImportVersion: 1
+  - Handle: 3471778696746152796
+    Type: Mesh
+    Path: Meshes\mesh_5_0.kbrmesh
+    LibraryPath: Meshes\mesh_5_0.kbrmesh
+    RootSourceHandle: 3592214733151679049
+    ParentHandle: 3592214733151679049
+    SubAssetKey: mesh:5_0
+    ImportVersion: 1
+  - Handle: 3486779317052954359
+    Type: Texture2D
+    Path: Textures\38.kbrtexture
+    LibraryPath: Textures\38.kbrtexture
+    RootSourceHandle: 3592214733151679049
+    ParentHandle: 3592214733151679049
+    SubAssetKey: texture:38
     ImportVersion: 1
   - Handle: 3514735240808057282
     Type: Material
@@ -2535,6 +3012,13 @@ AssetRegistry:
       - 2924151825702596875
       - 12926576783441300841
       - 14566932452580292634
+  - Handle: 3592214733151679049
+    Type: Model
+    Path: Models\sponza\sponza.gltf
+    RootSourceHandle: 3592214733151679049
+    ParentHandle: 0
+    SubAssetKey: ""
+    ImportVersion: 1
   - Handle: 3600178560882325247
     Type: Mesh
     Path: Meshes\mesh_13_0.kbrmesh
@@ -2559,6 +3043,64 @@ AssetRegistry:
     ParentHandle: 7563732692318888728
     SubAssetKey: material:137
     ImportVersion: 1
+  - Handle: 3635508589860200677
+    Type: Material
+    Path: Materials\9.kbrmaterial
+    LibraryPath: Materials\9.kbrmaterial
+    RootSourceHandle: 3592214733151679049
+    ParentHandle: 3592214733151679049
+    SubAssetKey: material:9
+    ImportVersion: 1
+    Dependencies:
+      - 17892572518878110509
+      - 4571490681262020291
+      - 4386830571018427890
+      - 9602914115203217070
+      - 9406601308357270012
+      - 9102511368109540745
+      - 3415265635022088886
+      - 10841134288657483234
+      - 7332298763032844378
+      - 6047068936498750292
+      - 8863549481084937987
+      - 17726121017710461372
+      - 3416222974438391443
+      - 16878825194290081402
+      - 4554272302379809908
+      - 15924157504918349308
+      - 18331464464310536425
+      - 2292989877418582707
+      - 1682051905634216147
+      - 9277846854264864933
+      - 3015329744583186767
+      - 162149534054231477
+      - 6630376773198558818
+      - 7562076932231910568
+      - 6309849053699577800
+      - 17618622406135231047
+      - 4647536863688545021
+      - 9997316614826821060
+      - 9832897256245327273
+      - 16103123452814638429
+      - 11274486374346585378
+      - 223317500553490292
+      - 3486779317052954359
+      - 13106449264185906434
+      - 5061839277828279224
+      - 1656676577746460656
+      - 18325670982947397201
+      - 7479338102868726026
+      - 9802067281274391955
+      - 7031739123983710582
+      - 2417652750706186624
+      - 6913098452901030745
+      - 10765384177709001448
+      - 1233990748962907759
+      - 10604242247912031542
+      - 13832073643189579980
+      - 534126962233704142
+      - 5734159455103572291
+      - 4618149021998797964
   - Handle: 3637922379622769427
     Type: Mesh
     Path: Meshes\mesh_2_1.kbrmesh
@@ -2701,6 +3243,14 @@ AssetRegistry:
     RootSourceHandle: 7563732692318888728
     ParentHandle: 7563732692318888728
     SubAssetKey: mesh:46_0
+    ImportVersion: 1
+  - Handle: 3874674024455554238
+    Type: Mesh
+    Path: Meshes\mesh_2_0.kbrmesh
+    LibraryPath: Meshes\mesh_2_0.kbrmesh
+    RootSourceHandle: 3592214733151679049
+    ParentHandle: 3592214733151679049
+    SubAssetKey: mesh:2_0
     ImportVersion: 1
   - Handle: 3911584749771893569
     Type: Mesh
@@ -2884,6 +3434,72 @@ AssetRegistry:
     ParentHandle: 7563732692318888728
     SubAssetKey: mesh:58_0
     ImportVersion: 1
+  - Handle: 4385168756168433571
+    Type: Material
+    Path: Materials\19.kbrmaterial
+    LibraryPath: Materials\19.kbrmaterial
+    RootSourceHandle: 3592214733151679049
+    ParentHandle: 3592214733151679049
+    SubAssetKey: material:19
+    ImportVersion: 1
+    Dependencies:
+      - 17892572518878110509
+      - 4571490681262020291
+      - 4386830571018427890
+      - 9602914115203217070
+      - 9406601308357270012
+      - 9102511368109540745
+      - 3415265635022088886
+      - 10841134288657483234
+      - 7332298763032844378
+      - 6047068936498750292
+      - 8863549481084937987
+      - 17726121017710461372
+      - 3416222974438391443
+      - 16878825194290081402
+      - 4554272302379809908
+      - 15924157504918349308
+      - 18331464464310536425
+      - 2292989877418582707
+      - 1682051905634216147
+      - 9277846854264864933
+      - 3015329744583186767
+      - 162149534054231477
+      - 6630376773198558818
+      - 7562076932231910568
+      - 6309849053699577800
+      - 17618622406135231047
+      - 4647536863688545021
+      - 9997316614826821060
+      - 9832897256245327273
+      - 16103123452814638429
+      - 11274486374346585378
+      - 223317500553490292
+      - 3486779317052954359
+      - 13106449264185906434
+      - 5061839277828279224
+      - 1656676577746460656
+      - 18325670982947397201
+      - 7479338102868726026
+      - 9802067281274391955
+      - 7031739123983710582
+      - 2417652750706186624
+      - 6913098452901030745
+      - 10765384177709001448
+      - 1233990748962907759
+      - 10604242247912031542
+      - 13832073643189579980
+      - 534126962233704142
+      - 5734159455103572291
+      - 4618149021998797964
+  - Handle: 4386830571018427890
+    Type: Texture2D
+    Path: Textures\10.kbrtexture
+    LibraryPath: Textures\10.kbrtexture
+    RootSourceHandle: 3592214733151679049
+    ParentHandle: 3592214733151679049
+    SubAssetKey: texture:10
+    ImportVersion: 1
   - Handle: 4388304654684176775
     Type: Mesh
     Path: Meshes\mesh_49_0.kbrmesh
@@ -3000,6 +3616,14 @@ AssetRegistry:
     ParentHandle: 0
     SubAssetKey: ""
     ImportVersion: 1
+  - Handle: 4554272302379809908
+    Type: Texture2D
+    Path: Textures\21.kbrtexture
+    LibraryPath: Textures\21.kbrtexture
+    RootSourceHandle: 3592214733151679049
+    ParentHandle: 3592214733151679049
+    SubAssetKey: texture:21
+    ImportVersion: 1
   - Handle: 4554591729800828961
     Type: Mesh
     Path: Meshes\mesh_31_0.kbrmesh
@@ -3007,6 +3631,14 @@ AssetRegistry:
     RootSourceHandle: 641661085910201849
     ParentHandle: 641661085910201849
     SubAssetKey: mesh:31_0
+    ImportVersion: 1
+  - Handle: 4571490681262020291
+    Type: Texture2D
+    Path: Textures\1.kbrtexture
+    LibraryPath: Textures\1.kbrtexture
+    RootSourceHandle: 3592214733151679049
+    ParentHandle: 3592214733151679049
+    SubAssetKey: texture:1
     ImportVersion: 1
   - Handle: 4572864024984485117
     Type: Mesh
@@ -3063,6 +3695,14 @@ AssetRegistry:
     ParentHandle: 0
     SubAssetKey: ""
     ImportVersion: 1
+  - Handle: 4618149021998797964
+    Type: Texture2D
+    Path: Textures\9.kbrtexture
+    LibraryPath: Textures\9.kbrtexture
+    RootSourceHandle: 3592214733151679049
+    ParentHandle: 3592214733151679049
+    SubAssetKey: texture:9
+    ImportVersion: 1
   - Handle: 4624903683578896935
     Type: Mesh
     Path: Meshes\mesh_35_0.kbrmesh
@@ -3070,6 +3710,14 @@ AssetRegistry:
     RootSourceHandle: 641661085910201849
     ParentHandle: 641661085910201849
     SubAssetKey: mesh:35_0
+    ImportVersion: 1
+  - Handle: 4647536863688545021
+    Type: Texture2D
+    Path: Textures\32.kbrtexture
+    LibraryPath: Textures\32.kbrtexture
+    RootSourceHandle: 3592214733151679049
+    ParentHandle: 3592214733151679049
+    SubAssetKey: texture:32
     ImportVersion: 1
   - Handle: 4648696109232674044
     Type: Mesh
@@ -3142,6 +3790,64 @@ AssetRegistry:
     ParentHandle: 7563732692318888728
     SubAssetKey: material:78
     ImportVersion: 1
+  - Handle: 4756831789259088058
+    Type: Material
+    Path: Materials\3.kbrmaterial
+    LibraryPath: Materials\3.kbrmaterial
+    RootSourceHandle: 3592214733151679049
+    ParentHandle: 3592214733151679049
+    SubAssetKey: material:3
+    ImportVersion: 1
+    Dependencies:
+      - 17892572518878110509
+      - 4571490681262020291
+      - 4386830571018427890
+      - 9602914115203217070
+      - 9406601308357270012
+      - 9102511368109540745
+      - 3415265635022088886
+      - 10841134288657483234
+      - 7332298763032844378
+      - 6047068936498750292
+      - 8863549481084937987
+      - 17726121017710461372
+      - 3416222974438391443
+      - 16878825194290081402
+      - 4554272302379809908
+      - 15924157504918349308
+      - 18331464464310536425
+      - 2292989877418582707
+      - 1682051905634216147
+      - 9277846854264864933
+      - 3015329744583186767
+      - 162149534054231477
+      - 6630376773198558818
+      - 7562076932231910568
+      - 6309849053699577800
+      - 17618622406135231047
+      - 4647536863688545021
+      - 9997316614826821060
+      - 9832897256245327273
+      - 16103123452814638429
+      - 11274486374346585378
+      - 223317500553490292
+      - 3486779317052954359
+      - 13106449264185906434
+      - 5061839277828279224
+      - 1656676577746460656
+      - 18325670982947397201
+      - 7479338102868726026
+      - 9802067281274391955
+      - 7031739123983710582
+      - 2417652750706186624
+      - 6913098452901030745
+      - 10765384177709001448
+      - 1233990748962907759
+      - 10604242247912031542
+      - 13832073643189579980
+      - 534126962233704142
+      - 5734159455103572291
+      - 4618149021998797964
   - Handle: 4771447168072800515
     Type: Mesh
     Path: Meshes\mesh_62_0.kbrmesh
@@ -3284,6 +3990,14 @@ AssetRegistry:
     RootSourceHandle: 0
     ParentHandle: 0
     SubAssetKey: ""
+    ImportVersion: 1
+  - Handle: 5061839277828279224
+    Type: Texture2D
+    Path: Textures\4.kbrtexture
+    LibraryPath: Textures\4.kbrtexture
+    RootSourceHandle: 3592214733151679049
+    ParentHandle: 3592214733151679049
+    SubAssetKey: texture:4
     ImportVersion: 1
   - Handle: 5079907620425664531
     Type: Mesh
@@ -3454,6 +4168,14 @@ AssetRegistry:
     ParentHandle: 6532463041022503106
     SubAssetKey: mesh:52_0
     ImportVersion: 1
+  - Handle: 5326613399001570374
+    Type: Mesh
+    Path: Meshes\mesh_6_1.kbrmesh
+    LibraryPath: Meshes\mesh_6_1.kbrmesh
+    RootSourceHandle: 3592214733151679049
+    ParentHandle: 3592214733151679049
+    SubAssetKey: mesh:6_1
+    ImportVersion: 1
   - Handle: 5327073524580569084
     Type: Mesh
     Path: Meshes\mesh_2_1.kbrmesh
@@ -3614,6 +4336,14 @@ AssetRegistry:
     ParentHandle: 18146978209962790870
     SubAssetKey: mesh:7_0
     ImportVersion: 1
+  - Handle: 5482688447636322377
+    Type: Mesh
+    Path: Meshes\mesh_4_0.kbrmesh
+    LibraryPath: Meshes\mesh_4_0.kbrmesh
+    RootSourceHandle: 3592214733151679049
+    ParentHandle: 3592214733151679049
+    SubAssetKey: mesh:4_0
+    ImportVersion: 1
   - Handle: 5486903486868619713
     Type: Material
     Path: C:\Development\KerberosRenderer\KerberosEditor\Assets\ImportedModels\sponza\Material_0.kbrmat
@@ -3683,6 +4413,14 @@ AssetRegistry:
     ParentHandle: 7563732692318888728
     SubAssetKey: mesh:39_1
     ImportVersion: 1
+  - Handle: 5612235856839324777
+    Type: Mesh
+    Path: Meshes\mesh_0_1.kbrmesh
+    LibraryPath: Meshes\mesh_0_1.kbrmesh
+    RootSourceHandle: 3592214733151679049
+    ParentHandle: 3592214733151679049
+    SubAssetKey: mesh:0_1
+    ImportVersion: 1
   - Handle: 5632090381540611763
     Type: Mesh
     Path: Meshes\mesh_70_0.kbrmesh
@@ -3728,6 +4466,22 @@ AssetRegistry:
     RootSourceHandle: 0
     ParentHandle: 0
     SubAssetKey: ""
+    ImportVersion: 1
+  - Handle: 5720632228471702554
+    Type: Mesh
+    Path: Meshes\mesh_0_7.kbrmesh
+    LibraryPath: Meshes\mesh_0_7.kbrmesh
+    RootSourceHandle: 3592214733151679049
+    ParentHandle: 3592214733151679049
+    SubAssetKey: mesh:0_7
+    ImportVersion: 1
+  - Handle: 5734159455103572291
+    Type: Texture2D
+    Path: Textures\8.kbrtexture
+    LibraryPath: Textures\8.kbrtexture
+    RootSourceHandle: 3592214733151679049
+    ParentHandle: 3592214733151679049
+    SubAssetKey: texture:8
     ImportVersion: 1
   - Handle: 5739770532272088543
     Type: Mesh
@@ -3957,6 +4711,14 @@ AssetRegistry:
       - 10139219631869340974
       - 1914481735144350484
       - 7756105005459114169
+  - Handle: 5986402957627556839
+    Type: Mesh
+    Path: Meshes\mesh_1_0.kbrmesh
+    LibraryPath: Meshes\mesh_1_0.kbrmesh
+    RootSourceHandle: 3592214733151679049
+    ParentHandle: 3592214733151679049
+    SubAssetKey: mesh:1_0
+    ImportVersion: 1
   - Handle: 6012064600281542218
     Type: Mesh
     Path: Meshes\mesh_63_0.kbrmesh
@@ -3994,6 +4756,14 @@ AssetRegistry:
     RootSourceHandle: 0
     ParentHandle: 0
     SubAssetKey: ""
+    ImportVersion: 1
+  - Handle: 6047068936498750292
+    Type: Texture2D
+    Path: Textures\17.kbrtexture
+    LibraryPath: Textures\17.kbrtexture
+    RootSourceHandle: 3592214733151679049
+    ParentHandle: 3592214733151679049
+    SubAssetKey: texture:17
     ImportVersion: 1
   - Handle: 6049551034815355219
     Type: Mesh
@@ -4113,6 +4883,14 @@ AssetRegistry:
     ParentHandle: 7563732692318888728
     SubAssetKey: mesh:4_0
     ImportVersion: 1
+  - Handle: 6309849053699577800
+    Type: Texture2D
+    Path: Textures\30.kbrtexture
+    LibraryPath: Textures\30.kbrtexture
+    RootSourceHandle: 3592214733151679049
+    ParentHandle: 3592214733151679049
+    SubAssetKey: texture:30
+    ImportVersion: 1
   - Handle: 6312562313719225623
     Type: Mesh
     Path: Meshes\mesh_17_1.kbrmesh
@@ -4121,6 +4899,64 @@ AssetRegistry:
     ParentHandle: 11581378365515906497
     SubAssetKey: mesh:17_1
     ImportVersion: 1
+  - Handle: 6320926565740111627
+    Type: Material
+    Path: Materials\13.kbrmaterial
+    LibraryPath: Materials\13.kbrmaterial
+    RootSourceHandle: 3592214733151679049
+    ParentHandle: 3592214733151679049
+    SubAssetKey: material:13
+    ImportVersion: 1
+    Dependencies:
+      - 17892572518878110509
+      - 4571490681262020291
+      - 4386830571018427890
+      - 9602914115203217070
+      - 9406601308357270012
+      - 9102511368109540745
+      - 3415265635022088886
+      - 10841134288657483234
+      - 7332298763032844378
+      - 6047068936498750292
+      - 8863549481084937987
+      - 17726121017710461372
+      - 3416222974438391443
+      - 16878825194290081402
+      - 4554272302379809908
+      - 15924157504918349308
+      - 18331464464310536425
+      - 2292989877418582707
+      - 1682051905634216147
+      - 9277846854264864933
+      - 3015329744583186767
+      - 162149534054231477
+      - 6630376773198558818
+      - 7562076932231910568
+      - 6309849053699577800
+      - 17618622406135231047
+      - 4647536863688545021
+      - 9997316614826821060
+      - 9832897256245327273
+      - 16103123452814638429
+      - 11274486374346585378
+      - 223317500553490292
+      - 3486779317052954359
+      - 13106449264185906434
+      - 5061839277828279224
+      - 1656676577746460656
+      - 18325670982947397201
+      - 7479338102868726026
+      - 9802067281274391955
+      - 7031739123983710582
+      - 2417652750706186624
+      - 6913098452901030745
+      - 10765384177709001448
+      - 1233990748962907759
+      - 10604242247912031542
+      - 13832073643189579980
+      - 534126962233704142
+      - 5734159455103572291
+      - 4618149021998797964
   - Handle: 6326998918262674619
     Type: Mesh
     Path: Meshes\mesh_1_1.kbrmesh
@@ -4137,6 +4973,64 @@ AssetRegistry:
     ParentHandle: 583060611811443193
     SubAssetKey: mesh:0_0
     ImportVersion: 1
+  - Handle: 6349103434357564142
+    Type: Material
+    Path: Materials\1.kbrmaterial
+    LibraryPath: Materials\1.kbrmaterial
+    RootSourceHandle: 3592214733151679049
+    ParentHandle: 3592214733151679049
+    SubAssetKey: material:1
+    ImportVersion: 1
+    Dependencies:
+      - 17892572518878110509
+      - 4571490681262020291
+      - 4386830571018427890
+      - 9602914115203217070
+      - 9406601308357270012
+      - 9102511368109540745
+      - 3415265635022088886
+      - 10841134288657483234
+      - 7332298763032844378
+      - 6047068936498750292
+      - 8863549481084937987
+      - 17726121017710461372
+      - 3416222974438391443
+      - 16878825194290081402
+      - 4554272302379809908
+      - 15924157504918349308
+      - 18331464464310536425
+      - 2292989877418582707
+      - 1682051905634216147
+      - 9277846854264864933
+      - 3015329744583186767
+      - 162149534054231477
+      - 6630376773198558818
+      - 7562076932231910568
+      - 6309849053699577800
+      - 17618622406135231047
+      - 4647536863688545021
+      - 9997316614826821060
+      - 9832897256245327273
+      - 16103123452814638429
+      - 11274486374346585378
+      - 223317500553490292
+      - 3486779317052954359
+      - 13106449264185906434
+      - 5061839277828279224
+      - 1656676577746460656
+      - 18325670982947397201
+      - 7479338102868726026
+      - 9802067281274391955
+      - 7031739123983710582
+      - 2417652750706186624
+      - 6913098452901030745
+      - 10765384177709001448
+      - 1233990748962907759
+      - 10604242247912031542
+      - 13832073643189579980
+      - 534126962233704142
+      - 5734159455103572291
+      - 4618149021998797964
   - Handle: 6356777237071125490
     Type: Mesh
     Path: Meshes\mesh_1_0.kbrmesh
@@ -4223,6 +5117,14 @@ AssetRegistry:
     ParentHandle: 0
     SubAssetKey: ""
     ImportVersion: 1
+  - Handle: 6560070729656261243
+    Type: Mesh
+    Path: Meshes\mesh_0_3.kbrmesh
+    LibraryPath: Meshes\mesh_0_3.kbrmesh
+    RootSourceHandle: 3592214733151679049
+    ParentHandle: 3592214733151679049
+    SubAssetKey: mesh:0_3
+    ImportVersion: 1
   - Handle: 6595402251853178050
     Type: Prefab
     Path: Prefabs\0.kbrprefab
@@ -4248,6 +5150,14 @@ AssetRegistry:
     RootSourceHandle: 14244998688843197978
     ParentHandle: 14244998688843197978
     SubAssetKey: mesh:1_0
+    ImportVersion: 1
+  - Handle: 6630376773198558818
+    Type: Texture2D
+    Path: Textures\29.kbrtexture
+    LibraryPath: Textures\29.kbrtexture
+    RootSourceHandle: 3592214733151679049
+    ParentHandle: 3592214733151679049
+    SubAssetKey: texture:29
     ImportVersion: 1
   - Handle: 6630569904583130931
     Type: Texture2D
@@ -4312,6 +5222,14 @@ AssetRegistry:
       - 2924151825702596875
       - 12926576783441300841
       - 14566932452580292634
+  - Handle: 6698001431423713801
+    Type: Mesh
+    Path: Meshes\mesh_9_0.kbrmesh
+    LibraryPath: Meshes\mesh_9_0.kbrmesh
+    RootSourceHandle: 3592214733151679049
+    ParentHandle: 3592214733151679049
+    SubAssetKey: mesh:9_0
+    ImportVersion: 1
   - Handle: 6699725011826553957
     Type: Mesh
     Path: Meshes\mesh_26_0.kbrmesh
@@ -4401,6 +5319,14 @@ AssetRegistry:
     ParentHandle: 6532463041022503106
     SubAssetKey: mesh:34_0
     ImportVersion: 1
+  - Handle: 6913098452901030745
+    Type: Texture2D
+    Path: Textures\46.kbrtexture
+    LibraryPath: Textures\46.kbrtexture
+    RootSourceHandle: 3592214733151679049
+    ParentHandle: 3592214733151679049
+    SubAssetKey: texture:46
+    ImportVersion: 1
   - Handle: 6937769365296522446
     Type: Mesh
     Path: Meshes\mesh_19_0.kbrmesh
@@ -4448,6 +5374,14 @@ AssetRegistry:
     RootSourceHandle: 6532463041022503106
     ParentHandle: 6532463041022503106
     SubAssetKey: mesh:25_0
+    ImportVersion: 1
+  - Handle: 7031739123983710582
+    Type: Texture2D
+    Path: Textures\44.kbrtexture
+    LibraryPath: Textures\44.kbrtexture
+    RootSourceHandle: 3592214733151679049
+    ParentHandle: 3592214733151679049
+    SubAssetKey: texture:44
     ImportVersion: 1
   - Handle: 7040673874607876108
     Type: Material
@@ -4510,6 +5444,14 @@ AssetRegistry:
     RootSourceHandle: 601935324361006322
     ParentHandle: 601935324361006322
     SubAssetKey: mesh:0_0
+    ImportVersion: 1
+  - Handle: 7140830431065720594
+    Type: Mesh
+    Path: Meshes\mesh_3_0.kbrmesh
+    LibraryPath: Meshes\mesh_3_0.kbrmesh
+    RootSourceHandle: 3592214733151679049
+    ParentHandle: 3592214733151679049
+    SubAssetKey: mesh:3_0
     ImportVersion: 1
   - Handle: 7148630189540508616
     Type: Material
@@ -4647,6 +5589,64 @@ AssetRegistry:
     ParentHandle: 7563732692318888728
     SubAssetKey: mesh:7_0
     ImportVersion: 1
+  - Handle: 7305894499464846406
+    Type: Material
+    Path: Materials\10.kbrmaterial
+    LibraryPath: Materials\10.kbrmaterial
+    RootSourceHandle: 3592214733151679049
+    ParentHandle: 3592214733151679049
+    SubAssetKey: material:10
+    ImportVersion: 1
+    Dependencies:
+      - 17892572518878110509
+      - 4571490681262020291
+      - 4386830571018427890
+      - 9602914115203217070
+      - 9406601308357270012
+      - 9102511368109540745
+      - 3415265635022088886
+      - 10841134288657483234
+      - 7332298763032844378
+      - 6047068936498750292
+      - 8863549481084937987
+      - 17726121017710461372
+      - 3416222974438391443
+      - 16878825194290081402
+      - 4554272302379809908
+      - 15924157504918349308
+      - 18331464464310536425
+      - 2292989877418582707
+      - 1682051905634216147
+      - 9277846854264864933
+      - 3015329744583186767
+      - 162149534054231477
+      - 6630376773198558818
+      - 7562076932231910568
+      - 6309849053699577800
+      - 17618622406135231047
+      - 4647536863688545021
+      - 9997316614826821060
+      - 9832897256245327273
+      - 16103123452814638429
+      - 11274486374346585378
+      - 223317500553490292
+      - 3486779317052954359
+      - 13106449264185906434
+      - 5061839277828279224
+      - 1656676577746460656
+      - 18325670982947397201
+      - 7479338102868726026
+      - 9802067281274391955
+      - 7031739123983710582
+      - 2417652750706186624
+      - 6913098452901030745
+      - 10765384177709001448
+      - 1233990748962907759
+      - 10604242247912031542
+      - 13832073643189579980
+      - 534126962233704142
+      - 5734159455103572291
+      - 4618149021998797964
   - Handle: 7308170944533328017
     Type: Material
     Path: Materials\57.kbrmaterial
@@ -4662,6 +5662,14 @@ AssetRegistry:
     RootSourceHandle: 10881124940085977282
     ParentHandle: 10881124940085977282
     SubAssetKey: mesh:1_0
+    ImportVersion: 1
+  - Handle: 7332298763032844378
+    Type: Texture2D
+    Path: Textures\16.kbrtexture
+    LibraryPath: Textures\16.kbrtexture
+    RootSourceHandle: 3592214733151679049
+    ParentHandle: 3592214733151679049
+    SubAssetKey: texture:16
     ImportVersion: 1
   - Handle: 7332958245068331126
     Type: Material
@@ -4756,6 +5764,14 @@ AssetRegistry:
     ParentHandle: 10934383581697002570
     SubAssetKey: material:10
     ImportVersion: 1
+  - Handle: 7479338102868726026
+    Type: Texture2D
+    Path: Textures\42.kbrtexture
+    LibraryPath: Textures\42.kbrtexture
+    RootSourceHandle: 3592214733151679049
+    ParentHandle: 3592214733151679049
+    SubAssetKey: texture:42
+    ImportVersion: 1
   - Handle: 7495980876294153059
     Type: Prefab
     Path: Prefabs\0.kbrprefab
@@ -4817,6 +5833,14 @@ AssetRegistry:
     RootSourceHandle: 8858309372063028477
     ParentHandle: 8858309372063028477
     SubAssetKey: mesh:24_0
+    ImportVersion: 1
+  - Handle: 7562076932231910568
+    Type: Texture2D
+    Path: Textures\3.kbrtexture
+    LibraryPath: Textures\3.kbrtexture
+    RootSourceHandle: 3592214733151679049
+    ParentHandle: 3592214733151679049
+    SubAssetKey: texture:3
     ImportVersion: 1
   - Handle: 7563732692318888728
     Type: Model
@@ -4902,6 +5926,14 @@ AssetRegistry:
     RootSourceHandle: 0
     ParentHandle: 0
     SubAssetKey: ""
+    ImportVersion: 1
+  - Handle: 7644080631679312852
+    Type: Mesh
+    Path: Meshes\mesh_8_0.kbrmesh
+    LibraryPath: Meshes\mesh_8_0.kbrmesh
+    RootSourceHandle: 3592214733151679049
+    ParentHandle: 3592214733151679049
+    SubAssetKey: mesh:8_0
     ImportVersion: 1
   - Handle: 7660354473404361516
     Type: Material
@@ -5660,6 +6692,64 @@ AssetRegistry:
     ParentHandle: 7563732692318888728
     SubAssetKey: mesh:13_1
     ImportVersion: 1
+  - Handle: 8736502972250848634
+    Type: Material
+    Path: Materials\2.kbrmaterial
+    LibraryPath: Materials\2.kbrmaterial
+    RootSourceHandle: 3592214733151679049
+    ParentHandle: 3592214733151679049
+    SubAssetKey: material:2
+    ImportVersion: 1
+    Dependencies:
+      - 17892572518878110509
+      - 4571490681262020291
+      - 4386830571018427890
+      - 9602914115203217070
+      - 9406601308357270012
+      - 9102511368109540745
+      - 3415265635022088886
+      - 10841134288657483234
+      - 7332298763032844378
+      - 6047068936498750292
+      - 8863549481084937987
+      - 17726121017710461372
+      - 3416222974438391443
+      - 16878825194290081402
+      - 4554272302379809908
+      - 15924157504918349308
+      - 18331464464310536425
+      - 2292989877418582707
+      - 1682051905634216147
+      - 9277846854264864933
+      - 3015329744583186767
+      - 162149534054231477
+      - 6630376773198558818
+      - 7562076932231910568
+      - 6309849053699577800
+      - 17618622406135231047
+      - 4647536863688545021
+      - 9997316614826821060
+      - 9832897256245327273
+      - 16103123452814638429
+      - 11274486374346585378
+      - 223317500553490292
+      - 3486779317052954359
+      - 13106449264185906434
+      - 5061839277828279224
+      - 1656676577746460656
+      - 18325670982947397201
+      - 7479338102868726026
+      - 9802067281274391955
+      - 7031739123983710582
+      - 2417652750706186624
+      - 6913098452901030745
+      - 10765384177709001448
+      - 1233990748962907759
+      - 10604242247912031542
+      - 13832073643189579980
+      - 534126962233704142
+      - 5734159455103572291
+      - 4618149021998797964
   - Handle: 8739797389701413985
     Type: Mesh
     Path: Meshes\mesh_2_0.kbrmesh
@@ -5745,6 +6835,14 @@ AssetRegistry:
     RootSourceHandle: 8858309372063028477
     ParentHandle: 0
     SubAssetKey: ""
+    ImportVersion: 1
+  - Handle: 8863549481084937987
+    Type: Texture2D
+    Path: Textures\18.kbrtexture
+    LibraryPath: Textures\18.kbrtexture
+    RootSourceHandle: 3592214733151679049
+    ParentHandle: 3592214733151679049
+    SubAssetKey: texture:18
     ImportVersion: 1
   - Handle: 8883860076979378219
     Type: Mesh
@@ -5844,6 +6942,14 @@ AssetRegistry:
     RootSourceHandle: 18268071128944098402
     ParentHandle: 18268071128944098402
     SubAssetKey: mesh:1_2
+    ImportVersion: 1
+  - Handle: 9102511368109540745
+    Type: Texture2D
+    Path: Textures\13.kbrtexture
+    LibraryPath: Textures\13.kbrtexture
+    RootSourceHandle: 3592214733151679049
+    ParentHandle: 3592214733151679049
+    SubAssetKey: texture:13
     ImportVersion: 1
   - Handle: 9108541160281777125
     Type: Texture2D
@@ -5963,6 +7069,14 @@ AssetRegistry:
     ParentHandle: 6532463041022503106
     SubAssetKey: mesh:54_0
     ImportVersion: 1
+  - Handle: 9277846854264864933
+    Type: Texture2D
+    Path: Textures\26.kbrtexture
+    LibraryPath: Textures\26.kbrtexture
+    RootSourceHandle: 3592214733151679049
+    ParentHandle: 3592214733151679049
+    SubAssetKey: texture:26
+    ImportVersion: 1
   - Handle: 9291749905009756433
     Type: Material
     Path: Materials\59.kbrmaterial
@@ -6042,6 +7156,64 @@ AssetRegistry:
     ParentHandle: 8858309372063028477
     SubAssetKey: mesh:64_0
     ImportVersion: 1
+  - Handle: 9369297552604712732
+    Type: Material
+    Path: Materials\21.kbrmaterial
+    LibraryPath: Materials\21.kbrmaterial
+    RootSourceHandle: 3592214733151679049
+    ParentHandle: 3592214733151679049
+    SubAssetKey: material:21
+    ImportVersion: 1
+    Dependencies:
+      - 17892572518878110509
+      - 4571490681262020291
+      - 4386830571018427890
+      - 9602914115203217070
+      - 9406601308357270012
+      - 9102511368109540745
+      - 3415265635022088886
+      - 10841134288657483234
+      - 7332298763032844378
+      - 6047068936498750292
+      - 8863549481084937987
+      - 17726121017710461372
+      - 3416222974438391443
+      - 16878825194290081402
+      - 4554272302379809908
+      - 15924157504918349308
+      - 18331464464310536425
+      - 2292989877418582707
+      - 1682051905634216147
+      - 9277846854264864933
+      - 3015329744583186767
+      - 162149534054231477
+      - 6630376773198558818
+      - 7562076932231910568
+      - 6309849053699577800
+      - 17618622406135231047
+      - 4647536863688545021
+      - 9997316614826821060
+      - 9832897256245327273
+      - 16103123452814638429
+      - 11274486374346585378
+      - 223317500553490292
+      - 3486779317052954359
+      - 13106449264185906434
+      - 5061839277828279224
+      - 1656676577746460656
+      - 18325670982947397201
+      - 7479338102868726026
+      - 9802067281274391955
+      - 7031739123983710582
+      - 2417652750706186624
+      - 6913098452901030745
+      - 10765384177709001448
+      - 1233990748962907759
+      - 10604242247912031542
+      - 13832073643189579980
+      - 534126962233704142
+      - 5734159455103572291
+      - 4618149021998797964
   - Handle: 9374758325805747966
     Type: Mesh
     Path: Meshes\mesh_30_0.kbrmesh
@@ -6049,6 +7221,14 @@ AssetRegistry:
     RootSourceHandle: 6532463041022503106
     ParentHandle: 6532463041022503106
     SubAssetKey: mesh:30_0
+    ImportVersion: 1
+  - Handle: 9406601308357270012
+    Type: Texture2D
+    Path: Textures\12.kbrtexture
+    LibraryPath: Textures\12.kbrtexture
+    RootSourceHandle: 3592214733151679049
+    ParentHandle: 3592214733151679049
+    SubAssetKey: texture:12
     ImportVersion: 1
   - Handle: 9426472049594984257
     Type: Model
@@ -6127,6 +7307,14 @@ AssetRegistry:
     RootSourceHandle: 7563732692318888728
     ParentHandle: 7563732692318888728
     SubAssetKey: mesh:15_1
+    ImportVersion: 1
+  - Handle: 9602914115203217070
+    Type: Texture2D
+    Path: Textures\11.kbrtexture
+    LibraryPath: Textures\11.kbrtexture
+    RootSourceHandle: 3592214733151679049
+    ParentHandle: 3592214733151679049
+    SubAssetKey: texture:11
     ImportVersion: 1
   - Handle: 9617278334156079787
     Type: Material
@@ -6216,6 +7404,14 @@ AssetRegistry:
     ParentHandle: 583060611811443193
     SubAssetKey: material:1
     ImportVersion: 1
+  - Handle: 9802067281274391955
+    Type: Texture2D
+    Path: Textures\43.kbrtexture
+    LibraryPath: Textures\43.kbrtexture
+    RootSourceHandle: 3592214733151679049
+    ParentHandle: 3592214733151679049
+    SubAssetKey: texture:43
+    ImportVersion: 1
   - Handle: 9808448206523787780
     Type: Mesh
     Path: Meshes\mesh_0_0.kbrmesh
@@ -6231,6 +7427,14 @@ AssetRegistry:
     RootSourceHandle: 10881124940085977282
     ParentHandle: 10881124940085977282
     SubAssetKey: mesh:11_0
+    ImportVersion: 1
+  - Handle: 9832897256245327273
+    Type: Texture2D
+    Path: Textures\34.kbrtexture
+    LibraryPath: Textures\34.kbrtexture
+    RootSourceHandle: 3592214733151679049
+    ParentHandle: 3592214733151679049
+    SubAssetKey: texture:34
     ImportVersion: 1
   - Handle: 9839828198670662324
     Type: Mesh
@@ -6382,6 +7586,14 @@ AssetRegistry:
     ParentHandle: 0
     SubAssetKey: ""
     ImportVersion: 1
+  - Handle: 9997316614826821060
+    Type: Texture2D
+    Path: Textures\33.kbrtexture
+    LibraryPath: Textures\33.kbrtexture
+    RootSourceHandle: 3592214733151679049
+    ParentHandle: 3592214733151679049
+    SubAssetKey: texture:33
+    ImportVersion: 1
   - Handle: 10019029325590162123
     Type: Mesh
     Path: Meshes\mesh_6_0.kbrmesh
@@ -6424,6 +7636,64 @@ AssetRegistry:
     ImportVersion: 1
     Dependencies:
       - 2718653949949361228
+  - Handle: 10051159133574294442
+    Type: Material
+    Path: Materials\0.kbrmaterial
+    LibraryPath: Materials\0.kbrmaterial
+    RootSourceHandle: 3592214733151679049
+    ParentHandle: 3592214733151679049
+    SubAssetKey: material:0
+    ImportVersion: 1
+    Dependencies:
+      - 17892572518878110509
+      - 4571490681262020291
+      - 4386830571018427890
+      - 9602914115203217070
+      - 9406601308357270012
+      - 9102511368109540745
+      - 3415265635022088886
+      - 10841134288657483234
+      - 7332298763032844378
+      - 6047068936498750292
+      - 8863549481084937987
+      - 17726121017710461372
+      - 3416222974438391443
+      - 16878825194290081402
+      - 4554272302379809908
+      - 15924157504918349308
+      - 18331464464310536425
+      - 2292989877418582707
+      - 1682051905634216147
+      - 9277846854264864933
+      - 3015329744583186767
+      - 162149534054231477
+      - 6630376773198558818
+      - 7562076932231910568
+      - 6309849053699577800
+      - 17618622406135231047
+      - 4647536863688545021
+      - 9997316614826821060
+      - 9832897256245327273
+      - 16103123452814638429
+      - 11274486374346585378
+      - 223317500553490292
+      - 3486779317052954359
+      - 13106449264185906434
+      - 5061839277828279224
+      - 1656676577746460656
+      - 18325670982947397201
+      - 7479338102868726026
+      - 9802067281274391955
+      - 7031739123983710582
+      - 2417652750706186624
+      - 6913098452901030745
+      - 10765384177709001448
+      - 1233990748962907759
+      - 10604242247912031542
+      - 13832073643189579980
+      - 534126962233704142
+      - 5734159455103572291
+      - 4618149021998797964
   - Handle: 10074170678567932633
     Type: Mesh
     Path: Meshes\mesh_74_0.kbrmesh
@@ -6570,6 +7840,14 @@ AssetRegistry:
     RootSourceHandle: 14244998688843197978
     ParentHandle: 14244998688843197978
     SubAssetKey: mesh:61_0
+    ImportVersion: 1
+  - Handle: 10332089540996564903
+    Type: Mesh
+    Path: Meshes\mesh_3_1.kbrmesh
+    LibraryPath: Meshes\mesh_3_1.kbrmesh
+    RootSourceHandle: 3592214733151679049
+    ParentHandle: 3592214733151679049
+    SubAssetKey: mesh:3_1
     ImportVersion: 1
   - Handle: 10376296709207270545
     Type: Mesh
@@ -6718,6 +7996,14 @@ AssetRegistry:
     ParentHandle: 8858309372063028477
     SubAssetKey: mesh:54_0
     ImportVersion: 1
+  - Handle: 10604242247912031542
+    Type: Texture2D
+    Path: Textures\5.kbrtexture
+    LibraryPath: Textures\5.kbrtexture
+    RootSourceHandle: 3592214733151679049
+    ParentHandle: 3592214733151679049
+    SubAssetKey: texture:5
+    ImportVersion: 1
   - Handle: 10632474817274883222
     Type: Mesh
     Path: Meshes\mesh_67_0.kbrmesh
@@ -6813,6 +8099,14 @@ AssetRegistry:
     ParentHandle: 0
     SubAssetKey: ""
     ImportVersion: 1
+  - Handle: 10765384177709001448
+    Type: Texture2D
+    Path: Textures\47.kbrtexture
+    LibraryPath: Textures\47.kbrtexture
+    RootSourceHandle: 3592214733151679049
+    ParentHandle: 3592214733151679049
+    SubAssetKey: texture:47
+    ImportVersion: 1
   - Handle: 10770776342521560225
     Type: Material
     Path: Materials\134.kbrmaterial
@@ -6900,6 +8194,14 @@ AssetRegistry:
     RootSourceHandle: 8858309372063028477
     ParentHandle: 8858309372063028477
     SubAssetKey: mesh:26_0
+    ImportVersion: 1
+  - Handle: 10841134288657483234
+    Type: Texture2D
+    Path: Textures\15.kbrtexture
+    LibraryPath: Textures\15.kbrtexture
+    RootSourceHandle: 3592214733151679049
+    ParentHandle: 3592214733151679049
+    SubAssetKey: texture:15
     ImportVersion: 1
   - Handle: 10845181145430735859
     Type: Prefab
@@ -7215,6 +8517,14 @@ AssetRegistry:
     Dependencies:
       - 7406437769366554508
       - 1088780657645338791
+  - Handle: 11274486374346585378
+    Type: Texture2D
+    Path: Textures\36.kbrtexture
+    LibraryPath: Textures\36.kbrtexture
+    RootSourceHandle: 3592214733151679049
+    ParentHandle: 3592214733151679049
+    SubAssetKey: texture:36
+    ImportVersion: 1
   - Handle: 11281633790612696209
     Type: Material
     Path: Materials\68.kbrmaterial
@@ -7287,6 +8597,14 @@ AssetRegistry:
     ParentHandle: 5954077952050993354
     SubAssetKey: mesh:0_0
     ImportVersion: 1
+  - Handle: 11451186213160227890
+    Type: Mesh
+    Path: Meshes\mesh_5_1.kbrmesh
+    LibraryPath: Meshes\mesh_5_1.kbrmesh
+    RootSourceHandle: 3592214733151679049
+    ParentHandle: 3592214733151679049
+    SubAssetKey: mesh:5_1
+    ImportVersion: 1
   - Handle: 11453815737906143822
     Type: Mesh
     Path: Meshes\mesh_97_0.kbrmesh
@@ -7294,6 +8612,14 @@ AssetRegistry:
     RootSourceHandle: 7563732692318888728
     ParentHandle: 7563732692318888728
     SubAssetKey: mesh:97_0
+    ImportVersion: 1
+  - Handle: 11483929653628971340
+    Type: Mesh
+    Path: Meshes\mesh_7_0.kbrmesh
+    LibraryPath: Meshes\mesh_7_0.kbrmesh
+    RootSourceHandle: 3592214733151679049
+    ParentHandle: 3592214733151679049
+    SubAssetKey: mesh:7_0
     ImportVersion: 1
   - Handle: 11487240311461131802
     Type: Texture2D
@@ -7670,6 +8996,14 @@ AssetRegistry:
     ParentHandle: 10881124940085977282
     SubAssetKey: mesh:10_1
     ImportVersion: 1
+  - Handle: 12205787463978693335
+    Type: Mesh
+    Path: Meshes\mesh_0_6.kbrmesh
+    LibraryPath: Meshes\mesh_0_6.kbrmesh
+    RootSourceHandle: 3592214733151679049
+    ParentHandle: 3592214733151679049
+    SubAssetKey: mesh:0_6
+    ImportVersion: 1
   - Handle: 12223276858219806200
     Type: Mesh
     Path: Meshes\mesh_1_0.kbrmesh
@@ -7678,6 +9012,64 @@ AssetRegistry:
     ParentHandle: 8858309372063028477
     SubAssetKey: mesh:1_0
     ImportVersion: 1
+  - Handle: 12231249857721946300
+    Type: Material
+    Path: Materials\22.kbrmaterial
+    LibraryPath: Materials\22.kbrmaterial
+    RootSourceHandle: 3592214733151679049
+    ParentHandle: 3592214733151679049
+    SubAssetKey: material:22
+    ImportVersion: 1
+    Dependencies:
+      - 17892572518878110509
+      - 4571490681262020291
+      - 4386830571018427890
+      - 9602914115203217070
+      - 9406601308357270012
+      - 9102511368109540745
+      - 3415265635022088886
+      - 10841134288657483234
+      - 7332298763032844378
+      - 6047068936498750292
+      - 8863549481084937987
+      - 17726121017710461372
+      - 3416222974438391443
+      - 16878825194290081402
+      - 4554272302379809908
+      - 15924157504918349308
+      - 18331464464310536425
+      - 2292989877418582707
+      - 1682051905634216147
+      - 9277846854264864933
+      - 3015329744583186767
+      - 162149534054231477
+      - 6630376773198558818
+      - 7562076932231910568
+      - 6309849053699577800
+      - 17618622406135231047
+      - 4647536863688545021
+      - 9997316614826821060
+      - 9832897256245327273
+      - 16103123452814638429
+      - 11274486374346585378
+      - 223317500553490292
+      - 3486779317052954359
+      - 13106449264185906434
+      - 5061839277828279224
+      - 1656676577746460656
+      - 18325670982947397201
+      - 7479338102868726026
+      - 9802067281274391955
+      - 7031739123983710582
+      - 2417652750706186624
+      - 6913098452901030745
+      - 10765384177709001448
+      - 1233990748962907759
+      - 10604242247912031542
+      - 13832073643189579980
+      - 534126962233704142
+      - 5734159455103572291
+      - 4618149021998797964
   - Handle: 12273150898644864466
     Type: Mesh
     Path: Meshes\mesh_0_0.kbrmesh
@@ -7740,6 +9132,64 @@ AssetRegistry:
     ParentHandle: 7563732692318888728
     SubAssetKey: material:44
     ImportVersion: 1
+  - Handle: 12381593450151428241
+    Type: Material
+    Path: Materials\4.kbrmaterial
+    LibraryPath: Materials\4.kbrmaterial
+    RootSourceHandle: 3592214733151679049
+    ParentHandle: 3592214733151679049
+    SubAssetKey: material:4
+    ImportVersion: 1
+    Dependencies:
+      - 17892572518878110509
+      - 4571490681262020291
+      - 4386830571018427890
+      - 9602914115203217070
+      - 9406601308357270012
+      - 9102511368109540745
+      - 3415265635022088886
+      - 10841134288657483234
+      - 7332298763032844378
+      - 6047068936498750292
+      - 8863549481084937987
+      - 17726121017710461372
+      - 3416222974438391443
+      - 16878825194290081402
+      - 4554272302379809908
+      - 15924157504918349308
+      - 18331464464310536425
+      - 2292989877418582707
+      - 1682051905634216147
+      - 9277846854264864933
+      - 3015329744583186767
+      - 162149534054231477
+      - 6630376773198558818
+      - 7562076932231910568
+      - 6309849053699577800
+      - 17618622406135231047
+      - 4647536863688545021
+      - 9997316614826821060
+      - 9832897256245327273
+      - 16103123452814638429
+      - 11274486374346585378
+      - 223317500553490292
+      - 3486779317052954359
+      - 13106449264185906434
+      - 5061839277828279224
+      - 1656676577746460656
+      - 18325670982947397201
+      - 7479338102868726026
+      - 9802067281274391955
+      - 7031739123983710582
+      - 2417652750706186624
+      - 6913098452901030745
+      - 10765384177709001448
+      - 1233990748962907759
+      - 10604242247912031542
+      - 13832073643189579980
+      - 534126962233704142
+      - 5734159455103572291
+      - 4618149021998797964
   - Handle: 12385282943144861126
     Type: Sound
     Path: Assets\Sounds\freesound_community-doorhit.wav
@@ -8149,6 +9599,14 @@ AssetRegistry:
     ParentHandle: 13025862333548612002
     SubAssetKey: mesh:6_0
     ImportVersion: 1
+  - Handle: 13106449264185906434
+    Type: Texture2D
+    Path: Textures\39.kbrtexture
+    LibraryPath: Textures\39.kbrtexture
+    RootSourceHandle: 3592214733151679049
+    ParentHandle: 3592214733151679049
+    SubAssetKey: texture:39
+    ImportVersion: 1
   - Handle: 13110728040056413928
     Type: Material
     Path: Materials\1.kbrmaterial
@@ -8400,6 +9858,72 @@ AssetRegistry:
     ParentHandle: 7563732692318888728
     SubAssetKey: mesh:77_1
     ImportVersion: 1
+  - Handle: 13346003504517060693
+    Type: Mesh
+    Path: Meshes\mesh_6_0.kbrmesh
+    LibraryPath: Meshes\mesh_6_0.kbrmesh
+    RootSourceHandle: 3592214733151679049
+    ParentHandle: 3592214733151679049
+    SubAssetKey: mesh:6_0
+    ImportVersion: 1
+  - Handle: 13346781592115606968
+    Type: Material
+    Path: Materials\23.kbrmaterial
+    LibraryPath: Materials\23.kbrmaterial
+    RootSourceHandle: 3592214733151679049
+    ParentHandle: 3592214733151679049
+    SubAssetKey: material:23
+    ImportVersion: 1
+    Dependencies:
+      - 17892572518878110509
+      - 4571490681262020291
+      - 4386830571018427890
+      - 9602914115203217070
+      - 9406601308357270012
+      - 9102511368109540745
+      - 3415265635022088886
+      - 10841134288657483234
+      - 7332298763032844378
+      - 6047068936498750292
+      - 8863549481084937987
+      - 17726121017710461372
+      - 3416222974438391443
+      - 16878825194290081402
+      - 4554272302379809908
+      - 15924157504918349308
+      - 18331464464310536425
+      - 2292989877418582707
+      - 1682051905634216147
+      - 9277846854264864933
+      - 3015329744583186767
+      - 162149534054231477
+      - 6630376773198558818
+      - 7562076932231910568
+      - 6309849053699577800
+      - 17618622406135231047
+      - 4647536863688545021
+      - 9997316614826821060
+      - 9832897256245327273
+      - 16103123452814638429
+      - 11274486374346585378
+      - 223317500553490292
+      - 3486779317052954359
+      - 13106449264185906434
+      - 5061839277828279224
+      - 1656676577746460656
+      - 18325670982947397201
+      - 7479338102868726026
+      - 9802067281274391955
+      - 7031739123983710582
+      - 2417652750706186624
+      - 6913098452901030745
+      - 10765384177709001448
+      - 1233990748962907759
+      - 10604242247912031542
+      - 13832073643189579980
+      - 534126962233704142
+      - 5734159455103572291
+      - 4618149021998797964
   - Handle: 13376614377632433265
     Type: Model
     Path: Models\CesiumMan\glTF-Binary\CesiumMan.glb
@@ -8501,6 +10025,14 @@ AssetRegistry:
     ParentHandle: 11581378365515906497
     SubAssetKey: mesh:20_0
     ImportVersion: 1
+  - Handle: 13613779281806729955
+    Type: Mesh
+    Path: Meshes\mesh_7_1.kbrmesh
+    LibraryPath: Meshes\mesh_7_1.kbrmesh
+    RootSourceHandle: 3592214733151679049
+    ParentHandle: 3592214733151679049
+    SubAssetKey: mesh:7_1
+    ImportVersion: 1
   - Handle: 13674601042531845732
     Type: Prefab
     Path: Prefabs\0.kbrprefab
@@ -8567,6 +10099,14 @@ AssetRegistry:
     ParentHandle: 11734900932705191300
     SubAssetKey: mesh:6_1
     ImportVersion: 1
+  - Handle: 13742802974986305692
+    Type: Mesh
+    Path: Meshes\mesh_0_8.kbrmesh
+    LibraryPath: Meshes\mesh_0_8.kbrmesh
+    RootSourceHandle: 3592214733151679049
+    ParentHandle: 3592214733151679049
+    SubAssetKey: mesh:0_8
+    ImportVersion: 1
   - Handle: 13776328120998914996
     Type: Mesh
     Path: Meshes\mesh_38_0.kbrmesh
@@ -8598,6 +10138,14 @@ AssetRegistry:
     RootSourceHandle: 7563732692318888728
     ParentHandle: 7563732692318888728
     SubAssetKey: mesh:59_0
+    ImportVersion: 1
+  - Handle: 13832073643189579980
+    Type: Texture2D
+    Path: Textures\6.kbrtexture
+    LibraryPath: Textures\6.kbrtexture
+    RootSourceHandle: 3592214733151679049
+    ParentHandle: 3592214733151679049
+    SubAssetKey: texture:6
     ImportVersion: 1
   - Handle: 13832618929387549735
     Type: Mesh
@@ -8803,6 +10351,14 @@ AssetRegistry:
     ParentHandle: 7563732692318888728
     SubAssetKey: mesh:17_0
     ImportVersion: 1
+  - Handle: 14325903939470384668
+    Type: Mesh
+    Path: Meshes\mesh_0_2.kbrmesh
+    LibraryPath: Meshes\mesh_0_2.kbrmesh
+    RootSourceHandle: 3592214733151679049
+    ParentHandle: 3592214733151679049
+    SubAssetKey: mesh:0_2
+    ImportVersion: 1
   - Handle: 14328482461823947123
     Type: Mesh
     Path: Meshes\mesh_5_3.kbrmesh
@@ -8976,6 +10532,14 @@ AssetRegistry:
     ParentHandle: 11581378365515906497
     SubAssetKey: mesh:9_1
     ImportVersion: 1
+  - Handle: 14581236797814382098
+    Type: Mesh
+    Path: Meshes\mesh_10_0.kbrmesh
+    LibraryPath: Meshes\mesh_10_0.kbrmesh
+    RootSourceHandle: 3592214733151679049
+    ParentHandle: 3592214733151679049
+    SubAssetKey: mesh:10_0
+    ImportVersion: 1
   - Handle: 14591437211258571756
     Type: Material
     Path: C:\Development\KerberosRenderer\KerberosEditor\Assets\ImportedModels\sponza\Material_6.kbrmat
@@ -9138,6 +10702,14 @@ AssetRegistry:
     LibraryPath: Meshes\mesh_11_0.kbrmesh
     RootSourceHandle: 6532463041022503106
     ParentHandle: 6532463041022503106
+    SubAssetKey: mesh:11_0
+    ImportVersion: 1
+  - Handle: 14879467559709340461
+    Type: Mesh
+    Path: Meshes\mesh_11_0.kbrmesh
+    LibraryPath: Meshes\mesh_11_0.kbrmesh
+    RootSourceHandle: 3592214733151679049
+    ParentHandle: 3592214733151679049
     SubAssetKey: mesh:11_0
     ImportVersion: 1
   - Handle: 14918301743479221969
@@ -9417,6 +10989,64 @@ AssetRegistry:
     ParentHandle: 0
     SubAssetKey: ""
     ImportVersion: 1
+  - Handle: 15529083784331757630
+    Type: Material
+    Path: Materials\6.kbrmaterial
+    LibraryPath: Materials\6.kbrmaterial
+    RootSourceHandle: 3592214733151679049
+    ParentHandle: 3592214733151679049
+    SubAssetKey: material:6
+    ImportVersion: 1
+    Dependencies:
+      - 17892572518878110509
+      - 4571490681262020291
+      - 4386830571018427890
+      - 9602914115203217070
+      - 9406601308357270012
+      - 9102511368109540745
+      - 3415265635022088886
+      - 10841134288657483234
+      - 7332298763032844378
+      - 6047068936498750292
+      - 8863549481084937987
+      - 17726121017710461372
+      - 3416222974438391443
+      - 16878825194290081402
+      - 4554272302379809908
+      - 15924157504918349308
+      - 18331464464310536425
+      - 2292989877418582707
+      - 1682051905634216147
+      - 9277846854264864933
+      - 3015329744583186767
+      - 162149534054231477
+      - 6630376773198558818
+      - 7562076932231910568
+      - 6309849053699577800
+      - 17618622406135231047
+      - 4647536863688545021
+      - 9997316614826821060
+      - 9832897256245327273
+      - 16103123452814638429
+      - 11274486374346585378
+      - 223317500553490292
+      - 3486779317052954359
+      - 13106449264185906434
+      - 5061839277828279224
+      - 1656676577746460656
+      - 18325670982947397201
+      - 7479338102868726026
+      - 9802067281274391955
+      - 7031739123983710582
+      - 2417652750706186624
+      - 6913098452901030745
+      - 10765384177709001448
+      - 1233990748962907759
+      - 10604242247912031542
+      - 13832073643189579980
+      - 534126962233704142
+      - 5734159455103572291
+      - 4618149021998797964
   - Handle: 15552838372300143613
     Type: Material
     Path: Materials\0.kbrmaterial
@@ -9543,6 +11173,14 @@ AssetRegistry:
     ParentHandle: 0
     SubAssetKey: ""
     ImportVersion: 1
+  - Handle: 15777906348711328762
+    Type: Mesh
+    Path: Meshes\mesh_0_5.kbrmesh
+    LibraryPath: Meshes\mesh_0_5.kbrmesh
+    RootSourceHandle: 3592214733151679049
+    ParentHandle: 3592214733151679049
+    SubAssetKey: mesh:0_5
+    ImportVersion: 1
   - Handle: 15778936489304889724
     Type: Mesh
     Path: Meshes\mesh_16_0.kbrmesh
@@ -9657,6 +11295,14 @@ AssetRegistry:
     Dependencies:
       - 6777624914576300078
       - 12612431020404786102
+  - Handle: 15924157504918349308
+    Type: Texture2D
+    Path: Textures\22.kbrtexture
+    LibraryPath: Textures\22.kbrtexture
+    RootSourceHandle: 3592214733151679049
+    ParentHandle: 3592214733151679049
+    SubAssetKey: texture:22
+    ImportVersion: 1
   - Handle: 15928276918545384593
     Type: Mesh
     Path: Meshes\mesh_57_0.kbrmesh
@@ -9713,6 +11359,64 @@ AssetRegistry:
     ParentHandle: 6532463041022503106
     SubAssetKey: mesh:31_0
     ImportVersion: 1
+  - Handle: 16085830695486284805
+    Type: Material
+    Path: Materials\16.kbrmaterial
+    LibraryPath: Materials\16.kbrmaterial
+    RootSourceHandle: 3592214733151679049
+    ParentHandle: 3592214733151679049
+    SubAssetKey: material:16
+    ImportVersion: 1
+    Dependencies:
+      - 17892572518878110509
+      - 4571490681262020291
+      - 4386830571018427890
+      - 9602914115203217070
+      - 9406601308357270012
+      - 9102511368109540745
+      - 3415265635022088886
+      - 10841134288657483234
+      - 7332298763032844378
+      - 6047068936498750292
+      - 8863549481084937987
+      - 17726121017710461372
+      - 3416222974438391443
+      - 16878825194290081402
+      - 4554272302379809908
+      - 15924157504918349308
+      - 18331464464310536425
+      - 2292989877418582707
+      - 1682051905634216147
+      - 9277846854264864933
+      - 3015329744583186767
+      - 162149534054231477
+      - 6630376773198558818
+      - 7562076932231910568
+      - 6309849053699577800
+      - 17618622406135231047
+      - 4647536863688545021
+      - 9997316614826821060
+      - 9832897256245327273
+      - 16103123452814638429
+      - 11274486374346585378
+      - 223317500553490292
+      - 3486779317052954359
+      - 13106449264185906434
+      - 5061839277828279224
+      - 1656676577746460656
+      - 18325670982947397201
+      - 7479338102868726026
+      - 9802067281274391955
+      - 7031739123983710582
+      - 2417652750706186624
+      - 6913098452901030745
+      - 10765384177709001448
+      - 1233990748962907759
+      - 10604242247912031542
+      - 13832073643189579980
+      - 534126962233704142
+      - 5734159455103572291
+      - 4618149021998797964
   - Handle: 16087867510997441185
     Type: Model
     Path: Models\deer.gltf
@@ -9735,6 +11439,14 @@ AssetRegistry:
     RootSourceHandle: 7563732692318888728
     ParentHandle: 7563732692318888728
     SubAssetKey: mesh:78_1
+    ImportVersion: 1
+  - Handle: 16103123452814638429
+    Type: Texture2D
+    Path: Textures\35.kbrtexture
+    LibraryPath: Textures\35.kbrtexture
+    RootSourceHandle: 3592214733151679049
+    ParentHandle: 3592214733151679049
+    SubAssetKey: texture:35
     ImportVersion: 1
   - Handle: 16114914187604837369
     Type: Mesh
@@ -9851,6 +11563,64 @@ AssetRegistry:
     ParentHandle: 6532463041022503106
     SubAssetKey: mesh:47_0
     ImportVersion: 1
+  - Handle: 16445993165995195148
+    Type: Material
+    Path: Materials\24.kbrmaterial
+    LibraryPath: Materials\24.kbrmaterial
+    RootSourceHandle: 3592214733151679049
+    ParentHandle: 3592214733151679049
+    SubAssetKey: material:24
+    ImportVersion: 1
+    Dependencies:
+      - 17892572518878110509
+      - 4571490681262020291
+      - 4386830571018427890
+      - 9602914115203217070
+      - 9406601308357270012
+      - 9102511368109540745
+      - 3415265635022088886
+      - 10841134288657483234
+      - 7332298763032844378
+      - 6047068936498750292
+      - 8863549481084937987
+      - 17726121017710461372
+      - 3416222974438391443
+      - 16878825194290081402
+      - 4554272302379809908
+      - 15924157504918349308
+      - 18331464464310536425
+      - 2292989877418582707
+      - 1682051905634216147
+      - 9277846854264864933
+      - 3015329744583186767
+      - 162149534054231477
+      - 6630376773198558818
+      - 7562076932231910568
+      - 6309849053699577800
+      - 17618622406135231047
+      - 4647536863688545021
+      - 9997316614826821060
+      - 9832897256245327273
+      - 16103123452814638429
+      - 11274486374346585378
+      - 223317500553490292
+      - 3486779317052954359
+      - 13106449264185906434
+      - 5061839277828279224
+      - 1656676577746460656
+      - 18325670982947397201
+      - 7479338102868726026
+      - 9802067281274391955
+      - 7031739123983710582
+      - 2417652750706186624
+      - 6913098452901030745
+      - 10765384177709001448
+      - 1233990748962907759
+      - 10604242247912031542
+      - 13832073643189579980
+      - 534126962233704142
+      - 5734159455103572291
+      - 4618149021998797964
   - Handle: 16469449500506139252
     Type: Mesh
     Path: Meshes\mesh_88_0.kbrmesh
@@ -10071,6 +11841,122 @@ AssetRegistry:
     ParentHandle: 10881124940085977282
     SubAssetKey: mesh:3_0
     ImportVersion: 1
+  - Handle: 16716218856421156534
+    Type: Material
+    Path: Materials\20.kbrmaterial
+    LibraryPath: Materials\20.kbrmaterial
+    RootSourceHandle: 3592214733151679049
+    ParentHandle: 3592214733151679049
+    SubAssetKey: material:20
+    ImportVersion: 1
+    Dependencies:
+      - 17892572518878110509
+      - 4571490681262020291
+      - 4386830571018427890
+      - 9602914115203217070
+      - 9406601308357270012
+      - 9102511368109540745
+      - 3415265635022088886
+      - 10841134288657483234
+      - 7332298763032844378
+      - 6047068936498750292
+      - 8863549481084937987
+      - 17726121017710461372
+      - 3416222974438391443
+      - 16878825194290081402
+      - 4554272302379809908
+      - 15924157504918349308
+      - 18331464464310536425
+      - 2292989877418582707
+      - 1682051905634216147
+      - 9277846854264864933
+      - 3015329744583186767
+      - 162149534054231477
+      - 6630376773198558818
+      - 7562076932231910568
+      - 6309849053699577800
+      - 17618622406135231047
+      - 4647536863688545021
+      - 9997316614826821060
+      - 9832897256245327273
+      - 16103123452814638429
+      - 11274486374346585378
+      - 223317500553490292
+      - 3486779317052954359
+      - 13106449264185906434
+      - 5061839277828279224
+      - 1656676577746460656
+      - 18325670982947397201
+      - 7479338102868726026
+      - 9802067281274391955
+      - 7031739123983710582
+      - 2417652750706186624
+      - 6913098452901030745
+      - 10765384177709001448
+      - 1233990748962907759
+      - 10604242247912031542
+      - 13832073643189579980
+      - 534126962233704142
+      - 5734159455103572291
+      - 4618149021998797964
+  - Handle: 16744270478953138166
+    Type: Material
+    Path: Materials\15.kbrmaterial
+    LibraryPath: Materials\15.kbrmaterial
+    RootSourceHandle: 3592214733151679049
+    ParentHandle: 3592214733151679049
+    SubAssetKey: material:15
+    ImportVersion: 1
+    Dependencies:
+      - 17892572518878110509
+      - 4571490681262020291
+      - 4386830571018427890
+      - 9602914115203217070
+      - 9406601308357270012
+      - 9102511368109540745
+      - 3415265635022088886
+      - 10841134288657483234
+      - 7332298763032844378
+      - 6047068936498750292
+      - 8863549481084937987
+      - 17726121017710461372
+      - 3416222974438391443
+      - 16878825194290081402
+      - 4554272302379809908
+      - 15924157504918349308
+      - 18331464464310536425
+      - 2292989877418582707
+      - 1682051905634216147
+      - 9277846854264864933
+      - 3015329744583186767
+      - 162149534054231477
+      - 6630376773198558818
+      - 7562076932231910568
+      - 6309849053699577800
+      - 17618622406135231047
+      - 4647536863688545021
+      - 9997316614826821060
+      - 9832897256245327273
+      - 16103123452814638429
+      - 11274486374346585378
+      - 223317500553490292
+      - 3486779317052954359
+      - 13106449264185906434
+      - 5061839277828279224
+      - 1656676577746460656
+      - 18325670982947397201
+      - 7479338102868726026
+      - 9802067281274391955
+      - 7031739123983710582
+      - 2417652750706186624
+      - 6913098452901030745
+      - 10765384177709001448
+      - 1233990748962907759
+      - 10604242247912031542
+      - 13832073643189579980
+      - 534126962233704142
+      - 5734159455103572291
+      - 4618149021998797964
   - Handle: 16765894761400630375
     Type: Mesh
     Path: Meshes\mesh_9_0.kbrmesh
@@ -10118,6 +12004,14 @@ AssetRegistry:
     RootSourceHandle: 5808246575810161645
     ParentHandle: 5808246575810161645
     SubAssetKey: mesh:0_0
+    ImportVersion: 1
+  - Handle: 16878825194290081402
+    Type: Texture2D
+    Path: Textures\20.kbrtexture
+    LibraryPath: Textures\20.kbrtexture
+    RootSourceHandle: 3592214733151679049
+    ParentHandle: 3592214733151679049
+    SubAssetKey: texture:20
     ImportVersion: 1
   - Handle: 16915135714368765785
     Type: Mesh
@@ -10489,6 +12383,64 @@ AssetRegistry:
     ParentHandle: 14244998688843197978
     SubAssetKey: material:0
     ImportVersion: 1
+  - Handle: 17396761942409581284
+    Type: Material
+    Path: Materials\5.kbrmaterial
+    LibraryPath: Materials\5.kbrmaterial
+    RootSourceHandle: 3592214733151679049
+    ParentHandle: 3592214733151679049
+    SubAssetKey: material:5
+    ImportVersion: 1
+    Dependencies:
+      - 17892572518878110509
+      - 4571490681262020291
+      - 4386830571018427890
+      - 9602914115203217070
+      - 9406601308357270012
+      - 9102511368109540745
+      - 3415265635022088886
+      - 10841134288657483234
+      - 7332298763032844378
+      - 6047068936498750292
+      - 8863549481084937987
+      - 17726121017710461372
+      - 3416222974438391443
+      - 16878825194290081402
+      - 4554272302379809908
+      - 15924157504918349308
+      - 18331464464310536425
+      - 2292989877418582707
+      - 1682051905634216147
+      - 9277846854264864933
+      - 3015329744583186767
+      - 162149534054231477
+      - 6630376773198558818
+      - 7562076932231910568
+      - 6309849053699577800
+      - 17618622406135231047
+      - 4647536863688545021
+      - 9997316614826821060
+      - 9832897256245327273
+      - 16103123452814638429
+      - 11274486374346585378
+      - 223317500553490292
+      - 3486779317052954359
+      - 13106449264185906434
+      - 5061839277828279224
+      - 1656676577746460656
+      - 18325670982947397201
+      - 7479338102868726026
+      - 9802067281274391955
+      - 7031739123983710582
+      - 2417652750706186624
+      - 6913098452901030745
+      - 10765384177709001448
+      - 1233990748962907759
+      - 10604242247912031542
+      - 13832073643189579980
+      - 534126962233704142
+      - 5734159455103572291
+      - 4618149021998797964
   - Handle: 17462854788003871872
     Type: Animation
     Path: Animations\0.kbranimation
@@ -10573,6 +12525,14 @@ AssetRegistry:
     ParentHandle: 7563732692318888728
     SubAssetKey: material:116
     ImportVersion: 1
+  - Handle: 17618622406135231047
+    Type: Texture2D
+    Path: Textures\31.kbrtexture
+    LibraryPath: Textures\31.kbrtexture
+    RootSourceHandle: 3592214733151679049
+    ParentHandle: 3592214733151679049
+    SubAssetKey: texture:31
+    ImportVersion: 1
   - Handle: 17625694878102777012
     Type: Texture2D
     Path: Assets\Textures\stonefloor01_normal_rgba.ktx2
@@ -10610,6 +12570,14 @@ AssetRegistry:
     RootSourceHandle: 7563732692318888728
     ParentHandle: 7563732692318888728
     SubAssetKey: material:76
+    ImportVersion: 1
+  - Handle: 17726121017710461372
+    Type: Texture2D
+    Path: Textures\19.kbrtexture
+    LibraryPath: Textures\19.kbrtexture
+    RootSourceHandle: 3592214733151679049
+    ParentHandle: 3592214733151679049
+    SubAssetKey: texture:19
     ImportVersion: 1
   - Handle: 17731534289553807850
     Type: Mesh
@@ -10698,6 +12666,14 @@ AssetRegistry:
     ParentHandle: 7563732692318888728
     SubAssetKey: material:12
     ImportVersion: 1
+  - Handle: 17892572518878110509
+    Type: Texture2D
+    Path: Textures\0.kbrtexture
+    LibraryPath: Textures\0.kbrtexture
+    RootSourceHandle: 3592214733151679049
+    ParentHandle: 3592214733151679049
+    SubAssetKey: texture:0
+    ImportVersion: 1
   - Handle: 17894277232324676885
     Type: Mesh
     Path: Meshes\mesh_3_2.kbrmesh
@@ -10753,6 +12729,64 @@ AssetRegistry:
     ParentHandle: 0
     SubAssetKey: ""
     ImportVersion: 1
+  - Handle: 18012873507129192588
+    Type: Material
+    Path: Materials\14.kbrmaterial
+    LibraryPath: Materials\14.kbrmaterial
+    RootSourceHandle: 3592214733151679049
+    ParentHandle: 3592214733151679049
+    SubAssetKey: material:14
+    ImportVersion: 1
+    Dependencies:
+      - 17892572518878110509
+      - 4571490681262020291
+      - 4386830571018427890
+      - 9602914115203217070
+      - 9406601308357270012
+      - 9102511368109540745
+      - 3415265635022088886
+      - 10841134288657483234
+      - 7332298763032844378
+      - 6047068936498750292
+      - 8863549481084937987
+      - 17726121017710461372
+      - 3416222974438391443
+      - 16878825194290081402
+      - 4554272302379809908
+      - 15924157504918349308
+      - 18331464464310536425
+      - 2292989877418582707
+      - 1682051905634216147
+      - 9277846854264864933
+      - 3015329744583186767
+      - 162149534054231477
+      - 6630376773198558818
+      - 7562076932231910568
+      - 6309849053699577800
+      - 17618622406135231047
+      - 4647536863688545021
+      - 9997316614826821060
+      - 9832897256245327273
+      - 16103123452814638429
+      - 11274486374346585378
+      - 223317500553490292
+      - 3486779317052954359
+      - 13106449264185906434
+      - 5061839277828279224
+      - 1656676577746460656
+      - 18325670982947397201
+      - 7479338102868726026
+      - 9802067281274391955
+      - 7031739123983710582
+      - 2417652750706186624
+      - 6913098452901030745
+      - 10765384177709001448
+      - 1233990748962907759
+      - 10604242247912031542
+      - 13832073643189579980
+      - 534126962233704142
+      - 5734159455103572291
+      - 4618149021998797964
   - Handle: 18039324678302688543
     Type: Material
     Path: Materials\14.kbrmaterial
@@ -10777,6 +12811,64 @@ AssetRegistry:
     ParentHandle: 6532463041022503106
     SubAssetKey: mesh:17_0
     ImportVersion: 1
+  - Handle: 18089760612083291288
+    Type: Material
+    Path: Materials\12.kbrmaterial
+    LibraryPath: Materials\12.kbrmaterial
+    RootSourceHandle: 3592214733151679049
+    ParentHandle: 3592214733151679049
+    SubAssetKey: material:12
+    ImportVersion: 1
+    Dependencies:
+      - 17892572518878110509
+      - 4571490681262020291
+      - 4386830571018427890
+      - 9602914115203217070
+      - 9406601308357270012
+      - 9102511368109540745
+      - 3415265635022088886
+      - 10841134288657483234
+      - 7332298763032844378
+      - 6047068936498750292
+      - 8863549481084937987
+      - 17726121017710461372
+      - 3416222974438391443
+      - 16878825194290081402
+      - 4554272302379809908
+      - 15924157504918349308
+      - 18331464464310536425
+      - 2292989877418582707
+      - 1682051905634216147
+      - 9277846854264864933
+      - 3015329744583186767
+      - 162149534054231477
+      - 6630376773198558818
+      - 7562076932231910568
+      - 6309849053699577800
+      - 17618622406135231047
+      - 4647536863688545021
+      - 9997316614826821060
+      - 9832897256245327273
+      - 16103123452814638429
+      - 11274486374346585378
+      - 223317500553490292
+      - 3486779317052954359
+      - 13106449264185906434
+      - 5061839277828279224
+      - 1656676577746460656
+      - 18325670982947397201
+      - 7479338102868726026
+      - 9802067281274391955
+      - 7031739123983710582
+      - 2417652750706186624
+      - 6913098452901030745
+      - 10765384177709001448
+      - 1233990748962907759
+      - 10604242247912031542
+      - 13832073643189579980
+      - 534126962233704142
+      - 5734159455103572291
+      - 4618149021998797964
   - Handle: 18116488829860752099
     Type: Mesh
     Path: Meshes\mesh_13_0.kbrmesh
@@ -10894,6 +12986,14 @@ AssetRegistry:
     ParentHandle: 14121002741739587132
     SubAssetKey: mesh:8_0
     ImportVersion: 1
+  - Handle: 18325670982947397201
+    Type: Texture2D
+    Path: Textures\41.kbrtexture
+    LibraryPath: Textures\41.kbrtexture
+    RootSourceHandle: 3592214733151679049
+    ParentHandle: 3592214733151679049
+    SubAssetKey: texture:41
+    ImportVersion: 1
   - Handle: 18326698198443033270
     Type: Mesh
     Path: Meshes\mesh_0_0.kbrmesh
@@ -10901,6 +13001,14 @@ AssetRegistry:
     RootSourceHandle: 17044738097112976773
     ParentHandle: 17044738097112976773
     SubAssetKey: mesh:0_0
+    ImportVersion: 1
+  - Handle: 18331464464310536425
+    Type: Texture2D
+    Path: Textures\23.kbrtexture
+    LibraryPath: Textures\23.kbrtexture
+    RootSourceHandle: 3592214733151679049
+    ParentHandle: 3592214733151679049
+    SubAssetKey: texture:23
     ImportVersion: 1
   - Handle: 18384162084077655652
     Type: Material
