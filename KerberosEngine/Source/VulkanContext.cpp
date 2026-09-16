@@ -18,6 +18,7 @@
 #include "ImGuizmo.h"
 
 #include <algorithm>
+#include <stacktrace>
 #include <iostream>
 
 import Kerberos;
@@ -82,6 +83,7 @@ static VKAPI_ATTR vk::Bool32 VKAPI_CALL DebugCallback(
 		}
 		else if (severity & vk::DebugUtilsMessageSeverityFlagBitsEXT::eError) {
 			Kerberos::Log::CoreError("General|Error: {}|{}: {}", pCallbackData->messageIdNumber, messageIdName, message);
+            Kerberos::Log::CoreDebug("{}", std::stacktrace::current());
 		}
 	}
 	else if (type & vk::DebugUtilsMessageTypeFlagBitsEXT::eValidation) {
@@ -96,6 +98,7 @@ static VKAPI_ATTR vk::Bool32 VKAPI_CALL DebugCallback(
 		}
 		else if (severity & vk::DebugUtilsMessageSeverityFlagBitsEXT::eError) {
 			Kerberos::Log::CoreError("Validation|Error: {}|{}: {}", pCallbackData->messageIdNumber, messageIdName, message);
+            Kerberos::Log::CoreDebug("{}", std::stacktrace::current());
 		}
 	}
 	else if (type & vk::DebugUtilsMessageTypeFlagBitsEXT::ePerformance) {
@@ -110,6 +113,7 @@ static VKAPI_ATTR vk::Bool32 VKAPI_CALL DebugCallback(
 		}
 		else if (severity & vk::DebugUtilsMessageSeverityFlagBitsEXT::eError) {
 			Kerberos::Log::CoreError("Performance|Error: {}|{}: {}", pCallbackData->messageIdNumber, messageIdName, message);
+            Kerberos::Log::CoreDebug("{}", std::stacktrace::current());
 		}
 	}
 	else if (type & vk::DebugUtilsMessageTypeFlagBitsEXT::eDeviceAddressBinding) {
@@ -124,6 +128,7 @@ static VKAPI_ATTR vk::Bool32 VKAPI_CALL DebugCallback(
 		}
 		else if (severity & vk::DebugUtilsMessageSeverityFlagBitsEXT::eError) {
 			Kerberos::Log::CoreError("DeviceAddressBinding|Error: {}|{}: {}", pCallbackData->messageIdNumber, messageIdName, message);
+            Kerberos::Log::CoreDebug("{}", std::stacktrace::current());
 		}
 	}
 	//std::cerr << "validation layer: type " << to_string(type) << " msg: " << pCallbackData->pMessage << "\n\n";
