@@ -92,7 +92,7 @@ namespace Kerberos
 				default: break;
 			}
 
-			Log::CoreInfo("{0}Member: {1}{2}, Type: {3}, Offset: {4}, Size: {5}",
+			Log::CoreDebug("{0}Member: {1}{2}, Type: {3}, Offset: {4}, Size: {5}",
 						  indent, memberName, arrayInfo, typeName, offset, memberSize);
 
 			if (memberType.basetype == spirv_cross::SPIRType::Struct)

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "UpscalerTypes.hpp"
+#include "Core/Core.hpp"
 
 #include <glm/vec2.hpp>
 
@@ -8,7 +9,13 @@ namespace  Kerberos {
 
 class IUpscaler {
 public:
+    IUpscaler() = default;
     virtual ~IUpscaler() = default;
+
+    IUpscaler(const IUpscaler&) = delete;
+    IUpscaler& operator=(const IUpscaler&) = delete;
+    IUpscaler(IUpscaler&&) = delete;
+    IUpscaler& operator=(IUpscaler&&) = delete;
 
     virtual void Initialize(const UpscalerCreateInfo& settings) = 0;
     virtual void Release() = 0;
@@ -30,5 +37,7 @@ public:
     [[nodiscard]]
     virtual float GetInverseUpscaleRatio() const = 0;
 };
+
+Owner<IUpscaler> CreateUpscaler(UpscalerType type);
 
 }

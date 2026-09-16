@@ -4,6 +4,8 @@ public struct SceneData
 {
     public float4x4 projection;
     public float4x4 view;
+    public float4x4 previousProjection;
+    public float4x4 previousView;
     public float4x4 lightSpaceMatrices[4];
     public float4 cascadeSplits;
     public float3 camPos;
@@ -34,6 +36,7 @@ public struct Material
 public struct PerObject 
 {
     public float4x4 model;
+    public float4x4 previousModel;
     public float4x4 worldNormal;
     public Material material;
     float _Padding1;

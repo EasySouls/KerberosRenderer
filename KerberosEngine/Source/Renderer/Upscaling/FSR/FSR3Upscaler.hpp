@@ -10,10 +10,10 @@ namespace Kerberos {
 
 class FSR3Upscaler : public IUpscaler {
 public:
-    explicit FSR3Upscaler(vk::Device device);
+    FSR3Upscaler(vk::Device device, vk::PhysicalDevice physicalDevice, PFN_vkGetDeviceProcAddr deviceProcAddr);
     ~FSR3Upscaler() override;
 
-    void Initialize(const UpscalerCreateInfo& settings) override;
+    void Initialize(const UpscalerCreateInfo& createInfo) override;
     void Release() override;
 
     void Resize(uint32_t displayWidth, uint32_t displayHeight) override;
@@ -28,18 +28,37 @@ public:
 
     float GetInverseUpscaleRatio() const override;
 
+    [[nodiscard]] bool IsInitialized() const { return m_Context != nullptr; }
+
 private:
+    static PFN_vkVoidFunction VKAPI_CALL OverrideVkGetDeviceProcAddr(
+        VkDevice device,
+        const char* name);
+
+private:
+
     vk::Device m_Device{nullptr};
+    vk::PhysicalDevice m_PhysicalDevice{nullptr};
+    PFN_vkGetDeviceProcAddr m_DeviceProcAddr = nullptr;
 
     ffx::Context m_Context{nullptr};
 
-    UpscalerCreateInfo m_Settings{};
-    UpscalerFrame m_Frame{};
+    struct Settings
+    {
+        uint32_t displayWidth{};
+        uint32_t displayHeight{};
 
-    UpscalerQuality m_Quality{};
+        uint32_t renderWidth{};
+        uint32_t renderHeight{};
+
+        UpscalerQuality quality = UpscalerQuality::Balanced;
+    };
+    Settings m_Settings{};
+    UpscalerFrame m_Frame{};
 
     float m_JitterX{0.0f};
     float m_JitterY{0.0f};
+    bool m_HasBegunFrame = false;
 };
 
 }

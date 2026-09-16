@@ -6,8 +6,13 @@
 
 namespace Kerberos {
 
+enum class UpscalerType {
+    Native,
+    FSR3
+};
+
 enum class UpscalerQuality {
-    UltraQuality = 1,
+    UltraQuality,
     Quality,
     Balanced,
     Performance,
@@ -18,18 +23,14 @@ struct UpscalerCreateInfo {
     uint32_t displayWidth{};
     uint32_t displayHeight{};
 
-    uint32_t renderWidth{};
-    uint32_t renderHeight{};
-
-    float maxUpscaleRatio = 2.0f;
-
-    UpscalerQuality initialQuality = UpscalerQuality::Balanced;
+    UpscalerQuality quality = UpscalerQuality::Balanced;
 };
 
 struct UpscalerTexture {
     vk::Image image;
     vk::ImageView view;
     vk::Format format;
+    vk::ImageUsageFlags usage;
     uint32_t width;
     uint32_t height;
     vk::ImageLayout currentLayout;
@@ -45,7 +46,8 @@ struct UpscalerDispatchInfo {
 
     float cameraNear;
     float cameraFar;
-    float cameraFovAngleVertical; /// Filed of view in radians
+    float cameraFovAngleVertical; /// Field of view in radians
+    float viewSpaceToMetersFactor = 1.0f;
 };
 
 struct UpscalerFrame {
