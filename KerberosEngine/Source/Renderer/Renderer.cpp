@@ -543,8 +543,6 @@ void Renderer::Init()
 
     s_Data->TextureManager.Initialize();
 
-    CreateResources();
-
     auto& context = VulkanContext::Get();
     const auto& device = context.GetDevice();
 
@@ -569,6 +567,11 @@ void Renderer::Init()
         s_Data->Upscaler->Initialize(upscalerCreateInfo);
         s_Data->UpscalingMode = UpscalerType::Native;
     }
+    const float upscaleRatio = s_Data->Upscaler->GetInverseUpscaleRatio();
+    s_Data->RenderSize = { static_cast<uint32_t>(s_Data->OutputSize.x * upscaleRatio),
+                           static_cast<uint32_t>(s_Data->OutputSize.y * upscaleRatio) };
+
+    CreateResources();
 }
 
 void Renderer::Shutdown()
