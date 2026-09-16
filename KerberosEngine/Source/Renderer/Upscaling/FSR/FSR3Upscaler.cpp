@@ -163,7 +163,14 @@ namespace Kerberos {
                             FFX_UPSCALE_ENABLE_MOTION_VECTORS_JITTER_CANCELLATION | // TODO: use unjittered matrices for motion vectors
                             FFX_UPSCALE_ENABLE_DEBUG_CHECKING;
 
-        upscaleDesc.fpMessage = nullptr;
+        upscaleDesc.fpMessage = [](const uint32_t type, const wchar_t* message) {
+            if (type == FFX_API_MESSAGE_TYPE_ERROR) {
+                Log::CoreError("FidelityFX FSR3: {}", message);
+            }
+            else if (type == FFX_API_MESSAGE_TYPE_WARNING) {
+                Log::CoreWarn("FidelityFX FSR3: {}", message);
+            }
+        };
 
         if (const ffx::ReturnCode ret
             = ffx::CreateContext(m_Context, nullptr, upscaleDesc, backendDesc);
