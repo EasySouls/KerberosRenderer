@@ -31,4 +31,4 @@
 	url = https://github.com/wolfpld/tracy.git
 [submodule "KerberosEngine/ThirdParty/FidelityFX-SDK"]
 	path = KerberosEngine/ThirdParty/FidelityFX-SDK
-	url = https://github.com/GPUOpen-LibrariesAndSDKs/FidelityFX-SDK.git
+	url = https://github.com/EasySouls/FidelityFX-SDK.git

@@ -33,8 +33,8 @@ endif()
 
 add_custom_command(TARGET KerberosEditor POST_BUILD
         COMMAND ${CMAKE_COMMAND} -E copy_if_different
-            "${FIDELITYFX_VK_DLL}"
-            "$<TARGET_FILE_DIR:KerberosEditor>/amd_fidelityfx_vk.dll"
+            "$<TARGET_FILE:amd_fidelityfx_vk>"
+            "$<TARGET_FILE_DIR:KerberosEditor>"
         VERBATIM
 )
 

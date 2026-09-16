@@ -10,47 +10,36 @@ set(FIDELITYFX_INCLUDE_DIR
         "${FIDELITYFX_ROOT}/ffx-api/include"
 )
 
-set(FIDELITYFX_VK_DLL
-        "${FIDELITYFX_BIN_ROOT}/amd_fidelityfx_vk.dll"
-        CACHE FILEPATH
-        "FidelityFX Vulkan runtime DLL"
+set(FFX_API_BACKEND
+        VK_X64
+        CACHE STRING
+        "FidelityFX API backend to build"
 )
 
-set(FIDELITYFX_VK_LIB
-        "${FIDELITYFX_BIN_ROOT}/amd_fidelityfx_vk.lib")
+set(FFX_FSR2 ON CACHE BOOL "" FORCE)
+set(FFX_FSR3 ON CACHE BOOL "" FORCE)
+set(FFX_FSR3UPSCALER ON CACHE BOOL "" FORCE)
+set(FFX_OF ON CACHE BOOL "" FORCE)
+set(FFX_FI ON CACHE BOOL "" FORCE)
+set(FFX_AUTO_COMPILE_SHADERS ON CACHE BOOL "" FORCE)
+set(FFX_BUILD_AS_DLL OFF CACHE BOOL "" FORCE)
 
+add_subdirectory(
+        "${FIDELITYFX_ROOT}/ffx-api"
+        "${CMAKE_BINARY_DIR}/FidelityFX/ffx-api"
+        EXCLUDE_FROM_ALL
+)
 
-if (NOT EXISTS "${FIDELITYFX_VK_DLL}")
-    message(FATAL_ERROR
-            "FidelityFX Vulkan DLL not found:\n"
-            "  ${FIDELITYFX_VK_DLL}"
-    )
-endif()
+add_library(Kerberos::FidelityFX ALIAS amd_fidelityfx_vk)
 
-if (NOT EXISTS "${FIDELITYFX_VK_LIB}")
-    message(FATAL_ERROR
-            "FidelityFX Vulkan import library not found:\n"
-            "  ${FIDELITYFX_VK_LIB}"
-    )
-endif()
-
-
-add_library(Kerberos::FidelityFX SHARED IMPORTED GLOBAL)
-
-set_target_properties(Kerberos::FidelityFX PROPERTIES
-        IMPORTED_IMPLIB
-        "${FIDELITYFX_VK_LIB}"
-
-        IMPORTED_LOCATION
-        "${FIDELITYFX_VK_DLL}"
-
-        INTERFACE_INCLUDE_DIRECTORIES
+target_include_directories(amd_fidelityfx_vk
+        PUBLIC
         "${FIDELITYFX_INCLUDE_DIR}"
 )
 
-
 add_custom_target(KerberosFidelityFXRuntime ALL
         COMMAND ${CMAKE_COMMAND} -E copy_if_different
-        "${FIDELITYFX_VK_DLL}"
-        "$<TARGET_FILE_DIR:KerberosEngine>/amd_fidelityfx_vk.dll"
+        "$<TARGET_FILE:amd_fidelityfx_vk>"
+        "$<TARGET_FILE_DIR:KerberosEngine>"
+        DEPENDS amd_fidelityfx_vk
 )
