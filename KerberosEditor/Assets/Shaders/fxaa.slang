@@ -4,7 +4,8 @@ import common;
 // FXAA 3.11 Shader
 // ============================================================================
 
-// The input texture MUST have Pre-tonemapped LDR RGB color, and Luma in the Alpha channel.
+// The input is HDR linear RGB at RenderSize. Luma is derived from RGB so this
+// pass does not depend on the bloom mask or on post-tonemap values.
 // The Sampler MUST be VK_FILTER_LINEAR with VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE.
 [[vk::binding(0, 0)]] Texture2D<float4> sceneColorTex;
 [[vk::binding(1, 0)]] SamplerState linearSampler;
@@ -34,7 +35,8 @@ VSOutput vertexMain(uint vertexID : SV_VertexID)
 // Helper function to get pre-calculated Luma from alpha channel
 float SampleLuma(float2 uv)
 {
-    return sceneColorTex.SampleLevel(linearSampler, uv, 0.0).a;
+    float3 hdrColor = sceneColorTex.SampleLevel(linearSampler, uv, 0.0).rgb;
+    return dot(hdrColor, float3(0.2126, 0.7152, 0.0722));
 }
 
 static const float FXAA_EDGE_THRESHOLD_MIN = 0.0833;
@@ -49,7 +51,7 @@ float3 ApplyFXAA(float2 uv)
 {
     float2 texelSize = pc.inverseScreenSize;
     // Sample center and 4 direct neighbors
-    float4 colorCenter = sceneColorTex.SampleLevel(linearSampler, uv, 0.0);
+    float3 colorCenter = sceneColorTex.SampleLevel(linearSampler, uv, 0.0).rgb;
     float lumaM = SampleLuma(uv);
 
     float lumaS = SampleLuma(uv + float2(0.0, 1.0) * texelSize);
@@ -63,7 +65,7 @@ float3 ApplyFXAA(float2 uv)
     // Early Exit: If contrast is too low, it's not an edge. Just return the pixel.
     float threshold = max(FXAA_EDGE_THRESHOLD_MIN, maxLuma * FXAA_EDGE_THRESHOLD);
     if (contrast < threshold) {
-        return colorCenter.rgb;
+        return colorCenter;
     }
 
     // Sample diagonals to determine edge direction
@@ -175,7 +177,7 @@ float3 ApplyFXAA(float2 uv)
 float4 fragmentMain(VSOutput input) : SV_Target
 {
     float2 uv = input.uv;
-    float3 ldrColor = ApplyFXAA(uv);
+    float3 hdrColor = ApplyFXAA(uv);
     
-    return float4(ldrColor, 1.0);
+    return float4(hdrColor, 1.0);
 }

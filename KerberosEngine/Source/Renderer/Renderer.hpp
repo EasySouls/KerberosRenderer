@@ -130,15 +130,17 @@ public:
                                    const Camera& mainCamera,
                                    const glm::mat4& mainCameraTransform,
                                    float dt);
+    using CalcLightSpaceMatricesFunc = std::function<std::pair<std::vector<glm::mat4>, glm::vec4>(
+        const glm::vec3&, const std::function<glm::vec4(float)>&)>;
+
     static void RenderScene(const Ref<Scene>& scene,
-                const glm::mat4& view,
-                const glm::mat4& projection,
-                const glm::vec3& camPos,
-                const std::function<std::pair<std::vector<glm::mat4>, glm::vec4>(
-                    const glm::vec3&, const std::function<glm::vec4(float)>&)>& calculateLightSpaceMatricesFunc,
-                float dt,
-                float nearPlane,
-                float farPlane);
+                            const glm::mat4& view,
+                            const glm::mat4& projection,
+                            const glm::vec3& camPos,
+                            const CalcLightSpaceMatricesFunc& calculateLightSpaceMatricesFunc,
+                            float dt,
+                            float nearPlane,
+                            float farPlane);
     
     static void RecordQueuedSceneRender(const vk::raii::CommandBuffer& cmd);
 
@@ -242,7 +244,7 @@ private:
     static void UpdateParticles(const vk::raii::CommandBuffer& cmd,
                                 uint32_t frameIndex,
                                 DescriptorAllocator& frameDescriptorAllocator,
-                                float& time);
+                                float time);
 
     static void RenderPrePass(const vk::raii::CommandBuffer& cmd,
                               uint32_t frameIndex,
@@ -255,26 +257,26 @@ private:
                              uint32_t frameIndex,
                              std::vector<RenderObject, std::pmr::polymorphic_allocator<RenderObject>> renderObjects,
                              uint32_t currentImage,
-                             vk::Viewport viewport,
+                             const vk::Viewport& viewport,
                              vk::Rect2D renderArea);
 
     static void RenderTransparent(const vk::raii::CommandBuffer& cmd,
                       uint32_t frameIndex,
                       std::vector<RenderObject, std::pmr::polymorphic_allocator<RenderObject>> renderObjects,
                       uint32_t currentImage,
-                      vk::Viewport viewport,
+                      const vk::Viewport& viewport,
                       vk::Rect2D renderArea);
 
     static void RenderPhysicsColliders(const vk::raii::CommandBuffer& cmd,
-                                       std::vector<LineVertex> colliderLineVertices,
+                                       const std::vector<LineVertex>& colliderLineVertices,
                                        uint32_t currentImage,
-                                       vk::Viewport viewport,
+                                       const vk::Viewport& viewport,
                                        vk::Rect2D renderArea);
 
     static void ResolveTransparencyPass(const vk::raii::CommandBuffer& cmd,
                                         uint32_t frameIndex,
                                         uint32_t currentImage,
-                                        vk::Viewport viewport,
+                                        const vk::Viewport& viewport,
                                         vk::Rect2D renderArea);
 
     static void RenderParticles(const vk::raii::CommandBuffer& cmd, uint32_t frameIndex);
@@ -300,6 +302,7 @@ private:
     static void ApplyUpscaling(const vk::raii::CommandBuffer& cmd, uint32_t frameIndex);
 
     static void ApplyBloom(const vk::raii::CommandBuffer& cmd, uint32_t frameIndex);
+    static void CompileRenderGraph();
 
     static void WriteGPUTimestamp(const vk::raii::CommandBuffer& cmd, uint32_t frameIndex, uint32_t index);
     static void ResolveGPUTimings(uint32_t frameIndex);
@@ -334,6 +337,7 @@ private:
     static void CreateTonemappedImage(uint32_t width, uint32_t height);
     static void SetupTonemappingResolveDescriptors();
     static void CreateOutputImage(uint32_t width, uint32_t height);
+    static void CreateFinalImage(uint32_t width, uint32_t height);
 
     static void CreateSMAATextures();
     static void CreateSMAADescriptorSetAndPipelineLayouts();
