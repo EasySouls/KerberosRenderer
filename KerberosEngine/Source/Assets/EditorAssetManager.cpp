@@ -355,15 +355,20 @@ namespace Kerberos
 			out << YAML::EndMap;
 		}
 
-		std::ofstream file(assetRegistryPath);
-		if (!file.is_open())
+        try
 		{
-            std::error_code ec(errno, std::generic_category());
+            std::ofstream file;
+            file.exceptions(std::ios::failbit | std::ios::badbit);
+            file.open(assetRegistryPath);
+
+			file << out.c_str();
+		}
+		catch (const std::ios_base::failure& e)
+		{
+            const std::error_code ec = e.code();
 
 			Log::CoreError("Could not open asset registry file for writing: {0}. Reason: {1} (Error code: {2})", assetRegistryPath.string(), ec.message(), ec.value());
-			return;
 		}
-		file << out.c_str();
 	}
 
 	bool EditorAssetManager::DeserializeAssetRegistry()
