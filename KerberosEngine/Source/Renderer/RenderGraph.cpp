@@ -156,36 +156,35 @@ void RenderGraph::Compile()
 
 void RenderGraph::Execute(vk::raii::CommandBuffer& commandBuffer, vk::Queue queue)
 {
-    // Execution state management for dynamic synchronization
-    std::vector<vk::CommandBuffer> cmdBuffers;      // Command buffer storage
-    std::vector<vk::Semaphore> waitSemaphores;      // Synchronization dependencies for current pass
-    std::vector<vk::PipelineStageFlags2> waitStages; // Pipeline stages to wait on
-    std::vector<vk::Semaphore> signalSemaphores;    // Semaphores to signal after current pass
+    std::vector<vk::SemaphoreSubmitInfo> waitSemaphoreInfos;
+    std::vector<vk::SemaphoreSubmitInfo> signalSemaphoreInfos;
 
-    // Ordered Pass Execution with Automatic Dependency Management
-    // Execute each pass in the computed dependency-safe order
     for (auto passIdx : m_ExecutionOrder) {
         const auto& pass = m_Passes[passIdx];
 
-        // Synchronization Setup - Collect Dependencies for Current Pass
-        // Determine what this pass must wait for before executing
-        waitSemaphores.clear();
-        waitStages.clear();
-
+        // Collect dependencies for the current pass
+        waitSemaphoreInfos.clear();
         for (size_t i = 0; i < m_SemaphoreSignalWaitPairs.size(); ++i) {
             if (m_SemaphoreSignalWaitPairs[i].WaitingPassIndex == passIdx) {
-                // This pass depends on the completion of another pass
-                waitSemaphores.push_back(*m_Semaphores[i]); // Wait for dependency completion
-                waitStages.emplace_back(vk::PipelineStageFlagBits2::eColorAttachmentOutput); // Wait at output stage
+                vk::SemaphoreSubmitInfo waitInfo;
+                waitInfo.setSemaphore(*m_Semaphores[i])
+                    .setStageMask(vk::PipelineStageFlagBits2::eColorAttachmentOutput)
+                    .setDeviceIndex(0)
+                    .setValue(0); // Use 0 for standard binary semaphores
+                waitSemaphoreInfos.push_back(waitInfo);
             }
         }
 
         // Collect semaphores that this pass will signal for dependent passes
-        signalSemaphores.clear();
+        signalSemaphoreInfos.clear();
         for (size_t i = 0; i < m_SemaphoreSignalWaitPairs.size(); ++i) {
             if (m_SemaphoreSignalWaitPairs[i].SignalingPassIndex == passIdx) {
-                // Other passes depend on this pass's completion
-                signalSemaphores.push_back(*m_Semaphores[i]); // Signal completion for dependents
+                vk::SemaphoreSubmitInfo signalInfo;
+                signalInfo.setSemaphore(*m_Semaphores[i])
+                    .setStageMask(vk::PipelineStageFlagBits2::eAllCommands)
+                    .setDeviceIndex(0)
+                    .setValue(0);
+                signalSemaphoreInfos.push_back(signalInfo);
             }
         }
 
@@ -196,13 +195,16 @@ void RenderGraph::Execute(vk::raii::CommandBuffer& commandBuffer, vk::Queue queu
             auto& resource = m_Resources[input];
 
             vk::ImageMemoryBarrier2 barrier;
-            barrier
-                .setOldLayout(resource.InitialLayout)
+            barrier.setOldLayout(resource.InitialLayout)
                 .setNewLayout(vk::ImageLayout::eShaderReadOnlyOptimal)
                 .setSrcQueueFamilyIndex(vk::QueueFamilyIgnored)
                 .setDstQueueFamilyIndex(vk::QueueFamilyIgnored)
                 .setImage(*resource.Image)
-                .setSubresourceRange({ .aspectMask = vk::ImageAspectFlagBits::eColor, .baseMipLevel = 0, .levelCount = 1, .baseArrayLayer = 0, .layerCount = 1 })
+                .setSubresourceRange({ .aspectMask = vk::ImageAspectFlagBits::eColor,
+                                       .baseMipLevel = 0,
+                                       .levelCount = 1,
+                                       .baseArrayLayer = 0,
+                                       .layerCount = 1 })
                 .setSrcAccessMask(vk::AccessFlagBits2::eMemoryWrite)
                 .setDstAccessMask(vk::AccessFlagBits2::eShaderRead)
                 .setSrcStageMask(vk::PipelineStageFlagBits2::eAllCommands)
@@ -224,13 +226,16 @@ void RenderGraph::Execute(vk::raii::CommandBuffer& commandBuffer, vk::Queue queu
             auto& resource = m_Resources[output];
 
             vk::ImageMemoryBarrier2 barrier;
-            barrier
-                .setOldLayout(resource.InitialLayout)
+            barrier.setOldLayout(resource.InitialLayout)
                 .setNewLayout(vk::ImageLayout::eColorAttachmentOptimal)
                 .setSrcQueueFamilyIndex(vk::QueueFamilyIgnored)
                 .setDstQueueFamilyIndex(vk::QueueFamilyIgnored)
                 .setImage(*resource.Image)
-                .setSubresourceRange({ .aspectMask = vk::ImageAspectFlagBits::eColor, .baseMipLevel = 0, .levelCount = 1, .baseArrayLayer = 0, .layerCount = 1 })
+                .setSubresourceRange({ .aspectMask = vk::ImageAspectFlagBits::eColor,
+                                       .baseMipLevel = 0,
+                                       .levelCount = 1,
+                                       .baseArrayLayer = 0,
+                                       .layerCount = 1 })
                 .setSrcAccessMask(vk::AccessFlagBits2::eMemoryRead)
                 .setDstAccessMask(vk::AccessFlagBits2::eColorAttachmentWrite)
                 .setSrcStageMask(vk::PipelineStageFlagBits2::eAllCommands)
@@ -249,17 +254,21 @@ void RenderGraph::Execute(vk::raii::CommandBuffer& commandBuffer, vk::Queue queu
 
         pass.ExecuteFunc(commandBuffer);
 
+        // Transition output resources to their final required layouts
         for (const auto& output : pass.Outputs) {
             auto& resource = m_Resources[output];
 
             vk::ImageMemoryBarrier2 barrier;
-            barrier
-                .setOldLayout(vk::ImageLayout::eColorAttachmentOptimal)
+            barrier.setOldLayout(vk::ImageLayout::eColorAttachmentOptimal)
                 .setNewLayout(resource.FinalLayout)
                 .setSrcQueueFamilyIndex(vk::QueueFamilyIgnored)
                 .setDstQueueFamilyIndex(vk::QueueFamilyIgnored)
                 .setImage(*resource.Image)
-                .setSubresourceRange({ .aspectMask = vk::ImageAspectFlagBits::eColor, .baseMipLevel = 0, .levelCount = 1, .baseArrayLayer = 0, .layerCount = 1 })
+                .setSubresourceRange({ .aspectMask = vk::ImageAspectFlagBits::eColor,
+                                       .baseMipLevel = 0,
+                                       .levelCount = 1,
+                                       .baseArrayLayer = 0,
+                                       .layerCount = 1 })
                 .setSrcAccessMask(vk::AccessFlagBits2::eColorAttachmentWrite)
                 .setDstAccessMask(vk::AccessFlagBits2::eMemoryRead)
                 .setSrcStageMask(vk::PipelineStageFlagBits2::eColorAttachmentOutput)
@@ -278,20 +287,15 @@ void RenderGraph::Execute(vk::raii::CommandBuffer& commandBuffer, vk::Queue queu
 
         commandBuffer.end();
 
-        vk::SubmitInfo submitInfo;
-        submitInfo
-            .setWaitSemaphoreCount(static_cast<uint32_t>(waitSemaphores.size()))
-            .setPWaitSemaphores(waitSemaphores.data())
-            .setPWaitDstStageMask(waitStages.data())
-            .setCommandBufferCount(1)
-            .setPCommandBuffers(&*commandBuffer)
-            .setSignalSemaphoreCount(static_cast<uint32_t>(signalSemaphores.size()))
-            .setPSignalSemaphores(signalSemaphores.data());
+        vk::CommandBufferSubmitInfo cmdBufInfo;
+        cmdBufInfo.setCommandBuffer(*commandBuffer).setDeviceMask(0);
 
-        const auto result = queue.submit(1, &submitInfo, nullptr);
-        if (result != vk::Result::eSuccess) {
-            throw std::runtime_error("Failed to submit render graph pass to queue");
-        }
+        vk::SubmitInfo2 submitInfo;
+        submitInfo.setWaitSemaphoreInfos(waitSemaphoreInfos)
+            .setCommandBufferInfos(cmdBufInfo)
+            .setSignalSemaphoreInfos(signalSemaphoreInfos);
+
+        queue.submit2(submitInfo);
     }
 }
 
