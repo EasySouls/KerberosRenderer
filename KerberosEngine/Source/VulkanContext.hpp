@@ -286,4 +286,6 @@ namespace Kerberos
 
 	void BeginRenderPassDebugLabel(const vk::raii::CommandBuffer& cmd, std::string_view labelName);
 	void EndRenderPassDebugLabel(const vk::raii::CommandBuffer& cmd);
-} 
+    void InsertDebugLabel(const vk::raii::CommandBuffer& cmd, std::string_view labelName);
+
+    } 

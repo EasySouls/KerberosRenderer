@@ -1951,4 +1951,17 @@ namespace Kerberos
 		(void)cmd;
 #endif
 	}
+
+    void InsertDebugLabel(const vk::raii::CommandBuffer& cmd, std::string_view labelName)
+    {
+#ifdef KBR_DEBUG
+        const vk::DebugUtilsLabelEXT labelInfo{
+            .pLabelName = labelName.data()
+        };
+        cmd.insertDebugUtilsLabelEXT(labelInfo);
+#else
+        (void)cmd;
+        (void)labelName;
+#endif
+    }
 }
