@@ -19,6 +19,7 @@
 
 #include <algorithm>
 #include <stacktrace>
+#include <sstream>
 #include <iostream>
 
 import Kerberos;
@@ -69,7 +70,43 @@ static VKAPI_ATTR vk::Bool32 VKAPI_CALL DebugCallback(
 
 {
     const char* messageIdName = pCallbackData->pMessageIdName ? pCallbackData->pMessageIdName : "No message ID name";
-	const char* message = pCallbackData->pMessage ? pCallbackData->pMessage : "No message";
+	const char* baseMessage = pCallbackData->pMessage ? pCallbackData->pMessage : "No message";
+
+	std::stringstream extras;
+
+	// Involved objects
+	if (pCallbackData->objectCount > 0) {
+        extras << "\nObjects: " << pCallbackData->objectCount;
+        for (uint32_t i = 0; i < pCallbackData->objectCount; i++) {
+            const auto& obj = pCallbackData->pObjects[i];
+            extras << "\n    [" << i << "] " << vk::to_string(obj.objectType) << " 0x" << std::hex << obj.objectHandle
+                   << std::dec;
+            if (obj.pObjectName) {
+                extras << "[" << obj.pObjectName << "]";
+            }
+        }
+    }
+
+	// Command buffer labels
+	if (pCallbackData->cmdBufLabelCount > 0) {
+        extras << "\nCommand Buffer Labels: " << pCallbackData->cmdBufLabelCount;
+        for (uint32_t i = 0; i < pCallbackData->cmdBufLabelCount; i++) {
+            const auto& label = pCallbackData->pCmdBufLabels[i];
+            extras << "\n    [" << i << "] " << (label.pLabelName ? label.pLabelName : "Unnamed");
+        }
+    }
+
+	// Queue labels
+	if (pCallbackData->queueLabelCount > 0) {
+        extras << "\nQueue Labels: " << pCallbackData->queueLabelCount;
+        for (uint32_t i = 0; i < pCallbackData->queueLabelCount; i++) {
+            const auto& label = pCallbackData->pQueueLabels[i];
+            extras << "\n    [" << i << "] " << (label.pLabelName ? label.pLabelName : "Unnamed");
+        }
+    }
+
+	const std::string fullMessage = std::string(baseMessage) + extras.str();
+    const char* message = fullMessage.c_str();
 
 	if (type & vk::DebugUtilsMessageTypeFlagBitsEXT::eGeneral) {
 		if (severity & vk::DebugUtilsMessageSeverityFlagBitsEXT::eVerbose) {
