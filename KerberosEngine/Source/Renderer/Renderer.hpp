@@ -236,6 +236,14 @@ private:
                                                           const Frustum& frustum,
                                                           std::pmr::memory_resource* arena);
 
+    static void CompileAndExecuteRenderGraph(const vk::raii::CommandBuffer& cmd,
+                                             uint32_t frameIndex,
+                                             uint32_t currentImage,
+                                             const RenderObjectContainer& allObjects,
+                                             const RenderObjectContainer& renderObjects,
+                                             std::pmr::memory_resource* frameArena,
+                                             const std::vector<LineVertex>& colliderLineVertices);
+
     static void RenderShadowPass(const vk::raii::CommandBuffer& cmd,
                                  uint32_t frameIndex,
                                  const RenderObjectContainer& renderObjects,
@@ -302,7 +310,6 @@ private:
     static void ApplyUpscaling(const vk::raii::CommandBuffer& cmd, uint32_t frameIndex);
 
     static void ApplyBloom(const vk::raii::CommandBuffer& cmd, uint32_t frameIndex);
-    static void CompileRenderGraph();
 
     static void WriteGPUTimestamp(const vk::raii::CommandBuffer& cmd, uint32_t frameIndex, uint32_t index);
     static void ResolveGPUTimings(uint32_t frameIndex);
