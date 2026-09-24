@@ -23,11 +23,16 @@ public:
 
     AssetFileWatchService(const AssetFileWatchService&) = delete;
     AssetFileWatchService& operator=(const AssetFileWatchService&) = delete;
+    AssetFileWatchService(AssetFileWatchService&&) = delete;
+    AssetFileWatchService& operator=(AssetFileWatchService&&) = delete;
 
-    void Start(std::filesystem::path assetsRoot, const std::unordered_set<std::string>& supportedExtensions,
+    void Start(const std::filesystem::path& assetsRoot,
+               const std::unordered_set<std::string>& supportedExtensions,
                Callback callback);
+
     void Stop();
-    void Reload(std::filesystem::path assetsRoot, std::unordered_set<std::string> supportedExtensions);
+
+    void Reload(const std::filesystem::path& assetsRoot, const std::unordered_set<std::string>& supportedExtensions);
 
 private:
     void OnFileEvent(const std::filesystem::path& path, filewatch::Event event);

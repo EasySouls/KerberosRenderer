@@ -173,6 +173,9 @@ namespace Kerberos
 				m_AssetRegistry.Remove(handle);
 				SerializeAssetRegistry();
 			}
+
+			Log::CoreInfo("Asset removed: {0}", relative.string());
+
 			return;
 		}
 
@@ -182,7 +185,16 @@ namespace Kerberos
 			const auto handle = m_AssetRegistry.GetHandle(
 				std::filesystem::relative(event.OldPath, m_AssetsRoot));
 			m_AssetRegistry.Get(handle).Filepath = relative;
+
+			Log::CoreInfo("Asset renamed: {0}", relative.string());
 		}
+
+		if (event.Type == AssetFileEventType::Added) {
+            Log::CoreInfo("Asset added: {0}", relative.string());
+        }
+        else if (event.Type == AssetFileEventType::Modified) {
+            Log::CoreInfo("Asset modified: {0}", relative.string());
+        }
 
 		const auto report = m_BuildCoordinator->Build(event.Path, event.Type == AssetFileEventType::Modified);
 		if (report.Built)
