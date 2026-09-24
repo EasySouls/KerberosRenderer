@@ -172,14 +172,17 @@ namespace Kerberos::RenderGraph
 		struct ImgState
         {
             ImageState Current{};
-            bool HasUse = false;
-            bool WasWrite = false;
-        };
+		    ImageState LastWrite{};
+		    bool HasUse = false;
+		    bool HasWrite = false;
+		    bool WasWrite = false;
+		};
         std::vector<ImgState> imgStates;
         imgStates.reserve(m_Images.size());
         for (const auto& img : m_Images)
         {
-            imgStates.push_back({ .Current = img.InitialState, .HasUse = false, .WasWrite = false });
+            imgStates.push_back({ .Current = img.InitialState, .LastWrite = img.InitialState,
+                                  .HasUse = false, .HasWrite = false, .WasWrite = false });
         }
 
         struct BufState
@@ -207,12 +210,16 @@ namespace Kerberos::RenderGraph
                 ImgState& previous = imgStates[usage.Image.Index];
                 const ImageState old = previous.Current;
                 const bool isWrite = usage.Usage == ResourceUsage::Write;
+                const vk::PipelineStageFlags2 sourceStages =
+                    old.Stages | (previous.HasWrite ? previous.LastWrite.Stages : vk::PipelineStageFlags2{});
+                const vk::AccessFlags2 sourceAccess =
+                    old.Access | (previous.HasWrite ? previous.LastWrite.Access : vk::AccessFlags2{});
 
                 if (!previous.HasUse || previous.WasWrite || isWrite || old.Layout != usage.Layout ||
                     old.Stages != usage.Stages || old.Access != usage.Access) 
                 {
-                    compiled.ImageBarriers.push_back({ .srcStageMask = old.Stages,
-                                                       .srcAccessMask = old.Access,
+                    compiled.ImageBarriers.push_back({ .srcStageMask = sourceStages,
+                                                       .srcAccessMask = sourceAccess,
                                                        .dstStageMask = usage.Stages,
                                                        .dstAccessMask = usage.Access,
                                                        .oldLayout = old.Layout,
@@ -224,6 +231,11 @@ namespace Kerberos::RenderGraph
                 }
                 previous.Current = { .Layout = usage.Layout, .Stages = usage.Stages, .Access = usage.Access };
                 previous.HasUse = true;
+                if (isWrite)
+                {
+                    previous.LastWrite = previous.Current;
+                    previous.HasWrite = true;
+                }
                 previous.WasWrite = isWrite;
             }
 
