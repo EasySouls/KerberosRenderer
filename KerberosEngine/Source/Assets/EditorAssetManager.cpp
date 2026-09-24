@@ -20,6 +20,10 @@
 #include <cerrno>
 #include <system_error>
 
+#ifdef KBR_PLATFORM_WINDOWS
+#include <Windows.h>
+#endif
+
 #include "Importers/GLTFPipelineImporter.hpp"
 
 import Kerberos;
@@ -367,19 +371,51 @@ namespace Kerberos
 			out << YAML::EndMap;
 		}
 
+		const std::filesystem::path temporaryRegistryPath = assetRegistryPath.string() + ".tmp";
         try
 		{
             std::ofstream file;
             file.exceptions(std::ios::failbit | std::ios::badbit);
-            file.open(assetRegistryPath);
+            file.open(temporaryRegistryPath);
 
 			file << out.c_str();
+			file.close();
 		}
 		catch (const std::ios_base::failure& e)
 		{
             const std::error_code ec = e.code();
 
 			Log::CoreError("Could not open asset registry file for writing: {0}. Reason: {1} (Error code: {2})", assetRegistryPath.string(), ec.message(), ec.value());
+			std::error_code cleanupError;
+			std::filesystem::remove(temporaryRegistryPath, cleanupError);
+			return;
+		}
+
+		try
+		{
+#ifdef KBR_PLATFORM_WINDOWS
+			const BOOL replaced = MoveFileExW(
+				temporaryRegistryPath.c_str(),
+				assetRegistryPath.c_str(),
+				MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH);
+			if (!replaced)
+			{
+				throw std::filesystem::filesystem_error(
+					"Could not replace asset registry file",
+					temporaryRegistryPath,
+					assetRegistryPath,
+					std::error_code(static_cast<int>(GetLastError()), std::system_category()));
+			}
+#else
+			std::filesystem::rename(temporaryRegistryPath, assetRegistryPath);
+#endif
+		}
+		catch (const std::filesystem::filesystem_error& e)
+		{
+			const std::error_code ec = e.code();
+			Log::CoreError("Could not replace asset registry file: {0}. Reason: {1} (Error code: {2})", assetRegistryPath.string(), ec.message(), ec.value());
+			std::error_code cleanupError;
+			std::filesystem::remove(temporaryRegistryPath, cleanupError);
 		}
 	}
 
