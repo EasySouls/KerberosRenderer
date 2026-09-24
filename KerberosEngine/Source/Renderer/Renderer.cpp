@@ -517,6 +517,8 @@ struct RendererData
 
     AntiAliasingMode AntiAliasingMode = AntiAliasingMode::SMAA;
     TonemappingOperator TonemappingOperator = TonemappingOperator::ACES;
+
+    std::vector<Renderer::DeferredAction> DeferredActions;
 };
 
 } // namespace
@@ -669,6 +671,8 @@ void Renderer::RenderScene(
     KBR_TRACY_FUNCTION();
 
     KBRAssert(!s_Data->PendingRender.IsValid, "Scene has already been queued for rendering!");
+
+    ApplyDeferredActions();
 
     glm::mat4 invView = glm::inverse(view);
 
@@ -3595,7 +3599,7 @@ void Renderer::ResizeResources(const uint32_t width, const uint32_t height)
 
     // Recreate descriptor set for the output image for ImGui rendering
     {
-        KBRAssert(s_Data->LinearSampler != nullptr && s_Data->OutputImage.ImageView != nullptr,
+        KBRAssert(s_Data->LinearSampler != nullptr && s_Data->FinalImage.ImageView != nullptr,
                         "Sampler and image view has to be initialized to create an ImGui descriptor set");
 
         s_Data->ColorOutputDescriptorSet =
@@ -3843,18 +3847,21 @@ UpscalerType Renderer::GetUpscalingMode()
 
 void Renderer::SetUpscalingMode(const UpscalerType mode)
 {
-    VulkanContext::Get().WaitIdle();
+    if (s_Data->UpscalingMode == mode)
+        return;
 
-    s_Data->UpscalingMode = mode;
+    EnqueueDeferredAction([mode]() { 
+        s_Data->UpscalingMode = mode;
 
-    s_Data->Upscaler = CreateUpscaler(mode);
+        s_Data->Upscaler = CreateUpscaler(mode);
 
-    const UpscalerCreateInfo upscalerCreateInfo{ .displayWidth = static_cast<uint32_t>(s_Data->OutputSize.x),
-                                                 .displayHeight = static_cast<uint32_t>(s_Data->OutputSize.y),
-                                                 .quality = s_Data->UpscalingQuality };
-    s_Data->Upscaler->Initialize(upscalerCreateInfo);
+        const UpscalerCreateInfo upscalerCreateInfo{ .displayWidth = static_cast<uint32_t>(s_Data->OutputSize.x),
+                                                     .displayHeight = static_cast<uint32_t>(s_Data->OutputSize.y),
+                                                     .quality = s_Data->UpscalingQuality };
+        s_Data->Upscaler->Initialize(upscalerCreateInfo);
 
-    ResizeResources(static_cast<uint32_t>(s_Data->OutputSize.x), static_cast<uint32_t>(s_Data->OutputSize.y));
+        ResizeResources(static_cast<uint32_t>(s_Data->OutputSize.x), static_cast<uint32_t>(s_Data->OutputSize.y));
+    });
 }
 
 UpscalerQuality Renderer::GetUpscalingQuality()
@@ -3865,13 +3872,16 @@ UpscalerQuality Renderer::GetUpscalingQuality()
 
 void Renderer::SetUpscalingQuality(const UpscalerQuality quality)
 {
-    VulkanContext::Get().WaitIdle();
+    if (s_Data->UpscalingQuality == quality)
+        return;
 
-    s_Data->UpscalingQuality = quality;
+    EnqueueDeferredAction([quality]() { 
+        s_Data->UpscalingQuality = quality;
 
-    s_Data->Upscaler->SetQuality(quality);
+        s_Data->Upscaler->SetQuality(quality);
 
-    ResizeResources(static_cast<uint32_t>(s_Data->OutputSize.x), static_cast<uint32_t>(s_Data->OutputSize.y));
+        ResizeResources(static_cast<uint32_t>(s_Data->OutputSize.x), static_cast<uint32_t>(s_Data->OutputSize.y));
+    });
 }
 
 glm::vec2 Renderer::GetOutputImageSize()
@@ -6110,6 +6120,23 @@ void Renderer::HandleMousePickingReadback(const vk::raii::CommandBuffer& cmd)
             (s_Data->MousePickingReadback.WriteIndex + 1) % Renderer::MousePickingReadbackFrameLag;
         s_Data->MousePickingReadback.RequestPending = false;
     }
+}
+
+void Renderer::EnqueueDeferredAction(DeferredAction&& action)
+{
+    s_Data->DeferredActions.push_back(std::move(action));
+}
+
+void Renderer::ApplyDeferredActions()
+{
+    if (s_Data->DeferredActions.empty())
+        return;
+
+    VulkanContext::Get().WaitIdle();
+
+    auto actions = std::exchange(s_Data->DeferredActions, {});
+    for (auto& action : actions)
+        action();
 }
 
 bool Renderer::IsUsingAccelerationStructures()

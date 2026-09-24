@@ -119,12 +119,15 @@ enum class BloomMode : std::uint8_t
     BrightPassPrefilter = 1
 };
 
+
 class Renderer
 {
 public:
     static void Init();
     static void Shutdown();
 
+    using DeferredAction = std::move_only_function<void()>;
+    
     static void RenderSceneEditor(const Ref<Scene>& scene, const Camera& camera, float dt);
     static void RenderSceneRuntime(const Ref<Scene>& scene,
                                    const Camera& mainCamera,
@@ -319,6 +322,9 @@ private:
     static glm::mat4 CalculateLightSpaceMatrix();
 
     static void HandleMousePickingReadback(const vk::raii::CommandBuffer& cmd);
+
+    static void EnqueueDeferredAction(DeferredAction&& action);
+    static void ApplyDeferredActions();
 
     static bool IsUsingAccelerationStructures();
 
