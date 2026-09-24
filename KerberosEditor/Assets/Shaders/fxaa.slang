@@ -32,11 +32,14 @@ VSOutput vertexMain(uint vertexID : SV_VertexID)
     return output;
 }
 
-// Helper function to get pre-calculated Luma from alpha channel
+// FXAA thresholds are tuned for a bounded display-referred luma domain. Keep
+// the HDR color untouched for filtering, but compress luminance for edge tests
+// so bright HDR values do not overwhelm the fixed minimum threshold.
 float SampleLuma(float2 uv)
 {
     float3 hdrColor = sceneColorTex.SampleLevel(linearSampler, uv, 0.0).rgb;
-    return dot(hdrColor, float3(0.2126, 0.7152, 0.0722));
+    float linearLuma = max(dot(hdrColor, float3(0.2126, 0.7152, 0.0722)), 0.0);
+    return linearLuma / (1.0 + linearLuma);
 }
 
 static const float FXAA_EDGE_THRESHOLD_MIN = 0.0833;
