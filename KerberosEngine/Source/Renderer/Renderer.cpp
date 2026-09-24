@@ -6941,7 +6941,7 @@ void Renderer::CreateFXAAImage(const uint32_t width, const uint32_t height)
                 vk::SampleCountFlagBits::e1,
                 s_Data->CompositeImage.Format,
                 vk::ImageTiling::eOptimal,
-                vk::ImageUsageFlagBits::eColorAttachment | vk::ImageUsageFlagBits::eSampled,
+                vk::ImageUsageFlagBits::eColorAttachment | vk::ImageUsageFlagBits::eSampled | vk::ImageUsageFlagBits::eTransferSrc,
                 vk::MemoryPropertyFlagBits::eDeviceLocal,
                 s_Data->CompositeImage.Image,
                 s_Data->CompositeImage.ImageMemory);
