@@ -20,6 +20,10 @@
 #include <cerrno>
 #include <system_error>
 
+#ifdef KBR_PLATFORM_WINDOWS
+#include <Windows.h>
+#endif
+
 #include "Importers/GLTFPipelineImporter.hpp"
 
 import Kerberos;
@@ -173,6 +177,9 @@ namespace Kerberos
 				m_AssetRegistry.Remove(handle);
 				SerializeAssetRegistry();
 			}
+
+			Log::CoreInfo("Asset removed: {0}", relative.string());
+
 			return;
 		}
 
@@ -182,7 +189,16 @@ namespace Kerberos
 			const auto handle = m_AssetRegistry.GetHandle(
 				std::filesystem::relative(event.OldPath, m_AssetsRoot));
 			m_AssetRegistry.Get(handle).Filepath = relative;
+
+			Log::CoreInfo("Asset renamed: {0}", relative.string());
 		}
+
+		if (event.Type == AssetFileEventType::Added) {
+            Log::CoreInfo("Asset added: {0}", relative.string());
+        }
+        else if (event.Type == AssetFileEventType::Modified) {
+            Log::CoreInfo("Asset modified: {0}", relative.string());
+        }
 
 		const auto report = m_BuildCoordinator->Build(event.Path, event.Type == AssetFileEventType::Modified);
 		if (report.Built)
@@ -355,15 +371,52 @@ namespace Kerberos
 			out << YAML::EndMap;
 		}
 
-		std::ofstream file(assetRegistryPath);
-		if (!file.is_open())
+		const std::filesystem::path temporaryRegistryPath = assetRegistryPath.string() + ".tmp";
+        try
 		{
-            std::error_code ec(errno, std::generic_category());
+            std::ofstream file;
+            file.exceptions(std::ios::failbit | std::ios::badbit);
+            file.open(temporaryRegistryPath);
+
+			file << out.c_str();
+			file.close();
+		}
+		catch (const std::ios_base::failure& e)
+		{
+            const std::error_code ec = e.code();
 
 			Log::CoreError("Could not open asset registry file for writing: {0}. Reason: {1} (Error code: {2})", assetRegistryPath.string(), ec.message(), ec.value());
+			std::error_code cleanupError;
+			std::filesystem::remove(temporaryRegistryPath, cleanupError);
 			return;
 		}
-		file << out.c_str();
+
+		try
+		{
+#ifdef KBR_PLATFORM_WINDOWS
+			const BOOL replaced = MoveFileExW(
+				temporaryRegistryPath.c_str(),
+				assetRegistryPath.c_str(),
+				MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH);
+			if (!replaced)
+			{
+				throw std::filesystem::filesystem_error(
+					"Could not replace asset registry file",
+					temporaryRegistryPath,
+					assetRegistryPath,
+					std::error_code(static_cast<int>(GetLastError()), std::system_category()));
+			}
+#else
+			std::filesystem::rename(temporaryRegistryPath, assetRegistryPath);
+#endif
+		}
+		catch (const std::filesystem::filesystem_error& e)
+		{
+			const std::error_code ec = e.code();
+			Log::CoreError("Could not replace asset registry file: {0}. Reason: {1} (Error code: {2})", assetRegistryPath.string(), ec.message(), ec.value());
+			std::error_code cleanupError;
+			std::filesystem::remove(temporaryRegistryPath, cleanupError);
+		}
 	}
 
 	bool EditorAssetManager::DeserializeAssetRegistry()

@@ -10,7 +10,7 @@ struct PushConstants { float4 rtMetrics; };
 
 #include "SMAA.hlsl"
 
-[[vk::binding(0, 0)]] Texture2D<float4> colorTex; // The original Tonemapped image
+[[vk::binding(0, 0)]] Texture2D<float4> colorTex; // HDR linear scene color
 [[vk::binding(1, 0)]] Texture2D<float4> blendTex; // The output from Pass 2 (Blend weight calculation)
 [[vk::binding(2, 0)]] SamplerState LinearSampler;
 [[vk::binding(3, 0)]] SamplerState PointSampler;

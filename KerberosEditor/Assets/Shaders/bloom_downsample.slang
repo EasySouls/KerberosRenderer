@@ -4,6 +4,9 @@ Sampler2D srcTexture;
 [[vk::binding(1, 0)]] 
 RWTexture2D<float4> dstTexture;
 
+[[vk::binding(2, 0)]]
+Sampler2D<float> bloomMaskTexture;
+
 [[vk::push_constant]]
 cbuffer PushConstants 
 {
@@ -73,8 +76,8 @@ void computeMain(uint3 threadId : SV_DispatchThreadID)
 
     if (isExtract == 1)
     {   
-        // The alpha channel is used to store the bloom contribution for later stages
-        color = color * saturate(e.a);
+        float bloomMask = saturate(bloomMaskTexture.SampleLevel(float2(uv.x, uv.y), 0).r);
+        color = color * bloomMask;
 
         color = min(color, float3(maxBrightness));
     }

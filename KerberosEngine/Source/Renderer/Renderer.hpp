@@ -1,5 +1,6 @@
 #pragma once
 
+#include "DescriptorAllocator.hpp"
 #include "Scene/Camera/EditorCamera.hpp"
 #include "Scene/Scene.hpp"
 #include "Upscaling/UpscalerTypes.hpp"
@@ -118,27 +119,32 @@ enum class BloomMode : std::uint8_t
     BrightPassPrefilter = 1
 };
 
+
 class Renderer
 {
 public:
     static void Init();
     static void Shutdown();
 
+    using DeferredAction = std::move_only_function<void()>;
+    
     static void RenderSceneEditor(const Ref<Scene>& scene, const Camera& camera, float dt);
     static void RenderSceneRuntime(const Ref<Scene>& scene,
                                    const Camera& mainCamera,
                                    const glm::mat4& mainCameraTransform,
                                    float dt);
-    static void
-    RenderScene(const Ref<Scene>& scene,
-                const glm::mat4& view,
-                const glm::mat4& projection,
-                const glm::vec3& camPos,
-                const std::function<std::pair<std::vector<glm::mat4>, glm::vec4>(
-                    const glm::vec3&, const std::function<glm::vec4(float)>&)>& calculateLightSpaceMatricesFunc,
-                float dt,
-                float nearPlane,
-                float farPlane);
+    using CalcLightSpaceMatricesFunc = std::function<std::pair<std::vector<glm::mat4>, glm::vec4>(
+        const glm::vec3&, const std::function<glm::vec4(float)>&)>;
+
+    static void RenderScene(const Ref<Scene>& scene,
+                            const glm::mat4& view,
+                            const glm::mat4& projection,
+                            const glm::vec3& camPos,
+                            const CalcLightSpaceMatricesFunc& calculateLightSpaceMatricesFunc,
+                            float dt,
+                            float nearPlane,
+                            float farPlane);
+    
     static void RecordQueuedSceneRender(const vk::raii::CommandBuffer& cmd);
 
     static void ResizeResources(uint32_t width, uint32_t height);
@@ -233,12 +239,59 @@ private:
                                                           const Frustum& frustum,
                                                           std::pmr::memory_resource* arena);
 
+    static void CompileAndExecuteRenderGraph(const vk::raii::CommandBuffer& cmd,
+                                             uint32_t frameIndex,
+                                             uint32_t currentImage,
+                                             const RenderObjectContainer& allObjects,
+                                             const RenderObjectContainer& renderObjects,
+                                             std::pmr::memory_resource* frameArena,
+                                             const std::vector<LineVertex>& colliderLineVertices);
+
     static void RenderShadowPass(const vk::raii::CommandBuffer& cmd,
                                  uint32_t frameIndex,
                                  const RenderObjectContainer& renderObjects,
                                  std::pmr::memory_resource* arena);
 
+    static void UpdateParticles(const vk::raii::CommandBuffer& cmd,
+                                uint32_t frameIndex,
+                                DescriptorAllocator& frameDescriptorAllocator,
+                                float time);
+
+    static void RenderPrePass(const vk::raii::CommandBuffer& cmd,
+                              uint32_t frameIndex,
+                              const RenderObjectContainer& renderObjects,
+                              uint32_t currentImage);
+
+    static void RenderGTAO(const vk::raii::CommandBuffer& cmd, uint32_t frameIndex, uint32_t currentImage);
+
+    static void RenderOpaque(const vk::raii::CommandBuffer& cmd,
+                             uint32_t frameIndex,
+                             const RenderObjectContainer& renderObjects,
+                             uint32_t currentImage,
+                             const vk::Viewport& viewport,
+                             vk::Rect2D renderArea);
+
+    static void RenderTransparent(const vk::raii::CommandBuffer& cmd,
+                                  uint32_t frameIndex,
+                                  const RenderObjectContainer& renderObjects,
+                                  uint32_t currentImage,
+                                  const vk::Viewport& viewport,
+                                  vk::Rect2D renderArea);
+
+    static void RenderPhysicsColliders(const vk::raii::CommandBuffer& cmd,
+                                       const std::vector<LineVertex>& colliderLineVertices,
+                                       uint32_t currentImage,
+                                       const vk::Viewport& viewport,
+                                       vk::Rect2D renderArea);
+
+    static void ResolveTransparencyPass(const vk::raii::CommandBuffer& cmd,
+                                        uint32_t frameIndex,
+                                        uint32_t currentImage,
+                                        const vk::Viewport& viewport,
+                                        vk::Rect2D renderArea);
+
     static void RenderParticles(const vk::raii::CommandBuffer& cmd, uint32_t frameIndex);
+
     static void RenderGrass(const vk::raii::CommandBuffer& cmd, uint32_t frameIndex);
 
     static void ApplyTonemapping(const vk::raii::CommandBuffer& cmd, uint32_t frameIndex);
@@ -270,6 +323,9 @@ private:
 
     static void HandleMousePickingReadback(const vk::raii::CommandBuffer& cmd);
 
+    static void EnqueueDeferredAction(DeferredAction&& action);
+    static void ApplyDeferredActions();
+
     static bool IsUsingAccelerationStructures();
 
     static void CreateDefaultMaterials();
@@ -294,6 +350,7 @@ private:
     static void CreateTonemappedImage(uint32_t width, uint32_t height);
     static void SetupTonemappingResolveDescriptors();
     static void CreateOutputImage(uint32_t width, uint32_t height);
+    static void CreateFinalImage(uint32_t width, uint32_t height);
 
     static void CreateSMAATextures();
     static void CreateSMAADescriptorSetAndPipelineLayouts();

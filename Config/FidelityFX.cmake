@@ -38,6 +38,8 @@ target_include_directories(amd_fidelityfx_vk
 )
 
 add_custom_target(KerberosFidelityFXRuntime ALL
+        COMMAND ${CMAKE_COMMAND} -E make_directory
+        "$<TARGET_FILE_DIR:KerberosEngine>"
         COMMAND ${CMAKE_COMMAND} -E copy_if_different
         "$<TARGET_FILE:amd_fidelityfx_vk>"
         "$<TARGET_FILE_DIR:KerberosEngine>"

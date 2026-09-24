@@ -24,13 +24,13 @@ AssetFileWatchService::~AssetFileWatchService()
     Stop();
 }
 
-void AssetFileWatchService::Start(std::filesystem::path assetsRoot,
+void AssetFileWatchService::Start(const std::filesystem::path& assetsRoot,
     const std::unordered_set<std::string>& supportedExtensions, Callback callback)
 {
     KBR_TRACY_FUNCTION();
 
     Stop();
-    m_AssetsRoot = Normalize(std::move(assetsRoot));
+    m_AssetsRoot = Normalize(assetsRoot);
     m_SupportedExtensions.clear();
     for (auto extension : supportedExtensions)
     {
@@ -59,13 +59,13 @@ void AssetFileWatchService::Stop()
     m_RenameSource.clear();
 }
 
-void AssetFileWatchService::Reload(std::filesystem::path assetsRoot,
-    std::unordered_set<std::string> supportedExtensions)
+void AssetFileWatchService::Reload(const std::filesystem::path& assetsRoot,
+    const std::unordered_set<std::string>& supportedExtensions)
 {
     KBR_TRACY_FUNCTION();
 
     auto callback = m_Callback;
-    Start(std::move(assetsRoot), std::move(supportedExtensions), std::move(callback));
+    Start(assetsRoot, supportedExtensions, std::move(callback));
 }
 
 std::filesystem::path AssetFileWatchService::Normalize(const std::filesystem::path& path)
