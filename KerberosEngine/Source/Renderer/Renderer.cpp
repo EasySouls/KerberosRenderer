@@ -66,6 +66,7 @@ struct ShadowMap
     vk::raii::ImageView ReadImageView = nullptr;
     std::array<vk::raii::ImageView, ShadowMap::CascadeCount> WriteImageViews{ nullptr, nullptr, nullptr, nullptr };
     vk::Format Format = vk::Format::eUndefined;
+    vk::ImageLayout CurrentLayout = vk::ImageLayout::eUndefined;
     vk::raii::PipelineLayout PipelineLayout = nullptr;
     Ref<GraphicsPipeline> Pipeline = nullptr;
 
@@ -95,6 +96,15 @@ struct ImageData
     vk::raii::DeviceMemory ImageMemory = nullptr;
     vk::raii::ImageView ImageView = nullptr;
     vk::Format Format = vk::Format::eUndefined;
+    vk::ImageLayout CurrentLayout = vk::ImageLayout::eUndefined;
+
+    void Clear()
+    {
+        ImageView.clear();
+        Image.clear();
+        ImageMemory.clear();
+        CurrentLayout = vk::ImageLayout::eUndefined;
+    }
 };
 
 struct PickingReadbackSlot
@@ -396,10 +406,6 @@ struct RendererData
     ImageData GTAOScratchImage;
     ImageData OutputImage;
 
-    vk::ImageLayout PickingImageLayout = vk::ImageLayout::eUndefined;
-    vk::ImageLayout OutputImageLayout = vk::ImageLayout::eUndefined;
-    vk::ImageLayout FinalImageLayout = vk::ImageLayout::eUndefined;
-
     vk::raii::PipelineLayout PBRPipelineLayout = nullptr;
     Ref<GraphicsPipeline> DepthPrePassPipeline = nullptr;
     Ref<GraphicsPipeline> PBROpaquePipeline = nullptr;
@@ -486,7 +492,6 @@ struct RendererData
 
     constexpr static uint32_t TemporalSequenceLength = 8;
 
-    vk::ImageLayout GTAOImageLayout = vk::ImageLayout::eUndefined;
     bool PreviousUseGTAO = true;
 
     Owner<IUpscaler> Upscaler = nullptr;
@@ -845,87 +850,7 @@ void Renderer::RenderGTAO(const vk::raii::CommandBuffer& cmd, const uint32_t fra
 {
     WriteGPUTimestamp(cmd, frameIndex, static_cast<uint32_t>(GPUTimestampQuery::AmbientOcclusionPassBegin));
 
-    const auto getSrcStageAccessForLayout =
-        [](const vk::ImageLayout layout) -> std::pair<vk::PipelineStageFlags2, vk::AccessFlags2> {
-        switch (layout) {
-        case vk::ImageLayout::eShaderReadOnlyOptimal:
-            return { vk::PipelineStageFlagBits2::eFragmentShader, vk::AccessFlagBits2::eShaderRead };
-        case vk::ImageLayout::eGeneral:
-            return { vk::PipelineStageFlagBits2::eComputeShader, vk::AccessFlagBits2::eShaderStorageWrite };
-        case vk::ImageLayout::eTransferDstOptimal:
-            return { vk::PipelineStageFlagBits2::eTransfer, vk::AccessFlagBits2::eTransferWrite };
-        case vk::ImageLayout::eUndefined:
-        default:
-            return { vk::PipelineStageFlagBits2::eTopOfPipe, {} };
-        }
-    };
-
     if (s_Data->UseGTAO) {
-        // Transition GTAO output image to storage image from sampled image for compute shader write
-        // Transition normal and depth images to shader read optimal layout
-        {
-            const auto [aoSrcStageMask, aoSrcAccessMask] = getSrcStageAccessForLayout(s_Data->GTAOImageLayout);
-            const vk::ImageMemoryBarrier2 aoBarrier{ .srcStageMask = aoSrcStageMask,
-                                                     .srcAccessMask = aoSrcAccessMask,
-                                                     .dstStageMask = vk::PipelineStageFlagBits2::eComputeShader,
-                                                     .dstAccessMask = vk::AccessFlagBits2::eShaderStorageWrite,
-                                                     .oldLayout = s_Data->GTAOImageLayout,
-                                                     .newLayout = vk::ImageLayout::eGeneral,
-                                                     .srcQueueFamilyIndex = vk::QueueFamilyIgnored,
-                                                     .dstQueueFamilyIndex = vk::QueueFamilyIgnored,
-                                                     .image = s_Data->GTAOImage.Image,
-                                                     .subresourceRange = { .aspectMask =
-                                                                           vk::ImageAspectFlagBits::eColor,
-                                                                           .baseMipLevel = 0,
-                                                                           .levelCount = 1,
-                                                                           .baseArrayLayer = 0,
-                                                                           .layerCount = 1 } };
-
-            const vk::ImageMemoryBarrier2 normalTextureBarrier{
-                .srcStageMask = vk::PipelineStageFlagBits2::eColorAttachmentOutput |
-                                vk::PipelineStageFlagBits2::eLateFragmentTests,
-                .srcAccessMask = vk::AccessFlagBits2::eColorAttachmentWrite,
-                .dstStageMask = vk::PipelineStageFlagBits2::eComputeShader,
-                .dstAccessMask = vk::AccessFlagBits2::eShaderRead,
-                .oldLayout = vk::ImageLayout::eColorAttachmentOptimal,
-                .newLayout = vk::ImageLayout::eShaderReadOnlyOptimal,
-                .srcQueueFamilyIndex = vk::QueueFamilyIgnored,
-                .dstQueueFamilyIndex = vk::QueueFamilyIgnored,
-                .image = s_Data->NormalImage.Image,
-                .subresourceRange = { .aspectMask = vk::ImageAspectFlagBits::eColor,
-                                      .baseMipLevel = 0,
-                                      .levelCount = 1,
-                                      .baseArrayLayer = 0,
-                                      .layerCount = 1 }
-            };
-
-            const vk::ImageMemoryBarrier2 depthBarrier{
-                .srcStageMask = vk::PipelineStageFlagBits2::eLateFragmentTests,
-                .srcAccessMask = vk::AccessFlagBits2::eDepthStencilAttachmentWrite,
-                .dstStageMask = vk::PipelineStageFlagBits2::eComputeShader,
-                .dstAccessMask = vk::AccessFlagBits2::eShaderRead,
-                .oldLayout = vk::ImageLayout::eDepthStencilAttachmentOptimal,
-                .newLayout = vk::ImageLayout::eShaderReadOnlyOptimal,
-                .srcQueueFamilyIndex = vk::QueueFamilyIgnored,
-                .dstQueueFamilyIndex = vk::QueueFamilyIgnored,
-                .image = s_Data->DepthImage.Image,
-                .subresourceRange = { .aspectMask = vk::ImageAspectFlagBits::eDepth,
-                                      .baseMipLevel = 0,
-                                      .levelCount = 1,
-                                      .baseArrayLayer = 0,
-                                      .layerCount = 1 }
-            };
-
-            const std::array barriers = { aoBarrier, normalTextureBarrier, depthBarrier };
-
-            const vk::DependencyInfo dependencyInfo = { .dependencyFlags = {},
-                                                        .imageMemoryBarrierCount =
-                                                        static_cast<uint32_t>(barriers.size()),
-                                                        .pImageMemoryBarriers = barriers.data() };
-
-            cmd.pipelineBarrier2(dependencyInfo);
-        }
-
         BeginRenderPassDebugLabel(cmd, "GTAO Compute Pass");
 
         cmd.bindPipeline(vk::PipelineBindPoint::eCompute, *s_Data->GTAOPipeline->GetVulkanPipeline());
@@ -963,24 +888,7 @@ void Renderer::RenderGTAO(const vk::raii::CommandBuffer& cmd, const uint32_t fra
                                           .layerCount = 1 }
                 };
 
-                const vk::ImageMemoryBarrier2 scratchBarrier{
-                    .srcStageMask = vk::PipelineStageFlagBits2::eComputeShader,
-                    .srcAccessMask = vk::AccessFlagBits2::eShaderStorageWrite,
-                    .dstStageMask = vk::PipelineStageFlagBits2::eComputeShader,
-                    .dstAccessMask = vk::AccessFlagBits2::eShaderStorageWrite,
-                    .oldLayout = vk::ImageLayout::eUndefined,
-                    .newLayout = vk::ImageLayout::eGeneral,
-                    .srcQueueFamilyIndex = vk::QueueFamilyIgnored,
-                    .dstQueueFamilyIndex = vk::QueueFamilyIgnored,
-                    .image = s_Data->GTAOScratchImage.Image,
-                    .subresourceRange = { .aspectMask = vk::ImageAspectFlagBits::eColor,
-                                          .baseMipLevel = 0,
-                                          .levelCount = 1,
-                                          .baseArrayLayer = 0,
-                                          .layerCount = 1 }
-                };
-
-                const std::array barriers = { mainImageToShaderReadBarrier, scratchBarrier };
+                const std::array barriers = { mainImageToShaderReadBarrier };
                 const vk::DependencyInfo dependencyInfo = { .dependencyFlags = {},
                                                             .imageMemoryBarrierCount =
                                                             static_cast<uint32_t>(barriers.size()),
@@ -1071,79 +979,12 @@ void Renderer::RenderGTAO(const vk::raii::CommandBuffer& cmd, const uint32_t fra
             EndRenderPassDebugLabel(cmd);
         }
 
-        // Transition ao image from storage image to sampled image
-        // and transition depth image back to depth attachment
-        {
-            const vk::ImageMemoryBarrier2 aoBarrier{ .srcStageMask = vk::PipelineStageFlagBits2::eComputeShader,
-                                                     .srcAccessMask = vk::AccessFlagBits2::eShaderStorageWrite,
-                                                     .dstStageMask = vk::PipelineStageFlagBits2::eFragmentShader,
-                                                     .dstAccessMask = vk::AccessFlagBits2::eShaderRead,
-                                                     .oldLayout = vk::ImageLayout::eGeneral,
-                                                     .newLayout = vk::ImageLayout::eShaderReadOnlyOptimal,
-                                                     .srcQueueFamilyIndex = vk::QueueFamilyIgnored,
-                                                     .dstQueueFamilyIndex = vk::QueueFamilyIgnored,
-                                                     .image = s_Data->GTAOImage.Image,
-                                                     .subresourceRange = { .aspectMask =
-                                                                           vk::ImageAspectFlagBits::eColor,
-                                                                           .baseMipLevel = 0,
-                                                                           .levelCount = 1,
-                                                                           .baseArrayLayer = 0,
-                                                                           .layerCount = 1 } };
-
-            const vk::ImageMemoryBarrier2 depthBarrier{
-                .srcStageMask = vk::PipelineStageFlagBits2::eComputeShader,
-                .srcAccessMask = vk::AccessFlagBits2::eShaderRead,
-                .dstStageMask = vk::PipelineStageFlagBits2::eEarlyFragmentTests |
-                                vk::PipelineStageFlagBits2::eLateFragmentTests,
-                .dstAccessMask = vk::AccessFlagBits2::eDepthStencilAttachmentRead |
-                                 vk::AccessFlagBits2::eDepthStencilAttachmentWrite,
-                .oldLayout = vk::ImageLayout::eShaderReadOnlyOptimal,
-                .newLayout = vk::ImageLayout::eDepthStencilAttachmentOptimal,
-                .srcQueueFamilyIndex = vk::QueueFamilyIgnored,
-                .dstQueueFamilyIndex = vk::QueueFamilyIgnored,
-                .image = s_Data->DepthImage.Image,
-                .subresourceRange = { .aspectMask = vk::ImageAspectFlagBits::eDepth,
-                                      .baseMipLevel = 0,
-                                      .levelCount = 1,
-                                      .baseArrayLayer = 0,
-                                      .layerCount = 1 }
-            };
-
-            const std::array barriers = { aoBarrier, depthBarrier };
-
-            const vk::DependencyInfo dependencyInfo = { .dependencyFlags = {},
-                                                        .imageMemoryBarrierCount =
-                                                        static_cast<uint32_t>(barriers.size()),
-                                                        .pImageMemoryBarriers = barriers.data() };
-
-            cmd.pipelineBarrier2(dependencyInfo);
-        }
-
-        s_Data->GTAOImageLayout = vk::ImageLayout::eShaderReadOnlyOptimal;
+        s_Data->GTAOImage.CurrentLayout = vk::ImageLayout::eShaderReadOnlyOptimal;
+        s_Data->GTAOScratchImage.CurrentLayout =
+            s_Data->UseBlurredGTAO ? vk::ImageLayout::eShaderReadOnlyOptimal : vk::ImageLayout::eUndefined;
     }
-    else if (s_Data->PreviousUseGTAO || s_Data->GTAOImageLayout == vk::ImageLayout::eUndefined) {
+    else if (s_Data->PreviousUseGTAO || s_Data->GTAOImage.CurrentLayout == vk::ImageLayout::eUndefined) {
         // GTAO disabled: clear once to neutral AO (1.0) so PBR keeps full ambient lighting.
-        const auto [aoSrcStageMask, aoSrcAccessMask] = getSrcStageAccessForLayout(s_Data->GTAOImageLayout);
-        const vk::ImageMemoryBarrier2 toTransferBarrier{ .srcStageMask = aoSrcStageMask,
-                                                         .srcAccessMask = aoSrcAccessMask,
-                                                         .dstStageMask = vk::PipelineStageFlagBits2::eTransfer,
-                                                         .dstAccessMask = vk::AccessFlagBits2::eTransferWrite,
-                                                         .oldLayout = s_Data->GTAOImageLayout,
-                                                         .newLayout = vk::ImageLayout::eTransferDstOptimal,
-                                                         .srcQueueFamilyIndex = vk::QueueFamilyIgnored,
-                                                         .dstQueueFamilyIndex = vk::QueueFamilyIgnored,
-                                                         .image = s_Data->GTAOImage.Image,
-                                                         .subresourceRange = { .aspectMask =
-                                                                               vk::ImageAspectFlagBits::eColor,
-                                                                               .baseMipLevel = 0,
-                                                                               .levelCount = 1,
-                                                                               .baseArrayLayer = 0,
-                                                                               .layerCount = 1 } };
-        const vk::DependencyInfo toTransferDependencyInfo{ .dependencyFlags = {},
-                                                           .imageMemoryBarrierCount = 1,
-                                                           .pImageMemoryBarriers = &toTransferBarrier };
-        cmd.pipelineBarrier2(toTransferDependencyInfo);
-
         constexpr vk::ClearColorValue clearNoAO{ std::array<float, 4>{ 1.0f, 0.0f, 0.0f, 0.0f } };
         constexpr std::array clearRanges = { vk::ImageSubresourceRange{ .aspectMask =
                                                                         vk::ImageAspectFlagBits::eColor,
@@ -1153,135 +994,13 @@ void Renderer::RenderGTAO(const vk::raii::CommandBuffer& cmd, const uint32_t fra
                                                                         .layerCount = 1 } };
         cmd.clearColorImage(*s_Data->GTAOImage.Image, vk::ImageLayout::eTransferDstOptimal, clearNoAO, clearRanges);
 
-        const vk::ImageMemoryBarrier2 toShaderReadBarrier{
-            .srcStageMask = vk::PipelineStageFlagBits2::eTransfer,
-            .srcAccessMask = vk::AccessFlagBits2::eTransferWrite,
-            .dstStageMask = vk::PipelineStageFlagBits2::eFragmentShader,
-            .dstAccessMask = vk::AccessFlagBits2::eShaderRead,
-            .oldLayout = vk::ImageLayout::eTransferDstOptimal,
-            .newLayout = vk::ImageLayout::eShaderReadOnlyOptimal,
-            .srcQueueFamilyIndex = vk::QueueFamilyIgnored,
-            .dstQueueFamilyIndex = vk::QueueFamilyIgnored,
-            .image = s_Data->GTAOImage.Image,
-            .subresourceRange = { .aspectMask = vk::ImageAspectFlagBits::eColor,
-                                  .baseMipLevel = 0,
-                                  .levelCount = 1,
-                                  .baseArrayLayer = 0,
-                                  .layerCount = 1 }
-        };
-        const vk::DependencyInfo toShaderReadDependencyInfo{ .dependencyFlags = {},
-                                                             .imageMemoryBarrierCount = 1,
-                                                             .pImageMemoryBarriers = &toShaderReadBarrier };
-        cmd.pipelineBarrier2(toShaderReadDependencyInfo);
-
-        s_Data->GTAOImageLayout = vk::ImageLayout::eShaderReadOnlyOptimal;
+        s_Data->GTAOImage.CurrentLayout = vk::ImageLayout::eShaderReadOnlyOptimal;
     }
 
     s_Data->PreviousUseGTAO = s_Data->UseGTAO;
 
     WriteGPUTimestamp(cmd, frameIndex, static_cast<uint32_t>(GPUTimestampQuery::AmbientOcclusionPassEnd));
 
-    // Transition shadow map image layout for shader read
-    {
-        vk::ImageMemoryBarrier2 barrier = { .srcStageMask = vk::PipelineStageFlagBits2::eEarlyFragmentTests |
-                                                            vk::PipelineStageFlagBits2::eLateFragmentTests,
-                                            .srcAccessMask = vk::AccessFlagBits2::eDepthStencilAttachmentWrite,
-                                            .dstStageMask = vk::PipelineStageFlagBits2::eFragmentShader,
-                                            .dstAccessMask = vk::AccessFlagBits2::eShaderRead,
-                                            .oldLayout = vk::ImageLayout::eDepthAttachmentOptimal,
-                                            .newLayout = vk::ImageLayout::eShaderReadOnlyOptimal,
-                                            .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-                                            .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-                                            .image = s_Data->ShadowMap.Image,
-                                            .subresourceRange = { .aspectMask = vk::ImageAspectFlagBits::eDepth,
-                                                                  .baseMipLevel = 0,
-                                                                  .levelCount = 1,
-                                                                  .baseArrayLayer = 0,
-                                                                  .layerCount = ShadowMap::CascadeCount } };
-        const vk::DependencyInfo dependencyInfo = { .dependencyFlags = {},
-                                                    .imageMemoryBarrierCount = 1,
-                                                    .pImageMemoryBarriers = &barrier };
-        cmd.pipelineBarrier2(dependencyInfo);
-    }
-
-    // Transition picking image to color attachment optimal
-    {
-        const vk::PipelineStageFlags2 srcStageMask = s_Data->PickingImageLayout == vk::ImageLayout::eTransferSrcOptimal
-                                                         ? vk::PipelineStageFlagBits2::eTransfer
-                                                         : vk::PipelineStageFlagBits2::eColorAttachmentOutput;
-        const vk::AccessFlags2 srcAccessMask = s_Data->PickingImageLayout == vk::ImageLayout::eTransferSrcOptimal
-                                                   ? vk::AccessFlagBits2::eTransferRead
-                                                   : vk::AccessFlagBits2::eColorAttachmentWrite;
-
-        vk::ImageMemoryBarrier2 barrier = { .srcStageMask = srcStageMask,
-                                            .srcAccessMask = srcAccessMask,
-                                            .dstStageMask = vk::PipelineStageFlagBits2::eColorAttachmentOutput,
-                                            .dstAccessMask = vk::AccessFlagBits2::eColorAttachmentWrite,
-                                            .oldLayout = vk::ImageLayout::eUndefined,
-                                            //.oldLayout = s_Data->PickingImageLayout == vk::ImageLayout::eUndefined ?
-                                            // vk::ImageLayout::eUndefined : s_Data->PickingImageLayout,
-                                            .newLayout = vk::ImageLayout::eColorAttachmentOptimal,
-                                            .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-                                            .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-                                            .image = s_Data->PickingImage.Image,
-                                            .subresourceRange = { .aspectMask = vk::ImageAspectFlagBits::eColor,
-                                                                  .baseMipLevel = 0,
-                                                                  .levelCount = 1,
-                                                                  .baseArrayLayer = 0,
-                                                                  .layerCount = 1 } };
-        const vk::DependencyInfo dependencyInfo = { .dependencyFlags = {},
-                                                    .imageMemoryBarrierCount = 1,
-                                                    .pImageMemoryBarriers = &barrier };
-        cmd.pipelineBarrier2(dependencyInfo);
-        s_Data->PickingImageLayout = vk::ImageLayout::eColorAttachmentOptimal;
-    }
-
-    // Transition color image layout for color attachment
-    {
-        vk::ImageMemoryBarrier2 barrier = { .srcStageMask = vk::PipelineStageFlagBits2::eColorAttachmentOutput,
-                                            .srcAccessMask = vk::AccessFlagBits2::eColorAttachmentWrite,
-                                            .dstStageMask = vk::PipelineStageFlagBits2::eColorAttachmentOutput,
-                                            .dstAccessMask = vk::AccessFlagBits2::eColorAttachmentWrite,
-                                            .oldLayout = vk::ImageLayout::eShaderReadOnlyOptimal,
-                                            .newLayout = vk::ImageLayout::eColorAttachmentOptimal,
-                                            .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-                                            .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-                                            .image = s_Data->ColorImage.Image,
-                                            .subresourceRange = { .aspectMask = vk::ImageAspectFlagBits::eColor,
-                                                                  .baseMipLevel = 0,
-                                                                  .levelCount = 1,
-                                                                  .baseArrayLayer = 0,
-                                                                  .layerCount = 1 } };
-        const vk::DependencyInfo dependencyInfo = { .dependencyFlags = {},
-                                                    .imageMemoryBarrierCount = 1,
-                                                    .pImageMemoryBarriers = &barrier };
-        cmd.pipelineBarrier2(dependencyInfo);
-    }
-
-    // Transition depth image to depth attachment optimal
-    {
-        vk::ImageMemoryBarrier2 barrier = { .srcStageMask = vk::PipelineStageFlagBits2::eEarlyFragmentTests |
-                                                            vk::PipelineStageFlagBits2::eLateFragmentTests,
-                                            .srcAccessMask = vk::AccessFlagBits2::eDepthStencilAttachmentWrite,
-                                            .dstStageMask = vk::PipelineStageFlagBits2::eEarlyFragmentTests |
-                                                            vk::PipelineStageFlagBits2::eLateFragmentTests,
-                                            .dstAccessMask = vk::AccessFlagBits2::eDepthStencilAttachmentRead |
-                                                             vk::AccessFlagBits2::eDepthStencilAttachmentWrite,
-                                            .oldLayout = vk::ImageLayout::eDepthAttachmentOptimal,
-                                            .newLayout = vk::ImageLayout::eDepthAttachmentOptimal,
-                                            .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-                                            .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-                                            .image = s_Data->DepthImage.Image,
-                                            .subresourceRange = { .aspectMask = vk::ImageAspectFlagBits::eDepth,
-                                                                  .baseMipLevel = 0,
-                                                                  .levelCount = 1,
-                                                                  .baseArrayLayer = 0,
-                                                                  .layerCount = 1 } };
-        const vk::DependencyInfo dependencyInfo = { .dependencyFlags = {},
-                                                    .imageMemoryBarrierCount = 1,
-                                                    .pImageMemoryBarriers = &barrier };
-        cmd.pipelineBarrier2(dependencyInfo);
-    }
 }
 
 void Renderer::RenderOpaque(const vk::raii::CommandBuffer& cmd,
@@ -2586,7 +2305,6 @@ void Renderer::CreateResources()
             reinterpret_cast<uint64_t>(static_cast<VkImageView>(*s_Data->PickingImage.ImageView)),
             vk::ObjectType::eImageView,
             "Picking Attachment Image View");
-        s_Data->PickingImageLayout = vk::ImageLayout::eUndefined;
 
         s_Data->DepthImage.Format = context.FindSupportedFormat({ vk::Format::eD32Sfloat },
                                                                 vk::ImageTiling::eOptimal,
@@ -3364,57 +3082,23 @@ void Renderer::ResizeResources(const uint32_t width, const uint32_t height)
     // Destroy old resources
     VulkanContext::DestroyImGuiDescriptorSet(s_Data->ColorOutputDescriptorSet);
 
-    s_Data->ColorImage.ImageView.clear();
-    s_Data->ColorImage.Image.clear();
-    s_Data->ColorImage.ImageMemory.clear();
-    s_Data->PickingImage.ImageView.clear();
-    s_Data->PickingImage.Image.clear();
-    s_Data->PickingImage.ImageMemory.clear();
-    s_Data->DepthImage.ImageView.clear();
-    s_Data->DepthImage.Image.clear();
-    s_Data->DepthImage.ImageMemory.clear();
-    s_Data->Transparency.AccumulationImage.ImageView.clear();
-    s_Data->Transparency.AccumulationImage.Image.clear();
-    s_Data->Transparency.AccumulationImage.ImageMemory.clear();
-    s_Data->Transparency.RevealageImage.ImageView.clear();
-    s_Data->Transparency.RevealageImage.Image.clear();
-    s_Data->Transparency.RevealageImage.ImageMemory.clear();
-    s_Data->ResolveImage.ImageView.clear();
-    s_Data->ResolveImage.Image.clear();
-    s_Data->ResolveImage.ImageMemory.clear();
-    s_Data->BloomMaskImage.ImageView.clear();
-    s_Data->BloomMaskImage.Image.clear();
-    s_Data->BloomMaskImage.ImageMemory.clear();
-    s_Data->TonemappedImage.ImageView.clear();
-    s_Data->TonemappedImage.Image.clear();
-    s_Data->TonemappedImage.ImageMemory.clear();
-    s_Data->CompositeImage.ImageView.clear();
-    s_Data->CompositeImage.Image.clear();
-    s_Data->CompositeImage.ImageMemory.clear();
-    s_Data->FinalImage.ImageView.clear();
-    s_Data->FinalImage.Image.clear();
-    s_Data->FinalImage.ImageMemory.clear();
-    s_Data->OutputImage.ImageView.clear();
-    s_Data->OutputImage.Image.clear();
-    s_Data->OutputImage.ImageMemory.clear();
-    s_Data->NormalImage.ImageView.clear();
-    s_Data->NormalImage.Image.clear();
-    s_Data->NormalImage.ImageMemory.clear();
-    s_Data->MotionImage.ImageView.clear();
-    s_Data->MotionImage.Image.clear();
-    s_Data->MotionImage.ImageMemory.clear();
-    s_Data->GTAOImage.ImageView.clear();
-    s_Data->GTAOImage.Image.clear();
-    s_Data->GTAOImage.ImageMemory.clear();
-    s_Data->GTAOScratchImage.ImageView.clear();
-    s_Data->GTAOScratchImage.Image.clear();
-    s_Data->GTAOScratchImage.ImageMemory.clear();
-    s_Data->SMAAResources.EdgesImage.ImageView.clear();
-    s_Data->SMAAResources.EdgesImage.Image.clear();
-    s_Data->SMAAResources.EdgesImage.ImageMemory.clear();
-    s_Data->SMAAResources.BlendImage.ImageView.clear();
-    s_Data->SMAAResources.BlendImage.Image.clear();
-    s_Data->SMAAResources.BlendImage.ImageMemory.clear();
+    s_Data->ColorImage.Clear();
+    s_Data->PickingImage.Clear();
+    s_Data->DepthImage.Clear();
+    s_Data->Transparency.AccumulationImage.Clear();
+    s_Data->Transparency.RevealageImage.Clear();
+    s_Data->ResolveImage.Clear();
+    s_Data->BloomMaskImage.Clear();
+    s_Data->TonemappedImage.Clear();
+    s_Data->CompositeImage.Clear();
+    s_Data->FinalImage.Clear();
+    s_Data->OutputImage.Clear();
+    s_Data->NormalImage.Clear();
+    s_Data->MotionImage.Clear();
+    s_Data->GTAOImage.Clear();
+    s_Data->GTAOScratchImage.Clear();
+    s_Data->SMAAResources.EdgesImage.Clear();
+    s_Data->SMAAResources.BlendImage.Clear();
 
     // Recreate resources with new size
 
@@ -4795,30 +4479,76 @@ void Renderer::CompileAndExecuteRenderGraph(const vk::raii::CommandBuffer& cmd,
         .Stages = vk::PipelineStageFlagBits2::eTopOfPipe,
         .Access = vk::AccessFlags2{} 
     };
-    const ImageState historyState{ 
-        .Layout = s_Data->HasTemporalHistory ? vk::ImageLayout::eShaderReadOnlyOptimal : vk::ImageLayout::eUndefined,
-        .Stages = s_Data->HasTemporalHistory ? vk::PipelineStageFlagBits2::eComputeShader : vk::PipelineStageFlagBits2::eTopOfPipe,
-        .Access = s_Data->HasTemporalHistory ? vk::AccessFlagBits2::eShaderRead : vk::AccessFlags2{} 
+    const auto stateForLayout = [](const vk::ImageLayout layout,
+                                   const vk::PipelineStageFlags2 fallbackStages,
+                                   const vk::AccessFlags2 fallbackAccess) {
+        if (layout == vk::ImageLayout::eUndefined)
+            return ImageState{ .Layout = layout,
+                               .Stages = vk::PipelineStageFlagBits2::eTopOfPipe,
+                               .Access = vk::AccessFlags2{} };
+        return ImageState{ .Layout = layout, .Stages = fallbackStages, .Access = fallbackAccess };
     };
+    const ImageState depthState =
+        s_Data->DepthImage.CurrentLayout == vk::ImageLayout::eUndefined
+            ? undefinedState
+            : s_Data->DepthImage.CurrentLayout == vk::ImageLayout::eShaderReadOnlyOptimal
+                ? ImageState{
+                    .Layout = s_Data->DepthImage.CurrentLayout,
+                    .Stages = vk::PipelineStageFlagBits2::eFragmentShader,
+                    .Access = vk::AccessFlagBits2::eShaderRead
+                }
+                : ImageState{
+                    .Layout = s_Data->DepthImage.CurrentLayout,
+                    .Stages = vk::PipelineStageFlagBits2::eEarlyFragmentTests |
+                              vk::PipelineStageFlagBits2::eLateFragmentTests,
+                    .Access = vk::AccessFlagBits2::eDepthStencilAttachmentRead |
+                              vk::AccessFlagBits2::eDepthStencilAttachmentWrite
+                };
+    const ImageState normalState = stateForLayout(
+        s_Data->NormalImage.CurrentLayout,
+        vk::PipelineStageFlagBits2::eFragmentShader,
+        vk::AccessFlagBits2::eShaderRead);
+    const ImageState motionState = stateForLayout(
+        s_Data->MotionImage.CurrentLayout,
+        vk::PipelineStageFlagBits2::eComputeShader,
+        vk::AccessFlagBits2::eShaderRead);
+    const ImageState shadowState = stateForLayout(
+        s_Data->ShadowMap.CurrentLayout,
+        vk::PipelineStageFlagBits2::eFragmentShader,
+        vk::AccessFlagBits2::eShaderRead);
+    const ImageState gtaoScratchState = stateForLayout(
+        s_Data->GTAOScratchImage.CurrentLayout,
+        vk::PipelineStageFlagBits2::eComputeShader,
+        vk::AccessFlagBits2::eShaderRead);
+
     const ImageState gtaoState{
-        .Layout = s_Data->GTAOImageLayout == vk::ImageLayout::eUndefined ? vk::ImageLayout::eUndefined : s_Data->GTAOImageLayout,
-        .Stages = s_Data->GTAOImageLayout == vk::ImageLayout::eUndefined ? vk::PipelineStageFlagBits2::eTopOfPipe : vk::PipelineStageFlagBits2::eFragmentShader,
-        .Access = s_Data->GTAOImageLayout == vk::ImageLayout::eUndefined ? vk::AccessFlags2{} : vk::AccessFlagBits2::eShaderRead
+        .Layout = s_Data->GTAOImage.CurrentLayout == vk::ImageLayout::eUndefined ? vk::ImageLayout::eUndefined
+                                                                                 : s_Data->GTAOImage.CurrentLayout,
+        .Stages = s_Data->GTAOImage.CurrentLayout == vk::ImageLayout::eUndefined ? vk::PipelineStageFlagBits2::eTopOfPipe : vk::PipelineStageFlagBits2::eFragmentShader,
+        .Access = s_Data->GTAOImage.CurrentLayout == vk::ImageLayout::eUndefined ? vk::AccessFlags2{} : vk::AccessFlagBits2::eShaderRead
     };
     const ImageState pickingState{ 
-        .Layout = s_Data->PickingImageLayout == vk::ImageLayout::eUndefined ? vk::ImageLayout::eUndefined : s_Data->PickingImageLayout,
-        .Stages = s_Data->PickingImageLayout == vk::ImageLayout::eTransferSrcOptimal ? vk::PipelineStageFlagBits2::eTransfer : vk::PipelineStageFlagBits2::eColorAttachmentOutput,
-        .Access = s_Data->PickingImageLayout == vk::ImageLayout::eTransferSrcOptimal ? vk::AccessFlagBits2::eTransferRead : vk::AccessFlagBits2::eColorAttachmentWrite 
+        .Layout = s_Data->PickingImage.CurrentLayout == vk::ImageLayout::eUndefined
+                                                 ? vk::ImageLayout::eUndefined
+                                                 : s_Data->PickingImage.CurrentLayout,
+        .Stages = s_Data->PickingImage.CurrentLayout == vk::ImageLayout::eTransferSrcOptimal ? vk::PipelineStageFlagBits2::eTransfer : vk::PipelineStageFlagBits2::eColorAttachmentOutput,
+        .Access = s_Data->PickingImage.CurrentLayout == vk::ImageLayout::eTransferSrcOptimal ? vk::AccessFlagBits2::eTransferRead : vk::AccessFlagBits2::eColorAttachmentWrite 
     };
-    const ImageState outputState{
-        .Layout = s_Data->OutputImageLayout == vk::ImageLayout::eUndefined ? vk::ImageLayout::eUndefined : s_Data->OutputImageLayout,
-        .Stages = s_Data->OutputImageLayout == vk::ImageLayout::eUndefined ? vk::PipelineStageFlagBits2::eTopOfPipe : vk::PipelineStageFlagBits2::eFragmentShader,
-        .Access = s_Data->OutputImageLayout == vk::ImageLayout::eUndefined ? vk::AccessFlags2{} : vk::AccessFlagBits2::eShaderRead
+    const ImageState outputState{ .Layout = s_Data->OutputImage.CurrentLayout == vk::ImageLayout::eUndefined
+                                                ? vk::ImageLayout::eUndefined
+                                                : s_Data->OutputImage.CurrentLayout,
+        .Stages = s_Data->OutputImage.CurrentLayout == vk::ImageLayout::eUndefined ? vk::PipelineStageFlagBits2::eTopOfPipe : vk::PipelineStageFlagBits2::eFragmentShader,
+        .Access = s_Data->OutputImage.CurrentLayout == vk::ImageLayout::eUndefined ? vk::AccessFlags2{} : vk::AccessFlagBits2::eShaderRead
     };
     const ImageState finalState{ 
-        .Layout = s_Data->FinalImageLayout == vk::ImageLayout::eUndefined ? vk::ImageLayout::eUndefined : s_Data->FinalImageLayout, 
-        .Stages = s_Data->FinalImageLayout == vk::ImageLayout::eUndefined ? vk::PipelineStageFlagBits2::eTopOfPipe : vk::PipelineStageFlagBits2::eFragmentShader, 
-        .Access = s_Data->FinalImageLayout == vk::ImageLayout::eUndefined ? vk::AccessFlags2{} : vk::AccessFlagBits2::eShaderRead
+        .Layout = s_Data->FinalImage.CurrentLayout == vk::ImageLayout::eUndefined ? vk::ImageLayout::eUndefined
+                                               : s_Data->FinalImage.CurrentLayout, 
+        .Stages = s_Data->FinalImage.CurrentLayout == vk::ImageLayout::eUndefined
+                                               ? vk::PipelineStageFlagBits2::eTopOfPipe
+                                               : vk::PipelineStageFlagBits2::eFragmentShader, 
+        .Access = s_Data->FinalImage.CurrentLayout == vk::ImageLayout::eUndefined
+                                               ? vk::AccessFlags2{}
+                                               : vk::AccessFlagBits2::eShaderRead
     };
 
     constexpr vk::ImageSubresourceRange depthRange{ .aspectMask = vk::ImageAspectFlagBits::eDepth,
@@ -4845,12 +4575,13 @@ void Renderer::CompileAndExecuteRenderGraph(const vk::raii::CommandBuffer& cmd,
     {
         KBR_TRACY_SCOPE("Rendergraph Compilation");
 
-        const auto hDepth = s_Data->RenderGraph.ImportImage(*s_Data->DepthImage.Image, historyState, depthRange);
-        const auto hNormal = s_Data->RenderGraph.ImportImage(*s_Data->NormalImage.Image, historyState, colorRange);
-        const auto hMotion = s_Data->RenderGraph.ImportImage(*s_Data->MotionImage.Image, historyState, colorRange);
-        const auto hShadow = s_Data->RenderGraph.ImportImage(*s_Data->ShadowMap.Image, undefinedState, shadowRange);
+        const auto hDepth = s_Data->RenderGraph.ImportImage(*s_Data->DepthImage.Image, depthState, depthRange);
+        const auto hNormal = s_Data->RenderGraph.ImportImage(*s_Data->NormalImage.Image, normalState, colorRange);
+        const auto hMotion = s_Data->RenderGraph.ImportImage(*s_Data->MotionImage.Image, motionState, colorRange);
+        const auto hShadow = s_Data->RenderGraph.ImportImage(*s_Data->ShadowMap.Image, shadowState, shadowRange);
         const auto hGTAO = s_Data->RenderGraph.ImportImage(*s_Data->GTAOImage.Image, gtaoState, colorRange);
-        const auto hGTAOScratch = s_Data->RenderGraph.ImportImage(*s_Data->GTAOScratchImage.Image, undefinedState, colorRange);
+        const auto hGTAOScratch =
+            s_Data->RenderGraph.ImportImage(*s_Data->GTAOScratchImage.Image, gtaoScratchState, colorRange);
         const auto hColor = s_Data->RenderGraph.ImportImage(*s_Data->ColorImage.Image, undefinedState, colorRange);
         const auto hPicking = s_Data->RenderGraph.ImportImage(*s_Data->PickingImage.Image, pickingState, colorRange);
         const auto hAccum = s_Data->RenderGraph.ImportImage(*s_Data->Transparency.AccumulationImage.Image, undefinedState, colorRange);
@@ -4950,8 +4681,6 @@ void Renderer::CompileAndExecuteRenderGraph(const vk::raii::CommandBuffer& cmd,
 
             return [=](const vk::raii::CommandBuffer& execCmd) {
                 Renderer::RenderOpaque(execCmd, frameIndex, renderObjects, currentImage, viewport, renderArea);
-                s_Data->GTAOImageLayout = vk::ImageLayout::eShaderReadOnlyOptimal;
-                s_Data->PickingImageLayout = vk::ImageLayout::eColorAttachmentOptimal;
             };
         });
 
@@ -5123,7 +4852,6 @@ void Renderer::CompileAndExecuteRenderGraph(const vk::raii::CommandBuffer& cmd,
             return [=](const vk::raii::CommandBuffer& execCmd)
             {
                 Renderer::ApplyUpscaling(execCmd, frameIndex);
-                s_Data->OutputImageLayout = vk::ImageLayout::eShaderReadOnlyOptimal;
             };
         });
 
@@ -5145,8 +4873,15 @@ void Renderer::CompileAndExecuteRenderGraph(const vk::raii::CommandBuffer& cmd,
             return [=](const vk::raii::CommandBuffer& execCmd)
             {
                 Renderer::ApplyTonemapping(execCmd, frameIndex);
-                s_Data->FinalImageLayout = vk::ImageLayout::eShaderReadOnlyOptimal;
             };
+        });
+
+        s_Data->RenderGraph.AddPass("Presentation", [&](Graph::PassBuilder& builder) -> PassExecuteFunction {
+            builder.Read(hFinal,
+                         vk::ImageLayout::eShaderReadOnlyOptimal,
+                         vk::PipelineStageFlagBits2::eFragmentShader,
+                         vk::AccessFlagBits2::eShaderRead);
+            return [](const vk::raii::CommandBuffer&) {};
         });
 
         s_Data->RenderGraph.AddPass("Mouse Picking", [&](Graph::PassBuilder& builder) -> PassExecuteFunction
@@ -5158,7 +4893,6 @@ void Renderer::CompileAndExecuteRenderGraph(const vk::raii::CommandBuffer& cmd,
             return [=](const vk::raii::CommandBuffer& execCmd)
             {
                 Renderer::HandleMousePickingReadback(execCmd);
-                s_Data->PickingImageLayout = vk::ImageLayout::eTransferSrcOptimal;
             };
         });
 
@@ -5169,6 +4903,16 @@ void Renderer::CompileAndExecuteRenderGraph(const vk::raii::CommandBuffer& cmd,
 
         s_Data->RenderGraph.Execute(cmd);
     }
+
+    s_Data->DepthImage.CurrentLayout = vk::ImageLayout::eShaderReadOnlyOptimal;
+    s_Data->NormalImage.CurrentLayout =
+        s_Data->UseGTAO ? vk::ImageLayout::eShaderReadOnlyOptimal
+                                                : vk::ImageLayout::eColorAttachmentOptimal;
+    s_Data->MotionImage.CurrentLayout = vk::ImageLayout::eShaderReadOnlyOptimal;
+    s_Data->ShadowMap.CurrentLayout = vk::ImageLayout::eShaderReadOnlyOptimal;
+    s_Data->PickingImage.CurrentLayout = vk::ImageLayout::eTransferSrcOptimal;
+    s_Data->OutputImage.CurrentLayout = vk::ImageLayout::eShaderReadOnlyOptimal;
+    s_Data->FinalImage.CurrentLayout = vk::ImageLayout::eShaderReadOnlyOptimal;
 }
 
 void Renderer::RenderShadowPass(const vk::raii::CommandBuffer& cmd,
@@ -5538,8 +5282,6 @@ void Renderer::ApplyTonemapping(const vk::raii::CommandBuffer& cmd, uint32_t fra
         .subresourceRange = { vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1 }
     };
     cmd.pipelineBarrier2({ .imageMemoryBarrierCount = 1, .pImageMemoryBarriers = &finalBarrier });*/
-    s_Data->FinalImageLayout = vk::ImageLayout::eShaderReadOnlyOptimal;
-
     WriteGPUTimestamp(cmd, frameIndex, static_cast<uint32_t>(GPUTimestampQuery::TonemappingPassEnd));
 }
 
@@ -6100,8 +5842,6 @@ void Renderer::ApplyUpscaling(const vk::raii::CommandBuffer &cmd, uint32_t frame
                               .layerCount = 1 }
     };
     cmd.pipelineBarrier2({ .imageMemoryBarrierCount = 1, .pImageMemoryBarriers = &finalBarrier });*/
-    s_Data->OutputImageLayout = vk::ImageLayout::eShaderReadOnlyOptimal;
-
     WriteGPUTimestamp(cmd, frameIndex, static_cast<uint32_t>(GPUTimestampQuery::UpscalingPassEnd));
 }
 
@@ -6335,29 +6075,6 @@ void Renderer::HandleMousePickingReadback(const vk::raii::CommandBuffer& cmd)
 
     if (s_Data->MousePickingReadback.RequestPending) {
         auto& writeSlot = s_Data->MousePickingReadback.Slots[s_Data->MousePickingReadback.WriteIndex];
-
-        vk::ImageMemoryBarrier2 toTransferSrcBarrier = {
-            .srcStageMask = vk::PipelineStageFlagBits2::eColorAttachmentOutput,
-            .srcAccessMask = vk::AccessFlagBits2::eColorAttachmentWrite,
-            .dstStageMask = vk::PipelineStageFlagBits2::eTransfer,
-            .dstAccessMask = vk::AccessFlagBits2::eTransferRead,
-            .oldLayout = vk::ImageLayout::eColorAttachmentOptimal,
-            .newLayout = vk::ImageLayout::eTransferSrcOptimal,
-            .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-            .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-            .image = s_Data->PickingImage.Image,
-            .subresourceRange = { .aspectMask = vk::ImageAspectFlagBits::eColor,
-                                  .baseMipLevel = 0,
-                                  .levelCount = 1,
-                                  .baseArrayLayer = 0,
-                                  .layerCount = 1 }
-        };
-
-        const vk::DependencyInfo toTransferDependencyInfo = { .dependencyFlags = {},
-                                                              .imageMemoryBarrierCount = 1,
-                                                              .pImageMemoryBarriers = &toTransferSrcBarrier };
-        cmd.pipelineBarrier2(toTransferDependencyInfo);
-        s_Data->PickingImageLayout = vk::ImageLayout::eTransferSrcOptimal;
 
         const uint32_t outputWidth = static_cast<uint32_t>(s_Data->RenderSize.x);
         const uint32_t outputHeight = static_cast<uint32_t>(s_Data->RenderSize.y);
@@ -6976,7 +6693,8 @@ void Renderer::CreateGTAOImage(const uint32_t width, const uint32_t height)
     s_Data->GTAOImage.ImageView = CreateImageView(
         device, s_Data->GTAOImage.Image, s_Data->GTAOImage.Format, vk::ImageAspectFlagBits::eColor, mipLevels);
     context.SetObjectDebugName(s_Data->GTAOImage.ImageView, "GTAO Image View");
-    s_Data->GTAOImageLayout = vk::ImageLayout::eUndefined;
+    s_Data->GTAOImage.CurrentLayout = vk::ImageLayout::eUndefined;
+    s_Data->GTAOScratchImage.CurrentLayout = vk::ImageLayout::eUndefined;
 
     CreateImage(device,
                 width,
@@ -7269,8 +6987,8 @@ void Renderer::CreateOutputImage(const uint32_t width, const uint32_t height)
                                                     vk::ImageAspectFlagBits::eColor,
                                                     mipLevels);
     context.SetObjectDebugName(s_Data->OutputImage.ImageView, "Upscaler Output Image View");
-    s_Data->OutputImageLayout = vk::ImageLayout::eUndefined;
-    s_Data->FinalImageLayout = vk::ImageLayout::eUndefined;
+    s_Data->OutputImage.CurrentLayout = vk::ImageLayout::eUndefined;
+    s_Data->FinalImage.CurrentLayout = vk::ImageLayout::eUndefined;
 }
 
 void Renderer::CreateFinalImage(const uint32_t width, const uint32_t height)
