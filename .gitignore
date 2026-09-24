@@ -375,3 +375,6 @@ KerberosEditor/Assets/Cache
 KerberosRenderer_StartupProfile.json
 KerberosRenderer_RuntimeProfile.json
 KerberosRenderer_ShutdownProfile.json
+
+# Crash dumps
+*.dmp
