@@ -259,24 +259,24 @@ private:
 
     static void RenderPrePass(const vk::raii::CommandBuffer& cmd,
                               uint32_t frameIndex,
-                              std::vector<RenderObject, std::pmr::polymorphic_allocator<RenderObject>> renderObjects,
+                              const RenderObjectContainer& renderObjects,
                               uint32_t currentImage);
 
     static void RenderGTAO(const vk::raii::CommandBuffer& cmd, uint32_t frameIndex, uint32_t currentImage);
 
     static void RenderOpaque(const vk::raii::CommandBuffer& cmd,
                              uint32_t frameIndex,
-                             std::vector<RenderObject, std::pmr::polymorphic_allocator<RenderObject>> renderObjects,
+                             const RenderObjectContainer& renderObjects,
                              uint32_t currentImage,
                              const vk::Viewport& viewport,
                              vk::Rect2D renderArea);
 
     static void RenderTransparent(const vk::raii::CommandBuffer& cmd,
-                      uint32_t frameIndex,
-                      std::vector<RenderObject, std::pmr::polymorphic_allocator<RenderObject>> renderObjects,
-                      uint32_t currentImage,
-                      const vk::Viewport& viewport,
-                      vk::Rect2D renderArea);
+                                  uint32_t frameIndex,
+                                  const RenderObjectContainer& renderObjects,
+                                  uint32_t currentImage,
+                                  const vk::Viewport& viewport,
+                                  vk::Rect2D renderArea);
 
     static void RenderPhysicsColliders(const vk::raii::CommandBuffer& cmd,
                                        const std::vector<LineVertex>& colliderLineVertices,

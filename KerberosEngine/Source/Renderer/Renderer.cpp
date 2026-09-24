@@ -490,6 +490,8 @@ struct RendererData
      */
     glm::vec2 RenderSize{ 1280.0f, 720.0f };
 
+    std::vector<Renderer::DeferredAction> DeferredActions;
+
     constexpr static uint32_t TemporalSequenceLength = 8;
 
     bool PreviousUseGTAO = true;
@@ -517,8 +519,6 @@ struct RendererData
 
     AntiAliasingMode AntiAliasingMode = AntiAliasingMode::SMAA;
     TonemappingOperator TonemappingOperator = TonemappingOperator::ACES;
-
-    std::vector<Renderer::DeferredAction> DeferredActions;
 };
 
 } // namespace
@@ -712,7 +712,7 @@ void Renderer::UpdateParticles(const vk::raii::CommandBuffer& cmd, const uint32_
     WriteGPUTimestamp(cmd, frameIndex, static_cast<uint32_t>(GPUTimestampQuery::ParticlesSimulateEnd));
 }
 
-void Renderer::RenderPrePass(const vk::raii::CommandBuffer& cmd, const uint32_t frameIndex, RenderObjectContainer renderObjects, const uint32_t currentImage)
+void Renderer::RenderPrePass(const vk::raii::CommandBuffer& cmd, const uint32_t frameIndex, const RenderObjectContainer& renderObjects, const uint32_t currentImage)
 {
     WriteGPUTimestamp(cmd, frameIndex, static_cast<uint32_t>(GPUTimestampQuery::DepthPrePassBegin));
 
@@ -1009,7 +1009,7 @@ void Renderer::RenderGTAO(const vk::raii::CommandBuffer& cmd, const uint32_t fra
 
 void Renderer::RenderOpaque(const vk::raii::CommandBuffer& cmd,
                             const uint32_t frameIndex,
-                            RenderObjectContainer renderObjects,
+                            const RenderObjectContainer& renderObjects,
                             const uint32_t currentImage,
                             const vk::Viewport& viewport,
                             const vk::Rect2D renderArea)
@@ -1119,7 +1119,7 @@ void Renderer::RenderOpaque(const vk::raii::CommandBuffer& cmd,
 
 void Renderer::RenderTransparent(const vk::raii::CommandBuffer& cmd,
                                  const uint32_t frameIndex,
-                                 RenderObjectContainer renderObjects,
+                                 const RenderObjectContainer& renderObjects,
                                  const uint32_t currentImage,
                                  const vk::Viewport& viewport,
                                  const vk::Rect2D renderArea) 
