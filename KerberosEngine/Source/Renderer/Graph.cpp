@@ -5,6 +5,7 @@
 #include <algorithm>
 #include <queue>
 #include <stdexcept>
+#include <unordered_map>
 
 import Kerberos;
 
@@ -169,6 +170,28 @@ namespace Kerberos::RenderGraph
 		if (m_ExecutionOrder.size() != passCount)
 			throw std::logic_error("Render graph contains a dependency cycle");
 
+		struct ImageSubresource
+		{
+			uint32_t Image = 0;
+			uint32_t Mip = 0;
+			uint32_t Layer = 0;
+
+			bool operator==(const ImageSubresource& other) const
+			{
+				return Image == other.Image && Mip == other.Mip && Layer == other.Layer;
+			}
+		};
+
+		struct ImageSubresourceHash
+		{
+			size_t operator()(const ImageSubresource& subresource) const
+			{
+				size_t hash = std::hash<uint32_t>{}(subresource.Image);
+				hash = hash * 31 + std::hash<uint32_t>{}(subresource.Mip);
+				return hash * 31 + std::hash<uint32_t>{}(subresource.Layer);
+			}
+		};
+
 		struct ImgState
         {
             ImageState Current{};
@@ -177,25 +200,22 @@ namespace Kerberos::RenderGraph
 		    bool HasWrite = false;
 		    bool WasWrite = false;
 		};
-        std::vector<ImgState> imgStates;
-        imgStates.reserve(m_Images.size());
-        for (const auto& img : m_Images)
-        {
-            imgStates.push_back({ .Current = img.InitialState, .LastWrite = img.InitialState,
-                                  .HasUse = false, .HasWrite = false, .WasWrite = false });
-        }
+        std::unordered_map<ImageSubresource, ImgState, ImageSubresourceHash> imgStates;
 
         struct BufState
         {
             BufferState Current{};
+            BufferState LastWrite{};
             bool HasUse = false;
+            bool HasWrite = false;
             bool WasWrite = false;
         };
         std::vector<BufState> bufStates;
         bufStates.reserve(m_Buffers.size());
         for (const auto& [Buffer, InitialState] : m_Buffers)
         {
-            bufStates.push_back({ .Current = InitialState, .HasUse = false, .WasWrite = false });
+            bufStates.push_back({ .Current = InitialState, .LastWrite = InitialState,
+                                  .HasUse = false, .HasWrite = false, .WasWrite = false });
         }
 
         m_CompiledPasses.clear();
@@ -205,18 +225,69 @@ namespace Kerberos::RenderGraph
             CompiledPass compiled{ .Handle = handle, .Name = pass.Name, .ImageBarriers = {}, .BufferBarriers = {} };
 
             // Image Barriers
-            for (const ImageUsage& usage : pass.ImageUsages) 
+            struct MergedImageUsage
             {
-                ImgState& previous = imgStates[usage.Image.Index];
-                const ImageState old = previous.Current;
-                const bool isWrite = usage.Usage == ResourceUsage::Write;
-                const vk::PipelineStageFlags2 sourceStages =
-                    old.Stages | (previous.HasWrite ? previous.LastWrite.Stages : vk::PipelineStageFlags2{});
-                const vk::AccessFlags2 sourceAccess =
-                    old.Access | (previous.HasWrite ? previous.LastWrite.Access : vk::AccessFlags2{});
+                vk::ImageAspectFlags AspectMask{};
+                vk::ImageLayout Layout = vk::ImageLayout::eGeneral;
+                vk::PipelineStageFlags2 Stages = vk::PipelineStageFlagBits2::eNone;
+                vk::AccessFlags2 Access = vk::AccessFlagBits2::eNone;
+                bool IsWrite = false;
+            };
 
-                if (!previous.HasUse || previous.WasWrite || isWrite || old.Layout != usage.Layout ||
-                    old.Stages != usage.Stages || old.Access != usage.Access) 
+            std::unordered_map<ImageSubresource, MergedImageUsage, ImageSubresourceHash> imageUsages;
+            for (const ImageUsage& usage : pass.ImageUsages)
+            {
+                const auto& imageRange = m_Images[usage.Image.Index].Range;
+                const uint32_t mipCount = usage.SubresourceRange.levelCount == vk::RemainingMipLevels
+                    ? imageRange.levelCount
+                    : usage.SubresourceRange.levelCount;
+                const uint32_t layerCount = usage.SubresourceRange.layerCount == vk::RemainingArrayLayers
+                    ? imageRange.layerCount
+                    : usage.SubresourceRange.layerCount;
+                if (mipCount == vk::RemainingMipLevels || layerCount == vk::RemainingArrayLayers)
+                    throw std::logic_error("Render graph image range has unresolved subresource count");
+
+                for (uint32_t mip = usage.SubresourceRange.baseMipLevel;
+                     mip < usage.SubresourceRange.baseMipLevel + mipCount; ++mip)
+                {
+                    for (uint32_t layer = usage.SubresourceRange.baseArrayLayer;
+                         layer < usage.SubresourceRange.baseArrayLayer + layerCount; ++layer)
+                    {
+                        const ImageSubresource key{ usage.Image.Index, mip, layer };
+                        auto [it, inserted] = imageUsages.try_emplace(key, MergedImageUsage{
+                            .AspectMask = usage.SubresourceRange.aspectMask,
+                            .Layout = usage.Layout,
+                            .Stages = usage.Stages,
+                            .Access = usage.Access,
+                            .IsWrite = usage.Usage == ResourceUsage::Write });
+                        if (!inserted)
+                        {
+                            if (it->second.Layout != usage.Layout)
+                                throw std::logic_error("Conflicting image layouts for overlapping subresources in render pass");
+                            it->second.AspectMask |= usage.SubresourceRange.aspectMask;
+                            it->second.Stages |= usage.Stages;
+                            it->second.Access |= usage.Access;
+                            it->second.IsWrite |= usage.Usage == ResourceUsage::Write;
+                        }
+                    }
+                }
+            }
+
+            for (const auto& [key, usage] : imageUsages)
+            {
+                auto [stateIt, inserted] = imgStates.try_emplace(key, ImgState{
+                    .Current = m_Images[key.Image].InitialState,
+                    .LastWrite = m_Images[key.Image].InitialState
+                });
+                ImgState& previous = stateIt->second;
+                const ImageState old = previous.Current;
+                const vk::PipelineStageFlags2 sourceStages =
+                    old.Stages | (previous.HasWrite ? previous.LastWrite.Stages : vk::PipelineStageFlagBits2::eNone);
+                const vk::AccessFlags2 sourceAccess =
+                    old.Access | (previous.HasWrite ? previous.LastWrite.Access : vk::AccessFlagBits2::eNone);
+
+                if (!previous.HasUse || previous.WasWrite || usage.IsWrite || old.Layout != usage.Layout ||
+                    old.Stages != usage.Stages || old.Access != usage.Access)
                 {
                     compiled.ImageBarriers.push_back({ .srcStageMask = sourceStages,
                                                        .srcAccessMask = sourceAccess,
@@ -226,17 +297,21 @@ namespace Kerberos::RenderGraph
                                                        .newLayout = usage.Layout,
                                                        .srcQueueFamilyIndex = vk::QueueFamilyIgnored,
                                                        .dstQueueFamilyIndex = vk::QueueFamilyIgnored,
-                                                       .image = m_Images[usage.Image.Index].Image,
-                                                       .subresourceRange = usage.SubresourceRange });
+                                                       .image = m_Images[key.Image].Image,
+                                                       .subresourceRange = { .aspectMask = usage.AspectMask,
+                                                                             .baseMipLevel = key.Mip,
+                                                                             .levelCount = 1,
+                                                                             .baseArrayLayer = key.Layer,
+                                                                             .layerCount = 1 } });
                 }
                 previous.Current = { .Layout = usage.Layout, .Stages = usage.Stages, .Access = usage.Access };
                 previous.HasUse = true;
-                if (isWrite)
+                if (usage.IsWrite)
                 {
                     previous.LastWrite = previous.Current;
                     previous.HasWrite = true;
                 }
-                previous.WasWrite = isWrite;
+                previous.WasWrite = usage.IsWrite;
             }
 
             // Buffer Barriers
@@ -245,12 +320,16 @@ namespace Kerberos::RenderGraph
                 BufState& previous = bufStates[usage.Buffer.Index];
                 const BufferState old = previous.Current;
                 const bool isWrite = usage.Usage == ResourceUsage::Write;
+                const vk::PipelineStageFlags2 sourceStages =
+                    old.Stages | (previous.HasWrite ? previous.LastWrite.Stages : vk::PipelineStageFlagBits2::eNone);
+                const vk::AccessFlags2 sourceAccess =
+                    old.Access | (previous.HasWrite ? previous.LastWrite.Access : vk::AccessFlagBits2::eNone);
 
                 if (!previous.HasUse || previous.WasWrite || isWrite || old.Stages != usage.Stages ||
                     old.Access != usage.Access) 
                 {
-                    compiled.BufferBarriers.push_back({ .srcStageMask = old.Stages,
-                                                        .srcAccessMask = old.Access,
+                    compiled.BufferBarriers.push_back({ .srcStageMask = sourceStages,
+                                                        .srcAccessMask = sourceAccess,
                                                         .dstStageMask = usage.Stages,
                                                         .dstAccessMask = usage.Access,
                                                         .srcQueueFamilyIndex = vk::QueueFamilyIgnored,
@@ -261,6 +340,11 @@ namespace Kerberos::RenderGraph
                 }
                 previous.Current = { .Stages = usage.Stages, .Access = usage.Access };
                 previous.HasUse = true;
+                if (isWrite)
+                {
+                    previous.LastWrite = previous.Current;
+                    previous.HasWrite = true;
+                }
                 previous.WasWrite = isWrite;
             }
 
