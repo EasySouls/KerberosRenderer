@@ -104,13 +104,20 @@ namespace Kerberos
 		m_MetaService = CreateOwner<AssetMetaService>(m_AssetsRoot);
 		m_ImporterRegistry.Register(CreateRef<GLTFPipelineImporter>());
 		m_BuildCoordinator = CreateOwner<AssetBuildCoordinator>(m_AssetsRoot, m_CacheRoot, *m_MetaService, m_ImporterRegistry, &m_AssetRegistry);
+	}
+
+	void EditorAssetManager::StartWatching()
+	{
+		KBR_TRACY_FUNCTION();
+
+		if (m_AssetsRoot.empty())
+			return;
 
 		std::unordered_set<std::string> extensions;
 		for (const auto& extension : assetExtensionMap | std::views::keys)
 			extensions.emplace(extension);
 
 		const auto lifetime = m_Lifetime;
-
 		m_FileWatch.Start(m_AssetsRoot, extensions, [this, lifetime](const AssetFileEvent& event) {
 			Application::Get().SubmitToMainThreadQueue([this, lifetime, event] {
 				if (lifetime->load())
@@ -196,13 +203,30 @@ namespace Kerberos
 		if (event.Type == AssetFileEventType::Added) {
             Log::CoreInfo("Asset added: {0}", relative.string());
         }
-        else if (event.Type == AssetFileEventType::Modified) {
+
+		const auto report = m_BuildCoordinator->Build(event.Path);
+		if (report.Built && report.Reason != AssetStaleReason::None)
+		{
+			SerializeAssetRegistry();
+		}
+
+		if (event.Type == AssetFileEventType::Modified && report.Reason != AssetStaleReason::None)
+		{
             Log::CoreInfo("Asset modified: {0}", relative.string());
         }
 
-		const auto report = m_BuildCoordinator->Build(event.Path, event.Type == AssetFileEventType::Modified);
-		if (report.Built)
-			SerializeAssetRegistry();
+		if (report.Warnings.size() > 0) {
+            Log::CoreWarn("Asset build completed with warnings: {}", report.Source.string());
+            for (const auto& warning : report.Warnings) {
+                Log::CoreWarn("  - {}", warning);
+            }
+        }
+        else if (report.Errors.size() > 0) {
+            Log::CoreError("Asset build failed with errors: {}", report.Source.string());
+            for (const auto& error : report.Errors) {
+                Log::CoreError("  - {}", error);
+            }
+        }
 	}
 
 	Ref<Asset> EditorAssetManager::GetAsset(const AssetHandle handle)

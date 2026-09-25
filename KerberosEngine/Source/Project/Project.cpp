@@ -52,7 +52,9 @@ namespace Kerberos
                 }
             }
 
-			return s_ActiveProject;
+            editorAssetManager->StartWatching();
+
+            return s_ActiveProject;
 		}
 
 		return nullptr;
@@ -118,7 +120,9 @@ namespace Kerberos
 		/// The project info has changed, so we might need to update the assets
 		const auto assetsRoot = s_ActiveProject->m_ProjectDirectory / info.AssetDirectory;
 		s_ActiveProject->m_AssetManager = CreateRef<EditorAssetManager>(assetsRoot, assetsRoot / "Cache");
-		std::dynamic_pointer_cast<EditorAssetManager>(s_ActiveProject->m_AssetManager)->EnsureAssetMetas();
+		const auto editorAssetManager = std::dynamic_pointer_cast<EditorAssetManager>(s_ActiveProject->m_AssetManager);
+		editorAssetManager->EnsureAssetMetas();
+		editorAssetManager->StartWatching();
 	}
 
 	Ref<RuntimeAssetManager> Project::UseRuntimeAssetManager()
