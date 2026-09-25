@@ -86,6 +86,7 @@ namespace Kerberos
 
 		ImGui::Columns(columns, nullptr, false);
 
+		std::filesystem::path directoryToOpen;
 		for (const auto& [path, handle, isDirectory] : m_ContentItems)
 		{
 			const std::string fileName = path.filename().string();
@@ -101,8 +102,7 @@ namespace Kerberos
 				ImGui::ImageButton(fileName.c_str(), rendererID, { thumbnailSize, thumbnailSize }, { 0, 1 }, { 1, 0 });
 				if (ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left))
 				{
-					m_CurrentDirectory = path;
-					RefreshAssetTree();
+					directoryToOpen = path;
 				}
 				ShowFolderContextMenu(path);
 			}
@@ -143,6 +143,12 @@ namespace Kerberos
 		ImGui::Columns(1);
 
 		ImGui::End();
+
+		if (!directoryToOpen.empty())
+		{
+			m_CurrentDirectory = directoryToOpen;
+			RefreshAssetTree();
+		}
 
 		m_NotificationManager.RenderNotifications();
 
