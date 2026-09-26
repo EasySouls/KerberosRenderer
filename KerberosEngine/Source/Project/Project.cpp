@@ -14,7 +14,7 @@ namespace Kerberos
 		return s_ActiveProject;
 	}
 
-	Ref<Project> Project::Load(const std::filesystem::path& filepath)
+	Ref<Project> Project::Load(const std::filesystem::path& filepath, const ProjectLoadOptions& options)
 	{
         KBR_TRACY_FUNCTION();
 
@@ -27,6 +27,9 @@ namespace Kerberos
 			projectToLoad->m_ProjectDirectory = absolutePath.parent_path();
 			s_ActiveProject = projectToLoad;
 			Log::CoreInfo("Project is loaded from {}", absolutePath.string());
+
+			if (!options.InitializeAssetManager)
+				return s_ActiveProject;
 
 			/// Initialize the asset manager for the project
 			/// TODO: Load Editor or Runtime Asset Manager based on the project type

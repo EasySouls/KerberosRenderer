@@ -61,6 +61,9 @@ registry, ensures metadata, builds sources, logs build diagnostics, and starts
 watching. Project reconfiguration follows a separate path and may not perform
 all of the same registry/build steps; preserve or explicitly reconcile that
 behavior when changing project lifecycle.
+`Project::Load` also supports an explicit headless option for tests; headless
+loads validate project state without creating the editor asset manager or
+starting its watcher.
 
 Scene updates drive editor/runtime simulation and then queue rendering. Scene
 serialization must preserve authored component data while leaving transient

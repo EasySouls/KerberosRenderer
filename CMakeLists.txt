@@ -13,6 +13,8 @@ endif()
 
 project(KerberosRenderer LANGUAGES CXX)
 
+option(KBR_BUILD_TESTS "Build KerberosRenderer tests." ON)
+
 message(STATUS "--- MODULE DIAGNOSTICS ---")
 message(STATUS "CMake Version:      ${CMAKE_VERSION}")
 message(STATUS "Compiler ID:        ${CMAKE_CXX_COMPILER_ID}")
@@ -57,8 +59,22 @@ message(STATUS "Vulkan SDK: ${KBR_VULKAN_DIR}")
 
 include("${CMAKE_CURRENT_SOURCE_DIR}/Config/KerberosBuildSettings.cmake")
 
+if(KBR_BUILD_TESTS)
+    enable_testing()
+
+    set(INSTALL_GTEST OFF CACHE BOOL "" FORCE)
+    set(gtest_build_samples OFF CACHE BOOL "" FORCE)
+    set(gtest_build_tests OFF CACHE BOOL "" FORCE)
+    set(BUILD_GMOCK OFF CACHE BOOL "" FORCE)
+    add_subdirectory(KerberosEngine/ThirdParty/googletest EXCLUDE_FROM_ALL)
+endif()
+
 add_subdirectory(KerberosEngine)
 add_subdirectory(KerberosScriptCoreLib)
 add_subdirectory(KerberosEditor)
+
+if(KBR_BUILD_TESTS)
+    add_subdirectory(Tests)
+endif()
 
 set_property(DIRECTORY PROPERTY VS_STARTUP_PROJECT KerberosEditor)
