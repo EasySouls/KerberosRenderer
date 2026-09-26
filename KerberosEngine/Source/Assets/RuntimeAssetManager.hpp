@@ -32,10 +32,11 @@ public:
 		return asset ? std::dynamic_pointer_cast<T>(asset) : nullptr;
 	}
 
-	const AssetRegistry* GetAssetRegistry() const { return m_Registry; }
+	const AssetRegistry& GetAssetRegistry() const { return m_Registry; }
 
 private:
-	const AssetRegistry* m_Registry = nullptr;
+	AssetRegistry m_Registry;
+	bool m_Configured = false;
 	RuntimeAssetResolver m_Resolver;
 	AssetMap m_LoadedAssets;
 };

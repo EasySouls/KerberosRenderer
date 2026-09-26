@@ -16,6 +16,8 @@ import Kerberos;
 
 namespace Kerberos
 {
+	// Deprecated: retained only for migration/reference. New model loading must
+	// use registered imported engine artifacts.
 	Ref<Mesh> AssimpModelImporter::ImportModel(AssetHandle /*handle*/, const AssetMetadata& metadata)
 	{
 		return ImportModel(metadata.Filepath);

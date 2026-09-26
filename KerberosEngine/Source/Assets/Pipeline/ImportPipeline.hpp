@@ -27,6 +27,7 @@ struct BuiltSubAsset
 struct ImportResult
 {
     AssetHandle SourceHandle;
+    std::filesystem::path SourceLibraryPath;
     std::vector<BuiltSubAsset> Outputs;
     std::vector<std::string> Warnings;
 };

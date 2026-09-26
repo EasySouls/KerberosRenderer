@@ -31,22 +31,12 @@ std::optional<RuntimeAssetLocation> RuntimeAssetResolver::Resolve(const AssetHan
 
 	const AssetMetadata& metadata = m_Registry->Get(handle);
 	std::vector<std::filesystem::path> candidates;
-	if (metadata.Filepath.is_absolute())
-		candidates.push_back(metadata.Filepath);
-	else
-	{
-		if (metadata.LibraryPath.is_absolute())
-			candidates.push_back(metadata.LibraryPath);
-		if (!metadata.LibraryPath.empty() && !m_LibraryRoot.empty())
-			candidates.push_back(m_LibraryRoot / metadata.LibraryPath);
-		else if (!metadata.LibraryPath.empty())
-			candidates.push_back(metadata.LibraryPath);
-		if (!m_LibraryRoot.empty())
-			candidates.push_back(m_LibraryRoot / metadata.Filepath);
-		if (!m_AssetRoot.empty())
-			candidates.push_back(m_AssetRoot / metadata.Filepath);
-		candidates.push_back(metadata.Filepath);
-	}
+	if (metadata.LibraryPath.is_absolute())
+		candidates.push_back(metadata.LibraryPath);
+	else if (!metadata.LibraryPath.empty() && !m_LibraryRoot.empty())
+		candidates.push_back(m_LibraryRoot / metadata.LibraryPath);
+	else if (!metadata.LibraryPath.empty())
+		candidates.push_back(metadata.LibraryPath);
 
 	std::error_code ec;
 	for (const auto& candidate : candidates)

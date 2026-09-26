@@ -13,6 +13,7 @@ import Kerberos;
 
 namespace Kerberos
 {
+	// Deprecated: this source-file loader must not be used for runtime assets.
 	static void GenerateTangentsForVertices(std::vector<Vertex>& vertices, const std::vector<uint32_t>& indices)
 	{
 		KBR_TRACY_FUNCTION();

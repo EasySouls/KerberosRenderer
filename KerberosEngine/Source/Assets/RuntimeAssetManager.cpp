@@ -2,6 +2,7 @@
 #include "RuntimeAssetManager.hpp"
 #include "Runtime/RuntimeAssetLoader.hpp"
 
+#include <stdexcept>
 #include <utility>
 
 namespace Kerberos {
@@ -17,8 +18,9 @@ RuntimeAssetManager::RuntimeAssetManager(const AssetRegistry& registry,
 void RuntimeAssetManager::Configure(const AssetRegistry& registry,
 	std::filesystem::path assetRoot, std::filesystem::path libraryRoot)
 {
-	m_Registry = &registry;
-	m_Resolver.Configure(m_Registry, std::move(assetRoot), std::move(libraryRoot));
+	m_Registry = registry;
+	m_Configured = true;
+	m_Resolver.Configure(&m_Registry, std::move(assetRoot), std::move(libraryRoot));
 	m_LoadedAssets.clear();
 }
 
@@ -41,7 +43,7 @@ Ref<Asset> RuntimeAssetManager::GetAsset(AssetHandle handle)
 
 bool RuntimeAssetManager::IsAssetHandleValid(const AssetHandle handle) const
 {
-	return handle.IsValid() && m_Registry && m_Registry->Contains(handle);
+	return m_Configured && handle.IsValid() && m_Registry.Contains(handle);
 }
 
 bool RuntimeAssetManager::IsAssetLoaded(const AssetHandle handle) const
@@ -51,10 +53,12 @@ bool RuntimeAssetManager::IsAssetLoaded(const AssetHandle handle) const
 
 AssetType RuntimeAssetManager::GetAssetType(const AssetHandle handle) const
 {
-	if (!handle.IsValid() || !m_Registry || !m_Registry->Contains(handle))
-		return AssetType::Texture2D;
+	if (!IsAssetHandleValid(handle))
+	{
+		throw std::runtime_error("Invalid runtime asset handle");
+	}
 
-	return m_Registry->Get(handle).Type;
+	return m_Registry.Get(handle).Type;
 }
 
 }

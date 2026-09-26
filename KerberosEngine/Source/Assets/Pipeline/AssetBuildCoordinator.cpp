@@ -113,6 +113,7 @@ AssetBuildReport AssetBuildCoordinator::Build(const std::filesystem::path& sourc
             root.Filepath = source;
 
         root.Type = importer->SourceAssetType();
+        root.LibraryPath = result.SourceLibraryPath;
 
         root.RootSourceHandle = meta.SourceHandle;
 

@@ -24,11 +24,16 @@ namespace Kerberos {
         result.SourceHandle = context.Meta.SourceHandle.IsValid() ? context.Meta.SourceHandle : AssetHandle();
         if (!result.SourceHandle.IsValid())
             result.SourceHandle = AssetHandle();
+        result.SourceLibraryPath = std::filesystem::path(context.SourceAbsolutePath.stem().string() + ".kbrscene");
 
         for (std::error_code ec;
              const auto& entry : std::filesystem::recursive_directory_iterator(context.CacheRootAbsolutePath, ec))
         {
-            if (ec || !entry.is_regular_file() || entry.path().extension() != ".kbrmesh" && entry.path().extension() != ".kbrmaterial" && entry.path().extension() != ".kbrtexture" && entry.path().extension() != ".kbrskeleton" && entry.path().extension() != ".kbranimation" && entry.path().extension() != ".kbrprefab")
+            const auto extension = entry.path().extension();
+            const bool isOutput = extension == ".kbrmesh" || extension == ".kbrmaterial" ||
+                extension == ".kbrtexture" || extension == ".kbrskeleton" ||
+                extension == ".kbranimation" || extension == ".kbrprefab";
+            if (ec || !entry.is_regular_file() || extension == ".kbrscene" || !isOutput)
                 continue;
 
             NativeAssetRecord record;

@@ -22,6 +22,8 @@ import Kerberos;
 
 namespace Kerberos
 {
+	// Deprecated: retained only for migration/reference. New model loading must
+	// use the imported native scene/mesh asset graph.
 	namespace
 	{
 		bool IsKtxData(const unsigned char* bytes, const int size)

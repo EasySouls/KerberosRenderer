@@ -109,10 +109,12 @@ extension, loads immediately, inserts into the registry, and serializes.
 Changes should reconcile these paths rather than adding another parallel
 system.
 
-`RuntimeAssetManager` holds a non-owning registry pointer and currently loads
-only the native Mesh and Model paths through `RuntimeAssetLoader`. Verify
-registry ownership and library-path resolution before changing project manager
-transitions or runtime packaging.
+`RuntimeAssetManager` owns a registry snapshot and resolves runtime entries
+only through their imported `LibraryPath`. It must not retain an editor-manager
+pointer, fall back to `Filepath`, invoke source importers, or mutate metadata.
+Invalid handles are errors rather than defaulting to an unrelated asset type.
+The runtime loader still supports only part of the selected artifact set; add
+loaders explicitly and preserve unsupported-asset errors until they exist.
 
 The asset browser is `KerberosEditor/Source/Windows/AssetsPanel.cpp`. It
 enumerates the filesystem, looks up handles, previews textures, opens files,

@@ -34,7 +34,7 @@ namespace Kerberos
 				return MaterialImporter::ImportMaterial(handle, metadata);
 			case AssetType::Model:
 			{
-				// TODO: This is the deprecated way of loading a mesh, the engine-specific format should be used
+				// Deprecated: model loading must move to imported engine artifacts.
 				const auto extension = metadata.Filepath.extension().string();
 				if (extension == ".gltf" || extension == ".glb")
 					return GLTFModelImporter::ImportModel(handle, metadata);
