@@ -2,6 +2,7 @@
 #include "Assets/Formats/NativeAssetSerializer.hpp"
 #include "Assets/Asset.hpp"
 #include "Assets/Pipeline/ImportPipeline.hpp"
+#include "Renderer/Vertex.hpp"
 #include "Profiling/Profilers.hpp"
 
 #include <tinygltf/tiny_gltf.h>
@@ -93,31 +94,88 @@ bool WriteMesh(const std::filesystem::path& root, const size_t mesh, const size_
 
     NativeMeshPayload payload;
     const auto it = p.attributes.find("POSITION");
-    if (it != p.attributes.end()) {
-        const auto& a = model.accessors[it->second]; const auto& view = model.bufferViews[a.bufferView];
-        const auto& buffer = model.buffers[view.buffer];
-        const size_t stride = a.ByteStride(view) ? a.ByteStride(view) : sizeof(float) * 3;
-        payload.VertexStride = sizeof(float) * 3; payload.VertexData.resize(a.count * payload.VertexStride);
-        const auto* src = buffer.data.data() + view.byteOffset + a.byteOffset;
+    if (it == p.attributes.end())
+        return false;
 
-        for (size_t i = 0; i < a.count; ++i) 
-        {
-            std::memcpy(payload.VertexData.data() + i * payload.VertexStride, src + i * stride, sizeof(float) * 3);
-        }
+    const auto& positionAccessor = model.accessors[it->second];
+    if (positionAccessor.bufferView < 0 || positionAccessor.componentType != TINYGLTF_COMPONENT_TYPE_FLOAT
+        || positionAccessor.type != TINYGLTF_TYPE_VEC3)
+        return false;
+
+    const auto readAttribute = [&model, &p](const char* name, const size_t vertex,
+        const size_t componentCount, float* destination) -> bool
+    {
+        std::fill(destination, destination + componentCount, 0.0f);
+        const auto attribute = p.attributes.find(name);
+        if (attribute == p.attributes.end())
+            return true;
+
+        const auto& accessor = model.accessors[attribute->second];
+        if (accessor.bufferView < 0 || accessor.componentType != TINYGLTF_COMPONENT_TYPE_FLOAT
+            || accessor.count <= vertex)
+            return false;
+        const auto& view = model.bufferViews[accessor.bufferView];
+        if (view.buffer < 0 || static_cast<size_t>(view.buffer) >= model.buffers.size())
+            return false;
+        const auto& buffer = model.buffers[view.buffer];
+        const size_t elementSize = componentCount * sizeof(float);
+        const size_t stride = accessor.ByteStride(view) ? accessor.ByteStride(view) : elementSize;
+        const size_t offset = view.byteOffset + accessor.byteOffset + vertex * stride;
+        if (offset > buffer.data.size() || elementSize > buffer.data.size() - offset)
+            return false;
+        std::memcpy(destination, buffer.data.data() + offset, elementSize);
+        return true;
+    };
+
+    std::vector<Vertex> vertices(positionAccessor.count);
+    for (size_t i = 0; i < vertices.size(); ++i)
+    {
+        if (!readAttribute("POSITION", i, 3, &vertices[i].Position.x)
+            || !readAttribute("NORMAL", i, 3, &vertices[i].Normal.x)
+            || !readAttribute("TEXCOORD_0", i, 2, &vertices[i].TexCoord.x))
+            return false;
+        vertices[i].Tangent = glm::vec4(0.0f, 0.0f, 0.0f, 1.0f);
+        if (!readAttribute("TANGENT", i, 4, &vertices[i].Tangent.x))
+            return false;
     }
+    payload.VertexStride = sizeof(Vertex);
+    payload.VertexData.resize(vertices.size() * sizeof(Vertex));
+    if (!vertices.empty())
+        std::memcpy(payload.VertexData.data(), vertices.data(), payload.VertexData.size());
+
     if (p.indices >= 0) {
         const auto& a = model.accessors[p.indices]; 
+        if (a.bufferView < 0)
+            return false;
         const auto& view = model.bufferViews[a.bufferView]; 
         const auto& buffer = model.buffers[view.buffer];
 
-        const auto* src = buffer.data.data() + view.byteOffset + a.byteOffset; 
+        const size_t componentSize = a.componentType == TINYGLTF_COMPONENT_TYPE_UNSIGNED_BYTE ? 1 :
+            a.componentType == TINYGLTF_COMPONENT_TYPE_UNSIGNED_SHORT ? 2 :
+            a.componentType == TINYGLTF_COMPONENT_TYPE_UNSIGNED_INT ? 4 : 0;
+        const size_t stride = a.ByteStride(view) ? a.ByteStride(view) : componentSize;
+        if (stride == 0 || view.buffer < 0 || static_cast<size_t>(view.buffer) >= model.buffers.size())
+            return false;
         payload.Indices.reserve(a.count);
 
         for (size_t i = 0; i < a.count; ++i) {
             uint32_t value = 0;
-            if (a.componentType == TINYGLTF_COMPONENT_TYPE_UNSIGNED_BYTE) value = src[i];
-            else if (a.componentType == TINYGLTF_COMPONENT_TYPE_UNSIGNED_SHORT) { uint16_t v; std::memcpy(&v, src + i * 2, 2); value = v; }
-            else { std::memcpy(&value, src + i * 4, 4); }
+            const size_t offset = view.byteOffset + a.byteOffset + i * stride;
+            if (offset > buffer.data.size() || componentSize > buffer.data.size() - offset)
+                return false;
+            const auto* index = buffer.data.data() + offset;
+            if (a.componentType == TINYGLTF_COMPONENT_TYPE_UNSIGNED_BYTE)
+                value = *index;
+            else if (a.componentType == TINYGLTF_COMPONENT_TYPE_UNSIGNED_SHORT)
+            {
+                uint16_t v;
+                std::memcpy(&v, index, sizeof(v));
+                value = v;
+            }
+            else if (a.componentType == TINYGLTF_COMPONENT_TYPE_UNSIGNED_INT)
+                std::memcpy(&value, index, sizeof(value));
+            else
+                return false;
             payload.Indices.push_back(value);
         }
     }
