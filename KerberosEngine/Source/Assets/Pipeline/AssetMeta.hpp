@@ -13,6 +13,7 @@ enum class ImporterType : uint8_t
     None = 0,
     Texture2D,
     GLTFScene,
+    Standalone,
 };
 
 enum class SubAssetKind : uint8_t

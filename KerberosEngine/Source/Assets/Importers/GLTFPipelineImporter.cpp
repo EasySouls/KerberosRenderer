@@ -86,4 +86,9 @@ namespace Kerberos {
         return ImporterType::GLTFScene;
     }
 
+    AssetType GLTFPipelineImporter::SourceAssetType() const
+    {
+        return AssetType::Model;
+    }
+
 }

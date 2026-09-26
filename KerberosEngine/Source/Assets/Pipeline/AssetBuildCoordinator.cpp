@@ -112,9 +112,7 @@ AssetBuildReport AssetBuildCoordinator::Build(const std::filesystem::path& sourc
         if (root.Filepath.empty() || ec) 
             root.Filepath = source;
 
-        root.Type = source.extension() == ".gltf" || source.extension() == ".glb"
-            ? AssetType::Model 
-            : root.Type;
+        root.Type = importer->SourceAssetType();
 
         root.RootSourceHandle = meta.SourceHandle;
 

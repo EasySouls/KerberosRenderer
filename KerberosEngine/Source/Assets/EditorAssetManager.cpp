@@ -4,6 +4,7 @@
 #include "Assets/Importers/AssetImporter.hpp"
 #include "Assets/Importers/IAssetImporter.hpp"
 #include "Assets/Importers/GLTFSceneImporter.hpp"
+#include "Assets/Importers/StandaloneAssetPipelineImporter.hpp"
 #include "Assets/Formats/NativeAssetSerializer.hpp"
 #include "Profiling/Profilers.hpp"
 #include "Project/Project.hpp"
@@ -31,7 +32,7 @@ import Kerberos;
 namespace Kerberos
 {
 
-	static const std::map<std::string_view, AssetType> assetExtensionMap = {
+	static const std::map<std::string_view, AssetType> sourceAssetExtensionMap = {
 		{ ".png", AssetType::Texture2D },
 		{ ".jpg", AssetType::Texture2D },
 		{ ".jpeg", AssetType::Texture2D },
@@ -40,7 +41,6 @@ namespace Kerberos
 		{ ".kbrcubemap", AssetType::TextureCube },
 		{ ".fbx", AssetType::Mesh },
 		{ ".obj", AssetType::Mesh },
-		{ ".kbrmesh", AssetType::Mesh },
 		{ ".gltf", AssetType::Model },
 		{ ".glb", AssetType::Model },
 		{ ".kerberos", AssetType::Scene },
@@ -50,6 +50,15 @@ namespace Kerberos
 		{ ".kbranim", AssetType::Animation }
 	};
 
+	static std::vector<std::string> SourceAssetExtensions()
+	{
+		std::vector<std::string> extensions;
+		extensions.reserve(sourceAssetExtensionMap.size());
+		for (const auto& extension : sourceAssetExtensionMap | std::views::keys)
+			extensions.emplace_back(extension);
+		return extensions;
+	}
+
 	static AssetType AssetTypeFromFileExtension(const std::filesystem::path& filepath)
 	{
 		std::string extension = filepath.extension().string();
@@ -58,9 +67,9 @@ namespace Kerberos
 		});
 		const std::string_view extensionView(extension);
 
-		if (assetExtensionMap.contains(extensionView))
+		if (sourceAssetExtensionMap.contains(extensionView))
 		{
-			return assetExtensionMap.at(extensionView);
+			return sourceAssetExtensionMap.at(extensionView);
 		}
 
 		Log::CoreWarn("Unknown asset type for file: {0}", filepath.string());
@@ -103,6 +112,13 @@ namespace Kerberos
 		std::filesystem::create_directories(m_CacheRoot, ec);
 		m_MetaService = CreateOwner<AssetMetaService>(m_AssetsRoot);
 		m_ImporterRegistry.Register(CreateRef<GLTFPipelineImporter>());
+		for (const auto& [extension, type] : sourceAssetExtensionMap)
+		{
+			if (extension == ".gltf" || extension == ".glb")
+				continue;
+			m_ImporterRegistry.Register(CreateRef<StandaloneAssetPipelineImporter>(
+				std::string(extension), type));
+		}
 		m_BuildCoordinator = CreateOwner<AssetBuildCoordinator>(m_AssetsRoot, m_CacheRoot, *m_MetaService, m_ImporterRegistry, &m_AssetRegistry);
 	}
 
@@ -114,7 +130,7 @@ namespace Kerberos
 			return;
 
 		std::unordered_set<std::string> extensions;
-		for (const auto& extension : assetExtensionMap | std::views::keys)
+		for (const auto& extension : SourceAssetExtensions())
 			extensions.emplace(extension);
 
 		const auto lifetime = m_Lifetime;
@@ -134,7 +150,7 @@ namespace Kerberos
 			return;
 
         constexpr AssetSourceScanner scanner;
-		const auto files = scanner.ScanForAssets(m_AssetsRoot, { ".gltf", ".glb" });
+		const auto files = scanner.ScanForAssets(m_AssetsRoot, SourceAssetExtensions());
 		for (const auto& file : files)
 		{
 			auto meta = m_MetaService->EnsureMetaForSource(file);
@@ -156,7 +172,7 @@ namespace Kerberos
 		if (!m_BuildCoordinator || m_AssetsRoot.empty())
 			return {};
         constexpr AssetSourceScanner scanner;
-		const auto files = scanner.ScanForAssets(m_AssetsRoot, { ".gltf", ".glb" });
+		const auto files = scanner.ScanForAssets(m_AssetsRoot, SourceAssetExtensions());
 		return m_BuildCoordinator->BuildAll(files, force);
 	}
 
@@ -179,9 +195,19 @@ namespace Kerberos
 		{
 			if (m_AssetRegistry.ContainsPath(relative))
 			{
-				const auto handle = m_AssetRegistry.GetHandle(relative);
-				m_LoadedAssets.erase(handle);
-				m_AssetRegistry.Remove(handle);
+				const auto rootHandle = m_AssetRegistry.GetHandle(relative);
+				std::vector<AssetHandle> handlesToRemove;
+				for (const auto& [handle, metadata] : m_AssetRegistry)
+				{
+					if (handle == rootHandle || metadata.RootSourceHandle == rootHandle ||
+						metadata.ParentHandle == rootHandle)
+						handlesToRemove.push_back(handle);
+				}
+				for (const auto handle : handlesToRemove)
+				{
+					m_LoadedAssets.erase(handle);
+					m_AssetRegistry.Remove(handle);
+				}
 				SerializeAssetRegistry();
 			}
 
@@ -190,12 +216,19 @@ namespace Kerberos
 			return;
 		}
 
-		if (event.Type == AssetFileEventType::Renamed &&
-			m_AssetRegistry.ContainsPath(std::filesystem::relative(event.OldPath, m_AssetsRoot)))
+		if (event.Type == AssetFileEventType::Renamed)
 		{
-			const auto handle = m_AssetRegistry.GetHandle(
-				std::filesystem::relative(event.OldPath, m_AssetsRoot));
-			m_AssetRegistry.Get(handle).Filepath = relative;
+			const auto oldRelative = std::filesystem::relative(event.OldPath, m_AssetsRoot);
+			if (m_AssetRegistry.ContainsPath(oldRelative))
+			{
+				const auto handle = m_AssetRegistry.GetHandle(oldRelative);
+				m_AssetRegistry.Get(handle).Filepath = relative;
+			}
+			if (m_MetaService->RebindMetaOnRename(event.OldPath, event.Path))
+			{
+				Log::CoreWarn("Could not rebind asset metadata from {0} to {1}",
+                             event.OldPath.string(), event.Path.string());
+			}
 
 			Log::CoreInfo("Asset renamed: {0}", relative.string());
 		}
@@ -205,7 +238,7 @@ namespace Kerberos
         }
 
 		const auto report = m_BuildCoordinator->Build(event.Path);
-		if (report.Built && report.Reason != AssetStaleReason::None)
+		if (report.Built && (report.Reason != AssetStaleReason::None || event.Type == AssetFileEventType::Renamed))
 		{
 			SerializeAssetRegistry();
 		}

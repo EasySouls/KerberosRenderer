@@ -56,7 +56,14 @@ AssetSourceScanner::ScanResult AssetSourceScanner::Scan(const std::filesystem::p
             std::string filename = entry.path().filename().string();
             std::ranges::transform(
                 filename, filename.begin(), [](const unsigned char c) { return static_cast<char>(std::tolower(c)); });
-            if (options.SkipCacheDirectories && entry.is_directory(error) && filename == "cache") {
+            if (!filename.empty() && filename.front() == '.')
+            {
+                if (entry.is_directory(error))
+                    it.disable_recursion_pending();
+                continue;
+            }
+            if (options.SkipCacheDirectories && entry.is_directory(error) &&
+                (filename == "cache" || filename == "staging" || filename == ".staging")) {
                 it.disable_recursion_pending();
                 continue;
             }

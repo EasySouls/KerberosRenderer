@@ -19,5 +19,6 @@ namespace Kerberos {
 			ImportResult Import(const ImportContext& context) override;
 
 			ImporterType Type() const override;
+			AssetType SourceAssetType() const override;
 		};
 	}
