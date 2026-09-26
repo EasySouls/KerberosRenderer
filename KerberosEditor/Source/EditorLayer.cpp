@@ -329,7 +329,7 @@ namespace Kerberos
 
 			if (const ImGuiPayload *payload = ImGui::AcceptDragDropPayload(assetBrowserMesh))
 			{
-				const AssetHandle handle = *static_cast<AssetHandle*>(payload->Data);
+				const AssetHandle handle = ReadAssetDragPayload(payload->Data, payload->DataSize).Handle;
 				const AssetType assetType = AssetManager::GetAssetType(handle);
 
 				if (assetType == AssetType::Model)

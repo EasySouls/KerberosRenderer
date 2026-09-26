@@ -543,13 +543,18 @@ namespace Kerberos
 		if (ImGui::BeginDragDropSource())
 		{
 			const AssetType assetType = Project::GetActive()->GetEditorAssetManager()->GetAssetType(handle);
+			const auto& metadata = Project::GetActive()->GetEditorAssetManager()->GetMetadata(handle);
+			const AssetDragPayload dragPayload{
+				.Handle = handle,
+				.RootHandle = metadata.RootSourceHandle.IsValid() ? metadata.RootSourceHandle : handle
+			};
 			const std::filesystem::path extension = filename.extension();
 
 			const std::string_view assetTypeStr = AssetTypeToString(assetType);
 
 			if (extension == ".jpg" || extension == ".png" || extension == ".svg")
 			{
-				ImGui::SetDragDropPayload(assetBrowserTexture, &handle, sizeof(AssetHandle), ImGuiCond_Once);
+				ImGui::SetDragDropPayload(assetBrowserTexture, &dragPayload, sizeof(dragPayload), ImGuiCond_Once);
 				if (const Ref<Texture2D> texture = AssetManager::GetAsset<Texture2D>(handle))
 				{
 					const uint64_t textureRendererID = VulkanContext::Get().GetImGuiRendererID(texture);
@@ -562,19 +567,19 @@ namespace Kerberos
 			}
 			else if (extension == ".kbrcubemap")
 			{
-				ImGui::SetDragDropPayload(assetBrowserTextureCube, &handle, sizeof(AssetHandle), ImGuiCond_Once);
+				ImGui::SetDragDropPayload(assetBrowserTextureCube, &dragPayload, sizeof(dragPayload), ImGuiCond_Once);
 			}
 			else if (assetType == AssetType::Mesh || assetType == AssetType::Model)
 			{
-				ImGui::SetDragDropPayload(assetBrowserMesh, &handle, sizeof(AssetHandle), ImGuiCond_Once);
+				ImGui::SetDragDropPayload(assetBrowserMesh, &dragPayload, sizeof(dragPayload), ImGuiCond_Once);
 			}
 			else if (assetType == AssetType::Sound)
 			{
-				ImGui::SetDragDropPayload(assetBrowserAudio, &handle, sizeof(AssetHandle), ImGuiCond_Once);
+				ImGui::SetDragDropPayload(assetBrowserAudio, &dragPayload, sizeof(dragPayload), ImGuiCond_Once);
 			}
 			else if (assetType == AssetType::Material)
 			{
-				ImGui::SetDragDropPayload(assetBrowserMaterial, &handle, sizeof(AssetHandle), ImGuiCond_Once);
+				ImGui::SetDragDropPayload(assetBrowserMaterial, &dragPayload, sizeof(dragPayload), ImGuiCond_Once);
 			}
 
 			ImGui::Text("%s", filename.string().c_str());

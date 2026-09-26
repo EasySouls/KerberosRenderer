@@ -340,7 +340,7 @@ bool HierarchyPanel::HandleHierarchyPanelDragAndDrop()
         return false;
 
     if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload(assetBrowserMesh)) {
-        const AssetHandle handle = *static_cast<AssetHandle*>(payload->Data);
+        const AssetHandle handle = ReadAssetDragPayload(payload->Data, payload->DataSize).Handle;
         const AssetType assetType = AssetManager::GetAssetType(handle);
 
         if (assetType == AssetType::Model) {
@@ -747,7 +747,7 @@ void HierarchyPanel::DrawComponents(const Entity entity)
 
                             if (ImGui::BeginDragDropTarget()) {
                                 if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload(assetBrowserMaterial)) {
-                                    const AssetHandle handle = *static_cast<AssetHandle*>(payload->Data);
+                                    const AssetHandle handle = ReadAssetDragPayload(payload->Data, payload->DataSize).Handle;
                                     if (const AssetType assetType = AssetManager::GetAssetType(handle);
                                         assetType != AssetType::Material) {
                                         Log::EditorError("Asset is not a material: {0}", handle);
@@ -778,7 +778,7 @@ void HierarchyPanel::DrawComponents(const Entity entity)
 
                             if (ImGui::BeginDragDropTarget()) {
                                 if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload(assetBrowserMesh)) {
-                                    const AssetHandle handle = *static_cast<AssetHandle*>(payload->Data);
+                                    const AssetHandle handle = ReadAssetDragPayload(payload->Data, payload->DataSize).Handle;
                                     if (const AssetType assetType = AssetManager::GetAssetType(handle);
                                         assetType != AssetType::Mesh && assetType != AssetType::Model) {
                                         Log::EditorError("Asset is not a mesh or model: {0}", handle);
@@ -924,7 +924,7 @@ void HierarchyPanel::DrawComponents(const Entity entity)
 
                             if (ImGui::BeginDragDropTarget()) {
                                 if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload(assetBrowserMaterial)) {
-                                    const AssetHandle handle = *static_cast<AssetHandle*>(payload->Data);
+                                    const AssetHandle handle = ReadAssetDragPayload(payload->Data, payload->DataSize).Handle;
                                     if (const AssetType assetType = AssetManager::GetAssetType(handle);
                                         assetType != AssetType::Material) {
                                         Log::EditorError("Asset is not a material: {0}", handle);
@@ -955,7 +955,7 @@ void HierarchyPanel::DrawComponents(const Entity entity)
 
                             if (ImGui::BeginDragDropTarget()) {
                                 if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload(assetBrowserMesh)) {
-                                    const AssetHandle handle = *static_cast<AssetHandle*>(payload->Data);
+                                    const AssetHandle handle = ReadAssetDragPayload(payload->Data, payload->DataSize).Handle;
                                     if (const AssetType assetType = AssetManager::GetAssetType(handle);
                                         assetType != AssetType::Mesh && assetType != AssetType::Model) {
                                         Log::EditorError("Asset is not a mesh or model: {0}", handle);
@@ -1171,7 +1171,7 @@ void HierarchyPanel::DrawComponents(const Entity entity)
             /// Handle drag and drop for meshes
             if (ImGui::BeginDragDropTarget()) {
                 if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload(assetBrowserMesh)) {
-                    const AssetHandle handle = *static_cast<AssetHandle*>(payload->Data);
+                    const AssetHandle handle = ReadAssetDragPayload(payload->Data, payload->DataSize).Handle;
                     if (const AssetType assetType = AssetManager::GetAssetType(handle);
                         assetType != AssetType::Mesh && assetType != AssetType::Model) {
                         Log::EditorError("Asset is not a mesh: {0}", handle);
@@ -1208,7 +1208,7 @@ void HierarchyPanel::DrawComponents(const Entity entity)
             /// Handle drag and drop for materials
             if (ImGui::BeginDragDropTarget()) {
                 if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload(assetBrowserMaterial)) {
-                    const AssetHandle handle = *static_cast<AssetHandle*>(payload->Data);
+                    const AssetHandle handle = ReadAssetDragPayload(payload->Data, payload->DataSize).Handle;
                     if (const AssetType assetType = AssetManager::GetAssetType(handle);
                         assetType != AssetType::Material) {
                         Log::EditorError("Asset is not a material: {0}", handle);
@@ -1504,7 +1504,7 @@ void HierarchyPanel::DrawComponents(const Entity entity)
             /// Handle drag and drop for textures
             if (ImGui::BeginDragDropTarget()) {
                 if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload(assetBrowserTextureCube)) {
-                    const AssetHandle handle = *static_cast<AssetHandle*>(payload->Data);
+                    const AssetHandle handle = ReadAssetDragPayload(payload->Data, payload->DataSize).Handle;
                     if (AssetManager::GetAssetType(handle) != AssetType::TextureCube) {
                         Log::EditorError("Asset is not a texture: {0}", handle);
                         m_NotificationManager.AddNotification("Asset is not a cubemap", Notification::Type::Error);
@@ -1570,7 +1570,7 @@ void HierarchyPanel::DrawComponents(const Entity entity)
             /// Handle drag and drop for fonts
             if (ImGui::BeginDragDropTarget()) {
                 if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload(assetBrowserFont)) {
-                    const AssetHandle handle = *static_cast<AssetHandle*>(payload->Data);
+                    const AssetHandle handle = ReadAssetDragPayload(payload->Data, payload->DataSize).Handle;
                     if (AssetManager::GetAssetType(handle) !=
                         AssetType::Texture2D) // TODO: Change to font type when it exists
                     {
@@ -1617,7 +1617,7 @@ void HierarchyPanel::DrawComponents(const Entity entity)
             /// Handle drag and drop for the audio asset
             if (ImGui::BeginDragDropTarget()) {
                 if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload(assetBrowserAudio)) {
-                    const AssetHandle handle = *static_cast<AssetHandle*>(payload->Data);
+                    const AssetHandle handle = ReadAssetDragPayload(payload->Data, payload->DataSize).Handle;
                     if (AssetManager::GetAssetType(handle) != AssetType::Sound) {
                         Log::EditorError("Asset is not a sound: {0}", handle);
                         m_NotificationManager.AddNotification("Asset is not a sound", Notification::Type::Error);
@@ -1668,7 +1668,7 @@ void HierarchyPanel::DrawComponents(const Entity entity)
             /// Handle drag and drop for the audio asset
             if (ImGui::BeginDragDropTarget()) {
                 if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload(assetBrowserAudio)) {
-                    const AssetHandle handle = *static_cast<AssetHandle*>(payload->Data);
+                    const AssetHandle handle = ReadAssetDragPayload(payload->Data, payload->DataSize).Handle;
                     if (AssetManager::GetAssetType(handle) != AssetType::Sound) {
                         Log::EditorError("Asset is not a sound: {0}", handle);
                         m_NotificationManager.AddNotification("Asset is not a sound", Notification::Type::Error);
@@ -1778,7 +1778,7 @@ void HierarchyPanel::DrawComponents(const Entity entity)
 
             if (ImGui::BeginDragDropTarget()) {
                 if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload(assetBrowserTexture)) {
-                    const AssetHandle handle = *static_cast<AssetHandle*>(payload->Data);
+                    const AssetHandle handle = ReadAssetDragPayload(payload->Data, payload->DataSize).Handle;
                     if (const AssetType assetType = AssetManager::GetAssetType(handle);
                         assetType != AssetType::Texture2D) {
                         Log::EditorError("Asset is not a texture: {0}", handle);

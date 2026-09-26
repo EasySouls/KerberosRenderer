@@ -118,8 +118,11 @@ loaders explicitly and preserve unsupported-asset errors until they exist.
 
 The asset browser is `KerberosEditor/Source/Windows/AssetsPanel.cpp`. It
 enumerates the filesystem, looks up handles, previews textures, opens files,
-supports drag/drop payloads, and edits materials. Refreshing its content list
-must not occur while iterating it.
+supports drag/drop payloads, and edits materials. Drag/drop payloads use
+`AssetDragPayload` and carry both the selected handle and its root source
+handle; consumers must decode through `ReadAssetDragPayload` rather than
+casting the payload to a bare handle. Refreshing its content list must not
+occur while iterating it.
 
 ## Validation
 
