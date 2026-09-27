@@ -376,5 +376,10 @@ KerberosRenderer_StartupProfile.json
 KerberosRenderer_RuntimeProfile.json
 KerberosRenderer_ShutdownProfile.json
 
+# GoogleTest/CMake test discovery artifacts
+/CMakeFiles/googletest_discovery_*.json
+/cmake_test_discovery_*.json
+/XMLGoogleTestResults.xml
+
 # Crash dumps
 *.dmp
