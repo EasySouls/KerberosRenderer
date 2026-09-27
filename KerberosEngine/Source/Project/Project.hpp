@@ -17,11 +17,17 @@ namespace Kerberos
 		std::filesystem::path StartScenePath;
 	};
 
+	struct ProjectLoadOptions
+	{
+		bool InitializeAssetManager = true;
+	};
+
 	class Project
 	{
 	public:
 		static Ref<Project> New();
-		static Ref<Project> Load(const std::filesystem::path& filepath);
+		static Ref<Project> Load(const std::filesystem::path& filepath,
+								 const ProjectLoadOptions& options = {});
 		static bool SaveActive();
 
 		/**

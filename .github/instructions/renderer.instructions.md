@@ -116,6 +116,9 @@ directory, compiles Slang to SPIR-V 1.6, caches `.spv`, reflects resources,
 and supports recompilation. `Application` changes to the project directory
 before creating the Vulkan context/renderer; shader path assumptions depend
 on this working-directory invariant.
+Tests may request a hidden GLFW window through
+`ApplicationSpecification::Headless`; this still creates the normal Vulkan
+context and renderer and is not a software or no-GPU mode.
 
 Shader source/build mapping is duplicated between runtime shader usage and
 `KerberosEditor/Assets/Shaders/compile_shaders.bat`. Update both when adding

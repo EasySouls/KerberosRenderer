@@ -61,6 +61,13 @@ registry, ensures metadata, builds sources, logs build diagnostics, and starts
 watching. Project reconfiguration follows a separate path and may not perform
 all of the same registry/build steps; preserve or explicitly reconcile that
 behavior when changing project lifecycle.
+`Project::Load` also supports an explicit headless option for tests; headless
+loads validate project state without creating the editor asset manager or
+starting its watcher.
+`ApplicationSpecification::Headless` is available to `TestApplication` for
+hidden-window Vulkan lifecycle tests. Those tests still use the real
+application, renderer, scripting, asset-manager, and scene-loading paths, but
+must close and release project resources before the application is destroyed.
 
 Scene updates drive editor/runtime simulation and then queue rendering. Scene
 serialization must preserve authored component data while leaving transient

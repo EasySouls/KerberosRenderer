@@ -34,6 +34,7 @@ namespace Kerberos
 		std::string Name = "Kerberos Application";
 		std::filesystem::path WorkingDirectory;
 		ApplicationCommandLineArgs CommandLineArgs;
+		bool Headless = false;
 	};
 
 	class Application
@@ -56,9 +57,9 @@ namespace Kerberos
 
 		void Close();
 
-		template<typename T> 
+		template<typename T, typename... Args>
 			requires std::is_base_of_v<Layer, T>
-		void PushLayer();
+		void PushLayer(Args&&... args);
 
 		void OnEvent(Event& event);
 
@@ -109,11 +110,11 @@ namespace Kerberos
 		static Application* s_Instance;
 	};
 
-	template <typename T> 
+	template <typename T, typename... Args>
 		requires std::is_base_of_v<Layer, T>
-	void Application::PushLayer() 
+	void Application::PushLayer(Args&&... args)
 	{
-        auto layer = CreateOwner<T>();
+        auto layer = CreateOwner<T>(std::forward<Args>(args)...);
 		layer->OnAttach();
 
 		m_Layers.emplace_back(std::move(layer));

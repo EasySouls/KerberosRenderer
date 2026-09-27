@@ -24,6 +24,9 @@ facade used by engine and editor consumers. See
 `AssetMetadata.hpp`, `AssetRegistry.hpp`,
 `EditorAssetManager.hpp`, `RuntimeAssetManager.hpp`, and
 `KerberosEngine/Source/Project/Project.cpp`.
+Normal editor project loads create and activate an `EditorAssetManager`;
+headless `Project::Load` callers may intentionally omit manager initialization
+for project-state tests and must not use asset-manager APIs in that mode.
 
 ## Root assets versus generated sub-assets
 

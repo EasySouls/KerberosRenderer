@@ -32,3 +32,6 @@
 [submodule "KerberosEngine/ThirdParty/FidelityFX-SDK"]
 	path = KerberosEngine/ThirdParty/FidelityFX-SDK
 	url = https://github.com/EasySouls/FidelityFX-SDK.git
+[submodule "KerberosEngine/ThirdParty/googletest"]
+	path = KerberosEngine/ThirdParty/googletest
+	url = https://github.com/google/googletest.git
