@@ -73,6 +73,31 @@ struct alignas(16) SpawnRequest
     float startSize;     // offset 128
     float endSize;       // offset 132
     glm::vec2 subUVGrid; // offset 136
+
+    static SpawnRequest CreateFromEmitter(const Kerberos::ParticleEmitterComponent& emitter, 
+                                          const glm::vec3& emitterPosition, 
+                                          const uint32_t spawnCount,
+                                          const float frameAspect,
+                                          const uint32_t textureIndex)
+    {
+        SpawnRequest request{};
+        request.emitterPosition = emitterPosition;
+        request.spawnCount = spawnCount;
+        request.minLife = emitter.MinLifetime;
+        request.maxLife = emitter.MaxLifetime;
+        request.minVelocity = emitter.MinVelocity;
+        request.maxVelocity = emitter.MaxVelocity;
+        request.minAcceleration = emitter.MinAcceleration;
+        request.maxAcceleration = emitter.MaxAcceleration;
+        request.startColor = emitter.StartColor;
+        request.endColor = emitter.EndColor;
+        request.startSize = emitter.StartSize;
+        request.endSize = emitter.EndSize;
+        request.subUVGrid = emitter.SubUVGrid;
+        request.FrameAspect = frameAspect;
+        request.TextureIndex = textureIndex;
+        return request;
+    }
 };
 
 struct Counters
@@ -86,6 +111,7 @@ struct Counters
 constexpr vk::DeviceSize DispatchIndirectOffset = 0;
 constexpr vk::DeviceSize DrawIndirectOffset = 16;
 constexpr vk::DeviceSize IndirectBufferSize = DrawIndirectOffset + sizeof(VkDrawIndirectCommand);
+
 } // namespace
 
 namespace Kerberos {
@@ -227,28 +253,12 @@ void ParticleSystem::Update(const Ref<Scene>& scene,
         if (spawnCount > 0) {
             emitter.spawnAccumulator -= static_cast<float>(spawnCount);
 
-            SpawnRequest req{};
-
-            req.emitterPosition = transform.WorldTransform[3];
-            req.spawnCount = spawnCount;
-
-            req.minLife = emitter.MinLifetime;
-            req.maxLife = emitter.MaxLifetime;
-            req.minVelocity = emitter.MinVelocity;
-            req.maxVelocity = emitter.MaxVelocity;
-            req.minAcceleration = emitter.MinAcceleration;
-            req.maxAcceleration = emitter.MaxAcceleration;
-            req.startColor = emitter.StartColor;
-            req.endColor = emitter.EndColor;
-            req.startSize = emitter.StartSize;
-            req.endSize = emitter.EndSize;
-            req.subUVGrid = emitter.SubUVGrid;
-
-            activeRequests.push_back(req);
-
             totalParticlesToSpawn += spawnCount;
 
             lastTextureHandle = emitter.ParticleTexture;
+
+            float frameAspect = 1.0f;
+            uint32_t textureIndex = 0; // TODO: Bindless
 
             if (AssetManager::IsAssetHandleValid(lastTextureHandle)) {
                 const auto& texture = AssetManager::GetAsset<Texture2D>(lastTextureHandle);
@@ -262,13 +272,11 @@ void ParticleSystem::Update(const Ref<Scene>& scene,
                           "Particle texture has invalid aspect ratio for entity {}",
                           static_cast<uint64_t>(entity));
 
-                req.FrameAspect = aspect;
-                req.TextureIndex = 0; // TODO: Bindless
+                frameAspect = aspect;
+                textureIndex = 0; // TODO: Bindless
             }
-            else {
-                req.FrameAspect = 1.0f;
-                req.TextureIndex = 0; // TODO: Bindless
-            }
+
+            activeRequests.push_back(SpawnRequest::CreateFromEmitter(emitter, transform.WorldTransform[3], spawnCount, frameAspect, textureIndex));
         }
     }
 
