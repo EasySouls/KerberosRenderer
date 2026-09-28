@@ -20,6 +20,8 @@ target_compile_options(KerberosBuildSettings INTERFACE
 
     $<$<CXX_COMPILER_ID:MSVC>:/wd4068> # C4068: unknown pragma
 
+    $<$<CXX_COMPILER_ID:MSVC>:/wd4996> # C4996: deprecated warning
+
     $<$<CXX_COMPILER_ID:GNU>:-Wall>
     $<$<CXX_COMPILER_ID:GNU>:-Wextra>
     $<$<CXX_COMPILER_ID:GNU>:-Werror>

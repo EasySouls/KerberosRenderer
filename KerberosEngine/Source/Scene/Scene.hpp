@@ -17,11 +17,16 @@ namespace Kerberos
 	class Entity;
 	class HierarchyPanel;
 
-	class Scene : public std::enable_shared_from_this<Scene>, public Asset
+	class Scene final : public std::enable_shared_from_this<Scene>, public Asset
 	{
-	public:
-		Scene();
+    public:
+        Scene();
 		~Scene() override;
+
+        Scene(const Scene& other) = delete;
+        Scene(Scene&& other) noexcept = delete;
+        Scene& operator=(const Scene& other) = delete;
+        Scene& operator=(Scene&& other) noexcept = delete;
 
 		void OnRuntimeStart();
 		void OnRuntimeStop() const;
@@ -61,6 +66,7 @@ namespace Kerberos
 		Entity DuplicateEntity(Entity entity, bool duplicateChildren);
 
 		void CreateChild(Entity entity);
+		[[deprecated("Import glTF as a prefab and call InstantiatePrefab")]]
 		Entity InstantiateModelAsset(AssetHandle modelHandle, const std::string& rootName = std::string());
 		Entity InstantiatePrefab(AssetHandle prefabHandle, const std::string& rootName = std::string());
 

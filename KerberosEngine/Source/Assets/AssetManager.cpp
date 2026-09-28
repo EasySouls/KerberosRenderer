@@ -1,6 +1,8 @@
 #include "kbrpch.hpp"
 #include "AssetManager.hpp"
 
+import Kerberos;
+
 namespace Kerberos {
 
 Ref<Mesh> AssetManager::ResolveMeshAsset(const AssetHandle handle)
@@ -14,8 +16,10 @@ Ref<Mesh> AssetManager::ResolveMeshAsset(const AssetHandle handle)
 	{
 		case AssetType::Mesh:
 			return GetAsset<Mesh>(handle);
-		case AssetType::Model:
+		case AssetType::ModelDEPRECATED:
 		{
+            KBRAssert(false, "We should use prefabs instead of Model");
+
 			const Ref<Model> model = GetAsset<Model>(handle);
 			if (!model)
 				return nullptr;

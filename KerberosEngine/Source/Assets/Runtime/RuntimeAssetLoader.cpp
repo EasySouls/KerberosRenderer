@@ -97,6 +97,7 @@ Ref<Model> LoadSceneManifest(AssetHandle handle, const std::filesystem::path& pa
 		node.SkinIndex = source.SkinIndex;
 		nodes.emplace_back(std::move(node));
 	}
+
 	return model;
 }
 
@@ -111,10 +112,14 @@ Ref<Asset> RuntimeAssetLoader::Load(const AssetHandle handle,
 	{
 		case AssetType::Mesh:
 			return LoadMesh(handle, path);
-		case AssetType::Model:
+		case AssetType::ModelDEPRECATED:
 			return LoadSceneManifest(handle, path);
 		default:
-			Log::CoreWarn("Runtime asset type {} has no native loader: {}", AssetTypeToString(metadata.Type), path.string());
+            KBRAssert(false,
+                      "Runtime asset type {} has no native loader: {}",
+                      AssetTypeToString(metadata.Type),
+                      path.string());
+			Log::CoreError("Runtime asset type {} has no native loader: {}", AssetTypeToString(metadata.Type), path.string());
 			return nullptr;
 	}
 }

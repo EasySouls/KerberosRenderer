@@ -17,7 +17,7 @@ enum class AssetType : uint8_t
 	Mesh,
 	Scene,
 	Sound,
-	Model,
+    ModelDEPRECATED [[deprecated("Use Prefab for imported glTF sources instead of Model")]],
 	Prefab,
 	Animation,
 	Skin
