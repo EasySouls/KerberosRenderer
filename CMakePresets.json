@@ -132,61 +132,78 @@
   ],
   "buildPresets": [
     {
+      "name":"build-base",
+      "hidden": true,
+      "environment": {
+        "CMAKE_BUILD_PARALLEL_LEVEL": ""
+      }
+    },
+    {
       "name": "vs2026-debug",
+      "inherits": "build-base",
       "displayName": "VS2026 (Debug)",
       "configurePreset": "vs2026",
       "configuration": "Debug"
     },
     {
       "name": "vs2026-release",
+      "inherits": "build-base",
       "displayName": "VS2026 (Release)",
       "configurePreset": "vs2026",
       "configuration": "Release"
     },
     {
       "name": "vs2026-relwithdebinfo",
+      "inherits": "build-base",
       "displayName": "VS2026 (RelWithDebInfo)",
       "configurePreset": "vs2026",
       "configuration": "RelWithDebInfo"
     },
     {
       "name": "ninja-msvc-debug",
+      "inherits": "build-base",
       "displayName": "MSVC Ninja Debug",
       "configurePreset": "ninja-msvc-debug",
       "configuration": "Debug"
     },
     {
       "name": "ninja-msvc-release",
+      "inherits": "build-base",
       "displayName": "MSVC Ninja Release",
       "configurePreset": "ninja-msvc-release",
       "configuration": "Release"
     },
     {
       "name": "ninja-msvc-relwithdebinfo",
+      "inherits": "build-base",
       "displayName": "MSVC Ninja RelWithDebInfo",
       "configurePreset": "ninja-msvc-relwithdebinfo",
       "configuration": "RelWithDebInfo"
     },
     {
       "name": "clangcl-debug",
+      "inherits": "build-base",
       "displayName": "ClangCL Debug",
       "configurePreset": "ninja-clang-debug",
       "configuration": "Debug"
     },
     {
       "name": "clangcl-release",
+      "inherits": "build-base",
       "displayName": "ClangCL Release",
       "configurePreset": "ninja-clang-release",
       "configuration": "Release"
     },
     {
       "name": "clangcl-relwithdebinfo",
+      "inherits": "build-base",
       "displayName": "ClangCL RelWithDebInfo",
       "configurePreset": "ninja-clang-relwithdebinfo",
       "configuration": "RelWithDebInfo"
     },
     {
       "name": "vs2026-tracy-relwithdebinfo",
+      "inherits": "build-base",
       "displayName": "VS2026 Tracy (RelWithDebInfo)",
       "configurePreset": "vs2026-tracy-relwithdebinfo",
       "configuration": "RelWithDebInfo"
