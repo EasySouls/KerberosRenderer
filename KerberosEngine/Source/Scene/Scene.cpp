@@ -487,7 +487,7 @@ Entity Scene::InstantiatePrefab(const AssetHandle prefabHandle, const std::strin
 			return {};
 		}
 
-		if (AssetManager::GetAssetType(modelHandle) != AssetType::Model)
+		if (AssetManager::GetAssetType(modelHandle) != AssetType::ModelDEPRECATED)
 		{
 			Log::CoreError("Asset {} is not a model asset.", modelHandle);
 			return {};

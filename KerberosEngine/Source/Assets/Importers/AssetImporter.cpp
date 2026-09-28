@@ -32,7 +32,7 @@ namespace Kerberos
 				return CubemapImporter::ImportCubemap(handle, metadata);
 			case AssetType::Material:
 				return MaterialImporter::ImportMaterial(handle, metadata);
-			case AssetType::Model:
+			case AssetType::ModelDEPRECATED:
 			{
 				// Deprecated: model loading must move to imported engine artifacts.
 				const auto extension = metadata.Filepath.extension().string();

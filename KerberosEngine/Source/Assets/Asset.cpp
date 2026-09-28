@@ -19,7 +19,7 @@ AssetType AssetTypeFromString(const std::string_view typeStr)
     if (typeStr == "Sound")
         return AssetType::Sound;
     if (typeStr == "Model")
-        return AssetType::Model;
+        return AssetType::ModelDEPRECATED;
     if (typeStr == "Prefab")
         return AssetType::Prefab;
     if (typeStr == "Animation")
@@ -46,7 +46,7 @@ std::string_view AssetTypeToString(const AssetType type)
         return "Scene";
     case AssetType::Sound:
         return "Sound";
-    case AssetType::Model:
+    case AssetType::ModelDEPRECATED:
         return "Model";
     case AssetType::Prefab:
         return "Prefab";
