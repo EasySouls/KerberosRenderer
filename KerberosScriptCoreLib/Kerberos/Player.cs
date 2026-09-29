@@ -12,10 +12,10 @@ namespace Kerberos.Source.Kerberos
 
         public MeshRef BulletMesh;
 
-        private TransformComponent _transformComponent;
-        private RigidBody3DComponent _rigidbody3DComponent;
-        private AudioSource2DComponent _audioSource2DComponent;
-        private Camera _mainCamera;
+        private TransformComponent _transformComponent = null!;
+        private RigidBody3DComponent _rigidbody3DComponent = null!;
+        private AudioSource2DComponent _audioSource2DComponent = null!;
+        private Camera _mainCamera = null!;
 
         // Implement OnXButtonClicked methods
         private bool _isPlayingAudio = false;
@@ -44,7 +44,7 @@ namespace Kerberos.Source.Kerberos
             if (HasComponent<AudioSource2DComponent>())
                 _audioSource2DComponent = GetComponent<AudioSource2DComponent>();
 
-            Entity cameraEntity = FindEntityByName("Camera");
+            Entity? cameraEntity = FindEntityByName("Camera");
             if (cameraEntity != null)
                 _mainCamera = cameraEntity.As<Camera>();
 

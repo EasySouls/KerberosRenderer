@@ -9,7 +9,7 @@ namespace Kerberos.Source.Kerberos
         public float DistanceFromPlayer;
         public float FOV = 45.0f;
 
-        private TransformComponent _transform;
+        private TransformComponent _transform = null!;
         private Entity? _target;
 
         public Camera() : base()

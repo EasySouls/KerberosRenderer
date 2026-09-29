@@ -15,8 +15,8 @@ public class CameraFollow : Entity
     public Vector3 TargetPivotOffset = new Vector3(0.0f, 1.5f, 0.0f);
     public bool SmoothFollow = true;
 
-    private TransformComponent _transform;
-    private Entity _target;
+    private TransformComponent _transform = null!;
+    private Entity? _target;
     private float _yaw = 0.0f;
     private float _pitch = 10.0f * (float)(Math.PI / 180.0);
     private float _distance = 0.0f;
@@ -110,6 +110,9 @@ public class CameraFollow : Entity
 
     private void UpdateCameraTransform(float deltaTime)
     {
+        if (_target == null)
+            return;
+
         Vector3 targetPos = _target.Translation;
         Vector3 pivotPosition = targetPos + TargetPivotOffset;
 
