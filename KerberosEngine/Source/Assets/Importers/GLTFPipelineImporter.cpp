@@ -23,8 +23,11 @@ namespace Kerberos {
         ImportResult result;
         result.SourceHandle = context.Meta.SourceHandle.IsValid() ? context.Meta.SourceHandle : AssetHandle();
         if (!result.SourceHandle.IsValid())
+        {
             result.SourceHandle = AssetHandle();
-        result.SourceLibraryPath = std::filesystem::path(context.SourceAbsolutePath.stem().string() + ".kbrscene");
+        }
+
+        result.SourceLibraryPath = std::filesystem::path(context.SourceAbsolutePath.stem().string() + ".kbrprefab");
 
         for (std::error_code ec;
              const auto& entry : std::filesystem::recursive_directory_iterator(context.CacheRootAbsolutePath, ec))
@@ -93,7 +96,7 @@ namespace Kerberos {
 
     AssetType GLTFPipelineImporter::SourceAssetType() const
     {
-        return AssetType::Model;
+        return AssetType::Prefab;
     }
 
 }

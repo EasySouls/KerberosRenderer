@@ -332,10 +332,10 @@ namespace Kerberos
 				const AssetHandle handle = ReadAssetDragPayload(payload->Data, payload->DataSize).Handle;
 				const AssetType assetType = AssetManager::GetAssetType(handle);
 
-				if (assetType == AssetType::Model)
+				if (assetType == AssetType::Prefab)
 				{
-					if (const Entity modelEntity = m_ActiveScene->InstantiateModelAsset(handle))
-						m_HierarchyPanel.SetSelectedEntity(modelEntity);
+					if (const Entity prefabEntity = m_ActiveScene->InstantiatePrefab(handle))
+						m_HierarchyPanel.SetSelectedEntity(prefabEntity);
 				}
 				else if (assetType == AssetType::Mesh)
 				{

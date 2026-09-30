@@ -343,9 +343,9 @@ bool HierarchyPanel::HandleHierarchyPanelDragAndDrop()
         const AssetHandle handle = ReadAssetDragPayload(payload->Data, payload->DataSize).Handle;
         const AssetType assetType = AssetManager::GetAssetType(handle);
 
-        if (assetType == AssetType::Model) {
-            if (const Entity modelEntity = m_Context->InstantiateModelAsset(handle))
-                m_SelectedEntity = modelEntity;
+        if (assetType == AssetType::Prefab) {
+            if (const Entity prefabEntity = m_Context->InstantiatePrefab(handle))
+                m_SelectedEntity = prefabEntity;
         }
         else if (assetType == AssetType::Mesh) {
             Entity meshEntity = m_Context->CreateEntity("Mesh");
@@ -780,7 +780,7 @@ void HierarchyPanel::DrawComponents(const Entity entity)
                                 if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload(assetBrowserMesh)) {
                                     const AssetHandle handle = ReadAssetDragPayload(payload->Data, payload->DataSize).Handle;
                                     if (const AssetType assetType = AssetManager::GetAssetType(handle);
-                                        assetType != AssetType::Mesh && assetType != AssetType::Model) {
+                                        assetType != AssetType::Mesh) {
                                         Log::EditorError("Asset is not a mesh or model: {0}", handle);
                                         m_NotificationManager.AddNotification("Asset is not a mesh or model",
                                                                               Notification::Type::Error);
@@ -957,7 +957,7 @@ void HierarchyPanel::DrawComponents(const Entity entity)
                                 if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload(assetBrowserMesh)) {
                                     const AssetHandle handle = ReadAssetDragPayload(payload->Data, payload->DataSize).Handle;
                                     if (const AssetType assetType = AssetManager::GetAssetType(handle);
-                                        assetType != AssetType::Mesh && assetType != AssetType::Model) {
+                                        assetType != AssetType::Mesh) {
                                         Log::EditorError("Asset is not a mesh or model: {0}", handle);
                                         m_NotificationManager.AddNotification("Asset is not a mesh or model",
                                                                               Notification::Type::Error);
@@ -1173,7 +1173,7 @@ void HierarchyPanel::DrawComponents(const Entity entity)
                 if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload(assetBrowserMesh)) {
                     const AssetHandle handle = ReadAssetDragPayload(payload->Data, payload->DataSize).Handle;
                     if (const AssetType assetType = AssetManager::GetAssetType(handle);
-                        assetType != AssetType::Mesh && assetType != AssetType::Model) {
+                        assetType != AssetType::Mesh) {
                         Log::EditorError("Asset is not a mesh: {0}", handle);
                         m_NotificationManager.AddNotification("Asset is not a mesh", Notification::Type::Error);
                         return;

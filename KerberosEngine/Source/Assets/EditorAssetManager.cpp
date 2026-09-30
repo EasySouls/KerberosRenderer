@@ -1,15 +1,12 @@
 #include "EditorAssetManager.hpp"
 #include "Core/Core.hpp"
 
-#include "Assets/Importers/AssetImporter.hpp"
-#include "Assets/Importers/IAssetImporter.hpp"
-#include "Assets/Importers/GLTFSceneImporter.hpp"
+#include "Assets/Runtime/RuntimeAssetLoader.hpp"
 #include "Assets/Importers/StandaloneAssetPipelineImporter.hpp"
 #include "Assets/Formats/NativeAssetSerializer.hpp"
 #include "Profiling/Profilers.hpp"
 #include "Project/Project.hpp"
 #include "Application.hpp"
-#include "ModelLoader.hpp"
 
 #include <yaml-cpp/yaml.h>
 
@@ -31,6 +28,28 @@ import Kerberos;
 
 namespace Kerberos
 {
+	namespace
+	{
+		Ref<Mesh> CreateEditorDefaultCube()
+		{
+            constexpr std::array positions = {
+				glm::vec3(-0.5f, -0.5f, -0.5f), glm::vec3(0.5f, -0.5f, -0.5f),
+				glm::vec3(0.5f, 0.5f, -0.5f), glm::vec3(-0.5f, 0.5f, -0.5f),
+				glm::vec3(-0.5f, -0.5f, 0.5f), glm::vec3(0.5f, -0.5f, 0.5f),
+				glm::vec3(0.5f, 0.5f, 0.5f), glm::vec3(-0.5f, 0.5f, 0.5f)
+			};
+			const std::vector<uint32_t> indices = {
+				0, 1, 2, 2, 3, 0, 4, 6, 5, 6, 4, 7,
+				0, 4, 5, 5, 1, 0, 3, 2, 6, 6, 7, 3,
+				0, 3, 7, 7, 4, 0, 1, 5, 6, 6, 2, 1
+			};
+			std::vector<Vertex> vertices;
+			vertices.reserve(positions.size());
+			for (const auto& position : positions)
+				vertices.push_back({ .Position = position, .Tangent = glm::vec4(0, 0, 0, 1) });
+			return CreateRef<Mesh>("EditorDefaultCube", vertices, indices);
+		}
+	}
 
 	static const std::map<std::string_view, AssetType> sourceAssetExtensionMap = {
 		{ ".png", AssetType::Texture2D },
@@ -41,8 +60,8 @@ namespace Kerberos
 		{ ".kbrcubemap", AssetType::TextureCube },
 		{ ".fbx", AssetType::Mesh },
 		{ ".obj", AssetType::Mesh },
-		{ ".gltf", AssetType::Model },
-		{ ".glb", AssetType::Model },
+		{ ".gltf", AssetType::Prefab },
+		{ ".glb", AssetType::Prefab },
 		{ ".kerberos", AssetType::Scene },
 		{ ".wav", AssetType::Sound }, // TODO: Add more audio file types when supported
 		{ ".kbrmat", AssetType::Material },
@@ -80,8 +99,6 @@ namespace Kerberos
 	{
 		KBR_TRACY_FUNCTION();
 
-		AssetImporter::Init();
-
 		if (!assetsRoot.empty())
 		{
 			ConfigurePipeline(assetsRoot, cacheRoot);
@@ -98,7 +115,7 @@ namespace Kerberos
 		std::memcpy(albedoBufferStruct.Data, albedoBuffer.data(), albedoBufferStruct.Size);
 		m_DefaultColorTexture = Texture2D::FromBuffer(albedoSpec, albedoBufferStruct);
 
-		m_DefaultCubeMesh = CreateRef<Mesh>(ModelLoader::LoadModel("Assets/Models/cube.gltf", None));
+		m_DefaultCubeMesh = CreateEditorDefaultCube();
 	}
 
 	void EditorAssetManager::ConfigurePipeline(const std::filesystem::path& assetsRoot, const std::filesystem::path& cacheRoot)
@@ -277,10 +294,19 @@ namespace Kerberos
 		else
 		{
 			const AssetMetadata& metadata = GetMetadata(handle);
-			asset = AssetImporter::ImportAsset(handle, metadata);
+			if (metadata.LibraryPath.empty())
+			{
+				Log::CoreError("Asset {0} has no imported library artifact", handle);
+				return nullptr;
+			}
+
+			const auto artifactPath = metadata.LibraryPath.is_absolute()
+				? metadata.LibraryPath
+				: m_CacheRoot / metadata.LibraryPath;
+			asset = RuntimeAssetLoader::Load(handle, metadata, artifactPath);
 			if (!asset)
 			{
-				Log::CoreError("Asset import failed!");
+				Log::CoreError("Imported artifact load failed for asset {0}", handle);
 				return nullptr;
 			}
 
@@ -329,8 +355,8 @@ namespace Kerberos
 		return GetMetadata(handle).Type;
 	}
 
-	AssetHandle EditorAssetManager::ImportAsset(const std::filesystem::path& filepath)
-	{
+	AssetHandle EditorAssetManager::ImportAsset(const std::filesystem::path& filepath) const
+    {
         KBR_TRACY_FUNCTION();
 
 		/// If the asset is already in the registry, return its handle
@@ -345,21 +371,11 @@ namespace Kerberos
 		metadata.Filepath = filepath;
 		metadata.Type = AssetTypeFromFileExtension(filepath);
 
-		const Ref<Asset> asset = AssetImporter::ImportAsset(handle, metadata);
-		if (!asset)
-		{
-			Log::CoreError("Failed to import asset: {0}", filepath.string());
+		const auto report = m_BuildCoordinator->Build(filepath, true);
+		if (!report.Built)
 			return AssetHandle::Invalid();
-		}
 
-		/// Assign generated handle to asset
-		asset->GetHandle() = handle;
-		m_AssetRegistry.Add(handle, metadata);
-		m_LoadedAssets[handle] = asset;
-
-		SerializeAssetRegistry();
-
-		return handle;
+		return m_AssetRegistry.GetHandle(filepath);
 	}
 
 	const AssetMetadata& EditorAssetManager::GetMetadata(const AssetHandle handle) const

@@ -78,12 +78,16 @@ AssetHandle Handle(const ImportContext* context, const std::string& key)
 }
 
 bool WriteRecord(const std::filesystem::path& root, const std::string& folder, const std::string& key,
-                 const std::string& kind, const uint32_t index, const std::string& data)
+                 const std::string& kind, const uint32_t index, const std::string& data,
+                 const std::string& filename = {})
 {
     KBR_TRACY_FUNCTION();
 
     std::error_code ec;
-    const auto path = root / folder / (key.substr(key.find(':') + 1) + ".kbr" + kind);
+    const auto outputName = filename.empty()
+        ? key.substr(key.find(':') + 1) + ".kbr" + kind
+        : filename + ".kbr" + kind;
+    const auto path = root / folder / outputName;
     std::filesystem::create_directories(path.parent_path(), ec);
     return !ec && NativeAssetSerializer::SerializeRecord({ .Version = NativeAssetFormatVersion, .Kind = kind, .SourceIndex = index, .LocalKey = key, .Data = data }, path);
 }
@@ -358,7 +362,8 @@ bool GLTFSceneImporter::Import(const std::filesystem::path& source, const std::f
     for (size_t i = 0; i < manifest.Nodes.size(); ++i) {
         prefab << i << ":" << manifest.Nodes[i].Name << ":" << manifest.Nodes[i].ParentIndex << ":" << manifest.Nodes[i].MeshIndex << ":" << manifest.Nodes[i].SkinIndex << ";";
     }
-    if (!WriteRecord(outputDirectory, "Prefabs", Key("prefab", 0), "prefab", 0, prefab.str())) 
+    if (!WriteRecord(outputDirectory, "", Key("prefab", 0), "prefab", 0,
+        prefab.str(), source.stem().string()))
         return false;
 
     return NativeAssetSerializer::SerializeSceneManifest(manifest, outputDirectory / (source.stem().string() + ".kbrscene"));

@@ -35,10 +35,13 @@ Do not confuse a source asset with its generated library outputs.
 - Root source metadata uses a source-relative `Filepath`.
 - Generated entries use a cache-relative `LibraryPath`, point to the root with
   `RootSourceHandle`/`ParentHandle`, and have a stable `SubAssetKey`.
-- glTF/GLB sources can generate meshes, materials, textures, skeletons,
-  animations, and prefabs.
+- glTF/GLB sources are imported as prefab root assets and can generate meshes,
+  materials, textures, skeletons, animations, and prefab subassets.
 - Stable local keys are required to reuse sub-asset handles across rebuilds.
 - Generated cache/staging outputs must not recursively become watched sources.
+- Source files may live anywhere below the assets root; importers must not
+  require user-facing folders such as `Assets/Prefabs`. Cache subdirectories
+  are an internal organization choice only.
 
 The active in-memory registry is `std::map<AssetHandle, AssetMetadata>`.
 `AssetRegistryTypes.hpp` contains a newer serialized-entry model that is not
@@ -58,7 +61,10 @@ There are two import concepts:
 - `ImporterRegistry`/`IAssetImporter` are build-pipeline importers used by
   `AssetBuildCoordinator`.
 
-`GLTFPipelineImporter` performs real conversion and emits derived outputs.
+`GLTFPipelineImporter` performs real conversion and emits derived outputs. Its
+public root type is `Prefab`: a glTF file is the source input, while the
+imported prefab artifact is what authored scenes should reference. A scene
+must not resolve the glTF source directly.
 `StandaloneAssetPipelineImporter` is currently a lightweight adapter for
 complete single-file sources: it supplies extension/type/build registration
 but emits no cache payload. Do not describe it as a full format converter.
@@ -105,12 +111,11 @@ scanning and watcher filtering based on the same source policy.
 
 ## Editor/runtime integration
 
-`EditorAssetManager::GetAsset()` lazily loads through the legacy
-`AssetImporter`, then assigns the persistent handle and caches the object.
-`ImportAsset()` is a separate direct-import path that derives type from the
-extension, loads immediately, inserts into the registry, and serializes.
-Changes should reconcile these paths rather than adding another parallel
-system.
+`EditorAssetManager::GetAsset()` must load through the imported artifact loader
+using registry `LibraryPath` values. It must not call the legacy
+`AssetImporter` source-loading switch. `ImportSource`/build operations are the
+only source ingestion path; the returned root handle represents the imported
+prefab or other imported artifact, not a live source-file object.
 
 `RuntimeAssetManager` owns a registry snapshot and resolves runtime entries
 only through their imported `LibraryPath`. It must not retain an editor-manager

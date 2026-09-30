@@ -569,9 +569,13 @@ namespace Kerberos
 			{
 				ImGui::SetDragDropPayload(assetBrowserTextureCube, &dragPayload, sizeof(dragPayload), ImGuiCond_Once);
 			}
-			else if (assetType == AssetType::Mesh || assetType == AssetType::Model)
+			else if (assetType == AssetType::Mesh)
 			{
 				ImGui::SetDragDropPayload(assetBrowserMesh, &dragPayload, sizeof(dragPayload), ImGuiCond_Once);
+			}
+			else if (assetType == AssetType::Prefab)
+			{
+                ImGui::SetDragDropPayload(assetBrowserPrefab, &dragPayload, sizeof(dragPayload), ImGuiCond_Once);
 			}
 			else if (assetType == AssetType::Sound)
 			{

@@ -2,6 +2,8 @@
 
 #include "Assets/Formats/NativeAssetSerializer.hpp"
 #include "Assets/Model.hpp"
+#include "Assets/Prefab.hpp"
+#include "Serialization/PrefabSerializer.hpp"
 #include "Renderer/Mesh.hpp"
 #include "Renderer/Vertex.hpp"
 #include "Profiling/Profilers.hpp"
@@ -101,6 +103,15 @@ Ref<Model> LoadSceneManifest(AssetHandle handle, const std::filesystem::path& pa
 	return model;
 }
 
+Ref<Prefab> LoadPrefab(const AssetHandle handle, const std::filesystem::path& path)
+{
+	auto prefab = PrefabSerializer::DeserializePrefab(path);
+	if (!prefab)
+		return nullptr;
+	prefab->GetHandle() = handle;
+	return prefab;
+}
+
 }
 
 Ref<Asset> RuntimeAssetLoader::Load(const AssetHandle handle,
@@ -114,6 +125,8 @@ Ref<Asset> RuntimeAssetLoader::Load(const AssetHandle handle,
 			return LoadMesh(handle, path);
 		case AssetType::ModelDEPRECATED:
 			return LoadSceneManifest(handle, path);
+		case AssetType::Prefab:
+			return LoadPrefab(handle, path);
 		default:
             KBRAssert(false,
                       "Runtime asset type {} has no native loader: {}",
