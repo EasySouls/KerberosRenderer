@@ -401,7 +401,7 @@ namespace Kerberos
 			KBRAssert(entity.HasComponent<RigidBody3DComponent>(), "Entity doesn't have a Rigidbody3DComponent.");
 
 			const RigidBody3DComponent& rb3d = entity.GetComponent<RigidBody3DComponent>();
-			KBRAssert(rb3d.RuntimeBody, "Rigidbody3DComponent doesn't have a runtime body.");
+			KBRAssert(rb3d.RuntimeBody != nullptr, "Rigidbody3DComponent doesn't have a runtime body.");
 
 			const JPH::Body* body = static_cast<JPH::Body*>(rb3d.RuntimeBody);
 			const JPH::BodyID& bodyId = body->GetID();
@@ -425,7 +425,7 @@ namespace Kerberos
 			KBRAssert(entity.HasComponent<RigidBody3DComponent>(), "Entity doesn't have a Rigidbody3DComponent.");
 
 			const RigidBody3DComponent& rb3D = entity.GetComponent<RigidBody3DComponent>();
-			KBRAssert(rb3D.RuntimeBody, "Rigidbody3DComponent doesn't have a runtime body.");
+			KBRAssert(rb3D.RuntimeBody != nullptr, "Rigidbody3DComponent doesn't have a runtime body.");
 
 			const JPH::Body* body = static_cast<JPH::Body*>(rb3D.RuntimeBody);
 			const JPH::BodyID& bodyId = body->GetID();

@@ -1,10 +1,12 @@
 #include "RuntimeAssetLoader.hpp"
 
 #include "Assets/Formats/NativeAssetSerializer.hpp"
+#include "Assets/Importers/MaterialImporter.hpp"
 #include "Assets/Model.hpp"
 #include "Assets/Prefab.hpp"
 #include "Serialization/PrefabSerializer.hpp"
 #include "Renderer/Mesh.hpp"
+#include "Renderer/Textures/Texture2D.hpp"
 #include "Renderer/Vertex.hpp"
 #include "Profiling/Profilers.hpp"
 
@@ -103,33 +105,129 @@ Ref<Model> LoadSceneManifest(AssetHandle handle, const std::filesystem::path& pa
 	return model;
 }
 
-Ref<Prefab> LoadPrefab(const AssetHandle handle, const std::filesystem::path& path)
+AssetHandle FindSubasset(const AssetRegistry* registry, const AssetHandle rootHandle,
+	const std::string& key)
 {
-	auto prefab = PrefabSerializer::DeserializePrefab(path);
-	if (!prefab)
+	if (!registry)
+		return AssetHandle::Invalid();
+
+	for (const auto& [handle, metadata] : *registry)
+	{
+		if (metadata.RootSourceHandle == rootHandle && metadata.SubAssetKey == key)
+			return handle;
+	}
+	return AssetHandle::Invalid();
+}
+
+Ref<Prefab> LoadNativePrefab(const AssetHandle handle, const AssetMetadata& metadata,
+	const std::filesystem::path& path, const AssetRegistry* registry)
+{
+	NativeAssetRecord record;
+	if (!NativeAssetSerializer::DeserializeRecord(path, record) || record.Kind != "prefab")
 		return nullptr;
+
+	GltfSceneManifest manifest;
+	const auto manifestPath = path.parent_path() / (path.stem().string() + ".kbrscene");
+	if (!NativeAssetSerializer::DeserializeSceneManifest(manifestPath, manifest))
+		return nullptr;
+
+	auto prefab = CreateRef<Prefab>();
+	prefab->Name = path.stem().string();
+	prefab->RootLocalIndex = InvalidPrefabLocalIndex;
+	const AssetHandle rootHandle = metadata.RootSourceHandle.IsValid()
+		? metadata.RootSourceHandle : handle;
+	prefab->Entities.reserve(manifest.Nodes.size());
+
+	for (size_t i = 0; i < manifest.Nodes.size(); ++i)
+	{
+		const auto& node = manifest.Nodes[i];
+		PrefabEntityData entity;
+		entity.LocalIndex = static_cast<PrefabLocalIndex>(i);
+		entity.Name = node.Name;
+		entity.Tag = node.Name;
+		entity.ParentLocalIndex = node.ParentIndex >= 0
+			? static_cast<PrefabLocalIndex>(node.ParentIndex)
+			: InvalidPrefabLocalIndex;
+
+		if (node.ParentIndex < 0 && prefab->RootLocalIndex == InvalidPrefabLocalIndex)
+			prefab->RootLocalIndex = entity.LocalIndex;
+
+		if (node.MeshIndex >= 0)
+		{
+			const std::string meshKey = "mesh:" + std::to_string(node.MeshIndex) + "_0";
+			const AssetHandle meshHandle = FindSubasset(registry, rootHandle, meshKey);
+			if (meshHandle.IsValid())
+			{
+				entity.StaticMeshAsset = meshHandle;
+				entity.HasStaticMesh = true;
+			}
+		}
+		prefab->Entities.push_back(std::move(entity));
+	}
+
+	for (auto& entity : prefab->Entities)
+	{
+		if (entity.ParentLocalIndex != InvalidPrefabLocalIndex
+			&& entity.ParentLocalIndex < prefab->Entities.size())
+			prefab->Entities[entity.ParentLocalIndex].Children.push_back(entity.LocalIndex);
+	}
+
+	if (prefab->RootLocalIndex == InvalidPrefabLocalIndex && !prefab->Entities.empty())
+		prefab->RootLocalIndex = 0;
 	prefab->GetHandle() = handle;
 	return prefab;
+}
+
+Ref<Texture2D> LoadTexture(const AssetHandle handle, const std::filesystem::path& path)
+{
+	auto texture = Texture2D::FromFile(path);
+	if (texture)
+		texture->GetHandle() = handle;
+	return texture;
+}
+
+Ref<Material> LoadMaterial(const std::filesystem::path& path)
+{
+	// Compatibility reader for authored materials until native material artifacts
+	// are emitted by the material pipeline.
+	return MaterialImporter::ImportMaterial(path);
 }
 
 }
 
 Ref<Asset> RuntimeAssetLoader::Load(const AssetHandle handle,
-	const AssetMetadata& metadata, const std::filesystem::path& path)
+	const AssetMetadata& metadata, const std::filesystem::path& path,
+	const AssetRegistry* registry)
 {
 	KBR_TRACY_FUNCTION();
 
 	switch (metadata.Type)
 	{
+		case AssetType::Texture2D:
+			return LoadTexture(handle, path);
+		case AssetType::Material:
+			return LoadMaterial(path);
 		case AssetType::Mesh:
 			return LoadMesh(handle, path);
 		case AssetType::ModelDEPRECATED:
 			return LoadSceneManifest(handle, path);
 		case AssetType::Prefab:
-			return LoadPrefab(handle, path);
+		{
+			NativeAssetRecord record;
+			if (NativeAssetSerializer::DeserializeRecord(path, record))
+				return record.Kind == "prefab"
+					? LoadNativePrefab(handle, metadata, path, registry)
+					: nullptr;
+
+			// Authored YAML prefabs remain readable; generated native cache
+			// prefabs are always recognized by the native record reader above.
+			auto prefab = PrefabSerializer::DeserializePrefab(path);
+			if (prefab)
+				prefab->GetHandle() = handle;
+			return prefab;
+		}
 		default:
-            KBRAssert(false,
-                      "Runtime asset type {} has no native loader: {}",
+            KBRAssert("Runtime asset type {} has no native loader: {}",
                       AssetTypeToString(metadata.Type),
                       path.string());
 			Log::CoreError("Runtime asset type {} has no native loader: {}", AssetTypeToString(metadata.Type), path.string());

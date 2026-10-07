@@ -303,11 +303,11 @@ namespace Kerberos
 			const auto artifactPath = metadata.LibraryPath.is_absolute()
 				? metadata.LibraryPath
 				: m_CacheRoot / metadata.LibraryPath;
-			asset = RuntimeAssetLoader::Load(handle, metadata, artifactPath);
+			asset = RuntimeAssetLoader::Load(handle, metadata, artifactPath, &m_AssetRegistry);
 			if (!asset)
 			{
-				Log::CoreError("Imported artifact load failed for asset {0}", handle);
-				return nullptr;
+				throw std::runtime_error(
+					std::format("Imported artifact load failed for asset {}: {}", handle, artifactPath.string()));
 			}
 
 			/// Assign the handle to the asset, since a random one was generated when creating the asset
@@ -335,7 +335,14 @@ namespace Kerberos
 			return false;
 		}
 
-		return true;
+		const AssetMetadata& metadata = m_AssetRegistry.Get(handle);
+		if (metadata.LibraryPath.empty())
+			return false;
+
+		const std::filesystem::path artifactPath = metadata.LibraryPath.is_absolute()
+			? metadata.LibraryPath
+			: m_CacheRoot / metadata.LibraryPath;
+		return std::filesystem::exists(artifactPath);
 	}
 
 	bool EditorAssetManager::IsAssetLoaded(const AssetHandle handle) const
@@ -355,27 +362,40 @@ namespace Kerberos
 		return GetMetadata(handle).Type;
 	}
 
-	AssetHandle EditorAssetManager::ImportAsset(const std::filesystem::path& filepath) const
+	AssetHandle EditorAssetManager::ImportAsset(const std::filesystem::path& filepath)
     {
         KBR_TRACY_FUNCTION();
 
-		/// If the asset is already in the registry, return its handle
-		if (m_AssetRegistry.ContainsPath(filepath))
+		const auto absolutePath = std::filesystem::absolute(filepath);
+		const auto registryPath = m_AssetsRoot.empty()
+			? filepath
+			: std::filesystem::relative(absolutePath, m_AssetsRoot);
+
+		/// Keep the fast path for a registered asset whose imported artifact exists.
+		if (m_AssetRegistry.ContainsPath(registryPath))
 		{
-			return m_AssetRegistry.GetHandle(filepath);
+			const AssetHandle existingHandle = m_AssetRegistry.GetHandle(registryPath);
+			if (IsAssetHandleValid(existingHandle))
+				return existingHandle;
 		}
 
 		/// Generate new handle
 		const AssetHandle handle;
 		AssetMetadata metadata;
-		metadata.Filepath = filepath;
-		metadata.Type = AssetTypeFromFileExtension(filepath);
+		metadata.Filepath = registryPath;
+		metadata.Type = AssetTypeFromFileExtension(registryPath);
 
-		const auto report = m_BuildCoordinator->Build(filepath, true);
+		const auto report = m_BuildCoordinator->Build(absolutePath, true);
 		if (!report.Built)
+		{
+			Log::CoreError("Failed to import asset: {}", absolutePath.string());
+			for (const auto& error : report.Errors)
+				Log::CoreError("  - {}", error);
 			return AssetHandle::Invalid();
+		}
 
-		return m_AssetRegistry.GetHandle(filepath);
+		SerializeAssetRegistry();
+		return m_AssetRegistry.GetHandle(registryPath);
 	}
 
 	const AssetMetadata& EditorAssetManager::GetMetadata(const AssetHandle handle) const

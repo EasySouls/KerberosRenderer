@@ -207,7 +207,7 @@ namespace Kerberos
 	void Font::GetQuadAtlasBounds(char character, double& al, double& ab, double& ar, double& at) const
 	{
 		const auto& glyph = m_MSDFData->FontGeometry.getGlyph(character);
-		KBRAssert(glyph, "Font does not contain character: {0}", character);
+		KBRAssert(glyph != nullptr, "Font does not contain character: {0}", character);
 
 		glyph->getQuadAtlasBounds(al, ab, ar, at);
 
@@ -216,7 +216,7 @@ namespace Kerberos
 	void Font::GetQuadPlaneBounds(char character, double& pl, double& pb, double& pr, double& pt) const
 	{
 		const auto& glyph = m_MSDFData->FontGeometry.getGlyph(character);
-		KBRAssert(glyph, "Font does not contain character: {0}", character);
+		KBRAssert(glyph != nullptr, "Font does not contain character: {0}", character);
 
 		glyph->getQuadPlaneBounds(pl, pb, pr, pt);
 	}
@@ -224,7 +224,7 @@ namespace Kerberos
 	double Font::GetAdvance(char character) const
 	{
 		const auto& glyph = m_MSDFData->FontGeometry.getGlyph(character);
-		KBRAssert(glyph, "Font does not contain character: {0}", character);
+		KBRAssert(glyph != nullptr, "Font does not contain character: {0}", character);
 
 		return glyph->getAdvance();
 	}

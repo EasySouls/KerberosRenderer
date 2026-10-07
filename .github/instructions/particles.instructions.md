@@ -74,7 +74,9 @@ The component is added and edited through
 `KerberosEditor/Source/Windows/HierarchyPanel.cpp`. Its active state, spawn
 rate, lifetime, velocity/acceleration ranges, colors, sizes, SubUV grid, and
 texture handle are exposed there. Texture drag/drop must validate a
-`Texture2D` handle and resolve it through the active asset manager.
+`Texture2D` handle and resolve it through the active asset manager. Asset
+validity includes a registered, existing imported artifact; a valid handle
+must not resolve to a null texture.
 
 `SceneSerializer.cpp` serializes/deserializes authored emitter fields.
 `spawnAccumulator` is transient and should reset on construction/deserialization.

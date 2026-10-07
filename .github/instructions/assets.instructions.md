@@ -46,7 +46,10 @@ Do not confuse a source asset with its generated library outputs.
 The active in-memory registry is `std::map<AssetHandle, AssetMetadata>`.
 `AssetRegistryTypes.hpp` contains a newer serialized-entry model that is not
 the active in-memory representation; do not assume both models are equivalent.
-Path lookups are linear and case-normalized.
+`AssetRegistry.kbrar` is required persisted editor/runtime index state, but it
+is derived and repairable: source `.meta` files own importer state and stable
+source/subasset identity, while successful builds reconcile the registry's
+handle-to-library metadata. Path lookups are linear and case-normalized.
 
 ## Source formats and import paths
 
@@ -61,10 +64,12 @@ There are two import concepts:
 - `ImporterRegistry`/`IAssetImporter` are build-pipeline importers used by
   `AssetBuildCoordinator`.
 
-`GLTFPipelineImporter` performs real conversion and emits derived outputs. Its
-public root type is `Prefab`: a glTF file is the source input, while the
-imported prefab artifact is what authored scenes should reference. A scene
-must not resolve the glTF source directly.
+`GLTFPipelineImporter` performs real conversion and emits derived native
+outputs. Its public root type is `Prefab`: a glTF file is the source input,
+while the imported binary `.kbrprefab` artifact plus its `.kbrscene` manifest
+are what runtime loading consumes. A scene must not resolve the glTF source
+directly, and native cache prefabs must not be sent through the legacy YAML
+`PrefabSerializer`.
 `StandaloneAssetPipelineImporter` is currently a lightweight adapter for
 complete single-file sources: it supplies extension/type/build registration
 but emits no cache payload. Do not describe it as a full format converter.
@@ -87,8 +92,11 @@ artifacts should address that gap deliberately.
 
 `AssetBuildCoordinator` serializes builds, finds the registered importer,
 ensures metadata, evaluates staleness, imports into a staging transaction,
-commits outputs, updates metadata, and updates the registry. Preserve stable
-handles and avoid partial registry updates on failed builds.
+commits outputs, updates metadata, reconciles obsolete generated entries, and
+updates the registry. `EditorAssetManager::ImportAsset` persists the resulting
+registry. Preserve stable handles and avoid partial registry updates on failed
+builds; stale registry data must be repaired from successful metadata/build
+results rather than treated as authoritative.
 
 ## File watching and events
 
@@ -112,10 +120,12 @@ scanning and watcher filtering based on the same source policy.
 ## Editor/runtime integration
 
 `EditorAssetManager::GetAsset()` must load through the imported artifact loader
-using registry `LibraryPath` values. It must not call the legacy
-`AssetImporter` source-loading switch. `ImportSource`/build operations are the
-only source ingestion path; the returned root handle represents the imported
-prefab or other imported artifact, not a live source-file object.
+using registry `LibraryPath` values. Native glTF prefab records resolve their
+generated mesh handles through registry `RootSourceHandle` and
+`SubAssetKey`. It must not call the legacy `AssetImporter` source-loading
+switch. `ImportSource`/build operations are the only source ingestion path;
+the returned root handle represents the imported prefab or other imported
+artifact, not a live source-file object.
 
 `RuntimeAssetManager` owns a registry snapshot and resolves runtime entries
 only through their imported `LibraryPath`. It must not retain an editor-manager
@@ -123,6 +133,10 @@ pointer, fall back to `Filepath`, invoke source importers, or mutate metadata.
 Invalid handles are errors rather than defaulting to an unrelated asset type.
 The runtime loader still supports only part of the selected artifact set; add
 loaders explicitly and preserve unsupported-asset errors until they exist.
+Current compatibility readers load existing KTX2 texture files and authored
+YAML material files when their registry entries explicitly provide an artifact
+path. These readers are transitional and must be replaced by native material
+and texture artifacts as the import pipeline is completed.
 
 The asset browser is `KerberosEditor/Source/Windows/AssetsPanel.cpp`. It
 enumerates the filesystem, looks up handles, previews textures, opens files,

@@ -66,6 +66,7 @@ struct PrefabEntityTemplate
     std::string MeshAssetPath;
     std::string MaterialAssetPath;
     bool HasStaticMesh = false;
+    AssetHandle StaticMeshAsset = AssetHandle::Invalid();
 };
 
 class PrefabAsset : public Asset

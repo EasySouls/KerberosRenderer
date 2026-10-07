@@ -28,10 +28,14 @@ namespace Kerberos
 	{
 		KBR_TRACY_FUNCTION();
 
-		if (!prefab) return false;
+		if (!prefab) 
+		{
+            return false;
+        }
+
 		YAML::Emitter out;
 		out << YAML::BeginMap << YAML::Key << "Prefab" << YAML::Value << YAML::BeginMap;
-		out << YAML::Key << "Name" << YAML::Value << prefab->Name;
+		out << YAML::Key << "Name" << YAML::Value << YAML::DoubleQuoted << prefab->Name;
 		out << YAML::Key << "RootLocalIndex" << YAML::Value << prefab->RootLocalIndex;
 		out << YAML::EndMap << YAML::Key << "Entities" << YAML::Value << YAML::BeginSeq;
 		for (size_t i = 0; i < prefab->Entities.size(); ++i)
@@ -39,11 +43,17 @@ namespace Kerberos
 			const auto& e = prefab->Entities[i];
 			const auto index = e.LocalIndex == InvalidPrefabLocalIndex ? static_cast<PrefabLocalIndex>(i) : e.LocalIndex;
 			out << YAML::BeginMap << YAML::Key << "LocalIndex" << YAML::Value << index;
-			out << YAML::Key << "Name" << YAML::Value << (e.Name.empty() ? e.Tag : e.Name);
+            out << YAML::Key << "Name" << YAML::Value << YAML::DoubleQuoted << (e.Name.empty() ? e.Tag : e.Name);
 			out << YAML::Key << "ParentLocalIndex" << YAML::Value << e.ParentLocalIndex;
 			out << YAML::Key << "Children" << YAML::Value << YAML::Flow << YAML::BeginSeq;
-			for (auto child : e.Children) out << child;
+
+			for (auto child : e.Children) 
+			{
+				out << child;
+			}
+
 			out << YAML::EndSeq;
+
 			auto writeVec = [&out](const char* key, const glm::vec3& v) {
 				out << YAML::Key << key << YAML::Value << YAML::Flow << YAML::BeginSeq << v.x << v.y << v.z << YAML::EndSeq;
 			};
@@ -83,14 +93,17 @@ namespace Kerberos
 					<< YAML::Key << "UseGravity" << YAML::Value << e.RigidBody->UseGravity
 					<< YAML::EndMap;
 			}
-			out << YAML::Key << "HasStaticMesh" << YAML::Value << e.HasStaticMesh
-				<< YAML::Key << "MeshAssetPath" << YAML::Value << e.MeshAssetPath
-				<< YAML::Key << "MaterialAssetPath" << YAML::Value << e.MaterialAssetPath
+			out << YAML::Key << "HasStaticMesh" << YAML::Value << e.HasStaticMesh 
+				<< YAML::Key << "MeshAssetPath" << YAML::Value << YAML::DoubleQuoted << e.MeshAssetPath
+				<< YAML::Key << "MaterialAssetPath" << YAML::Value << YAML::DoubleQuoted << e.MaterialAssetPath
 				<< YAML::EndMap;
 		}
 		out << YAML::EndSeq << YAML::EndMap;
 		std::ofstream file(filepath);
-		if (!file) return false;
+		if (!file) 
+		{
+			return false;
+		}
 		file << out.c_str();
 		return true;
 	}
@@ -99,17 +112,34 @@ namespace Kerberos
 	{
 		KBR_TRACY_FUNCTION();
 
-		if (!std::filesystem::exists(filepath)) return nullptr;
+		if (!std::filesystem::exists(filepath))
+		{
+            KBRAssert("Prefab file does not exist: {}", filepath.string());
+			return nullptr;
+		}
+
 		YAML::Node root;
-		try { root = YAML::LoadFile(filepath.string()); }
-		catch (const YAML::Exception& e) { Log::CoreError("Prefab YAML parse failed: {}", e.what()); return nullptr; }
-		if (!root["Prefab"] || !root["Entities"]) return nullptr;
+		try 
+		{ 
+			root = YAML::LoadFile(filepath.string());
+		}
+		catch (const YAML::Exception& e) 
+		{
+			Log::CoreError("Prefab YAML parse failed for file {}: {}", filepath.string(), e.what()); 
+			return nullptr;
+		}
+		if (!root["Prefab"] || !root["Entities"])
+		{
+			return nullptr;
+		}
 
 		auto prefab = CreateRef<Prefab>();
 		const auto meta = root["Prefab"];
+
 		prefab->Name = meta["Name"].as<std::string>("Untitled Prefab");
 		prefab->RootLocalIndex = meta["RootLocalIndex"].as<PrefabLocalIndex>(InvalidPrefabLocalIndex);
 		prefab->RootEntityID = UUID(meta["RootEntityID"].as<uint64_t>(0));
+
 		for (const auto& n : root["Entities"])
 		{
 			PrefabEntityData e;
@@ -124,20 +154,34 @@ namespace Kerberos
 			e.EulerRotation = e.Transform.Rotation;
 			e.ParentLocalIndex = n["ParentLocalIndex"].as<PrefabLocalIndex>(InvalidPrefabLocalIndex);
 			e.Parent = UUID(n["Parent"].as<uint64_t>(0));
-			if (n["Children"]) for (const auto& c : n["Children"]) {
-				if (n["ParentLocalIndex"].IsDefined() || n["LocalIndex"].IsDefined()) e.Children.push_back(c.as<PrefabLocalIndex>());
-				else e.ChildIDs.emplace_back(c.as<uint64_t>());
+            if (n["Children"]) 
+			{
+				for (const auto& c : n["Children"]) 
+				{
+                    if (n["ParentLocalIndex"].IsDefined() || n["LocalIndex"].IsDefined())
+                        e.Children.push_back(c.as<PrefabLocalIndex>());
+                    else
+                        e.ChildIDs.emplace_back(c.as<uint64_t>());
+                }
 			}
 			e.HasStaticMesh = n["HasStaticMesh"].as<bool>(false);
 			e.MeshAssetPath = n["MeshAssetPath"].as<std::string>("");
 			e.MaterialAssetPath = n["MaterialAssetPath"].as<std::string>("");
-			if (n["Skin"]) {
+
+			if (n["Skin"]) 
+			{
 				SkinComponentTemplate s;
 				s.SkeletonAsset = AssetHandle(n["Skin"]["SkeletonAsset"].as<uint64_t>(0));
-				if (n["Skin"]["JointEntityIndices"]) for (const auto& j : n["Skin"]["JointEntityIndices"]) s.JointEntityIndices.push_back(j.as<PrefabLocalIndex>());
+				if (n["Skin"]["JointEntityIndices"])
+				{
+					for (const auto& j : n["Skin"]["JointEntityIndices"]) 
+						s.JointEntityIndices.push_back(j.as<PrefabLocalIndex>());
+				}
 				e.Skin = s;
 			}
-			if (n["SkeletalMesh"]) {
+
+			if (n["SkeletalMesh"]) 
+			{
 				SkeletalMeshComponentTemplate s;
 				s.MeshAsset = AssetHandle(n["SkeletalMesh"]["MeshAsset"].as<uint64_t>(0));
 				s.SkeletonAsset = AssetHandle(n["SkeletalMesh"]["SkeletonAsset"].as<uint64_t>(0));
@@ -146,7 +190,9 @@ namespace Kerberos
 				s.CastShadows = n["SkeletalMesh"]["CastShadows"].as<bool>(true);
 				e.SkeletalMesh = s;
 			}
-			if (n["Animation"]) {
+
+			if (n["Animation"]) 
+			{
 				AnimationComponentTemplate a;
 				a.AnimationAsset = AssetHandle(n["Animation"]["AnimationAsset"].as<uint64_t>(0));
 				a.PlaybackSpeed = n["Animation"]["PlaybackSpeed"].as<float>(1.0f);
@@ -154,6 +200,7 @@ namespace Kerberos
 				a.AutoPlay = n["Animation"]["AutoPlay"].as<bool>(true);
 				e.Animation = a;
 			}
+
 			if (n["RigidBody"])
 			{
 				RigidBody3DComponent r;
@@ -163,18 +210,41 @@ namespace Kerberos
 				r.RuntimeBody = nullptr;
 				e.RigidBody = r;
 			}
+
 			prefab->Entities.push_back(std::move(e));
 		}
 		std::unordered_map<UUID, PrefabLocalIndex> ids;
-		for (const auto& e : prefab->Entities) if (e.ID.IsValid()) ids[e.ID] = e.LocalIndex;
+		for (const auto& e : prefab->Entities)
+		{
+            if (e.ID.IsValid()) 
+			{
+                ids[e.ID] = e.LocalIndex;
+            }
+		}
 		for (auto& e : prefab->Entities)
 		{
 			if (e.ParentLocalIndex == InvalidPrefabLocalIndex && ids.contains(e.Parent))
+			{
 				e.ParentLocalIndex = ids[e.Parent];
-			for (const auto& id : e.ChildIDs) if (ids.contains(id)) e.Children.push_back(ids[id]);
+			}
+			for (const auto& id : e.ChildIDs)
+			{
+				if (ids.contains(id)) 
+					e.Children.push_back(ids[id]);
+			}
 		}
 		if (prefab->RootLocalIndex == InvalidPrefabLocalIndex)
-			for (const auto& e : prefab->Entities) if (e.ID == prefab->RootEntityID) { prefab->RootLocalIndex = e.LocalIndex; break; }
+		{
+            for (const auto& e : prefab->Entities) 
+			{
+                if (e.ID == prefab->RootEntityID) 
+				{
+                    prefab->RootLocalIndex = e.LocalIndex;
+                    break;
+                }
+            }
+
+		}
 		return prefab;
 	}
 }

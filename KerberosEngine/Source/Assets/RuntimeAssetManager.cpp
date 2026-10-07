@@ -35,15 +35,24 @@ Ref<Asset> RuntimeAssetManager::GetAsset(AssetHandle handle)
 	const auto location = m_Resolver.Resolve(handle);
 	if (!location)
 		return nullptr;
-	auto asset = RuntimeAssetLoader::Load(handle, location->Metadata, location->Path);
-	if (asset)
-		m_LoadedAssets.emplace(handle, asset);
+	auto asset = RuntimeAssetLoader::Load(handle, location->Metadata, location->Path, &m_Registry);
+	if (!asset)
+		throw std::runtime_error("Runtime asset artifact failed to load");
+	m_LoadedAssets.emplace(handle, asset);
 	return asset;
 }
 
 bool RuntimeAssetManager::IsAssetHandleValid(const AssetHandle handle) const
 {
-	return m_Configured && handle.IsValid() && m_Registry.Contains(handle);
+	if (!m_Configured || !handle.IsValid() || !m_Registry.Contains(handle))
+		return false;
+
+	const auto& metadata = m_Registry.Get(handle);
+	if (metadata.LibraryPath.empty())
+		return false;
+
+	const auto location = m_Resolver.Resolve(handle);
+	return location.has_value() && std::filesystem::exists(location->Path);
 }
 
 bool RuntimeAssetManager::IsAssetLoaded(const AssetHandle handle) const

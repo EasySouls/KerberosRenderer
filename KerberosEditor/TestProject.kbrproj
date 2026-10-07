@@ -1,4 +1,4 @@
 Project:
   Name: TestProject
   AssetDirectory: Assets
-  StartScenePath: Scenes/Example.kerberos
+  StartScenePath: Scenes/PrefabTest.kerberos

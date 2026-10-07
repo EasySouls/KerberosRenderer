@@ -14,6 +14,8 @@
 
 namespace Kerberos
 {
+	struct AssetMetadata;
+	
 	class AssetsPanel : public EditorWindow
 	{
 	public:
@@ -53,7 +55,7 @@ namespace Kerberos
 
 		void ImportAssetDialog();
 
-		static void HandleAssetDragAndDrop(AssetHandle handle, const std::filesystem::path& filename);
+		static void HandleAssetDragAndDrop(AssetHandle handle, const std::filesystem::path& filename, const AssetMetadata& metadata);
 
 		void OpenMaterialEditor(const std::filesystem::path& materialPath);
 		void RenderMaterialEditors();
@@ -91,6 +93,7 @@ namespace Kerberos
 		};
 
 		std::vector<ContentItem> m_ContentItems;
+		bool m_RefreshRequested = false;
 
 		std::unordered_map<std::string, MaterialEditorState> m_OpenMaterialEditors;
 

@@ -624,7 +624,7 @@ bool SceneSerializer::Deserialize(const std::filesystem::path& filepath) const
                 meshCollider.IsTrigger = meshColliderComponent["IsTrigger"].as<bool>();
                 const AssetHandle meshHandle = AssetHandle(meshColliderComponent["Mesh"].as<uint64_t>());
                 if (meshHandle.IsValid()) {
-                    meshCollider.Mesh = AssetManager::ResolveMeshAsset(meshHandle);
+                    meshCollider.Mesh = AssetManager::GetAsset<Mesh>(meshHandle);
                 }
             }
 
@@ -637,7 +637,7 @@ bool SceneSerializer::Deserialize(const std::filesystem::path& filepath) const
 
                 const AssetHandle meshHandle = AssetHandle(staticMeshComponent["Mesh"].as<uint64_t>());
                 if (meshHandle.IsValid()) {
-                    staticMesh.StaticMesh = AssetManager::ResolveMeshAsset(meshHandle);
+                    staticMesh.StaticMesh = AssetManager::GetAsset<Mesh>(meshHandle);
                 }
                 else {
                     Log::CoreWarn("AssetHandle for mesh is invalid, using default cube mesh.");

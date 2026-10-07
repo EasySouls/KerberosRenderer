@@ -37,7 +37,7 @@ namespace Kerberos
 		 * @param filepath The path to the asset file.
 		 * @return The handle of the imported asset.
 		 */
-		AssetHandle ImportAsset(const std::filesystem::path& filepath) const;
+		AssetHandle ImportAsset(const std::filesystem::path& filepath);
 
 		const AssetMetadata& GetMetadata(AssetHandle handle) const;
 

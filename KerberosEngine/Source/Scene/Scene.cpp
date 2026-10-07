@@ -256,6 +256,11 @@ Entity Scene::InstantiatePrefab(const AssetHandle prefabHandle, const std::strin
 			auto& c = newEntity.AddComponent<SkinComponent>();
 			c.SkeletonAsset = prefabEntity.Skin->SkeletonAsset; c.JointMatrices.clear();
 		}
+		if (prefabEntity.HasStaticMesh && prefabEntity.StaticMeshAsset.IsValid())
+		{
+			auto& c = newEntity.AddComponent<StaticMeshComponent>();
+			c.StaticMesh = AssetManager::ResolveMeshAsset(prefabEntity.StaticMeshAsset);
+		}
 		if (prefabEntity.RigidBody) {
 			auto& c = newEntity.AddComponent<RigidBody3DComponent>(*prefabEntity.RigidBody);
 			c.RuntimeBody = nullptr; c.IsDirty = true;
@@ -703,13 +708,13 @@ Entity Scene::InstantiatePrefab(const AssetHandle prefabHandle, const std::strin
 
 	const PhysicsSystem& Scene::GetPhysicsSystem() const
 	{
-		KBRAssert(m_PhysicsSystem, "Physics system is not initialized");
+		KBRAssert(m_PhysicsSystem != nullptr, "Physics system is not initialized");
 		return *m_PhysicsSystem;
 	}
 
 	PhysicsSystem& Scene::GetPhysicsSystem()
 	{
-		KBRAssert(m_PhysicsSystem, "Physics system is not initialized");
+		KBRAssert(m_PhysicsSystem != nullptr, "Physics system is not initialized");
 		return *m_PhysicsSystem;
 	}
 

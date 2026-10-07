@@ -229,7 +229,7 @@ namespace Kerberos
 		KBR_TRACY_FUNCTION();
 
 		KBRAssert(!m_Scene.expired(), "Scene is not initialized!");
-		KBRAssert(m_JoltSystem, "Jolt Physics System is not initialized!");
+		KBRAssert(m_JoltSystem != nullptr, "Jolt Physics System is not initialized!");
 
 		// Handle entities with rigidbodies but no physics body created yet
 		const auto newBodies = m_Scene.lock()->m_Registry.view<RigidBody3DComponent, TransformComponent>(/*entt::exclude<>*/);
@@ -281,7 +281,7 @@ namespace Kerberos
 		KBR_TRACY_FUNCTION();
 
 		KBRAssert(!m_Scene.expired(), "Scene is not initialized!");
-		KBRAssert(m_JoltSystem, "Jolt Physics System is not initialized!");
+		KBRAssert(m_JoltSystem != nullptr, "Jolt Physics System is not initialized!");
 
 		const auto view = m_Scene.lock()->m_Registry.view<RigidBody3DComponent, TransformComponent>();
 		for (const auto e : view)

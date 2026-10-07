@@ -48,8 +48,6 @@ namespace Kerberos
 		const std::string roughnessTexPath = node["RoughnessTexture"].as<std::string>("");
 		const std::string aoTexPath = node["AOTexture"].as<std::string>("");
 		const std::string emissiveTexPath = node["EmissiveTexture"].as<std::string>("");
-		const Ref<EditorAssetManager> assetManager = Project::GetActive()->GetEditorAssetManager();
-
 		Material material;
 		material.Name = name;
 		material.EmissiveColor = emissiveColor;
@@ -79,14 +77,12 @@ namespace Kerberos
 				return nullptr;
 			}*/
 
-			const AssetHandle textureHandle = assetManager->ImportAsset(texturePath);
-			if (!textureHandle.IsValid())
-			{
-				Log::CoreWarn("MaterialImporter::ImportMaterial - Failed to import texture: {}", texturePath);
-				return nullptr;
-			}
-
-			return AssetManager::GetAsset<Texture2D>(textureHandle);
+			// Compatibility path for authored YAML materials. Native material
+			// artifacts will carry texture handles once that pipeline is complete.
+			const Ref<Texture2D> texture = Texture2D::FromFile(texturePath);
+			if (!texture)
+				Log::CoreWarn("MaterialImporter::ImportMaterial - Failed to load texture: {}", texturePath);
+			return texture;
 		};
 
 		material.AlbedoTexture = loadTexture(albedoTexPath);

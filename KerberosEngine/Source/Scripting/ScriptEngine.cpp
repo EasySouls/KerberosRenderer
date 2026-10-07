@@ -393,35 +393,35 @@ namespace Kerberos
 
 	bool ScriptEngine::CreateManagedInstance(const uint64_t entityID, const std::string& className)
 	{
-		KBRAssert(s_ScriptData->ManagedCreateInstance, "ManagedCreateInstance function pointer is null!");
+		KBRAssert(s_ScriptData->ManagedCreateInstance != nullptr, "ManagedCreateInstance function pointer is null!");
 
 		return s_ScriptData->ManagedCreateInstance(entityID, className.c_str()) != 0;
 	}
 
 	void ScriptEngine::DestroyManagedInstance(const uint64_t entityID)
 	{
-		KBRAssert(s_ScriptData->ManagedDestroyInstance, "ManagedDestroyInstance function pointer is null!");
+		KBRAssert(s_ScriptData->ManagedDestroyInstance != nullptr, "ManagedDestroyInstance function pointer is null!");
 		
 		s_ScriptData->ManagedDestroyInstance(entityID);
 	}
 
 	bool ScriptEngine::InvokeManagedOnCreate(const uint64_t entityID)
 	{
-		KBRAssert(s_ScriptData->ManagedInvokeOnCreate, "ManagedInvokeOnCreate function pointer is null!");
+		KBRAssert(s_ScriptData->ManagedInvokeOnCreate != nullptr, "ManagedInvokeOnCreate function pointer is null!");
 
 		return s_ScriptData->ManagedInvokeOnCreate(entityID) != 0;
 	}
 
 	bool ScriptEngine::InvokeManagedOnUpdate(const uint64_t entityID, const float deltaTime)
 	{
-		KBRAssert(s_ScriptData->ManagedInvokeOnUpdate, "ManagedInvokeOnUpdate function pointer is null!");
+		KBRAssert(s_ScriptData->ManagedInvokeOnUpdate != nullptr, "ManagedInvokeOnUpdate function pointer is null!");
 		
 		return s_ScriptData->ManagedInvokeOnUpdate(entityID, deltaTime) != 0;
 	}
 
 	bool ScriptEngine::InvokeManagedOnCollisionEnter(const uint64_t entityID, const CollisionEvent& event)
 	{
-		KBRAssert(s_ScriptData->ManagedInvokeOnCollisionEnter, "ManagedInvokeOnCollisionEnter function pointer is null!");
+		KBRAssert(s_ScriptData->ManagedInvokeOnCollisionEnter != nullptr, "ManagedInvokeOnCollisionEnter function pointer is null!");
 
 		const ScriptCollisionPayload payload = BuildScriptCollisionPayload(entityID, event);
 		return s_ScriptData->ManagedInvokeOnCollisionEnter(entityID, &payload) != 0;
@@ -429,7 +429,7 @@ namespace Kerberos
 
 	bool ScriptEngine::InvokeManagedOnCollisionPersist(const uint64_t entityID, const CollisionEvent& event)
 	{
-		KBRAssert(s_ScriptData->ManagedInvokeOnCollisionPersist, "ManagedInvokeOnCollisionPersist function pointer is null!");
+		KBRAssert(s_ScriptData->ManagedInvokeOnCollisionPersist != nullptr, "ManagedInvokeOnCollisionPersist function pointer is null!");
 
 		const ScriptCollisionPayload payload = BuildScriptCollisionPayload(entityID, event);
 		return s_ScriptData->ManagedInvokeOnCollisionPersist(entityID, &payload) != 0;
@@ -437,7 +437,7 @@ namespace Kerberos
 
 	bool ScriptEngine::InvokeManagedOnCollisionExit(const uint64_t entityID, const CollisionEvent& event)
 	{
-		KBRAssert(s_ScriptData->ManagedInvokeOnCollisionExit, "ManagedInvokeOnCollisionExit function pointer is null!");
+		KBRAssert(s_ScriptData->ManagedInvokeOnCollisionExit != nullptr, "ManagedInvokeOnCollisionExit function pointer is null!");
 
 		const ScriptCollisionPayload payload = BuildScriptCollisionPayload(entityID, event);
 		return s_ScriptData->ManagedInvokeOnCollisionExit(entityID, &payload) != 0;
@@ -445,21 +445,21 @@ namespace Kerberos
 
 	bool ScriptEngine::GetManagedFieldValue(const uint64_t entityID, const std::string& fieldName, void* outValue, const int bufferSize)
 	{
-		KBRAssert(s_ScriptData->ManagedGetFieldValue, "ManagedGetFieldValue function pointer is null!");
+		KBRAssert(s_ScriptData->ManagedGetFieldValue != nullptr, "ManagedGetFieldValue function pointer is null!");
 
 		return s_ScriptData->ManagedGetFieldValue(entityID, fieldName.c_str(), outValue, bufferSize) != 0;
 	}
 
 	bool ScriptEngine::SetManagedFieldValue(const uint64_t entityID, const std::string& fieldName, void* value, const int valueSize)
 	{
-		KBRAssert(s_ScriptData->ManagedSetFieldValue, "ManagedSetFieldValue function pointer is null!");
+		KBRAssert(s_ScriptData->ManagedSetFieldValue != nullptr, "ManagedSetFieldValue function pointer is null!");
 
 		return s_ScriptData->ManagedSetFieldValue(entityID, fieldName.c_str(), value, valueSize) != 0;
 	}
 
 	void ScriptEngine::SetManagedNativeCallbacks(void* callbackTable)
 	{
-		KBRAssert(s_ScriptData->ManagedSetNativeCallbacks, "ManagedSetNativeCallbacks function pointer is null!");
+		KBRAssert(s_ScriptData->ManagedSetNativeCallbacks != nullptr, "ManagedSetNativeCallbacks function pointer is null!");
 
 		s_ScriptData->ManagedSetNativeCallbacks(callbackTable);
 	}

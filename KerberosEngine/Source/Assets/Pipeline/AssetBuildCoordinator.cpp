@@ -3,6 +3,8 @@
 
 #include "Assets/Pipeline/ImportPipeline.hpp"
 
+#include <unordered_set>
+
 namespace Kerberos {
 
 AssetBuildCoordinator::AssetBuildCoordinator(std::filesystem::path assetsRoot,
@@ -24,12 +26,13 @@ AssetBuildReport AssetBuildCoordinator::Build(const std::filesystem::path& sourc
     std::error_code ec;
     if (!std::filesystem::is_regular_file(source, ec)) 
     { 
-        report.Errors.push_back("Source is not a regular file"); return report; 
+        report.Errors.emplace_back("Source is not a regular file");
+        return report; 
     }
     auto importer = m_Importers.Find(source.extension().string());
     if (!importer)
     { 
-        report.Errors.push_back("No importer registered for extension " + source.extension().string()); 
+        report.Errors.emplace_back("No importer registered for extension " + source.extension().string()); 
         return report;
     }
 
@@ -54,7 +57,7 @@ AssetBuildReport AssetBuildCoordinator::Build(const std::filesystem::path& sourc
     AssetBuildTransaction transaction(m_CacheRoot, source.stem().string());
     if (transaction.StagingRoot().empty()) 
     { 
-        report.Errors.push_back("Unable to create build staging directory"); 
+        report.Errors.emplace_back("Unable to create build staging directory"); 
         return report; 
     }
 
@@ -71,7 +74,7 @@ AssetBuildReport AssetBuildCoordinator::Build(const std::filesystem::path& sourc
     }
     catch (const std::exception& exception) 
     { 
-        report.Errors.push_back(exception.what()); 
+        report.Errors.emplace_back(exception.what()); 
         return report; 
     }
     report.Warnings = result.Warnings;
@@ -102,11 +105,27 @@ AssetBuildReport AssetBuildCoordinator::Build(const std::filesystem::path& sourc
     }
     if (!m_MetaService.SaveMeta(source, meta)) 
     { 
-        report.Errors.push_back("Failed to save asset meta"); 
+        report.Errors.emplace_back("Failed to save asset meta"); 
         return report; 
     }
     if (m_Registry)
     {
+        std::unordered_set<AssetHandle> currentHandles;
+        currentHandles.reserve(result.Outputs.size());
+        for (const auto& output : result.Outputs)
+            currentHandles.insert(output.Handle);
+
+        std::vector<AssetHandle> staleHandles;
+        for (const auto& [assetHandle, assetMetadata] : *m_Registry)
+        {
+            const bool isGeneratedForSource = assetMetadata.RootSourceHandle == meta.SourceHandle
+                && assetHandle != meta.SourceHandle;
+            if (isGeneratedForSource && !currentHandles.contains(assetHandle))
+                staleHandles.push_back(assetHandle);
+        }
+        for (const auto assetHandle : staleHandles)
+            m_Registry->Remove(assetHandle);
+
         AssetMetadata root;
         root.Filepath = std::filesystem::relative(source, m_AssetsRoot, ec);
         if (root.Filepath.empty() || ec) 

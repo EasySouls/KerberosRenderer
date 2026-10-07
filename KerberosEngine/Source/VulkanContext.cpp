@@ -1515,6 +1515,13 @@ namespace Kerberos
 		m_SwapChainExtent = extent;
 
 		m_SwapChainImages = m_SwapChain.getImages();
+
+		Log::CoreInfo("Swapchain created with {} images, format: {}, extent: {}x{}, present mode: {}",
+                      m_SwapChainImages.size(),
+                      vk::to_string(m_SwapChainImageFormat),
+                      m_SwapChainExtent.width,
+                      m_SwapChainExtent.height,
+                      vk::to_string(presentMode));
 	}
 
 	void VulkanContext::CreateSwapChainImageViews()

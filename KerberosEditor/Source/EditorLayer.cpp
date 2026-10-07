@@ -332,19 +332,37 @@ namespace Kerberos
 				const AssetHandle handle = ReadAssetDragPayload(payload->Data, payload->DataSize).Handle;
 				const AssetType assetType = AssetManager::GetAssetType(handle);
 
-				if (assetType == AssetType::Prefab)
-				{
-					if (const Entity prefabEntity = m_ActiveScene->InstantiatePrefab(handle))
-						m_HierarchyPanel.SetSelectedEntity(prefabEntity);
-				}
-				else if (assetType == AssetType::Mesh)
-				{
-					Entity meshEntity = m_ActiveScene->CreateEntity("Mesh");
-					auto &smc = meshEntity.AddComponent<StaticMeshComponent>();
-					smc.StaticMesh = AssetManager::ResolveMeshAsset(handle);
-					m_HierarchyPanel.SetSelectedEntity(meshEntity);
-				}
+				if (assetType != AssetType::Mesh) {
+                    const std::filesystem::path assetPath =  Project::GetActive()->GetEditorAssetManager()->GetMetadata(handle).Filepath;
+                    Log::EditorError("Asset is not a mesh: {0}", assetPath.string());
+                    m_NotificationManager.AddNotification("Asset is not a mesh: " + assetPath.string(),
+                                                          Notification::Type::Error);
+                    return;
+                }
+
+				Entity meshEntity = m_ActiveScene->CreateEntity("Mesh");
+				auto &smc = meshEntity.AddComponent<StaticMeshComponent>();
+				smc.StaticMesh = AssetManager::ResolveMeshAsset(handle);
+				m_HierarchyPanel.SetSelectedEntity(meshEntity);
 			}
+
+			if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload(assetBrowserPrefab)) 
+			{
+                const AssetHandle handle = ReadAssetDragPayload(payload->Data, payload->DataSize).Handle;
+                const AssetType assetType = AssetManager::GetAssetType(handle);
+
+				if (assetType != AssetType::Prefab)
+				{
+                    const std::filesystem::path assetPath = Project::GetActive()->GetEditorAssetManager()->GetMetadata(handle).Filepath;
+                    Log::EditorError("Asset is not a prefab: {0}", assetPath.string());
+                    m_NotificationManager.AddNotification("Asset is not a prefab: " + assetPath.string(),
+                                                          Notification::Type::Error);
+                    return;
+                }
+
+				if (const Entity prefabEntity = m_ActiveScene->InstantiatePrefab(handle))
+                    m_HierarchyPanel.SetSelectedEntity(prefabEntity);
+            }
 
 			ImGui::EndDragDropTarget();
 		}

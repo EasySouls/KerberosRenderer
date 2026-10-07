@@ -559,7 +559,7 @@ namespace Kerberos
 					mout.close();
 
 					// Register mesh asset with editor asset manager
-					Project::GetActive()->GetEditorAssetManager()->ImportAsset(meshPath);
+					const AssetHandle _ = Project::GetActive()->GetEditorAssetManager()->ImportAsset(meshPath);
 				}
 
 				// Export materials
@@ -591,7 +591,7 @@ namespace Kerberos
 					fout.close();
 
 					// Register imported material asset in editor asset manager
-					Project::GetActive()->GetEditorAssetManager()->ImportAsset(matPath);
+					const AssetHandle _ = Project::GetActive()->GetEditorAssetManager()->ImportAsset(matPath);
 				}
 
 				// Export a prefab YAML with proper UUID-based entity references
@@ -650,7 +650,7 @@ namespace Kerberos
 				YAML::Emitter prefabOut;
 				prefabOut << YAML::BeginMap;
 				prefabOut << YAML::Key << "Prefab" << YAML::Value << YAML::BeginMap;
-				prefabOut << YAML::Key << "Name" << YAML::Value << filepath.stem().string();
+				prefabOut << YAML::Key << "Name" << YAML::Value << YAML::DoubleQuoted << filepath.stem().string();
 				prefabOut << YAML::Key << "RootEntityID" << YAML::Value << static_cast<uint64_t>(rootEntityID);
 				prefabOut << YAML::EndMap; // Prefab
 
@@ -660,7 +660,7 @@ namespace Kerberos
 					auto& node = outNodes[nodeIndex];
 					prefabOut << YAML::BeginMap;
 					prefabOut << YAML::Key << "ID" << YAML::Value << static_cast<uint64_t>(nodeUUIDs[nodeIndex]);
-					prefabOut << YAML::Key << "Tag" << YAML::Value << node.Name;
+					prefabOut << YAML::Key << "Tag" << YAML::Value << YAML::DoubleQuoted << node.Name;
 					
 					// Convert translation
 					prefabOut << YAML::Key << "Translation" << YAML::Value << YAML::Flow << YAML::BeginSeq << node.Translation.x << node.Translation.y << node.Translation.z << YAML::EndSeq;
@@ -694,8 +694,8 @@ namespace Kerberos
 						// Store mesh and material paths for later resolution
 						// For now, we use placeholder paths - these should be updated to actual asset paths
 						// TODO: resolve to actual mesh/material asset paths
-						prefabOut << YAML::Key << "MeshAssetPath" << YAML::Value << "";
-						prefabOut << YAML::Key << "MaterialAssetPath" << YAML::Value << "";
+						prefabOut << YAML::Key << "MeshAssetPath" <<  YAML::Value << YAML::DoubleQuoted << "";
+						prefabOut << YAML::Key << "MaterialAssetPath" << YAML::Value << YAML::DoubleQuoted << "";
 					}
 					
 					prefabOut << YAML::EndMap; // Entity
@@ -708,7 +708,7 @@ namespace Kerberos
 				{
 					pfout << prefabOut.c_str();
 					pfout.close();
-					Project::GetActive()->GetEditorAssetManager()->ImportAsset(prefabPath);
+					const AssetHandle _ = Project::GetActive()->GetEditorAssetManager()->ImportAsset(prefabPath);
 				}
 			}
 			catch (const std::exception& e)

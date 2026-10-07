@@ -25,11 +25,12 @@ namespace Kerberos
 		{
 			KBR_TRACY_FUNCTION();
 
-			const auto relative = std::filesystem::relative(path, Project::GetAssetDirectory());
-			const auto& registry = Project::GetActive()->GetEditorAssetManager()->GetAssetRegistry();
-			for (const auto& [handle, metadata] : registry)
-				if (metadata.Filepath.lexically_normal() == relative.lexically_normal())
-					return handle;
+			const auto& assetManager = Project::GetActive()->GetEditorAssetManager();
+			const auto& registry = assetManager->GetAssetRegistry();
+			const auto relative = std::filesystem::relative(
+				std::filesystem::absolute(path), assetManager->GetAssetsRoot());
+			if (registry.ContainsPath(relative))
+				return registry.GetHandle(relative);
 
 			return AssetHandle::Invalid();
 		}
@@ -69,7 +70,10 @@ namespace Kerberos
 
 		ImGui::SameLine();
 		if (ImGui::Button("Refresh"))
+		{
 			RefreshAssetTree();
+		}
+
 		ImGui::SameLine();
 		ImportAssetDialog();
 
@@ -78,8 +82,7 @@ namespace Kerberos
 		static float cellSize = thumbnailSize + padding;
 
 		const float panelWidth = ImGui::GetContentRegionAvail().x;
-		int columns = static_cast<int>(panelWidth / cellSize);
-		columns = std::max(columns, 1);
+        const int columns = std::max(static_cast<int>(panelWidth / cellSize), 1);
 
 		/// Show default context menu when right-clicking on an empty space in the panel
 		ShowContextMenu(ImGuiPopupFlags_MouseButtonRight | ImGuiPopupFlags_NoOpenOverItems);
@@ -121,9 +124,43 @@ namespace Kerberos
 				}
 				const uint64_t rendererID = VulkanContext::Get().GetImGuiRendererID(preview);
 				ImGui::ImageButton(fileName.c_str(), rendererID, { thumbnailSize, thumbnailSize }, { 0, 1 }, { 1, 0 });
+
+				const auto& assetManager = Project::GetActive()->GetEditorAssetManager();
+
+                if (assetManager->IsAssetHandleValid(handle))
+				{
+                    const auto& metadata = assetManager->GetMetadata(handle);
+
+					if (ImGui::BeginItemTooltip()) 
+					{
+						ImGui::Text("%s", path.string().c_str());
+						ImGui::Text("Size: %llu bytes", std::filesystem::file_size(path));
+						ImGui::Text("Handle: %llu", handle);
+						const std::string type = std::string(AssetTypeToString(metadata.Type));
+						const std::string filepath = metadata.Filepath.string();
+						const std::string libraryPath = metadata.LibraryPath.string();
+						ImGui::Text("Type: %s", type.c_str());
+						ImGui::Text("Root Handle: %llu", metadata.RootSourceHandle);
+						ImGui::Text("Filepath: %s", filepath.c_str());
+						ImGui::Text("Library path: %s", libraryPath.c_str());
+						ImGui::EndTooltip();
+					}
+
+                    HandleAssetDragAndDrop(handle, path.filename(), metadata);
+				}
+                else 
+				{
+                    if (ImGui::BeginItemTooltip()) 
+					{
+                        ImGui::Text("%s", path.string().c_str());
+                        ImGui::Text("Size: %llu bytes", std::filesystem::file_size(path));
+                        ImGui::Text("Handle: %llu", handle);
+                        ImGui::EndTooltip();
+                    }
+				}
+
 				ShowFileContextMenu(path);
-				if (handle.IsValid())
-					HandleAssetDragAndDrop(handle, path.filename());
+
 				if (ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left))
 				{
 					if ((handle.IsValid() && AssetManager::GetAssetType(handle) == AssetType::Material) ||
@@ -147,6 +184,11 @@ namespace Kerberos
 		if (!directoryToOpen.empty())
 		{
 			m_CurrentDirectory = directoryToOpen;
+			RefreshAssetTree();
+		}
+		else if (m_RefreshRequested)
+		{
+			m_RefreshRequested = false;
 			RefreshAssetTree();
 		}
 
@@ -190,7 +232,18 @@ namespace Kerberos
 			if (ImGui::MenuItem("Import as asset"))
 			{
 				const Ref<EditorAssetManager> assetManager = Project::GetActive()->GetEditorAssetManager();
-				assetManager->ImportAsset(path);
+				const AssetHandle handle = assetManager->ImportAsset(path);
+				if (handle.IsValid())
+				{
+					m_RefreshRequested = true;
+					m_NotificationManager.AddNotification(
+						"Imported asset: " + path.string(), Notification::Type::Info);
+				}
+				else
+				{
+					m_NotificationManager.AddNotification(
+						"Failed to import asset: " + path.string(), Notification::Type::Error);
+				}
 
 				ImGui::CloseCurrentPopup();
 			}
@@ -279,7 +332,8 @@ namespace Kerberos
 					}
 					else
 					{
-						Project::GetActive()->GetEditorAssetManager()->ImportAsset(assetPath);
+                        [[maybe_unused]]
+						const AssetHandle handle = Project::GetActive()->GetEditorAssetManager()->ImportAsset(assetPath);
 					}
 				}
 				else
@@ -319,10 +373,17 @@ namespace Kerberos
 			}
 			bool hidden = false;
 			for (const auto& component : relative)
+			{
+                // Files or directories starting with a dot are considered hidden
 				hidden |= component.string().starts_with('.');
+			}
+
+			// Filter out hidden files and directories, as well as the "Cache" and "Staging" directories
 			if (hidden || (entry.is_directory() && (entry.path().filename() == "Cache" ||
-				entry.path().filename() == "Staging")))
+													entry.path().filename() == "Staging")))
+			{
 				continue;
+			}
 
 			m_ContentItems.push_back({
 				.Path = entry.path(),
@@ -516,7 +577,8 @@ namespace Kerberos
 				{
 					if (isInsideAssets)
 					{
-						Project::GetActive()->GetEditorAssetManager()->ImportAsset(assetPath);
+						[[maybe_unused]] 
+						const AssetHandle handle = Project::GetActive()->GetEditorAssetManager()->ImportAsset(assetPath);
 						RefreshAssetTree();
 					}
 					else
@@ -536,20 +598,19 @@ namespace Kerberos
 		}
 	}
 
-	void AssetsPanel::HandleAssetDragAndDrop(const AssetHandle handle, const std::filesystem::path& filename)
+	void AssetsPanel::HandleAssetDragAndDrop(const AssetHandle handle, const std::filesystem::path& filename, const AssetMetadata& metadata)
 	{
 		KBR_TRACY_FUNCTION();
 
 		if (ImGui::BeginDragDropSource())
 		{
-			const AssetType assetType = Project::GetActive()->GetEditorAssetManager()->GetAssetType(handle);
-			const auto& metadata = Project::GetActive()->GetEditorAssetManager()->GetMetadata(handle);
 			const AssetDragPayload dragPayload{
 				.Handle = handle,
 				.RootHandle = metadata.RootSourceHandle.IsValid() ? metadata.RootSourceHandle : handle
 			};
 			const std::filesystem::path extension = filename.extension();
 
+			const AssetType assetType = metadata.Type;
 			const std::string_view assetTypeStr = AssetTypeToString(assetType);
 
 			if (extension == ".jpg" || extension == ".png" || extension == ".svg")

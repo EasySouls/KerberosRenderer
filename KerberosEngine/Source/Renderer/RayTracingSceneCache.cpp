@@ -222,7 +222,7 @@ namespace Kerberos
     {
 	    KBR_TRACY_FUNCTION();
 
-		KBRAssert(mesh, "Mesh cannot be null!");
+		KBRAssert(mesh != nullptr, "Mesh cannot be null!");
 
 		auto& context = VulkanContext::Get();
 		const auto& device = context.GetDevice();
