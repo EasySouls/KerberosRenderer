@@ -28,9 +28,11 @@ public:
 
     void SetDebugName(const std::string& name) const;
 
+    static constexpr AssetType Type = AssetType::Mesh; // TODO: Maybe a new AssetType::SkeletalMesh is needed
+
     AssetType GetType() override
     {
-        return AssetType::Mesh;
+        return Type;
     }
 
     const std::vector<Vertex>& GetVertices() const

@@ -14,6 +14,7 @@
 #include "Scripting/ScriptEngine.hpp"
 #include "Physics/Jolt/Utils.hpp"
 #include "Profiling/Profilers.hpp"
+#include "Assets/Model.hpp"
 
 #include <glm/gtx/matrix_decompose.hpp>
 
@@ -232,51 +233,15 @@ Entity Scene::InstantiatePrefab(const AssetHandle prefabHandle, const std::strin
 
 	for (PrefabLocalIndex i = 0; i < prefab->Entities.size(); ++i)
 	{
-		const auto& prefabEntity = prefab->Entities[i];
-		const auto local = prefabEntity.LocalIndex == InvalidPrefabLocalIndex ? i : prefabEntity.LocalIndex;
-		if (prefabEntity.ID.IsValid()) legacyIndices[prefabEntity.ID] = local;
-		Entity newEntity = CreateEntity(prefabEntity.Name.empty() ? prefabEntity.Tag : prefabEntity.Name);
-		entityMapping[local] = newEntity;
-		auto& transform = newEntity.GetComponent<TransformComponent>();
-		transform.Translation = prefabEntity.Transform.Translation;
-		transform.Rotation = prefabEntity.Transform.Rotation;
-		transform.Scale = prefabEntity.Transform.Scale;
-		transform.WorldTransform = glm::mat4(1.0f);
-		if (prefabEntity.SkeletalMesh) {
-			auto& c = newEntity.AddComponent<SkeletalMeshComponent>();
-			c.MeshAsset = prefabEntity.SkeletalMesh->MeshAsset; c.SkeletonAsset = prefabEntity.SkeletalMesh->SkeletonAsset;
-			c.MaterialAsset = prefabEntity.SkeletalMesh->MaterialAsset; c.Visible = prefabEntity.SkeletalMesh->Visible; c.CastShadows = prefabEntity.SkeletalMesh->CastShadows;
-		}
-		if (prefabEntity.Animation) {
-			auto& c = newEntity.AddComponent<AnimationComponent>();
-			c.AnimationAsset = prefabEntity.Animation->AnimationAsset; c.PlaybackSpeed = prefabEntity.Animation->PlaybackSpeed;
-			c.IsLooping = prefabEntity.Animation->Loop; c.IsPlaying = prefabEntity.Animation->AutoPlay; c.CurrentTime = 0.0f;
-		}
-		if (prefabEntity.Skin) {
-			auto& c = newEntity.AddComponent<SkinComponent>();
-			c.SkeletonAsset = prefabEntity.Skin->SkeletonAsset; c.JointMatrices.clear();
-		}
-		if (prefabEntity.HasStaticMesh && prefabEntity.StaticMeshAsset.IsValid())
+		const PrefabEntityData& prefabEntity = prefab->Entities[i];
+		const PrefabLocalIndex local = prefabEntity.LocalIndex == InvalidPrefabLocalIndex ? i : prefabEntity.LocalIndex;
+		if (prefabEntity.ID.IsValid()) 
 		{
-			auto& c = newEntity.AddComponent<StaticMeshComponent>();
-			c.StaticMesh = AssetManager::ResolveMeshAsset(prefabEntity.StaticMeshAsset);
+		    legacyIndices[prefabEntity.ID] = local;
 		}
-		if (prefabEntity.RigidBody) {
-			auto& c = newEntity.AddComponent<RigidBody3DComponent>(*prefabEntity.RigidBody);
-			c.RuntimeBody = nullptr; c.IsDirty = true;
-		}
-		if (prefabEntity.BoxCollider) {
-			auto& c = newEntity.AddComponent<BoxCollider3DComponent>(*prefabEntity.BoxCollider);
-			c.RuntimeCollider = nullptr;
-		}
-		if (prefabEntity.SphereCollider) {
-			auto& c = newEntity.AddComponent<SphereCollider3DComponent>(*prefabEntity.SphereCollider);
-			c.RuntimeCollider = nullptr;
-		}
-		if (prefabEntity.CapsuleCollider) {
-			auto& c = newEntity.AddComponent<CapsuleCollider3DComponent>(*prefabEntity.CapsuleCollider);
-			c.RuntimeCollider = nullptr;
-		}
+		const Entity newEntity = CreateEntity(prefabEntity.Name.empty() ? prefabEntity.Tag : prefabEntity.Name);
+		entityMapping[local] = newEntity;
+		prefabEntity.ToEntity(newEntity);
 	}
 
 	for (size_t i = 0; i < prefab->Entities.size(); ++i)
@@ -284,24 +249,57 @@ Entity Scene::InstantiatePrefab(const AssetHandle prefabHandle, const std::strin
 		const auto& prefabEntity = prefab->Entities[i];
 		const auto local = prefabEntity.LocalIndex == InvalidPrefabLocalIndex ? static_cast<PrefabLocalIndex>(i) : prefabEntity.LocalIndex;
 		Entity child = entityMapping[local];
+
 		auto parentLocal = prefabEntity.ParentLocalIndex;
 		if (parentLocal == InvalidPrefabLocalIndex && prefabEntity.Parent.IsValid() && legacyIndices.contains(prefabEntity.Parent))
+		{
 			parentLocal = legacyIndices[prefabEntity.Parent];
+		}
 		if (parentLocal != InvalidPrefabLocalIndex && entityMapping.contains(parentLocal))
+		{
 			SetParent(child, entityMapping[parentLocal], false);
+		}
+
 		if (child.HasComponent<SkinComponent>())
 		{
 			for (auto joint : prefabEntity.Skin->JointEntityIndices)
-				if (entityMapping.contains(joint)) child.GetComponent<SkinComponent>().JointEntities.push_back(entityMapping[joint].GetUUID());
+			{
+				if (entityMapping.contains(joint)) 
+				    child.GetComponent<SkinComponent>().JointEntities.push_back(entityMapping[joint].GetUUID());
+			}
 			for (const auto& jointId : prefabEntity.Skin->JointEntityIDs)
-				if (legacyIndices.contains(jointId)) child.GetComponent<SkinComponent>().JointEntities.push_back(entityMapping[legacyIndices[jointId]].GetUUID());
+			{
+				if (legacyIndices.contains(jointId)) 
+				    child.GetComponent<SkinComponent>().JointEntities.push_back(entityMapping[legacyIndices[jointId]].GetUUID());
+			}
 		}
 		if (child.HasComponent<RigidBody3DComponent>()) child.GetComponent<RigidBody3DComponent>().RuntimeBody = nullptr;
 	}
 
 	PrefabLocalIndex rootLocal = prefab->RootLocalIndex;
-	if (rootLocal == InvalidPrefabLocalIndex && legacyIndices.contains(prefab->RootEntityID)) rootLocal = legacyIndices[prefab->RootEntityID];
+	if (rootLocal == InvalidPrefabLocalIndex && legacyIndices.contains(prefab->RootEntityID))
+	{
+	    rootLocal = legacyIndices[prefab->RootEntityID];
+	}
 	Entity instanceRoot = entityMapping.contains(rootLocal) ? entityMapping[rootLocal] : Entity{};
+	if (prefab->RequiresInstanceRoot)
+	{
+		instanceRoot = CreateEntity(resolvedRootName.empty() ? prefab->GetName() : resolvedRootName);
+		instanceRoot.AddComponent<PrefabInstanceComponent>(PrefabInstanceComponent{ prefabHandle });
+		for (size_t i = 0; i < prefab->Entities.size(); ++i)
+		{
+			const auto& prefabEntity = prefab->Entities[i];
+			if (prefabEntity.ParentLocalIndex == InvalidPrefabLocalIndex)
+			{
+				const auto local = prefabEntity.LocalIndex == InvalidPrefabLocalIndex
+					? static_cast<PrefabLocalIndex>(i)
+					: prefabEntity.LocalIndex;
+				if (entityMapping.contains(local))
+					SetParent(entityMapping[local], instanceRoot, false);
+			}
+		}
+		return instanceRoot;
+	}
 	if (instanceRoot)
 	{
 		// Rename the root to match the resolved name
@@ -810,12 +808,6 @@ Entity Scene::InstantiatePrefab(const AssetHandle prefabHandle, const std::strin
 
 		return newScene;
 	}
-
-	AssetType Scene::GetType()
-	{
-		return AssetType::Scene;
-	}
-
 
 	void Scene::Render2DRuntime([[maybe_unused]] const SceneCamera* mainCamera, [[maybe_unused]] const glm::mat4& mainCameraTransform, [[maybe_unused]] const float dt)
 	{

@@ -3,6 +3,7 @@
 
 #include "Assets/Runtime/RuntimeAssetLoader.hpp"
 #include "Assets/Importers/StandaloneAssetPipelineImporter.hpp"
+#include "Importers/GLTFPipelineImporter.hpp"
 #include "Assets/Formats/NativeAssetSerializer.hpp"
 #include "Profiling/Profilers.hpp"
 #include "Project/Project.hpp"
@@ -15,14 +16,12 @@
 #include <fstream>
 #include <map>
 #include <ranges>
-#include <cerrno>
 #include <system_error>
 
 #ifdef KBR_PLATFORM_WINDOWS
 #include <Windows.h>
 #endif
 
-#include "Importers/GLTFPipelineImporter.hpp"
 
 import Kerberos;
 
@@ -195,6 +194,8 @@ namespace Kerberos
 
 	EditorAssetManager::~EditorAssetManager() 
 	{
+        KBR_TRACY_FUNCTION();
+
 		m_Lifetime->store(false);
 		m_FileWatch.Stop();
 		Log::CoreTrace("EditorAssetManager destructed");
@@ -379,8 +380,6 @@ namespace Kerberos
 				return existingHandle;
 		}
 
-		/// Generate new handle
-		const AssetHandle handle;
 		AssetMetadata metadata;
 		metadata.Filepath = registryPath;
 		metadata.Type = AssetTypeFromFileExtension(registryPath);

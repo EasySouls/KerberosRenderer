@@ -13,6 +13,7 @@
 #include <cstring>
 #include <fstream>
 #include <limits>
+#include <sstream>
 #include <utility>
 
 import Kerberos;
@@ -134,46 +135,81 @@ Ref<Prefab> LoadNativePrefab(const AssetHandle handle, const AssetMetadata& meta
 	auto prefab = CreateRef<Prefab>();
 	prefab->Name = path.stem().string();
 	prefab->RootLocalIndex = InvalidPrefabLocalIndex;
+	prefab->RequiresInstanceRoot = true;
 	const AssetHandle rootHandle = metadata.RootSourceHandle.IsValid()
 		? metadata.RootSourceHandle : handle;
-	prefab->Entities.reserve(manifest.Nodes.size());
+	std::vector<PrefabLocalIndex> nodeLocalIndices;
+	nodeLocalIndices.reserve(manifest.Nodes.size());
+	prefab->Entities.reserve(manifest.Nodes.size() * 2);
 
 	for (size_t i = 0; i < manifest.Nodes.size(); ++i)
 	{
 		const auto& node = manifest.Nodes[i];
 		PrefabEntityData entity;
-		entity.LocalIndex = static_cast<PrefabLocalIndex>(i);
+		entity.LocalIndex = static_cast<PrefabLocalIndex>(prefab->Entities.size());
 		entity.Name = node.Name;
 		entity.Tag = node.Name;
-		entity.ParentLocalIndex = node.ParentIndex >= 0
-			? static_cast<PrefabLocalIndex>(node.ParentIndex)
-			: InvalidPrefabLocalIndex;
-
-		if (node.ParentIndex < 0 && prefab->RootLocalIndex == InvalidPrefabLocalIndex)
-			prefab->RootLocalIndex = entity.LocalIndex;
-
-		if (node.MeshIndex >= 0)
-		{
-			const std::string meshKey = "mesh:" + std::to_string(node.MeshIndex) + "_0";
-			const AssetHandle meshHandle = FindSubasset(registry, rootHandle, meshKey);
-			if (meshHandle.IsValid())
-			{
-				entity.StaticMeshAsset = meshHandle;
-				entity.HasStaticMesh = true;
-			}
-		}
+		nodeLocalIndices.push_back(entity.LocalIndex);
 		prefab->Entities.push_back(std::move(entity));
 	}
 
-	for (auto& entity : prefab->Entities)
+	for (size_t i = 0; i < manifest.Nodes.size(); ++i)
 	{
-		if (entity.ParentLocalIndex != InvalidPrefabLocalIndex
-			&& entity.ParentLocalIndex < prefab->Entities.size())
+		const auto& node = manifest.Nodes[i];
+		auto& nodeEntity = prefab->Entities[nodeLocalIndices[i]];
+		nodeEntity.ParentLocalIndex = node.ParentIndex >= 0
+			&& static_cast<size_t>(node.ParentIndex) < nodeLocalIndices.size()
+			? nodeLocalIndices[static_cast<size_t>(node.ParentIndex)]
+			: InvalidPrefabLocalIndex;
+		if (nodeEntity.ParentLocalIndex == InvalidPrefabLocalIndex
+			&& prefab->RootLocalIndex == InvalidPrefabLocalIndex)
+			prefab->RootLocalIndex = nodeEntity.LocalIndex;
+
+		for (const auto& primitive : node.Primitives)
+		{
+			PrefabEntityData primitiveEntity;
+			primitiveEntity.LocalIndex = static_cast<PrefabLocalIndex>(prefab->Entities.size());
+			primitiveEntity.Name = node.Name + "_Primitive_" + std::to_string(primitive.PrimitiveIndex);
+			primitiveEntity.Tag = primitiveEntity.Name;
+			primitiveEntity.ParentLocalIndex = nodeEntity.LocalIndex;
+
+			const std::string meshKey = "mesh:" + std::to_string(primitive.MeshIndex)
+				+ "_" + std::to_string(primitive.PrimitiveIndex);
+			const AssetHandle meshHandle = FindSubasset(registry, rootHandle, meshKey);
+			if (meshHandle.IsValid())
+			{
+				primitiveEntity.StaticMeshAsset = meshHandle;
+				primitiveEntity.HasStaticMesh = true;
+			}
+			else
+			{
+				Log::CoreError("Native prefab {} is missing mesh subasset {}", path.string(), meshKey);
+			}
+
+			if (primitive.MaterialIndex >= 0)
+			{
+				const std::string materialKey = "material:" + std::to_string(primitive.MaterialIndex);
+				primitiveEntity.StaticMaterialAsset = FindSubasset(registry, rootHandle, materialKey);
+				if (!primitiveEntity.StaticMaterialAsset.IsValid())
+					Log::CoreError("Native prefab {} is missing material subasset {}", path.string(), materialKey);
+			}
+			prefab->Entities.push_back(std::move(primitiveEntity));
+		}
+	}
+
+	for (size_t i = 0; i < prefab->Entities.size(); ++i)
+	{
+		auto& entity = prefab->Entities[i];
+		if (entity.ParentLocalIndex != InvalidPrefabLocalIndex && entity.ParentLocalIndex < prefab->Entities.size())
+		{
 			prefab->Entities[entity.ParentLocalIndex].Children.push_back(entity.LocalIndex);
+		}
 	}
 
 	if (prefab->RootLocalIndex == InvalidPrefabLocalIndex && !prefab->Entities.empty())
+	{
 		prefab->RootLocalIndex = 0;
+	}
 	prefab->GetHandle() = handle;
 	return prefab;
 }
@@ -193,6 +229,43 @@ Ref<Material> LoadMaterial(const std::filesystem::path& path)
 	return MaterialImporter::ImportMaterial(path);
 }
 
+Ref<Material> LoadNativeMaterial(AssetHandle handle, const std::filesystem::path& path)
+{
+	NativeAssetRecord record;
+	if (!NativeAssetSerializer::DeserializeRecord(path, record) || record.Kind != "material")
+		return nullptr;
+
+	auto material = CreateRef<Material>();
+	material->GetHandle() = handle;
+	material->Name = path.stem().string();
+
+	std::istringstream stream(record.Data);
+	std::string field;
+	while (std::getline(stream, field, ';'))
+	{
+		const auto separator = field.find('=');
+		if (separator == std::string::npos)
+			continue;
+		const std::string key = field.substr(0, separator);
+		const std::string value = field.substr(separator + 1);
+		if (key == "name")
+			material->Name = value;
+		else if (key == "metallic")
+			material->Params.MetallicFactor = std::stof(value);
+		else if (key == "roughness")
+			material->Params.RoughnessFactor = std::stof(value);
+		else if (key == "baseColor")
+		{
+			std::istringstream colors(value);
+			std::string component;
+			float* destination = &material->Params.AlbedoFactor.x;
+			for (size_t i = 0; i < 4 && std::getline(colors, component, ','); ++i)
+				destination[i] = std::stof(component);
+		}
+	}
+	return material;
+}
+
 }
 
 Ref<Asset> RuntimeAssetLoader::Load(const AssetHandle handle,
@@ -206,7 +279,12 @@ Ref<Asset> RuntimeAssetLoader::Load(const AssetHandle handle,
 		case AssetType::Texture2D:
 			return LoadTexture(handle, path);
 		case AssetType::Material:
+		{
+			NativeAssetRecord record;
+			if (NativeAssetSerializer::DeserializeRecord(path, record))
+				return LoadNativeMaterial(handle, path);
 			return LoadMaterial(path);
+		}
 		case AssetType::Mesh:
 			return LoadMesh(handle, path);
 		case AssetType::ModelDEPRECATED:

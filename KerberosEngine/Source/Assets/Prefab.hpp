@@ -9,7 +9,8 @@ namespace Kerberos
 	class Prefab : public Asset
 	{
 	public:
-		AssetType GetType() override { return AssetType::Prefab; }
+        static constexpr AssetType Type = AssetType::Prefab;
+		AssetType GetType() override { return Type; }
 
 		const std::string& GetName() const { return Name; }
 		void SetName(const std::string& name) { Name = name; }
@@ -18,5 +19,8 @@ namespace Kerberos
 		PrefabLocalIndex RootLocalIndex = InvalidPrefabLocalIndex;
 		UUID RootEntityID = UUID::Invalid(); // legacy prefab reference
 		std::vector<PrefabEntityData> Entities;
+
+		// TODO: Only for compatibility
+		bool RequiresInstanceRoot = false;
 	};
 }

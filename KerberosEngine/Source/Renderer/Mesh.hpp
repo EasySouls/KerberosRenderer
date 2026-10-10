@@ -29,7 +29,11 @@ namespace Kerberos
 
 		void SetDebugName(const std::string& name) const;
 
-		AssetType GetType() override { return AssetType::Mesh; }
+		static constexpr AssetType Type = AssetType::Mesh;
+        AssetType GetType() override
+        {
+            return Type;
+        }
 
 		const std::vector<Vertex>& GetVertices() const { return m_Vertices; }
 		const std::vector<uint32_t>& GetIndices() const { return m_Indices; }

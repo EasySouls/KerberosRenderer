@@ -7,7 +7,7 @@
 
 namespace Kerberos
 {
-    inline constexpr uint32_t NativeAssetFormatVersion = 2;
+    inline constexpr uint32_t NativeAssetFormatVersion = 3;
 
     struct NativeAssetHeader
     {
@@ -38,8 +38,15 @@ namespace Kerberos
         uint64_t StableId = 0;
         std::string Name;
         int32_t ParentIndex = -1;
-        int32_t MeshIndex = -1;
         int32_t SkinIndex = -1;
+
+        struct Primitive
+        {
+            uint32_t MeshIndex = 0;
+            uint32_t PrimitiveIndex = 0;
+            int32_t MaterialIndex = -1;
+        };
+        std::vector<Primitive> Primitives;
     };
 
     struct GltfSceneManifest

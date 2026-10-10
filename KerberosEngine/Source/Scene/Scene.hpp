@@ -102,7 +102,12 @@ namespace Kerberos
 
 		static Ref<Scene> Copy(const Ref<Scene>& other);
 
-		AssetType GetType() override;
+		static constexpr AssetType Type = AssetType::Scene;
+
+		AssetType GetType() override
+		{
+            return Type;
+		}
 
 	private:
 		template<typename T>

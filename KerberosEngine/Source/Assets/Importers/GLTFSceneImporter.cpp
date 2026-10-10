@@ -313,7 +313,20 @@ bool GLTFSceneImporter::Import(const std::filesystem::path& source, const std::f
 
     for (size_t i = 0; i < model.nodes.size(); ++i) {
         auto& n = manifest.Nodes[i]; n.StableId = StableId(manifest.SourcePath, "node", i);
-        n.Name = Name(model.nodes[i].name, "Node_", i); n.MeshIndex = model.nodes[i].mesh; n.SkinIndex = model.nodes[i].skin;
+        n.Name = Name(model.nodes[i].name, "Node_", i); n.SkinIndex = model.nodes[i].skin;
+        if (model.nodes[i].mesh >= 0 && static_cast<size_t>(model.nodes[i].mesh) < model.meshes.size())
+        {
+            const auto& mesh = model.meshes[model.nodes[i].mesh];
+            n.Primitives.reserve(mesh.primitives.size());
+            for (size_t primitiveIndex = 0; primitiveIndex < mesh.primitives.size(); ++primitiveIndex)
+            {
+                n.Primitives.push_back({
+                    .MeshIndex = static_cast<uint32_t>(model.nodes[i].mesh),
+                    .PrimitiveIndex = static_cast<uint32_t>(primitiveIndex),
+                    .MaterialIndex = mesh.primitives[primitiveIndex].material
+                });
+            }
+        }
         for (size_t p = 0; p < model.nodes.size(); ++p)
         {
             if (std::ranges::find(model.nodes[p].children, static_cast<int>(i)) != model.nodes[p].children.end()) 
@@ -360,7 +373,7 @@ bool GLTFSceneImporter::Import(const std::filesystem::path& source, const std::f
     }
     std::ostringstream prefab; prefab << "name=" << source.stem().string() << ";nodes=" << model.nodes.size() << ";";
     for (size_t i = 0; i < manifest.Nodes.size(); ++i) {
-        prefab << i << ":" << manifest.Nodes[i].Name << ":" << manifest.Nodes[i].ParentIndex << ":" << manifest.Nodes[i].MeshIndex << ":" << manifest.Nodes[i].SkinIndex << ";";
+        prefab << i << ":" << manifest.Nodes[i].Name << ":" << manifest.Nodes[i].ParentIndex << ":" << manifest.Nodes[i].SkinIndex << ";";
     }
     if (!WriteRecord(outputDirectory, "", Key("prefab", 0), "prefab", 0,
         prefab.str(), source.stem().string()))

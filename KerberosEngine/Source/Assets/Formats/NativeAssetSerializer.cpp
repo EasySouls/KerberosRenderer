@@ -99,9 +99,16 @@ namespace Kerberos
         if (!Write(stream, static_cast<uint32_t>(manifest.Nodes.size())))
             return false;
         for (const auto& node : manifest.Nodes)
-            if (!Write(stream, node.StableId) || !WriteString(stream, node.Name) || !Write(stream, node.ParentIndex)
-                || !Write(stream, node.MeshIndex) || !Write(stream, node.SkinIndex))
+        {
+            if (!Write(stream, node.StableId) || !WriteString(stream, node.Name)
+                || !Write(stream, node.ParentIndex) || !Write(stream, node.SkinIndex)
+                || !Write(stream, static_cast<uint32_t>(node.Primitives.size())))
                 return false;
+            for (const auto& primitive : node.Primitives)
+                if (!Write(stream, primitive.MeshIndex) || !Write(stream, primitive.PrimitiveIndex)
+                    || !Write(stream, primitive.MaterialIndex))
+                    return false;
+        }
         return stream.good();
     }
 
@@ -123,9 +130,36 @@ namespace Kerberos
         manifest.Nodes.clear();
         manifest.Nodes.resize(count);
         for (auto& node : manifest.Nodes)
-            if (!Read(stream, node.StableId) || !ReadString(stream, node.Name) || !Read(stream, node.ParentIndex)
-                || !Read(stream, node.MeshIndex) || !Read(stream, node.SkinIndex))
+        {
+            if (!Read(stream, node.StableId) || !ReadString(stream, node.Name)
+                || !Read(stream, node.ParentIndex))
                 return false;
+
+            if (header.Version < 3)
+            {
+                int32_t meshIndex = -1;
+                if (!Read(stream, meshIndex) || !Read(stream, node.SkinIndex))
+                    return false;
+                if (meshIndex >= 0)
+                    node.Primitives.push_back({
+                        .MeshIndex = static_cast<uint32_t>(meshIndex),
+                        .PrimitiveIndex = 0,
+                        .MaterialIndex = -1
+                    });
+            }
+            else
+            {
+                uint32_t primitiveCount = 0;
+                if (!Read(stream, node.SkinIndex) || !Read(stream, primitiveCount)
+                    || primitiveCount > 1'000'000)
+                    return false;
+                node.Primitives.resize(primitiveCount);
+                for (auto& primitive : node.Primitives)
+                    if (!Read(stream, primitive.MeshIndex) || !Read(stream, primitive.PrimitiveIndex)
+                        || !Read(stream, primitive.MaterialIndex))
+                        return false;
+            }
+        }
         return stream.good();
     }
 

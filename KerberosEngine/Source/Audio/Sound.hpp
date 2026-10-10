@@ -32,8 +32,13 @@ namespace Kerberos
 		void Mute() const;
 
 		const std::string& GetName() const { return m_Name; }
-		AssetType GetType() override { return AssetType::Sound; }
 		UUID GetSoundID() const { return m_SoundID; }
+
+		static constexpr AssetType Type = AssetType::Sound;
+        AssetType GetType() override
+        {
+            return Type;
+        }
 
 	private:
 		std::string m_Name;

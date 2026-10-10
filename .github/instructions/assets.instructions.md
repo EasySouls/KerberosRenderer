@@ -70,6 +70,12 @@ while the imported binary `.kbrprefab` artifact plus its `.kbrscene` manifest
 are what runtime loading consumes. A scene must not resolve the glTF source
 directly, and native cache prefabs must not be sent through the legacy YAML
 `PrefabSerializer`.
+The `.kbrscene` manifest stores the imported node graph and one record for
+each mesh primitive, including its generated mesh and material indices. Native
+glTF loading preserves source parent relationships, creates primitive child
+entities, assigns `StaticMeshComponent::MeshMaterial`, and adds a synthetic
+instance root so files with multiple glTF roots remain grouped. Legacy YAML
+prefabs do not receive this wrapper behavior.
 `StandaloneAssetPipelineImporter` is currently a lightweight adapter for
 complete single-file sources: it supplies extension/type/build registration
 but emits no cache payload. Do not describe it as a full format converter.

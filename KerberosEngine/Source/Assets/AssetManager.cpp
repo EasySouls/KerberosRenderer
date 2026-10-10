@@ -1,5 +1,6 @@
 #include "kbrpch.hpp"
 #include "AssetManager.hpp"
+#include "Model.hpp"
 
 import Kerberos;
 
@@ -24,14 +25,16 @@ Ref<Mesh> AssetManager::ResolveMeshAsset(const AssetHandle handle)
 			if (!model)
 				return nullptr;
 
+			// TODO: Very ugly, remove later when sure that nothing uses it anymore
 			const Ref<Mesh> mesh = model->GetPrimaryMesh();
 			if (mesh && !mesh->GetHandle().IsValid())
 				mesh->GetHandle() = handle;
 
 			return mesh;
 		}
-		default:
-			return nullptr;
+
+	default:
+		return nullptr;
 	}
 }
 

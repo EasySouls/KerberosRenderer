@@ -31,7 +31,11 @@ public:
 
 	~TextureCube() override;
 
-	AssetType GetType() override { return AssetType::Texture2D; }
+	static constexpr AssetType Type = AssetType::TextureCube;
+    AssetType GetType() override
+    {
+        return Type;
+    }
 
 	static Ref<TextureCube> FromData(const CubemapData& data);
 	static Ref<TextureCube> FromFile(const std::filesystem::path& filepath);

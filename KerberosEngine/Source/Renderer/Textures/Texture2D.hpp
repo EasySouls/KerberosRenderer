@@ -18,7 +18,11 @@ public:
 
 	~Texture2D() override;
 
-	AssetType GetType() override { return AssetType::Texture2D; }
+	static constexpr AssetType Type = AssetType::Texture2D;
+    AssetType GetType() override
+    {
+        return Type;
+    }
 
 	static Ref<Texture2D> FromBuffer(const TextureSpecification& spec, const Buffer& buffer);
 	static Ref<Texture2D> FromFile(const std::filesystem::path& filepath);

@@ -63,7 +63,11 @@ struct Material : public Asset
 
     bool operator==(const Material& other) const;
 
-    AssetType GetType() override { return AssetType::Material; }
+    static constexpr AssetType Type = AssetType::Material;
+    AssetType GetType() override
+    {
+        return Type;
+    }
 };
 
 }

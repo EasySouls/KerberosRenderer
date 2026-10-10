@@ -84,7 +84,8 @@ namespace Kerberos
 		{
 		}
 
-		AssetType GetType() override { return AssetType::ModelDEPRECATED; }
+		static constexpr AssetType Type = AssetType::ModelDEPRECATED;
+        AssetType GetType() override { return Type; }
 
 		const std::string& GetName() const { return m_Name; }
 		void SetName(std::string name) { m_Name = std::move(name); }
