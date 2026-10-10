@@ -1,8 +1,8 @@
----
-applyTo: "KerberosEngine/Source/Assets/**/*,KerberosEngine/Source/Project/**/*,KerberosEditor/Source/Windows/AssetsPanel.cpp,KerberosEditor/Source/AssetConstants.hpp,KerberosEditor/Assets/**/*"
----
-
 # Asset system context
+
+Applies to `KerberosEngine/Source/Assets/**`, `KerberosEngine/Source/Project/**`,
+`KerberosEditor/Source/Windows/AssetsPanel.cpp`,
+`KerberosEditor/Source/AssetConstants.hpp`, and `KerberosEditor/Assets/**`.
 
 ## Responsibilities and ownership
 

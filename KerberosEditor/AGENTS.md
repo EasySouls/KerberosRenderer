@@ -1,8 +1,8 @@
----
-applyTo: "KerberosEditor/Source/**/*,KerberosEngine/Source/Editor*,KerberosEngine/Source/Application*,KerberosEngine/Source/Project/**/*,KerberosEngine/Source/Scene/**/*"
----
-
 # Editor system context
+
+Applies to `KerberosEditor/Source/**`,
+`KerberosEngine/Source/Editor*`, `KerberosEngine/Source/Application*`,
+`KerberosEngine/Source/Project/**`, and `KerberosEngine/Source/Scene/**`.
 
 ## Lifecycle and ownership
 
