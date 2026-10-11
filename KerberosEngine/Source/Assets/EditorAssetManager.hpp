@@ -9,6 +9,7 @@
 #include "Importers/ImporterRegistry.hpp"
 #include "Pipeline/AssetSourceScanner.hpp"
 #include "Pipeline/AssetFileWatchService.hpp"
+#include "Renderer/Mesh.hpp"
 
 #include <filesystem>
 #include <atomic>
@@ -27,7 +28,6 @@ namespace Kerberos
 		bool IsAssetLoaded(AssetHandle handle) const override;
 
 		AssetType GetAssetType(AssetHandle handle) const override;
-
 
 		/**
 		 * Imports an asset from the given filepath.
@@ -48,12 +48,14 @@ namespace Kerberos
 		void SerializeAssetRegistry();
 		bool DeserializeAssetRegistry();
 
-		const AssetRegistry& GetAssetRegistry() const { return m_AssetRegistry; }
-		ImporterRegistry& GetImporterRegistry() { return m_ImporterRegistry; }
 		void ConfigurePipeline(const std::filesystem::path& assetsRoot, const std::filesystem::path& cacheRoot = {});
+
 		void StartWatching();
 		void EnsureAssetMetas() const;
 		std::vector<AssetBuildReport> BuildAssets(bool force = false) const;
+
+		ImporterRegistry& GetImporterRegistry() { return m_ImporterRegistry; }
+		const AssetRegistry& GetAssetRegistry() const { return m_AssetRegistry; }
 		AssetBuildCoordinator* GetBuildCoordinator() const { return m_BuildCoordinator.get(); }
 		const std::filesystem::path& GetAssetsRoot() const { return m_AssetsRoot; }
 		const std::filesystem::path& GetCacheRoot() const { return m_CacheRoot; }

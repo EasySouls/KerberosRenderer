@@ -37,6 +37,7 @@ public:
 private:
 	AssetRegistry m_Registry;
 	bool m_Configured = false;
+	std::filesystem::path m_LibraryRoot;
 	RuntimeAssetResolver m_Resolver;
 	AssetMap m_LoadedAssets;
 };

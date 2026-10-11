@@ -229,7 +229,8 @@ Ref<Material> LoadMaterial(const std::filesystem::path& path)
 	return MaterialImporter::ImportMaterial(path);
 }
 
-Ref<Material> LoadNativeMaterial(AssetHandle handle, const std::filesystem::path& path)
+Ref<Material> LoadNativeMaterial(AssetHandle handle, const std::filesystem::path& path,
+	const AssetRegistry* registry, const AssetHandle rootHandle, const std::filesystem::path& libraryRoot)
 {
 	NativeAssetRecord record;
 	if (!NativeAssetSerializer::DeserializeRecord(path, record) || record.Kind != "material")
@@ -238,6 +239,12 @@ Ref<Material> LoadNativeMaterial(AssetHandle handle, const std::filesystem::path
 	auto material = CreateRef<Material>();
 	material->GetHandle() = handle;
 	material->Name = path.stem().string();
+
+	int baseColorTexture = -1;
+	int normalTexture = -1;
+	int metallicRoughnessTexture = -1;
+	int occlusionTexture = -1;
+	int emissiveTexture = -1;
 
 	std::istringstream stream(record.Data);
 	std::string field;
@@ -262,7 +269,59 @@ Ref<Material> LoadNativeMaterial(AssetHandle handle, const std::filesystem::path
 			for (size_t i = 0; i < 4 && std::getline(colors, component, ','); ++i)
 				destination[i] = std::stof(component);
 		}
+		else if (key == "emissive")
+		{
+			std::istringstream colors(value);
+			std::string component;
+			float* destination = &material->EmissiveColor.x;
+			for (size_t i = 0; i < 3 && std::getline(colors, component, ','); ++i)
+				destination[i] = std::stof(component);
+			material->EmissiveIntensity = 1.0f;
+			material->Params.Emissive = material->EmissiveColor;
+		}
+		else if (key == "baseColorTexture")
+			baseColorTexture = std::stoi(value);
+		else if (key == "normalTexture")
+			normalTexture = std::stoi(value);
+		else if (key == "metallicRoughnessTexture")
+			metallicRoughnessTexture = std::stoi(value);
+		else if (key == "occlusionTexture")
+			occlusionTexture = std::stoi(value);
+		else if (key == "emissiveTexture")
+			emissiveTexture = std::stoi(value);
 	}
+
+	const auto loadTexture = [&](const int imageIndex) -> Ref<Texture2D>
+	{
+		if (imageIndex < 0)
+			return nullptr;
+
+		const AssetHandle textureHandle = FindSubasset(registry, rootHandle, "texture:" + std::to_string(imageIndex));
+		if (!textureHandle.IsValid() || !registry)
+		{
+			Log::CoreWarn("Material '{}' references missing texture sub-asset '{}'", material->Name,
+				"texture:" + std::to_string(imageIndex));
+			return nullptr;
+		}
+
+		const AssetMetadata& textureMeta = registry->Get(textureHandle);
+		std::filesystem::path texturePath = textureMeta.LibraryPath;
+		if (texturePath.is_relative() && !libraryRoot.empty())
+			texturePath = libraryRoot / texturePath;
+
+		Ref<Texture2D> texture = LoadTexture(textureHandle, texturePath);
+		if (!texture)
+			Log::CoreWarn("Failed to load texture '{}' for material '{}'", texturePath.string(), material->Name);
+		return texture;
+	};
+
+	material->AlbedoTexture = loadTexture(baseColorTexture);
+	material->NormalTexture = loadTexture(normalTexture);
+	material->MetallicTexture = loadTexture(metallicRoughnessTexture);
+	material->RoughnessTexture = material->MetallicTexture;
+	material->AOTexture = loadTexture(occlusionTexture);
+	material->EmissiveTexture = loadTexture(emissiveTexture);
+
 	return material;
 }
 
@@ -270,9 +329,11 @@ Ref<Material> LoadNativeMaterial(AssetHandle handle, const std::filesystem::path
 
 Ref<Asset> RuntimeAssetLoader::Load(const AssetHandle handle,
 	const AssetMetadata& metadata, const std::filesystem::path& path,
-	const AssetRegistry* registry)
+	const AssetRegistry* registry, const std::filesystem::path& libraryRoot)
 {
 	KBR_TRACY_FUNCTION();
+
+	const AssetHandle rootHandle = metadata.RootSourceHandle.IsValid() ? metadata.RootSourceHandle : handle;
 
 	switch (metadata.Type)
 	{
@@ -282,7 +343,7 @@ Ref<Asset> RuntimeAssetLoader::Load(const AssetHandle handle,
 		{
 			NativeAssetRecord record;
 			if (NativeAssetSerializer::DeserializeRecord(path, record))
-				return LoadNativeMaterial(handle, path);
+				return LoadNativeMaterial(handle, path, registry, rootHandle, libraryRoot);
 			return LoadMaterial(path);
 		}
 		case AssetType::Mesh:

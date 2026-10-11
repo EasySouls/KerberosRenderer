@@ -3,13 +3,17 @@
 #include "Assets/Asset.hpp"
 #include "Assets/Pipeline/ImportPipeline.hpp"
 #include "Renderer/Vertex.hpp"
+#include "Renderer/Textures/KTX2Encoder.hpp"
+#include "Utils/KtxConversion.hpp"
 #include "Profiling/Profilers.hpp"
 
 #include <tinygltf/tiny_gltf.h>
 #include <ktx.h>
 
 #include <algorithm>
+#include <fstream>
 #include <sstream>
+#include <unordered_set>
 
 import Kerberos;
 
@@ -109,7 +113,7 @@ bool WriteMesh(const std::filesystem::path& root, const size_t mesh, const size_
     const auto readAttribute = [&model, &p](const char* name, const size_t vertex,
         const size_t componentCount, float* destination) -> bool
     {
-        std::fill(destination, destination + componentCount, 0.0f);
+        std::fill_n(destination, componentCount, 0.0f);
         const auto attribute = p.attributes.find(name);
         if (attribute == p.attributes.end())
             return true;
@@ -259,6 +263,110 @@ bool LoadImageDataWithKtxFallback(
 
         return tinygltf::LoadImageData(image, imageIdx, err, warn, reqWidth, reqHeight, bytes, size, nullptr);
     }
+
+    bool IsKtx2Data(const unsigned char* bytes, const int size)
+    {
+        static constexpr unsigned char ktx2Magic[] = {
+            0xAB, 0x4B, 0x54, 0x58, 0x20, 0x32, 0x30, 0xBB, 0x0D, 0x0A, 0x1A, 0x0A
+        };
+        return bytes && size >= static_cast<int>(sizeof(ktx2Magic))
+            && std::memcmp(bytes, ktx2Magic, sizeof(ktx2Magic)) == 0;
+    }
+
+    std::filesystem::path ResolveTexturePath(const std::filesystem::path& sourcePath, const std::string& uri)
+    {
+        if (uri.empty())
+            return {};
+
+        std::filesystem::path texturePath(uri);
+        if (texturePath.is_relative())
+            texturePath = sourcePath.parent_path() / texturePath;
+
+        return texturePath.lexically_normal();
+    }
+
+    int ImageIndexForTexture(const tinygltf::Model& model, const int textureIndex)
+    {
+        if (textureIndex < 0 || textureIndex >= static_cast<int>(model.textures.size()))
+            return -1;
+
+        const int source = model.textures[textureIndex].source;
+        return (source >= 0 && source < static_cast<int>(model.images.size())) ? source : -1;
+    }
+
+    std::string SanitizeFileName(std::string value)
+    {
+        for (char& c : value)
+        {
+            if (c == '<' || c == '>' || c == ':' || c == '"' || c == '/' || c == '\\' || c == '|' || c == '?' || c == '*'
+                || c == ';' || c == '=' || c == ',')
+                c = '_';
+        }
+
+        while (!value.empty() && (value.front() == ' ' || value.front() == '.'))
+            value.erase(value.begin());
+        while (!value.empty() && (value.back() == ' ' || value.back() == '.'))
+            value.pop_back();
+
+        return value.empty() ? "Material" : value;
+    }
+
+    bool WriteTextureKtx2(const tinygltf::Image& image, const std::filesystem::path& sourcePath,
+                          const std::filesystem::path& destPath)
+    {
+        std::error_code ec;
+        std::filesystem::create_directories(destPath.parent_path(), ec);
+
+        // Already KTX2 bytes: write directly.
+        if (image.as_is && IsKtx2Data(image.image.data(), static_cast<int>(image.image.size())))
+        {
+            std::ofstream out(destPath, std::ios::binary);
+            if (!out)
+                return false;
+            out.write(reinterpret_cast<const char*>(image.image.data()), static_cast<std::streamsize>(image.image.size()));
+            return out.good();
+        }
+
+        // KTX1 bytes: convert from the external source file when available.
+        if (image.as_is)
+        {
+            if (image.uri.empty())
+            {
+                Log::CoreWarn("Embedded KTX1 image '{}' cannot be converted to KTX2; skipping texture.", image.name);
+                return false;
+            }
+
+            const std::filesystem::path source = ResolveTexturePath(sourcePath, image.uri);
+            std::filesystem::path ktx2 = source;
+            ktx2.replace_extension(".ktx2");
+
+            if (std::filesystem::exists(ktx2, ec))
+                return std::filesystem::copy_file(ktx2, destPath, std::filesystem::copy_options::overwrite_existing, ec);
+
+            const Process::ProcessResult result = KtxConversion::ConvertKtxToKtx2(source, true);
+            if (!result.Succeeded)
+            {
+                Log::CoreError("Failed to convert KTX to KTX2 for '{}': {}", source.string(), result.ErrorMessage);
+                return false;
+            }
+            return std::filesystem::copy_file(ktx2, destPath, std::filesystem::copy_options::overwrite_existing, ec);
+        }
+
+        // Decoded pixels: encode to KTX2.
+        if (image.image.empty() || image.width <= 0 || image.height <= 0)
+            return false;
+
+        TextureSpecification spec;
+        spec.Width = static_cast<uint32_t>(image.width);
+        spec.Height = static_cast<uint32_t>(image.height);
+        spec.Format = image.component == 4 ? ImageFormat::RGBA8
+            : image.component == 3 ? ImageFormat::RGB8
+            : image.component == 2 ? ImageFormat::RG8
+            : image.component == 1 ? ImageFormat::R8 : ImageFormat::RGBA8;
+
+        const Buffer pixels(image.image);
+        return KTX2Encoder::Encode(destPath, spec, pixels);
+    }
 }
 
 bool GLTFSceneImporter::Import(const std::filesystem::path& source, const std::filesystem::path& outputDirectory,
@@ -351,15 +459,50 @@ bool GLTFSceneImporter::Import(const std::filesystem::path& source, const std::f
             if (!WriteMesh(outputDirectory, mi, pi, model, prim)) 
                 return false;
         }
-    for (size_t i = 0; i < model.materials.size(); ++i) {
-        const auto& m = model.materials[i]; std::ostringstream d; d << "name=" << m.name << ";baseColor=" << m.pbrMetallicRoughness.baseColorFactor[0] << "," << m.pbrMetallicRoughness.baseColorFactor[1] << "," << m.pbrMetallicRoughness.baseColorFactor[2] << "," << m.pbrMetallicRoughness.baseColorFactor[3] << ";metallic=" << m.pbrMetallicRoughness.metallicFactor << ";roughness=" << m.pbrMetallicRoughness.roughnessFactor << ";baseColorTexture=" << m.pbrMetallicRoughness.baseColorTexture.index;
-        if (!WriteRecord(outputDirectory, "Materials", Key("material", i), "material", static_cast<uint32_t>(i), d.str())) 
+    // Materials: emit one native record per glTF material, with a readable name
+    // and references (by image index) to the imported texture sub-assets.
+    std::unordered_set<std::string> usedMaterialNames;
+    usedMaterialNames.reserve(model.materials.size());
+    for (size_t i = 0; i < model.materials.size(); ++i)
+    {
+        const auto& m = model.materials[i];
+        const auto& pbr = m.pbrMetallicRoughness;
+        const std::string materialName = Name(m.name, "Material_", i);
+        const std::string sanitized = SanitizeFileName(materialName);
+
+        std::string fileName = sanitized;
+        if (!usedMaterialNames.insert(fileName).second)
+        {
+            fileName = sanitized + "_" + std::to_string(i);
+            usedMaterialNames.insert(fileName);
+        }
+
+        std::ostringstream d;
+        d << "name=" << sanitized
+            << ";baseColor=" << pbr.baseColorFactor[0] << "," << pbr.baseColorFactor[1] << "," << pbr.baseColorFactor[2] << "," << pbr.baseColorFactor[3]
+            << ";metallic=" << pbr.metallicFactor
+            << ";roughness=" << pbr.roughnessFactor;
+        if (m.emissiveFactor.size() == 3)
+            d << ";emissive=" << m.emissiveFactor[0] << "," << m.emissiveFactor[1] << "," << m.emissiveFactor[2];
+        d << ";baseColorTexture=" << ImageIndexForTexture(model, pbr.baseColorTexture.index)
+            << ";normalTexture=" << ImageIndexForTexture(model, m.normalTexture.index)
+            << ";metallicRoughnessTexture=" << ImageIndexForTexture(model, pbr.metallicRoughnessTexture.index)
+            << ";occlusionTexture=" << ImageIndexForTexture(model, m.occlusionTexture.index)
+            << ";emissiveTexture=" << ImageIndexForTexture(model, m.emissiveTexture.index);
+
+        if (!WriteRecord(outputDirectory, "Materials", Key("material", i), "material", static_cast<uint32_t>(i), d.str(), fileName))
             return false;
     }
-    for (size_t i = 0; i < model.images.size(); ++i) {
-        const auto& im = model.images[i]; std::ostringstream d; d << "name=" << im.name << ";uri=" << im.uri << ";mime=" << im.mimeType << ";width=" << im.width << ";height=" << im.height << ";component=" << im.component << ";bits=" << im.bits << ";bytes=" << im.image.size();
-        if (!WriteRecord(outputDirectory, "Textures", Key("texture", i), "texture", static_cast<uint32_t>(i), d.str()))
-            return false;
+
+    // Textures: import each referenced image as a .ktx2 artifact in the cache.
+    for (size_t i = 0; i < model.images.size(); ++i)
+    {
+        const auto& im = model.images[i];
+        const std::filesystem::path destPath = outputDirectory / "Textures" / ("texture_" + std::to_string(i) + ".ktx2");
+        if (!WriteTextureKtx2(im, source, destPath))
+        {
+            Log::CoreWarn("Failed to import texture for glTF image '{}' (index {}); material references to it will be left unbound.", im.name, i);
+        }
     }
     for (size_t i = 0; i < model.skins.size(); ++i) {
         const auto& s = model.skins[i]; std::ostringstream d; d << "name=" << s.name << ";inverseBindAccessor=" << s.inverseBindMatrices << ";skeleton=" << s.skeleton << ";joints="; for (int j : s.joints) d << j << ",";

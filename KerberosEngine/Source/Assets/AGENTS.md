@@ -76,6 +76,11 @@ glTF loading preserves source parent relationships, creates primitive child
 entities, assigns `StaticMeshComponent::MeshMaterial`, and adds a synthetic
 instance root so files with multiple glTF roots remain grouped. Legacy YAML
 prefabs do not receive this wrapper behavior.
+The importer also emits one native material record per glTF material (named
+after the material, not just its index) and one `.ktx2` texture artifact per
+referenced image. Material records reference their textures by image index so
+runtime loading can resolve the corresponding `texture:<imageIndex>`
+sub-assets.
 `StandaloneAssetPipelineImporter` is currently a lightweight adapter for
 complete single-file sources: it supplies extension/type/build registration
 but emits no cache payload. Do not describe it as a full format converter.
@@ -139,10 +144,15 @@ pointer, fall back to `Filepath`, invoke source importers, or mutate metadata.
 Invalid handles are errors rather than defaulting to an unrelated asset type.
 The runtime loader still supports only part of the selected artifact set; add
 loaders explicitly and preserve unsupported-asset errors until they exist.
-Current compatibility readers load existing KTX2 texture files and authored
-YAML material files when their registry entries explicitly provide an artifact
-path. These readers are transitional and must be replaced by native material
-and texture artifacts as the import pipeline is completed.
+glTF imports now emit native texture artifacts: each referenced image is
+imported as a `.ktx2` file under `Textures/` (via `KTX2Encoder`/`KtxConversion`)
+and registered as a `Texture2D` sub-asset keyed `texture:<imageIndex>`. Native
+material records carry the base color, metallic, roughness, and emissive
+factors plus per-slot texture references by image index. `LoadNativeMaterial`
+resolves those references through the registry (`RootSourceHandle` +
+`SubAssetKey`) and loads the matching textures. Authored YAML material files
+still fall back to `MaterialImporter`; that reader remains transitional until
+authored materials are fully migrated.
 
 The asset browser is `KerberosEditor/Source/Windows/AssetsPanel.cpp`. It
 enumerates the filesystem, looks up handles, previews textures, opens files,

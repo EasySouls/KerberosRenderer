@@ -1,13 +1,9 @@
 #pragma once
 
-#include "Renderer/Mesh.hpp"
-#include "Renderer/Textures/Texture.hpp"
 #include "Assets/Asset.hpp"
 #include "Core/Core.hpp"
 
 #include <map>
-
-#include "Asset.hpp"
 
 namespace Kerberos
 {

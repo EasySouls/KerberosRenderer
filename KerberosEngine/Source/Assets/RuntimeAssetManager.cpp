@@ -1,5 +1,7 @@
 #include "kbrpch.hpp"
 #include "RuntimeAssetManager.hpp"
+
+#include "InvalidAssetHandleException.hpp"
 #include "Runtime/RuntimeAssetLoader.hpp"
 
 #include <stdexcept>
@@ -20,7 +22,8 @@ void RuntimeAssetManager::Configure(const AssetRegistry& registry,
 {
 	m_Registry = registry;
 	m_Configured = true;
-	m_Resolver.Configure(&m_Registry, std::move(assetRoot), std::move(libraryRoot));
+	m_LibraryRoot = std::move(libraryRoot);
+	m_Resolver.Configure(&m_Registry, std::move(assetRoot), m_LibraryRoot);
 	m_LoadedAssets.clear();
 }
 
@@ -35,7 +38,7 @@ Ref<Asset> RuntimeAssetManager::GetAsset(AssetHandle handle)
 	const auto location = m_Resolver.Resolve(handle);
 	if (!location)
 		return nullptr;
-	auto asset = RuntimeAssetLoader::Load(handle, location->Metadata, location->Path, &m_Registry);
+	auto asset = RuntimeAssetLoader::Load(handle, location->Metadata, location->Path, &m_Registry, m_LibraryRoot);
 	if (!asset)
 		throw std::runtime_error("Runtime asset artifact failed to load");
 	m_LoadedAssets.emplace(handle, asset);
@@ -64,7 +67,7 @@ AssetType RuntimeAssetManager::GetAssetType(const AssetHandle handle) const
 {
 	if (!IsAssetHandleValid(handle))
 	{
-		throw std::runtime_error("Invalid runtime asset handle");
+        throw InvalidAssetHandleException(handle);
 	}
 
 	return m_Registry.Get(handle).Type;

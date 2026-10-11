@@ -8,6 +8,7 @@
 #include "Profiling/Profilers.hpp"
 #include "Project/Project.hpp"
 #include "Application.hpp"
+#include "InvalidAssetHandleException.hpp"
 
 #include <yaml-cpp/yaml.h>
 
@@ -304,7 +305,7 @@ namespace Kerberos
 			const auto artifactPath = metadata.LibraryPath.is_absolute()
 				? metadata.LibraryPath
 				: m_CacheRoot / metadata.LibraryPath;
-			asset = RuntimeAssetLoader::Load(handle, metadata, artifactPath, &m_AssetRegistry);
+			asset = RuntimeAssetLoader::Load(handle, metadata, artifactPath, &m_AssetRegistry, m_CacheRoot);
 			if (!asset)
 			{
 				throw std::runtime_error(
@@ -358,7 +359,7 @@ namespace Kerberos
 		if (!IsAssetHandleValid(handle))
 		{
 			Log::CoreError("Invalid asset handle: {0}", handle);
-			throw std::runtime_error("Invalid asset handle when getting asset type!");
+            throw InvalidAssetHandleException(handle);
 		}
 		return GetMetadata(handle).Type;
 	}

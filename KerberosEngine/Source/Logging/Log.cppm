@@ -298,15 +298,6 @@ struct std::formatter<std::filesystem::path> : std::formatter<std::string>
     }
 };
 
-template <> 
-struct std::formatter<Kerberos::UUID> : std::formatter<std::string>
-{
-    auto format(const Kerberos::UUID& uuid, std::format_context& ctx) const
-    {
-        return std::formatter<std::string>::format(std::format("{}", static_cast<uint64_t>(uuid)), ctx);
-    }
-};
-
 template <>
 struct std::formatter<const wchar_t*> : std::formatter<std::string>
 {

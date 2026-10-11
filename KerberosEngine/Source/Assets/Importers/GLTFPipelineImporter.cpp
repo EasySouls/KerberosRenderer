@@ -34,7 +34,7 @@ namespace Kerberos {
         {
             const auto extension = entry.path().extension();
             const bool isOutput = extension == ".kbrmesh" || extension == ".kbrmaterial" ||
-                extension == ".kbrtexture" || extension == ".kbrskeleton" ||
+                extension == ".ktx2" || extension == ".kbrskeleton" ||
                 extension == ".kbranimation" || extension == ".kbrprefab";
             if (ec || !entry.is_regular_file() || extension == ".kbrscene" || !isOutput)
                 continue;
@@ -44,12 +44,15 @@ namespace Kerberos {
             if (entry.path().extension() == ".kbrmesh") {
                 type = AssetType::Mesh;
                 record.LocalKey = "mesh:" + entry.path().stem().string().substr(5);
+            } else if (entry.path().extension() == ".ktx2") {
+                // Textures are imported as KTX2 artifacts named texture_<imageIndex>.ktx2.
+                type = AssetType::Texture2D;
+                record.LocalKey = "texture:" + entry.path().stem().string().substr(8);
             } else {
                 if (!NativeAssetSerializer::DeserializeRecord(entry.path(), record))
                     continue;
 
                 if (record.Kind == "material") type = AssetType::Material;
-                else if (record.Kind == "texture") type = AssetType::Texture2D;
                 else if (record.Kind == "skeleton") type = AssetType::Skin;
                 else if (record.Kind == "animation") type = AssetType::Animation;
             }
@@ -92,6 +95,11 @@ namespace Kerberos {
     ImporterType GLTFPipelineImporter::Type() const
     {
         return ImporterType::GLTFScene;
+    }
+
+    uint32_t GLTFPipelineImporter::Version() const
+    {
+        return 2;
     }
 
     AssetType GLTFPipelineImporter::SourceAssetType() const

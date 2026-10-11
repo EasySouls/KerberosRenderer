@@ -45,8 +45,7 @@ public:
 	template <IsAssetSubclass T>
     static Ref<T> AsAsset(const AssetHandle handle)
 	{
-		// TODO: Maybe add an IsAssetHandleValid() call as well
-        if (!handle.IsValid() || GetAssetType(handle) != T::Type) {
+        if (!handle.IsValid() || !IsAssetHandleValid(handle) || GetAssetType(handle) != T::Type) {
             return nullptr;
         }
 
