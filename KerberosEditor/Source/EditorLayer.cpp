@@ -419,8 +419,9 @@ namespace Kerberos
 		const auto newProject = Project::New();
 
 		NewScene();
+
 		const std::string newSceneName = "Unnamed Scene.kerberos";
-		const std::filesystem::path scenePath = Project::GetAssetDirectory() / "Scenes" / newSceneName;
+		const std::filesystem::path scenePath = LookForNameForNewScene(Project::GetAssetDirectory(), newSceneName);
 
 		const SceneSerializer serializer(m_ActiveScene);
 		serializer.Serialize(scenePath.string());
@@ -429,14 +430,16 @@ namespace Kerberos
 
 		ProjectInfo projInfo;
 		projInfo.Name = newProject->GetInfo().Name;
-		projInfo.StartScenePath = "Scenes/" + newSceneName;
+        projInfo.StartScenePath = "Scenes/" + scenePath.filename().string();
 		projInfo.AssetDirectory = Project::GetAssetDirectory();
 		newProject->SetInfo(projInfo);
+
+		m_ActiveScenePath = scenePath;
 
 		m_AssetsPanel = CreateOwner<AssetsPanel>(m_NotificationManager);
 	}
 
-	void EditorLayer::OpenProject(const std::filesystem::path &filepath)
+	void EditorLayer::OpenProject(const std::filesystem::path& filepath)
 	{
         KBR_TRACY_FUNCTION();
 
@@ -491,13 +494,10 @@ namespace Kerberos
 		if (!canSave)
 			return;
 
-		// TODO: Store the current scene path in the project and save to that path instead of hardcoding it here
-		const std::filesystem::path scenePath = "assets/scenes/Example.kerberos";
-
 		const SceneSerializer serializer(m_ActiveScene);
-		serializer.Serialize(scenePath.string());
+		serializer.Serialize(m_ActiveScenePath.string());
 
-		m_NotificationManager.AddNotification("Scene saved to " + scenePath.string(), Notification::Type::Info);
+		m_NotificationManager.AddNotification("Scene saved to " + m_ActiveScenePath.string(), Notification::Type::Info);
 
 		Project::SaveActive();
 	}
@@ -516,6 +516,9 @@ namespace Kerberos
 
 		const SceneSerializer serializer(m_ActiveScene);
 		serializer.Serialize(filepath);
+
+		// When saving a scene as a new file, we update the active scene path to the new file path
+		m_ActiveScenePath = filepath;
 
 		m_NotificationManager.AddNotification("Scene saved to " + filepath, Notification::Type::Info);
 
@@ -553,6 +556,8 @@ namespace Kerberos
             Log::EditorInfo("Failed to load scene from {0}", filepath.string());
 			return;
 		}
+
+		m_ActiveScenePath = filepath;
 
 		m_EditorScene = newScene;
 		m_EditorScene->OnViewportResize(static_cast<uint32_t>(m_ViewportSize.x), static_cast<uint32_t>(m_ViewportSize.y));
@@ -1276,4 +1281,25 @@ namespace Kerberos
 		// Check if any ImGui item is actively being interacted with
 		return ImGui::IsAnyItemActive() || ImGui::IsAnyItemFocused();
 	}
+
+    std::filesystem::path EditorLayer::LookForNameForNewScene(const std::filesystem::path& startingPath, const std::string& defaultName)
+    {
+        const std::filesystem::path defaultPath = startingPath / defaultName;
+        if (!std::filesystem::exists(defaultPath))
+        {
+            return defaultPath;
+        }
+
+        // If the default name is taken, try to find a unique name
+        int counter = 1;
+        while (true)
+        {
+            const std::filesystem::path newPath = startingPath / (defaultName + std::to_string(counter));
+            if (!std::filesystem::exists(newPath))
+            {
+                return newPath;
+            }
+            counter++;
+        }
+    }
 }

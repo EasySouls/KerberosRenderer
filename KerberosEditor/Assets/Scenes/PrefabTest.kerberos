@@ -1,2 +1,38 @@
 Scene: Prefab Test Scene
 Entities:
+  - Entity: 2672245000720481895
+    TagComponent:
+      Tag: Avocado
+    TransformComponent:
+      Translation: [0, 13.276447, 0]
+      Rotation: [0, -0, 0]
+      Scale: [10, 10, 10]
+    HierarchyComponent:
+      Parent: 0
+      Children:
+        - 58768564089800646
+  - Entity: 10710461649067735061
+    TagComponent:
+      Tag: Avocado_Primitive_0
+    TransformComponent:
+      Translation: [0, 0, 0]
+      Rotation: [0, 0, 0]
+      Scale: [1, 1, 1]
+    HierarchyComponent:
+      Parent: 58768564089800646
+      Children:
+        []
+    StaticMeshComponent:
+      Mesh: 16851151495070434988
+      Material: 7040673874607876108
+  - Entity: 58768564089800646
+    TagComponent:
+      Tag: Avocado
+    TransformComponent:
+      Translation: [0, 0, 0]
+      Rotation: [0, 0, 0]
+      Scale: [1, 1, 1]
+    HierarchyComponent:
+      Parent: 2672245000720481895
+      Children:
+        - 10710461649067735061

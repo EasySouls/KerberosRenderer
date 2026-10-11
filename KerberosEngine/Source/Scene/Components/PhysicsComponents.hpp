@@ -44,6 +44,11 @@ namespace Kerberos
 			: Type(type)
 		{
 		}
+
+        RigidBody3DComponent(const RigidBody3DComponent&) = default;
+        RigidBody3DComponent(RigidBody3DComponent&&) = default;
+        RigidBody3DComponent& operator=(const RigidBody3DComponent&) = default;
+        RigidBody3DComponent& operator=(RigidBody3DComponent&&) = default;
 	};
 
 	struct BoxCollider3DComponent
@@ -60,6 +65,11 @@ namespace Kerberos
 			: Size(size), Offset(offset), IsTrigger(isTrigger)
 		{
 		}
+
+		BoxCollider3DComponent(const BoxCollider3DComponent&) = default;
+        BoxCollider3DComponent(BoxCollider3DComponent&&) = default;
+        BoxCollider3DComponent& operator=(const BoxCollider3DComponent&) = default;
+        BoxCollider3DComponent& operator=(BoxCollider3DComponent&&) = default;
 	};
 
 	struct SphereCollider3DComponent
@@ -76,6 +86,11 @@ namespace Kerberos
 			: Radius(radius), Offset(offset), IsTrigger(isTrigger)
 		{
 		}
+
+		SphereCollider3DComponent(const SphereCollider3DComponent&) = default;
+        SphereCollider3DComponent(SphereCollider3DComponent&&) = default;
+        SphereCollider3DComponent& operator=(const SphereCollider3DComponent&) = default;
+        SphereCollider3DComponent& operator=(SphereCollider3DComponent&&) = default;
 	};
 
 	struct CapsuleCollider3DComponent
@@ -93,6 +108,11 @@ namespace Kerberos
 			: Radius(radius), Height(height), Offset(offset), IsTrigger(isTrigger)
 		{
 		}
+
+		CapsuleCollider3DComponent(const CapsuleCollider3DComponent&) = default;
+        CapsuleCollider3DComponent(CapsuleCollider3DComponent&&) = default;
+        CapsuleCollider3DComponent& operator=(const CapsuleCollider3DComponent&) = default;
+        CapsuleCollider3DComponent& operator=(CapsuleCollider3DComponent&&) = default;
 	};
 
 	struct MeshCollider3DComponent
@@ -108,5 +128,10 @@ namespace Kerberos
 			: Mesh(mesh), Offset(offset), IsTrigger(isTrigger)
 		{
 		}
+
+		MeshCollider3DComponent(const MeshCollider3DComponent&) = default;
+        MeshCollider3DComponent(MeshCollider3DComponent&&) = default;
+        MeshCollider3DComponent& operator=(const MeshCollider3DComponent&) = default;
+        MeshCollider3DComponent& operator=(MeshCollider3DComponent&&) = default;
 	};
 }

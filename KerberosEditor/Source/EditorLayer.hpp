@@ -19,6 +19,7 @@
 #include <string>
 #include <array>
 #include <memory>
+#include <filesystem>
 
 
 namespace Kerberos
@@ -79,6 +80,8 @@ namespace Kerberos
 
 		static bool DoesImGuiWantInput();
 
+        static std::filesystem::path LookForNameForNewScene(const std::filesystem::path& startingPath, const std::string& defaultName);
+
 	private:
 		float m_Time = 0.0f;
 		float m_Fps = 0.0f;
@@ -92,6 +95,8 @@ namespace Kerberos
 		Ref<Scene> m_ActiveScene;
 		Ref<Scene> m_EditorScene;
 		Ref<Scene> m_RuntimeScene;
+
+		std::filesystem::path m_ActiveScenePath{};
 
 		Entity m_CameraEntity;
 
