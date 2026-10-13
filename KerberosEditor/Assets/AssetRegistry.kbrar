@@ -730,7 +730,7 @@ AssetRegistry:
   - Handle: 1106258551251021404
     Type: Prefab
     Path: Models\chinesedragon.gltf
-    LibraryPath: chinesedragon.kbrprefab
+    LibraryPath: Models\chinesedragon\chinesedragon.kbrprefab
     RootSourceHandle: 1106258551251021404
     ParentHandle: 0
     SubAssetKey: ""
@@ -4509,8 +4509,8 @@ AssetRegistry:
     ImportVersion: 1
   - Handle: 5413312760506220020
     Type: Material
-    Path: Materials\1.kbrmaterial
-    LibraryPath: Materials\1.kbrmaterial
+    Path: Models\chinesedragon\Materials\m1_03___Default.kbrmaterial
+    LibraryPath: Models\chinesedragon\Materials\m1_03___Default.kbrmaterial
     RootSourceHandle: 1106258551251021404
     ParentHandle: 1106258551251021404
     SubAssetKey: material:1
@@ -4804,8 +4804,8 @@ AssetRegistry:
     ImportVersion: 1
   - Handle: 5867488955051340525
     Type: Mesh
-    Path: Meshes\mesh_1_0.kbrmesh
-    LibraryPath: Meshes\mesh_1_0.kbrmesh
+    Path: Models\chinesedragon\Meshes\mesh_1_0_meshId2_name.kbrmesh
+    LibraryPath: Models\chinesedragon\Meshes\mesh_1_0_meshId2_name.kbrmesh
     RootSourceHandle: 1106258551251021404
     ParentHandle: 1106258551251021404
     SubAssetKey: mesh:1_0
@@ -5570,6 +5570,13 @@ AssetRegistry:
     RootSourceHandle: 6532463041022503106
     ParentHandle: 6532463041022503106
     SubAssetKey: mesh:41_0
+    ImportVersion: 1
+  - Handle: 6872976369200393987
+    Type: Texture2D
+    Path: Flame03-hollow_16x4.png
+    RootSourceHandle: 6872976369200393987
+    ParentHandle: 0
+    SubAssetKey: ""
     ImportVersion: 1
   - Handle: 6908520765687543397
     Type: Mesh
@@ -9082,8 +9089,8 @@ AssetRegistry:
     ImportVersion: 1
   - Handle: 11672070579435410442
     Type: Prefab
-    Path: chinesedragon.kbrprefab
-    LibraryPath: chinesedragon.kbrprefab
+    Path: Models\chinesedragon\chinesedragon.kbrprefab
+    LibraryPath: Models\chinesedragon\chinesedragon.kbrprefab
     RootSourceHandle: 1106258551251021404
     ParentHandle: 1106258551251021404
     SubAssetKey: prefab:0
@@ -11137,8 +11144,8 @@ AssetRegistry:
     ImportVersion: 1
   - Handle: 14817323082692345706
     Type: Mesh
-    Path: Meshes\mesh_0_0.kbrmesh
-    LibraryPath: Meshes\mesh_0_0.kbrmesh
+    Path: Models\chinesedragon\Meshes\mesh_0_0_meshId1_name.kbrmesh
+    LibraryPath: Models\chinesedragon\Meshes\mesh_0_0_meshId1_name.kbrmesh
     RootSourceHandle: 1106258551251021404
     ParentHandle: 1106258551251021404
     SubAssetKey: mesh:0_0
@@ -11757,8 +11764,8 @@ AssetRegistry:
     ImportVersion: 1
   - Handle: 15844439068900356504
     Type: Material
-    Path: Materials\0.kbrmaterial
-    LibraryPath: Materials\0.kbrmaterial
+    Path: Models\chinesedragon\Materials\m0_01___Default.003.kbrmaterial
+    LibraryPath: Models\chinesedragon\Materials\m0_01___Default.003.kbrmaterial
     RootSourceHandle: 1106258551251021404
     ParentHandle: 1106258551251021404
     SubAssetKey: material:0

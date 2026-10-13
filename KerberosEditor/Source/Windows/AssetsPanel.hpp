@@ -9,6 +9,7 @@
 #include <imgui/imgui.h>
 
 #include <filesystem>
+#include <vector>
 #include <map>
 #include <unordered_map>
 
@@ -49,19 +50,19 @@ namespace Kerberos
 		/**
 		* Context menu displayed when right-clicking on an empty area of the Assets panel.
 		*/
-		void ShowContextMenu(ImGuiPopupFlags popupFlags) const;
+		void ShowContextMenu(ImGuiPopupFlags popupFlags);
 
 		void RefreshAssetTree();
 
 		void ImportAssetDialog();
 
-		static void HandleAssetDragAndDrop(AssetHandle handle, const std::filesystem::path& filename, const AssetMetadata& metadata);
+	    void HandleAssetDragAndDrop(AssetHandle handle, const std::filesystem::path& filename, const AssetMetadata& metadata);
 
 		void OpenMaterialEditor(const std::filesystem::path& materialPath);
 		void RenderMaterialEditors();
 		static void DrawMaterialTextureField(const char* label, Ref<Texture2D>& texture);
 
-		std::filesystem::path GetRelativePath(const std::filesystem::path& absolutePath) const;
+		std::filesystem::path GetRelativePath(const std::filesystem::path& path) const;
 
 		enum class MaterialPreviewMesh : uint8_t
 		{
@@ -80,6 +81,8 @@ namespace Kerberos
 	private:
 		std::filesystem::path m_AssetsDirectory = "Assets";
 		std::filesystem::path m_CurrentDirectory = std::filesystem::current_path();
+        std::filesystem::path m_CurrentDirectoryRelativePath;
+
 		Ref<Texture2D> m_FolderIcon;
 		Ref<Texture2D> m_FileIcon;
 
@@ -90,10 +93,27 @@ namespace Kerberos
 			std::filesystem::path Path;
 			AssetHandle Handle = AssetHandle::Invalid();
 			bool IsDirectory = false;
+            std::filesystem::path RelativePath;
+            std::string Name;
+            std::string RelativePathString;
 		};
 
 		std::vector<ContentItem> m_ContentItems;
 		bool m_RefreshRequested = false;
+
+		// Asset-browser data is rebuilt only when the panel refreshes.
+        // Root handle -> generated sub-asset handles, sorted once during refresh.
+        std::map<AssetHandle, std::vector<AssetHandle>> m_SubAssetsByRoot;
+
+        // Snapshot of the artifact existence check; avoids IsAssetHandleValid() and
+        // filesystem::exists() / is_regular_file() calls during every ImGui frame.
+        std::map<AssetHandle, bool> m_CachedArtifactExists;
+
+        // Snapshot of registry metadata, so the render loop doesn't keep querying the manager.
+        std::map<AssetHandle, AssetMetadata> m_MetadataByHandle;
+
+        // Persistent search text for the asset browser.
+        char m_SearchFilter[256]{};
 
 		std::unordered_map<std::string, MaterialEditorState> m_OpenMaterialEditors;
 
