@@ -81,6 +81,18 @@ after the material, not just its index) and one `.ktx2` texture artifact per
 referenced image. Material records reference their textures by image index so
 runtime loading can resolve the corresponding `texture:<imageIndex>`
 sub-assets.
+
+All artifacts produced by a glTF import are written under a per-source cache
+namespace derived from the source path relative to the assets root (extension
+stripped), e.g. `Models/FlightHelmet/glTF/FlightHelmet/...`. This guarantees
+one source's cache entries never overwrite another source's, even when two
+glTF files share the same stem. Within that namespace, sub-asset file names
+are readable hints rather than bare indices: meshes use
+`mesh_<m>_<p>[_<meshName>]`, textures use `texture_<i>[_<imageName>]`, and
+materials/skeletons/animations use their glTF name with an index fallback.
+The leading index tokens are the source of the stable `SubAssetKey`
+(`mesh:<m>_<p>`, `texture:<i>`, etc.), so the readable suffix never changes
+sub-asset identity.
 `StandaloneAssetPipelineImporter` is currently a lightweight adapter for
 complete single-file sources: it supplies extension/type/build registration
 but emits no cache payload. Do not describe it as a full format converter.

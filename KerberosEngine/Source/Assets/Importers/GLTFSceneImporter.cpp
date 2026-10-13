@@ -14,6 +14,7 @@
 #include <fstream>
 #include <sstream>
 #include <unordered_set>
+#include <limits>
 
 import Kerberos;
 
@@ -24,28 +25,29 @@ namespace {
 uint64_t StableId(const std::string_view source, const std::string_view kind, const size_t index)
 {
     uint64_t h = 1469598103934665603ull;
+    constexpr uint64_t mul = 1099511628211ull;
     for (const char c : source)
     {
         h ^= static_cast<uint8_t>(c);
-        h *= 1099511628211ull;
+        h *= mul;
     }
 
     h ^= '|'; 
-    h *= 1099511628211ull;
+    h *= mul;
 
     for (const char c : kind) 
     { 
         h ^= static_cast<uint8_t>(c); 
-        h *= 1099511628211ull;
+        h *= mul;
     }
 
     h ^= '|';
-    h *= 1099511628211ull;
+    h *= mul;
 
     for (const char c : std::to_string(index)) 
     { 
         h ^= static_cast<uint8_t>(c); 
-        h *= 1099511628211ull; 
+        h *= mul; 
     }
     return h;
 }
@@ -55,30 +57,59 @@ std::string Name(const std::string& n, const char* prefix, const size_t i)
     return n.empty() ? std::string(prefix) + std::to_string(i) : n;
 }
 
-std::string Key(const char* kind, const size_t i, const size_t j = SIZE_MAX)
+std::string Key(const char* kind, const size_t i, const size_t j = std::numeric_limits<size_t>::max())
 { 
-    return j == SIZE_MAX 
+    return j == std::numeric_limits<size_t>::max() 
         ? std::string(kind) + ":" + std::to_string(i) 
         : std::string(kind) + ":" + std::to_string(i) + ":" + std::to_string(j);
 }
 
-AssetHandle Existing(const ImportContext* context, const std::string& key)
+std::string SanitizeFileName(std::string value)
 {
-    if (!context) 
-        return AssetHandle::Invalid();
-
-    for (const auto& e : context->Meta.SubAssets)
+    for (char& c : value)
     {
-        if (e.LocalKey == key && e.Handle.IsValid()) 
-            return e.Handle;
+        if (c == '<' || c == '>' || c == ':' || c == '"' || c == '/' || c == '\\' || c == '|' || c == '?' || c == '*'
+            || c == ';' || c == '=' || c == ',')
+            c = '_';
     }
-    return AssetHandle::Invalid();
+
+    while (!value.empty() && (value.front() == ' ' || value.front() == '.'))
+        value.erase(value.begin());
+    while (!value.empty() && (value.back() == ' ' || value.back() == '.'))
+        value.pop_back();
+
+    return value;
 }
 
-AssetHandle Handle(const ImportContext* context, const std::string& key)
+// Artifact filename stems (no extension). The leading index tokens are stable
+// and mirror the sub-asset key, while the trailing name is a readability hint.
+std::string MeshArtifactName(const size_t mesh, const size_t primitive, const std::string& meshName)
 {
-    const auto h = Existing(context, key);
-    return h.IsValid() ? h : AssetHandle(); 
+    std::string name = "mesh_" + std::to_string(mesh) + "_" + std::to_string(primitive);
+    const std::string sanitized = SanitizeFileName(meshName);
+    if (!sanitized.empty())
+        name += "_" + sanitized;
+    return name;
+}
+
+std::string TextureArtifactName(const size_t imageIndex, const std::string& imageName)
+{
+    std::string name = "texture_" + std::to_string(imageIndex);
+    const std::string sanitized = SanitizeFileName(imageName);
+    if (!sanitized.empty())
+        name += "_" + sanitized;
+    return name;
+}
+
+std::string UniqueArtifactName(std::unordered_set<std::string>& used, const std::string& base, const size_t index)
+{
+    std::string candidate = base;
+    if (!used.insert(candidate).second)
+    {
+        candidate = base + "_" + std::to_string(index);
+        used.insert(candidate);
+    }
+    return candidate;
 }
 
 bool WriteRecord(const std::filesystem::path& root, const std::string& folder, const std::string& key,
@@ -188,7 +219,7 @@ bool WriteMesh(const std::filesystem::path& root, const size_t mesh, const size_
         }
     }
     std::error_code ec;
-    const auto path = root / "Meshes" / ("mesh_" + std::to_string(mesh) + "_" + std::to_string(primitive) + ".kbrmesh");
+    const auto path = root / "Meshes" / (MeshArtifactName(mesh, primitive, model.meshes[mesh].name) + ".kbrmesh");
     std::filesystem::create_directories(path.parent_path(), ec);
     if (ec) {
         Log::CoreError("Failed to create directories for mesh: {}", ec.message());
@@ -294,23 +325,6 @@ bool LoadImageDataWithKtxFallback(
         return (source >= 0 && source < static_cast<int>(model.images.size())) ? source : -1;
     }
 
-    std::string SanitizeFileName(std::string value)
-    {
-        for (char& c : value)
-        {
-            if (c == '<' || c == '>' || c == ':' || c == '"' || c == '/' || c == '\\' || c == '|' || c == '?' || c == '*'
-                || c == ';' || c == '=' || c == ',')
-                c = '_';
-        }
-
-        while (!value.empty() && (value.front() == ' ' || value.front() == '.'))
-            value.erase(value.begin());
-        while (!value.empty() && (value.back() == ' ' || value.back() == '.'))
-            value.pop_back();
-
-        return value.empty() ? "Material" : value;
-    }
-
     bool WriteTextureKtx2(const tinygltf::Image& image, const std::filesystem::path& sourcePath,
                           const std::filesystem::path& destPath)
     {
@@ -370,7 +384,7 @@ bool LoadImageDataWithKtxFallback(
 }
 
 bool GLTFSceneImporter::Import(const std::filesystem::path& source, const std::filesystem::path& outputDirectory,
-                               GltfSceneManifest* output)
+                               const std::filesystem::path& namespacePath, GltfSceneManifest* output)
 {
     KBR_TRACY_FUNCTION();
 
@@ -448,7 +462,8 @@ bool GLTFSceneImporter::Import(const std::filesystem::path& source, const std::f
     if (outputDirectory.empty()) 
         return true;
     std::error_code ec;
-    std::filesystem::create_directories(outputDirectory, ec);
+    const std::filesystem::path artifactRoot = namespacePath.empty() ? outputDirectory : outputDirectory / namespacePath;
+    std::filesystem::create_directories(artifactRoot, ec);
     if (ec)
         return false;
 
@@ -456,7 +471,7 @@ bool GLTFSceneImporter::Import(const std::filesystem::path& source, const std::f
     for (size_t mi = 0; mi < model.meshes.size(); ++mi)
         for (size_t pi = 0; pi < model.meshes[mi].primitives.size(); ++pi) {
             const auto& prim = model.meshes[mi].primitives[pi];
-            if (!WriteMesh(outputDirectory, mi, pi, model, prim)) 
+            if (!WriteMesh(artifactRoot, mi, pi, model, prim)) 
                 return false;
         }
     // Materials: emit one native record per glTF material, with a readable name
@@ -469,13 +484,7 @@ bool GLTFSceneImporter::Import(const std::filesystem::path& source, const std::f
         const auto& pbr = m.pbrMetallicRoughness;
         const std::string materialName = Name(m.name, "Material_", i);
         const std::string sanitized = SanitizeFileName(materialName);
-
-        std::string fileName = sanitized;
-        if (!usedMaterialNames.insert(fileName).second)
-        {
-            fileName = sanitized + "_" + std::to_string(i);
-            usedMaterialNames.insert(fileName);
-        }
+        const std::string fileName = UniqueArtifactName(usedMaterialNames, sanitized, i);
 
         std::ostringstream d;
         d << "name=" << sanitized
@@ -490,7 +499,7 @@ bool GLTFSceneImporter::Import(const std::filesystem::path& source, const std::f
             << ";occlusionTexture=" << ImageIndexForTexture(model, m.occlusionTexture.index)
             << ";emissiveTexture=" << ImageIndexForTexture(model, m.emissiveTexture.index);
 
-        if (!WriteRecord(outputDirectory, "Materials", Key("material", i), "material", static_cast<uint32_t>(i), d.str(), fileName))
+        if (!WriteRecord(artifactRoot, "Materials", Key("material", i), "material", static_cast<uint32_t>(i), d.str(), fileName))
             return false;
     }
 
@@ -498,31 +507,40 @@ bool GLTFSceneImporter::Import(const std::filesystem::path& source, const std::f
     for (size_t i = 0; i < model.images.size(); ++i)
     {
         const auto& im = model.images[i];
-        const std::filesystem::path destPath = outputDirectory / "Textures" / ("texture_" + std::to_string(i) + ".ktx2");
+        std::string imageName = im.name;
+        if (imageName.empty() && !im.uri.empty())
+            imageName = std::filesystem::path(im.uri).stem().string();
+        const std::filesystem::path destPath = artifactRoot / "Textures" / (TextureArtifactName(i, imageName) + ".ktx2");
         if (!WriteTextureKtx2(im, source, destPath))
         {
             Log::CoreWarn("Failed to import texture for glTF image '{}' (index {}); material references to it will be left unbound.", im.name, i);
         }
     }
+    std::unordered_set<std::string> usedSkeletonNames;
+    usedSkeletonNames.reserve(model.skins.size());
     for (size_t i = 0; i < model.skins.size(); ++i) {
         const auto& s = model.skins[i]; std::ostringstream d; d << "name=" << s.name << ";inverseBindAccessor=" << s.inverseBindMatrices << ";skeleton=" << s.skeleton << ";joints="; for (int j : s.joints) d << j << ",";
-        if (!WriteRecord(outputDirectory, "Skeletons", Key("skeleton", i), "skeleton", static_cast<uint32_t>(i), d.str()))
+        const std::string fileName = UniqueArtifactName(usedSkeletonNames, SanitizeFileName(Name(s.name, "Skeleton_", i)), i);
+        if (!WriteRecord(artifactRoot, "Skeletons", Key("skeleton", i), "skeleton", static_cast<uint32_t>(i), d.str(), fileName))
             return false;
     }
+    std::unordered_set<std::string> usedAnimationNames;
+    usedAnimationNames.reserve(model.animations.size());
     for (size_t i = 0; i < model.animations.size(); ++i) {
         const auto& a = model.animations[i]; std::ostringstream d; d << "name=" << a.name << ";channels=" << a.channels.size() << ";samplers=" << a.samplers.size();
-        if (!WriteRecord(outputDirectory, "Animations", Key("animation", i), "animation", static_cast<uint32_t>(i), d.str()))
+        const std::string fileName = UniqueArtifactName(usedAnimationNames, SanitizeFileName(Name(a.name, "Animation_", i)), i);
+        if (!WriteRecord(artifactRoot, "Animations", Key("animation", i), "animation", static_cast<uint32_t>(i), d.str(), fileName))
             return false;
     }
     std::ostringstream prefab; prefab << "name=" << source.stem().string() << ";nodes=" << model.nodes.size() << ";";
     for (size_t i = 0; i < manifest.Nodes.size(); ++i) {
         prefab << i << ":" << manifest.Nodes[i].Name << ":" << manifest.Nodes[i].ParentIndex << ":" << manifest.Nodes[i].SkinIndex << ";";
     }
-    if (!WriteRecord(outputDirectory, "", Key("prefab", 0), "prefab", 0,
+    if (!WriteRecord(artifactRoot, "", Key("prefab", 0), "prefab", 0,
         prefab.str(), source.stem().string()))
         return false;
 
-    return NativeAssetSerializer::SerializeSceneManifest(manifest, outputDirectory / (source.stem().string() + ".kbrscene"));
+    return NativeAssetSerializer::SerializeSceneManifest(manifest, artifactRoot / (source.stem().string() + ".kbrscene"));
 }
 
 }
