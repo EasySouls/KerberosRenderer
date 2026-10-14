@@ -35,6 +35,7 @@
 import Kerberos;
 
 namespace {
+
 using namespace Kerberos;
 
 glm::mat4 GetWorldTransformWithoutScale(const TransformComponent& transform)
@@ -402,6 +403,7 @@ struct RendererData
     ImageData FinalImage;
     ImageData PickingImage;
     ImageData MotionImage;
+    ImageData ReactiveImage;
     ImageData GTAOImage;
     ImageData GTAOScratchImage;
     ImageData OutputImage;
@@ -1235,6 +1237,13 @@ void Renderer::RenderPhysicsColliders(const vk::raii::CommandBuffer& cmd,
         .storeOp = vk::AttachmentStoreOp::eStore,
     };
 
+    vk::RenderingAttachmentInfo reactiveAttachmentInfo{
+        .imageView = s_Data->ReactiveImage.ImageView,
+        .imageLayout = vk::ImageLayout::eColorAttachmentOptimal,
+        .loadOp = vk::AttachmentLoadOp::eLoad,
+        .storeOp = vk::AttachmentStoreOp::eStore,
+    };
+
     vk::RenderingAttachmentInfo depthAttachmentInfo{
         .imageView = s_Data->DepthImage.ImageView,
         .imageLayout = vk::ImageLayout::eDepthAttachmentOptimal,
@@ -1242,10 +1251,12 @@ void Renderer::RenderPhysicsColliders(const vk::raii::CommandBuffer& cmd,
         .storeOp = vk::AttachmentStoreOp::eDontCare,
     };
 
+    const std::array colorAttachments = { colorAttachmentInfo, reactiveAttachmentInfo };
+
     const vk::RenderingInfo renderingInfo{ .renderArea = renderArea,
                                            .layerCount = 1,
-                                           .colorAttachmentCount = 1,
-                                           .pColorAttachments = &colorAttachmentInfo,
+                                           .colorAttachmentCount = static_cast<uint32_t>(colorAttachments.size()),
+                                           .pColorAttachments = colorAttachments.data(),
                                            .pDepthAttachment = &depthAttachmentInfo };
 
     //BeginRenderPassDebugLabel(cmd, "Collider Debug Pass");
@@ -2186,19 +2197,25 @@ void Renderer::CreateResources()
             vk::ImageTiling::eOptimal,
             vk::FormatFeatureFlagBits::eColorAttachment | vk::FormatFeatureFlagBits::eSampledImage);
 
+        s_Data->ReactiveImage.Format = context.FindSupportedFormat(
+            { vk::Format::eR8Unorm },
+            vk::ImageTiling::eOptimal,
+            vk::FormatFeatureFlagBits::eColorAttachment | vk::FormatFeatureFlagBits::eSampledImage);
+
         s_Data->ResolveImage.Format = context.FindSupportedFormat(
             { vk::Format::eR16G16B16A16Sfloat, vk::Format::eR32G32B32A32Sfloat },
             vk::ImageTiling::eOptimal,
             vk::FormatFeatureFlagBits::eColorAttachment | vk::FormatFeatureFlagBits::eSampledImage);
 
+        s_Data->BloomMaskImage.Format = context.FindSupportedFormat({ vk::Format::eR8Unorm, vk::Format::eR16Unorm },
+                                                                    vk::ImageTiling::eOptimal,
+                                                                    vk::FormatFeatureFlagBits::eColorAttachment |
+                                                                        vk::FormatFeatureFlagBits::eSampledImage);
+
         const uint32_t initialImageWidth = static_cast<uint32_t>(s_Data->RenderSize.x);
         const uint32_t initialImageHeight = static_cast<uint32_t>(s_Data->RenderSize.y);
         constexpr uint32_t mipLevels = 1;
 
-        s_Data->BloomMaskImage.Format = context.FindSupportedFormat(
-            { vk::Format::eR8Unorm, vk::Format::eR16Unorm },
-            vk::ImageTiling::eOptimal,
-            vk::FormatFeatureFlagBits::eColorAttachment | vk::FormatFeatureFlagBits::eSampledImage);
         CreateImage(device,
                     initialImageWidth,
                     initialImageHeight,
@@ -2229,6 +2246,8 @@ void Renderer::CreateResources()
             reinterpret_cast<uint64_t>(static_cast<VkImageView>(*s_Data->ResolveImage.ImageView)),
             vk::ObjectType::eImageView,
             "Resolve Image View");
+
+        CreateReactiveImage(initialImageWidth, initialImageHeight);
 
         CreateImage(device,
                     initialImageWidth,
@@ -2511,8 +2530,8 @@ void Renderer::CreateResources()
         colliderPipelineSpec.EnableDepthWrite = false;
         colliderPipelineSpec.DepthTestFunc = DepthTestFunc::LessOrEqual;
         colliderPipelineSpec.Topology = PrimitiveTopology::LineList;
-        colliderPipelineSpec.BlendModes = { BlendMode::None };
-        colliderPipelineSpec.ColorAttachmentFormats = { s_Data->ColorImage.Format };
+        colliderPipelineSpec.BlendModes = { BlendMode::None, BlendMode::Additive };
+        colliderPipelineSpec.ColorAttachmentFormats = { s_Data->ColorImage.Format, s_Data->ReactiveImage.Format };
         colliderPipelineSpec.DepthAttachmentFormat = s_Data->DepthImage.Format;
         colliderPipelineSpec.DynamicStates = commonDynamicStates;
         s_Data->ColliderLinesPipeline = CreateRef<GraphicsPipeline>(colliderPipelineSpec);
@@ -2542,6 +2561,7 @@ void Renderer::CreateResources()
 
     s_Data->ParticleSystem.Initialize(s_Data->ColorImage.Format,
                                       s_Data->DepthImage.Format,
+                                      s_Data->ReactiveImage.Format,
                                       s_Data->DepthImage.ImageView,
                                       s_Data->PersistentDescriptorAllocator);
     s_Data->GrassSystem.Init(s_Data->PersistentDescriptorAllocator);
@@ -3092,6 +3112,7 @@ void Renderer::ResizeResources(const uint32_t width, const uint32_t height)
     s_Data->Transparency.AccumulationImage.Clear();
     s_Data->Transparency.RevealageImage.Clear();
     s_Data->ResolveImage.Clear();
+    s_Data->ReactiveImage.Clear();
     s_Data->BloomMaskImage.Clear();
     s_Data->TonemappedImage.Clear();
     s_Data->CompositeImage.Clear();
@@ -3108,6 +3129,7 @@ void Renderer::ResizeResources(const uint32_t width, const uint32_t height)
 
     CreateTonemappedImage(renderWidth, renderHeight);
 
+    CreateReactiveImage(renderWidth, renderHeight);
     CreateFXAAImage(renderWidth, renderHeight);
     CreateOutputImage(width, height);
     CreateFinalImage(width, height);
@@ -4502,18 +4524,18 @@ void Renderer::CompileAndExecuteRenderGraph(const vk::raii::CommandBuffer& cmd,
         s_Data->DepthImage.CurrentLayout == vk::ImageLayout::eUndefined
             ? undefinedState
             : s_Data->DepthImage.CurrentLayout == vk::ImageLayout::eShaderReadOnlyOptimal
-                ? ImageState{
-                    .Layout = s_Data->DepthImage.CurrentLayout,
-                    .Stages = vk::PipelineStageFlagBits2::eFragmentShader,
-                    .Access = vk::AccessFlagBits2::eShaderRead
-                }
-                : ImageState{
-                    .Layout = s_Data->DepthImage.CurrentLayout,
-                    .Stages = vk::PipelineStageFlagBits2::eEarlyFragmentTests |
-                              vk::PipelineStageFlagBits2::eLateFragmentTests,
-                    .Access = vk::AccessFlagBits2::eDepthStencilAttachmentRead |
-                              vk::AccessFlagBits2::eDepthStencilAttachmentWrite
-                };
+            ? ImageState{
+                .Layout = s_Data->DepthImage.CurrentLayout,
+                .Stages = vk::PipelineStageFlagBits2::eFragmentShader,
+                .Access = vk::AccessFlagBits2::eShaderRead
+            }
+            : ImageState{
+                .Layout = s_Data->DepthImage.CurrentLayout,
+                .Stages = vk::PipelineStageFlagBits2::eEarlyFragmentTests |
+                          vk::PipelineStageFlagBits2::eLateFragmentTests,
+                .Access = vk::AccessFlagBits2::eDepthStencilAttachmentRead |
+                          vk::AccessFlagBits2::eDepthStencilAttachmentWrite
+            };
     const ImageState normalState = stateForLayout(
         s_Data->NormalImage.CurrentLayout,
         vk::PipelineStageFlagBits2::eFragmentShader,
@@ -4521,6 +4543,10 @@ void Renderer::CompileAndExecuteRenderGraph(const vk::raii::CommandBuffer& cmd,
     const ImageState motionState = stateForLayout(
         s_Data->MotionImage.CurrentLayout,
         vk::PipelineStageFlagBits2::eComputeShader,
+        vk::AccessFlagBits2::eShaderRead);
+    const ImageState reactiveState = stateForLayout(
+        s_Data->ReactiveImage.CurrentLayout,
+        vk::PipelineStageFlagBits2::eFragmentShader,
         vk::AccessFlagBits2::eShaderRead);
     const ImageState shadowState = stateForLayout(
         s_Data->ShadowMap.CurrentLayout,
@@ -4533,32 +4559,32 @@ void Renderer::CompileAndExecuteRenderGraph(const vk::raii::CommandBuffer& cmd,
 
     const ImageState gtaoState{
         .Layout = s_Data->GTAOImage.CurrentLayout == vk::ImageLayout::eUndefined ? vk::ImageLayout::eUndefined
-                                                                                 : s_Data->GTAOImage.CurrentLayout,
+                      : s_Data->GTAOImage.CurrentLayout,
         .Stages = s_Data->GTAOImage.CurrentLayout == vk::ImageLayout::eUndefined ? vk::PipelineStageFlagBits2::eTopOfPipe : vk::PipelineStageFlagBits2::eFragmentShader,
         .Access = s_Data->GTAOImage.CurrentLayout == vk::ImageLayout::eUndefined ? vk::AccessFlags2{} : vk::AccessFlagBits2::eShaderRead
     };
     const ImageState pickingState{ 
         .Layout = s_Data->PickingImage.CurrentLayout == vk::ImageLayout::eUndefined
-                                                 ? vk::ImageLayout::eUndefined
-                                                 : s_Data->PickingImage.CurrentLayout,
+                      ? vk::ImageLayout::eUndefined
+                      : s_Data->PickingImage.CurrentLayout,
         .Stages = s_Data->PickingImage.CurrentLayout == vk::ImageLayout::eTransferSrcOptimal ? vk::PipelineStageFlagBits2::eTransfer : vk::PipelineStageFlagBits2::eColorAttachmentOutput,
         .Access = s_Data->PickingImage.CurrentLayout == vk::ImageLayout::eTransferSrcOptimal ? vk::AccessFlagBits2::eTransferRead : vk::AccessFlagBits2::eColorAttachmentWrite 
     };
     const ImageState outputState{ .Layout = s_Data->OutputImage.CurrentLayout == vk::ImageLayout::eUndefined
                                                 ? vk::ImageLayout::eUndefined
                                                 : s_Data->OutputImage.CurrentLayout,
-        .Stages = s_Data->OutputImage.CurrentLayout == vk::ImageLayout::eUndefined ? vk::PipelineStageFlagBits2::eTopOfPipe : vk::PipelineStageFlagBits2::eFragmentShader,
-        .Access = s_Data->OutputImage.CurrentLayout == vk::ImageLayout::eUndefined ? vk::AccessFlags2{} : vk::AccessFlagBits2::eShaderRead
+                                  .Stages = s_Data->OutputImage.CurrentLayout == vk::ImageLayout::eUndefined ? vk::PipelineStageFlagBits2::eTopOfPipe : vk::PipelineStageFlagBits2::eFragmentShader,
+                                  .Access = s_Data->OutputImage.CurrentLayout == vk::ImageLayout::eUndefined ? vk::AccessFlags2{} : vk::AccessFlagBits2::eShaderRead
     };
     const ImageState finalState{ 
         .Layout = s_Data->FinalImage.CurrentLayout == vk::ImageLayout::eUndefined ? vk::ImageLayout::eUndefined
-                                               : s_Data->FinalImage.CurrentLayout, 
+                      : s_Data->FinalImage.CurrentLayout, 
         .Stages = s_Data->FinalImage.CurrentLayout == vk::ImageLayout::eUndefined
-                                               ? vk::PipelineStageFlagBits2::eTopOfPipe
-                                               : vk::PipelineStageFlagBits2::eFragmentShader, 
+                      ? vk::PipelineStageFlagBits2::eTopOfPipe
+                      : vk::PipelineStageFlagBits2::eFragmentShader, 
         .Access = s_Data->FinalImage.CurrentLayout == vk::ImageLayout::eUndefined
-                                               ? vk::AccessFlags2{}
-                                               : vk::AccessFlagBits2::eShaderRead
+                      ? vk::AccessFlags2{}
+                      : vk::AccessFlagBits2::eShaderRead
     };
 
     constexpr vk::ImageSubresourceRange depthRange{ .aspectMask = vk::ImageAspectFlagBits::eDepth,
@@ -4588,6 +4614,7 @@ void Renderer::CompileAndExecuteRenderGraph(const vk::raii::CommandBuffer& cmd,
         const auto hDepth = s_Data->RenderGraph.ImportImage(*s_Data->DepthImage.Image, depthState, depthRange);
         const auto hNormal = s_Data->RenderGraph.ImportImage(*s_Data->NormalImage.Image, normalState, colorRange);
         const auto hMotion = s_Data->RenderGraph.ImportImage(*s_Data->MotionImage.Image, motionState, colorRange);
+        const auto hReactive = s_Data->RenderGraph.ImportImage(*s_Data->ReactiveImage.Image, reactiveState, colorRange);
         const auto hShadow = s_Data->RenderGraph.ImportImage(*s_Data->ShadowMap.Image, shadowState, shadowRange);
         const auto hGTAO = s_Data->RenderGraph.ImportImage(*s_Data->GTAOImage.Image, gtaoState, colorRange);
         const auto hGTAOScratch =
@@ -4699,6 +4726,10 @@ void Renderer::CompileAndExecuteRenderGraph(const vk::raii::CommandBuffer& cmd,
                           vk::ImageLayout::eColorAttachmentOptimal,
                           vk::PipelineStageFlagBits2::eColorAttachmentOutput,
                           vk::AccessFlagBits2::eColorAttachmentWrite);
+            builder.Write(hReactive,
+                          vk::ImageLayout::eColorAttachmentOptimal,
+                          vk::PipelineStageFlagBits2::eColorAttachmentOutput,
+                          vk::AccessFlagBits2::eColorAttachmentWrite);
             builder.Read(hDepth,
                          vk::ImageLayout::eDepthReadOnlyOptimal,
                          vk::PipelineStageFlagBits2::eEarlyFragmentTests | vk::PipelineStageFlagBits2::eFragmentShader,
@@ -4751,6 +4782,12 @@ void Renderer::CompileAndExecuteRenderGraph(const vk::raii::CommandBuffer& cmd,
                           vk::PipelineStageFlagBits2::eColorAttachmentOutput,
                           vk::AccessFlagBits2::eColorAttachmentWrite);
 
+            // TODO: Colliders are written in this pass, maybe move it to a separate pass for better organization
+            builder.Write(hReactive,
+                          vk::ImageLayout::eColorAttachmentOptimal,
+                          vk::PipelineStageFlagBits2::eColorAttachmentOutput,
+                          vk::AccessFlagBits2::eColorAttachmentWrite);
+
             return [=](const vk::raii::CommandBuffer& execCmd) {
                 Renderer::RenderTransparent(execCmd, frameIndex, renderObjects, currentImage, viewport, renderArea);
                 Renderer::RenderPhysicsColliders(execCmd, colliderLineVertices, currentImage, viewport, renderArea);
@@ -4796,18 +4833,18 @@ void Renderer::CompileAndExecuteRenderGraph(const vk::raii::CommandBuffer& cmd,
         s_Data->RenderGraph.AddPass("Bloom", [&](Graph::PassBuilder& builder) -> PassExecuteFunction {
             builder.Read(hResolve,
                          vk::ImageLayout::eShaderReadOnlyOptimal,
-                             vk::PipelineStageFlagBits2::eComputeShader,
-                             vk::AccessFlagBits2::eShaderRead);
-                             builder.Read(hBloomMask,
-                                          vk::ImageLayout::eShaderReadOnlyOptimal,
-                                          vk::PipelineStageFlagBits2::eComputeShader,
-                                          vk::AccessFlagBits2::eShaderRead);
-                             builder.Write(hBloom,
-                                           vk::ImageLayout::eGeneral,
-                                           vk::PipelineStageFlagBits2::eComputeShader,
-                                           vk::AccessFlagBits2::eShaderStorageWrite);
+                         vk::PipelineStageFlagBits2::eComputeShader,
+                         vk::AccessFlagBits2::eShaderRead);
+            builder.Read(hBloomMask,
+                         vk::ImageLayout::eShaderReadOnlyOptimal,
+                         vk::PipelineStageFlagBits2::eComputeShader,
+                         vk::AccessFlagBits2::eShaderRead);
+            builder.Write(hBloom,
+                          vk::ImageLayout::eGeneral,
+                          vk::PipelineStageFlagBits2::eComputeShader,
+                          vk::AccessFlagBits2::eShaderStorageWrite);
 
-                             return [=](const vk::raii::CommandBuffer& execCmd) { Renderer::ApplyBloom(execCmd, frameIndex); };
+            return [=](const vk::raii::CommandBuffer& execCmd) { Renderer::ApplyBloom(execCmd, frameIndex); };
         });
 
         const bool useFsrInput = s_Data->UpscalingMode == UpscalerType::FSR3;
@@ -4856,6 +4893,10 @@ void Renderer::CompileAndExecuteRenderGraph(const vk::raii::CommandBuffer& cmd,
                          vk::PipelineStageFlagBits2::eComputeShader,
                          vk::AccessFlagBits2::eShaderRead);
             builder.Read(hMotion,
+                         vk::ImageLayout::eShaderReadOnlyOptimal,
+                         vk::PipelineStageFlagBits2::eComputeShader,
+                         vk::AccessFlagBits2::eShaderRead);
+            builder.Read(hReactive,
                          vk::ImageLayout::eShaderReadOnlyOptimal,
                          vk::PipelineStageFlagBits2::eComputeShader,
                          vk::AccessFlagBits2::eShaderRead);
@@ -4923,9 +4964,10 @@ void Renderer::CompileAndExecuteRenderGraph(const vk::raii::CommandBuffer& cmd,
     s_Data->DepthImage.CurrentLayout = vk::ImageLayout::eShaderReadOnlyOptimal;
     s_Data->NormalImage.CurrentLayout =
         s_Data->UseGTAO ? vk::ImageLayout::eShaderReadOnlyOptimal
-                                                : vk::ImageLayout::eColorAttachmentOptimal;
+            : vk::ImageLayout::eColorAttachmentOptimal;
     s_Data->MotionImage.CurrentLayout = vk::ImageLayout::eShaderReadOnlyOptimal;
     s_Data->ShadowMap.CurrentLayout = vk::ImageLayout::eShaderReadOnlyOptimal;
+    s_Data->ReactiveImage.CurrentLayout = vk::ImageLayout::eShaderReadOnlyOptimal;
     s_Data->PickingImage.CurrentLayout = vk::ImageLayout::eTransferSrcOptimal;
     s_Data->OutputImage.CurrentLayout = vk::ImageLayout::eShaderReadOnlyOptimal;
     s_Data->FinalImage.CurrentLayout = vk::ImageLayout::eShaderReadOnlyOptimal;
@@ -5064,6 +5106,16 @@ void Renderer::RenderParticles(const vk::raii::CommandBuffer& cmd, const uint32_
         .storeOp = vk::AttachmentStoreOp::eStore,
     };
 
+    vk::RenderingAttachmentInfo reactiveAttachmentInfo{
+        .imageView = s_Data->ReactiveImage.ImageView,
+        .imageLayout = vk::ImageLayout::eColorAttachmentOptimal,
+        .loadOp = vk::AttachmentLoadOp::eClear,
+        .storeOp = vk::AttachmentStoreOp::eStore,
+        .clearValue = vk::ClearColorValue{ std::array{ 0.0f, 0.0f, 0.0f, 1.0f } }
+    };
+
+    const std::array colorAttachments = { colorAttachmentInfo, reactiveAttachmentInfo };
+
     vk::RenderingAttachmentInfo depthAttachmentInfo{
         .imageView = s_Data->DepthImage.ImageView,
         .imageLayout = vk::ImageLayout::eDepthReadOnlyOptimal,
@@ -5084,8 +5136,8 @@ void Renderer::RenderParticles(const vk::raii::CommandBuffer& cmd, const uint32_
 
     const vk::RenderingInfo renderingInfo{ .renderArea = renderArea,
                                            .layerCount = 1,
-                                           .colorAttachmentCount = 1,
-                                           .pColorAttachments = &colorAttachmentInfo,
+                                           .colorAttachmentCount = static_cast<uint32_t>(colorAttachments.size()),
+                                           .pColorAttachments = colorAttachments.data(),
                                            .pDepthAttachment = &depthAttachmentInfo };
 
     //BeginRenderPassDebugLabel(cmd, "Particles Draw Pass");
@@ -5307,7 +5359,7 @@ void Renderer::ApplyAntiAliasing(const vk::raii::CommandBuffer& cmd, const uint3
 
     WriteGPUTimestamp(cmd, frameIndex, static_cast<uint32_t>(GPUTimestampQuery::AntialiasingPassBegin));
 
-   /* {
+    /* {
         const vk::ImageMemoryBarrier2 resolveBarrier = {
             .srcStageMask = vk::PipelineStageFlagBits2::eComputeShader |
                             vk::PipelineStageFlagBits2::eColorAttachmentOutput,
@@ -5530,7 +5582,7 @@ void Renderer::ApplySMAA(const vk::raii::CommandBuffer& cmd,
 
         cmd.pushConstants<SMAAData::PushConstants>(*s_Data->SMAAResources.EdgeDetectionPipelineLayout,
                                                    vk::ShaderStageFlagBits::eFragment |
-                                                       vk::ShaderStageFlagBits::eVertex,
+                                                   vk::ShaderStageFlagBits::eVertex,
                                                    0,
                                                    { smaaPushConstants });
 
@@ -5612,7 +5664,7 @@ void Renderer::ApplySMAA(const vk::raii::CommandBuffer& cmd,
 
         cmd.pushConstants<SMAAData::PushConstants>(*s_Data->SMAAResources.BlendWeightPipelineLayout,
                                                    vk::ShaderStageFlagBits::eFragment |
-                                                       vk::ShaderStageFlagBits::eVertex,
+                                                   vk::ShaderStageFlagBits::eVertex,
                                                    0,
                                                    { smaaPushConstants });
 
@@ -5676,7 +5728,7 @@ void Renderer::ApplySMAA(const vk::raii::CommandBuffer& cmd,
 
         cmd.pushConstants<SMAAData::PushConstants>(*s_Data->SMAAResources.NeighborhoodBlendingPipelineLayout,
                                                    vk::ShaderStageFlagBits::eFragment |
-                                                       vk::ShaderStageFlagBits::eVertex,
+                                                   vk::ShaderStageFlagBits::eVertex,
                                                    0,
                                                    { smaaPushConstants });
 
@@ -5688,7 +5740,7 @@ void Renderer::ApplySMAA(const vk::raii::CommandBuffer& cmd,
     }
 }
 
-void Renderer::ApplyUpscaling(const vk::raii::CommandBuffer &cmd, uint32_t frameIndex)
+void Renderer::ApplyUpscaling(const vk::raii::CommandBuffer &cmd, const uint32_t frameIndex)
 {
     KBR_TRACY_FUNCTION();
 
@@ -5824,6 +5876,15 @@ void Renderer::ApplyUpscaling(const vk::raii::CommandBuffer &cmd, uint32_t frame
             .height = static_cast<uint32_t>(s_Data->RenderSize.y),
             .currentLayout = vk::ImageLayout::eShaderReadOnlyOptimal
         },
+        .inputReactive = {
+            .image = s_Data->ReactiveImage.Image,
+            .view = s_Data->ReactiveImage.ImageView,
+            .format = s_Data->ReactiveImage.Format,
+            .usage = vk::ImageUsageFlagBits::eColorAttachment | vk::ImageUsageFlagBits::eSampled,
+            .width = static_cast<uint32_t>(s_Data->RenderSize.x),
+            .height = static_cast<uint32_t>(s_Data->RenderSize.y),
+            .currentLayout = vk::ImageLayout::eShaderReadOnlyOptimal
+        },
         .outputColor = {
             .image = s_Data->OutputImage.Image,
             .view = s_Data->OutputImage.ImageView,
@@ -5922,8 +5983,8 @@ void Renderer::ApplyBloom(const vk::raii::CommandBuffer& cmd, const uint32_t fra
                                                        .dstAccessMask = vk::AccessFlagBits2::eShaderRead |
                                                                         vk::AccessFlagBits2::eShaderStorageWrite };
         const vk::DependencyInfo depInfo = { .dependencyFlags = {},
-                                       .memoryBarrierCount = 1,
-                                       .pMemoryBarriers = &memoryBarrier };
+                                             .memoryBarrierCount = 1,
+                                             .pMemoryBarriers = &memoryBarrier };
         cmd.pipelineBarrier2(depInfo);
     };
 
@@ -6215,69 +6276,69 @@ void Renderer::SetupDescriptors()
 
     std::vector<vk::DescriptorSetLayoutBinding> bindings = {
         vk::DescriptorSetLayoutBinding{ // Scene data
-                                        .binding = 0,
-                                        .descriptorType = vk::DescriptorType::eUniformBuffer,
-                                        .descriptorCount = 1,
-                                        .stageFlags =
-                                            vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment |
-                                            vk::ShaderStageFlagBits::eGeometry | vk::ShaderStageFlagBits::eCompute,
-                                        .pImmutableSamplers = nullptr },
+            .binding = 0,
+            .descriptorType = vk::DescriptorType::eUniformBuffer,
+            .descriptorCount = 1,
+            .stageFlags =
+            vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment |
+            vk::ShaderStageFlagBits::eGeometry | vk::ShaderStageFlagBits::eCompute,
+            .pImmutableSamplers = nullptr },
         vk::DescriptorSetLayoutBinding{ // Light data and other params
-                                        .binding = 1,
-                                        .descriptorType = vk::DescriptorType::eUniformBuffer,
-                                        .descriptorCount = 1,
-                                        .stageFlags = vk::ShaderStageFlagBits::eFragment,
-                                        .pImmutableSamplers = nullptr },
+            .binding = 1,
+            .descriptorType = vk::DescriptorType::eUniformBuffer,
+            .descriptorCount = 1,
+            .stageFlags = vk::ShaderStageFlagBits::eFragment,
+            .pImmutableSamplers = nullptr },
         vk::DescriptorSetLayoutBinding{ // Per-object data
-                                        .binding = 2,
-                                        .descriptorType = vk::DescriptorType::eUniformBufferDynamic,
-                                        .descriptorCount = 1,
-                                        .stageFlags = vk::ShaderStageFlagBits::eVertex |
-                                                      vk::ShaderStageFlagBits::eFragment |
-                                                      vk::ShaderStageFlagBits::eGeometry,
-                                        .pImmutableSamplers = nullptr },
+            .binding = 2,
+            .descriptorType = vk::DescriptorType::eUniformBufferDynamic,
+            .descriptorCount = 1,
+            .stageFlags = vk::ShaderStageFlagBits::eVertex |
+                          vk::ShaderStageFlagBits::eFragment |
+                          vk::ShaderStageFlagBits::eGeometry,
+            .pImmutableSamplers = nullptr },
         vk::DescriptorSetLayoutBinding{ // Shadow map
-                                        .binding = 3,
-                                        .descriptorType = vk::DescriptorType::eCombinedImageSampler,
-                                        .descriptorCount = 1,
-                                        .stageFlags = vk::ShaderStageFlagBits::eFragment,
-                                        .pImmutableSamplers = nullptr },
+            .binding = 3,
+            .descriptorType = vk::DescriptorType::eCombinedImageSampler,
+            .descriptorCount = 1,
+            .stageFlags = vk::ShaderStageFlagBits::eFragment,
+            .pImmutableSamplers = nullptr },
         vk::DescriptorSetLayoutBinding{ // Irradiance map
-                                        .binding = 4,
-                                        .descriptorType = vk::DescriptorType::eCombinedImageSampler,
-                                        .descriptorCount = 1,
-                                        .stageFlags = vk::ShaderStageFlagBits::eFragment,
-                                        .pImmutableSamplers = nullptr },
+            .binding = 4,
+            .descriptorType = vk::DescriptorType::eCombinedImageSampler,
+            .descriptorCount = 1,
+            .stageFlags = vk::ShaderStageFlagBits::eFragment,
+            .pImmutableSamplers = nullptr },
         vk::DescriptorSetLayoutBinding{ // BRDF LUT
-                                        .binding = 5,
-                                        .descriptorType = vk::DescriptorType::eCombinedImageSampler,
-                                        .descriptorCount = 1,
-                                        .stageFlags = vk::ShaderStageFlagBits::eFragment,
-                                        .pImmutableSamplers = nullptr },
+            .binding = 5,
+            .descriptorType = vk::DescriptorType::eCombinedImageSampler,
+            .descriptorCount = 1,
+            .stageFlags = vk::ShaderStageFlagBits::eFragment,
+            .pImmutableSamplers = nullptr },
         vk::DescriptorSetLayoutBinding{ // Prefiltered environment map
-                                        .binding = 6,
-                                        .descriptorType = vk::DescriptorType::eCombinedImageSampler,
-                                        .descriptorCount = 1,
-                                        .stageFlags = vk::ShaderStageFlagBits::eFragment,
-                                        .pImmutableSamplers = nullptr },
+            .binding = 6,
+            .descriptorType = vk::DescriptorType::eCombinedImageSampler,
+            .descriptorCount = 1,
+            .stageFlags = vk::ShaderStageFlagBits::eFragment,
+            .pImmutableSamplers = nullptr },
         vk::DescriptorSetLayoutBinding{ // TLAS
-                                        .binding = 7,
-                                        .descriptorType = vk::DescriptorType::eAccelerationStructureKHR,
-                                        .descriptorCount = 1,
-                                        .stageFlags = vk::ShaderStageFlagBits::eFragment,
-                                        .pImmutableSamplers = nullptr },
+            .binding = 7,
+            .descriptorType = vk::DescriptorType::eAccelerationStructureKHR,
+            .descriptorCount = 1,
+            .stageFlags = vk::ShaderStageFlagBits::eFragment,
+            .pImmutableSamplers = nullptr },
         vk::DescriptorSetLayoutBinding{ // Light storage buffer
-                                        .binding = 8,
-                                        .descriptorType = vk::DescriptorType::eStorageBuffer,
-                                        .descriptorCount = 1,
-                                        .stageFlags = vk::ShaderStageFlagBits::eFragment,
-                                        .pImmutableSamplers = nullptr },
+            .binding = 8,
+            .descriptorType = vk::DescriptorType::eStorageBuffer,
+            .descriptorCount = 1,
+            .stageFlags = vk::ShaderStageFlagBits::eFragment,
+            .pImmutableSamplers = nullptr },
         vk::DescriptorSetLayoutBinding{ // Global AO texture
-                                        .binding = 9,
-                                        .descriptorType = vk::DescriptorType::eCombinedImageSampler,
-                                        .descriptorCount = 1,
-                                        .stageFlags = vk::ShaderStageFlagBits::eFragment,
-                                        .pImmutableSamplers = nullptr },
+            .binding = 9,
+            .descriptorType = vk::DescriptorType::eCombinedImageSampler,
+            .descriptorCount = 1,
+            .stageFlags = vk::ShaderStageFlagBits::eFragment,
+            .pImmutableSamplers = nullptr },
     };
 
     const vk::DescriptorSetLayoutCreateInfo layoutInfo{ .bindingCount = static_cast<uint32_t>(bindings.size()),
@@ -6304,7 +6365,7 @@ void Renderer::SetupDescriptors()
                                                         .range = sizeof(SceneUniformData) };
 
         const vk::DescriptorBufferInfo paramsBufferInfo{ .buffer =
-                                                             *s_Data->UniformBuffers[i].globalLighting->GetBuffer(),
+                                                         *s_Data->UniformBuffers[i].globalLighting->GetBuffer(),
                                                          .offset = 0,
                                                          .range = sizeof(GlobalLighting) };
 
@@ -6425,7 +6486,7 @@ void Renderer::SetupDescriptors()
 void Renderer::CreateSkyboxResources()
 {
     KBRAssert(s_Data->Skybox.SkyboxTexture != nullptr,
-                    "Skybox texture has to be set before creating skybox resources");
+              "Skybox texture has to be set before creating skybox resources");
 
     // TODO: Set default skybox texture if none is set by the user
 
@@ -6451,11 +6512,11 @@ void Renderer::CreateSkyboxResources()
 void Renderer::CreateTransparencyResources(const uint32_t width, const uint32_t height)
 {
     KBRAssert(s_Data->Transparency.AccumulationImage.Format != vk::Format::eUndefined,
-                    "Accumulation format has to be set before creating transparency resources");
+              "Accumulation format has to be set before creating transparency resources");
     KBRAssert(s_Data->Transparency.RevealageImage.Format != vk::Format::eUndefined,
-                    "Revealage format has to be set before creating transparency resources");
+              "Revealage format has to be set before creating transparency resources");
     KBRAssert(s_Data->Transparency.DistortionImage.Format != vk::Format::eUndefined,
-                    "Distortion format has to be set before creating transparency resources");
+              "Distortion format has to be set before creating transparency resources");
 
     auto& context = VulkanContext::Get();
     const auto& device = context.GetDevice();
@@ -6571,48 +6632,48 @@ void Renderer::CreateTransparencyResources(const uint32_t width, const uint32_t 
 void Renderer::SetupTransparencyDescriptors()
 {
     KBRAssert(s_Data->DescriptorPool != nullptr,
-                    "Descriptor pool has to be created before setting up transparency descriptors");
+              "Descriptor pool has to be created before setting up transparency descriptors");
 
     auto& context = VulkanContext::Get();
     const auto& device = context.GetDevice();
 
     std::vector<vk::DescriptorSetLayoutBinding> bindings = {
         vk::DescriptorSetLayoutBinding{ // Opaque color
-                                        .binding = 0,
-                                        .descriptorType = vk::DescriptorType::eCombinedImageSampler,
-                                        .descriptorCount = 1,
-                                        .stageFlags = vk::ShaderStageFlagBits::eFragment,
-                                        .pImmutableSamplers = nullptr },
+            .binding = 0,
+            .descriptorType = vk::DescriptorType::eCombinedImageSampler,
+            .descriptorCount = 1,
+            .stageFlags = vk::ShaderStageFlagBits::eFragment,
+            .pImmutableSamplers = nullptr },
         vk::DescriptorSetLayoutBinding{ // Opaque depth
-                                        .binding = 1,
-                                        .descriptorType = vk::DescriptorType::eCombinedImageSampler,
-                                        .descriptorCount = 1,
-                                        .stageFlags = vk::ShaderStageFlagBits::eFragment,
-                                        .pImmutableSamplers = nullptr },
+            .binding = 1,
+            .descriptorType = vk::DescriptorType::eCombinedImageSampler,
+            .descriptorCount = 1,
+            .stageFlags = vk::ShaderStageFlagBits::eFragment,
+            .pImmutableSamplers = nullptr },
         vk::DescriptorSetLayoutBinding{ // Accumulation
-                                        .binding = 2,
-                                        .descriptorType = vk::DescriptorType::eCombinedImageSampler,
-                                        .descriptorCount = 1,
-                                        .stageFlags = vk::ShaderStageFlagBits::eFragment,
-                                        .pImmutableSamplers = nullptr },
+            .binding = 2,
+            .descriptorType = vk::DescriptorType::eCombinedImageSampler,
+            .descriptorCount = 1,
+            .stageFlags = vk::ShaderStageFlagBits::eFragment,
+            .pImmutableSamplers = nullptr },
         vk::DescriptorSetLayoutBinding{ // Revealage
-                                        .binding = 3,
-                                        .descriptorType = vk::DescriptorType::eCombinedImageSampler,
-                                        .descriptorCount = 1,
-                                        .stageFlags = vk::ShaderStageFlagBits::eFragment,
-                                        .pImmutableSamplers = nullptr },
+            .binding = 3,
+            .descriptorType = vk::DescriptorType::eCombinedImageSampler,
+            .descriptorCount = 1,
+            .stageFlags = vk::ShaderStageFlagBits::eFragment,
+            .pImmutableSamplers = nullptr },
         vk::DescriptorSetLayoutBinding{ // Distortion
-                                        .binding = 4,
-                                        .descriptorType = vk::DescriptorType::eCombinedImageSampler,
-                                        .descriptorCount = 1,
-                                        .stageFlags = vk::ShaderStageFlagBits::eFragment,
-                                        .pImmutableSamplers = nullptr },
+            .binding = 4,
+            .descriptorType = vk::DescriptorType::eCombinedImageSampler,
+            .descriptorCount = 1,
+            .stageFlags = vk::ShaderStageFlagBits::eFragment,
+            .pImmutableSamplers = nullptr },
         vk::DescriptorSetLayoutBinding{ // Global lighting data
-                                        .binding = 5,
-                                        .descriptorType = vk::DescriptorType::eUniformBuffer,
-                                        .descriptorCount = 1,
-                                        .stageFlags = vk::ShaderStageFlagBits::eFragment,
-                                        .pImmutableSamplers = nullptr },
+            .binding = 5,
+            .descriptorType = vk::DescriptorType::eUniformBuffer,
+            .descriptorCount = 1,
+            .stageFlags = vk::ShaderStageFlagBits::eFragment,
+            .pImmutableSamplers = nullptr },
     };
 
     const vk::DescriptorSetLayoutCreateInfo layoutInfo{ .bindingCount = static_cast<uint32_t>(bindings.size()),
@@ -6626,7 +6687,7 @@ void Renderer::SetupTransparencyDescriptors()
 
     const vk::DescriptorSetAllocateInfo allocInfo{ .descriptorPool = *s_Data->DescriptorPool,
                                                    .descriptorSetCount =
-                                                       static_cast<uint32_t>(s_Data->DescriptorSets.size()),
+                                                   static_cast<uint32_t>(s_Data->DescriptorSets.size()),
                                                    .pSetLayouts = compositeSetLayouts.data() };
 
     std::vector<vk::raii::DescriptorSet> compositeDescriptorSets = device.allocateDescriptorSets(allocInfo);
@@ -6646,7 +6707,7 @@ void Renderer::SetupTransparencyDescriptors()
 
         const vk::DescriptorImageInfo accumulationImageInfo{ .sampler = *s_Data->PointSampler,
                                                              .imageView =
-                                                                 *s_Data->Transparency.AccumulationImage.ImageView,
+                                                             *s_Data->Transparency.AccumulationImage.ImageView,
                                                              .imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal };
 
         const vk::DescriptorImageInfo revealageImageInfo{ .sampler = *s_Data->PointSampler,
@@ -6697,11 +6758,11 @@ void Renderer::SetupTransparencyDescriptors()
 void Renderer::CreateGTAOImage(const uint32_t width, const uint32_t height)
 {
     KBRAssert(s_Data->GTAOImage.Format != vk::Format::eUndefined,
-                    "GTAO image format has to be set before creating GTAO image!");
+              "GTAO image format has to be set before creating GTAO image!");
     KBRAssert(s_Data->GTAOScratchImage.Format != vk::Format::eUndefined,
-                    "GTAO scratch image format has to be set before creating GTAO image!");
+              "GTAO scratch image format has to be set before creating GTAO image!");
     KBRAssert(s_Data->GTAOImage.Format == s_Data->GTAOScratchImage.Format,
-                    "GTAO image format must be the same as GTAO scratch image format!");
+              "GTAO image format must be the same as GTAO scratch image format!");
 
     auto& context = VulkanContext::Get();
     const auto& device = context.GetDevice();
@@ -6716,7 +6777,7 @@ void Renderer::CreateGTAOImage(const uint32_t width, const uint32_t height)
                 s_Data->GTAOImage.Format,
                 vk::ImageTiling::eOptimal,
                 vk::ImageUsageFlagBits::eStorage | vk::ImageUsageFlagBits::eSampled |
-                    vk::ImageUsageFlagBits::eTransferDst,
+                vk::ImageUsageFlagBits::eTransferDst,
                 vk::MemoryPropertyFlagBits::eDeviceLocal,
                 s_Data->GTAOImage.Image,
                 s_Data->GTAOImage.ImageMemory);
@@ -6738,7 +6799,7 @@ void Renderer::CreateGTAOImage(const uint32_t width, const uint32_t height)
                 s_Data->GTAOScratchImage.Format,
                 vk::ImageTiling::eOptimal,
                 vk::ImageUsageFlagBits::eStorage | vk::ImageUsageFlagBits::eSampled |
-                    vk::ImageUsageFlagBits::eTransferDst,
+                vk::ImageUsageFlagBits::eTransferDst,
                 vk::MemoryPropertyFlagBits::eDeviceLocal,
                 s_Data->GTAOScratchImage.Image,
                 s_Data->GTAOScratchImage.ImageMemory);
@@ -6757,11 +6818,11 @@ void Renderer::CreateGTAOImage(const uint32_t width, const uint32_t height)
 void Renderer::SetupGTAODescriptors()
 {
     KBRAssert(s_Data->DescriptorPool != nullptr,
-                    "Descriptor pool has to be created before setting up GTAO descriptors");
+              "Descriptor pool has to be created before setting up GTAO descriptors");
     KBRAssert(s_Data->DescriptorSetLayouts.gtao != nullptr,
-                    "GTAO descriptor set layout has to be created before setting up GTAO descriptors");
+              "GTAO descriptor set layout has to be created before setting up GTAO descriptors");
     KBRAssert(s_Data->DescriptorSetLayouts.crossBilateralBlur != nullptr,
-                    "Cross-bilateral blur descriptor set layout has to be created before setting up GTAO descriptors");
+              "Cross-bilateral blur descriptor set layout has to be created before setting up GTAO descriptors");
 
     auto& context = VulkanContext::Get();
     const auto& device = context.GetDevice();
@@ -6771,7 +6832,7 @@ void Renderer::SetupGTAODescriptors()
 
     const vk::DescriptorSetAllocateInfo allocInfo{ .descriptorPool = *s_Data->DescriptorPool,
                                                    .descriptorSetCount =
-                                                       static_cast<uint32_t>(s_Data->DescriptorSets.size()),
+                                                   static_cast<uint32_t>(s_Data->DescriptorSets.size()),
                                                    .pSetLayouts = gtaoSetLayouts.data() };
 
     const vk::DescriptorImageInfo opaqueDepthImageInfo{ .sampler = *s_Data->PointSampler,
@@ -6831,7 +6892,7 @@ void Renderer::SetupGTAODescriptors()
 
     const vk::DescriptorSetAllocateInfo blurAllocInfo{ .descriptorPool = *s_Data->DescriptorPool,
                                                        .descriptorSetCount =
-                                                           static_cast<uint32_t>(s_Data->DescriptorSets.size()),
+                                                       static_cast<uint32_t>(s_Data->DescriptorSets.size()),
                                                        .pSetLayouts = blurSetLayouts.data() };
 
     std::vector<vk::raii::DescriptorSet> horizontalBlurDescriptorSets = device.allocateDescriptorSets(blurAllocInfo);
@@ -6925,43 +6986,10 @@ void Renderer::SetupGTAODescriptors()
     }
 }
 
-void Renderer::CreateTonemappedImage(const uint32_t width, const uint32_t height)
-{
-    KBRAssert(s_Data->TonemappedImage.Format != vk::Format::eUndefined,
-                    "Tonemapped image format has to be set before creating tonemapped image!");
-
-    auto& context = VulkanContext::Get();
-    const auto& device = context.GetDevice();
-
-    constexpr uint32_t mipLevels = 1;
-
-    CreateImage(device,
-                width,
-                height,
-                mipLevels,
-                vk::SampleCountFlagBits::e1,
-                s_Data->TonemappedImage.Format,
-                vk::ImageTiling::eOptimal,
-                vk::ImageUsageFlagBits::eColorAttachment | vk::ImageUsageFlagBits::eSampled,
-                vk::MemoryPropertyFlagBits::eDeviceLocal,
-                s_Data->TonemappedImage.Image,
-                s_Data->TonemappedImage.ImageMemory);
-
-    context.SetObjectDebugName(s_Data->TonemappedImage.Image, "Tonemapped Image");
-    context.SetObjectDebugName(s_Data->TonemappedImage.ImageMemory, "Tonemapped Image Memory");
-
-    s_Data->TonemappedImage.ImageView = CreateImageView(device,
-                                                        s_Data->TonemappedImage.Image,
-                                                        s_Data->TonemappedImage.Format,
-                                                        vk::ImageAspectFlagBits::eColor,
-                                                        mipLevels);
-    context.SetObjectDebugName(s_Data->TonemappedImage.ImageView, "Tonemapped Image View");
-}
-
 void Renderer::CreateFXAAImage(const uint32_t width, const uint32_t height)
 {
     KBRAssert(s_Data->CompositeImage.Format != vk::Format::eUndefined,
-                    "Composite image format has to be set before creating composite image!");
+              "Composite image format has to be set before creating composite image!");
 
     auto& context = VulkanContext::Get();
     const auto& device = context.GetDevice();
@@ -6991,152 +7019,12 @@ void Renderer::CreateFXAAImage(const uint32_t width, const uint32_t height)
     context.SetObjectDebugName(s_Data->CompositeImage.ImageView, "Composite Image View");
 }
 
-void Renderer::CreateOutputImage(const uint32_t width, const uint32_t height)
-{
-    KBRAssert(s_Data->OutputImage.Format != vk::Format::eUndefined,
-              "Output image format has to be set before creating output image!");
-
-    auto& context = VulkanContext::Get();
-    const auto& device = context.GetDevice();
-    constexpr uint32_t mipLevels = 1;
-
-    CreateImage(device,
-                width,
-                height,
-                mipLevels,
-                vk::SampleCountFlagBits::e1,
-                s_Data->OutputImage.Format,
-                vk::ImageTiling::eOptimal,
-                vk::ImageUsageFlagBits::eStorage | vk::ImageUsageFlagBits::eSampled |
-                    vk::ImageUsageFlagBits::eTransferDst,
-                vk::MemoryPropertyFlagBits::eDeviceLocal,
-                s_Data->OutputImage.Image,
-                s_Data->OutputImage.ImageMemory);
-
-    context.SetObjectDebugName(s_Data->OutputImage.Image, "Upscaler Output Image");
-    context.SetObjectDebugName(s_Data->OutputImage.ImageMemory, "Upscaler Output Image Memory");
-    s_Data->OutputImage.ImageView = CreateImageView(device,
-                                                    s_Data->OutputImage.Image,
-                                                    s_Data->OutputImage.Format,
-                                                    vk::ImageAspectFlagBits::eColor,
-                                                    mipLevels);
-    context.SetObjectDebugName(s_Data->OutputImage.ImageView, "Upscaler Output Image View");
-    s_Data->OutputImage.CurrentLayout = vk::ImageLayout::eUndefined;
-    s_Data->FinalImage.CurrentLayout = vk::ImageLayout::eUndefined;
-}
-
-void Renderer::CreateFinalImage(const uint32_t width, const uint32_t height)
-{
-    KBRAssert(s_Data->CompositeImage.Format != vk::Format::eUndefined,
-              "Final image format has to be set before creating the final image!");
-
-    auto& context = VulkanContext::Get();
-    const auto& device = context.GetDevice();
-    constexpr uint32_t mipLevels = 1;
-
-    CreateImage(device,
-                width,
-                height,
-                mipLevels,
-                vk::SampleCountFlagBits::e1,
-                s_Data->CompositeImage.Format,
-                vk::ImageTiling::eOptimal,
-                vk::ImageUsageFlagBits::eColorAttachment | vk::ImageUsageFlagBits::eSampled,
-                vk::MemoryPropertyFlagBits::eDeviceLocal,
-                s_Data->FinalImage.Image,
-                s_Data->FinalImage.ImageMemory);
-
-    context.SetObjectDebugName(s_Data->FinalImage.Image, "Final Tonemapped Image");
-    context.SetObjectDebugName(s_Data->FinalImage.ImageMemory, "Final Tonemapped Image Memory");
-    s_Data->FinalImage.ImageView = CreateImageView(device,
-                                                   s_Data->FinalImage.Image,
-                                                   s_Data->CompositeImage.Format,
-                                                   vk::ImageAspectFlagBits::eColor,
-                                                   mipLevels);
-    context.SetObjectDebugName(s_Data->FinalImage.ImageView, "Final Tonemapped Image View");
-}
-
-void Renderer::SetupTonemappingResolveDescriptors()
-{
-    KBRAssert(s_Data->DescriptorPool != nullptr,
-                    "Descriptor pool has to be created before setting up tonemapping descriptors");
-    KBRAssert(
-        s_Data->DescriptorSetLayouts.tonemappingResolve != nullptr,
-        "Tonemapping resolve descriptor set layout has to be created before setting up tonemapping descriptors");
-
-    auto& context = VulkanContext::Get();
-    const auto& device = context.GetDevice();
-
-    const std::vector<vk::DescriptorSetLayout> tonemappingSetLayouts(s_Data->DescriptorSets.size(),
-                                                                     *s_Data->DescriptorSetLayouts.tonemappingResolve);
-
-    const vk::DescriptorSetAllocateInfo allocInfo{ .descriptorPool = *s_Data->DescriptorPool,
-                                                   .descriptorSetCount =
-                                                       static_cast<uint32_t>(s_Data->DescriptorSets.size()),
-                                                   .pSetLayouts = tonemappingSetLayouts.data() };
-
-    std::vector<vk::raii::DescriptorSet> tonemappingDescriptorSets = device.allocateDescriptorSets(allocInfo);
-
-    for (uint32_t i = 0; i < VulkanContext::MaxFramesInFlight; i++) {
-        s_Data->DescriptorSets[i].tonemappingResolve = std::move(tonemappingDescriptorSets[i]);
-        context.SetObjectDebugName(s_Data->DescriptorSets[i].tonemappingResolve,
-                                   "Tonemapping Resolve Descriptor Set[" + std::to_string(i) + "]");
-
-        const vk::DescriptorImageInfo sceneColorImageInfo{ .sampler = nullptr,
-                                                           .imageView = *s_Data->OutputImage.ImageView,
-                                                           .imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal };
-
-        const vk::DescriptorImageInfo linearSamplerInfo{ .sampler = *s_Data->LinearSampler,
-                                                         .imageView = nullptr,
-                                                         .imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal };
-
-        const vk::DescriptorImageInfo bloomTextureInfo{ .sampler = *s_Data->LinearSampler,
-                                                        .imageView = *s_Data->Bloom.ImageViews[0],
-                                                        .imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal };
-
-        const vk::DescriptorBufferInfo globalLightingBufferInfo{
-            .buffer = *s_Data->UniformBuffers[i].globalLighting->GetBuffer(),
-            .offset = 0,
-            .range = sizeof(GlobalLighting)
-        };
-
-        const std::vector descriptorWrites = {
-            vk::WriteDescriptorSet{ .dstSet = *s_Data->DescriptorSets[i].tonemappingResolve,
-                                    .dstBinding = 0,
-                                    .dstArrayElement = 0,
-                                    .descriptorCount = 1,
-                                    .descriptorType = vk::DescriptorType::eSampledImage,
-                                    .pImageInfo = &sceneColorImageInfo },
-            vk::WriteDescriptorSet{ .dstSet = *s_Data->DescriptorSets[i].tonemappingResolve,
-                                    .dstBinding = 1,
-                                    .dstArrayElement = 0,
-                                    .descriptorCount = 1,
-                                    .descriptorType = vk::DescriptorType::eSampler,
-                                    .pImageInfo = &linearSamplerInfo },
-            vk::WriteDescriptorSet{ .dstSet = *s_Data->DescriptorSets[i].tonemappingResolve,
-                                    .dstBinding = 2,
-                                    .dstArrayElement = 0,
-                                    .descriptorCount = 1,
-                                    .descriptorType = vk::DescriptorType::eCombinedImageSampler,
-                                    .pImageInfo = &bloomTextureInfo },
-            vk::WriteDescriptorSet{ .dstSet = *s_Data->DescriptorSets[i].tonemappingResolve,
-                                    .dstBinding = 3,
-                                    .dstArrayElement = 0,
-                                    .descriptorCount = 1,
-                                    .descriptorType = vk::DescriptorType::eUniformBuffer,
-                                    .pBufferInfo = &globalLightingBufferInfo }
-        };
-
-        device.updateDescriptorSets(descriptorWrites, {});
-    }
-}
-
 void Renderer::SetupFXAADescriptors()
 {
     KBRAssert(s_Data->DescriptorPool != nullptr,
-                    "Descriptor pool has to be created before setting up FXAA descriptors");
+              "Descriptor pool has to be created before setting up FXAA descriptors");
     KBRAssert(s_Data->DescriptorSetLayouts.fxaa != nullptr,
-                    "FXAA descriptor set layout has to be created before setting up FXAA descriptors");
+              "FXAA descriptor set layout has to be created before setting up FXAA descriptors");
 
     auto& context = VulkanContext::Get();
     const auto& device = context.GetDevice();
@@ -7146,7 +7034,7 @@ void Renderer::SetupFXAADescriptors()
 
     const vk::DescriptorSetAllocateInfo allocInfo{ .descriptorPool = *s_Data->DescriptorPool,
                                                    .descriptorSetCount =
-                                                       static_cast<uint32_t>(s_Data->DescriptorSets.size()),
+                                                   static_cast<uint32_t>(s_Data->DescriptorSets.size()),
                                                    .pSetLayouts = fxaaSetLayouts.data() };
 
     std::vector<vk::raii::DescriptorSet> fxaaDescriptorSets = device.allocateDescriptorSets(allocInfo);
@@ -7207,7 +7095,7 @@ void Renderer::SetupFXAADescriptors()
 void Renderer::CreateBloomImage(const uint32_t width, const uint32_t height)
 {
     KBRAssert(s_Data->Bloom.Format != vk::Format::eUndefined,
-                    "Bloom image format has to be set before creating bloom resources!");
+              "Bloom image format has to be set before creating bloom resources!");
 
     const uint32_t bloomWidth = width / 2;
     const uint32_t bloomHeight = height / 2;
@@ -7224,7 +7112,7 @@ void Renderer::CreateBloomImage(const uint32_t width, const uint32_t height)
                 s_Data->Bloom.Format,
                 vk::ImageTiling::eOptimal,
                 vk::ImageUsageFlagBits::eColorAttachment | vk::ImageUsageFlagBits::eSampled |
-                    vk::ImageUsageFlagBits::eTransferDst | vk::ImageUsageFlagBits::eStorage,
+                vk::ImageUsageFlagBits::eTransferDst | vk::ImageUsageFlagBits::eStorage,
                 vk::MemoryPropertyFlagBits::eDeviceLocal,
                 s_Data->Bloom.Image,
                 s_Data->Bloom.ImageMemory);
@@ -7365,29 +7253,29 @@ void Renderer::CreateBloomResources(const uint32_t width, const uint32_t height)
     s_Data->Bloom.Format = context.FindSupportedFormat({ vk::Format::eR16G16B16A16Sfloat },
                                                        vk::ImageTiling::eOptimal,
                                                        vk::FormatFeatureFlagBits::eStorageImage |
-                                                           vk::FormatFeatureFlagBits::eSampledImage);
+                                                       vk::FormatFeatureFlagBits::eSampledImage);
 
     CreateBloomImage(width, height);
 
     std::vector<vk::DescriptorSetLayoutBinding> bindings = {
         vk::DescriptorSetLayoutBinding{ // Source
-                                        .binding = 0,
-                                        .descriptorType = vk::DescriptorType::eCombinedImageSampler,
-                                        .descriptorCount = 1,
-                                        .stageFlags = vk::ShaderStageFlagBits::eCompute,
-                                        .pImmutableSamplers = nullptr },
+            .binding = 0,
+            .descriptorType = vk::DescriptorType::eCombinedImageSampler,
+            .descriptorCount = 1,
+            .stageFlags = vk::ShaderStageFlagBits::eCompute,
+            .pImmutableSamplers = nullptr },
         vk::DescriptorSetLayoutBinding{ // Destination
-                                        .binding = 1,
-                                        .descriptorType = vk::DescriptorType::eStorageImage,
-                                        .descriptorCount = 1,
-                                        .stageFlags = vk::ShaderStageFlagBits::eCompute,
-                                        .pImmutableSamplers = nullptr },
+            .binding = 1,
+            .descriptorType = vk::DescriptorType::eStorageImage,
+            .descriptorCount = 1,
+            .stageFlags = vk::ShaderStageFlagBits::eCompute,
+            .pImmutableSamplers = nullptr },
         vk::DescriptorSetLayoutBinding{ // Bloom mask
-                                        .binding = 2,
-                                        .descriptorType = vk::DescriptorType::eCombinedImageSampler,
-                                        .descriptorCount = 1,
-                                        .stageFlags = vk::ShaderStageFlagBits::eCompute,
-                                        .pImmutableSamplers = nullptr },
+            .binding = 2,
+            .descriptorType = vk::DescriptorType::eCombinedImageSampler,
+            .descriptorCount = 1,
+            .stageFlags = vk::ShaderStageFlagBits::eCompute,
+            .pImmutableSamplers = nullptr },
     };
 
     const vk::DescriptorSetLayoutCreateInfo layoutInfo{ .bindingCount = static_cast<uint32_t>(bindings.size()),
@@ -7403,11 +7291,11 @@ void Renderer::CreateBloomResources(const uint32_t width, const uint32_t height)
                                                                  .size = sizeof(BloomData::DownsamplePushConstants) };
 
     const vk::PipelineLayoutCreateInfo bloomDowsamplePipelineLayoutInfo{ .setLayoutCount =
-                                                                             static_cast<uint32_t>(setLayouts.size()),
+                                                                         static_cast<uint32_t>(setLayouts.size()),
                                                                          .pSetLayouts = setLayouts.data(),
                                                                          .pushConstantRangeCount = 1,
                                                                          .pPushConstantRanges =
-                                                                             &downsamplePushConstantRange };
+                                                                         &downsamplePushConstantRange };
 
     s_Data->Bloom.DownsamplePipelineLayout = vk::raii::PipelineLayout{ device, bloomDowsamplePipelineLayoutInfo };
     context.SetObjectDebugName(s_Data->Bloom.DownsamplePipelineLayout, "Bloom Downsample Pipeline Layout");
@@ -7424,11 +7312,11 @@ void Renderer::CreateBloomResources(const uint32_t width, const uint32_t height)
                                                                .size = sizeof(BloomData::UpsamplePushConstants) };
 
     const vk::PipelineLayoutCreateInfo bloomUpsamplePipelineLayoutInfo{ .setLayoutCount =
-                                                                            static_cast<uint32_t>(setLayouts.size()),
+                                                                        static_cast<uint32_t>(setLayouts.size()),
                                                                         .pSetLayouts = setLayouts.data(),
                                                                         .pushConstantRangeCount = 1,
                                                                         .pPushConstantRanges =
-                                                                            &upsamplePushConstantRange };
+                                                                        &upsamplePushConstantRange };
 
     s_Data->Bloom.UpsamplePipelineLayout = vk::raii::PipelineLayout{ device, bloomUpsamplePipelineLayoutInfo };
     context.SetObjectDebugName(s_Data->Bloom.UpsamplePipelineLayout, "Bloom Upsample Pipeline Layout");
@@ -7439,6 +7327,179 @@ void Renderer::CreateBloomResources(const uint32_t width, const uint32_t height)
     bloomUpsamplePipelineSpec.PipelineLayout = *s_Data->Bloom.UpsamplePipelineLayout;
 
     s_Data->Bloom.UpsamplePipeline = CreateRef<ComputePipeline>(bloomUpsamplePipelineSpec);
+}
+
+void Renderer::CreateTonemappedImage(const uint32_t width, const uint32_t height)
+{
+    KBRAssert(s_Data->TonemappedImage.Format != vk::Format::eUndefined,
+              "Tonemapped image format has to be set before creating tonemapped image!");
+
+    auto& context = VulkanContext::Get();
+    const auto& device = context.GetDevice();
+
+    constexpr uint32_t mipLevels = 1;
+
+    CreateImage(device,
+                width,
+                height,
+                mipLevels,
+                vk::SampleCountFlagBits::e1,
+                s_Data->TonemappedImage.Format,
+                vk::ImageTiling::eOptimal,
+                vk::ImageUsageFlagBits::eColorAttachment | vk::ImageUsageFlagBits::eSampled,
+                vk::MemoryPropertyFlagBits::eDeviceLocal,
+                s_Data->TonemappedImage.Image,
+                s_Data->TonemappedImage.ImageMemory);
+
+    context.SetObjectDebugName(s_Data->TonemappedImage.Image, "Tonemapped Image");
+    context.SetObjectDebugName(s_Data->TonemappedImage.ImageMemory, "Tonemapped Image Memory");
+
+    s_Data->TonemappedImage.ImageView = CreateImageView(device,
+                                                        s_Data->TonemappedImage.Image,
+                                                        s_Data->TonemappedImage.Format,
+                                                        vk::ImageAspectFlagBits::eColor,
+                                                        mipLevels);
+    context.SetObjectDebugName(s_Data->TonemappedImage.ImageView, "Tonemapped Image View");
+}
+
+void Renderer::SetupTonemappingResolveDescriptors()
+{
+    KBRAssert(s_Data->DescriptorPool != nullptr,
+              "Descriptor pool has to be created before setting up tonemapping descriptors");
+    KBRAssert(
+        s_Data->DescriptorSetLayouts.tonemappingResolve != nullptr,
+        "Tonemapping resolve descriptor set layout has to be created before setting up tonemapping descriptors");
+
+    auto& context = VulkanContext::Get();
+    const auto& device = context.GetDevice();
+
+    const std::vector<vk::DescriptorSetLayout> tonemappingSetLayouts(s_Data->DescriptorSets.size(),
+                                                                     *s_Data->DescriptorSetLayouts.tonemappingResolve);
+
+    const vk::DescriptorSetAllocateInfo allocInfo{ .descriptorPool = *s_Data->DescriptorPool,
+                                                   .descriptorSetCount =
+                                                   static_cast<uint32_t>(s_Data->DescriptorSets.size()),
+                                                   .pSetLayouts = tonemappingSetLayouts.data() };
+
+    std::vector<vk::raii::DescriptorSet> tonemappingDescriptorSets = device.allocateDescriptorSets(allocInfo);
+
+    for (uint32_t i = 0; i < VulkanContext::MaxFramesInFlight; i++) {
+        s_Data->DescriptorSets[i].tonemappingResolve = std::move(tonemappingDescriptorSets[i]);
+        context.SetObjectDebugName(s_Data->DescriptorSets[i].tonemappingResolve,
+                                   "Tonemapping Resolve Descriptor Set[" + std::to_string(i) + "]");
+
+        const vk::DescriptorImageInfo sceneColorImageInfo{ .sampler = nullptr,
+                                                           .imageView = *s_Data->OutputImage.ImageView,
+                                                           .imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal };
+
+        const vk::DescriptorImageInfo linearSamplerInfo{ .sampler = *s_Data->LinearSampler,
+                                                         .imageView = nullptr,
+                                                         .imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal };
+
+        const vk::DescriptorImageInfo bloomTextureInfo{ .sampler = *s_Data->LinearSampler,
+                                                        .imageView = *s_Data->Bloom.ImageViews[0],
+                                                        .imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal };
+
+        const vk::DescriptorBufferInfo globalLightingBufferInfo{
+            .buffer = *s_Data->UniformBuffers[i].globalLighting->GetBuffer(),
+            .offset = 0,
+            .range = sizeof(GlobalLighting)
+        };
+
+        const std::vector descriptorWrites = {
+            vk::WriteDescriptorSet{ .dstSet = *s_Data->DescriptorSets[i].tonemappingResolve,
+                                    .dstBinding = 0,
+                                    .dstArrayElement = 0,
+                                    .descriptorCount = 1,
+                                    .descriptorType = vk::DescriptorType::eSampledImage,
+                                    .pImageInfo = &sceneColorImageInfo },
+            vk::WriteDescriptorSet{ .dstSet = *s_Data->DescriptorSets[i].tonemappingResolve,
+                                    .dstBinding = 1,
+                                    .dstArrayElement = 0,
+                                    .descriptorCount = 1,
+                                    .descriptorType = vk::DescriptorType::eSampler,
+                                    .pImageInfo = &linearSamplerInfo },
+            vk::WriteDescriptorSet{ .dstSet = *s_Data->DescriptorSets[i].tonemappingResolve,
+                                    .dstBinding = 2,
+                                    .dstArrayElement = 0,
+                                    .descriptorCount = 1,
+                                    .descriptorType = vk::DescriptorType::eCombinedImageSampler,
+                                    .pImageInfo = &bloomTextureInfo },
+            vk::WriteDescriptorSet{ .dstSet = *s_Data->DescriptorSets[i].tonemappingResolve,
+                                    .dstBinding = 3,
+                                    .dstArrayElement = 0,
+                                    .descriptorCount = 1,
+                                    .descriptorType = vk::DescriptorType::eUniformBuffer,
+                                    .pBufferInfo = &globalLightingBufferInfo }
+        };
+
+        device.updateDescriptorSets(descriptorWrites, {});
+    }
+}
+
+void Renderer::CreateOutputImage(const uint32_t width, const uint32_t height)
+{
+    KBRAssert(s_Data->OutputImage.Format != vk::Format::eUndefined,
+              "Output image format has to be set before creating output image!");
+
+    auto& context = VulkanContext::Get();
+    const auto& device = context.GetDevice();
+    constexpr uint32_t mipLevels = 1;
+
+    CreateImage(device,
+                width,
+                height,
+                mipLevels,
+                vk::SampleCountFlagBits::e1,
+                s_Data->OutputImage.Format,
+                vk::ImageTiling::eOptimal,
+                vk::ImageUsageFlagBits::eStorage | vk::ImageUsageFlagBits::eSampled |
+                vk::ImageUsageFlagBits::eTransferDst,
+                vk::MemoryPropertyFlagBits::eDeviceLocal,
+                s_Data->OutputImage.Image,
+                s_Data->OutputImage.ImageMemory);
+
+    context.SetObjectDebugName(s_Data->OutputImage.Image, "Upscaler Output Image");
+    context.SetObjectDebugName(s_Data->OutputImage.ImageMemory, "Upscaler Output Image Memory");
+    s_Data->OutputImage.ImageView = CreateImageView(device,
+                                                    s_Data->OutputImage.Image,
+                                                    s_Data->OutputImage.Format,
+                                                    vk::ImageAspectFlagBits::eColor,
+                                                    mipLevels);
+    context.SetObjectDebugName(s_Data->OutputImage.ImageView, "Upscaler Output Image View");
+    s_Data->OutputImage.CurrentLayout = vk::ImageLayout::eUndefined;
+    s_Data->FinalImage.CurrentLayout = vk::ImageLayout::eUndefined;
+}
+
+void Renderer::CreateFinalImage(const uint32_t width, const uint32_t height)
+{
+    KBRAssert(s_Data->CompositeImage.Format != vk::Format::eUndefined,
+              "Final image format has to be set before creating the final image!");
+
+    auto& context = VulkanContext::Get();
+    const auto& device = context.GetDevice();
+    constexpr uint32_t mipLevels = 1;
+
+    CreateImage(device,
+                width,
+                height,
+                mipLevels,
+                vk::SampleCountFlagBits::e1,
+                s_Data->CompositeImage.Format,
+                vk::ImageTiling::eOptimal,
+                vk::ImageUsageFlagBits::eColorAttachment | vk::ImageUsageFlagBits::eSampled,
+                vk::MemoryPropertyFlagBits::eDeviceLocal,
+                s_Data->FinalImage.Image,
+                s_Data->FinalImage.ImageMemory);
+
+    context.SetObjectDebugName(s_Data->FinalImage.Image, "Final Tonemapped Image");
+    context.SetObjectDebugName(s_Data->FinalImage.ImageMemory, "Final Tonemapped Image Memory");
+    s_Data->FinalImage.ImageView = CreateImageView(device,
+                                                   s_Data->FinalImage.Image,
+                                                   s_Data->CompositeImage.Format,
+                                                   vk::ImageAspectFlagBits::eColor,
+                                                   mipLevels);
+    context.SetObjectDebugName(s_Data->FinalImage.ImageView, "Final Tonemapped Image View");
 }
 
 void Renderer::CreateSMAATextures()
@@ -7563,23 +7624,23 @@ void Renderer::CreateSMAADescriptorSetAndPipelineLayouts()
     {
         std::vector<vk::DescriptorSetLayoutBinding> bindings = {
             vk::DescriptorSetLayoutBinding{ // Tonemapped image
-                                            .binding = 0,
-                                            .descriptorType = vk::DescriptorType::eCombinedImageSampler,
-                                            .descriptorCount = 1,
-                                            .stageFlags = vk::ShaderStageFlagBits::eFragment,
-                                            .pImmutableSamplers = nullptr },
+                .binding = 0,
+                .descriptorType = vk::DescriptorType::eCombinedImageSampler,
+                .descriptorCount = 1,
+                .stageFlags = vk::ShaderStageFlagBits::eFragment,
+                .pImmutableSamplers = nullptr },
             vk::DescriptorSetLayoutBinding{ // Linear sampler
-                                            .binding = 1,
-                                            .descriptorType = vk::DescriptorType::eSampler,
-                                            .descriptorCount = 1,
-                                            .stageFlags = vk::ShaderStageFlagBits::eFragment,
-                                            .pImmutableSamplers = nullptr },
+                .binding = 1,
+                .descriptorType = vk::DescriptorType::eSampler,
+                .descriptorCount = 1,
+                .stageFlags = vk::ShaderStageFlagBits::eFragment,
+                .pImmutableSamplers = nullptr },
             vk::DescriptorSetLayoutBinding{ // Point sampler
-                                            .binding = 2,
-                                            .descriptorType = vk::DescriptorType::eSampler,
-                                            .descriptorCount = 1,
-                                            .stageFlags = vk::ShaderStageFlagBits::eFragment,
-                                            .pImmutableSamplers = nullptr },
+                .binding = 2,
+                .descriptorType = vk::DescriptorType::eSampler,
+                .descriptorCount = 1,
+                .stageFlags = vk::ShaderStageFlagBits::eFragment,
+                .pImmutableSamplers = nullptr },
         };
 
         const vk::DescriptorSetLayoutCreateInfo layoutInfo{ .bindingCount = static_cast<uint32_t>(bindings.size()),
@@ -7592,7 +7653,7 @@ void Renderer::CreateSMAADescriptorSetAndPipelineLayouts()
         const std::array setLayouts = { *s_Data->SMAAResources.DescriptorSetLayouts.EdgeDetection };
 
         const vk::PipelineLayoutCreateInfo pipelineLayoutInfo{ .setLayoutCount =
-                                                                   static_cast<uint32_t>(setLayouts.size()),
+                                                               static_cast<uint32_t>(setLayouts.size()),
                                                                .pSetLayouts = setLayouts.data(),
                                                                .pushConstantRangeCount = 1,
                                                                .pPushConstantRanges = &pushConstantRange };
@@ -7606,35 +7667,35 @@ void Renderer::CreateSMAADescriptorSetAndPipelineLayouts()
     {
         std::vector<vk::DescriptorSetLayoutBinding> bindings = {
             vk::DescriptorSetLayoutBinding{ // Edges texture
-                                            .binding = 0,
-                                            .descriptorType = vk::DescriptorType::eCombinedImageSampler,
-                                            .descriptorCount = 1,
-                                            .stageFlags = vk::ShaderStageFlagBits::eFragment,
-                                            .pImmutableSamplers = nullptr },
+                .binding = 0,
+                .descriptorType = vk::DescriptorType::eCombinedImageSampler,
+                .descriptorCount = 1,
+                .stageFlags = vk::ShaderStageFlagBits::eFragment,
+                .pImmutableSamplers = nullptr },
             vk::DescriptorSetLayoutBinding{ // Area texture
-                                            .binding = 1,
-                                            .descriptorType = vk::DescriptorType::eCombinedImageSampler,
-                                            .descriptorCount = 1,
-                                            .stageFlags = vk::ShaderStageFlagBits::eFragment,
-                                            .pImmutableSamplers = nullptr },
+                .binding = 1,
+                .descriptorType = vk::DescriptorType::eCombinedImageSampler,
+                .descriptorCount = 1,
+                .stageFlags = vk::ShaderStageFlagBits::eFragment,
+                .pImmutableSamplers = nullptr },
             vk::DescriptorSetLayoutBinding{ // Search texture
-                                            .binding = 2,
-                                            .descriptorType = vk::DescriptorType::eCombinedImageSampler,
-                                            .descriptorCount = 1,
-                                            .stageFlags = vk::ShaderStageFlagBits::eFragment,
-                                            .pImmutableSamplers = nullptr },
+                .binding = 2,
+                .descriptorType = vk::DescriptorType::eCombinedImageSampler,
+                .descriptorCount = 1,
+                .stageFlags = vk::ShaderStageFlagBits::eFragment,
+                .pImmutableSamplers = nullptr },
             vk::DescriptorSetLayoutBinding{ // Linear sampler
-                                            .binding = 3,
-                                            .descriptorType = vk::DescriptorType::eSampler,
-                                            .descriptorCount = 1,
-                                            .stageFlags = vk::ShaderStageFlagBits::eFragment,
-                                            .pImmutableSamplers = nullptr },
+                .binding = 3,
+                .descriptorType = vk::DescriptorType::eSampler,
+                .descriptorCount = 1,
+                .stageFlags = vk::ShaderStageFlagBits::eFragment,
+                .pImmutableSamplers = nullptr },
             vk::DescriptorSetLayoutBinding{ // Point sampler
-                                            .binding = 4,
-                                            .descriptorType = vk::DescriptorType::eSampler,
-                                            .descriptorCount = 1,
-                                            .stageFlags = vk::ShaderStageFlagBits::eFragment,
-                                            .pImmutableSamplers = nullptr },
+                .binding = 4,
+                .descriptorType = vk::DescriptorType::eSampler,
+                .descriptorCount = 1,
+                .stageFlags = vk::ShaderStageFlagBits::eFragment,
+                .pImmutableSamplers = nullptr },
         };
 
         const vk::DescriptorSetLayoutCreateInfo layoutInfo{ .bindingCount = static_cast<uint32_t>(bindings.size()),
@@ -7647,7 +7708,7 @@ void Renderer::CreateSMAADescriptorSetAndPipelineLayouts()
         const std::array setLayouts = { *s_Data->SMAAResources.DescriptorSetLayouts.BlendWeight };
 
         const vk::PipelineLayoutCreateInfo pipelineLayoutInfo{ .setLayoutCount =
-                                                                   static_cast<uint32_t>(setLayouts.size()),
+                                                               static_cast<uint32_t>(setLayouts.size()),
                                                                .pSetLayouts = setLayouts.data(),
                                                                .pushConstantRangeCount = 1,
                                                                .pPushConstantRanges = &pushConstantRange };
@@ -7661,29 +7722,29 @@ void Renderer::CreateSMAADescriptorSetAndPipelineLayouts()
     {
         std::vector<vk::DescriptorSetLayoutBinding> bindings = {
             vk::DescriptorSetLayoutBinding{ // Tonemapped image
-                                            .binding = 0,
-                                            .descriptorType = vk::DescriptorType::eCombinedImageSampler,
-                                            .descriptorCount = 1,
-                                            .stageFlags = vk::ShaderStageFlagBits::eFragment,
-                                            .pImmutableSamplers = nullptr },
+                .binding = 0,
+                .descriptorType = vk::DescriptorType::eCombinedImageSampler,
+                .descriptorCount = 1,
+                .stageFlags = vk::ShaderStageFlagBits::eFragment,
+                .pImmutableSamplers = nullptr },
             vk::DescriptorSetLayoutBinding{ // Blend weights texture
-                                            .binding = 1,
-                                            .descriptorType = vk::DescriptorType::eCombinedImageSampler,
-                                            .descriptorCount = 1,
-                                            .stageFlags = vk::ShaderStageFlagBits::eFragment,
-                                            .pImmutableSamplers = nullptr },
+                .binding = 1,
+                .descriptorType = vk::DescriptorType::eCombinedImageSampler,
+                .descriptorCount = 1,
+                .stageFlags = vk::ShaderStageFlagBits::eFragment,
+                .pImmutableSamplers = nullptr },
             vk::DescriptorSetLayoutBinding{ // Linear sampler
-                                            .binding = 2,
-                                            .descriptorType = vk::DescriptorType::eSampler,
-                                            .descriptorCount = 1,
-                                            .stageFlags = vk::ShaderStageFlagBits::eFragment,
-                                            .pImmutableSamplers = nullptr },
+                .binding = 2,
+                .descriptorType = vk::DescriptorType::eSampler,
+                .descriptorCount = 1,
+                .stageFlags = vk::ShaderStageFlagBits::eFragment,
+                .pImmutableSamplers = nullptr },
             vk::DescriptorSetLayoutBinding{ // Point sampler
-                                            .binding = 3,
-                                            .descriptorType = vk::DescriptorType::eSampler,
-                                            .descriptorCount = 1,
-                                            .stageFlags = vk::ShaderStageFlagBits::eFragment,
-                                            .pImmutableSamplers = nullptr },
+                .binding = 3,
+                .descriptorType = vk::DescriptorType::eSampler,
+                .descriptorCount = 1,
+                .stageFlags = vk::ShaderStageFlagBits::eFragment,
+                .pImmutableSamplers = nullptr },
         };
 
         const vk::DescriptorSetLayoutCreateInfo layoutInfo{ .bindingCount = static_cast<uint32_t>(bindings.size()),
@@ -7697,7 +7758,7 @@ void Renderer::CreateSMAADescriptorSetAndPipelineLayouts()
         const std::array setLayouts = { *s_Data->SMAAResources.DescriptorSetLayouts.NeighbourhoodBlend };
 
         const vk::PipelineLayoutCreateInfo pipelineLayoutInfo{ .setLayoutCount =
-                                                                   static_cast<uint32_t>(setLayouts.size()),
+                                                               static_cast<uint32_t>(setLayouts.size()),
                                                                .pSetLayouts = setLayouts.data(),
                                                                .pushConstantRangeCount = 1,
                                                                .pPushConstantRanges = &pushConstantRange };
@@ -7712,9 +7773,9 @@ void Renderer::CreateSMAADescriptorSetAndPipelineLayouts()
 void Renderer::CreateSMAAImages(const uint32_t width, const uint32_t height)
 {
     KBRAssert(s_Data->SMAAResources.EdgesImage.Format != vk::Format::eUndefined,
-                    "SMAA edge detection image format has to be set before creating SMAA images!");
+              "SMAA edge detection image format has to be set before creating SMAA images!");
     KBRAssert(s_Data->SMAAResources.BlendImage.Format != vk::Format::eUndefined,
-                    "SMAA blend image format has to be set before creating SMAA images!");
+              "SMAA blend image format has to be set before creating SMAA images!");
 
     auto& context = VulkanContext::Get();
     const auto& device = context.GetDevice();
@@ -7769,7 +7830,7 @@ void Renderer::CreateSMAAImages(const uint32_t width, const uint32_t height)
 void Renderer::SetupSMAADescriptors()
 {
     KBRAssert(s_Data->DescriptorPool != nullptr,
-                    "Descriptor pool has to be created before setting up transparency descriptors");
+              "Descriptor pool has to be created before setting up transparency descriptors");
 
     auto& context = VulkanContext::Get();
     const auto& device = context.GetDevice();
@@ -7842,7 +7903,7 @@ void Renderer::SetupSMAADescriptors()
                                                            .imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal };
             const vk::DescriptorImageInfo searchTextureInfo{ .sampler = *s_Data->LinearSampler,
                                                              .imageView =
-                                                                 *s_Data->SMAAResources.SearchTexture.ImageView,
+                                                             *s_Data->SMAAResources.SearchTexture.ImageView,
                                                              .imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal };
 
             const std::array write = {
@@ -7894,9 +7955,9 @@ void Renderer::SetupSMAADescriptors()
 
             const vk::DescriptorImageInfo blendWeightsImageInfo{ .sampler = *s_Data->LinearSampler,
                                                                  .imageView =
-                                                                     *s_Data->SMAAResources.BlendImage.ImageView,
+                                                                 *s_Data->SMAAResources.BlendImage.ImageView,
                                                                  .imageLayout =
-                                                                     vk::ImageLayout::eShaderReadOnlyOptimal };
+                                                                 vk::ImageLayout::eShaderReadOnlyOptimal };
 
             const std::array write = {
                 vk::WriteDescriptorSet{ .dstSet = *s_Data->SMAAResources.DescriptorSets[i].NeighbourhoodBlend,
@@ -7928,4 +7989,43 @@ void Renderer::SetupSMAADescriptors()
         }
     }
 }
+
+void Renderer::CreateReactiveImage(const uint32_t width, const uint32_t height)
+{
+    KBRAssert(s_Data->ReactiveImage.Format != vk::Format::eUndefined,
+              "Reactive image format has to be set before creating reactive images!");
+
+    auto& context = VulkanContext::Get();
+    const auto& device = context.GetDevice();
+
+    constexpr uint32_t mipLevels = 1;
+
+    CreateImage(device,
+                width,
+                height,
+                mipLevels,
+                vk::SampleCountFlagBits::e1,
+                s_Data->ReactiveImage.Format,
+                vk::ImageTiling::eOptimal,
+                vk::ImageUsageFlagBits::eColorAttachment | vk::ImageUsageFlagBits::eSampled,
+                vk::MemoryPropertyFlagBits::eDeviceLocal,
+                s_Data->ReactiveImage.Image,
+                s_Data->ReactiveImage.ImageMemory);
+
+    context.SetObjectDebugName(reinterpret_cast<uint64_t>(static_cast<VkImage>(*s_Data->ReactiveImage.Image)),
+                               vk::ObjectType::eImage,
+                               "Reactive Image");
+
+    context.SetObjectDebugName(
+        reinterpret_cast<uint64_t>(static_cast<VkDeviceMemory>(*s_Data->ReactiveImage.ImageMemory)),
+        vk::ObjectType::eDeviceMemory,
+        "Reactive Image Memory");
+
+    s_Data->ReactiveImage.ImageView = CreateImageView(
+        device, s_Data->ReactiveImage.Image, s_Data->ReactiveImage.Format, vk::ImageAspectFlagBits::eColor, mipLevels);
+    context.SetObjectDebugName(reinterpret_cast<uint64_t>(static_cast<VkImageView>(*s_Data->ReactiveImage.ImageView)),
+                               vk::ObjectType::eImageView,
+                               "Reactive Image View");
+}
+
 } // namespace Kerberos

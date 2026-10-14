@@ -31,6 +31,12 @@ struct VertexOutput
     float viewZ : VIEWZ;       // View space Z for depth sorting
 };
 
+struct PSOutput
+{
+    float4 Color : SV_Target0;
+    float Reactive : SV_Target1;
+};
+
 static const float2 QUAD_POSITIONS[6] = {
     float2(-0.5, -0.5), float2(0.5, -0.5), float2(-0.5, 0.5),
     float2(0.5, -0.5), float2(0.5, 0.5), float2(-0.5, 0.5)
@@ -86,7 +92,7 @@ VertexOutput vertexMain(uint vertexID: SV_VulkanVertexID, uint instanceID: SV_Vu
 }
 
 [shader("fragment")]
-float4 fragmentMain(VertexOutput input) : SV_Target
+PSOutput fragmentMain(VertexOutput input)
 {
     float4 texColor1 = particleTexture.Sample(particleSampler, input.uv1);
     float4 texColor2 = particleTexture.Sample(particleSampler, input.uv2);
@@ -113,7 +119,10 @@ float4 fragmentMain(VertexOutput input) : SV_Target
     if (finalColor.a < 0.01)
         discard;
 
+    PSOutput output;
     // The 0 alpha is important, because the alpha of every pass before the bloom pass
     // is considered to be the bloom mask, and we don't want to bloom the particles.
-    return float4(finalColor.rgb, 0);
+    output.Color = float4(finalColor.rgb, 0);
+    output.Reactive = 1.0;
+    return output;
 }

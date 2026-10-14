@@ -39,6 +39,7 @@ public:
 
     void Initialize(vk::Format colorFormat,
                     vk::Format depthFormat,
+                    vk::Format reactiveFormat,
                     vk::ImageView sceneDepthImageView,
                     const Owner<DescriptorAllocator>& allocator);
 
@@ -55,7 +56,7 @@ public:
 
 private:
     void SetupDescriptors();
-    void SetupPipelines(vk::Format colorFormat, vk::Format depthFormat);
+    void SetupPipelines(vk::Format colorFormat, vk::Format depthFormat, vk::Format reactiveFormat);
 
     void AllocateParticleFrameBuffers();
     void AllocateIndirectDrawBuffers();

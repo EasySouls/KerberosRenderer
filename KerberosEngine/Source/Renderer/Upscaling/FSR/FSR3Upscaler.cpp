@@ -299,6 +299,9 @@ namespace Kerberos {
         const FfxApiResourceDescription motionVectorsDesc = GetFFXApiResourceDesc(dispatchInfo.inputMotionVectors);
         dispatchDesc.motionVectors = ffxApiGetResourceVK(dispatchInfo.inputMotionVectors.image, motionVectorsDesc, FFX_API_RESOURCE_STATE_COMPUTE_READ);
 
+        const FfxApiResourceDescription reactiveDesc = GetFFXApiResourceDesc(dispatchInfo.inputReactive);
+        dispatchDesc.reactive = ffxApiGetResourceVK(dispatchInfo.inputReactive.image, reactiveDesc, FFX_API_RESOURCE_STATE_COMPUTE_READ);
+
         const FfxApiResourceDescription outputDesc = GetFFXApiResourceDesc(dispatchInfo.outputColor);
         dispatchDesc.output = ffxApiGetResourceVK(dispatchInfo.outputColor.image, outputDesc, FFX_API_RESOURCE_STATE_UNORDERED_ACCESS);
 

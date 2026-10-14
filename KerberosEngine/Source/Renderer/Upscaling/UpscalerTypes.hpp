@@ -42,6 +42,7 @@ struct UpscalerDispatchInfo {
     UpscalerTexture inputColor;         /// Unscaled, aliased render output
     UpscalerTexture inputDepth;         /// Unscaled depth buffer
     UpscalerTexture inputMotionVectors; /// Unscaled velocity buffer (eR16G16Sfloat)
+    UpscalerTexture inputReactive;      /// Unscaled reactive mask (eR8Unorm)
     UpscalerTexture outputColor;        /// Upscaled display-resolution target
 
     float cameraNear;

@@ -195,6 +195,7 @@ ParticleSystem::~ParticleSystem()
 
 void ParticleSystem::Initialize(const vk::Format colorFormat,
                                 const vk::Format depthFormat,
+                                const vk::Format reactiveFormat,
                                 const vk::ImageView sceneDepthImageView,
                                 const Owner<DescriptorAllocator>& allocator)
 {
@@ -207,7 +208,7 @@ void ParticleSystem::Initialize(const vk::Format colorFormat,
     CreateDefaultParticleTexture();
     AllocateDescriptorBuffers();
 
-    SetupPipelines(colorFormat, depthFormat);
+    SetupPipelines(colorFormat, depthFormat, reactiveFormat);
 }
 
 void ParticleSystem::Update(const Ref<Scene>& scene,
@@ -590,7 +591,7 @@ void ParticleSystem::SetupDescriptors()
     m_PointSampler = vk::raii::Sampler(device, pointSamplerInfo);
 }
 
-void ParticleSystem::SetupPipelines(vk::Format colorFormat, vk::Format depthFormat)
+void ParticleSystem::SetupPipelines(const vk::Format colorFormat, const vk::Format depthFormat, const vk::Format reactiveFormat)
 {
     const auto& context = VulkanContext::Get();
 
@@ -643,8 +644,8 @@ void ParticleSystem::SetupPipelines(vk::Format colorFormat, vk::Format depthForm
     renderPipelineSpec.EnableDepthTest = true;
     renderPipelineSpec.EnableDepthWrite = false;
     renderPipelineSpec.FrontFace = FrontFace::CounterClockwise;
-    renderPipelineSpec.BlendModes = { BlendMode::Additive };
-    renderPipelineSpec.ColorAttachmentFormats = { colorFormat };
+    renderPipelineSpec.BlendModes = { BlendMode::Additive, BlendMode::Additive };
+    renderPipelineSpec.ColorAttachmentFormats = { colorFormat, reactiveFormat };
     renderPipelineSpec.DepthAttachmentFormat = depthFormat;
     renderPipelineSpec.DynamicStates = dynamicStates;
     renderPipelineSpec.UsingDescriptorBuffers = context.UseDescriptorBuffers();

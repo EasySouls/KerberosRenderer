@@ -356,6 +356,8 @@ private:
     static void CreateSMAADescriptorSetAndPipelineLayouts();
     static void CreateSMAAImages(uint32_t width, uint32_t height);
     static void SetupSMAADescriptors();
+
+    static void CreateReactiveImage(uint32_t width, uint32_t height);
 };
 
 }

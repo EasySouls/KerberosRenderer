@@ -1,661 +1,5 @@
 Scene: Prefab Test Scene
 Entities:
-  - Entity: 13953111263288906839
-    TagComponent:
-      Tag: GlassPlastic_low
-    TransformComponent:
-      Translation: [0, 0, 0]
-      Rotation: [0, 0, 0]
-      Scale: [1, 1, 1]
-    HierarchyComponent:
-      Parent: 18298329815438644473
-      Children:
-        - 15126191386373777595
-  - Entity: 13968441503205898088
-    TagComponent:
-      Tag: LeatherParts_low
-    TransformComponent:
-      Translation: [0, 0, 0]
-      Rotation: [0, 0, 0]
-      Scale: [1, 1, 1]
-    HierarchyComponent:
-      Parent: 18298329815438644473
-      Children:
-        - 8411289886123736624
-  - Entity: 12496792434886261975
-    TagComponent:
-      Tag: Lenses_low
-    TransformComponent:
-      Translation: [0, 0, 0]
-      Rotation: [0, 0, 0]
-      Scale: [1, 1, 1]
-    HierarchyComponent:
-      Parent: 18298329815438644473
-      Children:
-        - 4769820081474932153
-  - Entity: 15046912959302453566
-    TagComponent:
-      Tag: MetalParts_low
-    TransformComponent:
-      Translation: [0, 0, 0]
-      Rotation: [0, 0, 0]
-      Scale: [1, 1, 1]
-    HierarchyComponent:
-      Parent: 18298329815438644473
-      Children:
-        - 4830847219763571769
-  - Entity: 15016965203441506823
-    TagComponent:
-      Tag: RubberWood_low
-    TransformComponent:
-      Translation: [0, 0, 0]
-      Rotation: [0, 0, 0]
-      Scale: [1, 1, 1]
-    HierarchyComponent:
-      Parent: 18298329815438644473
-      Children:
-        - 3689625112535852236
-  - Entity: 18298329815438644473
-    TagComponent:
-      Tag: FlightHelmet
-    TransformComponent:
-      Translation: [0, 0, 0]
-      Rotation: [0, 0, 0]
-      Scale: [1, 1, 1]
-    HierarchyComponent:
-      Parent: 2309897673315485630
-      Children:
-        - 13953111263288906839
-        - 13968441503205898088
-        - 12496792434886261975
-        - 15046912959302453566
-        - 15016965203441506823
-  - Entity: 15126191386373777595
-    TagComponent:
-      Tag: GlassPlastic_low_Primitive_0
-    TransformComponent:
-      Translation: [0, 0, 0]
-      Rotation: [0, 0, 0]
-      Scale: [1, 1, 1]
-    HierarchyComponent:
-      Parent: 13953111263288906839
-      Children:
-        []
-    StaticMeshComponent:
-      Mesh: 9808448206523787780
-      Material: 17073322028550738675
-  - Entity: 8411289886123736624
-    TagComponent:
-      Tag: LeatherParts_low_Primitive_0
-    TransformComponent:
-      Translation: [0, 0, 0]
-      Rotation: [0, 0, 0]
-      Scale: [1, 1, 1]
-    HierarchyComponent:
-      Parent: 13968441503205898088
-      Children:
-        []
-    StaticMeshComponent:
-      Mesh: 16915135714368765785
-      Material: 6676803753272468920
-  - Entity: 4769820081474932153
-    TagComponent:
-      Tag: Lenses_low_Primitive_0
-    TransformComponent:
-      Translation: [0, 0, 0]
-      Rotation: [0, 0, 0]
-      Scale: [1, 1, 1]
-    HierarchyComponent:
-      Parent: 12496792434886261975
-      Children:
-        []
-    StaticMeshComponent:
-      Mesh: 8047863363254832814
-      Material: 12386874916838283376
-  - Entity: 4830847219763571769
-    TagComponent:
-      Tag: MetalParts_low_Primitive_0
-    TransformComponent:
-      Translation: [0, 0, 0]
-      Rotation: [0, 0, 0]
-      Scale: [1, 1, 1]
-    HierarchyComponent:
-      Parent: 15046912959302453566
-      Children:
-        []
-    StaticMeshComponent:
-      Mesh: 9010966859324372532
-      Material: 7576939720918905087
-  - Entity: 3689625112535852236
-    TagComponent:
-      Tag: RubberWood_low_Primitive_0
-    TransformComponent:
-      Translation: [0, 0, 0]
-      Rotation: [0, 0, 0]
-      Scale: [1, 1, 1]
-    HierarchyComponent:
-      Parent: 15016965203441506823
-      Children:
-        []
-    StaticMeshComponent:
-      Mesh: 10032230584710340853
-      Material: 3587010134174927858
-  - Entity: 2309897673315485630
-    TagComponent:
-      Tag: FlightHelmet
-    TransformComponent:
-      Translation: [78.65976, 53.70305, 0]
-      Rotation: [0, -0, 0]
-      Scale: [40, 40, 40]
-    HierarchyComponent:
-      Parent: 0
-      Children:
-        - 18298329815438644473
-  - Entity: 12527572461200342431
-    TagComponent:
-      Tag: Mesh_0
-    TransformComponent:
-      Translation: [0, 0, 0]
-      Rotation: [0, 0, 0]
-      Scale: [1, 1, 1]
-    HierarchyComponent:
-      Parent: 9251497249926176830
-      Children:
-        - 8962185671762250278
-        - 17592456877450172069
-        - 16211297263971241631
-        - 13198141757514981040
-        - 18022682883976554945
-        - 8990442735281482479
-        - 18201023964870521757
-        - 10632939449977631231
-        - 12635730015482121806
-  - Entity: 7736845600537112189
-    TagComponent:
-      Tag: Flowerpots
-    TransformComponent:
-      Translation: [0, 0, 0]
-      Rotation: [0, 0, 0]
-      Scale: [1, 1, 1]
-    HierarchyComponent:
-      Parent: 9251497249926176830
-      Children:
-        - 13752600680617844049
-  - Entity: 4814742719951103421
-    TagComponent:
-      Tag: Flowers
-    TransformComponent:
-      Translation: [0, 0, 0]
-      Rotation: [0, 0, 0]
-      Scale: [1, 1, 1]
-    HierarchyComponent:
-      Parent: 9251497249926176830
-      Children:
-        - 9198503198742021792
-  - Entity: 17950333656082433335
-    TagComponent:
-      Tag: Lions
-    TransformComponent:
-      Translation: [0, 0, 0]
-      Rotation: [0, 0, 0]
-      Scale: [1, 1, 1]
-    HierarchyComponent:
-      Parent: 9251497249926176830
-      Children:
-        - 16947337968313416840
-        - 1326014304208256657
-  - Entity: 3511607945600703144
-    TagComponent:
-      Tag: Shrub
-    TransformComponent:
-      Translation: [0, 0, 0]
-      Rotation: [0, 0, 0]
-      Scale: [1, 1, 1]
-    HierarchyComponent:
-      Parent: 9251497249926176830
-      Children:
-        - 14053706822261148235
-  - Entity: 10452057587685148730
-    TagComponent:
-      Tag: Curtains (green)
-    TransformComponent:
-      Translation: [0, 0, 0]
-      Rotation: [0, 0, 0]
-      Scale: [1, 1, 1]
-    HierarchyComponent:
-      Parent: 9251497249926176830
-      Children:
-        - 9468966493362514305
-        - 3426819792598754212
-  - Entity: 850344798046789503
-    TagComponent:
-      Tag: Curtains (blue)
-    TransformComponent:
-      Translation: [0, 0, 0]
-      Rotation: [0, 0, 0]
-      Scale: [1, 1, 1]
-    HierarchyComponent:
-      Parent: 9251497249926176830
-      Children:
-        - 16049212907839977046
-        - 14845296184576762597
-  - Entity: 3391188525280934540
-    TagComponent:
-      Tag: Curtains (red)
-    TransformComponent:
-      Translation: [0, 0, 0]
-      Rotation: [0, 0, 0]
-      Scale: [1, 1, 1]
-    HierarchyComponent:
-      Parent: 9251497249926176830
-      Children:
-        - 6324173818849992781
-        - 2526752099391000151
-  - Entity: 9131314643102807485
-    TagComponent:
-      Tag: Braziers
-    TransformComponent:
-      Translation: [0, 0, 0]
-      Rotation: [0, 0, 0]
-      Scale: [1, 1, 1]
-    HierarchyComponent:
-      Parent: 9251497249926176830
-      Children:
-        - 3163207635127556758
-  - Entity: 12284340345856640531
-    TagComponent:
-      Tag: Brazier chains
-    TransformComponent:
-      Translation: [0, 0, 0]
-      Rotation: [0, 0, 0]
-      Scale: [1, 1, 1]
-    HierarchyComponent:
-      Parent: 9251497249926176830
-      Children:
-        - 18258931904753151653
-  - Entity: 11840601829660933191
-    TagComponent:
-      Tag: Fountains
-    TransformComponent:
-      Translation: [0, 0, 0]
-      Rotation: [0, 0, 0]
-      Scale: [1, 1, 1]
-    HierarchyComponent:
-      Parent: 9251497249926176830
-      Children:
-        - 8330827716100596905
-  - Entity: 12311372704161057154
-    TagComponent:
-      Tag: Rods
-    TransformComponent:
-      Translation: [0, 0, 0]
-      Rotation: [0, 0, 0]
-      Scale: [1, 1, 1]
-    HierarchyComponent:
-      Parent: 9251497249926176830
-      Children:
-        - 3063775031580468050
-  - Entity: 1316149305405234137
-    TagComponent:
-      Tag: Roof
-    TransformComponent:
-      Translation: [0, 0, 0]
-      Rotation: [0, 0, 0]
-      Scale: [1, 1, 1]
-    HierarchyComponent:
-      Parent: 9251497249926176830
-      Children:
-        - 2379782774528358598
-  - Entity: 8962185671762250278
-    TagComponent:
-      Tag: Mesh_0_Primitive_0
-    TransformComponent:
-      Translation: [0, 0, 0]
-      Rotation: [0, 0, 0]
-      Scale: [1, 1, 1]
-    HierarchyComponent:
-      Parent: 12527572461200342431
-      Children:
-        []
-    StaticMeshComponent:
-      Mesh: 2220153872577626798
-      Material: 10051159133574294442
-  - Entity: 17592456877450172069
-    TagComponent:
-      Tag: Mesh_0_Primitive_1
-    TransformComponent:
-      Translation: [0, 0, 0]
-      Rotation: [0, 0, 0]
-      Scale: [1, 1, 1]
-    HierarchyComponent:
-      Parent: 12527572461200342431
-      Children:
-        []
-    StaticMeshComponent:
-      Mesh: 5612235856839324777
-      Material: 6349103434357564142
-  - Entity: 16211297263971241631
-    TagComponent:
-      Tag: Mesh_0_Primitive_2
-    TransformComponent:
-      Translation: [0, 0, 0]
-      Rotation: [0, 0, 0]
-      Scale: [1, 1, 1]
-    HierarchyComponent:
-      Parent: 12527572461200342431
-      Children:
-        []
-    StaticMeshComponent:
-      Mesh: 14325903939470384668
-      Material: 8736502972250848634
-  - Entity: 13198141757514981040
-    TagComponent:
-      Tag: Mesh_0_Primitive_3
-    TransformComponent:
-      Translation: [0, 0, 0]
-      Rotation: [0, 0, 0]
-      Scale: [1, 1, 1]
-    HierarchyComponent:
-      Parent: 12527572461200342431
-      Children:
-        []
-    StaticMeshComponent:
-      Mesh: 6560070729656261243
-      Material: 4756831789259088058
-  - Entity: 18022682883976554945
-    TagComponent:
-      Tag: Mesh_0_Primitive_4
-    TransformComponent:
-      Translation: [0, 0, 0]
-      Rotation: [0, 0, 0]
-      Scale: [1, 1, 1]
-    HierarchyComponent:
-      Parent: 12527572461200342431
-      Children:
-        []
-    StaticMeshComponent:
-      Mesh: 1673791072952261535
-      Material: 12381593450151428241
-  - Entity: 8990442735281482479
-    TagComponent:
-      Tag: Mesh_0_Primitive_5
-    TransformComponent:
-      Translation: [0, 0, 0]
-      Rotation: [0, 0, 0]
-      Scale: [1, 1, 1]
-    HierarchyComponent:
-      Parent: 12527572461200342431
-      Children:
-        []
-    StaticMeshComponent:
-      Mesh: 15777906348711328762
-      Material: 17396761942409581284
-  - Entity: 18201023964870521757
-    TagComponent:
-      Tag: Mesh_0_Primitive_6
-    TransformComponent:
-      Translation: [0, 0, 0]
-      Rotation: [0, 0, 0]
-      Scale: [1, 1, 1]
-    HierarchyComponent:
-      Parent: 12527572461200342431
-      Children:
-        []
-    StaticMeshComponent:
-      Mesh: 12205787463978693335
-      Material: 15529083784331757630
-  - Entity: 10632939449977631231
-    TagComponent:
-      Tag: Mesh_0_Primitive_7
-    TransformComponent:
-      Translation: [0, 0, 0]
-      Rotation: [0, 0, 0]
-      Scale: [1, 1, 1]
-    HierarchyComponent:
-      Parent: 12527572461200342431
-      Children:
-        []
-    StaticMeshComponent:
-      Mesh: 5720632228471702554
-      Material: 2385003743927989712
-  - Entity: 12635730015482121806
-    TagComponent:
-      Tag: Mesh_0_Primitive_8
-    TransformComponent:
-      Translation: [0, 0, 0]
-      Rotation: [0, 0, 0]
-      Scale: [1, 1, 1]
-    HierarchyComponent:
-      Parent: 12527572461200342431
-      Children:
-        []
-    StaticMeshComponent:
-      Mesh: 13742802974986305692
-      Material: 1351790369370411745
-  - Entity: 13752600680617844049
-    TagComponent:
-      Tag: Flowerpots_Primitive_0
-    TransformComponent:
-      Translation: [0, 0, 0]
-      Rotation: [0, 0, 0]
-      Scale: [1, 1, 1]
-    HierarchyComponent:
-      Parent: 7736845600537112189
-      Children:
-        []
-    StaticMeshComponent:
-      Mesh: 5986402957627556839
-      Material: 3635508589860200677
-  - Entity: 9198503198742021792
-    TagComponent:
-      Tag: Flowers_Primitive_0
-    TransformComponent:
-      Translation: [0, 0, 0]
-      Rotation: [0, 0, 0]
-      Scale: [1, 1, 1]
-    HierarchyComponent:
-      Parent: 4814742719951103421
-      Children:
-        []
-    StaticMeshComponent:
-      Mesh: 3874674024455554238
-      Material: 7305894499464846406
-  - Entity: 16947337968313416840
-    TagComponent:
-      Tag: Lions_Primitive_0
-    TransformComponent:
-      Translation: [0, 0, 0]
-      Rotation: [0, 0, 0]
-      Scale: [1, 1, 1]
-    HierarchyComponent:
-      Parent: 17950333656082433335
-      Children:
-        []
-    StaticMeshComponent:
-      Mesh: 7140830431065720594
-      Material: 2053644066673746009
-  - Entity: 1326014304208256657
-    TagComponent:
-      Tag: Lions_Primitive_1
-    TransformComponent:
-      Translation: [0, 0, 0]
-      Rotation: [0, 0, 0]
-      Scale: [1, 1, 1]
-    HierarchyComponent:
-      Parent: 17950333656082433335
-      Children:
-        []
-    StaticMeshComponent:
-      Mesh: 10332089540996564903
-      Material: 18089760612083291288
-  - Entity: 14053706822261148235
-    TagComponent:
-      Tag: Shrub_Primitive_0
-    TransformComponent:
-      Translation: [0, 0, 0]
-      Rotation: [0, 0, 0]
-      Scale: [1, 1, 1]
-    HierarchyComponent:
-      Parent: 3511607945600703144
-      Children:
-        []
-    StaticMeshComponent:
-      Mesh: 5482688447636322377
-      Material: 6320926565740111627
-  - Entity: 9468966493362514305
-    TagComponent:
-      Tag: Curtains (green)_Primitive_0
-    TransformComponent:
-      Translation: [0, 0, 0]
-      Rotation: [0, 0, 0]
-      Scale: [1, 1, 1]
-    HierarchyComponent:
-      Parent: 10452057587685148730
-      Children:
-        []
-    StaticMeshComponent:
-      Mesh: 3471778696746152796
-      Material: 18012873507129192588
-  - Entity: 3426819792598754212
-    TagComponent:
-      Tag: Curtains (green)_Primitive_1
-    TransformComponent:
-      Translation: [0, 0, 0]
-      Rotation: [0, 0, 0]
-      Scale: [1, 1, 1]
-    HierarchyComponent:
-      Parent: 10452057587685148730
-      Children:
-        []
-    StaticMeshComponent:
-      Mesh: 11451186213160227890
-      Material: 16744270478953138166
-  - Entity: 16049212907839977046
-    TagComponent:
-      Tag: Curtains (blue)_Primitive_0
-    TransformComponent:
-      Translation: [0, 0, 0]
-      Rotation: [0, 0, 0]
-      Scale: [1, 1, 1]
-    HierarchyComponent:
-      Parent: 850344798046789503
-      Children:
-        []
-    StaticMeshComponent:
-      Mesh: 13346003504517060693
-      Material: 16085830695486284805
-  - Entity: 14845296184576762597
-    TagComponent:
-      Tag: Curtains (blue)_Primitive_1
-    TransformComponent:
-      Translation: [0, 0, 0]
-      Rotation: [0, 0, 0]
-      Scale: [1, 1, 1]
-    HierarchyComponent:
-      Parent: 850344798046789503
-      Children:
-        []
-    StaticMeshComponent:
-      Mesh: 5326613399001570374
-      Material: 2810746752824269533
-  - Entity: 6324173818849992781
-    TagComponent:
-      Tag: Curtains (red)_Primitive_0
-    TransformComponent:
-      Translation: [0, 0, 0]
-      Rotation: [0, 0, 0]
-      Scale: [1, 1, 1]
-    HierarchyComponent:
-      Parent: 3391188525280934540
-      Children:
-        []
-    StaticMeshComponent:
-      Mesh: 11483929653628971340
-      Material: 2430472383928565410
-  - Entity: 2526752099391000151
-    TagComponent:
-      Tag: Curtains (red)_Primitive_1
-    TransformComponent:
-      Translation: [0, 0, 0]
-      Rotation: [0, 0, 0]
-      Scale: [1, 1, 1]
-    HierarchyComponent:
-      Parent: 3391188525280934540
-      Children:
-        []
-    StaticMeshComponent:
-      Mesh: 13613779281806729955
-      Material: 4385168756168433571
-  - Entity: 3163207635127556758
-    TagComponent:
-      Tag: Braziers_Primitive_0
-    TransformComponent:
-      Translation: [0, 0, 0]
-      Rotation: [0, 0, 0]
-      Scale: [1, 1, 1]
-    HierarchyComponent:
-      Parent: 9131314643102807485
-      Children:
-        []
-    StaticMeshComponent:
-      Mesh: 7644080631679312852
-      Material: 16716218856421156534
-  - Entity: 18258931904753151653
-    TagComponent:
-      Tag: Brazier chains_Primitive_0
-    TransformComponent:
-      Translation: [0, 0, 0]
-      Rotation: [0, 0, 0]
-      Scale: [1, 1, 1]
-    HierarchyComponent:
-      Parent: 12284340345856640531
-      Children:
-        []
-    StaticMeshComponent:
-      Mesh: 6698001431423713801
-      Material: 9369297552604712732
-  - Entity: 8330827716100596905
-    TagComponent:
-      Tag: Fountains_Primitive_0
-    TransformComponent:
-      Translation: [0, 0, 0]
-      Rotation: [0, 0, 0]
-      Scale: [1, 1, 1]
-    HierarchyComponent:
-      Parent: 11840601829660933191
-      Children:
-        []
-    StaticMeshComponent:
-      Mesh: 14581236797814382098
-      Material: 12231249857721946300
-  - Entity: 3063775031580468050
-    TagComponent:
-      Tag: Rods_Primitive_0
-    TransformComponent:
-      Translation: [0, 0, 0]
-      Rotation: [0, 0, 0]
-      Scale: [1, 1, 1]
-    HierarchyComponent:
-      Parent: 12311372704161057154
-      Children:
-        []
-    StaticMeshComponent:
-      Mesh: 14879467559709340461
-      Material: 13346781592115606968
-  - Entity: 2379782774528358598
-    TagComponent:
-      Tag: Roof_Primitive_0
-    TransformComponent:
-      Translation: [0, 0, 0]
-      Rotation: [0, 0, 0]
-      Scale: [1, 1, 1]
-    HierarchyComponent:
-      Parent: 1316149305405234137
-      Children:
-        []
-    StaticMeshComponent:
-      Mesh: 3292115844336249506
-      Material: 16445993165995195148
   - Entity: 9251497249926176830
     TagComponent:
       Tag: sponza
@@ -679,3 +23,681 @@ Entities:
         - 11840601829660933191
         - 12311372704161057154
         - 1316149305405234137
+  - Entity: 2379782774528358598
+    TagComponent:
+      Tag: Roof_Primitive_0
+    TransformComponent:
+      Translation: [0, 0, 0]
+      Rotation: [0, 0, 0]
+      Scale: [1, 1, 1]
+    HierarchyComponent:
+      Parent: 1316149305405234137
+      Children:
+        []
+    StaticMeshComponent:
+      Mesh: 3292115844336249506
+      Material: 16445993165995195148
+  - Entity: 3063775031580468050
+    TagComponent:
+      Tag: Rods_Primitive_0
+    TransformComponent:
+      Translation: [0, 0, 0]
+      Rotation: [0, 0, 0]
+      Scale: [1, 1, 1]
+    HierarchyComponent:
+      Parent: 12311372704161057154
+      Children:
+        []
+    StaticMeshComponent:
+      Mesh: 14879467559709340461
+      Material: 13346781592115606968
+  - Entity: 8330827716100596905
+    TagComponent:
+      Tag: Fountains_Primitive_0
+    TransformComponent:
+      Translation: [0, 0, 0]
+      Rotation: [0, 0, 0]
+      Scale: [1, 1, 1]
+    HierarchyComponent:
+      Parent: 11840601829660933191
+      Children:
+        []
+    StaticMeshComponent:
+      Mesh: 14581236797814382098
+      Material: 12231249857721946300
+  - Entity: 18258931904753151653
+    TagComponent:
+      Tag: Brazier chains_Primitive_0
+    TransformComponent:
+      Translation: [0, 0, 0]
+      Rotation: [0, 0, 0]
+      Scale: [1, 1, 1]
+    HierarchyComponent:
+      Parent: 12284340345856640531
+      Children:
+        []
+    StaticMeshComponent:
+      Mesh: 6698001431423713801
+      Material: 9369297552604712732
+  - Entity: 3163207635127556758
+    TagComponent:
+      Tag: Braziers_Primitive_0
+    TransformComponent:
+      Translation: [0, 0, 0]
+      Rotation: [0, 0, 0]
+      Scale: [1, 1, 1]
+    HierarchyComponent:
+      Parent: 9131314643102807485
+      Children:
+        []
+    StaticMeshComponent:
+      Mesh: 7644080631679312852
+      Material: 16716218856421156534
+  - Entity: 2526752099391000151
+    TagComponent:
+      Tag: Curtains (red)_Primitive_1
+    TransformComponent:
+      Translation: [0, 0, 0]
+      Rotation: [0, 0, 0]
+      Scale: [1, 1, 1]
+    HierarchyComponent:
+      Parent: 3391188525280934540
+      Children:
+        []
+    StaticMeshComponent:
+      Mesh: 13613779281806729955
+      Material: 4385168756168433571
+  - Entity: 6324173818849992781
+    TagComponent:
+      Tag: Curtains (red)_Primitive_0
+    TransformComponent:
+      Translation: [0, 0, 0]
+      Rotation: [0, 0, 0]
+      Scale: [1, 1, 1]
+    HierarchyComponent:
+      Parent: 3391188525280934540
+      Children:
+        []
+    StaticMeshComponent:
+      Mesh: 11483929653628971340
+      Material: 2430472383928565410
+  - Entity: 14845296184576762597
+    TagComponent:
+      Tag: Curtains (blue)_Primitive_1
+    TransformComponent:
+      Translation: [0, 0, 0]
+      Rotation: [0, 0, 0]
+      Scale: [1, 1, 1]
+    HierarchyComponent:
+      Parent: 850344798046789503
+      Children:
+        []
+    StaticMeshComponent:
+      Mesh: 5326613399001570374
+      Material: 2810746752824269533
+  - Entity: 16049212907839977046
+    TagComponent:
+      Tag: Curtains (blue)_Primitive_0
+    TransformComponent:
+      Translation: [0, 0, 0]
+      Rotation: [0, 0, 0]
+      Scale: [1, 1, 1]
+    HierarchyComponent:
+      Parent: 850344798046789503
+      Children:
+        []
+    StaticMeshComponent:
+      Mesh: 13346003504517060693
+      Material: 16085830695486284805
+  - Entity: 3426819792598754212
+    TagComponent:
+      Tag: Curtains (green)_Primitive_1
+    TransformComponent:
+      Translation: [0, 0, 0]
+      Rotation: [0, 0, 0]
+      Scale: [1, 1, 1]
+    HierarchyComponent:
+      Parent: 10452057587685148730
+      Children:
+        []
+    StaticMeshComponent:
+      Mesh: 11451186213160227890
+      Material: 16744270478953138166
+  - Entity: 9468966493362514305
+    TagComponent:
+      Tag: Curtains (green)_Primitive_0
+    TransformComponent:
+      Translation: [0, 0, 0]
+      Rotation: [0, 0, 0]
+      Scale: [1, 1, 1]
+    HierarchyComponent:
+      Parent: 10452057587685148730
+      Children:
+        []
+    StaticMeshComponent:
+      Mesh: 3471778696746152796
+      Material: 18012873507129192588
+  - Entity: 14053706822261148235
+    TagComponent:
+      Tag: Shrub_Primitive_0
+    TransformComponent:
+      Translation: [0, 0, 0]
+      Rotation: [0, 0, 0]
+      Scale: [1, 1, 1]
+    HierarchyComponent:
+      Parent: 3511607945600703144
+      Children:
+        []
+    StaticMeshComponent:
+      Mesh: 5482688447636322377
+      Material: 6320926565740111627
+  - Entity: 1326014304208256657
+    TagComponent:
+      Tag: Lions_Primitive_1
+    TransformComponent:
+      Translation: [0, 0, 0]
+      Rotation: [0, 0, 0]
+      Scale: [1, 1, 1]
+    HierarchyComponent:
+      Parent: 17950333656082433335
+      Children:
+        []
+    StaticMeshComponent:
+      Mesh: 10332089540996564903
+      Material: 18089760612083291288
+  - Entity: 16947337968313416840
+    TagComponent:
+      Tag: Lions_Primitive_0
+    TransformComponent:
+      Translation: [0, 0, 0]
+      Rotation: [0, 0, 0]
+      Scale: [1, 1, 1]
+    HierarchyComponent:
+      Parent: 17950333656082433335
+      Children:
+        []
+    StaticMeshComponent:
+      Mesh: 7140830431065720594
+      Material: 2053644066673746009
+  - Entity: 9198503198742021792
+    TagComponent:
+      Tag: Flowers_Primitive_0
+    TransformComponent:
+      Translation: [0, 0, 0]
+      Rotation: [0, 0, 0]
+      Scale: [1, 1, 1]
+    HierarchyComponent:
+      Parent: 4814742719951103421
+      Children:
+        []
+    StaticMeshComponent:
+      Mesh: 3874674024455554238
+      Material: 7305894499464846406
+  - Entity: 13752600680617844049
+    TagComponent:
+      Tag: Flowerpots_Primitive_0
+    TransformComponent:
+      Translation: [0, 0, 0]
+      Rotation: [0, 0, 0]
+      Scale: [1, 1, 1]
+    HierarchyComponent:
+      Parent: 7736845600537112189
+      Children:
+        []
+    StaticMeshComponent:
+      Mesh: 5986402957627556839
+      Material: 3635508589860200677
+  - Entity: 12635730015482121806
+    TagComponent:
+      Tag: Mesh_0_Primitive_8
+    TransformComponent:
+      Translation: [0, 0, 0]
+      Rotation: [0, 0, 0]
+      Scale: [1, 1, 1]
+    HierarchyComponent:
+      Parent: 12527572461200342431
+      Children:
+        []
+    StaticMeshComponent:
+      Mesh: 13742802974986305692
+      Material: 1351790369370411745
+  - Entity: 10632939449977631231
+    TagComponent:
+      Tag: Mesh_0_Primitive_7
+    TransformComponent:
+      Translation: [0, 0, 0]
+      Rotation: [0, 0, 0]
+      Scale: [1, 1, 1]
+    HierarchyComponent:
+      Parent: 12527572461200342431
+      Children:
+        []
+    StaticMeshComponent:
+      Mesh: 5720632228471702554
+      Material: 2385003743927989712
+  - Entity: 18201023964870521757
+    TagComponent:
+      Tag: Mesh_0_Primitive_6
+    TransformComponent:
+      Translation: [0, 0, 0]
+      Rotation: [0, 0, 0]
+      Scale: [1, 1, 1]
+    HierarchyComponent:
+      Parent: 12527572461200342431
+      Children:
+        []
+    StaticMeshComponent:
+      Mesh: 12205787463978693335
+      Material: 15529083784331757630
+  - Entity: 8990442735281482479
+    TagComponent:
+      Tag: Mesh_0_Primitive_5
+    TransformComponent:
+      Translation: [0, 0, 0]
+      Rotation: [0, 0, 0]
+      Scale: [1, 1, 1]
+    HierarchyComponent:
+      Parent: 12527572461200342431
+      Children:
+        []
+    StaticMeshComponent:
+      Mesh: 15777906348711328762
+      Material: 17396761942409581284
+  - Entity: 18022682883976554945
+    TagComponent:
+      Tag: Mesh_0_Primitive_4
+    TransformComponent:
+      Translation: [0, 0, 0]
+      Rotation: [0, 0, 0]
+      Scale: [1, 1, 1]
+    HierarchyComponent:
+      Parent: 12527572461200342431
+      Children:
+        []
+    RigidBody3DComponent:
+      Mass: 1
+      Type: 0
+      Velocity: [0, 0, 0]
+      AngularVelocity: [0, 0, 0]
+      UseGravity: true
+      Friction: 0.5
+      Restitution: 0.5
+    BoxCollider3DComponent:
+      Size: [255.9, 13.7, 270.5]
+      Offset: [0, 0, 0]
+    StaticMeshComponent:
+      Mesh: 1673791072952261535
+      Material: 12381593450151428241
+  - Entity: 13198141757514981040
+    TagComponent:
+      Tag: Mesh_0_Primitive_3
+    TransformComponent:
+      Translation: [0, 0, 0]
+      Rotation: [0, 0, 0]
+      Scale: [1, 1, 1]
+    HierarchyComponent:
+      Parent: 12527572461200342431
+      Children:
+        []
+    StaticMeshComponent:
+      Mesh: 6560070729656261243
+      Material: 4756831789259088058
+  - Entity: 16211297263971241631
+    TagComponent:
+      Tag: Mesh_0_Primitive_2
+    TransformComponent:
+      Translation: [0, 0, 0]
+      Rotation: [0, 0, 0]
+      Scale: [1, 1, 1]
+    HierarchyComponent:
+      Parent: 12527572461200342431
+      Children:
+        []
+    StaticMeshComponent:
+      Mesh: 14325903939470384668
+      Material: 8736502972250848634
+  - Entity: 17592456877450172069
+    TagComponent:
+      Tag: Mesh_0_Primitive_1
+    TransformComponent:
+      Translation: [0, 0, 0]
+      Rotation: [0, 0, 0]
+      Scale: [1, 1, 1]
+    HierarchyComponent:
+      Parent: 12527572461200342431
+      Children:
+        []
+    StaticMeshComponent:
+      Mesh: 5612235856839324777
+      Material: 6349103434357564142
+  - Entity: 8962185671762250278
+    TagComponent:
+      Tag: Mesh_0_Primitive_0
+    TransformComponent:
+      Translation: [0, 0, 0]
+      Rotation: [0, 0, 0]
+      Scale: [1, 1, 1]
+    HierarchyComponent:
+      Parent: 12527572461200342431
+      Children:
+        []
+    StaticMeshComponent:
+      Mesh: 2220153872577626798
+      Material: 10051159133574294442
+  - Entity: 1316149305405234137
+    TagComponent:
+      Tag: Roof
+    TransformComponent:
+      Translation: [0, 0, 0]
+      Rotation: [0, 0, 0]
+      Scale: [1, 1, 1]
+    HierarchyComponent:
+      Parent: 9251497249926176830
+      Children:
+        - 2379782774528358598
+  - Entity: 12311372704161057154
+    TagComponent:
+      Tag: Rods
+    TransformComponent:
+      Translation: [0, 0, 0]
+      Rotation: [0, 0, 0]
+      Scale: [1, 1, 1]
+    HierarchyComponent:
+      Parent: 9251497249926176830
+      Children:
+        - 3063775031580468050
+  - Entity: 11840601829660933191
+    TagComponent:
+      Tag: Fountains
+    TransformComponent:
+      Translation: [0, 0, 0]
+      Rotation: [0, 0, 0]
+      Scale: [1, 1, 1]
+    HierarchyComponent:
+      Parent: 9251497249926176830
+      Children:
+        - 8330827716100596905
+  - Entity: 12284340345856640531
+    TagComponent:
+      Tag: Brazier chains
+    TransformComponent:
+      Translation: [0, 0, 0]
+      Rotation: [0, 0, 0]
+      Scale: [1, 1, 1]
+    HierarchyComponent:
+      Parent: 9251497249926176830
+      Children:
+        - 18258931904753151653
+  - Entity: 9131314643102807485
+    TagComponent:
+      Tag: Braziers
+    TransformComponent:
+      Translation: [0, 0, 0]
+      Rotation: [0, 0, 0]
+      Scale: [1, 1, 1]
+    HierarchyComponent:
+      Parent: 9251497249926176830
+      Children:
+        - 3163207635127556758
+  - Entity: 3391188525280934540
+    TagComponent:
+      Tag: Curtains (red)
+    TransformComponent:
+      Translation: [0, 0, 0]
+      Rotation: [0, 0, 0]
+      Scale: [1, 1, 1]
+    HierarchyComponent:
+      Parent: 9251497249926176830
+      Children:
+        - 6324173818849992781
+        - 2526752099391000151
+  - Entity: 850344798046789503
+    TagComponent:
+      Tag: Curtains (blue)
+    TransformComponent:
+      Translation: [0, 0, 0]
+      Rotation: [0, 0, 0]
+      Scale: [1, 1, 1]
+    HierarchyComponent:
+      Parent: 9251497249926176830
+      Children:
+        - 16049212907839977046
+        - 14845296184576762597
+  - Entity: 10452057587685148730
+    TagComponent:
+      Tag: Curtains (green)
+    TransformComponent:
+      Translation: [0, 0, 0]
+      Rotation: [0, 0, 0]
+      Scale: [1, 1, 1]
+    HierarchyComponent:
+      Parent: 9251497249926176830
+      Children:
+        - 9468966493362514305
+        - 3426819792598754212
+  - Entity: 3511607945600703144
+    TagComponent:
+      Tag: Shrub
+    TransformComponent:
+      Translation: [0, 0, 0]
+      Rotation: [0, 0, 0]
+      Scale: [1, 1, 1]
+    HierarchyComponent:
+      Parent: 9251497249926176830
+      Children:
+        - 14053706822261148235
+  - Entity: 17950333656082433335
+    TagComponent:
+      Tag: Lions
+    TransformComponent:
+      Translation: [0, 0, 0]
+      Rotation: [0, 0, 0]
+      Scale: [1, 1, 1]
+    HierarchyComponent:
+      Parent: 9251497249926176830
+      Children:
+        - 16947337968313416840
+        - 1326014304208256657
+  - Entity: 4814742719951103421
+    TagComponent:
+      Tag: Flowers
+    TransformComponent:
+      Translation: [0, 0, 0]
+      Rotation: [0, 0, 0]
+      Scale: [1, 1, 1]
+    HierarchyComponent:
+      Parent: 9251497249926176830
+      Children:
+        - 9198503198742021792
+  - Entity: 7736845600537112189
+    TagComponent:
+      Tag: Flowerpots
+    TransformComponent:
+      Translation: [0, 0, 0]
+      Rotation: [0, 0, 0]
+      Scale: [1, 1, 1]
+    HierarchyComponent:
+      Parent: 9251497249926176830
+      Children:
+        - 13752600680617844049
+  - Entity: 12527572461200342431
+    TagComponent:
+      Tag: Mesh_0
+    TransformComponent:
+      Translation: [0, 0, 0]
+      Rotation: [0, 0, 0]
+      Scale: [1, 1, 1]
+    HierarchyComponent:
+      Parent: 9251497249926176830
+      Children:
+        - 8962185671762250278
+        - 17592456877450172069
+        - 16211297263971241631
+        - 13198141757514981040
+        - 18022682883976554945
+        - 8990442735281482479
+        - 18201023964870521757
+        - 10632939449977631231
+        - 12635730015482121806
+  - Entity: 2309897673315485630
+    TagComponent:
+      Tag: FlightHelmet
+    TransformComponent:
+      Translation: [78.65976, 53.70305, 0]
+      Rotation: [0, -0, 0]
+      Scale: [40, 40, 40]
+    HierarchyComponent:
+      Parent: 0
+      Children:
+        - 18298329815438644473
+    RigidBody3DComponent:
+      Mass: 1
+      Type: 1
+      Velocity: [0, 0, 0]
+      AngularVelocity: [0, 0, 0]
+      UseGravity: true
+      Friction: 0.5
+      Restitution: 0.5
+    BoxCollider3DComponent:
+      Size: [9, 13.7, 7.2]
+      Offset: [0, 0.4, 0]
+  - Entity: 3689625112535852236
+    TagComponent:
+      Tag: RubberWood_low_Primitive_0
+    TransformComponent:
+      Translation: [0, 0, 0]
+      Rotation: [0, 0, 0]
+      Scale: [1, 1, 1]
+    HierarchyComponent:
+      Parent: 15016965203441506823
+      Children:
+        []
+    StaticMeshComponent:
+      Mesh: 10032230584710340853
+      Material: 3587010134174927858
+  - Entity: 4830847219763571769
+    TagComponent:
+      Tag: MetalParts_low_Primitive_0
+    TransformComponent:
+      Translation: [0, 0, 0]
+      Rotation: [0, 0, 0]
+      Scale: [1, 1, 1]
+    HierarchyComponent:
+      Parent: 15046912959302453566
+      Children:
+        []
+    StaticMeshComponent:
+      Mesh: 9010966859324372532
+      Material: 7576939720918905087
+  - Entity: 4769820081474932153
+    TagComponent:
+      Tag: Lenses_low_Primitive_0
+    TransformComponent:
+      Translation: [0, 0, 0]
+      Rotation: [0, 0, 0]
+      Scale: [1, 1, 1]
+    HierarchyComponent:
+      Parent: 12496792434886261975
+      Children:
+        []
+    StaticMeshComponent:
+      Mesh: 8047863363254832814
+      Material: 12386874916838283376
+  - Entity: 8411289886123736624
+    TagComponent:
+      Tag: LeatherParts_low_Primitive_0
+    TransformComponent:
+      Translation: [0, 0, 0]
+      Rotation: [0, 0, 0]
+      Scale: [1, 1, 1]
+    HierarchyComponent:
+      Parent: 13968441503205898088
+      Children:
+        []
+    StaticMeshComponent:
+      Mesh: 16915135714368765785
+      Material: 6676803753272468920
+  - Entity: 15126191386373777595
+    TagComponent:
+      Tag: GlassPlastic_low_Primitive_0
+    TransformComponent:
+      Translation: [0, 0, 0]
+      Rotation: [0, 0, 0]
+      Scale: [1, 1, 1]
+    HierarchyComponent:
+      Parent: 13953111263288906839
+      Children:
+        []
+    StaticMeshComponent:
+      Mesh: 9808448206523787780
+      Material: 17073322028550738675
+  - Entity: 18298329815438644473
+    TagComponent:
+      Tag: FlightHelmet
+    TransformComponent:
+      Translation: [0, 0, 0]
+      Rotation: [0, 0, 0]
+      Scale: [1, 1, 1]
+    HierarchyComponent:
+      Parent: 2309897673315485630
+      Children:
+        - 13953111263288906839
+        - 13968441503205898088
+        - 12496792434886261975
+        - 15046912959302453566
+        - 15016965203441506823
+  - Entity: 15016965203441506823
+    TagComponent:
+      Tag: RubberWood_low
+    TransformComponent:
+      Translation: [0, 0, 0]
+      Rotation: [0, 0, 0]
+      Scale: [1, 1, 1]
+    HierarchyComponent:
+      Parent: 18298329815438644473
+      Children:
+        - 3689625112535852236
+  - Entity: 15046912959302453566
+    TagComponent:
+      Tag: MetalParts_low
+    TransformComponent:
+      Translation: [0, 0, 0]
+      Rotation: [0, 0, 0]
+      Scale: [1, 1, 1]
+    HierarchyComponent:
+      Parent: 18298329815438644473
+      Children:
+        - 4830847219763571769
+  - Entity: 12496792434886261975
+    TagComponent:
+      Tag: Lenses_low
+    TransformComponent:
+      Translation: [0, 0, 0]
+      Rotation: [0, 0, 0]
+      Scale: [1, 1, 1]
+    HierarchyComponent:
+      Parent: 18298329815438644473
+      Children:
+        - 4769820081474932153
+  - Entity: 13968441503205898088
+    TagComponent:
+      Tag: LeatherParts_low
+    TransformComponent:
+      Translation: [0, 0, 0]
+      Rotation: [0, 0, 0]
+      Scale: [1, 1, 1]
+    HierarchyComponent:
+      Parent: 18298329815438644473
+      Children:
+        - 8411289886123736624
+  - Entity: 13953111263288906839
+    TagComponent:
+      Tag: GlassPlastic_low
+    TransformComponent:
+      Translation: [0, 0, 0]
+      Rotation: [0, 0, 0]
+      Scale: [1, 1, 1]
+    HierarchyComponent:
+      Parent: 18298329815438644473
+      Children:
+        - 15126191386373777595
