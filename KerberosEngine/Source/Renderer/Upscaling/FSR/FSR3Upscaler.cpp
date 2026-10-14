@@ -158,9 +158,9 @@ namespace Kerberos {
             .width = m_Settings.displayWidth,
             .height = m_Settings.displayHeight
         };
-        upscaleDesc.flags = /*FFX_UPSCALE_ENABLE_HIGH_DYNAMIC_RANGE |*/
+        upscaleDesc.flags = FFX_UPSCALE_ENABLE_HIGH_DYNAMIC_RANGE |
                             FFX_UPSCALE_ENABLE_AUTO_EXPOSURE |
-                            FFX_UPSCALE_ENABLE_MOTION_VECTORS_JITTER_CANCELLATION | // TODO: use unjittered matrices for motion vectors
+                            FFX_UPSCALE_ENABLE_MOTION_VECTORS_JITTER_CANCELLATION |
                             FFX_UPSCALE_ENABLE_DEBUG_CHECKING;
 
         upscaleDesc.fpMessage = [](const uint32_t type, const wchar_t* message) {

@@ -1337,7 +1337,7 @@ void Renderer::RecordQueuedSceneRender(const vk::raii::CommandBuffer& cmd)
         s_Data->HasTemporalHistory ? s_Data->PreviousProjection : s_Data->PendingRender.Projection;
     glm::mat4 currentProjection = s_Data->PendingRender.Projection;
     currentProjection[2][0] += 2.0f * jitter.x / s_Data->RenderSize.x;
-    currentProjection[2][1] += 2.0f * jitter.y / s_Data->RenderSize.y;
+    currentProjection[2][1] -= 2.0f * jitter.y / s_Data->RenderSize.y;
     s_Data->PreviousView = s_Data->PendingRender.View;
     s_Data->PreviousProjection = currentProjection;
 
@@ -4810,38 +4810,44 @@ void Renderer::CompileAndExecuteRenderGraph(const vk::raii::CommandBuffer& cmd,
                              return [=](const vk::raii::CommandBuffer& execCmd) { Renderer::ApplyBloom(execCmd, frameIndex); };
         });
 
-        s_Data->RenderGraph.AddPass("Anti-Aliasing", [&](Graph::PassBuilder& builder) -> PassExecuteFunction
+        const bool useFsrInput = s_Data->UpscalingMode == UpscalerType::FSR3;
+        const auto hUpscaleInput = useFsrInput ? hResolve : hComposite;
+
+        if (!useFsrInput)
         {
-            builder.Read(hResolve,
-                         vk::ImageLayout::eShaderReadOnlyOptimal,
-                         vk::PipelineStageFlagBits2::eFragmentShader,
-                         vk::AccessFlagBits2::eShaderRead);
-            builder.Write(hComposite,
-                          vk::ImageLayout::eColorAttachmentOptimal,
-                          vk::PipelineStageFlagBits2::eColorAttachmentOutput,
-                          vk::AccessFlagBits2::eColorAttachmentWrite);
-
-            if (s_Data->AntiAliasingMode == AntiAliasingMode::SMAA)
+            s_Data->RenderGraph.AddPass("Anti-Aliasing", [&](Graph::PassBuilder& builder) -> PassExecuteFunction
             {
-                const auto hSMAAEdges = s_Data->RenderGraph.ImportImage(*s_Data->SMAAResources.EdgesImage.Image, undefinedState, colorRange);
-                const auto hSMAABlend = s_Data->RenderGraph.ImportImage(*s_Data->SMAAResources.BlendImage.Image, undefinedState, colorRange);
-
-                builder.Write(hSMAAEdges,
+                builder.Read(hResolve,
+                             vk::ImageLayout::eShaderReadOnlyOptimal,
+                             vk::PipelineStageFlagBits2::eFragmentShader,
+                             vk::AccessFlagBits2::eShaderRead);
+                builder.Write(hComposite,
                               vk::ImageLayout::eColorAttachmentOptimal,
                               vk::PipelineStageFlagBits2::eColorAttachmentOutput,
                               vk::AccessFlagBits2::eColorAttachmentWrite);
-                builder.Write(hSMAABlend,
-                              vk::ImageLayout::eColorAttachmentOptimal,
-                              vk::PipelineStageFlagBits2::eColorAttachmentOutput,
-                              vk::AccessFlagBits2::eColorAttachmentWrite);
-            }
 
-            return [=](const vk::raii::CommandBuffer& execCmd) { Renderer::ApplyAntiAliasing(execCmd, frameIndex); };
-        });
+                if (s_Data->AntiAliasingMode == AntiAliasingMode::SMAA)
+                {
+                    const auto hSMAAEdges = s_Data->RenderGraph.ImportImage(*s_Data->SMAAResources.EdgesImage.Image, undefinedState, colorRange);
+                    const auto hSMAABlend = s_Data->RenderGraph.ImportImage(*s_Data->SMAAResources.BlendImage.Image, undefinedState, colorRange);
+
+                    builder.Write(hSMAAEdges,
+                                  vk::ImageLayout::eColorAttachmentOptimal,
+                                  vk::PipelineStageFlagBits2::eColorAttachmentOutput,
+                                  vk::AccessFlagBits2::eColorAttachmentWrite);
+                    builder.Write(hSMAABlend,
+                                  vk::ImageLayout::eColorAttachmentOptimal,
+                                  vk::PipelineStageFlagBits2::eColorAttachmentOutput,
+                                  vk::AccessFlagBits2::eColorAttachmentWrite);
+                }
+
+                return [=](const vk::raii::CommandBuffer& execCmd) { Renderer::ApplyAntiAliasing(execCmd, frameIndex); };
+            });
+        }
 
         s_Data->RenderGraph.AddPass("Upscaling", [&](Graph::PassBuilder& builder) -> PassExecuteFunction
         {
-            builder.Read(hComposite,
+            builder.Read(hUpscaleInput,
                          vk::ImageLayout::eShaderReadOnlyOptimal,
                          vk::PipelineStageFlagBits2::eComputeShader,
                          vk::AccessFlagBits2::eShaderRead);
@@ -5687,6 +5693,7 @@ void Renderer::ApplyUpscaling(const vk::raii::CommandBuffer &cmd, uint32_t frame
     KBR_TRACY_FUNCTION();
 
     WriteGPUTimestamp(cmd, frameIndex, static_cast<uint32_t>(GPUTimestampQuery::UpscalingPassBegin));
+    const bool useFsrInput = s_Data->UpscalingMode == UpscalerType::FSR3;
 
     /*const vk::ImageMemoryBarrier2 compositeBarrier{
         .srcStageMask = vk::PipelineStageFlagBits2::eColorAttachmentOutput,
@@ -5791,9 +5798,9 @@ void Renderer::ApplyUpscaling(const vk::raii::CommandBuffer &cmd, uint32_t frame
     const UpscalerDispatchInfo dispatchInfo{
         .commandBuffer = cmd,
         .inputColor = {
-            .image = s_Data->CompositeImage.Image,
-            .view = s_Data->CompositeImage.ImageView,
-            .format = s_Data->CompositeImage.Format,
+            .image = useFsrInput ? s_Data->ResolveImage.Image : s_Data->CompositeImage.Image,
+            .view = useFsrInput ? s_Data->ResolveImage.ImageView : s_Data->CompositeImage.ImageView,
+            .format = useFsrInput ? s_Data->ResolveImage.Format : s_Data->CompositeImage.Format,
             .usage = vk::ImageUsageFlagBits::eColorAttachment | vk::ImageUsageFlagBits::eSampled,
             .width = static_cast<uint32_t>(s_Data->RenderSize.x),
             .height = static_cast<uint32_t>(s_Data->RenderSize.y),

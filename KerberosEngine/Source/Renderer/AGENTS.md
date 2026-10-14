@@ -85,6 +85,11 @@ The active pass order is approximately:
 13. presentation
 14. mouse picking
 
+When FSR3 is active, the spatial anti-aliasing pass is skipped and FSR3
+consumes the pre-AA HDR resolve so its internal temporal history receives the
+original jittered samples. Native presentation continues to use the
+anti-aliasing pass and composite image.
+
 `RenderGraph.hpp/.cpp` is a legacy graph with different resource ownership,
 semaphores, and queue submissions. Do not extend or mix it with `Graph`
 without first proving it is still used.
