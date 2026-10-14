@@ -256,6 +256,7 @@ struct BloomData
     std::vector<vk::raii::ImageView> ImageViews{};
     std::vector<glm::vec2> MipSizes{};
     vk::Format Format = vk::Format::eUndefined;
+    vk::ImageLayout CurrentLayout = vk::ImageLayout::eUndefined;
 
     constexpr static uint32_t MaxMipLevels = 10;
     constexpr static uint32_t DefaultMipLevels = 7;
@@ -3111,6 +3112,7 @@ void Renderer::ResizeResources(const uint32_t width, const uint32_t height)
     s_Data->DepthImage.Clear();
     s_Data->Transparency.AccumulationImage.Clear();
     s_Data->Transparency.RevealageImage.Clear();
+    s_Data->Transparency.DistortionImage.Clear();
     s_Data->ResolveImage.Clear();
     s_Data->ReactiveImage.Clear();
     s_Data->BloomMaskImage.Clear();
@@ -4587,6 +4589,39 @@ void Renderer::CompileAndExecuteRenderGraph(const vk::raii::CommandBuffer& cmd,
                       : vk::AccessFlagBits2::eShaderRead
     };
 
+    const ImageState colorState = stateForLayout(
+        s_Data->ColorImage.CurrentLayout,
+        vk::PipelineStageFlagBits2::eFragmentShader,
+        vk::AccessFlagBits2::eShaderRead);
+    const ImageState accumState = stateForLayout(
+        s_Data->Transparency.AccumulationImage.CurrentLayout,
+        vk::PipelineStageFlagBits2::eFragmentShader,
+        vk::AccessFlagBits2::eShaderRead);
+    const ImageState revealState = stateForLayout(
+        s_Data->Transparency.RevealageImage.CurrentLayout,
+        vk::PipelineStageFlagBits2::eFragmentShader,
+        vk::AccessFlagBits2::eShaderRead);
+    const ImageState distortState = stateForLayout(
+        s_Data->Transparency.DistortionImage.CurrentLayout,
+        vk::PipelineStageFlagBits2::eFragmentShader,
+        vk::AccessFlagBits2::eShaderRead);
+    const ImageState resolveState = stateForLayout(
+        s_Data->ResolveImage.CurrentLayout,
+        vk::PipelineStageFlagBits2::eFragmentShader | vk::PipelineStageFlagBits2::eComputeShader,
+        vk::AccessFlagBits2::eShaderRead);
+    const ImageState bloomMaskState = stateForLayout(
+        s_Data->BloomMaskImage.CurrentLayout,
+        vk::PipelineStageFlagBits2::eComputeShader,
+        vk::AccessFlagBits2::eShaderRead);
+    const ImageState bloomState = stateForLayout(
+        s_Data->Bloom.CurrentLayout,
+        vk::PipelineStageFlagBits2::eFragmentShader,
+        vk::AccessFlagBits2::eShaderRead);
+    const ImageState compositeState = stateForLayout(
+        s_Data->CompositeImage.CurrentLayout,
+        vk::PipelineStageFlagBits2::eComputeShader,
+        vk::AccessFlagBits2::eShaderRead);
+
     constexpr vk::ImageSubresourceRange depthRange{ .aspectMask = vk::ImageAspectFlagBits::eDepth,
                                                     .baseMipLevel = 0,
                                                     .levelCount = 1,
@@ -4619,15 +4654,15 @@ void Renderer::CompileAndExecuteRenderGraph(const vk::raii::CommandBuffer& cmd,
         const auto hGTAO = s_Data->RenderGraph.ImportImage(*s_Data->GTAOImage.Image, gtaoState, colorRange);
         const auto hGTAOScratch =
             s_Data->RenderGraph.ImportImage(*s_Data->GTAOScratchImage.Image, gtaoScratchState, colorRange);
-        const auto hColor = s_Data->RenderGraph.ImportImage(*s_Data->ColorImage.Image, undefinedState, colorRange);
+        const auto hColor = s_Data->RenderGraph.ImportImage(*s_Data->ColorImage.Image, colorState, colorRange);
         const auto hPicking = s_Data->RenderGraph.ImportImage(*s_Data->PickingImage.Image, pickingState, colorRange);
-        const auto hAccum = s_Data->RenderGraph.ImportImage(*s_Data->Transparency.AccumulationImage.Image, undefinedState, colorRange);
-        const auto hReveal = s_Data->RenderGraph.ImportImage(*s_Data->Transparency.RevealageImage.Image, undefinedState, colorRange);
-        const auto hDistort = s_Data->RenderGraph.ImportImage(*s_Data->Transparency.DistortionImage.Image, undefinedState, colorRange);
-        const auto hResolve = s_Data->RenderGraph.ImportImage(*s_Data->ResolveImage.Image, undefinedState, colorRange);
-        const auto hBloomMask = s_Data->RenderGraph.ImportImage(*s_Data->BloomMaskImage.Image, undefinedState, colorRange);
-        const auto hBloom = s_Data->RenderGraph.ImportImage(*s_Data->Bloom.Image, undefinedState, bloomRange);
-        const auto hComposite = s_Data->RenderGraph.ImportImage(*s_Data->CompositeImage.Image, undefinedState, colorRange);
+        const auto hAccum = s_Data->RenderGraph.ImportImage(*s_Data->Transparency.AccumulationImage.Image, accumState, colorRange);
+        const auto hReveal = s_Data->RenderGraph.ImportImage(*s_Data->Transparency.RevealageImage.Image, revealState, colorRange);
+        const auto hDistort = s_Data->RenderGraph.ImportImage(*s_Data->Transparency.DistortionImage.Image, distortState, colorRange);
+        const auto hResolve = s_Data->RenderGraph.ImportImage(*s_Data->ResolveImage.Image, resolveState, colorRange);
+        const auto hBloomMask = s_Data->RenderGraph.ImportImage(*s_Data->BloomMaskImage.Image, bloomMaskState, colorRange);
+        const auto hBloom = s_Data->RenderGraph.ImportImage(*s_Data->Bloom.Image, bloomState, bloomRange);
+        const auto hComposite = s_Data->RenderGraph.ImportImage(*s_Data->CompositeImage.Image, compositeState, colorRange);
         const auto hOutput = s_Data->RenderGraph.ImportImage(*s_Data->OutputImage.Image, outputState, colorRange);
         const auto hFinal = s_Data->RenderGraph.ImportImage(*s_Data->FinalImage.Image, finalState, colorRange);
 
@@ -4782,7 +4817,12 @@ void Renderer::CompileAndExecuteRenderGraph(const vk::raii::CommandBuffer& cmd,
                           vk::PipelineStageFlagBits2::eColorAttachmentOutput,
                           vk::AccessFlagBits2::eColorAttachmentWrite);
 
-            // TODO: Colliders are written in this pass, maybe move it to a separate pass for better organization
+            // Physics colliders render into the opaque color target from within
+            // this pass, so declare the color write here as well.
+            builder.Write(hColor,
+                          vk::ImageLayout::eColorAttachmentOptimal,
+                          vk::PipelineStageFlagBits2::eColorAttachmentOutput,
+                          vk::AccessFlagBits2::eColorAttachmentWrite);
             builder.Write(hReactive,
                           vk::ImageLayout::eColorAttachmentOptimal,
                           vk::PipelineStageFlagBits2::eColorAttachmentOutput,
@@ -4971,6 +5011,15 @@ void Renderer::CompileAndExecuteRenderGraph(const vk::raii::CommandBuffer& cmd,
     s_Data->PickingImage.CurrentLayout = vk::ImageLayout::eTransferSrcOptimal;
     s_Data->OutputImage.CurrentLayout = vk::ImageLayout::eShaderReadOnlyOptimal;
     s_Data->FinalImage.CurrentLayout = vk::ImageLayout::eShaderReadOnlyOptimal;
+    s_Data->ColorImage.CurrentLayout = vk::ImageLayout::eShaderReadOnlyOptimal;
+    s_Data->Transparency.AccumulationImage.CurrentLayout = vk::ImageLayout::eShaderReadOnlyOptimal;
+    s_Data->Transparency.RevealageImage.CurrentLayout = vk::ImageLayout::eShaderReadOnlyOptimal;
+    s_Data->Transparency.DistortionImage.CurrentLayout = vk::ImageLayout::eShaderReadOnlyOptimal;
+    s_Data->ResolveImage.CurrentLayout = vk::ImageLayout::eShaderReadOnlyOptimal;
+    s_Data->BloomMaskImage.CurrentLayout = vk::ImageLayout::eShaderReadOnlyOptimal;
+    s_Data->Bloom.CurrentLayout = vk::ImageLayout::eShaderReadOnlyOptimal;
+    if (s_Data->UpscalingMode == UpscalerType::Native)
+        s_Data->CompositeImage.CurrentLayout = vk::ImageLayout::eShaderReadOnlyOptimal;
 }
 
 void Renderer::RenderShadowPass(const vk::raii::CommandBuffer& cmd,
@@ -7119,6 +7168,8 @@ void Renderer::CreateBloomImage(const uint32_t width, const uint32_t height)
 
     context.SetObjectDebugName(s_Data->Bloom.Image, "Bloom Image");
     context.SetObjectDebugName(s_Data->Bloom.ImageMemory, "Bloom Image Memory");
+
+    s_Data->Bloom.CurrentLayout = vk::ImageLayout::eUndefined;
 
     s_Data->Bloom.MipSizes.clear();
     s_Data->Bloom.MipSizes.reserve(mipLevels);
