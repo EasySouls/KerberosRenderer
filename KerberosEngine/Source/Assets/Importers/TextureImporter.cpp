@@ -2,6 +2,7 @@
 #include "Core/Core.hpp"
 #include "Renderer/Textures/Texture2D.hpp"
 #include "Renderer/Textures/KTX2Encoder.hpp"
+#include "Renderer/Textures/KTX2FormatSelector.hpp"
 #include "Profiling/Profilers.hpp"
 #include "Utils/KtxConversion.hpp"
 #include "ImportUtils.hpp"
@@ -35,10 +36,13 @@ namespace Kerberos
 {
 	Ref<Texture2D> TextureImporter::ImportTexture(AssetHandle /*handle*/, const AssetMetadata& metadata)
 	{
-		return ImportTexture(metadata.Filepath);
+		// TODO: Read an sRGB flag from import settings (.meta) once the editor
+		// exposes an import options dialog, for now authored textures default to
+		// sRGB color interpretation.
+		return ImportTexture(metadata.Filepath, true);
 	}
 
-	Ref<Texture2D> TextureImporter::ImportTexture(const std::filesystem::path& filepath)
+	Ref<Texture2D> TextureImporter::ImportTexture(const std::filesystem::path& filepath, const bool srgb)
 	{
 		KBR_TRACY_FUNCTION();
 
@@ -83,7 +87,7 @@ namespace Kerberos
 			return texture;
 		}
 
-		auto [spec, buffer] = LoadTextureData(filepath, true);
+		auto [spec, buffer] = LoadTextureData(filepath, true, 0, srgb);
 		auto ktx2Filepath = filepath;
 		ktx2Filepath.replace_extension(".ktx2");
 		if (KTX2Encoder::EncodeIfNeeded(filepath, ktx2Filepath, spec, buffer))
@@ -97,7 +101,7 @@ namespace Kerberos
 		return texture;
 	}
 
-	std::pair<TextureSpecification, Buffer> TextureImporter::LoadTextureData(const std::filesystem::path& filepath, const bool flip, const int desiredChannels)
+	std::pair<TextureSpecification, Buffer> TextureImporter::LoadTextureData(const std::filesystem::path& filepath, const bool flip, const int desiredChannels, const bool srgb)
 	{
 		KBR_TRACY_FUNCTION();
 
@@ -138,9 +142,10 @@ namespace Kerberos
 		TextureSpecification spec;
 		spec.Width = width;
 		spec.Height = height;
-		spec.Format = outputChannels == 1 ? ImageFormat::R8 :
+		const ImageFormat format = outputChannels == 1 ? ImageFormat::R8 :
 			(outputChannels == 2 ? ImageFormat::RG8 :
 			(outputChannels == 3 ? ImageFormat::RGB8 : ImageFormat::RGBA8));
+		spec.Format = srgb ? KTX2FormatSelector::ToSrgb(format) : format;
 
 		return std::make_pair(spec, std::move(data));
 	}

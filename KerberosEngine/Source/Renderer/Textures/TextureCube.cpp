@@ -5,6 +5,7 @@
 #include "Utils.hpp"
 #include "Utils/KtxConversion.hpp"
 #include "KTX2Loader.hpp"
+#include "KTX2FormatSelector.hpp"
 #include "Profiling/Profilers.hpp"
 
 import Kerberos;
@@ -17,9 +18,125 @@ static ktxResult LoadKTXFile(const std::filesystem::path& filepath, ktxTexture2*
 	return result;
 }
 
-TextureCube::TextureCube([[maybe_unused]] const CubemapData& data)
+TextureCube::TextureCube(const CubemapData& data)
 {
-	KBRAssert(false, "TextureCube::TextureCube - CubemapData constructor is not implemented yet");
+	KBR_TRACY_FUNCTION();
+
+	const auto& firstFace = data.Faces[0];
+	KBRAssert(firstFace.Buffer.Data != nullptr && firstFace.Buffer.Size > 0,
+		"TextureCube::TextureCube - first cubemap face has no data");
+	for (size_t face = 1; face < data.Faces.size(); ++face)
+	{
+		const auto& other = data.Faces[face];
+		KBRAssert(other.Buffer.Data != nullptr && other.Buffer.Size == firstFace.Buffer.Size
+			&& other.Specification.Width == firstFace.Specification.Width
+			&& other.Specification.Height == firstFace.Specification.Height
+			&& other.Specification.Format == firstFace.Specification.Format,
+			"TextureCube::TextureCube - cubemap faces must share width, height, format, and buffer size");
+	}
+
+	m_Specification = firstFace.Specification;
+	width = firstFace.Specification.Width;
+	height = firstFace.Specification.Height;
+	mipLevels = 1;
+	layerCount = 6;
+	usageFlags = vk::ImageUsageFlagBits::eSampled;
+	imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal;
+	format = KTX2FormatSelector::Select(m_Specification.Format);
+	if (data.IsSRGB)
+		format = KTX2FormatSelector::ToSrgb(format);
+
+	auto& context = VulkanContext::Get();
+	const auto& device = context.GetDevice();
+
+	// Assemble a staging buffer holding all six faces back to back.
+	const uint64_t faceSize = firstFace.Buffer.Size;
+	vk::BufferCreateInfo bufferCreateInfo{
+		.size = faceSize * data.Faces.size(),
+		.usage = vk::BufferUsageFlagBits::eTransferSrc,
+		.sharingMode = vk::SharingMode::eExclusive
+	};
+	vk::raii::Buffer stagingBuffer = device.createBuffer(bufferCreateInfo, nullptr);
+
+	vk::MemoryRequirements memReqs = stagingBuffer.getMemoryRequirements();
+	vk::MemoryAllocateInfo memAllocInfo{
+		.allocationSize = memReqs.size,
+		.memoryTypeIndex = FindMemoryType(memReqs.memoryTypeBits, vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent)
+	};
+	vk::raii::DeviceMemory stagingMemory = device.allocateMemory(memAllocInfo, nullptr);
+	stagingBuffer.bindMemory(stagingMemory, 0);
+
+	uint8_t* mapped = static_cast<uint8_t*>(stagingMemory.mapMemory(0, memReqs.size));
+	for (size_t face = 0; face < data.Faces.size(); ++face)
+		std::memcpy(mapped + face * faceSize, data.Faces[face].Buffer.Data, faceSize);
+	stagingMemory.unmapMemory();
+
+	std::vector<vk::BufferImageCopy> bufferCopyRegions;
+	for (uint32_t face = 0; face < 6; ++face)
+	{
+		vk::BufferImageCopy bufferCopyRegion{
+			.bufferOffset = static_cast<vk::DeviceSize>(face) * faceSize,
+			.imageSubresource = {
+				.aspectMask = vk::ImageAspectFlagBits::eColor,
+				.mipLevel = 0,
+				.baseArrayLayer = face,
+				.layerCount = 1,
+			},
+			.imageExtent = { .width = width, .height = height, .depth = 1 }
+		};
+		bufferCopyRegions.push_back(bufferCopyRegion);
+	}
+
+	vk::ImageCreateInfo imageCreateInfo{
+		.flags = vk::ImageCreateFlagBits::eCubeCompatible,
+		.imageType = vk::ImageType::e2D,
+		.format = format,
+		.extent = { .width = width, .height = height, .depth = 1 },
+		.mipLevels = mipLevels,
+		.arrayLayers = 6,
+		.samples = vk::SampleCountFlagBits::e1,
+		.tiling = vk::ImageTiling::eOptimal,
+		.usage = usageFlags,
+		.sharingMode = vk::SharingMode::eExclusive,
+		.initialLayout = vk::ImageLayout::eUndefined,
+	};
+	imageCreateInfo.usage |= vk::ImageUsageFlagBits::eTransferDst;
+
+	image = device.createImage(imageCreateInfo, nullptr);
+	memReqs = image.getMemoryRequirements();
+	memAllocInfo.allocationSize = memReqs.size;
+	memAllocInfo.memoryTypeIndex = FindMemoryType(memReqs.memoryTypeBits, vk::MemoryPropertyFlagBits::eDeviceLocal);
+	deviceMemory = device.allocateMemory(memAllocInfo, nullptr);
+	image.bindMemory(deviceMemory, 0);
+
+	vk::ImageSubresourceRange subresourceRange{
+		.aspectMask = vk::ImageAspectFlagBits::eColor,
+		.baseMipLevel = 0,
+		.levelCount = mipLevels,
+		.layerCount = 6,
+	};
+
+	context.Submit(VulkanContext::OperationType::Graphics, [&](const vk::raii::CommandBuffer& copyCmd)
+	{
+		context.TransitionImageLayout(copyCmd, image, vk::ImageLayout::eUndefined, vk::ImageLayout::eTransferDstOptimal, subresourceRange);
+		copyCmd.copyBufferToImage(stagingBuffer, image, vk::ImageLayout::eTransferDstOptimal, bufferCopyRegions);
+		context.TransitionImageLayout(copyCmd, image, vk::ImageLayout::eTransferDstOptimal, imageLayout, subresourceRange);
+	});
+
+	CreateSampler(device);
+
+	vk::ImageViewCreateInfo viewCreateInfo{
+		.image = image,
+		.viewType = vk::ImageViewType::eCube,
+		.format = format,
+		.subresourceRange = { .aspectMask = vk::ImageAspectFlagBits::eColor, .baseMipLevel = 0, .levelCount = mipLevels, .baseArrayLayer = 0, .layerCount = 6 },
+	};
+	view = device.createImageView(viewCreateInfo);
+
+	UpdateDescriptor();
+
+	const std::string debugName = data.Name.empty() ? "Cubemap" : data.Name;
+	SetDebugName(debugName);
 }
 
 TextureCube::TextureCube(const std::filesystem::path& filepath)

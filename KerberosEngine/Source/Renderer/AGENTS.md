@@ -111,6 +111,14 @@ objects. Texture slots are packed with sampler selection and exhaustion is an
 explicit error. `Material::ResolveIndices` converts material texture handles
 to global texture indices.
 
+sRGB textures rely on hardware decode: color textures are stored with `*Srgb`
+formats so sampling returns linear values, and the image view must carry the
+same sRGB format as the image (`KTX2FormatSelector::Select`/`ToSrgb`). The
+output chain stays linear HDR until `tonemapping_resolve` applies manual gamma
+into a UNORM swapchain, so there is exactly one decode and one encode; do not
+switch the swapchain to sRGB without removing that shader gamma. sRGB images
+must remain sampled-only (no storage usage).
+
 Dynamic uniform offsets must respect
 `minUniformBufferOffsetAlignment`; current per-object allocation also has a
 capacity limit. Graph image subresource ranges and overlapping layout

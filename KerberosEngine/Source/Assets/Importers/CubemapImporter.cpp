@@ -91,8 +91,12 @@ namespace Kerberos
 
 			constexpr int desiredChannels = 4;
 			constexpr bool flip = true;
+			// Faces are loaded as linear data.
+			// TextureCube applies the
+			// descriptor's IsSRGB flag when creating the image.
+			constexpr bool srgb = false;
 
-			const auto [spec, buffer] = TextureImporter::LoadTextureData(facePath, flip, desiredChannels);
+			const auto [spec, buffer] = TextureImporter::LoadTextureData(facePath, flip, desiredChannels, srgb);
 			faceData.Specification = spec;
 			faceData.Buffer = Buffer::Copy(buffer);
 			return faceData;

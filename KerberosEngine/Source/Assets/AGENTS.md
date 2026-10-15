@@ -86,7 +86,15 @@ so they match the renderer's sampling convention; this is the same flip
 faces. The combined glTF `metallicRoughnessTexture` is bound to both the
 metallic and roughness material slots; shaders read roughness from the G
 channel and metallic from the B channel (R and A are unused), per the glTF 2.0
-spec.
+spec. Texture color space follows glTF slot semantics: base color and emissive
+images are encoded as sRGB formats (hardware-decoded to linear on sampling)
+while normal, metallic-roughness, and occlusion images stay linear. Images
+referenced by no material slot default to sRGB; an image used by both color
+and data slots is encoded as sRGB with a warning. Standalone textures take an
+explicit `srgb` flag on `TextureImporter::ImportTexture`/`LoadTextureData`,
+defaulting to sRGB until import settings expose it in the editor; cubemap
+faces are loaded linear and `CubemapData::IsSRGB` selects the sRGB image
+format in `TextureCube`.
 
 All artifacts produced by a glTF import are written under a per-source cache
 namespace derived from the source path relative to the assets root (extension
@@ -122,7 +130,7 @@ imported, or are imported lossily:
 - Animation keyframes (only channel/sampler counts are stored).
 - `alphaMode`, `alphaCutoff`, and `doubleSided` material settings.
 - Texture sampler wrap/filter modes and `KHR_texture_transform`.
-- sRGB decoding for base color (all textures are encoded as UNORM).
+- 16-bit per-channel source images.
 - Draco / meshopt mesh compression and `KHR_materials_*` extensions.
 - Multiple scenes per file and punctual lights (`KHR_lights_punctual`).
 

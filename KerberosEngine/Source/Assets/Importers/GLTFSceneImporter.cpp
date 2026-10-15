@@ -4,6 +4,7 @@
 #include "Assets/Pipeline/ImportPipeline.hpp"
 #include "Renderer/Vertex.hpp"
 #include "Renderer/Textures/KTX2Encoder.hpp"
+#include "Renderer/Textures/KTX2FormatSelector.hpp"
 #include "Utils/KtxConversion.hpp"
 #include "Profiling/Profilers.hpp"
 
@@ -326,7 +327,7 @@ bool LoadImageDataWithKtxFallback(
     }
 
     bool WriteTextureKtx2(const tinygltf::Image& image, const std::filesystem::path& sourcePath,
-                          const std::filesystem::path& destPath)
+                          const std::filesystem::path& destPath, const bool srgb)
     {
         std::error_code ec;
         std::filesystem::create_directories(destPath.parent_path(), ec);
@@ -373,10 +374,13 @@ bool LoadImageDataWithKtxFallback(
         TextureSpecification spec;
         spec.Width = static_cast<uint32_t>(image.width);
         spec.Height = static_cast<uint32_t>(image.height);
-        spec.Format = image.component == 4 ? ImageFormat::RGBA8
+        ImageFormat format = image.component == 4 ? ImageFormat::RGBA8
             : image.component == 3 ? ImageFormat::RGB8
             : image.component == 2 ? ImageFormat::RG8
             : image.component == 1 ? ImageFormat::R8 : ImageFormat::RGBA8;
+        // sRGB color data only applies to 3/4 channel images, single and dual
+        // channel images have no sRGB formats and remain linear.
+        spec.Format = srgb ? KTX2FormatSelector::ToSrgb(format) : format;
 
         // glTF stores image rows top-down, but the renderer samples textures with
         // a vertically flipped row order (see TextureImporter::LoadTextureData,
@@ -516,6 +520,28 @@ bool GLTFSceneImporter::Import(const std::filesystem::path& source, const std::f
     }
 
     // Textures: import each referenced image as a .ktx2 artifact in the cache.
+    // Color-space choice follows the glTF slot semantics of the referencing
+    // material: base color and emissive are sRGB color data; normal, metallic-
+    // roughness, and occlusion are linear data. Images referenced by no
+    // material slot default to sRGB.
+    enum class ImageUsage : uint8_t { Color = 1u << 0, Data = 1u << 1 };
+    std::vector<uint8_t> imageUsage(model.images.size(), 0);
+    const auto markUsage = [&](const int textureIndex, const ImageUsage usage)
+    {
+        const int imageIndex = ImageIndexForTexture(model, textureIndex);
+        if (imageIndex >= 0)
+            imageUsage[imageIndex] |= static_cast<uint8_t>(usage);
+    };
+    for (const auto& material : model.materials)
+    {
+        const auto& pbr = material.pbrMetallicRoughness;
+        markUsage(pbr.baseColorTexture.index, ImageUsage::Color);
+        markUsage(pbr.metallicRoughnessTexture.index, ImageUsage::Data);
+        markUsage(material.normalTexture.index, ImageUsage::Data);
+        markUsage(material.occlusionTexture.index, ImageUsage::Data);
+        markUsage(material.emissiveTexture.index, ImageUsage::Color);
+    }
+
     for (size_t i = 0; i < model.images.size(); ++i)
     {
         const auto& im = model.images[i];
@@ -523,7 +549,17 @@ bool GLTFSceneImporter::Import(const std::filesystem::path& source, const std::f
         if (imageName.empty() && !im.uri.empty())
             imageName = std::filesystem::path(im.uri).stem().string();
         const std::filesystem::path destPath = artifactRoot / "Textures" / (TextureArtifactName(i, imageName) + ".ktx2");
-        if (!WriteTextureKtx2(im, source, destPath))
+
+        const bool usedAsColor = (imageUsage[i] & static_cast<uint8_t>(ImageUsage::Color)) != 0;
+        const bool usedAsData = (imageUsage[i] & static_cast<uint8_t>(ImageUsage::Data)) != 0;
+        if (usedAsColor && usedAsData)
+        {
+            Log::CoreWarn("glTF image '{}' (index {}) is referenced by both color and data texture slots; encoding it as sRGB, so data slots will receive sRGB-decoded samples.", im.name, i);
+        }
+        // sRGB unless the image is exclusively used as linear data.
+        const bool srgb = usedAsColor || !usedAsData;
+
+        if (!WriteTextureKtx2(im, source, destPath, srgb))
         {
             Log::CoreWarn("Failed to import texture for glTF image '{}' (index {}); material references to it will be left unbound.", im.name, i);
         }

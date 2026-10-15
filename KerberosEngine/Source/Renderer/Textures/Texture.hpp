@@ -14,7 +14,9 @@ enum class ImageFormat
 	RG8,
 	RGB8,
 	RGBA8,
-	RGBA32F
+	RGBA32F,
+	SRGB8,
+    SRGBA8,
 };
 
 struct TextureSpecification

@@ -146,7 +146,7 @@ ImporterType GLTFPipelineImporter::Type() const
 
 uint32_t GLTFPipelineImporter::Version() const
 {
-    return 4;
+    return 5;
 }
 
 AssetType GLTFPipelineImporter::SourceAssetType() const
