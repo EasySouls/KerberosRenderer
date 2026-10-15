@@ -378,7 +378,19 @@ bool LoadImageDataWithKtxFallback(
             : image.component == 2 ? ImageFormat::RG8
             : image.component == 1 ? ImageFormat::R8 : ImageFormat::RGBA8;
 
-        const Buffer pixels(image.image);
+        // glTF stores image rows top-down, but the renderer samples textures with
+        // a vertically flipped row order (see TextureImporter::LoadTextureData,
+        // which flips standalone images and cubemap faces). Flip the decoded rows
+        // so glTF textures match every other image import path.
+        const size_t component = static_cast<size_t>(image.component);
+        const size_t rowBytes = static_cast<size_t>(image.width) * component;
+        const Buffer pixels(static_cast<uint64_t>(image.image.size()));
+        for (int y = 0; y < image.height; ++y)
+        {
+            const size_t sourceRow = static_cast<size_t>(image.height - 1 - y) * rowBytes;
+            const size_t destinationRow = static_cast<size_t>(y) * rowBytes;
+            std::memcpy(pixels.Data + destinationRow, image.image.data() + sourceRow, rowBytes);
+        }
         return KTX2Encoder::Encode(destPath, spec, pixels);
     }
 }

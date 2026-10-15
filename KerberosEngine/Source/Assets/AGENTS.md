@@ -80,7 +80,10 @@ The importer also emits one native material record per glTF material (named
 after the material, not just its index) and one `.ktx2` texture artifact per
 referenced image. Material records reference their textures by image index so
 runtime loading can resolve the corresponding `texture:<imageIndex>`
-sub-assets.
+sub-assets. Decoded glTF images are flipped vertically before encoding to KTX2
+so they match the renderer's sampling convention; this is the same flip
+`TextureImporter::LoadTextureData` applies to standalone images and cubemap
+faces.
 
 All artifacts produced by a glTF import are written under a per-source cache
 namespace derived from the source path relative to the assets root (extension
