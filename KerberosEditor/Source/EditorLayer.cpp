@@ -632,7 +632,7 @@ namespace Kerberos
 
 			/// Entity transform
 			auto &tc = selectedEntity.GetComponent<TransformComponent>();
-			auto transform = tc.GetTransform();
+			auto transform = tc.WorldTransform;
 
 			/// Snapping
 			const bool snap = Input::IsKeyPressed(Key::LeftControl);
@@ -647,8 +647,17 @@ namespace Kerberos
 
 			if (ImGuizmo::IsUsing())
 			{
+                glm::mat4 parentWorld = glm::mat4(1.0f);
+                if (const Entity parent = m_ActiveScene->GetParent(selectedEntity); parent)
+                    parentWorld = parent.GetComponent<TransformComponent>().WorldTransform;
+
+                const glm::mat4 localTransform = glm::inverse(parentWorld) * transform;
+
 				glm::vec3 translation, rotationDegrees, scale;
-				ImGuizmo::DecomposeMatrixToComponents(glm::value_ptr(transform), glm::value_ptr(translation), glm::value_ptr(rotationDegrees), glm::value_ptr(scale));
+                ImGuizmo::DecomposeMatrixToComponents(glm::value_ptr(localTransform),
+                                                      glm::value_ptr(translation),
+                                                      glm::value_ptr(rotationDegrees),
+                                                      glm::value_ptr(scale));
 
 				tc.Translation = translation;
 				tc.Rotation = glm::radians(rotationDegrees);
