@@ -83,7 +83,10 @@ runtime loading can resolve the corresponding `texture:<imageIndex>`
 sub-assets. Decoded glTF images are flipped vertically before encoding to KTX2
 so they match the renderer's sampling convention; this is the same flip
 `TextureImporter::LoadTextureData` applies to standalone images and cubemap
-faces.
+faces. The combined glTF `metallicRoughnessTexture` is bound to both the
+metallic and roughness material slots; shaders read roughness from the G
+channel and metallic from the B channel (R and A are unused), per the glTF 2.0
+spec.
 
 All artifacts produced by a glTF import are written under a per-source cache
 namespace derived from the source path relative to the assets root (extension
@@ -105,6 +108,25 @@ format-specific importers and update this file.
 Importer extension lookup normalizes the leading dot and case. Unknown file
 types must not silently become `Texture2D`; preserve explicit error/warning
 behavior when changing type classification.
+
+## Known glTF import limitations
+
+The glTF pipeline currently handles opaque, single-UV, unanimated
+metallic-roughness content. Valid glTF files using the following are not yet
+imported, or are imported lossily:
+
+- Per-texture `texCoord` indices beyond `TEXCOORD_0` (lightmaps, multi-UV).
+- `COLOR_0` vertex colors and `TEXCOORD_1+` attribute sets.
+- Morph targets, and `JOINTS_0`/`WEIGHTS_0` skinning weights (skeletons are
+  recorded but skinned meshes do not deform).
+- Animation keyframes (only channel/sampler counts are stored).
+- `alphaMode`, `alphaCutoff`, and `doubleSided` material settings.
+- Texture sampler wrap/filter modes and `KHR_texture_transform`.
+- sRGB decoding for base color (all textures are encoded as UNORM).
+- Draco / meshopt mesh compression and `KHR_materials_*` extensions.
+- Multiple scenes per file and punctual lights (`KHR_lights_punctual`).
+
+Extend the importer deliberately rather than assuming full glTF coverage.
 
 ## Metadata, registry, and staleness
 

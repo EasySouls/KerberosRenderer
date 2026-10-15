@@ -292,10 +292,10 @@ PSOutput fragmentMain(VSOutput input)
     float3 R = reflect(-V, N);
 
     uint metallicTexIndex = perObject.material.metallicTexIndex;
-    float metallicTex = SampleBindless(metallicTexIndex, input.TexCoord).r;
+    float metallicTex = SampleBindless(metallicTexIndex, input.TexCoord).b;
     float metallic = clamp(metallicTex * perObject.material.metallic, 0.0, 1.0);
     uint roughnessTexIndex = perObject.material.roughnessTexIndex;
-    float roughnessTex = SampleBindless(roughnessTexIndex, input.TexCoord).r;
+    float roughnessTex = SampleBindless(roughnessTexIndex, input.TexCoord).g;
     float roughness = clamp(roughnessTex * perObject.material.roughness, 0.0, 1.0);
 
     float2 screenUV = input.Position.xy / scene.viewportSize;
