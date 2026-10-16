@@ -96,14 +96,6 @@ void HierarchyPanel::OnImGuiRender()
 
     ImGui::End();
 
-    ImGui::Begin("Properties");
-    if (m_SelectedEntity) {
-        DrawComponents(m_SelectedEntity);
-
-        AddComponentPopup(m_SelectedEntity);
-    }
-    ImGui::End();
-
     for (const auto& e : m_DeletionQueue) {
         m_NotificationManager.AddNotification("Entity deleted: " + e.GetComponent<TagComponent>().Tag,
                                               Notification::Type::Info);

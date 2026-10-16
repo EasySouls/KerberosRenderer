@@ -41,6 +41,26 @@ namespace Kerberos
 
 		const AssetMetadata& GetMetadata(AssetHandle handle) const;
 
+		/**
+		 * Loads the persistent import metadata (.meta) for a source file.
+		 * @return The meta, or nullopt if it is missing or invalid.
+		 */
+		std::optional<AssetMetaFile> GetMetaFile(const std::filesystem::path& sourcePath) const;
+
+		/**
+		 * Persists the texture sRGB import options for a source and re-imports it.
+		 * @return The source's root handle on success, or AssetHandle::Invalid().
+		 */
+		AssetHandle SetTextureSrgbOptions(const std::filesystem::path& sourcePath,
+			const std::map<std::string, bool>& textureSrgb);
+
+		/**
+		 * Force-rebuilds a single source and evicts cached loaded artifacts so
+		 * consumers reload the regenerated outputs.
+		 * @return The source's root handle on success, or AssetHandle::Invalid().
+		 */
+		AssetHandle ReimportAsset(const std::filesystem::path& sourcePath);
+
 		Ref<Mesh> GetDefaultCubeMesh() const;
 		Ref<Texture2D> GetDefaultColorTexture() const;
 		Ref<Font> GetDefaultFont() const;

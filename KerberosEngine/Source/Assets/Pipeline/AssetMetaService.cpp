@@ -70,6 +70,11 @@ std::optional<AssetMetaFile> AssetMetaService::LoadMeta(const std::filesystem::p
                 meta.SubAssets.push_back(std::move(entry));
             }
         }
+        if (config["TextureSrgb"]) {
+            for (const auto& entry : config["TextureSrgb"]) {
+                meta.TextureSrgb[entry.first.as<std::string>()] = entry.second.as<bool>();
+            }
+        }
         return meta;
     } catch (const YAML::Exception& e) {
         Log::CoreWarn("Invalid meta file {0}: {1}", metaPath.string(), e.what());
@@ -77,7 +82,7 @@ std::optional<AssetMetaFile> AssetMetaService::LoadMeta(const std::filesystem::p
     }
 }
 
-bool AssetMetaService::SaveMeta(const std::filesystem::path& sourcePath, const AssetMetaFile& meta) 
+bool AssetMetaService::SaveMeta(const std::filesystem::path& sourcePath, const AssetMetaFile& meta) const
 {
     KBR_TRACY_FUNCTION();
 
@@ -96,11 +101,18 @@ bool AssetMetaService::SaveMeta(const std::filesystem::path& sourcePath, const A
             << YAML::Key << "Kind" << YAML::Value << static_cast<uint8_t>(entry.Kind)
             << YAML::EndMap;
     }
-    out << YAML::EndSeq << YAML::EndMap;
+    out << YAML::EndSeq;
+    if (!meta.TextureSrgb.empty()) {
+        out << YAML::Key << "TextureSrgb" << YAML::Value << YAML::BeginMap;
+        for (const auto& [key, value] : meta.TextureSrgb)
+            out << YAML::Key << key << YAML::Value << value;
+        out << YAML::EndMap;
+    }
+    out << YAML::EndMap;
     return WriteAtomic(MetaPathFor(sourcePath), out.c_str());
 }
 
-bool AssetMetaService::RebindMetaOnRename(const std::filesystem::path& oldPath, const std::filesystem::path& newPath) 
+bool AssetMetaService::RebindMetaOnRename(const std::filesystem::path& oldPath, const std::filesystem::path& newPath) const
 {
     KBR_TRACY_FUNCTION();
 
@@ -113,7 +125,7 @@ bool AssetMetaService::RebindMetaOnRename(const std::filesystem::path& oldPath, 
     if (ec) return false;
     std::filesystem::rename(oldMeta, newMeta, ec);
     if (ec) {
-        auto meta = LoadMeta(oldPath);
+        const auto meta = LoadMeta(oldPath);
         return meta.has_value() && SaveMeta(newPath, *meta) &&
                (std::filesystem::remove(oldMeta, ec), !ec);
     }

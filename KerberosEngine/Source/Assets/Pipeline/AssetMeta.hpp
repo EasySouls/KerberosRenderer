@@ -3,6 +3,7 @@
 #include "Assets/Asset.hpp"
 
 #include <cstdint>
+#include <map>
 #include <string>
 #include <vector>
 
@@ -35,7 +36,7 @@ struct SubAssetMetaEntry
 
 struct AssetMetaFile
 {
-    static constexpr uint32_t CurrentSchemaVersion = 1;
+    static constexpr uint32_t CurrentSchemaVersion = 2;
     uint32_t SchemaVersion = CurrentSchemaVersion;
     /* The source asset file handle */
     AssetHandle SourceHandle = AssetHandle::Invalid();
@@ -44,6 +45,14 @@ struct AssetMetaFile
     /* Content hash for staleness checks */
     std::string SourceHash{};
     std::vector<SubAssetMetaEntry> SubAssets;
+
+    /* User-editable import options. `TextureSrgb` maps a texture sub-asset to
+     * its sRGB color-space interpretation:
+     *   "texture:<imageIndex>" for glTF-generated textures,
+     *   "source"               for a standalone texture source.
+     * An absent key means "use the importer default". Importers materialize
+     * defaults into this map on first import. */
+    std::map<std::string, bool> TextureSrgb;
 };
 
 };

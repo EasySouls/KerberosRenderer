@@ -13,6 +13,7 @@
 
 #include <algorithm>
 #include <fstream>
+#include <map>
 #include <sstream>
 #include <unordered_set>
 #include <limits>
@@ -400,7 +401,9 @@ bool LoadImageDataWithKtxFallback(
 }
 
 bool GLTFSceneImporter::Import(const std::filesystem::path& source, const std::filesystem::path& outputDirectory,
-                               const std::filesystem::path& namespacePath, GltfSceneManifest* output)
+                               const std::filesystem::path& namespacePath, GltfSceneManifest* output,
+                               const std::map<std::string, bool>* textureSrgbOverrides,
+                               std::map<std::string, bool>* textureSrgbOut)
 {
     KBR_TRACY_FUNCTION();
 
@@ -556,8 +559,19 @@ bool GLTFSceneImporter::Import(const std::filesystem::path& source, const std::f
         {
             Log::CoreWarn("glTF image '{}' (index {}) is referenced by both color and data texture slots; encoding it as sRGB, so data slots will receive sRGB-decoded samples.", im.name, i);
         }
-        // sRGB unless the image is exclusively used as linear data.
-        const bool srgb = usedAsColor || !usedAsData;
+
+        // Resolve sRGB: user override wins, otherwise fall back to the
+        // slot-derived default (sRGB unless exclusively used as linear data).
+        const std::string key = "texture:" + std::to_string(i);
+        bool srgb = usedAsColor || !usedAsData;
+        if (textureSrgbOverrides)
+        {
+            const auto overrideIt = textureSrgbOverrides->find(key);
+            if (overrideIt != textureSrgbOverrides->end())
+                srgb = overrideIt->second;
+        }
+        if (textureSrgbOut)
+            (*textureSrgbOut)[key] = srgb;
 
         if (!WriteTextureKtx2(im, source, destPath, srgb))
         {

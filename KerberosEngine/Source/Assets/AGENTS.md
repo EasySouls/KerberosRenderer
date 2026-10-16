@@ -146,6 +146,16 @@ registry completeness, and sub-asset handle validity. Generated output
 existence is not currently fully validated, so changes involving cache
 artifacts should address that gap deliberately.
 
+Import options also live in the `.meta` (`AssetMetaFile::TextureSrgb`), a map
+from a stable key to an sRGB boolean. glTF sources use `texture:<imageIndex>`
+keys; a standalone texture source uses the key `source`. Importers materialize
+derived defaults into this map on first import (so a glTF's slot-derived sRGB
+choices persist until the user changes them) and the build coordinator writes
+the importer's materialized map back to the `.meta`. The inspector panel edits
+these values and applies them via
+`EditorAssetManager::SetTextureSrgbOptions` (which persists the `.meta` and
+force-rebuilds via `ReimportAsset`, evicting cached loaded artifacts).
+
 `AssetBuildCoordinator` serializes builds, finds the registered importer,
 ensures metadata, evaluates staleness, imports into a staging transaction,
 commits outputs, updates metadata, reconciles obsolete generated entries, and

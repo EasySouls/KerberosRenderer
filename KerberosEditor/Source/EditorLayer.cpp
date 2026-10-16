@@ -83,11 +83,16 @@ namespace Kerberos
 
 		m_BasicFont = AssetManager::GetDefaultFont();
 
-		m_EditorCamera = std::make_unique<FirstPersonCamera>(45.0f, 16.0f / 9.0f, 0.1f, 1000.0f);
+
+		constexpr float nearClip = 0.1f;
+        constexpr float farClip = 10000.0f;
+        constexpr float cameraMoveSpeed = 50.0f;
+		m_EditorCamera = std::make_unique<FirstPersonCamera>(45.0f, 16.0f / 9.0f, nearClip, farClip);
 		// m_EditorCamera = std::make_unique<EditorCamera>(45.0f, 16.0f / 9.0f, 0.1f, 1000.0f);
 		m_EditorCamera->SetFlipY(true);
 		m_EditorCamera->SetPosition(glm::vec3(0.0f, 15.0f, -45.0f));
 		m_EditorCamera->SetRotation(glm::vec3(0.0f, 90.0f, 0.0f));
+		m_EditorCamera->SetMoveSpeed(cameraMoveSpeed);
 
 		m_ViewportSize = {1280.0f, 720.0f};
 
@@ -233,6 +238,9 @@ namespace Kerberos
 		m_HierarchyPanel.OnImGuiRender();
 		m_AssetsPanel->OnImGuiRender();
 		m_ConsolePanel.OnImGuiRender();
+
+		m_InspectorPanel.SetContext(&m_HierarchyPanel, m_AssetsPanel.get());
+		m_InspectorPanel.OnImGuiRender();
 
 		DrawViewport();
 

@@ -403,6 +403,80 @@ namespace Kerberos
 		return m_AssetRegistry.Get(handle);
 	}
 
+	std::optional<AssetMetaFile> EditorAssetManager::GetMetaFile(const std::filesystem::path& sourcePath) const
+	{
+		if (!m_MetaService)
+			return std::nullopt;
+		return m_MetaService->LoadMeta(sourcePath);
+	}
+
+	AssetHandle EditorAssetManager::SetTextureSrgbOptions(const std::filesystem::path& sourcePath,
+		const std::map<std::string, bool>& textureSrgb)
+	{
+		KBR_TRACY_FUNCTION();
+
+		if (!m_MetaService)
+			return AssetHandle::Invalid();
+
+		auto meta = m_MetaService->LoadMeta(sourcePath);
+		if (!meta.has_value())
+		{
+			Log::CoreWarn("Cannot set import options for a source with no metadata: {}", sourcePath.string());
+			return AssetHandle::Invalid();
+		}
+		meta->TextureSrgb = textureSrgb;
+		if (!m_MetaService->SaveMeta(sourcePath, *meta))
+		{
+			Log::CoreError("Failed to persist import options for {}", sourcePath.string());
+			return AssetHandle::Invalid();
+		}
+
+		return ReimportAsset(sourcePath);
+	}
+
+	AssetHandle EditorAssetManager::ReimportAsset(const std::filesystem::path& sourcePath)
+	{
+		KBR_TRACY_FUNCTION();
+
+		if (!m_BuildCoordinator)
+			return AssetHandle::Invalid();
+
+		const auto absolutePath = std::filesystem::absolute(sourcePath);
+		const auto report = m_BuildCoordinator->Build(absolutePath, true);
+		if (!report.Built)
+		{
+			for (const auto& error : report.Errors)
+				Log::CoreError("  {}", error);
+			return AssetHandle::Invalid();
+		}
+
+		const auto registryPath = m_AssetsRoot.empty()
+			? sourcePath
+			: std::filesystem::relative(absolutePath, m_AssetsRoot);
+		const AssetHandle rootHandle = m_AssetRegistry.ContainsPath(registryPath)
+			? m_AssetRegistry.GetHandle(registryPath)
+			: AssetHandle::Invalid();
+
+		if (rootHandle.IsValid())
+		{
+			/// Evict cached loaded artifacts so consumers reload the regenerated outputs.
+			for (auto it = m_LoadedAssets.begin(); it != m_LoadedAssets.end();)
+			{
+				const AssetHandle handle = it->first;
+				const bool isRoot = handle == rootHandle;
+				const bool isChild = m_AssetRegistry.Contains(handle)
+					&& m_AssetRegistry.Get(handle).RootSourceHandle == rootHandle;
+				if (isRoot || isChild)
+					it = m_LoadedAssets.erase(it);
+				else
+					++it;
+			}
+		}
+
+		SerializeAssetRegistry();
+		return rootHandle;
+	}
+
 	Ref<Mesh> EditorAssetManager::GetDefaultCubeMesh() const
 	{
 		KBRAssert(m_DefaultCubeMesh != nullptr, "Default cube mesh has not been loaded");

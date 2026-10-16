@@ -34,12 +34,13 @@ namespace Kerberos
 
 		void SetOnEntityDeleted(const std::function<void(Entity)>& callback);
 
+		void AddComponentPopup(Entity entity);
+
 	private:
 		void DrawEntityNode(const Entity& entity);
 		void DrawEntityNodeContextMenu(const Entity& entity, bool& entityDeleted) const;
 		void DrawEntityNodeChildren(const Entity& entity);
 		void QueueEntityDeletion(const Entity& entity);
-		void AddComponentPopup(Entity entity);
 
 		bool OnKeyPressed(const KeyPressedEvent& event);
 

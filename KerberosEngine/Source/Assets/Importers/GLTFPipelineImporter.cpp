@@ -64,10 +64,11 @@ ImportResult GLTFPipelineImporter::Import(const ImportContext &context)
         namespacePath = context.SourceAbsolutePath.stem();
     namespacePath.replace_extension();
 
-    GltfSceneManifest manifest;
-    if (!GLTFSceneImporter::Import(context.SourceAbsolutePath, context.CacheRootAbsolutePath, namespacePath, &manifest))
-        throw std::runtime_error("Failed to build glTF scene");
     ImportResult result;
+    GltfSceneManifest manifest;
+    if (!GLTFSceneImporter::Import(context.SourceAbsolutePath, context.CacheRootAbsolutePath, namespacePath, &manifest,
+                                   &context.Meta.TextureSrgb, &result.TextureSrgb))
+        throw std::runtime_error("Failed to build glTF scene");
     result.SourceHandle = context.Meta.SourceHandle.IsValid() ? context.Meta.SourceHandle : AssetHandle();
     if (!result.SourceHandle.IsValid())
     {
@@ -146,7 +147,7 @@ ImporterType GLTFPipelineImporter::Type() const
 
 uint32_t GLTFPipelineImporter::Version() const
 {
-    return 5;
+    return 6;
 }
 
 AssetType GLTFPipelineImporter::SourceAssetType() const

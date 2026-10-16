@@ -93,6 +93,7 @@ AssetBuildReport AssetBuildCoordinator::Build(const std::filesystem::path& sourc
     meta.ImporterType = importer->Type();
     meta.ImporterVersion = importer->Version();
     meta.SourceHash = AssetMetaService::ComputeSourceHash(source);
+    meta.TextureSrgb = result.TextureSrgb;
     meta.SubAssets.clear();
     for (const auto& output : result.Outputs)
     {

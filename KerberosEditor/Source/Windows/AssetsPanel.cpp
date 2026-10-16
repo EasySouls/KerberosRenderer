@@ -15,6 +15,8 @@
 
 #include "VulkanContext.hpp"
 
+#include <ranges>
+
 import Kerberos;
 
 namespace Kerberos {
@@ -213,11 +215,17 @@ std::string AssetStatusLabel(const AssetHandle handle,
 
                     if (item.IsDirectory)
                     {
-                        ImGui::Selectable((std::string("[DIR]  ") + fileName).c_str(),
-                                          false,
-                                          ImGuiSelectableFlags_SpanAllColumns | ImGuiSelectableFlags_AllowDoubleClick);
+                        if (ImGui::Selectable((std::string("[DIR]  ") + fileName).c_str(),
+                                              false,
+                                              ImGuiSelectableFlags_SpanAllColumns | ImGuiSelectableFlags_AllowDoubleClick))
+                        {
+                            ClearSelection();
+                        }
                         if (ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left))
+                        {
                             directoryToOpen = item.Path;
+                        }
+
                         ShowFolderContextMenu(item.Path);
                     }
                     else if (hasSubAssets)
@@ -231,40 +239,68 @@ std::string AssetStatusLabel(const AssetHandle handle,
                                                          AssetTypeIcon(metadata ? metadata->Type : AssetType::Prefab),
                                                          fileName.c_str());
                         if (registered && metadata)
+                        {
                             HandleAssetDragAndDrop(handle, item.Path.filename(), *metadata);
+                        }
 
                         ShowFileContextMenu(item.Path);
+
+                        if (ImGui::IsItemClicked())
+                        {
+                            m_SelectedAsset = { 
+                                .Handle = handle,
+                                .Path = item.Path,
+                                .Type = metadata ? metadata->Type : AssetType::Prefab 
+                            };
+                        }
 
                         if (ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left))
                         {
                             const auto extension = item.Path.extension();
                             if (extension == ".kbrmat" || extension == ".kbrmaterial")
+                            {
                                 OpenMaterialEditor(item.Path);
+                            }
 
                             else if (!FileOperations::OpenFile(item.Path.string().c_str()))
+                            {
                                 m_NotificationManager.AddNotification("Could not open file: " + item.Path.string(),
                                                                       Notification::Type::Error);
+                            }
                         }
                     }
                     else
                     {
-                        ImGui::Selectable(
+                        const bool selected = handle.IsValid() && handle == m_SelectedAsset.Handle;
+                        if (ImGui::Selectable(
                             (std::string(AssetTypeIcon(metadata ? metadata->Type : AssetType::Texture2D)) + "  " +
                              fileName)
                                 .c_str(),
-                            false,
-                            ImGuiSelectableFlags_SpanAllColumns | ImGuiSelectableFlags_AllowDoubleClick);
+                            selected,
+                            ImGuiSelectableFlags_SpanAllColumns | ImGuiSelectableFlags_AllowDoubleClick))
+                        {
+                            m_SelectedAsset = { .Handle = handle, .Path = item.Path, .Type = metadata ? metadata->Type : AssetType::Texture2D };
+                        }
+
                         if (registered && metadata)
+                        {
                             HandleAssetDragAndDrop(handle, item.Path.filename(), *metadata);
+                        }
+
                         ShowFileContextMenu(item.Path);
+
                         if (ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left))
                         {
                             const auto extension = item.Path.extension();
                             if (extension == ".kbrmat" || extension == ".kbrmaterial")
+                            {
                                 OpenMaterialEditor(item.Path);
+                            }
                             else if (!FileOperations::OpenFile(item.Path.string().c_str()))
+                            {
                                 m_NotificationManager.AddNotification("Could not open file: " + item.Path.string(),
                                                                       Notification::Type::Error);
+                            }
                         }
                     }
 
@@ -275,27 +311,41 @@ std::string AssetStatusLabel(const AssetHandle handle,
                         ImGui::Text("%.*s", static_cast<int>(typeName.size()), typeName.data());
                     }
                     else
+                    {
                         ImGui::TextDisabled(item.IsDirectory ? "Folder" : "Source file");
+                    }
 
                     ImGui::TableSetColumnIndex(2);
                     if (item.IsDirectory)
+                    {
                         ImGui::TextDisabled("-");
+                    }
                     else
                     {
                         const auto status = AssetStatusLabel(handle, metadata, m_CachedArtifactExists);
                         if (status == "Ready")
+                        {
                             ImGui::TextColored(ImVec4(0.35f, 0.82f, 0.45f, 1.0f), "%s", status.c_str());
+                        }
                         else if (status == "Missing artifact")
+                        {
                             ImGui::TextColored(ImVec4(0.95f, 0.48f, 0.30f, 1.0f), "%s", status.c_str());
+                        }
                         else
+                        {
                             ImGui::TextDisabled("%s", status.c_str());
+                        }
                     }
 
                     ImGui::TableSetColumnIndex(3);
                     if (metadata && !metadata->SubAssetKey.empty())
+                    {
                         ImGui::TextDisabled("%s", metadata->SubAssetKey.c_str());
+                    }
                     else
+                    {
                         ImGui::TextDisabled("%s", treePathId.c_str());
+                    }
 
                     if (childrenOpen)
                     {
@@ -304,6 +354,7 @@ std::string AssetStatusLabel(const AssetHandle handle,
                             const auto childIt = m_MetadataByHandle.find(childHandle);
                             if (childIt == m_MetadataByHandle.end())
                                 continue;
+
                             const auto& childMetadata = childIt->second;
                             const std::string childName = AssetDisplayName(childMetadata, childHandle);
                             if (!matchesSearch(childName) && !matchesSearch(childMetadata.SubAssetKey) &&
@@ -359,6 +410,11 @@ std::string AssetStatusLabel(const AssetHandle handle,
             {
                 ImGui::TextDisabled("No assets to display.");
             }
+
+            if (ImGui::IsWindowHovered() && !ImGui::IsAnyItemHovered() && ImGui::IsMouseClicked(ImGuiMouseButton_Left))
+            {
+                ClearSelection();
+            }
         }
         ImGui::End();
 
@@ -374,6 +430,11 @@ std::string AssetStatusLabel(const AssetHandle handle,
 
         m_NotificationManager.RenderNotifications();
         RenderMaterialEditors();
+    }
+
+	void AssetsPanel::ClearSelection()
+    {
+        m_SelectedAsset = {};
     }
 
 	void AssetsPanel::ShowFileContextMenu(const std::filesystem::path& path)
@@ -583,9 +644,8 @@ std::string AssetStatusLabel(const AssetHandle handle,
                 m_SubAssetsByRoot[rootHandle].push_back(handle);
         }
 
-        for (auto& group : m_SubAssetsByRoot)
+        for (auto& children : m_SubAssetsByRoot | std::views::values)
         {
-            auto& children = group.second;
             std::ranges::sort(children, [this](const AssetHandle left, const AssetHandle right) {
                 const auto leftIt = m_MetadataByHandle.find(left);
                 const auto rightIt = m_MetadataByHandle.find(right);
@@ -630,7 +690,10 @@ std::string AssetStatusLabel(const AssetHandle handle,
                 error.clear();
                 continue;
             }
-            if (hidden || (isDirectory && (entry.path().filename() == "Cache" || entry.path().filename() == "Staging")))
+            const bool isMetaFile = entry.path().extension() == ".meta";
+            const bool isAssetRegistry = entry.path().extension() == ".kbrar";
+            const bool isCacheDir = entry.path().filename() == "Cache" || entry.path().filename() == "Staging";
+            if (hidden || (isDirectory && isCacheDir) || isMetaFile || isAssetRegistry)
                 continue;
 
             AssetHandle handle = AssetHandle::Invalid();

@@ -33,6 +33,15 @@ namespace Kerberos
 	{
 		ImportResult result;
 		result.SourceHandle = context.Meta.SourceHandle.IsValid() ? context.Meta.SourceHandle : AssetHandle();
+
+		// Texture sources carry a single sRGB option under "source".
+		// Materialize a default of sRGB (color) on first import and preserve user overrides.
+		if (m_AssetType == AssetType::Texture2D || m_AssetType == AssetType::TextureCube)
+		{
+			result.TextureSrgb = context.Meta.TextureSrgb;
+			result.TextureSrgb.try_emplace("source", true);
+		}
+
 		return result;
 	}
 

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Core/Core.hpp"
+#include "Assets/Asset.hpp"
 #include "Renderer/Textures/Texture2D.hpp"
 #include "Renderer/Material.hpp"
 #include "EditorWindow.hpp"
@@ -16,6 +17,13 @@
 namespace Kerberos
 {
 	struct AssetMetadata;
+
+    struct AssetSelection
+    {
+        AssetHandle Handle = AssetHandle::Invalid();
+        std::filesystem::path Path;
+        AssetType Type = AssetType::Texture2D;
+    };
 	
 	class AssetsPanel : public EditorWindow
 	{
@@ -35,6 +43,21 @@ namespace Kerberos
 
 		void OnEvent(Event& event) override;
 		void OnImGuiRender() override;
+
+		
+        /**
+         * The currently selected source asset (root), if any.
+         */
+        AssetSelection GetSelectedAsset() const { return m_SelectedAsset; }
+
+        bool HasAssetSelection() const { return !m_SelectedAsset.Path.empty(); }
+
+		void ClearSelection();
+
+		/**
+		* Requests an asset-tree refresh on the next render.
+		*/
+		void RequestRefresh() { m_RefreshRequested = true; }
 
 	private:
 		/**
@@ -100,6 +123,9 @@ namespace Kerberos
 
 		std::vector<ContentItem> m_ContentItems;
 		bool m_RefreshRequested = false;
+
+		// Selected source asset (root), tracked for the inspector panel.
+        AssetSelection m_SelectedAsset;
 
 		// Asset-browser data is rebuilt only when the panel refreshes.
         // Root handle -> generated sub-asset handles, sorted once during refresh.

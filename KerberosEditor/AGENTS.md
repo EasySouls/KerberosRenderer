@@ -41,9 +41,16 @@ Editor windows live mainly under
 `KerberosEditor/Source/Windows`. Important integrations include:
 
 - `AssetsPanel`: filesystem browser, previews, context menus, material editor,
-  asset drag/drop, and source import.
+  asset drag/drop, source import, and source-asset selection (single click).
 - `HierarchyPanel`: entity selection, component add/remove, and component
   editing, including particle emitters.
+- `InspectorPanel`: the unified right-side "Properties" window. It shows entity
+  components when an entity is selected and asset import options when a source
+  asset is selected in `AssetsPanel` (asset selection takes display precedence).
+  Texture assets show a preview image plus an sRGB toggle; glTF assets list
+  their generated texture sub-assets with per-texture sRGB toggles. Edits are
+  staged locally and applied with Apply/Revert, which persists the `.meta` and
+  re-imports the source.
 - `ViewportPanel`: rendered image display, viewport resize, camera input, and
   GPU mouse picking.
 - project/scene panels: project settings, serialization, scene lifecycle, and

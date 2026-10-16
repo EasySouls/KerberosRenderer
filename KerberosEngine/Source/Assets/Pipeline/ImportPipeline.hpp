@@ -3,6 +3,7 @@
 #include "Assets/Pipeline/AssetMeta.hpp"
 
 #include <filesystem>
+#include <map>
 #include <string>
 #include <vector>
 
@@ -71,6 +72,8 @@ struct ImportResult
     std::vector<BuiltSubAsset> Outputs;
     /** Non-fatal importer diagnostics returned to the build coordinator. */
     std::vector<std::string> Warnings;
+    /** Materialized texture sRGB options to persist in the source meta. */
+    std::map<std::string, bool> TextureSrgb;
 };
 
 /**

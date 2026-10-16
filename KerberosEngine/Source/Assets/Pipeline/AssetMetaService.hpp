@@ -23,10 +23,10 @@ public:
 
     /// Persist meta atomically (write temp + rename).
     /// @returns success.
-    bool SaveMeta(const std::filesystem::path& sourcePath, const AssetMetaFile& meta);
+    bool SaveMeta(const std::filesystem::path& sourcePath, const AssetMetaFile& meta) const;
 
     /// Move/rename handling: attach meta to new path and update internal indices.
-    bool RebindMetaOnRename(const std::filesystem::path& oldPath, const std::filesystem::path& newPath);
+    bool RebindMetaOnRename(const std::filesystem::path& oldPath, const std::filesystem::path& newPath) const;
 
     /// Compute a canonical meta path for a source.
     static std::filesystem::path MetaPathFor(const std::filesystem::path& sourcePath);
