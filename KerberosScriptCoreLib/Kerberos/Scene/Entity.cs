@@ -87,5 +87,11 @@ namespace Kerberos.Source.Kerberos.Scene
             ulong entityID = InternalCalls.Entity_Instantiate(name);
             return new Entity(entityID);
         }
+
+        protected static Entity Instantiate(PrefabRef prefab)
+        {
+            ulong entityID = InternalCalls.Entity_InstantiatePrefab(prefab.Handle);
+            return new Entity(entityID);
+        }
     }
 }

@@ -33,7 +33,8 @@ namespace Kerberos
 		MaterialRef,
 		MeshRef,
 		TextureRef,
-		AssetHandle
+		AssetHandle,
+		PrefabRef
 	};
 
 	struct ScriptField

@@ -983,6 +983,7 @@ std::string AssetStatusLabel(const AssetHandle handle,
             payloadType = assetBrowserMaterial;
             break;
         default:
+            payloadType = assetBrowserItem;
             break;
         }
 

@@ -43,20 +43,29 @@ namespace Kerberos
 	{
 		KBR_TRACY_FUNCTION();
 
+		m_IsRunning = true;
+
 		m_PhysicsSystem->Initialize(shared_from_this());
 		m_PhysicsSystem->Update(0.0f); // Sync physics bodies with transforms before scripts run for the first time
 
 		ScriptEngine::OnRuntimeStart(shared_from_this());
 
-		/// Instantiate all scripts
-		m_Registry.view<ScriptComponent>().each([this](auto enttId, [[maybe_unused]] ScriptComponent& script) {
-			const Entity entity{ enttId, this };
+		/// Instantiate all scripts. Snapshot the entities first because a
+		/// script's OnCreate may spawn prefabs that add new ScriptComponents.
+		std::vector<Entity> scriptEntities;
+		const auto scriptView = m_Registry.view<ScriptComponent>();
+		scriptEntities.reserve(static_cast<size_t>(m_Registry.storage<ScriptComponent>().size()));
+		for (const auto enttId : scriptView)
+			scriptEntities.emplace_back(enttId, this);
+
+		for (const Entity entity : scriptEntities)
 			ScriptEngine::OnCreateEntity(entity);
-		});
 	}
 
-	void Scene::OnRuntimeStop() const
+	void Scene::OnRuntimeStop()
 	{
+		m_IsRunning = false;
+
 		m_PhysicsSystem->Cleanup();
 
 		ScriptEngine::OnRuntimeStop();
@@ -274,6 +283,26 @@ Entity Scene::InstantiatePrefab(const AssetHandle prefabHandle, const std::strin
 			}
 		}
 		if (child.HasComponent<RigidBody3DComponent>()) child.GetComponent<RigidBody3DComponent>().RuntimeBody = nullptr;
+	}
+
+	if (m_IsRunning)
+	{
+		/// Entities spawned while the scene is running do not go through
+		/// OnRuntimeStart, so create their script instances and run OnCreate now.
+		for (size_t i = 0; i < prefab->Entities.size(); ++i)
+		{
+			const auto& prefabEntity = prefab->Entities[i];
+			const auto local = prefabEntity.LocalIndex == InvalidPrefabLocalIndex
+				? static_cast<PrefabLocalIndex>(i)
+				: prefabEntity.LocalIndex;
+
+			const auto it = entityMapping.find(local);
+			if (it == entityMapping.end() || !it->second)
+				continue;
+
+			if (it->second.HasComponent<ScriptComponent>())
+				ScriptEngine::OnCreateEntity(it->second);
+		}
 	}
 
 	PrefabLocalIndex rootLocal = prefab->RootLocalIndex;
@@ -1073,11 +1102,16 @@ Entity Scene::InstantiatePrefab(const AssetHandle prefabHandle, const std::strin
 		{
 			KBR_TRACY_SCOPE("Scene::UpdateScripts - C# scripts update");
 
-			m_Registry.view<ScriptComponent>().each([this, ts](auto id, [[maybe_unused]] const ScriptComponent& script)
-			{
-				const Entity entity{ id, this };
+			/// Snapshot first: scripts may instantiate prefabs during OnUpdate,
+			/// which mutates the ScriptComponent storage.
+			std::vector<Entity> scriptEntities;
+			const auto scriptView = m_Registry.view<ScriptComponent>();
+			scriptEntities.reserve(static_cast<size_t>(m_Registry.storage<ScriptComponent>().size()));
+			for (const auto enttId : scriptView)
+				scriptEntities.emplace_back(enttId, this);
+
+			for (const Entity entity : scriptEntities)
 				ScriptEngine::OnUpdateEntity(entity, ts);
-			});
 		}
 	}
 

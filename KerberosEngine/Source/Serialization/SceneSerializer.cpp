@@ -9,6 +9,7 @@
 #include "Scripting/ScriptClass.hpp"
 #include "Scripting/ScriptEngine.hpp"
 #include "Scripting/ScriptUtils.hpp"
+#include "Serialization/ScriptFieldSerializer.hpp"
 #include "SerializationUtils.hpp"
 #include "Profiling/Profilers.hpp"
 
@@ -115,65 +116,7 @@ static void SerializeEntity(YAML::Emitter& out, const Entity entity)
                     out << YAML::BeginMap;
                     out << YAML::Key << "Name" << YAML::Value << name;
                     out << YAML::Key << "Type" << YAML::Value << ScriptUtils::ScriptFieldTypeToString(field.Field.Type);
-                    switch (field.Field.Type) {
-                    case ScriptFieldType::Short:
-                        out << YAML::Key << "Data" << YAML::Value << field.GetValue<short>();
-                        break;
-                    case ScriptFieldType::Long:
-                        out << YAML::Key << "Data" << YAML::Value << field.GetValue<long>();
-                        break;
-                    case ScriptFieldType::UShort:
-                        out << YAML::Key << "Data" << YAML::Value << field.GetValue<uint16_t>();
-                        break;
-                    case ScriptFieldType::UInt:
-                        out << YAML::Key << "Data" << YAML::Value << field.GetValue<uint32_t>();
-                        break;
-                    case ScriptFieldType::ULong:
-                        out << YAML::Key << "Data" << YAML::Value << field.GetValue<uint64_t>();
-                        break;
-                    case ScriptFieldType::Double:
-                        out << YAML::Key << "Data" << YAML::Value << field.GetValue<double>();
-                        break;
-                    case ScriptFieldType::Char:
-                        out << YAML::Key << "Data" << YAML::Value << field.GetValue<char>();
-                        break;
-                    case ScriptFieldType::Byte:
-                        out << YAML::Key << "Data" << YAML::Value << static_cast<int>(field.GetValue<uint8_t>());
-                        break;
-                    case ScriptFieldType::String:
-                        out << YAML::Key << "Data" << YAML::Value << field.GetValue<std::string>();
-                        break;
-                    case ScriptFieldType::Bool:
-                        out << YAML::Key << "Data" << YAML::Value << field.GetValue<bool>();
-                        break;
-                    case ScriptFieldType::Int:
-                        out << YAML::Key << "Data" << YAML::Value << field.GetValue<int>();
-                        break;
-                    case ScriptFieldType::Float:
-                        out << YAML::Key << "Data" << YAML::Value << field.GetValue<float>();
-                        break;
-                    case ScriptFieldType::Vec2:
-                        out << YAML::Key << "Data" << YAML::Value << field.GetValue<glm::vec2>();
-                        break;
-                    case ScriptFieldType::Vec3:
-                        out << YAML::Key << "Data" << YAML::Value << field.GetValue<glm::vec3>();
-                        break;
-                    case ScriptFieldType::Vec4:
-                        out << YAML::Key << "Data" << YAML::Value << field.GetValue<glm::vec4>();
-                        break;
-                    case ScriptFieldType::AssetHandle:
-                        out << YAML::Key << "Data" << YAML::Value << field.GetValue<uint8_t>();
-                        break;
-                    case ScriptFieldType::MaterialRef:
-                        out << YAML::Key << "Data" << YAML::Value << field.GetValue<uint64_t>();
-                        break;
-                    case ScriptFieldType::MeshRef:
-                        out << YAML::Key << "Data" << YAML::Value << field.GetValue<uint64_t>();
-                        break;
-                    case ScriptFieldType::TextureRef:
-                        out << YAML::Key << "Data" << YAML::Value << field.GetValue<uint64_t>();
-                        break;
-                    }
+                    ScriptFieldSerializer::Serialize(out, field);
                     out << YAML::EndMap;
                 }
             }
@@ -420,65 +363,7 @@ static void DeserializeScriptFieldInitializers(const YAML::Node& scriptFields, c
         ScriptFieldInitializer initializer;
         initializer.Field.Name = name;
         initializer.Field.Type = type;
-        switch (type) {
-        case ScriptFieldType::Short:
-            initializer.SetValue<short>(field["Data"].as<short>());
-            break;
-        case ScriptFieldType::Long:
-            initializer.SetValue<long>(field["Data"].as<long>());
-            break;
-        case ScriptFieldType::UShort:
-            initializer.SetValue<uint16_t>(field["Data"].as<uint16_t>());
-            break;
-        case ScriptFieldType::UInt:
-            initializer.SetValue<uint32_t>(field["Data"].as<uint32_t>());
-            break;
-        case ScriptFieldType::ULong:
-            initializer.SetValue<uint64_t>(field["Data"].as<uint64_t>());
-            break;
-        case ScriptFieldType::Double:
-            initializer.SetValue<double>(field["Data"].as<double>());
-            break;
-        case ScriptFieldType::Char:
-            initializer.SetValue<char>(field["Data"].as<char>());
-            break;
-        case ScriptFieldType::Byte:
-            initializer.SetValue<uint8_t>(static_cast<uint8_t>(field["Data"].as<int>()));
-            break;
-        case ScriptFieldType::String:
-            initializer.SetValue<std::string>(field["Data"].as<std::string>());
-            break;
-        case ScriptFieldType::Bool:
-            initializer.SetValue<bool>(field["Data"].as<bool>());
-            break;
-        case ScriptFieldType::Int:
-            initializer.SetValue<int>(field["Data"].as<int>());
-            break;
-        case ScriptFieldType::Float:
-            initializer.SetValue<float>(field["Data"].as<float>());
-            break;
-        case ScriptFieldType::Vec2:
-            initializer.SetValue<glm::vec2>(field["Data"].as<glm::vec2>());
-            break;
-        case ScriptFieldType::Vec3:
-            initializer.SetValue<glm::vec3>(field["Data"].as<glm::vec3>());
-            break;
-        case ScriptFieldType::Vec4:
-            initializer.SetValue<glm::vec4>(field["Data"].as<glm::vec4>());
-            break;
-        case ScriptFieldType::AssetHandle:
-            initializer.SetValue<uint8_t>(field["Data"].as<uint8_t>());
-            break;
-        case ScriptFieldType::MaterialRef:
-            initializer.SetValue<uint64_t>(field["Data"].as<uint64_t>());
-            break;
-        case ScriptFieldType::MeshRef:
-            initializer.SetValue<uint64_t>(field["Data"].as<uint64_t>());
-            break;
-        case ScriptFieldType::TextureRef:
-            initializer.SetValue<uint64_t>(field["Data"].as<uint64_t>());
-            break;
-        }
+        ScriptFieldSerializer::Deserialize(field, initializer);
 
         scriptFieldInitializers[name] = initializer;
     }

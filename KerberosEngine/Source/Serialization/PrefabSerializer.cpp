@@ -1,5 +1,7 @@
 #include "PrefabSerializer.hpp"
 #include "Profiling/Profilers.hpp"
+#include "Serialization/ScriptFieldSerializer.hpp"
+#include "Scripting/ScriptUtils.hpp"
 
 #include <yaml-cpp/yaml.h>
 #include <fstream>
@@ -92,6 +94,28 @@ namespace Kerberos
 					<< YAML::Key << "Mass" << YAML::Value << e.RigidBody->Mass
 					<< YAML::Key << "UseGravity" << YAML::Value << e.RigidBody->UseGravity
 					<< YAML::EndMap;
+			}
+			if (!e.Scripts.empty())
+			{
+				out << YAML::Key << "Scripts" << YAML::Value << YAML::BeginSeq;
+				for (const auto& script : e.Scripts)
+				{
+					out << YAML::BeginMap;
+					out << YAML::Key << "ClassName" << YAML::Value << script.ClassName;
+					out << YAML::Key << "ScriptFields" << YAML::Value << YAML::BeginSeq;
+					for (const auto& field : script.FieldInitializers)
+					{
+						out << YAML::BeginMap;
+						out << YAML::Key << "Name" << YAML::Value << field.Field.Name;
+						out << YAML::Key << "Type" << YAML::Value
+							<< ScriptUtils::ScriptFieldTypeToString(field.Field.Type);
+						ScriptFieldSerializer::Serialize(out, field);
+						out << YAML::EndMap;
+					}
+					out << YAML::EndSeq;
+					out << YAML::EndMap;
+				}
+				out << YAML::EndSeq;
 			}
 			out << YAML::Key << "HasStaticMesh" << YAML::Value << e.HasStaticMesh 
 				<< YAML::Key << "MeshAssetPath" << YAML::Value << YAML::DoubleQuoted << e.MeshAssetPath
@@ -209,6 +233,30 @@ namespace Kerberos
 				r.UseGravity = n["RigidBody"]["UseGravity"].as<bool>(true);
 				r.RuntimeBody = nullptr;
 				e.RigidBody = r;
+			}
+
+			if (n["Scripts"])
+			{
+				for (const auto& scriptNode : n["Scripts"])
+				{
+					PrefabScriptTemplate script;
+					script.ClassName = scriptNode["ClassName"].as<std::string>();
+
+					if (auto scriptFields = scriptNode["ScriptFields"])
+					{
+						for (const auto& fieldNode : scriptFields)
+						{
+							ScriptFieldInitializer initializer;
+							initializer.Field.Name = fieldNode["Name"].as<std::string>();
+							initializer.Field.Type =
+								ScriptUtils::StringToScriptFieldType(fieldNode["Type"].as<std::string>());
+							ScriptFieldSerializer::Deserialize(fieldNode, initializer);
+							script.FieldInitializers.push_back(std::move(initializer));
+						}
+					}
+
+					e.Scripts.push_back(std::move(script));
+				}
 			}
 
 			prefab->Entities.push_back(std::move(e));

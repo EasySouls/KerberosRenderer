@@ -76,6 +76,7 @@ namespace Kerberos
 		void* AudioSource3DComponent_IsLooping;
 
 		void* Physics_Raycast;
+		void* Entity_InstantiatePrefab;
 	};
 
 	/// Component type name to HasComponent check mapping
@@ -198,6 +199,21 @@ namespace Kerberos
 		if (const Ref<Scene> scene = ScriptEngine::GetSceneContext().lock())
 		{
 			const Entity entity = scene->CreateEntity(nameStr);
+			return entity.GetUUID();
+		}
+		return UUID::Invalid();
+	}
+
+	static uint64_t Entity_InstantiatePrefab(const uint64_t prefabHandle)
+	{
+		KBR_TRACY_FUNCTION();
+
+		if (const Ref<Scene> scene = ScriptEngine::GetSceneContext().lock())
+		{
+			const Entity entity = scene->InstantiatePrefab(AssetHandle(prefabHandle));
+			if (!entity)
+				return UUID::Invalid();
+
 			return entity.GetUUID();
 		}
 		return UUID::Invalid();
@@ -772,6 +788,7 @@ namespace Kerberos
 		callbackTable.AudioSource3DComponent_IsLooping = reinterpret_cast<void*>(&AudioSource3DComponent_IsLooping);
 
 		callbackTable.Physics_Raycast = reinterpret_cast<void*>(&Physics_Raycast);
+		callbackTable.Entity_InstantiatePrefab = reinterpret_cast<void*>(&Entity_InstantiatePrefab);
 
 		/// Pass the callback table to the managed side
 		ScriptEngine::SetManagedNativeCallbacks(&callbackTable);

@@ -2,6 +2,7 @@
 
 #include "Scene/Entity.hpp"
 #include "Scene/Components/AnimationComponents.hpp"
+#include "Scripting/ScriptEngine.hpp"
 
 namespace Kerberos {
 
@@ -62,6 +63,23 @@ void PrefabEntityTemplate::ToEntity(Entity newEntity) const
     {
         auto& c = newEntity.AddComponent<CapsuleCollider3DComponent>(CapsuleCollider.value());
         c.RuntimeCollider = nullptr;
+    }
+    if (!Scripts.empty())
+    {
+        auto& scriptComponent = newEntity.AddComponent<ScriptComponent>();
+        for (const auto& script : Scripts)
+        {
+            scriptComponent.ClassNames.push_back(script.ClassName);
+
+            if (ScriptEngine::ClassExists(script.ClassName))
+                ScriptEngine::CreateScriptFieldInitializers(newEntity, script.ClassName);
+
+            auto& initializers = ScriptEngine::GetScriptFieldInitializerMap(newEntity, script.ClassName);
+            for (const auto& fieldInitializer : script.FieldInitializers)
+            {
+                initializers[fieldInitializer.Field.Name] = fieldInitializer;
+            }
+        }
     }
 }
 

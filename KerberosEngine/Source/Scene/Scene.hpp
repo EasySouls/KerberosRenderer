@@ -8,7 +8,6 @@
 #include "Assets/Asset.hpp"
 
 #include <entt/single_include/entt/entt.hpp>
-#include <set>
 #include <string_view>
 #include <memory>
 
@@ -29,10 +28,12 @@ namespace Kerberos
         Scene& operator=(Scene&& other) noexcept = delete;
 
 		void OnRuntimeStart();
-		void OnRuntimeStop() const;
+		void OnRuntimeStop();
 		void OnSimulationStart();
 		void OnSimulationStop() const;
 		void SetScenePaused(bool isPaused);
+
+		bool IsRunning() const { return m_IsRunning; }
 
 		void OnUpdateEditor(float ts, const Camera& camera);
 		void OnUpdateSimulation(float ts, const Camera& camera);
@@ -141,6 +142,7 @@ namespace Kerberos
 		uint32_t m_ViewportHeight = 0;
 
 		bool m_IsScenePaused = false;
+		bool m_IsRunning = false;
 
 		bool m_Is3D = true;
 		bool m_EnableShadowMapping = true;

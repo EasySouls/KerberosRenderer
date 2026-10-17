@@ -80,6 +80,14 @@ single `ClassName`/`ScriptFields` form. When script lifecycle, managed interop
 signatures, or the serialized script format changes, update this file and keep
 the native callback/bridge signatures synchronized.
 
+Script fields support `PrefabRef`, `TextureRef`, and `AssetHandle` reference
+types with asset-browser drag/drop. `Entity.Instantiate(PrefabRef)` spawns a
+prefab through `Scene::InstantiatePrefab`; while the scene is running, spawned
+scripted-prefab entities get script instances created and `OnCreate` invoked
+immediately. `Scene::UpdateScripts`/`OnRuntimeStart` snapshot the script entity
+list before invoking callbacks so scripts may spawn prefabs during lifecycle
+methods.
+
 ## Project and scene flow
 
 Project loading creates/activates an editor asset manager, loads the asset

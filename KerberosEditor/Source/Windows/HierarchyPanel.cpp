@@ -20,11 +20,99 @@
 #include <imgui/imgui_internal.h>
 
 #include <filesystem>
+#include <optional>
 
 
 import Kerberos;
 
 namespace Kerberos {
+
+namespace
+{
+    bool AcceptAnyAssetDragDrop(AssetHandle& outHandle)
+    {
+        constexpr const char* payloadTypes[] = {
+            assetBrowserTexture,
+            assetBrowserTextureCube,
+            assetBrowserMesh,
+            assetBrowserPrefab,
+            assetBrowserAudio,
+            assetBrowserMaterial,
+            assetBrowserItem
+        };
+
+        for (const char* payloadType : payloadTypes)
+        {
+            if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload(payloadType))
+            {
+                outHandle = ReadAssetDragPayload(payload->Data, payload->DataSize).Handle;
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    std::string GetAssetDisplayName(const uint64_t handle)
+    {
+        if (handle != 0 && AssetManager::IsAssetHandleValid(UUID(handle)))
+        {
+            const auto& metadata =
+                Project::GetActive()->GetEditorAssetManager()->GetMetadata(UUID(handle));
+            return metadata.Filepath.filename().string();
+        }
+
+        return "None";
+    }
+
+    std::optional<AssetHandle> DrawScriptAssetReferenceField(
+        const char* label,
+        const uint64_t currentHandle,
+        const char* payloadType,
+        const std::optional<AssetType> requiredType)
+    {
+        ImGui::Text("%s: %s", label, GetAssetDisplayName(currentHandle).c_str());
+
+        std::optional<AssetHandle> newHandle;
+        if (ImGui::BeginDragDropTarget())
+        {
+            if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload(payloadType))
+            {
+                const AssetHandle handle = ReadAssetDragPayload(payload->Data, payload->DataSize).Handle;
+                if (!requiredType || AssetManager::GetAssetType(handle) == *requiredType)
+                {
+                    newHandle = handle;
+                }
+                else
+                {
+                    Log::EditorError("Asset type does not match the script field: {0}", handle);
+                }
+            }
+            ImGui::EndDragDropTarget();
+        }
+
+        return newHandle;
+    }
+
+    std::optional<AssetHandle> DrawScriptAnyAssetReferenceField(
+        const char* label,
+        const uint64_t currentHandle)
+    {
+        ImGui::Text("%s: %s", label, GetAssetDisplayName(currentHandle).c_str());
+
+        std::optional<AssetHandle> newHandle;
+        if (ImGui::BeginDragDropTarget())
+        {
+            AssetHandle handle;
+            if (AcceptAnyAssetDragDrop(handle))
+                newHandle = handle;
+            ImGui::EndDragDropTarget();
+        }
+
+        return newHandle;
+    }
+}
+
 
 HierarchyPanel::HierarchyPanel(const Ref<Scene>& context) : m_Context(context)
 {
@@ -823,6 +911,30 @@ void HierarchyPanel::DrawComponents(const Entity entity)
                                     ImGui::EndDragDropTarget();
                                 }
                             }
+                        else if (scriptField.Type == ScriptFieldType::PrefabRef) {
+                            const uint64_t value = scriptInstance->GetFieldValue<uint64_t>(name);
+                            if (const auto newHandle = DrawScriptAssetReferenceField(
+                                    name.c_str(), value, assetBrowserPrefab, AssetType::Prefab)) {
+                                scriptInstance->SetFieldValue<uint64_t>(
+                                    name, static_cast<uint64_t>(*newHandle));
+                            }
+                        }
+                        else if (scriptField.Type == ScriptFieldType::TextureRef) {
+                            const uint64_t value = scriptInstance->GetFieldValue<uint64_t>(name);
+                            if (const auto newHandle = DrawScriptAssetReferenceField(
+                                    name.c_str(), value, assetBrowserTexture, AssetType::Texture2D)) {
+                                scriptInstance->SetFieldValue<uint64_t>(
+                                    name, static_cast<uint64_t>(*newHandle));
+                            }
+                        }
+                        else if (scriptField.Type == ScriptFieldType::AssetHandle) {
+                            const uint64_t value = scriptInstance->GetFieldValue<uint64_t>(name);
+                            if (const auto newHandle =
+                                    DrawScriptAnyAssetReferenceField(name.c_str(), value)) {
+                                scriptInstance->SetFieldValue<uint64_t>(
+                                    name, static_cast<uint64_t>(*newHandle));
+                            }
+                        }
                             else {
                                 ImGui::Text("Unsupported field type");
                             }
@@ -1000,6 +1112,27 @@ void HierarchyPanel::DrawComponents(const Entity entity)
                                     ImGui::EndDragDropTarget();
                                 }
                             }
+                        else if (scriptField.Type == ScriptFieldType::PrefabRef) {
+                            const uint64_t value = fieldInitializer.GetValue<uint64_t>();
+                            if (const auto newHandle = DrawScriptAssetReferenceField(
+                                    fieldName.c_str(), value, assetBrowserPrefab, AssetType::Prefab)) {
+                                fieldInitializer.SetValue(static_cast<uint64_t>(*newHandle));
+                            }
+                        }
+                        else if (scriptField.Type == ScriptFieldType::TextureRef) {
+                            const uint64_t value = fieldInitializer.GetValue<uint64_t>();
+                            if (const auto newHandle = DrawScriptAssetReferenceField(
+                                    fieldName.c_str(), value, assetBrowserTexture, AssetType::Texture2D)) {
+                                fieldInitializer.SetValue(static_cast<uint64_t>(*newHandle));
+                            }
+                        }
+                        else if (scriptField.Type == ScriptFieldType::AssetHandle) {
+                            const uint64_t value = fieldInitializer.GetValue<uint64_t>();
+                            if (const auto newHandle = DrawScriptAnyAssetReferenceField(
+                                    fieldName.c_str(), value)) {
+                                fieldInitializer.SetValue(static_cast<uint64_t>(*newHandle));
+                            }
+                        }
                             else {
                                 ImGui::Text("Unsupported field type");
                             }

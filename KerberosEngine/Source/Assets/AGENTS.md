@@ -76,6 +76,13 @@ glTF loading preserves source parent relationships, creates primitive child
 entities, assigns `StaticMeshComponent::MeshMaterial`, and adds a synthetic
 instance root so files with multiple glTF roots remain grouped. Legacy YAML
 prefabs do not receive this wrapper behavior.
+Authored YAML prefabs may also carry per-entity script records
+(`PrefabScriptTemplate`: class name plus serialized field initializers).
+`PrefabSerializer` writes and reads those records, and
+`PrefabEntityTemplate::ToEntity` recreates the entity's `ScriptComponent` and
+field initializers. Native glTF prefabs remain script-free. When a scene is
+running, `Scene::InstantiatePrefab` creates script instances and runs
+`OnCreate` for scripted prefab entities immediately.
 The importer also emits one native material record per glTF material (named
 after the material, not just its index) and one `.ktx2` texture artifact per
 referenced image. Material records reference their textures by image index so

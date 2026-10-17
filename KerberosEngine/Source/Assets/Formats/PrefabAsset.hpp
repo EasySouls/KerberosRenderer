@@ -3,6 +3,7 @@
 #include "Assets/Asset.hpp"
 #include "Scene/Components.hpp"
 #include "Scene/Components/PhysicsComponents.hpp"
+#include "Scripting/ScriptClass.hpp"
 
 #include <cstdint>
 #include <limits>
@@ -41,6 +42,12 @@ struct AnimationComponentTemplate
     bool AutoPlay = true;
 };
 
+struct PrefabScriptTemplate
+{
+    std::string ClassName;
+    std::vector<ScriptFieldInitializer> FieldInitializers;
+};
+
 struct PrefabEntityTemplate
 {
     PrefabLocalIndex LocalIndex = InvalidPrefabLocalIndex;
@@ -63,6 +70,8 @@ struct PrefabEntityTemplate
     std::optional<BoxCollider3DComponent> BoxCollider;
     std::optional<SphereCollider3DComponent> SphereCollider;
     std::optional<CapsuleCollider3DComponent> CapsuleCollider;
+
+    std::vector<PrefabScriptTemplate> Scripts;
 
     // Legacy static mesh fields are retained for old prefab files.
     std::string MeshAssetPath;
