@@ -67,13 +67,6 @@ AssetRegistry:
     ParentHandle: 641661085910201849
     SubAssetKey: material:3
     ImportVersion: 1
-  - Handle: 115472114555992723
-    Type: Texture2D
-    Path: Assets\Textures\rocks_color_rgba.ktx2
-    RootSourceHandle: 0
-    ParentHandle: 0
-    SubAssetKey: ""
-    ImportVersion: 1
   - Handle: 119207984755643155
     Type: Mesh
     Path: Models\treasure_glow\Meshes\mesh_34_0_Cube.017.kbrmesh
@@ -97,13 +90,6 @@ AssetRegistry:
     RootSourceHandle: 11581378365515906497
     ParentHandle: 11581378365515906497
     SubAssetKey: material:2
-    ImportVersion: 1
-  - Handle: 157304167842572665
-    Type: Texture2D
-    Path: Models\sponza\14170708867020035030.ktx2
-    RootSourceHandle: 157304167842572665
-    ParentHandle: 0
-    SubAssetKey: ""
     ImportVersion: 1
   - Handle: 160444920585381677
     Type: Mesh
@@ -211,13 +197,6 @@ AssetRegistry:
     ParentHandle: 7563732692318888728
     SubAssetKey: mesh:35_0
     ImportVersion: 1
-  - Handle: 342257920881037543
-    Type: Texture2D
-    Path: Models\sponza\2051777328469649772.ktx2
-    RootSourceHandle: 342257920881037543
-    ParentHandle: 0
-    SubAssetKey: ""
-    ImportVersion: 1
   - Handle: 352769759997396011
     Type: Material
     Path: Models\gltf\glTF-Embedded\Buggy\Materials\Material_22_4.kbrmaterial
@@ -249,13 +228,6 @@ AssetRegistry:
     RootSourceHandle: 7563732692318888728
     ParentHandle: 7563732692318888728
     SubAssetKey: material:71
-    ImportVersion: 1
-  - Handle: 397620605935490416
-    Type: Texture2D
-    Path: Textures\texturearray_rgba.ktx2
-    RootSourceHandle: 397620605935490416
-    ParentHandle: 0
-    SubAssetKey: ""
     ImportVersion: 1
   - Handle: 417507307939784092
     Type: Prefab
@@ -327,13 +299,6 @@ AssetRegistry:
     Path: Models\FlightHelmet\glTF\FlightHelmet.gltf
     LibraryPath: Models\FlightHelmet\glTF\FlightHelmet\FlightHelmet.kbrprefab
     RootSourceHandle: 516790474266850667
-    ParentHandle: 0
-    SubAssetKey: ""
-    ImportVersion: 1
-  - Handle: 523078573608891103
-    Type: Texture2D
-    Path: Models\sponza\14650633544276105767.ktx2
-    RootSourceHandle: 523078573608891103
     ParentHandle: 0
     SubAssetKey: ""
     ImportVersion: 1
@@ -434,13 +399,6 @@ AssetRegistry:
     RootSourceHandle: 6532463041022503106
     ParentHandle: 6532463041022503106
     SubAssetKey: mesh:62_0
-    ImportVersion: 1
-  - Handle: 628170718107820631
-    Type: Texture2D
-    Path: Models\sponza\7645212358685992005.ktx2
-    RootSourceHandle: 628170718107820631
-    ParentHandle: 0
-    SubAssetKey: ""
     ImportVersion: 1
   - Handle: 633989501622947483
     Type: Material
@@ -615,13 +573,6 @@ AssetRegistry:
     RootSourceHandle: 7563732692318888728
     ParentHandle: 7563732692318888728
     SubAssetKey: mesh:15_0
-    ImportVersion: 1
-  - Handle: 926753587182379847
-    Type: Texture2D
-    Path: Assets\Textures\rocks_normal_height_rgba.ktx2
-    RootSourceHandle: 0
-    ParentHandle: 0
-    SubAssetKey: ""
     ImportVersion: 1
   - Handle: 936174458688460079
     Type: Material
@@ -975,13 +926,6 @@ AssetRegistry:
     ParentHandle: 11581378365515906497
     SubAssetKey: mesh:15_0
     ImportVersion: 1
-  - Handle: 1404466632092923728
-    Type: Texture2D
-    Path: Models\sponza\6047387724914829168.ktx2
-    RootSourceHandle: 1404466632092923728
-    ParentHandle: 0
-    SubAssetKey: ""
-    ImportVersion: 1
   - Handle: 1411387094672952085
     Type: Mesh
     Path: Models\treasure_glow\Meshes\mesh_12_0_Cylinder.013.kbrmesh
@@ -1078,13 +1022,6 @@ AssetRegistry:
     ParentHandle: 0
     SubAssetKey: ""
     ImportVersion: 1
-  - Handle: 1527973132246201909
-    Type: Texture2D
-    Path: Textures\cubemap_array.ktx2
-    RootSourceHandle: 1527973132246201909
-    ParentHandle: 0
-    SubAssetKey: ""
-    ImportVersion: 1
   - Handle: 1560418355865105332
     Type: Mesh
     Path: Models\retroufo_glow\Meshes\mesh_48_0_Mesh_48.001.kbrmesh
@@ -1119,13 +1056,6 @@ AssetRegistry:
     ImportVersion: 1
     Dependencies:
       - 11442503968413873368
-  - Handle: 1645528967787985492
-    Type: Texture2D
-    Path: Models\sponza\755318871556304029.ktx2
-    RootSourceHandle: 1645528967787985492
-    ParentHandle: 0
-    SubAssetKey: ""
-    ImportVersion: 1
   - Handle: 1653301886982838594
     Type: Skin
     Path: Models\CesiumMan\glTF-Binary\CesiumMan\Skeletons\Armature.kbrskeleton
@@ -1284,13 +1214,6 @@ AssetRegistry:
     ParentHandle: 0
     SubAssetKey: ""
     ImportVersion: 1
-  - Handle: 1814812369213250009
-    Type: Texture2D
-    Path: Textures\stonefloor01_color_rgba.ktx2
-    RootSourceHandle: 1814812369213250009
-    ParentHandle: 0
-    SubAssetKey: ""
-    ImportVersion: 1
   - Handle: 1890307284088198669
     Type: Material
     Path: Models\gltf\glTF-Embedded\Buggy\Materials\Material_20_13.kbrmaterial
@@ -1298,13 +1221,6 @@ AssetRegistry:
     RootSourceHandle: 7563732692318888728
     ParentHandle: 7563732692318888728
     SubAssetKey: material:13
-    ImportVersion: 1
-  - Handle: 1896080296960406141
-    Type: Texture2D
-    Path: Textures\texture_orientation_ccw_rgba.ktx2
-    RootSourceHandle: 1896080296960406141
-    ParentHandle: 0
-    SubAssetKey: ""
     ImportVersion: 1
   - Handle: 1896423241257672216
     Type: Material
@@ -1384,13 +1300,6 @@ AssetRegistry:
     RootSourceHandle: 516790474266850667
     ParentHandle: 516790474266850667
     SubAssetKey: texture:5
-    ImportVersion: 1
-  - Handle: 2030210444570410901
-    Type: Texture2D
-    Path: Textures\texturearray_rocks_rgba.ktx2
-    RootSourceHandle: 2030210444570410901
-    ParentHandle: 0
-    SubAssetKey: ""
     ImportVersion: 1
   - Handle: 2041384049262616864
     Type: Mesh
@@ -1554,13 +1463,6 @@ AssetRegistry:
     ParentHandle: 11734900932705191300
     SubAssetKey: material:4
     ImportVersion: 1
-  - Handle: 2171915110125973741
-    Type: Texture2D
-    Path: Textures\crate01_color_height_rgba.ktx2
-    RootSourceHandle: 2171915110125973741
-    ParentHandle: 0
-    SubAssetKey: ""
-    ImportVersion: 1
   - Handle: 2204407495483562196
     Type: Mesh
     Path: Models\treasure_smooth\Meshes\mesh_10_0_Cylinder.011.kbrmesh
@@ -1576,13 +1478,6 @@ AssetRegistry:
     RootSourceHandle: 11581378365515906497
     ParentHandle: 11581378365515906497
     SubAssetKey: mesh:57_0
-    ImportVersion: 1
-  - Handle: 2218885143489596834
-    Type: Texture2D
-    Path: Models\sponza\2374361008830720677.ktx2
-    RootSourceHandle: 2218885143489596834
-    ParentHandle: 0
-    SubAssetKey: ""
     ImportVersion: 1
   - Handle: 2220153872577626798
     Type: Mesh
@@ -1695,13 +1590,6 @@ AssetRegistry:
     RootSourceHandle: 7563732692318888728
     ParentHandle: 7563732692318888728
     SubAssetKey: material:28
-    ImportVersion: 1
-  - Handle: 2384691371482736695
-    Type: Texture2D
-    Path: Models\sponza\17876391417123941155.ktx2
-    RootSourceHandle: 2384691371482736695
-    ParentHandle: 0
-    SubAssetKey: ""
     ImportVersion: 1
   - Handle: 2385003743927989712
     Type: Material
@@ -1898,13 +1786,6 @@ AssetRegistry:
     RootSourceHandle: 15647259791250822083
     ParentHandle: 15647259791250822083
     SubAssetKey: mesh:0_0
-    ImportVersion: 1
-  - Handle: 2476193390652821903
-    Type: Texture2D
-    Path: Models\cerberus\albedo.ktx2
-    RootSourceHandle: 2476193390652821903
-    ParentHandle: 0
-    SubAssetKey: ""
     ImportVersion: 1
   - Handle: 2509967105843046231
     Type: Prefab
@@ -2466,13 +2347,6 @@ AssetRegistry:
       - 8047863363254832814
       - 9010966859324372532
       - 10032230584710340853
-  - Handle: 2827815545611507797
-    Type: Texture2D
-    Path: Models\sponza\10388182081421875623.ktx2
-    RootSourceHandle: 2827815545611507797
-    ParentHandle: 0
-    SubAssetKey: ""
-    ImportVersion: 1
   - Handle: 2839339710771549398
     Type: Mesh
     Path: Models\treasure_smooth\Meshes\mesh_65_0_Cylinder.027.kbrmesh
@@ -2521,13 +2395,6 @@ AssetRegistry:
     ParentHandle: 6532463041022503106
     SubAssetKey: mesh:27_0
     ImportVersion: 1
-  - Handle: 2888231585383915661
-    Type: Texture2D
-    Path: Textures\stonefloor02_normal_rgba.ktx2
-    RootSourceHandle: 2888231585383915661
-    ParentHandle: 0
-    SubAssetKey: ""
-    ImportVersion: 1
   - Handle: 2889305248430574066
     Type: Mesh
     Path: Models\reflection_scene\Meshes\mesh_4_0_Sphere.003.kbrmesh
@@ -2536,13 +2403,6 @@ AssetRegistry:
     ParentHandle: 11734900932705191300
     SubAssetKey: mesh:4_0
     ImportVersion: 1
-  - Handle: 2890595732826897063
-    Type: Texture2D
-    Path: Textures\cubemap_vulkan.ktx2
-    RootSourceHandle: 2890595732826897063
-    ParentHandle: 0
-    SubAssetKey: ""
-    ImportVersion: 1
   - Handle: 2924151825702596875
     Type: Texture2D
     Path: Models\FlightHelmet\glTF\FlightHelmet\Textures\texture_7_FlightHelmet_occlusionRoughnessMetallic2.ktx2
@@ -2550,13 +2410,6 @@ AssetRegistry:
     RootSourceHandle: 516790474266850667
     ParentHandle: 516790474266850667
     SubAssetKey: texture:7
-    ImportVersion: 1
-  - Handle: 2928255582413882816
-    Type: Texture2D
-    Path: Models\sponza\8750083169368950601.ktx2
-    RootSourceHandle: 2928255582413882816
-    ParentHandle: 0
-    SubAssetKey: ""
     ImportVersion: 1
   - Handle: 2933438360759287824
     Type: Mesh
@@ -2606,13 +2459,6 @@ AssetRegistry:
     RootSourceHandle: 11581378365515906497
     ParentHandle: 11581378365515906497
     SubAssetKey: mesh:13_1
-    ImportVersion: 1
-  - Handle: 2963811978163713109
-    Type: Texture2D
-    Path: Textures\hdr\gcanyon_cube.ktx2
-    RootSourceHandle: 2963811978163713109
-    ParentHandle: 0
-    SubAssetKey: ""
     ImportVersion: 1
   - Handle: 2979583518871057240
     Type: Material
@@ -2737,13 +2583,6 @@ AssetRegistry:
     ParentHandle: 7563732692318888728
     SubAssetKey: mesh:49_0
     ImportVersion: 1
-  - Handle: 3145294242498770690
-    Type: Texture2D
-    Path: Textures\hdr\pisa_cube.ktx2
-    RootSourceHandle: 3145294242498770690
-    ParentHandle: 0
-    SubAssetKey: ""
-    ImportVersion: 1
   - Handle: 3148316396032555593
     Type: Material
     Path: Assets\Materials\ground.kbrmat
@@ -2807,13 +2646,6 @@ AssetRegistry:
     RootSourceHandle: 14121002741739587132
     ParentHandle: 14121002741739587132
     SubAssetKey: mesh:1_0
-    ImportVersion: 1
-  - Handle: 3201126708998267275
-    Type: Texture2D
-    Path: Models\sponza\11490520546946913238.ktx2
-    RootSourceHandle: 3201126708998267275
-    ParentHandle: 0
-    SubAssetKey: ""
     ImportVersion: 1
   - Handle: 3208332634157529898
     Type: Material
@@ -3032,13 +2864,6 @@ AssetRegistry:
     Path: Assets\Materials\cerberus.kbrmat
     LibraryPath: ..\Materials\cerberus.kbrmat
     RootSourceHandle: 0
-    ParentHandle: 0
-    SubAssetKey: ""
-    ImportVersion: 1
-  - Handle: 3423684872110199485
-    Type: Texture2D
-    Path: Textures\terrain_heightmap_r16.ktx2
-    RootSourceHandle: 3423684872110199485
     ParentHandle: 0
     SubAssetKey: ""
     ImportVersion: 1
@@ -3265,13 +3090,6 @@ AssetRegistry:
     ParentHandle: 14244998688843197978
     SubAssetKey: mesh:10_0
     ImportVersion: 1
-  - Handle: 3657332525593464174
-    Type: Texture2D
-    Path: Models\sponza\13982482287905699490.ktx2
-    RootSourceHandle: 3657332525593464174
-    ParentHandle: 0
-    SubAssetKey: ""
-    ImportVersion: 1
   - Handle: 3662506915942807038
     Type: Material
     Path: Models\plants\Materials\Material_011.kbrmaterial
@@ -3295,13 +3113,6 @@ AssetRegistry:
     RootSourceHandle: 7563732692318888728
     ParentHandle: 7563732692318888728
     SubAssetKey: mesh:71_1
-    ImportVersion: 1
-  - Handle: 3725541886454758420
-    Type: Texture2D
-    Path: Models\sponza\8481240838833932244.ktx2
-    RootSourceHandle: 3725541886454758420
-    ParentHandle: 0
-    SubAssetKey: ""
     ImportVersion: 1
   - Handle: 3727856270706102138
     Type: Mesh
@@ -3548,13 +3359,6 @@ AssetRegistry:
     RootSourceHandle: 11581378365515906497
     ParentHandle: 11581378365515906497
     SubAssetKey: mesh:59_0
-    ImportVersion: 1
-  - Handle: 4203122329716467485
-    Type: Texture2D
-    Path: Models\sponza\8006627369776289000.ktx2
-    RootSourceHandle: 4203122329716467485
-    ParentHandle: 0
-    SubAssetKey: ""
     ImportVersion: 1
   - Handle: 4229625760450669139
     Type: Mesh
@@ -3833,13 +3637,6 @@ AssetRegistry:
     RootSourceHandle: 11581378365515906497
     ParentHandle: 11581378365515906497
     SubAssetKey: material:3
-    ImportVersion: 1
-  - Handle: 4586000639422382411
-    Type: Texture2D
-    Path: Models\sponza\6593109234861095314.ktx2
-    RootSourceHandle: 4586000639422382411
-    ParentHandle: 0
-    SubAssetKey: ""
     ImportVersion: 1
   - Handle: 4587036587002877693
     Type: Mesh
@@ -4128,13 +3925,6 @@ AssetRegistry:
     ParentHandle: 0
     SubAssetKey: ""
     ImportVersion: 1
-  - Handle: 4925737031612761827
-    Type: Texture2D
-    Path: Textures\terrain_texturearray_rgba.ktx2
-    RootSourceHandle: 4925737031612761827
-    ParentHandle: 0
-    SubAssetKey: ""
-    ImportVersion: 1
   - Handle: 4927339456928655212
     Type: Mesh
     Path: Models\gltf\glTF-Embedded\Buggy\Meshes\mesh_83_0_body_51.kbrmesh
@@ -4191,13 +3981,6 @@ AssetRegistry:
     ParentHandle: 3592214733151679049
     SubAssetKey: texture:4
     ImportVersion: 1
-  - Handle: 5067944393102838560
-    Type: Texture2D
-    Path: Textures\cubemap_space.ktx2
-    RootSourceHandle: 5067944393102838560
-    ParentHandle: 0
-    SubAssetKey: ""
-    ImportVersion: 1
   - Handle: 5079907620425664531
     Type: Mesh
     Path: Models\retroufo\Meshes\mesh_0_0_Mesh_0.kbrmesh
@@ -4205,13 +3988,6 @@ AssetRegistry:
     RootSourceHandle: 14244998688843197978
     ParentHandle: 14244998688843197978
     SubAssetKey: mesh:0_0
-    ImportVersion: 1
-  - Handle: 5082567301878459137
-    Type: Texture2D
-    Path: Textures\rocks_color_rgba.ktx2
-    RootSourceHandle: 5082567301878459137
-    ParentHandle: 0
-    SubAssetKey: ""
     ImportVersion: 1
   - Handle: 5091245074571244391
     Type: Texture2D
@@ -4305,13 +4081,6 @@ AssetRegistry:
     RootSourceHandle: 6532463041022503106
     ParentHandle: 6532463041022503106
     SubAssetKey: mesh:14_0
-    ImportVersion: 1
-  - Handle: 5184093595592760978
-    Type: Texture2D
-    Path: Assets\Textures\stonefloor01_color_rgba.ktx2
-    RootSourceHandle: 0
-    ParentHandle: 0
-    SubAssetKey: ""
     ImportVersion: 1
   - Handle: 5194735605268595741
     Type: Mesh
@@ -4531,13 +4300,6 @@ AssetRegistry:
     ParentHandle: 10934383581697002570
     SubAssetKey: mesh:0_0
     ImportVersion: 1
-  - Handle: 5439121974435431214
-    Type: Texture2D
-    Path: Models\sponza\14267839433702832875.ktx2
-    RootSourceHandle: 5439121974435431214
-    ParentHandle: 0
-    SubAssetKey: ""
-    ImportVersion: 1
   - Handle: 5439986381364387768
     Type: Mesh
     Path: Models\retroufo_red_lowpoly\Meshes\mesh_15_0_Mesh_15.kbrmesh
@@ -4605,13 +4367,6 @@ AssetRegistry:
     Type: Material
     Path: Materials\armor.kbrmat
     RootSourceHandle: 5553020161777056314
-    ParentHandle: 0
-    SubAssetKey: ""
-    ImportVersion: 1
-  - Handle: 5562997118612046986
-    Type: Texture2D
-    Path: Models\sponza\8773302468495022225.ktx2
-    RootSourceHandle: 5562997118612046986
     ParentHandle: 0
     SubAssetKey: ""
     ImportVersion: 1
@@ -4906,13 +4661,6 @@ AssetRegistry:
     ParentHandle: 7563732692318888728
     SubAssetKey: mesh:0_0
     ImportVersion: 1
-  - Handle: 5958097031217824212
-    Type: Texture2D
-    Path: Models\sponza\4477655471536070370.ktx2
-    RootSourceHandle: 5958097031217824212
-    ParentHandle: 0
-    SubAssetKey: ""
-    ImportVersion: 1
   - Handle: 5966745131588316335
     Type: Material
     Path: Models\gltf\glTF-Embedded\Buggy\Materials\Material_20_51.kbrmaterial
@@ -5005,13 +4753,6 @@ AssetRegistry:
     ParentHandle: 6532463041022503106
     SubAssetKey: mesh:67_0
     ImportVersion: 1
-  - Handle: 6060344023121252779
-    Type: Texture2D
-    Path: Models\cerberus\metallic.ktx2
-    RootSourceHandle: 6060344023121252779
-    ParentHandle: 0
-    SubAssetKey: ""
-    ImportVersion: 1
   - Handle: 6064951775333052819
     Type: Material
     Path: Models\gltf\glTF-Embedded\Buggy\Materials\Material_20_108.kbrmaterial
@@ -5098,13 +4839,6 @@ AssetRegistry:
     ParentHandle: 7091104109938620452
     SubAssetKey: mesh:2_1
     ImportVersion: 1
-  - Handle: 6238035296533204066
-    Type: Texture2D
-    Path: Textures\metalplate_nomips_rgba.ktx2
-    RootSourceHandle: 6238035296533204066
-    ParentHandle: 0
-    SubAssetKey: ""
-    ImportVersion: 1
   - Handle: 6241660044645966324
     Type: Mesh
     Path: Models\CesiumMan\glTF-Embedded\CesiumMan\Meshes\mesh_0_0_Cesium_Man.kbrmesh
@@ -5112,13 +4846,6 @@ AssetRegistry:
     RootSourceHandle: 1809898354495857078
     ParentHandle: 1809898354495857078
     SubAssetKey: mesh:0_0
-    ImportVersion: 1
-  - Handle: 6297670982187797025
-    Type: Texture2D
-    Path: Textures\stonefloor03_color_height_rgba.ktx2
-    RootSourceHandle: 6297670982187797025
-    ParentHandle: 0
-    SubAssetKey: ""
     ImportVersion: 1
   - Handle: 6299968933034832867
     Type: Mesh
@@ -5291,13 +5018,6 @@ AssetRegistry:
     ParentHandle: 583060611811443193
     SubAssetKey: mesh:1_0
     ImportVersion: 1
-  - Handle: 6365234392246444922
-    Type: Texture2D
-    Path: Models\sponza\14118779221266351425.ktx2
-    RootSourceHandle: 6365234392246444922
-    ParentHandle: 0
-    SubAssetKey: ""
-    ImportVersion: 1
   - Handle: 6367696241145087664
     Type: Mesh
     Path: Models\treasure_smooth\Meshes\mesh_17_0_Cylinder.024.kbrmesh
@@ -5436,13 +5156,6 @@ AssetRegistry:
     ParentHandle: 11581378365515906497
     SubAssetKey: mesh:14_1
     ImportVersion: 1
-  - Handle: 6644287514154954155
-    Type: Texture2D
-    Path: Textures\fireplace_normalmap_rgba.ktx2
-    RootSourceHandle: 6644287514154954155
-    ParentHandle: 0
-    SubAssetKey: ""
-    ImportVersion: 1
   - Handle: 6659350222170023705
     Type: Material
     Path: Models\gltf\glTF-Embedded\Buggy\Materials\Material_20_56.kbrmaterial
@@ -5455,13 +5168,6 @@ AssetRegistry:
     Type: Texture2D
     Path: Models\FlightHelmet\glTF\FlightHelmet_baseColor2.png
     RootSourceHandle: 6665712026118286940
-    ParentHandle: 0
-    SubAssetKey: ""
-    ImportVersion: 1
-  - Handle: 6667797476333483113
-    Type: Texture2D
-    Path: Models\sponza\2185409758123873465.ktx2
-    RootSourceHandle: 6667797476333483113
     ParentHandle: 0
     SubAssetKey: ""
     ImportVersion: 1
@@ -5609,13 +5315,6 @@ AssetRegistry:
     RootSourceHandle: 8858309372063028477
     ParentHandle: 8858309372063028477
     SubAssetKey: material:1
-    ImportVersion: 1
-  - Handle: 6951381813301136443
-    Type: Texture2D
-    Path: Textures\metalplate01_rgba.ktx2
-    RootSourceHandle: 6951381813301136443
-    ParentHandle: 0
-    SubAssetKey: ""
     ImportVersion: 1
   - Handle: 6952368541152634623
     Type: Mesh
@@ -5765,13 +5464,6 @@ AssetRegistry:
     Path: Models\cerberus\cerberus.gltf
     LibraryPath: Models\cerberus\cerberus\cerberus.kbrprefab
     RootSourceHandle: 7217538472807364334
-    ParentHandle: 0
-    SubAssetKey: ""
-    ImportVersion: 1
-  - Handle: 7225974619115200999
-    Type: Texture2D
-    Path: Models\sponza\16275776544635328252.ktx2
-    RootSourceHandle: 7225974619115200999
     ParentHandle: 0
     SubAssetKey: ""
     ImportVersion: 1
@@ -6003,13 +5695,6 @@ AssetRegistry:
     RootSourceHandle: 18146978209962790870
     ParentHandle: 18146978209962790870
     SubAssetKey: mesh:5_2
-    ImportVersion: 1
-  - Handle: 7441895838196593016
-    Type: Texture2D
-    Path: Models\sponza\15722799267630235092.ktx2
-    RootSourceHandle: 7441895838196593016
-    ParentHandle: 0
-    SubAssetKey: ""
     ImportVersion: 1
   - Handle: 7473895060546404605
     Type: Material
@@ -6288,20 +5973,6 @@ AssetRegistry:
     ParentHandle: 10934383581697002570
     SubAssetKey: mesh:3_0
     ImportVersion: 1
-  - Handle: 7785270081869138126
-    Type: Texture2D
-    Path: Textures\fireplace_colormap_rgba.ktx2
-    RootSourceHandle: 7785270081869138126
-    ParentHandle: 0
-    SubAssetKey: ""
-    ImportVersion: 1
-  - Handle: 7795706910952412749
-    Type: Texture2D
-    Path: Models\sponza\7441062115984513793.ktx2
-    RootSourceHandle: 7795706910952412749
-    ParentHandle: 0
-    SubAssetKey: ""
-    ImportVersion: 1
   - Handle: 7797606804651272864
     Type: Mesh
     Path: Models\retroufo\Meshes\mesh_7_0_Mesh_7.kbrmesh
@@ -6396,13 +6067,6 @@ AssetRegistry:
     RootSourceHandle: 8858309372063028477
     ParentHandle: 8858309372063028477
     SubAssetKey: mesh:22_0
-    ImportVersion: 1
-  - Handle: 7936823637044323857
-    Type: Texture2D
-    Path: Textures\hdr\uffizi_cube.ktx2
-    RootSourceHandle: 7936823637044323857
-    ParentHandle: 0
-    SubAssetKey: ""
     ImportVersion: 1
   - Handle: 7940831354917863559
     Type: Material
@@ -6559,13 +6223,6 @@ AssetRegistry:
     RootSourceHandle: 11581378365515906497
     ParentHandle: 11581378365515906497
     SubAssetKey: mesh:14_0
-    ImportVersion: 1
-  - Handle: 8117762249468075222
-    Type: Texture2D
-    Path: Textures\colored_glass_rgba.ktx2
-    RootSourceHandle: 8117762249468075222
-    ParentHandle: 0
-    SubAssetKey: ""
     ImportVersion: 1
   - Handle: 8151981278749144361
     Type: Mesh
@@ -6834,13 +6491,6 @@ AssetRegistry:
     ParentHandle: 14244998688843197978
     SubAssetKey: mesh:50_0
     ImportVersion: 1
-  - Handle: 8509263561951193761
-    Type: Texture2D
-    Path: Models\cerberus\roughness.ktx2
-    RootSourceHandle: 8509263561951193761
-    ParentHandle: 0
-    SubAssetKey: ""
-    ImportVersion: 1
   - Handle: 8546228080955587583
     Type: Prefab
     Path: Models\oaktree\oaktree.kbrprefab
@@ -6885,20 +6535,6 @@ AssetRegistry:
     RootSourceHandle: 14244998688843197978
     ParentHandle: 14244998688843197978
     SubAssetKey: mesh:48_0
-    ImportVersion: 1
-  - Handle: 8600682852921679773
-    Type: Texture2D
-    Path: Textures\texturearray_plants_rgba.ktx2
-    RootSourceHandle: 8600682852921679773
-    ParentHandle: 0
-    SubAssetKey: ""
-    ImportVersion: 1
-  - Handle: 8605380196805837796
-    Type: Texture2D
-    Path: Textures\rocks_normal_height_rgba.ktx2
-    RootSourceHandle: 8605380196805837796
-    ParentHandle: 0
-    SubAssetKey: ""
     ImportVersion: 1
   - Handle: 8630309684518284475
     Type: Mesh
@@ -7347,13 +6983,6 @@ AssetRegistry:
     ParentHandle: 7563732692318888728
     SubAssetKey: mesh:90_0
     ImportVersion: 1
-  - Handle: 9306104543907443755
-    Type: Texture2D
-    Path: Textures\stonefloor02_color_rgba.ktx2
-    RootSourceHandle: 9306104543907443755
-    ParentHandle: 0
-    SubAssetKey: ""
-    ImportVersion: 1
   - Handle: 9308557572870297334
     Type: Mesh
     Path: Models\treasure_smooth\Meshes\mesh_61_0_Cube.044.kbrmesh
@@ -7474,13 +7103,6 @@ AssetRegistry:
     RootSourceHandle: 6532463041022503106
     ParentHandle: 6532463041022503106
     SubAssetKey: mesh:30_0
-    ImportVersion: 1
-  - Handle: 9386756036260095887
-    Type: Texture2D
-    Path: Models\sponza\12501374198249454378.ktx2
-    RootSourceHandle: 9386756036260095887
-    ParentHandle: 0
-    SubAssetKey: ""
     ImportVersion: 1
   - Handle: 9406601308357270012
     Type: Texture2D
@@ -7641,13 +7263,6 @@ AssetRegistry:
     ParentHandle: 6532463041022503106
     SubAssetKey: mesh:20_0
     ImportVersion: 1
-  - Handle: 9740765187577293731
-    Type: Texture2D
-    Path: Textures\particle_smoke.ktx2
-    RootSourceHandle: 9740765187577293731
-    ParentHandle: 0
-    SubAssetKey: ""
-    ImportVersion: 1
   - Handle: 9741485865493362571
     Type: Mesh
     Path: Models\treasure_smooth\Meshes\mesh_8_0_Cylinder.009.kbrmesh
@@ -7703,13 +7318,6 @@ AssetRegistry:
     RootSourceHandle: 10881124940085977282
     ParentHandle: 10881124940085977282
     SubAssetKey: mesh:11_0
-    ImportVersion: 1
-  - Handle: 9826349158401489947
-    Type: Texture2D
-    Path: Models\cerberus\ao.ktx2
-    RootSourceHandle: 9826349158401489947
-    ParentHandle: 0
-    SubAssetKey: ""
     ImportVersion: 1
   - Handle: 9832897256245327273
     Type: Texture2D
@@ -7822,13 +7430,6 @@ AssetRegistry:
     RootSourceHandle: 8858309372063028477
     ParentHandle: 8858309372063028477
     SubAssetKey: mesh:5_0
-    ImportVersion: 1
-  - Handle: 9921626738468206613
-    Type: Texture2D
-    Path: Models\sponza\15295713303328085182.ktx2
-    RootSourceHandle: 9921626738468206613
-    ParentHandle: 0
-    SubAssetKey: ""
     ImportVersion: 1
   - Handle: 9925614031711031094
     Type: Mesh
@@ -8083,13 +7684,6 @@ AssetRegistry:
     RootSourceHandle: 18268071128944098402
     ParentHandle: 18268071128944098402
     SubAssetKey: mesh:2_0
-    ImportVersion: 1
-  - Handle: 10280936285269305196
-    Type: Texture2D
-    Path: Models\sponza\6772804448157695701.ktx2
-    RootSourceHandle: 10280936285269305196
-    ParentHandle: 0
-    SubAssetKey: ""
     ImportVersion: 1
   - Handle: 10286718422577426843
     Type: Material
@@ -8364,13 +7958,6 @@ AssetRegistry:
     ParentHandle: 11581378365515906497
     SubAssetKey: mesh:0_1
     ImportVersion: 1
-  - Handle: 10706587586284397035
-    Type: Texture2D
-    Path: Models\sponza\5823059166183034438.ktx2
-    RootSourceHandle: 10706587586284397035
-    ParentHandle: 0
-    SubAssetKey: ""
-    ImportVersion: 1
   - Handle: 10708807184246110080
     Type: Mesh
     Path: Models\retroufo_glow\Meshes\mesh_22_0_Mesh_22.001.kbrmesh
@@ -8627,20 +8214,6 @@ AssetRegistry:
     RootSourceHandle: 7563732692318888728
     ParentHandle: 7563732692318888728
     SubAssetKey: material:79
-    ImportVersion: 1
-  - Handle: 10978123594103707837
-    Type: Texture2D
-    Path: Models\sponza\3628158980083700836.ktx2
-    RootSourceHandle: 10978123594103707837
-    ParentHandle: 0
-    SubAssetKey: ""
-    ImportVersion: 1
-  - Handle: 10985935280459695804
-    Type: Texture2D
-    Path: Textures\stonefloor01_normal_rgba.ktx2
-    RootSourceHandle: 10985935280459695804
-    ParentHandle: 0
-    SubAssetKey: ""
     ImportVersion: 1
   - Handle: 10999740023053926886
     Type: Mesh
@@ -9050,20 +8623,6 @@ AssetRegistry:
     ParentHandle: 0
     SubAssetKey: ""
     ImportVersion: 1
-  - Handle: 11582372071932623764
-    Type: Texture2D
-    Path: Models\sponza\332936164838540657.ktx2
-    RootSourceHandle: 11582372071932623764
-    ParentHandle: 0
-    SubAssetKey: ""
-    ImportVersion: 1
-  - Handle: 11635717575015702302
-    Type: Texture2D
-    Path: Models\sponza\3827035219084910048.ktx2
-    RootSourceHandle: 11635717575015702302
-    ParentHandle: 0
-    SubAssetKey: ""
-    ImportVersion: 1
   - Handle: 11635883320332838712
     Type: Material
     Path: ImportedModels\sponza\Material_24.kbrmat
@@ -9148,13 +8707,6 @@ AssetRegistry:
     ParentHandle: 0
     SubAssetKey: ""
     ImportVersion: 1
-  - Handle: 11740764540771421743
-    Type: Texture2D
-    Path: Textures\font_bitmap_rgba.ktx2
-    RootSourceHandle: 11740764540771421743
-    ParentHandle: 0
-    SubAssetKey: ""
-    ImportVersion: 1
   - Handle: 11765714727260817111
     Type: Material
     Path: Models\vulkanscene_shadow\Materials\White_002.kbrmaterial
@@ -9171,24 +8723,10 @@ AssetRegistry:
     ParentHandle: 7563732692318888728
     SubAssetKey: material:90
     ImportVersion: 1
-  - Handle: 11770008681431408186
-    Type: Texture2D
-    Path: Textures\font_sdf_rgba.ktx2
-    RootSourceHandle: 11770008681431408186
-    ParentHandle: 0
-    SubAssetKey: ""
-    ImportVersion: 1
   - Handle: 11776928278205417952
     Type: Texture2D
     Path: Models\FlightHelmet\glTF\FlightHelmet_occlusionRoughnessMetallic4.png
     RootSourceHandle: 11776928278205417952
-    ParentHandle: 0
-    SubAssetKey: ""
-    ImportVersion: 1
-  - Handle: 11781338111538932881
-    Type: Texture2D
-    Path: Models\sponza\7056944414013900257.ktx2
-    RootSourceHandle: 11781338111538932881
     ParentHandle: 0
     SubAssetKey: ""
     ImportVersion: 1
@@ -9279,13 +8817,6 @@ AssetRegistry:
     RootSourceHandle: 14244998688843197978
     ParentHandle: 14244998688843197978
     SubAssetKey: mesh:17_0
-    ImportVersion: 1
-  - Handle: 11977038520296417998
-    Type: Texture2D
-    Path: Textures\cubemap_yokohama_rgba.ktx2
-    RootSourceHandle: 11977038520296417998
-    ParentHandle: 0
-    SubAssetKey: ""
     ImportVersion: 1
   - Handle: 11977560660695792735
     Type: Material
@@ -9913,13 +9444,6 @@ AssetRegistry:
     ParentHandle: 516790474266850667
     SubAssetKey: texture:8
     ImportVersion: 1
-  - Handle: 12930557336592136610
-    Type: Texture2D
-    Path: Models\cerberus\ao_b.ktx2
-    RootSourceHandle: 12930557336592136610
-    ParentHandle: 0
-    SubAssetKey: ""
-    ImportVersion: 1
   - Handle: 12968963011700777413
     Type: Material
     Path: Materials\rock.kbrmat
@@ -10042,13 +9566,6 @@ AssetRegistry:
     RootSourceHandle: 7563732692318888728
     ParentHandle: 7563732692318888728
     SubAssetKey: material:2
-    ImportVersion: 1
-  - Handle: 13144785108643752847
-    Type: Texture2D
-    Path: Models\cerberus\normal.ktx2
-    RootSourceHandle: 13144785108643752847
-    ParentHandle: 0
-    SubAssetKey: ""
     ImportVersion: 1
   - Handle: 13201797956794002092
     Type: Mesh
@@ -10268,13 +9785,6 @@ AssetRegistry:
     ParentHandle: 7563732692318888728
     SubAssetKey: mesh:77_1
     ImportVersion: 1
-  - Handle: 13316536766042283664
-    Type: Texture2D
-    Path: Textures\particle01_rgba.ktx2
-    RootSourceHandle: 13316536766042283664
-    ParentHandle: 0
-    SubAssetKey: ""
-    ImportVersion: 1
   - Handle: 13346003504517060693
     Type: Mesh
     Path: Models\sponza\sponza\Meshes\mesh_6_0_Mesh_0.006.kbrmesh
@@ -10428,13 +9938,6 @@ AssetRegistry:
     ParentHandle: 10934383581697002570
     SubAssetKey: mesh:3_2
     ImportVersion: 1
-  - Handle: 13531468210920311307
-    Type: Texture2D
-    Path: Models\sponza\2775690330959970771.ktx2
-    RootSourceHandle: 13531468210920311307
-    ParentHandle: 0
-    SubAssetKey: ""
-    ImportVersion: 1
   - Handle: 13577368848827794105
     Type: Mesh
     Path: Models\retroufo\Meshes\mesh_28_0_Mesh_31.kbrmesh
@@ -10518,13 +10021,6 @@ AssetRegistry:
     ParentHandle: 7563732692318888728
     SubAssetKey: material:70
     ImportVersion: 1
-  - Handle: 13713342856588498596
-    Type: Texture2D
-    Path: Models\armor\colormap_rgba.ktx2
-    RootSourceHandle: 13713342856588498596
-    ParentHandle: 0
-    SubAssetKey: ""
-    ImportVersion: 1
   - Handle: 13722267492080613136
     Type: Material
     Path: ImportedModels\sponza\Material_20.kbrmat
@@ -10539,13 +10035,6 @@ AssetRegistry:
     RootSourceHandle: 11734900932705191300
     ParentHandle: 11734900932705191300
     SubAssetKey: mesh:6_1
-    ImportVersion: 1
-  - Handle: 13731996707224247925
-    Type: Texture2D
-    Path: Models\sponza\2969916736137545357.ktx2
-    RootSourceHandle: 13731996707224247925
-    ParentHandle: 0
-    SubAssetKey: ""
     ImportVersion: 1
   - Handle: 13742802974986305692
     Type: Mesh
@@ -10634,13 +10123,6 @@ AssetRegistry:
     ParentHandle: 641661085910201849
     SubAssetKey: mesh:23_0
     ImportVersion: 1
-  - Handle: 13925310463357182466
-    Type: Texture2D
-    Path: Textures\gridlines.ktx2
-    RootSourceHandle: 13925310463357182466
-    ParentHandle: 0
-    SubAssetKey: ""
-    ImportVersion: 1
   - Handle: 13925428482154118856
     Type: Mesh
     Path: Models\samplescene\Meshes\mesh_5_0_Plane01_Plane01.001.kbrmesh
@@ -10656,20 +10138,6 @@ AssetRegistry:
     RootSourceHandle: 16654277587415935315
     ParentHandle: 16654277587415935315
     SubAssetKey: material:0
-    ImportVersion: 1
-  - Handle: 14001651161357485109
-    Type: Texture2D
-    Path: Textures\vulkan_cloth_rgba.ktx2
-    RootSourceHandle: 14001651161357485109
-    ParentHandle: 0
-    SubAssetKey: ""
-    ImportVersion: 1
-  - Handle: 14001901820842025453
-    Type: Texture2D
-    Path: Textures\matcap_array_rgba.ktx2
-    RootSourceHandle: 14001901820842025453
-    ParentHandle: 0
-    SubAssetKey: ""
     ImportVersion: 1
   - Handle: 14042281952890578181
     Type: Mesh
@@ -10885,13 +10353,6 @@ AssetRegistry:
     ParentHandle: 7563732692318888728
     SubAssetKey: material:30
     ImportVersion: 1
-  - Handle: 14490528903981536392
-    Type: Texture2D
-    Path: Textures\skysphere_rgba.ktx2
-    RootSourceHandle: 14490528903981536392
-    ParentHandle: 0
-    SubAssetKey: ""
-    ImportVersion: 1
   - Handle: 14495046642497812774
     Type: Mesh
     Path: Models\gltf\glTF-Embedded\Buggy\Meshes\mesh_91_0_body_35.kbrmesh
@@ -11088,13 +10549,6 @@ AssetRegistry:
     ParentHandle: 11581378365515906497
     SubAssetKey: mesh:53_0
     ImportVersion: 1
-  - Handle: 14734440342852560082
-    Type: Texture2D
-    Path: Models\sponza\4675343432951571524.ktx2
-    RootSourceHandle: 14734440342852560082
-    ParentHandle: 0
-    SubAssetKey: ""
-    ImportVersion: 1
   - Handle: 14751061127955870362
     Type: Mesh
     Path: Models\retroufo\Meshes\mesh_32_0_Mesh_28.kbrmesh
@@ -11284,13 +10738,6 @@ AssetRegistry:
     ParentHandle: 6532463041022503106
     SubAssetKey: mesh:6_0
     ImportVersion: 1
-  - Handle: 15114874600462391868
-    Type: Texture2D
-    Path: Models\sponza\4601176305987539675.ktx2
-    RootSourceHandle: 15114874600462391868
-    ParentHandle: 0
-    SubAssetKey: ""
-    ImportVersion: 1
   - Handle: 15117061975233476141
     Type: Mesh
     Path: Models\retroufo_red_lowpoly\Meshes\mesh_36_0_Mesh_44.kbrmesh
@@ -11323,13 +10770,6 @@ AssetRegistry:
     ParentHandle: 14244998688843197978
     SubAssetKey: mesh:33_0
     ImportVersion: 1
-  - Handle: 15190653788958532168
-    Type: Texture2D
-    Path: Models\sponza\759203620573749278.ktx2
-    RootSourceHandle: 15190653788958532168
-    ParentHandle: 0
-    SubAssetKey: ""
-    ImportVersion: 1
   - Handle: 15230786351381584689
     Type: Mesh
     Path: Models\treasure_glow\Meshes\mesh_14_1_Cylinder.015.kbrmesh
@@ -11337,13 +10777,6 @@ AssetRegistry:
     RootSourceHandle: 8858309372063028477
     ParentHandle: 8858309372063028477
     SubAssetKey: mesh:14_1
-    ImportVersion: 1
-  - Handle: 15234175427624316612
-    Type: Texture2D
-    Path: Models\sponza\6151467286084645207.ktx2
-    RootSourceHandle: 15234175427624316612
-    ParentHandle: 0
-    SubAssetKey: ""
     ImportVersion: 1
   - Handle: 15253618709966216375
     Type: Prefab
@@ -11372,13 +10805,6 @@ AssetRegistry:
     Dependencies:
       - 2781957408488098424
       - 17600187571117543440
-  - Handle: 15258714180552547289
-    Type: Texture2D
-    Path: Textures\texture_orientation_cw_rgba.ktx2
-    RootSourceHandle: 15258714180552547289
-    ParentHandle: 0
-    SubAssetKey: ""
-    ImportVersion: 1
   - Handle: 15274795671209156400
     Type: Material
     Path: Models\gltf\glTF-Embedded\Buggy\Materials\Material_27_37.kbrmaterial
@@ -11435,13 +10861,6 @@ AssetRegistry:
     ParentHandle: 14544762050738413302
     SubAssetKey: mesh:0_0
     ImportVersion: 1
-  - Handle: 15437638958078335493
-    Type: Texture2D
-    Path: Models\sponza\5061699253647017043.ktx2
-    RootSourceHandle: 15437638958078335493
-    ParentHandle: 0
-    SubAssetKey: ""
-    ImportVersion: 1
   - Handle: 15462070879749610509
     Type: Mesh
     Path: Models\samplescene\Meshes\mesh_8_0_Cylinder02_Cylinder02.001.kbrmesh
@@ -11457,13 +10876,6 @@ AssetRegistry:
     RootSourceHandle: 11581378365515906497
     ParentHandle: 11581378365515906497
     SubAssetKey: mesh:39_0
-    ImportVersion: 1
-  - Handle: 15508688895101868959
-    Type: Texture2D
-    Path: Textures\gratefloor_rgba.ktx2
-    RootSourceHandle: 15508688895101868959
-    ParentHandle: 0
-    SubAssetKey: ""
     ImportVersion: 1
   - Handle: 15512527064872351027
     Type: Mesh
@@ -11573,13 +10985,6 @@ AssetRegistry:
     ParentHandle: 7563732692318888728
     SubAssetKey: material:133
     ImportVersion: 1
-  - Handle: 15615930773958427620
-    Type: Texture2D
-    Path: Textures\crate02_color_height_rgba.ktx2
-    RootSourceHandle: 15615930773958427620
-    ParentHandle: 0
-    SubAssetKey: ""
-    ImportVersion: 1
   - Handle: 15623595434560101410
     Type: Mesh
     Path: Models\treasure_glow\Meshes\mesh_8_1_Cylinder.009.kbrmesh
@@ -11636,13 +11041,6 @@ AssetRegistry:
     ParentHandle: 0
     SubAssetKey: ""
     ImportVersion: 1
-  - Handle: 15702818114886942163
-    Type: Texture2D
-    Path: Models\sponza\white.ktx2
-    RootSourceHandle: 15702818114886942163
-    ParentHandle: 0
-    SubAssetKey: ""
-    ImportVersion: 1
   - Handle: 15716526078061057797
     Type: Mesh
     Path: Models\reflection_scene\Meshes\mesh_0_0_Teapot.kbrmesh
@@ -11658,13 +11056,6 @@ AssetRegistry:
     RootSourceHandle: 17044738097112976773
     ParentHandle: 17044738097112976773
     SubAssetKey: material:9
-    ImportVersion: 1
-  - Handle: 15732811219696105851
-    Type: Texture2D
-    Path: Assets\Textures\stonefloor02_normal_rgba.ktx2
-    RootSourceHandle: 0
-    ParentHandle: 0
-    SubAssetKey: ""
     ImportVersion: 1
   - Handle: 15745371111862447836
     Type: Material
@@ -11778,13 +11169,6 @@ AssetRegistry:
     ParentHandle: 7563732692318888728
     SubAssetKey: material:21
     ImportVersion: 1
-  - Handle: 15879457051065473146
-    Type: Texture2D
-    Path: Textures\particle_fire.ktx2
-    RootSourceHandle: 15879457051065473146
-    ParentHandle: 0
-    SubAssetKey: ""
-    ImportVersion: 1
   - Handle: 15892699020629714813
     Type: Material
     Path: Models\voyager\Materials\tex_02_AO.kbrmaterial
@@ -11851,13 +11235,6 @@ AssetRegistry:
     RootSourceHandle: 7563732692318888728
     ParentHandle: 7563732692318888728
     SubAssetKey: mesh:43_0
-    ImportVersion: 1
-  - Handle: 16071588569575658067
-    Type: Texture2D
-    Path: Models\sponza\4910669866631290573.ktx2
-    RootSourceHandle: 16071588569575658067
-    ParentHandle: 0
-    SubAssetKey: ""
     ImportVersion: 1
   - Handle: 16077664530152950553
     Type: Mesh
@@ -12054,13 +11431,6 @@ AssetRegistry:
     Dependencies:
       - 13234965616846954524
       - 17126938606881893236
-  - Handle: 16318635891490433892
-    Type: Texture2D
-    Path: Models\sponza\4975155472559461469.ktx2
-    RootSourceHandle: 16318635891490433892
-    ParentHandle: 0
-    SubAssetKey: ""
-    ImportVersion: 1
   - Handle: 16333970933503921788
     Type: Mesh
     Path: Models\retroufo_red_lowpoly\Meshes\mesh_14_0_Mesh_14.kbrmesh
@@ -12186,13 +11556,6 @@ AssetRegistry:
     Dependencies:
       - 6117488966325901854
       - 12079770157671729652
-  - Handle: 16529829378752601640
-    Type: Texture2D
-    Path: Models\armor\normalmap_rgba.ktx2
-    RootSourceHandle: 16529829378752601640
-    ParentHandle: 0
-    SubAssetKey: ""
-    ImportVersion: 1
   - Handle: 16534743241450310373
     Type: Mesh
     Path: Models\gltf\glTF-Embedded\Buggy\Meshes\mesh_41_0_technic_2_2_l_p_SOLIDS_1.kbrmesh
@@ -12273,27 +11636,6 @@ AssetRegistry:
     ParentHandle: 14121002741739587132
     SubAssetKey: mesh:7_0
     ImportVersion: 1
-  - Handle: 16612539486805409438
-    Type: Texture2D
-    Path: Textures\lavaplanet_rgba.ktx2
-    RootSourceHandle: 16612539486805409438
-    ParentHandle: 0
-    SubAssetKey: ""
-    ImportVersion: 1
-  - Handle: 16620592730411168492
-    Type: Texture2D
-    Path: Textures\ground_dry_rgba.ktx2
-    RootSourceHandle: 16620592730411168492
-    ParentHandle: 0
-    SubAssetKey: ""
-    ImportVersion: 1
-  - Handle: 16625212518064820772
-    Type: Texture2D
-    Path: Models\sponza\6667038893015345571.ktx2
-    RootSourceHandle: 16625212518064820772
-    ParentHandle: 0
-    SubAssetKey: ""
-    ImportVersion: 1
   - Handle: 16632328383056869627
     Type: Material
     Path: Models\reflection_scene\Materials\m1_09___Default.kbrmaterial
@@ -12362,13 +11704,6 @@ AssetRegistry:
     RootSourceHandle: 8858309372063028477
     ParentHandle: 8858309372063028477
     SubAssetKey: mesh:39_0
-    ImportVersion: 1
-  - Handle: 16678733153879101124
-    Type: Texture2D
-    Path: Assets\Textures\colored_glass_rgba.ktx2
-    RootSourceHandle: 0
-    ParentHandle: 0
-    SubAssetKey: ""
     ImportVersion: 1
   - Handle: 16691347508489223665
     Type: Mesh
@@ -12563,13 +11898,6 @@ AssetRegistry:
     ParentHandle: 7595600645355862566
     SubAssetKey: mesh:0_0
     ImportVersion: 1
-  - Handle: 16853089819234003102
-    Type: Texture2D
-    Path: Textures\particle_gradient_rgba.ktx2
-    RootSourceHandle: 16853089819234003102
-    ParentHandle: 0
-    SubAssetKey: ""
-    ImportVersion: 1
   - Handle: 16870403839334099498
     Type: Mesh
     Path: Models\sibenik\Meshes\mesh_0_0_Mesh_0.kbrmesh
@@ -12586,13 +11914,6 @@ AssetRegistry:
     ParentHandle: 3592214733151679049
     SubAssetKey: texture:20
     ImportVersion: 1
-  - Handle: 16885710185443600445
-    Type: Texture2D
-    Path: Models\sponza\11474523244911310074.ktx2
-    RootSourceHandle: 16885710185443600445
-    ParentHandle: 0
-    SubAssetKey: ""
-    ImportVersion: 1
   - Handle: 16915135714368765785
     Type: Mesh
     Path: Models\FlightHelmet\glTF\FlightHelmet\Meshes\mesh_1_0_LeatherParts_low.kbrmesh
@@ -12605,13 +11926,6 @@ AssetRegistry:
     Type: Texture2D
     Path: Assets\Flame03-hollow_16x4.png
     RootSourceHandle: 0
-    ParentHandle: 0
-    SubAssetKey: ""
-    ImportVersion: 1
-  - Handle: 16937723222217057244
-    Type: Texture2D
-    Path: Models\sponza\16299174074766089871.ktx2
-    RootSourceHandle: 16937723222217057244
     ParentHandle: 0
     SubAssetKey: ""
     ImportVersion: 1
@@ -12792,13 +12106,6 @@ AssetRegistry:
     ParentHandle: 13577412551968241284
     SubAssetKey: mesh:0_0
     ImportVersion: 1
-  - Handle: 17164040778592405191
-    Type: Texture2D
-    Path: Models\sponza\5792855332885324923.ktx2
-    RootSourceHandle: 17164040778592405191
-    ParentHandle: 0
-    SubAssetKey: ""
-    ImportVersion: 1
   - Handle: 17166732185072507423
     Type: Mesh
     Path: Models\gltf\glTF-Embedded\Buggy\Meshes\mesh_104_0_body_9.kbrmesh
@@ -12822,13 +12129,6 @@ AssetRegistry:
     ParentHandle: 13025862333548612002
     SubAssetKey: mesh:2_0
     ImportVersion: 1
-  - Handle: 17198552155939365212
-    Type: Texture2D
-    Path: Models\sponza\9288698199695299068.ktx2
-    RootSourceHandle: 17198552155939365212
-    ParentHandle: 0
-    SubAssetKey: ""
-    ImportVersion: 1
   - Handle: 17213127900663895753
     Type: Mesh
     Path: Models\treasure_smooth\Meshes\mesh_12_1_Cylinder.013.kbrmesh
@@ -12836,13 +12136,6 @@ AssetRegistry:
     RootSourceHandle: 11581378365515906497
     ParentHandle: 11581378365515906497
     SubAssetKey: mesh:12_1
-    ImportVersion: 1
-  - Handle: 17224611000465532358
-    Type: Texture2D
-    Path: Textures\vulkan_11_rgba.ktx2
-    RootSourceHandle: 17224611000465532358
-    ParentHandle: 0
-    SubAssetKey: ""
     ImportVersion: 1
   - Handle: 17227941547969886676
     Type: Prefab
@@ -13043,13 +12336,6 @@ AssetRegistry:
       - 534126962233704142
       - 5734159455103572291
       - 4618149021998797964
-  - Handle: 17417458269136024750
-    Type: Texture2D
-    Path: Models\sponza\10381718147657362067.ktx2
-    RootSourceHandle: 17417458269136024750
-    ParentHandle: 0
-    SubAssetKey: ""
-    ImportVersion: 1
   - Handle: 17462854788003871872
     Type: Animation
     Path: Models\CesiumMan\glTF-Binary\CesiumMan\Animations\Animation_0.kbranimation
@@ -13113,20 +12399,6 @@ AssetRegistry:
     RootSourceHandle: 3592214733151679049
     ParentHandle: 3592214733151679049
     SubAssetKey: texture:31
-    ImportVersion: 1
-  - Handle: 17618679536041582146
-    Type: Texture2D
-    Path: Textures\texture.ktx2
-    RootSourceHandle: 17618679536041582146
-    ParentHandle: 0
-    SubAssetKey: ""
-    ImportVersion: 1
-  - Handle: 17625694878102777012
-    Type: Texture2D
-    Path: Assets\Textures\stonefloor01_normal_rgba.ktx2
-    RootSourceHandle: 0
-    ParentHandle: 0
-    SubAssetKey: ""
     ImportVersion: 1
   - Handle: 17661218481974994647
     Type: Mesh
@@ -13457,13 +12729,6 @@ AssetRegistry:
       - 534126962233704142
       - 5734159455103572291
       - 4618149021998797964
-  - Handle: 18110646082054649373
-    Type: Texture2D
-    Path: Models\sponza\2299742237651021498.ktx2
-    RootSourceHandle: 18110646082054649373
-    ParentHandle: 0
-    SubAssetKey: ""
-    ImportVersion: 1
   - Handle: 18116488829860752099
     Type: Mesh
     Path: Models\treasure_smooth\Meshes\mesh_13_0_Cylinder.014.kbrmesh
@@ -13519,13 +12784,6 @@ AssetRegistry:
     RootSourceHandle: 7563732692318888728
     ParentHandle: 7563732692318888728
     SubAssetKey: mesh:52_0
-    ImportVersion: 1
-  - Handle: 18215846470715262713
-    Type: Texture2D
-    Path: Models\sponza\7268504077753552595.ktx2
-    RootSourceHandle: 18215846470715262713
-    ParentHandle: 0
-    SubAssetKey: ""
     ImportVersion: 1
   - Handle: 18220364884304738997
     Type: Material
