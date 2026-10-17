@@ -80,6 +80,9 @@ void HierarchyPanel::OnImGuiRender()
     /// If an empty space is clicked, deselect the entity
     if (ImGui::IsMouseDown(0) && ImGui::IsWindowHovered()) {
         m_SelectedEntity = {};
+        if (m_OnEntitySelected) {
+            m_OnEntitySelected(m_SelectedEntity);
+        }
     }
 
     /// If the right mouse button is clicked, show the context menu
@@ -112,6 +115,9 @@ void HierarchyPanel::OnImGuiRender()
 void HierarchyPanel::SetSelectedEntity(const Entity entity)
 {
     m_SelectedEntity = entity;
+    if (m_OnEntitySelected) {
+        m_OnEntitySelected(entity);
+    }
 }
 
 void HierarchyPanel::OnEvent(Event& event)
@@ -123,6 +129,11 @@ void HierarchyPanel::OnEvent(Event& event)
 void HierarchyPanel::SetOnEntityDeleted(const std::function<void(Entity)>& callback)
 {
     m_OnEntityDeleted = callback;
+}
+
+void HierarchyPanel::SetOnEntitySelected(const std::function<void(Entity)>& callback)
+{
+    m_OnEntitySelected = callback;
 }
 
 void HierarchyPanel::DrawEntityNode(const Entity& entity)
@@ -139,6 +150,9 @@ void HierarchyPanel::DrawEntityNode(const Entity& entity)
 
     if (ImGui::IsItemClicked()) {
         m_SelectedEntity = entity;
+        if (m_OnEntitySelected) {
+            m_OnEntitySelected(entity);
+        }
     }
 
     bool entityDeleted = false;

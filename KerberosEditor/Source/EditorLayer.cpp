@@ -38,6 +38,14 @@ namespace Kerberos
 				m_HoveredEntity = {};
 				m_HoveredEntityDeletedLastFrame = true;
 			} });
+
+		// Selecting an entity in the hierarchy takes over the inspector from any
+		// asset import-options selection, which would otherwise keep precedence.
+		m_HierarchyPanel.SetOnEntitySelected([this](const Entity entity)
+		{
+			if (entity && m_AssetsPanel)
+				m_AssetsPanel->ClearSelection();
+		});
 	}
 
 	EditorLayer::~EditorLayer()

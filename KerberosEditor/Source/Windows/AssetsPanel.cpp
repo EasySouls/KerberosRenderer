@@ -364,7 +364,12 @@ std::string AssetStatusLabel(const AssetHandle handle,
                             ImGui::TableNextRow();
                             ImGui::TableSetColumnIndex(0);
                             ImGui::PushID(static_cast<int>(static_cast<uint64_t>(childHandle) & 0x7fffffff));
-                            ImGui::Text("    %s  %s", AssetTypeIcon(childMetadata.Type), childName.c_str());
+
+                            const std::string childLabel =
+                                std::string("    ") + AssetTypeIcon(childMetadata.Type) + "  " + childName;
+                            ImGui::Selectable(childLabel.c_str(),
+                                              false,
+                                              ImGuiSelectableFlags_SpanAllColumns | ImGuiSelectableFlags_AllowDoubleClick);
                             HandleAssetDragAndDrop(childHandle, childMetadata.LibraryPath.filename(), childMetadata);
                             if (ImGui::BeginPopupContextItem("GeneratedSubAssetContext"))
                             {

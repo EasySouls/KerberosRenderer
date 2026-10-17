@@ -34,6 +34,12 @@ namespace Kerberos
 
 		void SetOnEntityDeleted(const std::function<void(Entity)>& callback);
 
+		/**
+		 * Called whenever the selected entity changes through user interaction or
+		 * SetSelectedEntity(), so other panels can react to the new selection.
+		 */
+		void SetOnEntitySelected(const std::function<void(Entity)>& callback);
+
 		void AddComponentPopup(Entity entity);
 
 	private:
@@ -66,6 +72,7 @@ namespace Kerberos
 		std::vector<Entity> m_DeletionQueue;
 
 		std::function<void(Entity)> m_OnEntityDeleted;
+		std::function<void(Entity)> m_OnEntitySelected;
 
 		// Examples
 		Ref<Texture2D> m_WhiteTexture;
