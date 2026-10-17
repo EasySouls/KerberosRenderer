@@ -28,27 +28,27 @@ namespace Kerberos
 
 	void ScriptInstance::InvokeOnCreate() const
 	{
-		ScriptEngine::InvokeManagedOnCreate(static_cast<uint64_t>(m_EntityID));
+		ScriptEngine::InvokeManagedOnCreate(static_cast<uint64_t>(m_EntityID), m_ScriptClass->GetFullName());
 	}
 
 	void ScriptInstance::InvokeOnUpdate(const float deltaTime) const
 	{
-		ScriptEngine::InvokeManagedOnUpdate(static_cast<uint64_t>(m_EntityID), deltaTime);
+		ScriptEngine::InvokeManagedOnUpdate(static_cast<uint64_t>(m_EntityID), m_ScriptClass->GetFullName(), deltaTime);
 	}
 
 	void ScriptInstance::InvokeOnCollisionEnter(const CollisionEvent& event) const 
 	{
-		ScriptEngine::InvokeManagedOnCollisionEnter(static_cast<uint64_t>(m_EntityID), event);
+		ScriptEngine::InvokeManagedOnCollisionEnter(static_cast<uint64_t>(m_EntityID), m_ScriptClass->GetFullName(), event);
 	}
 
 	void ScriptInstance::InvokeOnCollisionPersist(const CollisionEvent& event) const 
 	{
-		ScriptEngine::InvokeManagedOnCollisionPersist(static_cast<uint64_t>(m_EntityID), event);
+		ScriptEngine::InvokeManagedOnCollisionPersist(static_cast<uint64_t>(m_EntityID), m_ScriptClass->GetFullName(), event);
 	}
 
 	void ScriptInstance::InvokeOnCollisionExit(const CollisionEvent& event) const 
 	{
-		ScriptEngine::InvokeManagedOnCollisionExit(static_cast<uint64_t>(m_EntityID), event);
+		ScriptEngine::InvokeManagedOnCollisionExit(static_cast<uint64_t>(m_EntityID), m_ScriptClass->GetFullName(), event);
 	}
 
 	void ScriptInstance::IntializeFieldValues(
@@ -70,6 +70,7 @@ namespace Kerberos
 
 		return ScriptEngine::GetManagedFieldValue(
 			static_cast<uint64_t>(m_EntityID),
+			m_ScriptClass->GetFullName(),
 			name, buffer, maxFieldSize);
 	}
 
@@ -83,6 +84,7 @@ namespace Kerberos
 
 		ScriptEngine::SetManagedFieldValue(
 			static_cast<uint64_t>(m_EntityID),
+			m_ScriptClass->GetFullName(),
 			name, const_cast<void*>(value), maxFieldSize);
 	}
 }

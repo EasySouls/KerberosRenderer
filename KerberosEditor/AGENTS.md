@@ -64,6 +64,22 @@ systems. Keep ownership clear: UI state belongs to the panel, persistent
 scene/project state belongs to the corresponding engine object, and GPU
 resources belong to Vulkan/renderer owners.
 
+## C# script components
+
+`ScriptComponent` (`KerberosEngine/Source/Scene/Components.hpp`) stores an
+ordered `ClassNames` list, so a single entity can run several C# scripts.
+`ScriptEngine` keys both runtime instances and authored field initializers by
+`(entity UUID, script class full name)`; the managed `ScriptGlue` bridge stores
+instances per entity in a class-name dictionary. `Entity.As<T>()` and
+`Entity.GetScript<T>()` resolve a specific script instance by type.
+
+`HierarchyPanel` renders one entry per script class with add/remove controls
+and per-script field editors. `SceneSerializer` emits a `Scripts` sequence
+(each entry has `ClassName` and `ScriptFields`) and still accepts the legacy
+single `ClassName`/`ScriptFields` form. When script lifecycle, managed interop
+signatures, or the serialized script format changes, update this file and keep
+the native callback/bridge signatures synchronized.
+
 ## Project and scene flow
 
 Project loading creates/activates an editor asset manager, loads the asset

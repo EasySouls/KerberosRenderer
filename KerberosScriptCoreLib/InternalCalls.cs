@@ -239,9 +239,9 @@ namespace Kerberos.Source
             finally { Marshal.FreeHGlobal(ptr); }
         }
 
-        internal static object? Entity_GetScriptInstance(ulong entityID)
+        internal static object? Entity_GetScriptInstance(ulong entityID, Type type)
         {
-            return ScriptGlue.GetInstance(entityID);
+            return ScriptGlue.GetInstance(entityID, type);
         }
 
         internal static ulong Entity_Instantiate(string name)

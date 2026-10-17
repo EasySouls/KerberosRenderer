@@ -101,12 +101,14 @@ static void SerializeEntity(YAML::Emitter& out, const Entity entity)
         out << YAML::Key << "ScriptComponent";
         out << YAML::BeginMap;
         const auto& script = entity.GetComponent<ScriptComponent>();
-        out << YAML::Key << "ClassName" << YAML::Value << script.ClassName;
+        out << YAML::Key << "Scripts" << YAML::Value << YAML::BeginSeq;
 
-        out << YAML::Key << "ScriptFields" << YAML::Key;
-        out << YAML::BeginSeq;
-        {
-            const auto& fieldInitializers = ScriptEngine::GetScriptFieldInitializerMap(entity);
+        for (const auto& className : script.ClassNames) {
+            out << YAML::BeginMap;
+            out << YAML::Key << "ClassName" << YAML::Value << className;
+            out << YAML::Key << "ScriptFields" << YAML::Value << YAML::BeginSeq;
+
+            const auto& fieldInitializers = ScriptEngine::GetScriptFieldInitializerMap(entity, className);
 
             if (!fieldInitializers.empty()) {
                 for (const auto& [name, field] : fieldInitializers) {
@@ -175,9 +177,12 @@ static void SerializeEntity(YAML::Emitter& out, const Entity entity)
                     out << YAML::EndMap;
                 }
             }
-        }
-        out << YAML::EndSeq;
 
+            out << YAML::EndSeq;
+            out << YAML::EndMap;
+        }
+
+        out << YAML::EndSeq;
         out << YAML::EndMap;
     }
 
@@ -404,6 +409,81 @@ void SceneSerializer::SerializeRuntime([[maybe_unused]] const std::filesystem::p
     throw std::logic_error("Not implemented");
 }
 
+static void DeserializeScriptFieldInitializers(const YAML::Node& scriptFields, const Entity entity, const std::string& className)
+{
+    auto& scriptFieldInitializers = ScriptEngine::GetScriptFieldInitializerMap(entity, className);
+
+    for (const auto& field : scriptFields) {
+        const std::string name = field["Name"].as<std::string>();
+        const ScriptFieldType type =
+            ScriptUtils::StringToScriptFieldType(field["Type"].as<std::string>());
+        ScriptFieldInitializer initializer;
+        initializer.Field.Name = name;
+        initializer.Field.Type = type;
+        switch (type) {
+        case ScriptFieldType::Short:
+            initializer.SetValue<short>(field["Data"].as<short>());
+            break;
+        case ScriptFieldType::Long:
+            initializer.SetValue<long>(field["Data"].as<long>());
+            break;
+        case ScriptFieldType::UShort:
+            initializer.SetValue<uint16_t>(field["Data"].as<uint16_t>());
+            break;
+        case ScriptFieldType::UInt:
+            initializer.SetValue<uint32_t>(field["Data"].as<uint32_t>());
+            break;
+        case ScriptFieldType::ULong:
+            initializer.SetValue<uint64_t>(field["Data"].as<uint64_t>());
+            break;
+        case ScriptFieldType::Double:
+            initializer.SetValue<double>(field["Data"].as<double>());
+            break;
+        case ScriptFieldType::Char:
+            initializer.SetValue<char>(field["Data"].as<char>());
+            break;
+        case ScriptFieldType::Byte:
+            initializer.SetValue<uint8_t>(static_cast<uint8_t>(field["Data"].as<int>()));
+            break;
+        case ScriptFieldType::String:
+            initializer.SetValue<std::string>(field["Data"].as<std::string>());
+            break;
+        case ScriptFieldType::Bool:
+            initializer.SetValue<bool>(field["Data"].as<bool>());
+            break;
+        case ScriptFieldType::Int:
+            initializer.SetValue<int>(field["Data"].as<int>());
+            break;
+        case ScriptFieldType::Float:
+            initializer.SetValue<float>(field["Data"].as<float>());
+            break;
+        case ScriptFieldType::Vec2:
+            initializer.SetValue<glm::vec2>(field["Data"].as<glm::vec2>());
+            break;
+        case ScriptFieldType::Vec3:
+            initializer.SetValue<glm::vec3>(field["Data"].as<glm::vec3>());
+            break;
+        case ScriptFieldType::Vec4:
+            initializer.SetValue<glm::vec4>(field["Data"].as<glm::vec4>());
+            break;
+        case ScriptFieldType::AssetHandle:
+            initializer.SetValue<uint8_t>(field["Data"].as<uint8_t>());
+            break;
+        case ScriptFieldType::MaterialRef:
+            initializer.SetValue<uint64_t>(field["Data"].as<uint64_t>());
+            break;
+        case ScriptFieldType::MeshRef:
+            initializer.SetValue<uint64_t>(field["Data"].as<uint64_t>());
+            break;
+        case ScriptFieldType::TextureRef:
+            initializer.SetValue<uint64_t>(field["Data"].as<uint64_t>());
+            break;
+        }
+
+        scriptFieldInitializers[name] = initializer;
+    }
+}
+
 bool SceneSerializer::Deserialize(const std::filesystem::path& filepath) const
 {
     KBR_TRACY_FUNCTION();
@@ -484,78 +564,22 @@ bool SceneSerializer::Deserialize(const std::filesystem::path& filepath) const
 
             if (auto scriptComponent = entity["ScriptComponent"]) {
                 auto& script = deserializedEntity.AddComponent<ScriptComponent>();
-                script.ClassName = scriptComponent["ClassName"].as<std::string>();
-                std::unordered_map<std::string, ScriptFieldInitializer>& scriptFieldInitializers =
-                    ScriptEngine::GetScriptFieldInitializerMap(deserializedEntity);
-                if (auto scriptFields = scriptComponent["ScriptFields"]) {
-                    for (const auto& field : scriptFields) {
-                        const std::string name = field["Name"].as<std::string>();
-                        const ScriptFieldType type =
-                            ScriptUtils::StringToScriptFieldType(field["Type"].as<std::string>());
-                        ScriptFieldInitializer initializer;
-                        initializer.Field.Name = name;
-                        initializer.Field.Type = type;
-                        switch (type) {
-                        case ScriptFieldType::Short:
-                            initializer.SetValue<short>(field["Data"].as<short>());
-                            break;
-                        case ScriptFieldType::Long:
-                            initializer.SetValue<long>(field["Data"].as<long>());
-                            break;
-                        case ScriptFieldType::UShort:
-                            initializer.SetValue<uint16_t>(field["Data"].as<uint16_t>());
-                            break;
-                        case ScriptFieldType::UInt:
-                            initializer.SetValue<uint32_t>(field["Data"].as<uint32_t>());
-                            break;
-                        case ScriptFieldType::ULong:
-                            initializer.SetValue<uint64_t>(field["Data"].as<uint64_t>());
-                            break;
-                        case ScriptFieldType::Double:
-                            initializer.SetValue<double>(field["Data"].as<double>());
-                            break;
-                        case ScriptFieldType::Char:
-                            initializer.SetValue<char>(field["Data"].as<char>());
-                            break;
-                        case ScriptFieldType::Byte:
-                            initializer.SetValue<uint8_t>(static_cast<uint8_t>(field["Data"].as<int>()));
-                            break;
-                        case ScriptFieldType::String:
-                            initializer.SetValue<std::string>(field["Data"].as<std::string>());
-                            break;
-                        case ScriptFieldType::Bool:
-                            initializer.SetValue<bool>(field["Data"].as<bool>());
-                            break;
-                        case ScriptFieldType::Int:
-                            initializer.SetValue<int>(field["Data"].as<int>());
-                            break;
-                        case ScriptFieldType::Float:
-                            initializer.SetValue<float>(field["Data"].as<float>());
-                            break;
-                        case ScriptFieldType::Vec2:
-                            initializer.SetValue<glm::vec2>(field["Data"].as<glm::vec2>());
-                            break;
-                        case ScriptFieldType::Vec3:
-                            initializer.SetValue<glm::vec3>(field["Data"].as<glm::vec3>());
-                            break;
-                        case ScriptFieldType::Vec4:
-                            initializer.SetValue<glm::vec4>(field["Data"].as<glm::vec4>());
-                            break;
-                        case ScriptFieldType::AssetHandle:
-                            initializer.SetValue<uint8_t>(field["Data"].as<uint8_t>());
-                            break;
-                        case ScriptFieldType::MaterialRef:
-                            initializer.SetValue<uint64_t>(field["Data"].as<uint64_t>());
-                            break;
-                        case ScriptFieldType::MeshRef:
-                            initializer.SetValue<uint64_t>(field["Data"].as<uint64_t>());
-                            break;
-                        case ScriptFieldType::TextureRef:
-                            initializer.SetValue<uint64_t>(field["Data"].as<uint64_t>());
-                            break;
-                        }
 
-                        scriptFieldInitializers[name] = initializer;
+                if (auto scripts = scriptComponent["Scripts"]) {
+                    for (const auto& scriptNode : scripts) {
+                        const std::string className = scriptNode["ClassName"].as<std::string>();
+                        script.ClassNames.push_back(className);
+                        if (auto scriptFields = scriptNode["ScriptFields"]) {
+                            DeserializeScriptFieldInitializers(scriptFields, deserializedEntity, className);
+                        }
+                    }
+                }
+                else if (auto className = scriptComponent["ClassName"]) {
+                    /// Legacy single-script format.
+                    const std::string legacyClassName = className.as<std::string>();
+                    script.ClassNames.push_back(legacyClassName);
+                    if (auto scriptFields = scriptComponent["ScriptFields"]) {
+                        DeserializeScriptFieldInitializers(scriptFields, deserializedEntity, legacyClassName);
                     }
                 }
             }

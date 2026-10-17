@@ -30,7 +30,7 @@ namespace Kerberos.Source
         private static Assembly? s_CoreAssembly;
         private static Type? s_EntityBaseClass;
         private static readonly Dictionary<string, Type> EntityClasses = new();
-        private static readonly Dictionary<ulong, Entity> EntityInstances = new();
+        private static readonly Dictionary<ulong, Dictionary<string, Entity>> EntityInstances = new();
 
         // Cached MethodInfo for OnCreate and OnUpdate
         private static readonly Dictionary<Type, MethodInfo?> OnCreateMethods = new();
@@ -212,7 +212,13 @@ namespace Kerberos.Source
                     return 0;
                 }
 
-                EntityInstances[entityID] = instance;
+                if (!EntityInstances.TryGetValue(entityID, out var instances))
+                {
+                    instances = new Dictionary<string, Entity>();
+                    EntityInstances[entityID] = instances;
+                }
+
+                instances[className] = instance;
                 return 1;
             }
             catch (Exception ex)
@@ -224,9 +230,18 @@ namespace Kerberos.Source
         }
 
         [UnmanagedCallersOnly]
-        public static void DestroyInstance(ulong entityID)
+        public static void DestroyInstance(ulong entityID, IntPtr classNamePtr)
         {
-            EntityInstances.Remove(entityID);
+            if (classNamePtr == IntPtr.Zero)
+                return;
+
+            string className = Marshal.PtrToStringAnsi(classNamePtr)!;
+            if (!EntityInstances.TryGetValue(entityID, out var instances))
+                return;
+
+            instances.Remove(className);
+            if (instances.Count == 0)
+                EntityInstances.Remove(entityID);
         }
 
         [UnmanagedCallersOnly]
@@ -236,12 +251,39 @@ namespace Kerberos.Source
         }
 
         /// <summary>
-        /// Gets a managed entity instance by ID. Used by InternalCalls.Entity_GetScriptInstance.
+        /// Gets the managed script instance of the requested type for an entity.
+        /// Used by InternalCalls.Entity_GetScriptInstance and Entity.As&lt;T&gt;().
         /// </summary>
-        public static Entity? GetInstance(ulong entityID)
+        public static Entity? GetInstance(ulong entityID, Type type)
         {
-            EntityInstances.TryGetValue(entityID, out var instance);
-            return instance;
+            if (!EntityInstances.TryGetValue(entityID, out var instances))
+                return null;
+
+            foreach (var instance in instances.Values)
+            {
+                if (type.IsInstanceOfType(instance))
+                    return instance;
+            }
+
+            return null;
+        }
+
+        /// <summary>
+        /// Resolves the managed script instance for an entity and class name.
+        /// </summary>
+        private static bool TryGetInstance(ulong entityID, IntPtr classNamePtr, out Entity? instance)
+        {
+            instance = null;
+
+            if (classNamePtr == IntPtr.Zero || !EntityInstances.TryGetValue(entityID, out var instances))
+                return false;
+
+            string className = Marshal.PtrToStringAnsi(classNamePtr)!;
+            if (!instances.TryGetValue(className, out var found))
+                return false;
+
+            instance = found;
+            return true;
         }
 
         // ====================================================================
@@ -249,11 +291,11 @@ namespace Kerberos.Source
         // ====================================================================
 
         [UnmanagedCallersOnly]
-        public static int InvokeOnCreate(ulong entityID)
+        public static int InvokeOnCreate(ulong entityID, IntPtr classNamePtr)
         {
             try
             {
-                if (!EntityInstances.TryGetValue(entityID, out var instance))
+                if (!TryGetInstance(entityID, classNamePtr, out var instance) || instance == null)
                     return 0;
 
                 var type = instance.GetType();
@@ -272,11 +314,11 @@ namespace Kerberos.Source
         }
 
         [UnmanagedCallersOnly]
-        public static int InvokeOnUpdate(ulong entityID, float deltaTime)
+        public static int InvokeOnUpdate(ulong entityID, IntPtr classNamePtr, float deltaTime)
         {
             try
             {
-                if (!EntityInstances.TryGetValue(entityID, out var instance))
+                if (!TryGetInstance(entityID, classNamePtr, out var instance) || instance == null)
                     return 0;
 
                 var type = instance.GetType();
@@ -295,11 +337,11 @@ namespace Kerberos.Source
         }
 
         [UnmanagedCallersOnly]
-        public static int InvokeOnCollisionEnter(ulong entityID, IntPtr eventPtr)
+        public static int InvokeOnCollisionEnter(ulong entityID, IntPtr classNamePtr, IntPtr eventPtr)
         {
             try
             {
-                if (!EntityInstances.TryGetValue(entityID, out var instance))
+                if (!TryGetInstance(entityID, classNamePtr, out var instance) || instance == null)
                     return 0;
                 if (eventPtr == IntPtr.Zero)
                     return 0;
@@ -321,11 +363,11 @@ namespace Kerberos.Source
         }
 
         [UnmanagedCallersOnly]
-        public static int InvokeOnCollisionPersist(ulong entityID, IntPtr eventPtr)
+        public static int InvokeOnCollisionPersist(ulong entityID, IntPtr classNamePtr, IntPtr eventPtr)
         {
             try
             {
-                if (!EntityInstances.TryGetValue(entityID, out var instance))
+                if (!TryGetInstance(entityID, classNamePtr, out var instance) || instance == null)
                     return 0;
                 if (eventPtr == IntPtr.Zero)
                     return 0;
@@ -345,11 +387,11 @@ namespace Kerberos.Source
         }
 
         [UnmanagedCallersOnly]
-        public static int InvokeOnCollisionExit(ulong entityID, IntPtr eventPtr)
+        public static int InvokeOnCollisionExit(ulong entityID, IntPtr classNamePtr, IntPtr eventPtr)
         {
             try
             {
-                if (!EntityInstances.TryGetValue(entityID, out var instance))
+                if (!TryGetInstance(entityID, classNamePtr, out var instance) || instance == null)
                     return 0;
                 if (eventPtr == IntPtr.Zero)
                     return 0;
@@ -384,66 +426,16 @@ namespace Kerberos.Source
         // Field Access
         // ====================================================================
 
-        [UnmanagedCallersOnly]
-        public static int GetFieldValueFloat(ulong entityID, IntPtr fieldNamePtr, IntPtr outValue)
-        {
-            try
-            {
-                if (!EntityInstances.TryGetValue(entityID, out var instance))
-                    return 0;
-
-                string fieldName = Marshal.PtrToStringAnsi(fieldNamePtr)!;
-                var field = instance.GetType().GetField(fieldName, BindingFlags.Instance | BindingFlags.Public);
-                if (field == null)
-                    return 0;
-
-                object? value = field.GetValue(instance);
-                if (value is float f)
-                {
-                    Marshal.Copy(BitConverter.GetBytes(f), 0, outValue, sizeof(float));
-                    return 1;
-                }
-
-                return 0;
-            }
-            catch
-            {
-                return 0;
-            }
-        }
-
-        [UnmanagedCallersOnly]
-        public static int SetFieldValueFloat(ulong entityID, IntPtr fieldNamePtr, float value)
-        {
-            try
-            {
-                if (!EntityInstances.TryGetValue(entityID, out var instance))
-                    return 0;
-
-                string fieldName = Marshal.PtrToStringAnsi(fieldNamePtr)!;
-                var field = instance.GetType().GetField(fieldName, BindingFlags.Instance | BindingFlags.Public);
-                if (field == null)
-                    return 0;
-
-                field.SetValue(instance, value);
-                return 1;
-            }
-            catch
-            {
-                return 0;
-            }
-        }
-
         /// <summary>
         /// Generic field getter that copies field value bytes to a buffer.
         /// Supports: int, float, double, long, bool, byte, short, and blittable structs (Vector2/3/4).
         /// </summary>
         [UnmanagedCallersOnly]
-        public static int GetFieldValue(ulong entityID, IntPtr fieldNamePtr, IntPtr outValue, int bufferSize)
+        public static int GetFieldValue(ulong entityID, IntPtr classNamePtr, IntPtr fieldNamePtr, IntPtr outValue, int bufferSize)
         {
             try
             {
-                if (!EntityInstances.TryGetValue(entityID, out var instance))
+                if (!TryGetInstance(entityID, classNamePtr, out var instance) || instance == null)
                     return 0;
 
                 string fieldName = Marshal.PtrToStringAnsi(fieldNamePtr)!;
@@ -467,11 +459,11 @@ namespace Kerberos.Source
         /// Generic field setter that reads field value bytes from a buffer.
         /// </summary>
         [UnmanagedCallersOnly]
-        public static int SetFieldValue(ulong entityID, IntPtr fieldNamePtr, IntPtr valuePtr, int valueSize)
+        public static int SetFieldValue(ulong entityID, IntPtr classNamePtr, IntPtr fieldNamePtr, IntPtr valuePtr, int valueSize)
         {
             try
             {
-                if (!EntityInstances.TryGetValue(entityID, out var instance))
+                if (!TryGetInstance(entityID, classNamePtr, out var instance) || instance == null)
                     return 0;
 
                 string fieldName = Marshal.PtrToStringAnsi(fieldNamePtr)!;

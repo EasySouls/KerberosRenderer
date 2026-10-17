@@ -19,6 +19,7 @@
 #include <filewatch/FileWatch.hpp>
 
 #include <string_view>
+#include <algorithm>
 
 
 #ifdef _WIN32
@@ -57,12 +58,16 @@ namespace Kerberos
 		std::unordered_map<std::string, Ref<ScriptClass>> EntityClasses;
 
 		using FieldInitializerMap = std::unordered_map<std::string, ScriptFieldInitializer>;
+		/// Per-entity field initializers, keyed by script class full name.
+		using ClassFieldInitializerMap = std::unordered_map<std::string, FieldInitializerMap>;
 		/// Holds the data for the initial values of the fields of each entity
-		std::unordered_map<UUID, FieldInitializerMap> EntityFieldInitializers;
+		std::unordered_map<UUID, ClassFieldInitializerMap> EntityFieldInitializers;
 
 		/// Runtime data
 		std::weak_ptr<Scene> SceneContext;
-		std::unordered_map<UUID, Ref<ScriptInstance>> EntityInstances;
+		/// Per-entity script instances, keyed by script class full name.
+		using ClassInstanceMap = std::unordered_map<std::string, Ref<ScriptInstance>>;
+		std::unordered_map<UUID, ClassInstanceMap> EntityInstances;
 
 		/// Managed function pointers (from ScriptGlue bridge)
 		ManagedLoadAssemblyClassesFn LoadAssemblyClasses = nullptr;
@@ -249,39 +254,48 @@ namespace Kerberos
 		KBR_TRACY_FUNCTION();
 
 		auto& scriptComponent = entity.GetComponent<ScriptComponent>();
-
-		if (!ClassExists(scriptComponent.ClassName))
-		{
-			Log::CoreError("Script class '{0}' does not exist!", scriptComponent.ClassName);
-			return;
-		}
-
-		Ref<ScriptInstance> instance = nullptr;
-
-		/// Apply initial field values when instantiating the script, if there are any
-		if (const auto& fieldInitializers = GetScriptFieldInitializerMap(entity); !fieldInitializers.empty())
-		{
-			instance = CreateRef<ScriptInstance>(s_ScriptData->EntityClasses[scriptComponent.ClassName], entity, fieldInitializers);
-		}
-		else
-		{
-			instance = CreateRef<ScriptInstance>(s_ScriptData->EntityClasses[scriptComponent.ClassName], entity, std::unordered_map<std::string, ScriptFieldInitializer>());
-		}
-
 		const UUID entityID = entity.GetUUID();
-		s_ScriptData->EntityInstances[entityID] = instance;
 
-		instance->InvokeOnCreate();
+		for (const std::string& className : scriptComponent.ClassNames)
+		{
+			if (className.empty())
+				continue;
+
+			if (!ClassExists(className))
+			{
+				Log::CoreError("Script class '{0}' does not exist!", className);
+				continue;
+			}
+
+			/// Apply initial field values when instantiating the script, if there are any
+			const auto& fieldInitializers = GetScriptFieldInitializerMap(entity, className);
+			Ref<ScriptInstance> instance = CreateRef<ScriptInstance>(
+				s_ScriptData->EntityClasses[className], entity, fieldInitializers);
+
+			s_ScriptData->EntityInstances[entityID][className] = instance;
+
+			instance->InvokeOnCreate();
+		}
 	}
 
 	void ScriptEngine::OnUpdateEntity(const Entity entity, const float deltaTime)
 	{
 		KBR_TRACY_FUNCTION();
 
-		KBRAssert(entity.HasComponent<ScriptComponent>(), "Entity does not have a ScriptComponent!");
-		KBRAssert(s_ScriptData->EntityInstances.contains(entity.GetUUID()), "No script instance found for entity!");
+		if (!entity.HasComponent<ScriptComponent>())
+			return;
 
-		s_ScriptData->EntityInstances[entity.GetUUID()]->InvokeOnUpdate(deltaTime);
+		const UUID entityID = entity.GetUUID();
+		const auto instancesIt = s_ScriptData->EntityInstances.find(entityID);
+		if (instancesIt == s_ScriptData->EntityInstances.end())
+			return;
+
+		for (const std::string& className : entity.GetComponent<ScriptComponent>().ClassNames)
+		{
+			const auto instanceIt = instancesIt->second.find(className);
+			if (instanceIt != instancesIt->second.end() && instanceIt->second)
+				instanceIt->second->InvokeOnUpdate(deltaTime);
+		}
 	}
 
 	void ScriptEngine::OnCollision(const Entity entity, const CollisionEvent& event) 
@@ -291,19 +305,29 @@ namespace Kerberos
 		if (!entity.HasComponent<ScriptComponent>())
 			return;
 
-		KBRAssert(s_ScriptData->EntityInstances.contains(entity.GetUUID()), "No script instance found for entity!");
+		const UUID entityID = entity.GetUUID();
+		const auto instancesIt = s_ScriptData->EntityInstances.find(entityID);
+		if (instancesIt == s_ScriptData->EntityInstances.end())
+			return;
 
-		switch (event.EventType)
+		for (const std::string& className : entity.GetComponent<ScriptComponent>().ClassNames)
 		{
-			case CollisionEventType::Enter:
-				s_ScriptData->EntityInstances[entity.GetUUID()]->InvokeOnCollisionEnter(event);
-				break;
-			case CollisionEventType::Persist:
-				s_ScriptData->EntityInstances[entity.GetUUID()]->InvokeOnCollisionPersist(event);
-				break;
-			case CollisionEventType::Exit:
-				s_ScriptData->EntityInstances[entity.GetUUID()]->InvokeOnCollisionExit(event);
-				break;
+			const auto instanceIt = instancesIt->second.find(className);
+			if (instanceIt == instancesIt->second.end() || !instanceIt->second)
+				continue;
+
+			switch (event.EventType)
+			{
+				case CollisionEventType::Enter:
+					instanceIt->second->InvokeOnCollisionEnter(event);
+					break;
+				case CollisionEventType::Persist:
+					instanceIt->second->InvokeOnCollisionPersist(event);
+					break;
+				case CollisionEventType::Exit:
+					instanceIt->second->InvokeOnCollisionExit(event);
+					break;
+			}
 		}
 	}
 
@@ -317,44 +341,44 @@ namespace Kerberos
 		KBR_TRACY_FUNCTION();
 
 		KBRAssert(ClassExists(className), "Script class doesn't exist!");
-
-		const UUID entityID = entity.GetUUID();
-		const std::string_view currentClassName = entity.GetComponent<ScriptComponent>().ClassName;
-		if (s_ScriptData->EntityFieldInitializers.contains(entityID) && currentClassName == className)
-		{
+		if (!ClassExists(className))
 			return;
-		}
 
 		const Ref<ScriptClass>& scriptClass = s_ScriptData->EntityClasses.at(className);
 		const auto& serializedFields = scriptClass->GetSerializedFields();
 
-		ScriptEngineData::FieldInitializerMap fieldInitializers;
+		auto& fieldInitializers = s_ScriptData->EntityFieldInitializers[entity.GetUUID()][className];
+
+		/// Merge the class definition into the existing initializer set so that
+		/// authored values survive and newly added script fields get defaults.
 		for (const auto& [name, field] : serializedFields)
 		{
-			ScriptFieldInitializer fieldInitializer;
+			ScriptFieldInitializer& fieldInitializer = fieldInitializers[name];
 			fieldInitializer.Field = field;
-
-			fieldInitializers[name] = fieldInitializer;
 		}
-
-		s_ScriptData->EntityFieldInitializers[entityID] = fieldInitializers;
 	}
 
 	void ScriptEngine::CopyScriptFieldInitializers(const Entity srcEntity, const Entity dstEntity) 
 	{
 		KBR_TRACY_FUNCTION();
 
-		const std::string& dstClassName = dstEntity.GetComponent<ScriptComponent>().ClassName;
-
 		KBRAssert(srcEntity.HasComponent<ScriptComponent>(), "Source entity does not have a ScriptComponent!");
 		KBRAssert(dstEntity.HasComponent<ScriptComponent>(), "Destination entity does not have a ScriptComponent!");
-		KBRAssert(srcEntity.GetComponent<ScriptComponent>().ClassName == dstClassName, "Script initializers can only be copied between entities of the same script class!");
 
-		CreateScriptFieldInitializers(dstEntity, dstClassName);
+		const auto& srcClassNames = srcEntity.GetComponent<ScriptComponent>().ClassNames;
+		const auto& dstClassNames = dstEntity.GetComponent<ScriptComponent>().ClassNames;
 
-		const auto& srcInitializers = GetScriptFieldInitializerMap(srcEntity);
-		auto& dstInitializers = GetScriptFieldInitializerMap(dstEntity);
-		dstInitializers = srcInitializers;
+		for (const std::string& className : dstClassNames)
+		{
+			if (std::find(srcClassNames.begin(), srcClassNames.end(), className) == srcClassNames.end())
+				continue;
+
+			CreateScriptFieldInitializers(dstEntity, className);
+
+			const auto& srcInitializers = GetScriptFieldInitializerMap(srcEntity, className);
+			auto& dstInitializers = GetScriptFieldInitializerMap(dstEntity, className);
+			dstInitializers = srcInitializers;
+		}
 	}
 
 	const std::unordered_map<std::string, Ref<ScriptClass>>& ScriptEngine::GetEntityClasses()
@@ -362,28 +386,41 @@ namespace Kerberos
 		return s_ScriptData->EntityClasses;
 	}
 
-	std::unordered_map<std::string, ScriptFieldInitializer>& ScriptEngine::GetScriptFieldInitializerMap(const Entity entity)
+	std::unordered_map<std::string, ScriptFieldInitializer>& ScriptEngine::GetScriptFieldInitializerMap(const Entity entity, const std::string& className)
 	{
 		const UUID entityID = entity.GetUUID();
-		if (!s_ScriptData->EntityFieldInitializers.contains(entityID))
+		auto& classInitializers = s_ScriptData->EntityFieldInitializers[entityID];
+		if (!classInitializers.contains(className))
 		{
 			const std::string_view entityName = entity.GetName();
-			Log::CoreTrace("No field initializers found for entity {}"sv, entityName);
+			Log::CoreTrace("No field initializers found for entity {} and script {}"sv, entityName, className);
 
-			return s_ScriptData->EntityFieldInitializers[entityID];
+			return classInitializers[className];
 		}
 
-		return s_ScriptData->EntityFieldInitializers.at(entityID);
+		return classInitializers.at(className);
 	}
 
-	Ref<ScriptInstance> ScriptEngine::GetEntityInstance(const UUID entityID)
+	Ref<ScriptInstance> ScriptEngine::GetEntityInstance(const UUID entityID, const std::string& className)
 	{
-		if (!s_ScriptData->EntityInstances.contains(entityID))
-		{
+		const auto instancesIt = s_ScriptData->EntityInstances.find(entityID);
+		if (instancesIt == s_ScriptData->EntityInstances.end())
 			return nullptr;
-		}
 
-		return s_ScriptData->EntityInstances.at(entityID);
+		const auto instanceIt = instancesIt->second.find(className);
+		if (instanceIt == instancesIt->second.end())
+			return nullptr;
+
+		return instanceIt->second;
+	}
+
+	const std::unordered_map<std::string, Ref<ScriptInstance>>* ScriptEngine::GetEntityInstances(const UUID entityID)
+	{
+		const auto instancesIt = s_ScriptData->EntityInstances.find(entityID);
+		if (instancesIt == s_ScriptData->EntityInstances.end())
+			return nullptr;
+
+		return &instancesIt->second;
 	}
 
 	const std::weak_ptr<Scene>& ScriptEngine::GetSceneContext()
@@ -398,63 +435,63 @@ namespace Kerberos
 		return s_ScriptData->ManagedCreateInstance(entityID, className.c_str()) != 0;
 	}
 
-	void ScriptEngine::DestroyManagedInstance(const uint64_t entityID)
+	void ScriptEngine::DestroyManagedInstance(const uint64_t entityID, const std::string& className)
 	{
 		KBRAssert(s_ScriptData->ManagedDestroyInstance != nullptr, "ManagedDestroyInstance function pointer is null!");
 		
-		s_ScriptData->ManagedDestroyInstance(entityID);
+		s_ScriptData->ManagedDestroyInstance(entityID, className.c_str());
 	}
 
-	bool ScriptEngine::InvokeManagedOnCreate(const uint64_t entityID)
+	bool ScriptEngine::InvokeManagedOnCreate(const uint64_t entityID, const std::string& className)
 	{
 		KBRAssert(s_ScriptData->ManagedInvokeOnCreate != nullptr, "ManagedInvokeOnCreate function pointer is null!");
 
-		return s_ScriptData->ManagedInvokeOnCreate(entityID) != 0;
+		return s_ScriptData->ManagedInvokeOnCreate(entityID, className.c_str()) != 0;
 	}
 
-	bool ScriptEngine::InvokeManagedOnUpdate(const uint64_t entityID, const float deltaTime)
+	bool ScriptEngine::InvokeManagedOnUpdate(const uint64_t entityID, const std::string& className, const float deltaTime)
 	{
 		KBRAssert(s_ScriptData->ManagedInvokeOnUpdate != nullptr, "ManagedInvokeOnUpdate function pointer is null!");
 		
-		return s_ScriptData->ManagedInvokeOnUpdate(entityID, deltaTime) != 0;
+		return s_ScriptData->ManagedInvokeOnUpdate(entityID, className.c_str(), deltaTime) != 0;
 	}
 
-	bool ScriptEngine::InvokeManagedOnCollisionEnter(const uint64_t entityID, const CollisionEvent& event)
+	bool ScriptEngine::InvokeManagedOnCollisionEnter(const uint64_t entityID, const std::string& className, const CollisionEvent& event)
 	{
 		KBRAssert(s_ScriptData->ManagedInvokeOnCollisionEnter != nullptr, "ManagedInvokeOnCollisionEnter function pointer is null!");
 
 		const ScriptCollisionPayload payload = BuildScriptCollisionPayload(entityID, event);
-		return s_ScriptData->ManagedInvokeOnCollisionEnter(entityID, &payload) != 0;
+		return s_ScriptData->ManagedInvokeOnCollisionEnter(entityID, className.c_str(), &payload) != 0;
 	}
 
-	bool ScriptEngine::InvokeManagedOnCollisionPersist(const uint64_t entityID, const CollisionEvent& event)
+	bool ScriptEngine::InvokeManagedOnCollisionPersist(const uint64_t entityID, const std::string& className, const CollisionEvent& event)
 	{
 		KBRAssert(s_ScriptData->ManagedInvokeOnCollisionPersist != nullptr, "ManagedInvokeOnCollisionPersist function pointer is null!");
 
 		const ScriptCollisionPayload payload = BuildScriptCollisionPayload(entityID, event);
-		return s_ScriptData->ManagedInvokeOnCollisionPersist(entityID, &payload) != 0;
+		return s_ScriptData->ManagedInvokeOnCollisionPersist(entityID, className.c_str(), &payload) != 0;
 	}
 
-	bool ScriptEngine::InvokeManagedOnCollisionExit(const uint64_t entityID, const CollisionEvent& event)
+	bool ScriptEngine::InvokeManagedOnCollisionExit(const uint64_t entityID, const std::string& className, const CollisionEvent& event)
 	{
 		KBRAssert(s_ScriptData->ManagedInvokeOnCollisionExit != nullptr, "ManagedInvokeOnCollisionExit function pointer is null!");
 
 		const ScriptCollisionPayload payload = BuildScriptCollisionPayload(entityID, event);
-		return s_ScriptData->ManagedInvokeOnCollisionExit(entityID, &payload) != 0;
+		return s_ScriptData->ManagedInvokeOnCollisionExit(entityID, className.c_str(), &payload) != 0;
 	}
 
-	bool ScriptEngine::GetManagedFieldValue(const uint64_t entityID, const std::string& fieldName, void* outValue, const int bufferSize)
+	bool ScriptEngine::GetManagedFieldValue(const uint64_t entityID, const std::string& className, const std::string& fieldName, void* outValue, const int bufferSize)
 	{
 		KBRAssert(s_ScriptData->ManagedGetFieldValue != nullptr, "ManagedGetFieldValue function pointer is null!");
 
-		return s_ScriptData->ManagedGetFieldValue(entityID, fieldName.c_str(), outValue, bufferSize) != 0;
+		return s_ScriptData->ManagedGetFieldValue(entityID, className.c_str(), fieldName.c_str(), outValue, bufferSize) != 0;
 	}
 
-	bool ScriptEngine::SetManagedFieldValue(const uint64_t entityID, const std::string& fieldName, void* value, const int valueSize)
+	bool ScriptEngine::SetManagedFieldValue(const uint64_t entityID, const std::string& className, const std::string& fieldName, void* value, const int valueSize)
 	{
 		KBRAssert(s_ScriptData->ManagedSetFieldValue != nullptr, "ManagedSetFieldValue function pointer is null!");
 
-		return s_ScriptData->ManagedSetFieldValue(entityID, fieldName.c_str(), value, valueSize) != 0;
+		return s_ScriptData->ManagedSetFieldValue(entityID, className.c_str(), fieldName.c_str(), value, valueSize) != 0;
 	}
 
 	void ScriptEngine::SetManagedNativeCallbacks(void* callbackTable)

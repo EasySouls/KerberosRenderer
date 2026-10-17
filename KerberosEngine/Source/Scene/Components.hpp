@@ -1,6 +1,7 @@
 #pragma once
 
 #include <string>
+#include <vector>
 
 #include <glm/ext/matrix_transform.hpp>
 #include <glm/glm.hpp>
@@ -142,7 +143,10 @@ struct CameraComponent
 
 struct ScriptComponent
 {
-    std::string ClassName;
+    /// Ordered list of managed script classes attached to the entity.
+    /// Each entity owns at most one ScriptComponent, but that component may
+    /// reference any number of script classes.
+    std::vector<std::string> ClassNames;
 
     ScriptComponent() = default;
     ScriptComponent(const ScriptComponent&) = default;

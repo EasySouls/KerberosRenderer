@@ -67,10 +67,19 @@ namespace Kerberos.Source.Kerberos.Scene
 
         protected internal T As<T>() where T : Entity, new()
         {
-            object instance = InternalCalls.Entity_GetScriptInstance(ID)
+            object instance = InternalCalls.Entity_GetScriptInstance(ID, typeof(T))
                               ?? throw new ArgumentNullException(nameof(ID));
 
             return (instance as T)!;
+        }
+
+        /// <summary>
+        /// Returns the script instance of the requested type attached to this entity,
+        /// or null when the entity does not have that script.
+        /// </summary>
+        protected internal T? GetScript<T>() where T : Entity, new()
+        {
+            return InternalCalls.Entity_GetScriptInstance(ID, typeof(T)) as T;
         }
 
         protected static Entity Instantiate(string name)

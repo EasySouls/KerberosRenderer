@@ -610,389 +610,413 @@ void HierarchyPanel::DrawComponents(const Entity entity)
         if (opened) {
             auto& component = entity.GetComponent<ScriptComponent>();
 
-            bool scriptClassExists = false;
-            const auto& entityClasses = ScriptEngine::GetEntityClasses();
+            int scriptIndexToRemove = -1;
+            for (int scriptIndex = 0; scriptIndex < static_cast<int>(component.ClassNames.size()); ++scriptIndex)
+            {
+                ImGui::PushID(scriptIndex);
 
-            if (entityClasses.contains(component.ClassName)) {
-                scriptClassExists = true;
-                ScriptEngine::CreateScriptFieldInitializers(entity, component.ClassName);
-            }
+                std::string& className = component.ClassNames[scriptIndex];
+                bool scriptClassExists = false;
+                const auto& entityClasses = ScriptEngine::GetEntityClasses();
 
-            static char buffer[64];
-            strcpy_s(buffer, component.ClassName.c_str());
-
-            if (!scriptClassExists) {
-                ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.9f, 0.2f, 0.3f, 1.0f));
-            }
-
-            if (ImGui::InputText("Class", buffer, sizeof(buffer))) {
-                if (entityClasses.contains(buffer)) {
-                    ScriptEngine::CreateScriptFieldInitializers(entity, buffer);
+                if (entityClasses.contains(className)) {
+                    scriptClassExists = true;
+                    ScriptEngine::CreateScriptFieldInitializers(entity, className);
                 }
-                component.ClassName = buffer;
-            }
 
-            if (scriptClassExists) {
-                /// We decide whether to show the initializer fields based on whether the script instance exists
-                /// This is basically just a check if the scene is running or not,
-                /// since script instances are only created when the scene is running
-                if (const Ref<ScriptInstance>& scriptInstance = ScriptEngine::GetEntityInstance(entity.GetUUID())) {
-                    /// The scene is running, show the live fields for the script instance
+                char buffer[128];
+                strcpy_s(buffer, sizeof(buffer), className.c_str());
 
-                    /// Fields
-                    const auto& fields = scriptInstance->GetScriptClass()->GetSerializedFields();
-                    for (const auto& [name, scriptField] : fields) {
-                        if (scriptField.Type == ScriptFieldType::Short) {
-                            short value = scriptInstance->GetFieldValue<short>(name);
-                            if (ImGui::InputScalar(name.c_str(), ImGuiDataType_S16, &value)) {
-                                scriptInstance->SetFieldValue<short>(name, value);
+                if (!scriptClassExists) {
+                    ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.9f, 0.2f, 0.3f, 1.0f));
+                }
+
+                ImGui::SetNextItemWidth(-90.0f);
+                if (ImGui::InputText("##Class", buffer, sizeof(buffer))) {
+                    if (entityClasses.contains(buffer)) {
+                        ScriptEngine::CreateScriptFieldInitializers(entity, buffer);
+                    }
+                    className = buffer;
+                }
+
+                if (!scriptClassExists) {
+                    ImGui::PopStyleColor();
+                }
+
+                ImGui::SameLine();
+                if (ImGui::Button("Remove")) {
+                    scriptIndexToRemove = scriptIndex;
+                }
+
+                if (scriptClassExists) {
+                    /// We decide whether to show the initializer fields based on whether the script instance exists
+                    /// This is basically just a check if the scene is running or not,
+                    /// since script instances are only created when the scene is running
+                    if (const Ref<ScriptInstance>& scriptInstance = ScriptEngine::GetEntityInstance(entity.GetUUID(), className)) {
+                        /// The scene is running, show the live fields for the script instance
+
+                        /// Fields
+                        const auto& fields = scriptInstance->GetScriptClass()->GetSerializedFields();
+                        for (const auto& [name, scriptField] : fields) {
+                            if (scriptField.Type == ScriptFieldType::Short) {
+                                short value = scriptInstance->GetFieldValue<short>(name);
+                                if (ImGui::InputScalar(name.c_str(), ImGuiDataType_S16, &value)) {
+                                    scriptInstance->SetFieldValue<short>(name, value);
+                                }
                             }
-                        }
-                        else if (scriptField.Type == ScriptFieldType::Int) {
-                            int value = scriptInstance->GetFieldValue<int>(name);
-                            if (ImGui::InputInt(name.c_str(), &value)) {
-                                scriptInstance->SetFieldValue<int>(name, value);
+                            else if (scriptField.Type == ScriptFieldType::Int) {
+                                int value = scriptInstance->GetFieldValue<int>(name);
+                                if (ImGui::InputInt(name.c_str(), &value)) {
+                                    scriptInstance->SetFieldValue<int>(name, value);
+                                }
                             }
-                        }
-                        else if (scriptField.Type == ScriptFieldType::Long) {
-                            int64_t value = scriptInstance->GetFieldValue<int64_t>(name);
-                            if (ImGui::InputScalar(name.c_str(), ImGuiDataType_S64, &value)) {
-                                scriptInstance->SetFieldValue<int64_t>(name, value);
+                            else if (scriptField.Type == ScriptFieldType::Long) {
+                                int64_t value = scriptInstance->GetFieldValue<int64_t>(name);
+                                if (ImGui::InputScalar(name.c_str(), ImGuiDataType_S64, &value)) {
+                                    scriptInstance->SetFieldValue<int64_t>(name, value);
+                                }
                             }
-                        }
-                        else if (scriptField.Type == ScriptFieldType::UShort) {
-                            uint16_t value = scriptInstance->GetFieldValue<uint16_t>(name);
-                            if (ImGui::InputScalar(name.c_str(), ImGuiDataType_U16, &value)) {
-                                scriptInstance->SetFieldValue<uint16_t>(name, value);
+                            else if (scriptField.Type == ScriptFieldType::UShort) {
+                                uint16_t value = scriptInstance->GetFieldValue<uint16_t>(name);
+                                if (ImGui::InputScalar(name.c_str(), ImGuiDataType_U16, &value)) {
+                                    scriptInstance->SetFieldValue<uint16_t>(name, value);
+                                }
                             }
-                        }
-                        else if (scriptField.Type == ScriptFieldType::UInt) {
-                            uint32_t value = scriptInstance->GetFieldValue<uint32_t>(name);
-                            if (ImGui::InputScalar(name.c_str(), ImGuiDataType_U32, &value)) {
-                                scriptInstance->SetFieldValue<uint32_t>(name, value);
+                            else if (scriptField.Type == ScriptFieldType::UInt) {
+                                uint32_t value = scriptInstance->GetFieldValue<uint32_t>(name);
+                                if (ImGui::InputScalar(name.c_str(), ImGuiDataType_U32, &value)) {
+                                    scriptInstance->SetFieldValue<uint32_t>(name, value);
+                                }
                             }
-                        }
-                        else if (scriptField.Type == ScriptFieldType::ULong) {
-                            uint64_t value = scriptInstance->GetFieldValue<uint64_t>(name);
-                            if (ImGui::InputScalar(name.c_str(), ImGuiDataType_U64, &value)) {
-                                scriptInstance->SetFieldValue<uint64_t>(name, value);
+                            else if (scriptField.Type == ScriptFieldType::ULong) {
+                                uint64_t value = scriptInstance->GetFieldValue<uint64_t>(name);
+                                if (ImGui::InputScalar(name.c_str(), ImGuiDataType_U64, &value)) {
+                                    scriptInstance->SetFieldValue<uint64_t>(name, value);
+                                }
                             }
-                        }
-                        else if (scriptField.Type == ScriptFieldType::Float) {
-                            float value = scriptInstance->GetFieldValue<float>(name);
-                            if (ImGui::DragFloat(name.c_str(), &value, 0.1f)) {
-                                scriptInstance->SetFieldValue<float>(name, value);
+                            else if (scriptField.Type == ScriptFieldType::Float) {
+                                float value = scriptInstance->GetFieldValue<float>(name);
+                                if (ImGui::DragFloat(name.c_str(), &value, 0.1f)) {
+                                    scriptInstance->SetFieldValue<float>(name, value);
+                                }
                             }
-                        }
-                        else if (scriptField.Type == ScriptFieldType::Double) {
-                            double value = scriptInstance->GetFieldValue<double>(name);
-                            if (ImGui::DragScalar(name.c_str(), ImGuiDataType_Double, &value, 0.1f)) {
-                                scriptInstance->SetFieldValue<double>(name, value);
+                            else if (scriptField.Type == ScriptFieldType::Double) {
+                                double value = scriptInstance->GetFieldValue<double>(name);
+                                if (ImGui::DragScalar(name.c_str(), ImGuiDataType_Double, &value, 0.1f)) {
+                                    scriptInstance->SetFieldValue<double>(name, value);
+                                }
                             }
-                        }
-                        else if (scriptField.Type == ScriptFieldType::Bool) {
-                            bool value = scriptInstance->GetFieldValue<bool>(name);
-                            if (ImGui::Checkbox(name.c_str(), &value)) {
-                                scriptInstance->SetFieldValue<bool>(name, value);
+                            else if (scriptField.Type == ScriptFieldType::Bool) {
+                                bool value = scriptInstance->GetFieldValue<bool>(name);
+                                if (ImGui::Checkbox(name.c_str(), &value)) {
+                                    scriptInstance->SetFieldValue<bool>(name, value);
+                                }
                             }
-                        }
-                        else if (scriptField.Type == ScriptFieldType::String) {
-                            std::string value = scriptInstance->GetFieldValue<std::string>(name);
-                            char strBuffer[256];
-                            strcpy_s(strBuffer, sizeof(strBuffer), value.c_str());
-                            if (ImGui::InputText(name.c_str(), strBuffer, sizeof(strBuffer))) {
-                                scriptInstance->SetFieldValue<std::string>(name, std::string(strBuffer));
+                            else if (scriptField.Type == ScriptFieldType::String) {
+                                std::string value = scriptInstance->GetFieldValue<std::string>(name);
+                                char strBuffer[256];
+                                strcpy_s(strBuffer, sizeof(strBuffer), value.c_str());
+                                if (ImGui::InputText(name.c_str(), strBuffer, sizeof(strBuffer))) {
+                                    scriptInstance->SetFieldValue<std::string>(name, std::string(strBuffer));
+                                }
                             }
-                        }
-                        else if (scriptField.Type == ScriptFieldType::Vec2) {
-                            glm::vec2 value = scriptInstance->GetFieldValue<glm::vec2>(name);
-                            if (ImGui::DragFloat2(name.c_str(), glm::value_ptr(value), 0.1f)) {
-                                scriptInstance->SetFieldValue<glm::vec2>(name, value);
+                            else if (scriptField.Type == ScriptFieldType::Vec2) {
+                                glm::vec2 value = scriptInstance->GetFieldValue<glm::vec2>(name);
+                                if (ImGui::DragFloat2(name.c_str(), glm::value_ptr(value), 0.1f)) {
+                                    scriptInstance->SetFieldValue<glm::vec2>(name, value);
+                                }
                             }
-                        }
-                        else if (scriptField.Type == ScriptFieldType::Vec3) {
-                            glm::vec3 value = scriptInstance->GetFieldValue<glm::vec3>(name);
-                            if (ImGui::DragFloat3(name.c_str(), glm::value_ptr(value), 0.1f)) {
-                                scriptInstance->SetFieldValue<glm::vec3>(name, value);
+                            else if (scriptField.Type == ScriptFieldType::Vec3) {
+                                glm::vec3 value = scriptInstance->GetFieldValue<glm::vec3>(name);
+                                if (ImGui::DragFloat3(name.c_str(), glm::value_ptr(value), 0.1f)) {
+                                    scriptInstance->SetFieldValue<glm::vec3>(name, value);
+                                }
                             }
-                        }
-                        else if (scriptField.Type == ScriptFieldType::Vec4) {
-                            glm::vec4 value = scriptInstance->GetFieldValue<glm::vec4>(name);
-                            if (ImGui::DragFloat4(name.c_str(), glm::value_ptr(value), 0.1f)) {
-                                scriptInstance->SetFieldValue<glm::vec4>(name, value);
+                            else if (scriptField.Type == ScriptFieldType::Vec4) {
+                                glm::vec4 value = scriptInstance->GetFieldValue<glm::vec4>(name);
+                                if (ImGui::DragFloat4(name.c_str(), glm::value_ptr(value), 0.1f)) {
+                                    scriptInstance->SetFieldValue<glm::vec4>(name, value);
+                                }
                             }
-                        }
-                        else if (scriptField.Type == ScriptFieldType::MaterialRef) {
-                            /*Ref<Material> value = scriptInstance->GetFieldValue<Ref<Material>>(name);
-                            if (ImGui::Button("Select Material"))
-                            {
-                                ImGui::OpenPopup((name + "MaterialSelector").c_str());
-                            }
-                            if (ImGui::BeginPopup((name + "MaterialSelector").c_str()))
-                            {
-                                const auto& materials = AssetManager::GetAssetsByType<Material>();
-                                for (const auto& [id, material] : materials)
+                            else if (scriptField.Type == ScriptFieldType::MaterialRef) {
+                                /*Ref<Material> value = scriptInstance->GetFieldValue<Ref<Material>>(name);
+                                if (ImGui::Button("Select Material"))
                                 {
-                                    if (ImGui::Selectable(material->GetName().c_str()))
+                                    ImGui::OpenPopup((name + "MaterialSelector").c_str());
+                                }
+                                if (ImGui::BeginPopup((name + "MaterialSelector").c_str()))
+                                {
+                                    const auto& materials = AssetManager::GetAssetsByType<Material>();
+                                    for (const auto& [id, material] : materials)
                                     {
-                                        scriptInstance->SetFieldValue<Ref<Material>>(name, material);
-                                        ImGui::CloseCurrentPopup();
+                                        if (ImGui::Selectable(material->GetName().c_str()))
+                                        {
+                                            scriptInstance->SetFieldValue<Ref<Material>>(name, material);
+                                            ImGui::CloseCurrentPopup();
+                                        }
                                     }
-                                }
-                                ImGui::EndPopup();
-                            }*/
-                            const uint64_t value = scriptInstance->GetFieldValue<uint64_t>(name);
-                            std::string materialLabel = "No material selected";
-                            if (value != UUID::Invalid()) {
-                                const Ref<Material> material = AssetManager::GetAsset<Material>(UUID(value));
-                                const auto& metadata =
-                                    Project::GetActive()->GetEditorAssetManager()->GetMetadata(material->GetHandle());
-                                materialLabel = metadata.Filepath.filename().string();
-                            }
-                            ImGui::Text("%s: %s", name.c_str(), materialLabel.c_str());
-
-                            if (ImGui::BeginDragDropTarget()) {
-                                if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload(assetBrowserMaterial)) {
-                                    const AssetHandle handle = ReadAssetDragPayload(payload->Data, payload->DataSize).Handle;
-                                    if (const AssetType assetType = AssetManager::GetAssetType(handle);
-                                        assetType != AssetType::Material) {
-                                        Log::EditorError("Asset is not a material: {0}", handle);
-                                        m_NotificationManager.AddNotification("Asset is not a material",
-                                                                              Notification::Type::Error);
-                                        ImGui::EndDragDropTarget();
-
-                                        return;
-                                    }
-                                    const Ref<Material> newMaterial = AssetManager::GetAsset<Material>(handle);
-                                    scriptInstance->SetFieldValue<uint64_t>(name, newMaterial->GetHandle());
-                                }
-                                ImGui::EndDragDropTarget();
-                            }
-                        }
-                        else if (scriptField.Type == ScriptFieldType::MeshRef) {
-                            const uint64_t value = scriptInstance->GetFieldValue<uint64_t>(name);
-                            std::string meshLabel = "No mesh selected";
-                            if (value != UUID::Invalid()) {
-                                const Ref<Mesh> mesh = AssetManager::ResolveMeshAsset(UUID(value));
-                                if (mesh && AssetManager::IsAssetHandleValid(UUID(value))) {
+                                    ImGui::EndPopup();
+                                }*/
+                                const uint64_t value = scriptInstance->GetFieldValue<uint64_t>(name);
+                                std::string materialLabel = "No material selected";
+                                if (value != UUID::Invalid()) {
+                                    const Ref<Material> material = AssetManager::GetAsset<Material>(UUID(value));
                                     const auto& metadata =
-                                        Project::GetActive()->GetEditorAssetManager()->GetMetadata(UUID(value));
-                                    meshLabel = metadata.Filepath.filename().string();
+                                        Project::GetActive()->GetEditorAssetManager()->GetMetadata(material->GetHandle());
+                                    materialLabel = metadata.Filepath.filename().string();
+                                }
+                                ImGui::Text("%s: %s", name.c_str(), materialLabel.c_str());
+
+                                if (ImGui::BeginDragDropTarget()) {
+                                    if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload(assetBrowserMaterial)) {
+                                        const AssetHandle handle = ReadAssetDragPayload(payload->Data, payload->DataSize).Handle;
+                                        if (const AssetType assetType = AssetManager::GetAssetType(handle);
+                                            assetType != AssetType::Material) {
+                                            Log::EditorError("Asset is not a material: {0}", handle);
+                                            m_NotificationManager.AddNotification("Asset is not a material",
+                                                                                  Notification::Type::Error);
+                                            ImGui::EndDragDropTarget();
+
+                                            return;
+                                        }
+                                        const Ref<Material> newMaterial = AssetManager::GetAsset<Material>(handle);
+                                        scriptInstance->SetFieldValue<uint64_t>(name, newMaterial->GetHandle());
+                                    }
+                                    ImGui::EndDragDropTarget();
                                 }
                             }
-                            ImGui::Text("%s: %s", name.c_str(), meshLabel.c_str());
-
-                            if (ImGui::BeginDragDropTarget()) {
-                                if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload(assetBrowserMesh)) {
-                                    const AssetHandle handle = ReadAssetDragPayload(payload->Data, payload->DataSize).Handle;
-                                    if (const AssetType assetType = AssetManager::GetAssetType(handle);
-                                        assetType != AssetType::Mesh) {
-                                        Log::EditorError("Asset is not a mesh or model: {0}", handle);
-                                        m_NotificationManager.AddNotification("Asset is not a mesh or model",
-                                                                              Notification::Type::Error);
-                                        ImGui::EndDragDropTarget();
-
-                                        return;
+                            else if (scriptField.Type == ScriptFieldType::MeshRef) {
+                                const uint64_t value = scriptInstance->GetFieldValue<uint64_t>(name);
+                                std::string meshLabel = "No mesh selected";
+                                if (value != UUID::Invalid()) {
+                                    const Ref<Mesh> mesh = AssetManager::ResolveMeshAsset(UUID(value));
+                                    if (mesh && AssetManager::IsAssetHandleValid(UUID(value))) {
+                                        const auto& metadata =
+                                            Project::GetActive()->GetEditorAssetManager()->GetMetadata(UUID(value));
+                                        meshLabel = metadata.Filepath.filename().string();
                                     }
-                                    const Ref<Mesh> newMesh = AssetManager::ResolveMeshAsset(handle);
-                                    if (!newMesh) {
-                                        Log::EditorError("Could not resolve mesh from asset: {0}", handle);
-                                        m_NotificationManager.AddNotification(
-                                            "Could not resolve mesh from selected asset", Notification::Type::Error);
-                                        ImGui::EndDragDropTarget();
-                                        return;
-                                    }
-                                    scriptInstance->SetFieldValue<uint64_t>(name, newMesh->GetHandle());
                                 }
-                                ImGui::EndDragDropTarget();
+                                ImGui::Text("%s: %s", name.c_str(), meshLabel.c_str());
+
+                                if (ImGui::BeginDragDropTarget()) {
+                                    if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload(assetBrowserMesh)) {
+                                        const AssetHandle handle = ReadAssetDragPayload(payload->Data, payload->DataSize).Handle;
+                                        if (const AssetType assetType = AssetManager::GetAssetType(handle);
+                                            assetType != AssetType::Mesh) {
+                                            Log::EditorError("Asset is not a mesh or model: {0}", handle);
+                                            m_NotificationManager.AddNotification("Asset is not a mesh or model",
+                                                                                  Notification::Type::Error);
+                                            ImGui::EndDragDropTarget();
+
+                                            return;
+                                        }
+                                        const Ref<Mesh> newMesh = AssetManager::ResolveMeshAsset(handle);
+                                        if (!newMesh) {
+                                            Log::EditorError("Could not resolve mesh from asset: {0}", handle);
+                                            m_NotificationManager.AddNotification(
+                                                "Could not resolve mesh from selected asset", Notification::Type::Error);
+                                            ImGui::EndDragDropTarget();
+                                            return;
+                                        }
+                                        scriptInstance->SetFieldValue<uint64_t>(name, newMesh->GetHandle());
+                                    }
+                                    ImGui::EndDragDropTarget();
+                                }
+                            }
+                            else {
+                                ImGui::Text("Unsupported field type");
                             }
                         }
-                        else {
-                            ImGui::Text("Unsupported field type");
+                    }
+                    else {
+                        /// The scene is not running, show the initializer fields for the script,
+                        /// which then will be applied to the script when the scene starts.
+                        auto& fields = ScriptEngine::GetScriptFieldInitializerMap(entity, className);
+                        for (auto& [fieldName, fieldInitializer] : fields) {
+                            const auto& scriptField = fieldInitializer.Field;
+
+                            if (scriptField.Type == ScriptFieldType::Short) {
+                                short value = fieldInitializer.GetValue<short>();
+                                if (ImGui::InputScalar(fieldName.c_str(), ImGuiDataType_S16, &value)) {
+                                    fieldInitializer.SetValue<short>(value);
+                                }
+                            }
+                            else if (scriptField.Type == ScriptFieldType::Int) {
+                                int value = fieldInitializer.GetValue<int>();
+                                if (ImGui::InputInt(fieldName.c_str(), &value)) {
+                                    fieldInitializer.SetValue<int>(value);
+                                }
+                            }
+                            else if (scriptField.Type == ScriptFieldType::Long) {
+                                int64_t value = fieldInitializer.GetValue<int64_t>();
+                                if (ImGui::InputScalar(fieldName.c_str(), ImGuiDataType_S64, &value)) {
+                                    fieldInitializer.SetValue<int64_t>(value);
+                                }
+                            }
+                            if (scriptField.Type == ScriptFieldType::UShort) {
+                                uint16_t value = fieldInitializer.GetValue<uint16_t>();
+                                if (ImGui::InputScalar(fieldName.c_str(), ImGuiDataType_U16, &value)) {
+                                    fieldInitializer.SetValue<uint16_t>(value);
+                                }
+                            }
+                            else if (scriptField.Type == ScriptFieldType::UInt) {
+                                uint32_t value = fieldInitializer.GetValue<uint32_t>();
+                                if (ImGui::InputScalar(fieldName.c_str(), ImGuiDataType_U32, &value)) {
+                                    fieldInitializer.SetValue<uint32_t>(value);
+                                }
+                            }
+                            else if (scriptField.Type == ScriptFieldType::ULong) {
+                                uint64_t value = fieldInitializer.GetValue<uint64_t>();
+                                if (ImGui::InputScalar(fieldName.c_str(), ImGuiDataType_U64, &value)) {
+                                    fieldInitializer.SetValue<uint64_t>(value);
+                                }
+                            }
+                            else if (scriptField.Type == ScriptFieldType::Float) {
+                                float value = fieldInitializer.GetValue<float>();
+                                if (ImGui::DragFloat(fieldName.c_str(), &value, 0.1f)) {
+                                    fieldInitializer.SetValue<float>(value);
+                                }
+                            }
+                            else if (scriptField.Type == ScriptFieldType::Double) {
+                                double value = fieldInitializer.GetValue<double>();
+                                if (ImGui::DragScalar(fieldName.c_str(), ImGuiDataType_Double, &value, 0.1f)) {
+                                    fieldInitializer.SetValue<double>(value);
+                                }
+                            }
+                            else if (scriptField.Type == ScriptFieldType::Bool) {
+                                bool value = fieldInitializer.GetValue<bool>();
+                                if (ImGui::Checkbox(fieldName.c_str(), &value)) {
+                                    fieldInitializer.SetValue<bool>(value);
+                                }
+                            }
+                            else if (scriptField.Type == ScriptFieldType::String) {
+                                std::string value = fieldInitializer.GetValue<std::string>();
+                                char strBuffer[256];
+                                strcpy_s(strBuffer, sizeof(strBuffer), value.c_str());
+                                if (ImGui::InputText(fieldName.c_str(), strBuffer, sizeof(strBuffer))) {
+                                    fieldInitializer.SetValue<std::string>(std::string(strBuffer));
+                                }
+                            }
+                            else if (scriptField.Type == ScriptFieldType::Vec2) {
+                                glm::vec2 value = fieldInitializer.GetValue<glm::vec2>();
+                                if (ImGui::DragFloat2(fieldName.c_str(), glm::value_ptr(value), 0.1f)) {
+                                    fieldInitializer.SetValue<glm::vec2>(value);
+                                }
+                            }
+                            else if (scriptField.Type == ScriptFieldType::Vec3) {
+                                glm::vec3 value = fieldInitializer.GetValue<glm::vec3>();
+                                if (ImGui::DragFloat3(fieldName.c_str(), glm::value_ptr(value), 0.1f)) {
+                                    fieldInitializer.SetValue<glm::vec3>(value);
+                                }
+                            }
+                            else if (scriptField.Type == ScriptFieldType::Vec4) {
+                                glm::vec4 value = fieldInitializer.GetValue<glm::vec4>();
+                                if (ImGui::DragFloat4(fieldName.c_str(), glm::value_ptr(value), 0.1f)) {
+                                    fieldInitializer.SetValue<glm::vec4>(value);
+                                }
+                            }
+                            else if (scriptField.Type == ScriptFieldType::MaterialRef) {
+                                /*Ref<Material> value = scriptInstance->GetFieldValue<Ref<Material>>(name);
+                                if (ImGui::Button("Select Material"))
+                                {
+                                    ImGui::OpenPopup((name + "MaterialSelector").c_str());
+                                }
+                                if (ImGui::BeginPopup((name + "MaterialSelector").c_str()))
+                                {
+                                    const auto& materials = AssetManager::GetAssetsByType<Material>();
+                                    for (const auto& [id, material] : materials)
+                                    {
+                                        if (ImGui::Selectable(material->GetName().c_str()))
+                                        {
+                                            scriptInstance->SetFieldValue<Ref<Material>>(name, material);
+                                            ImGui::CloseCurrentPopup();
+                                        }
+                                    }
+                                    ImGui::EndPopup();
+                                }*/
+                                const uint64_t value = fieldInitializer.GetValue<uint64_t>();
+                                std::string materialLabel = "No material selected";
+                                if (value != UUID::Invalid()) {
+                                    const Ref<Material> material = AssetManager::GetAsset<Material>(UUID(value));
+                                    const auto& metadata =
+                                        Project::GetActive()->GetEditorAssetManager()->GetMetadata(material->GetHandle());
+                                    materialLabel = metadata.Filepath.filename().string();
+                                }
+                                ImGui::Text("%s: %s", fieldName.c_str(), materialLabel.c_str());
+
+                                if (ImGui::BeginDragDropTarget()) {
+                                    if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload(assetBrowserMaterial)) {
+                                        const AssetHandle handle = ReadAssetDragPayload(payload->Data, payload->DataSize).Handle;
+                                        if (const AssetType assetType = AssetManager::GetAssetType(handle);
+                                            assetType != AssetType::Material) {
+                                            Log::EditorError("Asset is not a material: {0}", handle);
+                                            m_NotificationManager.AddNotification("Asset is not a material",
+                                                                                  Notification::Type::Error);
+                                            ImGui::EndDragDropTarget();
+
+                                            return;
+                                        }
+                                        const Ref<Material> newMaterial = AssetManager::GetAsset<Material>(handle);
+                                        fieldInitializer.SetValue(newMaterial->GetHandle());
+                                    }
+                                    ImGui::EndDragDropTarget();
+                                }
+                            }
+                            else if (scriptField.Type == ScriptFieldType::MeshRef) {
+                                const uint64_t value = fieldInitializer.GetValue<uint64_t>();
+                                std::string meshLabel = "No mesh selected";
+                                if (value != UUID::Invalid()) {
+                                    const Ref<Mesh> mesh = AssetManager::ResolveMeshAsset(UUID(value));
+                                    if (mesh && AssetManager::IsAssetHandleValid(UUID(value))) {
+                                        const auto& metadata =
+                                            Project::GetActive()->GetEditorAssetManager()->GetMetadata(UUID(value));
+                                        meshLabel = metadata.Filepath.filename().string();
+                                    }
+                                }
+                                ImGui::Text("%s: %s", fieldName.c_str(), meshLabel.c_str());
+
+                                if (ImGui::BeginDragDropTarget()) {
+                                    if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload(assetBrowserMesh)) {
+                                        const AssetHandle handle = ReadAssetDragPayload(payload->Data, payload->DataSize).Handle;
+                                        if (const AssetType assetType = AssetManager::GetAssetType(handle);
+                                            assetType != AssetType::Mesh) {
+                                            Log::EditorError("Asset is not a mesh or model: {0}", handle);
+                                            m_NotificationManager.AddNotification("Asset is not a mesh or model",
+                                                                                  Notification::Type::Error);
+                                            ImGui::EndDragDropTarget();
+
+                                            return;
+                                        }
+                                        const Ref<Mesh> newMesh = AssetManager::ResolveMeshAsset(handle);
+                                        if (!newMesh) {
+                                            Log::EditorError("Could not resolve mesh from asset: {0}", handle);
+                                            m_NotificationManager.AddNotification(
+                                                "Could not resolve mesh from selected asset", Notification::Type::Error);
+                                            ImGui::EndDragDropTarget();
+                                            return;
+                                        }
+                                        fieldInitializer.SetValue(newMesh->GetHandle());
+                                    }
+                                    ImGui::EndDragDropTarget();
+                                }
+                            }
+                            else {
+                                ImGui::Text("Unsupported field type");
+                            }
                         }
                     }
                 }
-                else {
-                    /// The scene is not running, show the initializer fields for the script,
-                    /// which then will be applied to the script when the scene starts.
-                    auto& fields = ScriptEngine::GetScriptFieldInitializerMap(entity);
-                    for (auto& [fieldName, fieldInitializer] : fields) {
-                        const auto& scriptField = fieldInitializer.Field;
 
-                        if (scriptField.Type == ScriptFieldType::Short) {
-                            short value = fieldInitializer.GetValue<short>();
-                            if (ImGui::InputScalar(fieldName.c_str(), ImGuiDataType_S16, &value)) {
-                                fieldInitializer.SetValue<short>(value);
-                            }
-                        }
-                        else if (scriptField.Type == ScriptFieldType::Int) {
-                            int value = fieldInitializer.GetValue<int>();
-                            if (ImGui::InputInt(fieldName.c_str(), &value)) {
-                                fieldInitializer.SetValue<int>(value);
-                            }
-                        }
-                        else if (scriptField.Type == ScriptFieldType::Long) {
-                            int64_t value = fieldInitializer.GetValue<int64_t>();
-                            if (ImGui::InputScalar(fieldName.c_str(), ImGuiDataType_S64, &value)) {
-                                fieldInitializer.SetValue<int64_t>(value);
-                            }
-                        }
-                        if (scriptField.Type == ScriptFieldType::UShort) {
-                            uint16_t value = fieldInitializer.GetValue<uint16_t>();
-                            if (ImGui::InputScalar(fieldName.c_str(), ImGuiDataType_U16, &value)) {
-                                fieldInitializer.SetValue<uint16_t>(value);
-                            }
-                        }
-                        else if (scriptField.Type == ScriptFieldType::UInt) {
-                            uint32_t value = fieldInitializer.GetValue<uint32_t>();
-                            if (ImGui::InputScalar(fieldName.c_str(), ImGuiDataType_U32, &value)) {
-                                fieldInitializer.SetValue<uint32_t>(value);
-                            }
-                        }
-                        else if (scriptField.Type == ScriptFieldType::ULong) {
-                            uint64_t value = fieldInitializer.GetValue<uint64_t>();
-                            if (ImGui::InputScalar(fieldName.c_str(), ImGuiDataType_U64, &value)) {
-                                fieldInitializer.SetValue<uint64_t>(value);
-                            }
-                        }
-                        else if (scriptField.Type == ScriptFieldType::Float) {
-                            float value = fieldInitializer.GetValue<float>();
-                            if (ImGui::DragFloat(fieldName.c_str(), &value, 0.1f)) {
-                                fieldInitializer.SetValue<float>(value);
-                            }
-                        }
-                        else if (scriptField.Type == ScriptFieldType::Double) {
-                            double value = fieldInitializer.GetValue<double>();
-                            if (ImGui::DragScalar(fieldName.c_str(), ImGuiDataType_Double, &value, 0.1f)) {
-                                fieldInitializer.SetValue<double>(value);
-                            }
-                        }
-                        else if (scriptField.Type == ScriptFieldType::Bool) {
-                            bool value = fieldInitializer.GetValue<bool>();
-                            if (ImGui::Checkbox(fieldName.c_str(), &value)) {
-                                fieldInitializer.SetValue<bool>(value);
-                            }
-                        }
-                        else if (scriptField.Type == ScriptFieldType::String) {
-                            std::string value = fieldInitializer.GetValue<std::string>();
-                            char strBuffer[256];
-                            strcpy_s(strBuffer, sizeof(strBuffer), value.c_str());
-                            if (ImGui::InputText(fieldName.c_str(), strBuffer, sizeof(strBuffer))) {
-                                fieldInitializer.SetValue<std::string>(std::string(strBuffer));
-                            }
-                        }
-                        else if (scriptField.Type == ScriptFieldType::Vec2) {
-                            glm::vec2 value = fieldInitializer.GetValue<glm::vec2>();
-                            if (ImGui::DragFloat2(fieldName.c_str(), glm::value_ptr(value), 0.1f)) {
-                                fieldInitializer.SetValue<glm::vec2>(value);
-                            }
-                        }
-                        else if (scriptField.Type == ScriptFieldType::Vec3) {
-                            glm::vec3 value = fieldInitializer.GetValue<glm::vec3>();
-                            if (ImGui::DragFloat3(fieldName.c_str(), glm::value_ptr(value), 0.1f)) {
-                                fieldInitializer.SetValue<glm::vec3>(value);
-                            }
-                        }
-                        else if (scriptField.Type == ScriptFieldType::Vec4) {
-                            glm::vec4 value = fieldInitializer.GetValue<glm::vec4>();
-                            if (ImGui::DragFloat4(fieldName.c_str(), glm::value_ptr(value), 0.1f)) {
-                                fieldInitializer.SetValue<glm::vec4>(value);
-                            }
-                        }
-                        else if (scriptField.Type == ScriptFieldType::MaterialRef) {
-                            /*Ref<Material> value = scriptInstance->GetFieldValue<Ref<Material>>(name);
-                            if (ImGui::Button("Select Material"))
-                            {
-                                ImGui::OpenPopup((name + "MaterialSelector").c_str());
-                            }
-                            if (ImGui::BeginPopup((name + "MaterialSelector").c_str()))
-                            {
-                                const auto& materials = AssetManager::GetAssetsByType<Material>();
-                                for (const auto& [id, material] : materials)
-                                {
-                                    if (ImGui::Selectable(material->GetName().c_str()))
-                                    {
-                                        scriptInstance->SetFieldValue<Ref<Material>>(name, material);
-                                        ImGui::CloseCurrentPopup();
-                                    }
-                                }
-                                ImGui::EndPopup();
-                            }*/
-                            const uint64_t value = fieldInitializer.GetValue<uint64_t>();
-                            std::string materialLabel = "No material selected";
-                            if (value != UUID::Invalid()) {
-                                const Ref<Material> material = AssetManager::GetAsset<Material>(UUID(value));
-                                const auto& metadata =
-                                    Project::GetActive()->GetEditorAssetManager()->GetMetadata(material->GetHandle());
-                                materialLabel = metadata.Filepath.filename().string();
-                            }
-                            ImGui::Text("%s: %s", fieldName.c_str(), materialLabel.c_str());
-
-                            if (ImGui::BeginDragDropTarget()) {
-                                if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload(assetBrowserMaterial)) {
-                                    const AssetHandle handle = ReadAssetDragPayload(payload->Data, payload->DataSize).Handle;
-                                    if (const AssetType assetType = AssetManager::GetAssetType(handle);
-                                        assetType != AssetType::Material) {
-                                        Log::EditorError("Asset is not a material: {0}", handle);
-                                        m_NotificationManager.AddNotification("Asset is not a material",
-                                                                              Notification::Type::Error);
-                                        ImGui::EndDragDropTarget();
-
-                                        return;
-                                    }
-                                    const Ref<Material> newMaterial = AssetManager::GetAsset<Material>(handle);
-                                    fieldInitializer.SetValue(newMaterial->GetHandle());
-                                }
-                                ImGui::EndDragDropTarget();
-                            }
-                        }
-                        else if (scriptField.Type == ScriptFieldType::MeshRef) {
-                            const uint64_t value = fieldInitializer.GetValue<uint64_t>();
-                            std::string meshLabel = "No mesh selected";
-                            if (value != UUID::Invalid()) {
-                                const Ref<Mesh> mesh = AssetManager::ResolveMeshAsset(UUID(value));
-                                if (mesh && AssetManager::IsAssetHandleValid(UUID(value))) {
-                                    const auto& metadata =
-                                        Project::GetActive()->GetEditorAssetManager()->GetMetadata(UUID(value));
-                                    meshLabel = metadata.Filepath.filename().string();
-                                }
-                            }
-                            ImGui::Text("%s: %s", fieldName.c_str(), meshLabel.c_str());
-
-                            if (ImGui::BeginDragDropTarget()) {
-                                if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload(assetBrowserMesh)) {
-                                    const AssetHandle handle = ReadAssetDragPayload(payload->Data, payload->DataSize).Handle;
-                                    if (const AssetType assetType = AssetManager::GetAssetType(handle);
-                                        assetType != AssetType::Mesh) {
-                                        Log::EditorError("Asset is not a mesh or model: {0}", handle);
-                                        m_NotificationManager.AddNotification("Asset is not a mesh or model",
-                                                                              Notification::Type::Error);
-                                        ImGui::EndDragDropTarget();
-
-                                        return;
-                                    }
-                                    const Ref<Mesh> newMesh = AssetManager::ResolveMeshAsset(handle);
-                                    if (!newMesh) {
-                                        Log::EditorError("Could not resolve mesh from asset: {0}", handle);
-                                        m_NotificationManager.AddNotification(
-                                            "Could not resolve mesh from selected asset", Notification::Type::Error);
-                                        ImGui::EndDragDropTarget();
-                                        return;
-                                    }
-                                    fieldInitializer.SetValue(newMesh->GetHandle());
-                                }
-                                ImGui::EndDragDropTarget();
-                            }
-                        }
-                        else {
-                            ImGui::Text("Unsupported field type");
-                        }
-                    }
-                }
+                ImGui::Separator();
+                ImGui::PopID();
             }
 
-            if (!scriptClassExists) {
-                ImGui::PopStyleColor();
+            if (ImGui::Button("Add Script")) {
+                component.ClassNames.emplace_back();
+            }
+
+            if (scriptIndexToRemove >= 0 && scriptIndexToRemove < static_cast<int>(component.ClassNames.size())) {
+                component.ClassNames.erase(component.ClassNames.begin() + scriptIndexToRemove);
             }
 
             ImGui::TreePop();
