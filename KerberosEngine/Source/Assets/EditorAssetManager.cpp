@@ -3,6 +3,7 @@
 
 #include "Assets/Runtime/RuntimeAssetLoader.hpp"
 #include "Assets/Importers/StandaloneAssetPipelineImporter.hpp"
+#include "Assets/Importers/TexturePipelineImporter.hpp"
 #include "Importers/GLTFPipelineImporter.hpp"
 #include "Assets/Formats/NativeAssetSerializer.hpp"
 #include "Profiling/Profilers.hpp"
@@ -129,10 +130,16 @@ namespace Kerberos
 		std::filesystem::create_directories(m_CacheRoot, ec);
 		m_MetaService = CreateOwner<AssetMetaService>(m_AssetsRoot);
 		m_ImporterRegistry.Register(CreateRef<GLTFPipelineImporter>());
+		m_ImporterRegistry.Register(CreateRef<TexturePipelineImporter>());
 		for (const auto& [extension, type] : sourceAssetExtensionMap)
 		{
 			if (extension == ".gltf" || extension == ".glb")
 				continue;
+
+			if (type == AssetType::Texture2D)
+				continue;
+
+			// Register a generic standalone importer for all other asset types
 			m_ImporterRegistry.Register(CreateRef<StandaloneAssetPipelineImporter>(
 				std::string(extension), type));
 		}
@@ -177,7 +184,11 @@ namespace Kerberos
 			{
 				meta.SourceHandle = m_AssetRegistry.ContainsPath(file)
 					? m_AssetRegistry.GetHandle(file) : m_AssetRegistry.GetHandle(relativeFile);
-				m_MetaService->SaveMeta(file, meta);
+
+				if (!m_MetaService->SaveMeta(file, meta))
+				{
+					Log::CoreError("Failed to save asset metadata for {0}", file.string());
+				}
 			}
 		}
 	}

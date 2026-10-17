@@ -8,7 +8,7 @@ namespace Kerberos::KTX2Loader
 	bool IsKTX2(const std::filesystem::path& filepath)
 	{
 		std::string extension = filepath.extension().string();
-		std::ranges::transform(extension, extension.begin(), [](unsigned char c) {
+		std::ranges::transform(extension, extension.begin(), [](const unsigned char c) {
 			return static_cast<char>(std::tolower(c));
 		});
 		return extension == ".ktx2";
@@ -20,8 +20,12 @@ namespace Kerberos::KTX2Loader
 
 		if (!texture || !IsKTX2(filepath))
 			return false;
+
 		*texture = nullptr;
-		return ktxTexture2_CreateFromNamedFile(filepath.string().c_str(),
-			KTX_TEXTURE_CREATE_LOAD_IMAGE_DATA_BIT, texture) == KTX_SUCCESS;
+
+		const ktxResult result =
+            ktxTexture2_CreateFromNamedFile(filepath.string().c_str(), KTX_TEXTURE_CREATE_LOAD_IMAGE_DATA_BIT, texture);
+
+		return result == KTX_SUCCESS;
 	}
 }

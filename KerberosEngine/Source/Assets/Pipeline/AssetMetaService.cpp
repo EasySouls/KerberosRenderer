@@ -11,9 +11,11 @@ import Kerberos;
 
 namespace Kerberos {
 
-AssetMetaService::AssetMetaService(std::filesystem::path assetsRoot) : m_AssetsRoot(std::move(assetsRoot)) {}
+AssetMetaService::AssetMetaService(std::filesystem::path assetsRoot) 
+: m_AssetsRoot(std::move(assetsRoot)) 
+{}
 
-AssetMetaFile AssetMetaService::EnsureMetaForSource(const std::filesystem::path& sourcePath) 
+AssetMetaFile AssetMetaService::EnsureMetaForSource(const std::filesystem::path& sourcePath) const
 {
     KBR_TRACY_FUNCTION();
 
@@ -28,7 +30,10 @@ AssetMetaFile AssetMetaService::EnsureMetaForSource(const std::filesystem::path&
         AssetMetaFile newMeta;
         newMeta.SourceHandle = AssetHandle();
         newMeta.SourceHash = ComputeSourceHash(sourcePath);
-        SaveMeta(sourcePath, newMeta);
+        if (!SaveMeta(sourcePath, newMeta))
+        {
+            Log::CoreError("Failed to save asset metadata for {0}", sourcePath.string());
+        }
         return newMeta;
     }
 
@@ -56,13 +61,24 @@ std::optional<AssetMetaFile> AssetMetaService::LoadMeta(const std::filesystem::p
             meta.SchemaVersion = config["SchemaVersion"].as<uint32_t>();
         if (meta.SchemaVersion > AssetMetaFile::CurrentSchemaVersion)
             return std::nullopt;
-        if (config["ImporterVersion"]) meta.ImporterVersion = config["ImporterVersion"].as<uint32_t>();
-        if (config["ImporterType"]) meta.ImporterType = static_cast<ImporterType>(config["ImporterType"].as<uint8_t>());
-        const YAML::Node sourceHandle = config["SourceHandle"] ? config["SourceHandle"] : config["Handle"];
-        if (sourceHandle) meta.SourceHandle = AssetHandle(sourceHandle.as<uint64_t>());
-        if (config["SourceHash"]) meta.SourceHash = config["SourceHash"].as<std::string>();
-        if (config["SubAssets"]) {
-            for (const auto& node : config["SubAssets"]) {
+        if (config["ImporterVersion"]) 
+            meta.ImporterVersion = config["ImporterVersion"].as<uint32_t>();
+        if (config["ImporterType"]) 
+            meta.ImporterType = static_cast<ImporterType>(config["ImporterType"].as<uint8_t>());
+
+        const YAML::Node sourceHandle = config["SourceHandle"] 
+            ? config["SourceHandle"] 
+            : config["Handle"];
+
+        if (sourceHandle) 
+            meta.SourceHandle = AssetHandle(sourceHandle.as<uint64_t>());
+        if (config["SourceHash"]) 
+            meta.SourceHash = config["SourceHash"].as<std::string>();
+
+        if (config["SubAssets"])
+        {
+            for (const auto& node : config["SubAssets"]) 
+            {
                 SubAssetMetaEntry entry;
                 if (node["LocalKey"]) entry.LocalKey = node["LocalKey"].as<std::string>();
                 if (node["Handle"]) entry.Handle = AssetHandle(node["Handle"].as<uint64_t>());
@@ -70,13 +86,17 @@ std::optional<AssetMetaFile> AssetMetaService::LoadMeta(const std::filesystem::p
                 meta.SubAssets.push_back(std::move(entry));
             }
         }
-        if (config["TextureSrgb"]) {
-            for (const auto& entry : config["TextureSrgb"]) {
+        if (config["TextureSrgb"]) 
+        {
+            for (const auto& entry : config["TextureSrgb"]) 
+            {
                 meta.TextureSrgb[entry.first.as<std::string>()] = entry.second.as<bool>();
             }
         }
         return meta;
-    } catch (const YAML::Exception& e) {
+    } 
+    catch (const YAML::Exception& e) 
+    {
         Log::CoreWarn("Invalid meta file {0}: {1}", metaPath.string(), e.what());
         return std::nullopt;
     }
@@ -136,8 +156,11 @@ std::filesystem::path AssetMetaService::MetaPathFor(const std::filesystem::path&
 {
     KBR_TRACY_FUNCTION();
 
+    // Append .meta to the full filename so every source file gets a unique meta
+    // (e.g. foo.png.meta and foo.ktx.meta do not collide on the same stem).
     std::filesystem::path metaPath = sourcePath;
-    return metaPath.replace_extension(".meta");
+    metaPath += ".meta";
+    return metaPath;
 }
 
 std::string AssetMetaService::ComputeSourceHash(const std::filesystem::path& sourcePath) 

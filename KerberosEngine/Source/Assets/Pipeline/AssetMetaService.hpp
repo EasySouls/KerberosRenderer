@@ -16,7 +16,7 @@ public:
     explicit AssetMetaService(std::filesystem::path assetsRoot);
 
     /// Ensure a .meta file exists for `sourcePath`. Returns the meta (new or existing).
-    AssetMetaFile EnsureMetaForSource(const std::filesystem::path& sourcePath);
+    AssetMetaFile EnsureMetaForSource(const std::filesystem::path& sourcePath) const;
 
     /// Load meta; returns nullopt if not present or invalid.
     std::optional<AssetMetaFile> LoadMeta(const std::filesystem::path& sourcePath) const;

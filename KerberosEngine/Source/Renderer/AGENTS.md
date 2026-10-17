@@ -119,6 +119,11 @@ into a UNORM swapchain, so there is exactly one decode and one encode; do not
 switch the swapchain to sRGB without removing that shader gamma. sRGB images
 must remain sampled-only (no storage usage).
 
+`Texture2D`/`TextureCube` file-loading constructors accept only `.ktx2`.
+KTX1 and raster conversion is the asset pipeline's responsibility (see
+`TexturePipelineImporter`), not the loader's; do not reintroduce conversion in
+the loaders.
+
 Dynamic uniform offsets must respect
 `minUniformBufferOffsetAlignment`; current per-object allocation also has a
 capacity limit. Graph image subresource ranges and overlapping layout

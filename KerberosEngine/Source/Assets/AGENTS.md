@@ -90,11 +90,11 @@ spec. Texture color space follows glTF slot semantics: base color and emissive
 images are encoded as sRGB formats (hardware-decoded to linear on sampling)
 while normal, metallic-roughness, and occlusion images stay linear. Images
 referenced by no material slot default to sRGB; an image used by both color
-and data slots is encoded as sRGB with a warning. Standalone textures take an
-explicit `srgb` flag on `TextureImporter::ImportTexture`/`LoadTextureData`,
-defaulting to sRGB until import settings expose it in the editor; cubemap
-faces are loaded linear and `CubemapData::IsSRGB` selects the sRGB image
-format in `TextureCube`.
+and data slots is encoded as sRGB with a warning. Raster texture sources use
+the `TextureSrgb["source"]` value from their source `.meta` (default sRGB)
+because raster formats cannot reliably describe their color space; KTX/KTX2
+sources self-describe via their embedded format. Cubemap faces are loaded
+linear and `CubemapData::IsSRGB` selects the sRGB image format in `TextureCube`.
 
 All artifacts produced by a glTF import are written under a per-source cache
 namespace derived from the source path relative to the assets root (extension
@@ -107,11 +107,33 @@ materials/skeletons/animations use their glTF name with an index fallback.
 The leading index tokens are the source of the stable `SubAssetKey`
 (`mesh:<m>_<p>`, `texture:<i>`, etc.), so the readable suffix never changes
 sub-asset identity.
-`StandaloneAssetPipelineImporter` is currently a lightweight adapter for
-complete single-file sources: it supplies extension/type/build registration
-but emits no cache payload. Do not describe it as a full format converter.
-If standalone formats gain cache conversion, replace the adapter behavior with
-format-specific importers and update this file.
+
+`TexturePipelineImporter` converts texture sources into cached `.ktx2`
+artifacts so runtime loading only consumes KTX2. Raster images are decoded
+(flipped) and encoded; KTX1 sources are converted with the `ktx2ktx2` tool;
+KTX2 sources are copied as-is. Each texture source gets its own cache
+namespace that keeps the source extension (e.g. `Textures/foo.png/foo.ktx2`),
+so same-stem sources such as `foo.png` and `foo.ktx2` never overwrite each
+other. Generated artifacts live only in the cache, never in the source tree,
+so they are never rescanned as sources.
+
+`StandaloneAssetPipelineImporter` remains a lightweight adapter for the
+non-texture single-file sources (FBX/OBJ, audio, authored materials/prefabs,
+animations, cubemaps): it supplies extension/type/build registration but emits
+no cache payload. Do not describe it as a full format converter; add a
+format-specific pipeline importer when a format gains cache conversion.
+
+Deferred texture features (not yet implemented):
+- Generated `.ktx2` artifacts have no mip chain (`KTX2Encoder` writes one
+  level); mip generation is a separate follow-up.
+- HDR and 16-bit raster sources are decoded as 8-bit by `LoadTextureData`.
+- The cubemap pipeline (`.kbrcubemap`) still uses the no-payload standalone
+  adapter and is not converted to cache artifacts yet.
+- The legacy `TextureImporter`/`AssetImporter` direct-loading path remains in
+  the codebase.
+- The sRGB import option is editable only for raster sources. Authored KTX/KTX2
+  files self-describe sRGB and the option is ignored; a future read-only sRGB
+  display (derived from the embedded format) is planned for the inspector.
 
 Importer extension lookup normalizes the leading dot and case. Unknown file
 types must not silently become `Texture2D`; preserve explicit error/warning
@@ -141,6 +163,10 @@ Extend the importer deliberately rather than assuming full glTF coverage.
 `AssetMetaService` owns source `.meta` files. Metadata includes schema version,
 source handle, importer type/version, source hash, and sub-asset handle/key
 records. Missing metadata is created; writes use a temporary file and rename.
+Meta files are named by appending `.meta` to the full source filename (e.g.
+`foo.png.meta`, `foo.ktx.meta`), so sources that share a stem get distinct
+metadata. Older stem-named metas (e.g. `foo.meta`) are not migrated
+automatically; renaming them is a manual/offline operation.
 `AssetStalenessEvaluator` checks force rebuilds, source existence/hash,
 registry completeness, and sub-asset handle validity. Generated output
 existence is not currently fully validated, so changes involving cache
