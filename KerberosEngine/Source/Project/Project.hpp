@@ -6,6 +6,7 @@
 #include "Assets/RuntimeAssetManager.hpp"
 
 #include <filesystem>
+#include <string_view>
 
 namespace Kerberos
 {
@@ -25,15 +26,15 @@ namespace Kerberos
 	class Project
 	{
 	public:
-		static Ref<Project> New();
+		static Ref<Project> New(const std::filesystem::path& projectDirectory = {});
 		static Ref<Project> Load(const std::filesystem::path& filepath,
 								 const ProjectLoadOptions& options = {});
 		static bool SaveActive();
 
 		/**
-		* Returns the path to the active project's asset directory.
+		* Returns the absolute path to the active project's asset directory.
 		*/
-		static const std::filesystem::path& GetAssetDirectory();
+		static std::filesystem::path GetAssetDirectory();
 
         /**
          * Returns the path to the active project's root directory.
@@ -48,6 +49,9 @@ namespace Kerberos
         static std::filesystem::path GetAssetFileSystemPath(const std::filesystem::path& assetPath);
 
         void SetInfo(const ProjectInfo& info);
+
+		/// Converts a project name into a valid PascalCase identifier.
+		static std::string ToPascalCaseName(std::string_view name);
 
 		ProjectInfo& GetInfo() { return m_Info; }
 

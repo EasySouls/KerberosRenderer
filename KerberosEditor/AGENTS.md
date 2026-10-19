@@ -88,7 +88,57 @@ immediately. `Scene::UpdateScripts`/`OnRuntimeStart` snapshot the script entity
 list before invoking callbacks so scripts may spawn prefabs during lifecycle
 methods.
 
+Script classes use the `Kerberos.*` namespace (renamed from
+`Kerberos.Source.Kerberos.*`); `ScriptUtils::MigrateLegacyScriptClassName`
+rewrites the old prefix when scenes/prefabs are deserialized. The built-in
+sample scripts (`Player`, `Camera`, `CameraFollow`) live in `KerberosScriptCoreLib`
+under `Kerberos`; user scripts live in their own per-project assembly.
+
+Each project owns a C# project at `<project>/Assets/Scripts/<PascalName>.csproj`
+(referencing `KerberosScriptCoreLib` through `$(KerberosEnginePath)`, with
+`<Private>false</Private>` so the core library is provided by the host),
+generated on project creation by `WriteUserScriptProject` with the project name
+PascalCased (`Project::ToPascalCaseName`). `ScriptEngine::OnProjectOpened`
+builds it with `dotnet build -c Debug -o <project>/Library/Scripts`, loads it
+into a collectible `AssemblyLoadContext`, and watches `Assets/Scripts` for
+rebuilds. The user load context resolves `KerberosScriptCoreLib` to the already
+loaded core assembly (not a copy from the output directory) so user script
+types derive from the same `Entity` base type. The core assembly path comes from
+`EnginePaths::ScriptAssemblies()`.
+
 ## Project and scene flow
+
+`File > New Project...` asks for an empty folder through
+`FileDialog::SelectFolder`; the selected folder becomes the project directory
+and its name becomes the project name. The editor creates `Assets/Scenes`,
+writes a default `Untitled Scene.kerberos`, activates the new project, registers
+the start scene, and persists `<ProjectName>.kbrproj`. The default scene is
+written before the project is activated so a failure leaves the current project
+untouched.
+
+The UI thread is initialized as a single-threaded apartment with `OleInitialize`
+at the start of `Application` construction, before audio/other COM consumers
+run. Shell dialogs (`IFileOpenDialog`) require an STA thread; the audio backends
+otherwise initialize the thread as MTA. `FileDialog::SelectFolder` shows the
+modern dialog synchronously on the UI thread and falls back to the legacy
+`SHBrowseForFolder` only if the thread is unexpectedly MTA.
+
+Project switches triggered from the menu (`New Project...` and `Open Project...`)
+are deferred with `Application::SubmitToMainThreadQueue` and run at the start of
+the next frame; `CreateProject`/`OpenProject` call `VulkanContext::WaitIdle()`
+before releasing the old project. Never replace the active project or scene
+synchronously from an ImGui callback: releasing the old project destroys cached
+GPU mesh/texture buffers while the current frame's command buffer may still
+reference them (validation error `vkFreeMemory ... currently in use`, followed
+by a fence wait hang).
+
+Project-relative paths must resolve through `Project::GetProjectDirectory()` and
+`Project::GetAssetDirectory()`. `GetAssetDirectory()` returns an absolute
+project-directory/asset-directory path; do not assume the process working
+directory is the project directory. Engine-owned content (fonts, icons, shaders,
+and the managed script assembly) resolves through `Core/EnginePaths`
+(`EnginePaths::Assets()`, `Shaders()`, `ScriptAssemblies()`, ...), initialized
+by `Application` from `ApplicationSpecification::EngineRoot`.
 
 Project loading creates/activates an editor asset manager, loads the asset
 registry, ensures metadata, builds sources, logs build diagnostics, and starts

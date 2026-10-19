@@ -167,6 +167,16 @@ Extend the importer deliberately rather than assuming full glTF coverage.
 
 ## Metadata, registry, and staleness
 
+Registry entries carry an `AssetSourceRoot` (`Project` or `Engine`) serialized
+as the `SourceRoot` field; missing values default to `Project` so older
+registries stay readable. `AssetUri` (`Assets/AssetUri.hpp`) formats and parses
+`project::/<rel>` and `engine::/<rel>` URIs, which are the authoring/tooling
+form of `(SourceRoot, relative path)`. Project assets resolve against
+`Project::GetAssetDirectory()`; engine assets (when registered) resolve against
+`EnginePaths::Assets()` and their artifacts against the engine cache root
+(`EditorAssetManager::GetEngineCacheRoot()`). `EditorAssetManager` and
+`RuntimeAssetResolver` both pick the cache/library root per `SourceRoot`.
+
 `AssetMetaService` owns source `.meta` files. Metadata includes schema version,
 source handle, importer type/version, source hash, and sub-asset handle/key
 records. Missing metadata is created; writes use a temporary file and rename.

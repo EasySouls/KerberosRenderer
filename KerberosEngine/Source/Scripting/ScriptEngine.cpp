@@ -1,9 +1,11 @@
 #include "ScriptEngine.hpp"
 
+#include "Core/EnginePaths.hpp"
 #include "Scripting/ScriptInterface.hpp"
 #include "Scripting/ScriptClass.hpp"
 #include "Scripting/ScriptInstance.hpp"
 #include "Scripting/ScriptUtils.hpp"
+#include "Utils/Process.hpp"
 //#include "Core/Filesystem.hpp"
 #include "Scene/Scene.hpp"
 #include "Scene/Entity.hpp"
@@ -69,6 +71,12 @@ namespace Kerberos
 		using ClassInstanceMap = std::unordered_map<std::string, Ref<ScriptInstance>>;
 		std::unordered_map<UUID, ClassInstanceMap> EntityInstances;
 
+		/// User per-project script assembly
+		std::filesystem::path UserProjectDirectory;
+		std::string UserAssemblyName;
+		std::filesystem::path UserCsprojPath;
+		std::filesystem::path UserAssemblyPath;
+
 		/// Managed function pointers (from ScriptGlue bridge)
 		ManagedLoadAssemblyClassesFn LoadAssemblyClasses = nullptr;
 		ManagedClassExistsFn ManagedClassExists = nullptr;
@@ -91,6 +99,7 @@ namespace Kerberos
 
 	static ScriptEngineData* s_ScriptData = nullptr;
 	static Owner<filewatch::FileWatch<std::string>> s_Filewatcher = nullptr;
+	static Owner<filewatch::FileWatch<std::string>> s_UserScriptFilewatcher = nullptr;
 
 	static ScriptCollisionPayload BuildScriptCollisionPayload(const uint64_t selfEntityID, const CollisionEvent& event)
 	{
@@ -200,14 +209,14 @@ namespace Kerberos
 
 		InitDotNet();
 
-		const std::filesystem::path assemblyPath = std::filesystem::current_path() / "Resources"sv / "Scripts"sv / "KerberosScriptCoreLib.dll"sv;
+		const std::filesystem::path assemblyPath = EnginePaths::ScriptAssemblies() / "KerberosScriptCoreLib.dll"sv;
 		LoadAssembly(assemblyPath);
 		LoadAssemblyClasses();
 
 		ScriptInterface::RegisterFunctions();
 
 		/// Setup filewatcher to reload assembly on changes
-		const std::filesystem::path watchPath = std::filesystem::current_path() / "Resources"sv / "Scripts"sv;
+		const std::filesystem::path watchPath = EnginePaths::ScriptAssemblies();
 		s_Filewatcher = CreateOwner<filewatch::FileWatch<std::string>>(
 			watchPath.string(),
 			OnAssemblyFileChanged
@@ -233,6 +242,73 @@ namespace Kerberos
 
 		LoadAssembly(s_ScriptData->CoreAssemblyPath);
 		LoadAssemblyClasses();
+	}
+
+	void ScriptEngine::OnProjectOpened(const std::filesystem::path& projectDirectory, const std::string& assemblyName)
+	{
+		KBR_TRACY_FUNCTION();
+
+		if (assemblyName.empty())
+		{
+			s_ScriptData->UserProjectDirectory.clear();
+			s_ScriptData->UserAssemblyName.clear();
+			s_ScriptData->UserCsprojPath.clear();
+			s_ScriptData->UserAssemblyPath.clear();
+		}
+		else
+		{
+			s_ScriptData->UserProjectDirectory = projectDirectory;
+			s_ScriptData->UserAssemblyName = assemblyName;
+			s_ScriptData->UserCsprojPath = projectDirectory / "Assets" / "Scripts" / (assemblyName + ".csproj");
+			s_ScriptData->UserAssemblyPath = projectDirectory / "Library" / "Scripts" / (assemblyName + ".dll");
+		}
+
+		BuildUserAssembly();
+		ReloadAssembly();
+
+		/// Watch the user's script folder and rebuild on change.
+		s_UserScriptFilewatcher.reset();
+		if (!s_ScriptData->UserCsprojPath.empty())
+		{
+			const std::filesystem::path scriptsDirectory = s_ScriptData->UserCsprojPath.parent_path();
+			if (std::filesystem::exists(scriptsDirectory))
+			{
+				s_UserScriptFilewatcher = CreateOwner<filewatch::FileWatch<std::string>>(
+					scriptsDirectory.string(), OnUserScriptFileChanged);
+			}
+		}
+	}
+
+	bool ScriptEngine::BuildUserAssembly()
+	{
+		KBR_TRACY_FUNCTION();
+
+		if (s_ScriptData->UserCsprojPath.empty() || !std::filesystem::exists(s_ScriptData->UserCsprojPath))
+			return false;
+
+		const std::filesystem::path outputDirectory = s_ScriptData->UserAssemblyPath.parent_path();
+		std::error_code ec;
+		std::filesystem::create_directories(outputDirectory, ec);
+
+		const std::vector<std::string> arguments = {
+			"build",
+			s_ScriptData->UserCsprojPath.string(),
+			"-c", "Debug",
+			"-o", outputDirectory.string(),
+			"--nologo",
+			"-p:KerberosEnginePath=" + EnginePaths::GetRoot().string()
+		};
+
+		const Process::ProcessResult result = Process::Execute("dotnet", arguments);
+		if (!result.Succeeded)
+		{
+			Log::CoreError("Failed to build user script assembly '{}' (exit code {}): {}",
+				s_ScriptData->UserAssemblyName, result.ExitCode, result.ErrorMessage);
+			return false;
+		}
+
+		Log::CoreInfo("Built user script assembly '{}'", s_ScriptData->UserAssemblyName);
+		return true;
 	}
 
 	void ScriptEngine::OnRuntimeStart(const Ref<Scene>& scene)
@@ -589,7 +665,8 @@ namespace Kerberos
 		}
 
 		const std::string assemblyPath = s_ScriptData->CoreAssemblyPath.string();
-		const int result = s_ScriptData->LoadAssemblyClasses(assemblyPath.c_str());
+		const std::string userAssemblyPath = s_ScriptData->UserAssemblyPath.string();
+		const int result = s_ScriptData->LoadAssemblyClasses(assemblyPath.c_str(), userAssemblyPath.c_str());
 		if (!result)
 		{
 			Log::CoreError("Failed to load assembly classes from {}", assemblyPath);
@@ -612,7 +689,7 @@ namespace Kerberos
 			std::string fullName = nameBuffers[i];
 			Log::CoreTrace("Loaded C# class: {}", fullName);
 
-			/// Parse namespace and class name from full name (e.g. "Kerberos.Source.Kerberos.Player" -> ns="Kerberos.Source.Kerberos", name="Player")
+			/// Parse namespace and class name from full name (e.g. "Kerberos.Player" -> ns="Kerberos", name="Player")
 			std::string nameSpace;
 			std::string className;
 			const size_t lastDot = fullName.rfind('.');
@@ -657,7 +734,7 @@ namespace Kerberos
 		}
 
 		/// Register the Entity base class reference
-		s_ScriptData->EntityClass = ScriptClass("Kerberos.Source.Kerberos.Scene", "Entity", "Kerberos.Source.Kerberos.Scene.Entity");
+		s_ScriptData->EntityClass = ScriptClass("Kerberos.Scene", "Entity", "Kerberos.Scene.Entity");
 	}
 
 	template<typename T>
@@ -691,8 +768,8 @@ namespace Kerberos
 	{
 		KBR_TRACY_FUNCTION();
 
-		const char* glueType = "Kerberos.Source.ScriptGlue, KerberosScriptCoreLib";
-		const char* callbacksType = "Kerberos.Source.InternalCalls, KerberosScriptCoreLib";
+		const char* glueType = "Kerberos.ScriptGlue, KerberosScriptCoreLib";
+		const char* callbacksType = "Kerberos.InternalCalls, KerberosScriptCoreLib";
 
 		s_ScriptData->LoadAssemblyClasses = LoadManagedFunction<ManagedLoadAssemblyClassesFn>(glueType, "LoadAssemblyClasses");
 		s_ScriptData->ManagedClassExists = LoadManagedFunction<ManagedClassExistsFn>(glueType, "ClassExists");
@@ -739,5 +816,20 @@ namespace Kerberos
 				ReloadAssembly();
 			});
 		}
+	}
+
+	void ScriptEngine::OnUserScriptFileChanged(const std::string& path, const filewatch::Event changeType)
+	{
+		KBR_TRACY_FUNCTION();
+
+		const std::string extension = std::filesystem::path(path).extension().string();
+		if (extension != ".cs" && extension != ".csproj")
+			return;
+
+		Log::CoreInfo("User script {0}: {1}", FileWatchEventToString(changeType), path);
+		Application::Get().SubmitToMainThreadQueue([]() {
+			if (BuildUserAssembly())
+				ReloadAssembly();
+		});
 	}
 }

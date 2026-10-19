@@ -728,14 +728,14 @@ namespace Kerberos
 		KBR_TRACY_FUNCTION();
 
 		/// Register component types for HasComponent checks
-		RegisterComponent<TransformComponent>("Kerberos.Source.Kerberos.Scene.TransformComponent");
-		RegisterComponent<TagComponent>("Kerberos.Source.Kerberos.Scene.TagComponent");
-		RegisterComponent<StaticMeshComponent>("Kerberos.Source.Kerberos.Scene.StaticMeshComponent");
-		RegisterComponent<RigidBody3DComponent>("Kerberos.Source.Kerberos.Scene.RigidBody3DComponent");
-		RegisterComponent<TextComponent>("Kerberos.Source.Kerberos.Scene.TextComponent");
-		RegisterComponent<AudioSource2DComponent>("Kerberos.Source.Kerberos.Scene.AudioSource2DComponent");
-		RegisterComponent<AudioSource3DComponent>("Kerberos.Source.Kerberos.Scene.AudioSource3DComponent");
-		RegisterComponent<AudioListenerComponent>("Kerberos.Source.Kerberos.Scene.AudioListenerComponent");
+		RegisterComponent<TransformComponent>("Kerberos.Scene.TransformComponent");
+		RegisterComponent<TagComponent>("Kerberos.Scene.TagComponent");
+		RegisterComponent<StaticMeshComponent>("Kerberos.Scene.StaticMeshComponent");
+		RegisterComponent<RigidBody3DComponent>("Kerberos.Scene.RigidBody3DComponent");
+		RegisterComponent<TextComponent>("Kerberos.Scene.TextComponent");
+		RegisterComponent<AudioSource2DComponent>("Kerberos.Scene.AudioSource2DComponent");
+		RegisterComponent<AudioSource3DComponent>("Kerberos.Scene.AudioSource3DComponent");
+		RegisterComponent<AudioListenerComponent>("Kerberos.Scene.AudioListenerComponent");
 
 		/// Build the native callback table and pass it to the managed side
 		static NativeCallbackTable callbackTable = {};

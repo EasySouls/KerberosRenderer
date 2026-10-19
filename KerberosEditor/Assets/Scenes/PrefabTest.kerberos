@@ -802,7 +802,7 @@ Entities:
         - 12730685242936340594
     ScriptComponent:
       Scripts:
-        - ClassName: Kerberos.Source.Kerberos.Player
+        - ClassName: Kerberos.Player
           ScriptFields:
             - Name: Speed
               Type: Float

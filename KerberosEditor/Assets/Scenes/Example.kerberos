@@ -43,7 +43,7 @@ Entities:
       Children:
         []
     ScriptComponent:
-      ClassName: Kerberos.Source.Kerberos.Player
+      ClassName: Kerberos.Player
       ScriptFields:
         - Name: Speed
           Type: Float

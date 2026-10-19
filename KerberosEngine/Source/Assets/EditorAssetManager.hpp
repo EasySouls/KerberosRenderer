@@ -79,6 +79,7 @@ namespace Kerberos
 		AssetBuildCoordinator* GetBuildCoordinator() const { return m_BuildCoordinator.get(); }
 		const std::filesystem::path& GetAssetsRoot() const { return m_AssetsRoot; }
 		const std::filesystem::path& GetCacheRoot() const { return m_CacheRoot; }
+		const std::filesystem::path& GetEngineCacheRoot() const { return m_EngineCacheRoot; }
 
 	private:
 		void HandleAssetFileEvent(const AssetFileEvent& event);
@@ -92,6 +93,7 @@ namespace Kerberos
 
 		std::filesystem::path m_AssetsRoot;
 		std::filesystem::path m_CacheRoot;
+		std::filesystem::path m_EngineCacheRoot;
 		Owner<AssetMetaService> m_MetaService;
 		ImporterRegistry m_ImporterRegistry;
 		Owner<AssetBuildCoordinator> m_BuildCoordinator;

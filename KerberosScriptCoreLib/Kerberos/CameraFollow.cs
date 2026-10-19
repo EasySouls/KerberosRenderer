@@ -1,8 +1,8 @@
 using System;
-using Kerberos.Source.Kerberos.Core;
-using Kerberos.Source.Kerberos.Scene;
+using Kerberos.Core;
+using Kerberos.Scene;
 
-namespace Kerberos.Source.Kerberos;
+namespace Kerberos;
 
 public class CameraFollow : Entity
 {

@@ -17,11 +17,23 @@ namespace Kerberos
 	void XAudio2AudioManager::Init()
 	{
 		HRESULT res = CoInitializeEx(nullptr, COINIT_MULTITHREADED);
-		if (FAILED(res))
+		if (res == RPC_E_CHANGED_MODE)
+		{
+			/// The calling thread (e.g. the UI thread) is already initialized in
+			/// another apartment. XAudio2 works from an STA, so reuse it instead
+			/// of failing and leaving the thread's COM apartment inconsistent.
+			m_ComInitialized = false;
+		}
+		else if (FAILED(res))
 		{
 			Log::CoreError("Failed to initialize COM library for XAudio2! HRESULT: {0}", res);
 			KBRAssert(false, "Failed to initialize COM library for XAudio2!");
 			throw std::runtime_error("Failed to initialize COM library for XAudio2!");
+		}
+		else
+		{
+			/// S_OK and S_FALSE both increase the per-thread COM ref count.
+			m_ComInitialized = true;
 		}
 
 		res = XAudio2Create(&m_XAudio2, 0, XAUDIO2_USE_DEFAULT_PROCESSOR);
@@ -99,7 +111,11 @@ namespace Kerberos
 			m_XAudio2->Release();
 			m_XAudio2 = nullptr;
 		}
-		CoUninitialize();
+		if (m_ComInitialized)
+		{
+			CoUninitialize();
+			m_ComInitialized = false;
+		}
 	}
 
 	Ref<Sound> XAudio2AudioManager::Load(const std::filesystem::path& filepath)

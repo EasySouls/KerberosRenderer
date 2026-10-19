@@ -24,6 +24,14 @@ namespace Kerberos
 		 */
 		[[nodiscard]]
 		static std::string SaveFile(const char* filter = "", const char* requiredExtension = nullptr);
+
+		/**
+		 * Opens a folder selection dialog.
+		 * @param title An optional title displayed in the dialog.
+		 * @return An absolute path to the folder selected by the user, or an empty string if the user cancelled the dialog.
+		 */
+		[[nodiscard]]
+		static std::string SelectFolder(const char* title = "Select a folder");
 	};
 
 	class FileOperations

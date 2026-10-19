@@ -5,6 +5,7 @@
 #include <slang/slang-com-ptr.h>
 #include <slang/slang.h>
 
+#include "Core/EnginePaths.hpp"
 #include "IO.hpp"
 
 import Kerberos;
@@ -46,7 +47,8 @@ std::vector<uint32_t> SlangCompiler::CompileToSpirv(const std::filesystem::path&
 	sessionDesc.targetCount = 1;
 	sessionDesc.targets = &targetDesc;
 
-	const char* searchPaths[] = { "assets/shaders" };
+	const std::string shaderSearchPath = EnginePaths::Shaders().string();
+	const char* searchPaths[] = { shaderSearchPath.c_str() };
 	sessionDesc.searchPathCount = 1;
 	sessionDesc.searchPaths = searchPaths;
 

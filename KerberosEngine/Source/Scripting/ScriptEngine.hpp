@@ -31,7 +31,7 @@ namespace Kerberos
 	};
 
 	/// Function pointer types for calls into the managed ScriptGlue bridge
-	using ManagedLoadAssemblyClassesFn = int(*)(const char* assemblyPath);
+	using ManagedLoadAssemblyClassesFn = int(*)(const char* coreAssemblyPath, const char* userAssemblyPath);
 	using ManagedClassExistsFn = int(*)(const char* className);
 	using ManagedCreateInstanceFn = int(*)(uint64_t entityID, const char* className);
 	using ManagedDestroyInstanceFn = void(*)(uint64_t entityID, const char* className);
@@ -55,6 +55,11 @@ namespace Kerberos
 		static void Init();
 		static void Shutdown();
 		static void ReloadAssembly();
+
+		/// Configures the user's per-project C# assembly, builds it, and reloads.
+		/// Called when a project is opened or created. Pass an empty
+		/// assemblyName to clear the user assembly (e.g. when no project is open).
+		static void OnProjectOpened(const std::filesystem::path& projectDirectory, const std::string& assemblyName);
 
 		static void OnRuntimeStart(const Ref<Scene>& scene);
 		static void OnRuntimeStop();
@@ -97,8 +102,10 @@ namespace Kerberos
 
 		static void LoadAssembly(const std::filesystem::path& assemblyPath);
 		static void LoadAssemblyClasses();
+		static bool BuildUserAssembly();
 
 		static void OnAssemblyFileChanged(const std::string& path, const filewatch::Event changeType);
+		static void OnUserScriptFileChanged(const std::string& path, const filewatch::Event changeType);
 
 		/// Loads a single function pointer from the managed assembly
 		template<typename T>

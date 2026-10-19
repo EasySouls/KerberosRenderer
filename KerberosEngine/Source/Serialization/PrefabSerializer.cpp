@@ -240,7 +240,8 @@ namespace Kerberos
 				for (const auto& scriptNode : n["Scripts"])
 				{
 					PrefabScriptTemplate script;
-					script.ClassName = scriptNode["ClassName"].as<std::string>();
+					script.ClassName =
+						ScriptUtils::MigrateLegacyScriptClassName(scriptNode["ClassName"].as<std::string>());
 
 					if (auto scriptFields = scriptNode["ScriptFields"])
 					{

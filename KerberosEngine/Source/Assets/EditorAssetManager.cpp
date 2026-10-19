@@ -1,5 +1,6 @@
 #include "EditorAssetManager.hpp"
 #include "Core/Core.hpp"
+#include "Core/EnginePaths.hpp"
 
 #include "Assets/Runtime/RuntimeAssetLoader.hpp"
 #include "Assets/Importers/StandaloneAssetPipelineImporter.hpp"
@@ -105,7 +106,7 @@ namespace Kerberos
 			ConfigurePipeline(assetsRoot, cacheRoot);
 		}
 
-		m_DefaultFont = CreateRef<Font>("InterRegular", "Assets/Fonts/Inter/Inter_18pt-Regular.ttf");
+		m_DefaultFont = CreateRef<Font>("InterRegular", EnginePaths::Assets() / "Fonts/Inter/Inter_18pt-Regular.ttf");
 
 		constexpr std::array<uint8_t, 4> albedoBuffer = { 255, 255, 255, 255 };
 		TextureSpecification albedoSpec{};
@@ -125,6 +126,7 @@ namespace Kerberos
 
 		m_AssetsRoot = std::filesystem::absolute(assetsRoot);
 		m_CacheRoot = cacheRoot.empty() ? m_AssetsRoot / "Cache" : std::filesystem::absolute(cacheRoot);
+		m_EngineCacheRoot = EnginePaths::Assets() / "Cache";
 		std::error_code ec;
 		std::filesystem::create_directories(m_AssetsRoot, ec);
 		std::filesystem::create_directories(m_CacheRoot, ec);
@@ -313,10 +315,12 @@ namespace Kerberos
 				return nullptr;
 			}
 
+			const std::filesystem::path& cacheRoot =
+				metadata.SourceRoot == AssetSourceRoot::Engine ? m_EngineCacheRoot : m_CacheRoot;
 			const auto artifactPath = metadata.LibraryPath.is_absolute()
 				? metadata.LibraryPath
-				: m_CacheRoot / metadata.LibraryPath;
-			asset = RuntimeAssetLoader::Load(handle, metadata, artifactPath, &m_AssetRegistry, m_CacheRoot);
+				: cacheRoot / metadata.LibraryPath;
+			asset = RuntimeAssetLoader::Load(handle, metadata, artifactPath, &m_AssetRegistry, cacheRoot);
 			if (!asset)
 			{
 				throw std::runtime_error(
@@ -354,7 +358,7 @@ namespace Kerberos
 
 		const std::filesystem::path artifactPath = metadata.LibraryPath.is_absolute()
 			? metadata.LibraryPath
-			: m_CacheRoot / metadata.LibraryPath;
+			: (metadata.SourceRoot == AssetSourceRoot::Engine ? m_EngineCacheRoot : m_CacheRoot) / metadata.LibraryPath;
 		return std::filesystem::exists(artifactPath);
 	}
 
@@ -531,6 +535,7 @@ namespace Kerberos
 				out << YAML::Key << "Handle" << YAML::Value << handle;
 				out << YAML::Key << "Type" << YAML::Value << AssetTypeToString(metadata.Type);
 				out << YAML::Key << "Path" << YAML::Value << metadata.Filepath.string();
+				out << YAML::Key << "SourceRoot" << YAML::Value << static_cast<int>(metadata.SourceRoot);
 				if (!metadata.LibraryPath.empty())
 					out << YAML::Key << "LibraryPath" << YAML::Value << metadata.LibraryPath.string();
 				out << YAML::Key << "RootSourceHandle" << YAML::Value << static_cast<uint64_t>(metadata.RootSourceHandle);
@@ -655,6 +660,7 @@ namespace Kerberos
 			const AssetType type = AssetTypeFromString(typeStr);
 
 			AssetMetadata metadata{ .Type = type, .Filepath = filepath };
+			if (assetNode["SourceRoot"]) metadata.SourceRoot = static_cast<AssetSourceRoot>(assetNode["SourceRoot"].as<int>());
 			if (assetNode["LibraryPath"]) metadata.LibraryPath = assetNode["LibraryPath"].as<std::string>();
 			if (assetNode["RootSourceHandle"]) metadata.RootSourceHandle = AssetHandle(assetNode["RootSourceHandle"].as<uint64_t>());
 			if (assetNode["ParentHandle"]) metadata.ParentHandle = AssetHandle(assetNode["ParentHandle"].as<uint64_t>());

@@ -133,6 +133,10 @@ if(WIN32)
         Winmm
         Version
         Bcrypt
+        ole32
+        uuid
+        shell32
+        comdlg32
     )
 endif()
 

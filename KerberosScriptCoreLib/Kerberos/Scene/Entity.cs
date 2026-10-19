@@ -1,7 +1,7 @@
 using System;
-using Kerberos.Source.Kerberos.Core;
+using Kerberos.Core;
 
-namespace Kerberos.Source.Kerberos.Scene
+namespace Kerberos.Scene
 {
     public class Entity
     {

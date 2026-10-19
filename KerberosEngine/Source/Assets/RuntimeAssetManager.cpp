@@ -10,20 +10,23 @@
 namespace Kerberos {
 
 RuntimeAssetManager::RuntimeAssetManager(const AssetRegistry& registry,
-	std::filesystem::path assetRoot, std::filesystem::path libraryRoot)
+	std::filesystem::path assetRoot, std::filesystem::path libraryRoot,
+	std::filesystem::path engineLibraryRoot)
 {
 	KBR_TRACY_FUNCTION();
 
-	Configure(registry, std::move(assetRoot), std::move(libraryRoot));
+	Configure(registry, std::move(assetRoot), std::move(libraryRoot), std::move(engineLibraryRoot));
 }
 
 void RuntimeAssetManager::Configure(const AssetRegistry& registry,
-	std::filesystem::path assetRoot, std::filesystem::path libraryRoot)
+	std::filesystem::path assetRoot, std::filesystem::path libraryRoot,
+	std::filesystem::path engineLibraryRoot)
 {
 	m_Registry = registry;
 	m_Configured = true;
 	m_LibraryRoot = std::move(libraryRoot);
-	m_Resolver.Configure(&m_Registry, std::move(assetRoot), m_LibraryRoot);
+	m_EngineLibraryRoot = std::move(engineLibraryRoot);
+	m_Resolver.Configure(&m_Registry, std::move(assetRoot), m_LibraryRoot, m_EngineLibraryRoot);
 	m_LoadedAssets.clear();
 }
 

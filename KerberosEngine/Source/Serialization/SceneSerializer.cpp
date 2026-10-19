@@ -452,7 +452,8 @@ bool SceneSerializer::Deserialize(const std::filesystem::path& filepath) const
 
                 if (auto scripts = scriptComponent["Scripts"]) {
                     for (const auto& scriptNode : scripts) {
-                        const std::string className = scriptNode["ClassName"].as<std::string>();
+                        const std::string className =
+                            ScriptUtils::MigrateLegacyScriptClassName(scriptNode["ClassName"].as<std::string>());
                         script.ClassNames.push_back(className);
                         if (auto scriptFields = scriptNode["ScriptFields"]) {
                             DeserializeScriptFieldInitializers(scriptFields, deserializedEntity, className);
@@ -461,7 +462,8 @@ bool SceneSerializer::Deserialize(const std::filesystem::path& filepath) const
                 }
                 else if (auto className = scriptComponent["ClassName"]) {
                     /// Legacy single-script format.
-                    const std::string legacyClassName = className.as<std::string>();
+                    const std::string legacyClassName =
+                        ScriptUtils::MigrateLegacyScriptClassName(className.as<std::string>());
                     script.ClassNames.push_back(legacyClassName);
                     if (auto scriptFields = scriptComponent["ScriptFields"]) {
                         DeserializeScriptFieldInitializers(scriptFields, deserializedEntity, legacyClassName);

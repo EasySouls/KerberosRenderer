@@ -1,5 +1,6 @@
 #include "Application.hpp"
 
+#include "Core/EnginePaths.hpp"
 #include "Events/KeyPressedEvent.hpp"
 #include "Events/KeyReleasedEvent.hpp"
 #include "Events/KeyTypedEvent.hpp"
@@ -26,6 +27,7 @@ import Kerberos;
 
 
 #ifdef KBR_PLATFORM_WINDOWS
+#include <ole2.h>
 extern "C"
 {
 	__declspec(dllexport) DWORD NvOptimusEnablement = 0x00000001;
@@ -58,6 +60,19 @@ namespace Kerberos
 
 		m_Specification = spec;
 
+#ifdef KBR_PLATFORM_WINDOWS
+		/// The UI thread must be a single-threaded apartment for shell dialogs and
+		/// OLE. Initialize it before audio/other libraries, which otherwise
+		/// initialize this thread as MTA and make IFileOpenDialog::Show hang.
+		const HRESULT oleResult = OleInitialize(nullptr);
+		m_OleInitialized = SUCCEEDED(oleResult);
+		if (!m_OleInitialized)
+		{
+			Log::CoreError("Failed to initialize OLE on the UI thread. HRESULT: 0x{:08x}",
+				static_cast<uint32_t>(oleResult));
+		}
+#endif
+
 		/// Set the working directory
 		if (!spec.WorkingDirectory.empty())
 		{
@@ -71,6 +86,10 @@ namespace Kerberos
 			m_Specification.WorkingDirectory = std::filesystem::current_path();
 			Log::CoreWarn("No working directory specified, using current path: {0}", std::filesystem::current_path().string());
 		}
+
+		/// The engine content root defaults to the working directory but can be
+		/// overridden (e.g. by a packaged editor) via ApplicationSpecification.
+		EnginePaths::Initialize(spec.EngineRoot.empty() ? m_Specification.WorkingDirectory : spec.EngineRoot);
 
 		m_AudioManager.reset(AudioManager::Create());
 		m_AudioManager->Init();
@@ -231,10 +250,21 @@ namespace Kerberos
 		Renderer::Shutdown();
 		ScriptEngine::Shutdown();
 
+		/// Release COM-owning subsystems before OLE/COM is uninitialized.
+		m_AudioManager.reset();
+
 		Project::ReleaseActiveProjectResources();
 
 		glfwDestroyWindow(m_Window);
 		glfwTerminate();
+
+#ifdef KBR_PLATFORM_WINDOWS
+		if (m_OleInitialized)
+		{
+			OleUninitialize();
+			m_OleInitialized = false;
+		}
+#endif
 	}
 
 	void Application::Run() 

@@ -4,6 +4,7 @@
 #include "Buffer.hpp"
 #include "ColliderDebugHelpers.hpp"
 #include "ComputePipeline.hpp"
+#include "Core/EnginePaths.hpp"
 #include "DescriptorAllocator.hpp"
 #include "GraphicsPipeline.hpp"
 #include "GrassSystem.hpp"
@@ -1732,7 +1733,7 @@ void Renderer::CreateResources()
         vk::Format::eR16G16B16A16Sfloat,
         vk::ImageUsageFlagBits::eSampled
     );*/
-    s_Data->Skybox.SkyboxTexture = TextureCube::FromFile("Assets/Textures/hdr/pisa_cube.ktx2");
+    s_Data->Skybox.SkyboxTexture = TextureCube::FromFile(EnginePaths::Assets() / "Textures/hdr/pisa_cube.ktx2");
 
     CreateSkyboxResources();
 
@@ -6542,7 +6543,7 @@ void Renderer::CreateSkyboxResources()
     if (s_Data->Skybox.SkyboxMesh == nullptr) {
         // The project has not been initialized this far
         // s_Data->Skybox.SkyboxMesh = AssetManager::GetDefaultCubeMesh();
-        s_Data->Skybox.SkyboxMesh = CreateRef<Mesh>(ModelLoader::LoadModel("Assets/Models/cube.gltf", None));
+        s_Data->Skybox.SkyboxMesh = CreateRef<Mesh>(ModelLoader::LoadModel(EnginePaths::Assets() / "Models/cube.gltf", None));
     }
     if (s_Data->Skybox.LutBrdfTexture == nullptr) {
         s_Data->Skybox.LutBrdfTexture = CreateRef<Texture2D>();

@@ -5,6 +5,7 @@
 #include "Assets/AssetManager.hpp"
 #include "Assets/Importers/MaterialImporter.hpp"
 #include "Assets/Importers/TextureImporter.hpp"
+#include "Core/EnginePaths.hpp"
 #include "Profiling/Profilers.hpp"
 #include "Project/Project.hpp"
 #include "Utils/SystemOperations.hpp"
@@ -96,8 +97,8 @@ std::string AssetStatusLabel(const AssetHandle handle,
 		: m_AssetsDirectory(Project::GetAssetDirectory()), m_CurrentDirectory(m_AssetsDirectory), m_NotificationManager(
 			std::move(notificationManager))
 	{
-		m_FolderIcon = TextureImporter::ImportTexture("Assets/Editor/directory_icon.png");
-		m_FileIcon = TextureImporter::ImportTexture("Assets/Editor/file_icon.png");
+		m_FolderIcon = TextureImporter::ImportTexture(EnginePaths::Assets() / "Editor/directory_icon.png");
+		m_FileIcon = TextureImporter::ImportTexture(EnginePaths::Assets() / "Editor/file_icon.png");
 
 	    // Normalize once. The browser always holds absolute paths after this point,
         // so it can use lexical path operations instead of filesystem::relative(), which tanks the framerate.

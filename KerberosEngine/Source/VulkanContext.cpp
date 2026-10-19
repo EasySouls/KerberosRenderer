@@ -20,6 +20,7 @@
 #include <algorithm>
 #include <stacktrace>
 #include <sstream>
+#include <limits>
 #include <iostream>
 
 import Kerberos;
@@ -234,13 +235,13 @@ namespace Kerberos
 	void VulkanContext::Draw()
 	{
 		KBR_TRACY_FUNCTION();
-		const vk::Result fenceResult = m_Device.waitForFences(*m_InFlightFences[m_FrameIndex], vk::True, UINT64_MAX);
+		const vk::Result fenceResult = m_Device.waitForFences(*m_InFlightFences[m_FrameIndex], vk::True, std::numeric_limits<uint64_t>::max());
 		if (fenceResult != vk::Result::eSuccess)
 		{
 			throw std::runtime_error("failed to wait for fence!");
 		}
 
-		auto [result, imageIndex] = m_SwapChain.acquireNextImage(UINT64_MAX, *m_PresentCompleteSemaphores[m_FrameIndex], nullptr);
+		auto [result, imageIndex] = m_SwapChain.acquireNextImage(std::numeric_limits<uint64_t>::max(), *m_PresentCompleteSemaphores[m_FrameIndex], nullptr);
 		if (result == vk::Result::eErrorOutOfDateKHR) {
 			RecreateSwapchain();
 			return;
@@ -437,7 +438,7 @@ namespace Kerberos
 			.pCommandBuffers = &*commandBuffer
 		};
 		queue.submit(submitInfo, *oneTimeFence);
-		const vk::Result result = m_Device.waitForFences(*oneTimeFence, vk::True, UINT64_MAX);
+		const vk::Result result = m_Device.waitForFences(*oneTimeFence, vk::True, std::numeric_limits<uint64_t>::max());
 		KBRAssert(result == vk::Result::eSuccess, "Failed to wait for fence!");
 	}
 
@@ -511,7 +512,7 @@ namespace Kerberos
 			.pCommandBuffers = &*commandBuffer
 		};
 		queue.submit(submitInfo, *oneTimeFence);
-		const vk::Result result = m_Device.waitForFences(*oneTimeFence, vk::True, UINT64_MAX);
+		const vk::Result result = m_Device.waitForFences(*oneTimeFence, vk::True, std::numeric_limits<uint64_t>::max());
 		KBRAssert(result == vk::Result::eSuccess, "Failed to wait for fence!");
 	}
 

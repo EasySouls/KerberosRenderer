@@ -14,10 +14,12 @@ class RuntimeAssetManager final : public AssetManagerBase
 public:
 	RuntimeAssetManager() = default;
 	explicit RuntimeAssetManager(const AssetRegistry& registry,
-		std::filesystem::path assetRoot = {}, std::filesystem::path libraryRoot = {});
+		std::filesystem::path assetRoot = {}, std::filesystem::path libraryRoot = {},
+		std::filesystem::path engineLibraryRoot = {});
 
 	void Configure(const AssetRegistry& registry,
-		std::filesystem::path assetRoot = {}, std::filesystem::path libraryRoot = {});
+		std::filesystem::path assetRoot = {}, std::filesystem::path libraryRoot = {},
+		std::filesystem::path engineLibraryRoot = {});
 	Ref<Asset> GetAsset(AssetHandle handle) override;
 
 	bool IsAssetHandleValid(AssetHandle handle) const override;
@@ -38,6 +40,7 @@ private:
 	AssetRegistry m_Registry;
 	bool m_Configured = false;
 	std::filesystem::path m_LibraryRoot;
+	std::filesystem::path m_EngineLibraryRoot;
 	RuntimeAssetResolver m_Resolver;
 	AssetMap m_LoadedAssets;
 };

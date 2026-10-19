@@ -19,11 +19,13 @@ public:
 	RuntimeAssetResolver() = default;
     explicit RuntimeAssetResolver(const AssetRegistry* registry,
                                   std::filesystem::path assetRoot = {},
-                                  std::filesystem::path libraryRoot = {});
+                                  std::filesystem::path libraryRoot = {},
+                                  std::filesystem::path engineLibraryRoot = {});
 
 	void Configure(const AssetRegistry* registry,
 		std::filesystem::path assetRoot = {},
-		std::filesystem::path libraryRoot = {});
+		std::filesystem::path libraryRoot = {},
+		std::filesystem::path engineLibraryRoot = {});
 
 	std::optional<RuntimeAssetLocation> Resolve(AssetHandle handle) const;
 
@@ -31,6 +33,7 @@ private:
 	const AssetRegistry* m_Registry = nullptr;
 	std::filesystem::path m_AssetRoot;
 	std::filesystem::path m_LibraryRoot;
+	std::filesystem::path m_EngineLibraryRoot;
 };
 
 }
