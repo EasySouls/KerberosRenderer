@@ -19,6 +19,12 @@ struct SkyboxData
 	float4x4 model;
 };
 
+struct PSOutput
+{
+    float4 Color : SV_Target0;
+    uint EntityID : SV_Target1;
+};
+
 [[vk::binding(0, 0)]]
 ConstantBuffer<SkyboxData> skyboxData;
 
@@ -52,7 +58,7 @@ VSOutput vertexMain(VSInput input)
 }
 
 [shader("fragment")]
-float4 fragmentMain(VSOutput input)
+PSOutput fragmentMain(VSOutput input)
 {
     float3 sampleUV = float3(input.UVW.x, -input.UVW.y, input.UVW.z);
     float3 color = samplerEnv.Sample(sampleUV).rgb;
@@ -64,5 +70,11 @@ float4 fragmentMain(VSOutput input)
  //   color = pow(color, (1.0f / globalLighting.gamma).xxx);
 
     float bloomMask = 0.0;
-	return float4(color, bloomMask);
+
+    PSOutput output;
+    output.Color = float4(color, bloomMask);
+    // The skybox is not an entity, never let it overwrite the picking target
+    // with an undefined value (0 would map to the first entity in the scene).
+    output.EntityID = 0xFFFFFFFFu;
+    return output;
 }

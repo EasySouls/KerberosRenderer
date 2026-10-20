@@ -29,6 +29,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstddef>
 #include <limits>
 #include <unordered_map>
 
@@ -149,14 +150,22 @@ struct SceneUniformData
     glm::mat4 previousView{ 0.f };
     std::array<glm::mat4, ShadowMap::CascadeCount> lightSpaceMatrices{ glm::mat4(0.0f) };
     glm::vec4 cascadeSplits{ 0.f };
-    alignas(16) glm::vec3 camPos{ 0.f };
+    glm::vec3 camPos{ 0.f };
     uint32_t lightCount = 0;
     glm::vec2 viewportSize{ 0.0f, 0.0f };
+    [[maybe_unused]] uint8_t _Padding1[8];
     glm::vec3 cameraRight{ 0.f };
     float deltaTime = 0.0f;
     glm::vec3 cameraUp{ 0.f };
     float time = 0.0f;
 };
+
+static_assert(offsetof(SceneUniformData, camPos) == 528);
+static_assert(offsetof(SceneUniformData, cameraRight) == 560);
+static_assert(offsetof(SceneUniformData, deltaTime) == 572);
+static_assert(offsetof(SceneUniformData, cameraUp) == 576);
+static_assert(offsetof(SceneUniformData, time) == 588);
+static_assert(sizeof(SceneUniformData) == 592);
 
 struct GlobalLighting
 {
@@ -171,10 +180,14 @@ struct PerObjectData
     alignas(16) glm::mat4 previousModel{ 0.f };
     alignas(16) glm::mat4 worldNormal{ 0.f };
     alignas(16) Material::UniformBlock material;
-    [[maybe_unused]] uint8_t _Padding1[4];
-    alignas(16) uint32_t entityID = std::numeric_limits<uint32_t>::max();
-    [[maybe_unused]] uint8_t _Padding2[12];
+    [[maybe_unused]] uint8_t _Padding1[8];
+    uint32_t entityID = std::numeric_limits<uint32_t>::max();
+    [[maybe_unused]] uint8_t _Padding2[24];
 };
+
+static_assert(offsetof(PerObjectData, material) == 192);
+static_assert(offsetof(PerObjectData, entityID) == 260);
+static_assert(sizeof(PerObjectData) == 288);
 
 struct SkyboxData
 {
