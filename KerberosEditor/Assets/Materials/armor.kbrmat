@@ -4,9 +4,9 @@ Roughness: 1
 Metallic: 0
 EmissiveColor: [0.07450981, 0.3647059, 0.07450981]
 EmissiveIntensity: 4
-AlbedoTexture: Assets/Models/armor/colormap_rgba.ktx2
-NormalTexture: Assets/Models/armor/normalmap_rgba.ktx2
-MetallicTexture: ""
-RoughnessTexture: ""
-AOTexture: ""
-EmissiveTexture: ""
+AlbedoTexture: 13713342856588498596
+NormalTexture: 16529829378752601640
+MetallicTexture: 0
+RoughnessTexture: 0
+AOTexture: 0
+EmissiveTexture: 0

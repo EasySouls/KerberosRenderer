@@ -72,10 +72,11 @@ namespace Kerberos
 
 		void StartWatching();
 		void EnsureAssetMetas() const;
-		std::vector<AssetBuildReport> BuildAssets(bool force = false) const;
+		std::vector<AssetBuildReport> BuildAssets(bool force = false);
 
 		ImporterRegistry& GetImporterRegistry() { return m_ImporterRegistry; }
-		const AssetRegistry& GetAssetRegistry() const { return m_AssetRegistry; }
+		const AssetRegistry& GetAssetRegistry() const override { return m_AssetRegistry; }
+		std::span<const AssetHandle> GetAssetsOfType(AssetType type) const override { return m_AssetRegistry.GetAssetsOfType(type); }
 		AssetBuildCoordinator* GetBuildCoordinator() const { return m_BuildCoordinator.get(); }
 		const std::filesystem::path& GetAssetsRoot() const { return m_AssetsRoot; }
 		const std::filesystem::path& GetCacheRoot() const { return m_CacheRoot; }

@@ -5,6 +5,7 @@
 #include "Assets/Runtime/RuntimeAssetLoader.hpp"
 #include "Assets/Importers/StandaloneAssetPipelineImporter.hpp"
 #include "Assets/Importers/TexturePipelineImporter.hpp"
+#include "Assets/Importers/MaterialPipelineImporter.hpp"
 #include "Importers/GLTFPipelineImporter.hpp"
 #include "Assets/Formats/NativeAssetSerializer.hpp"
 #include "Profiling/Profilers.hpp"
@@ -133,12 +134,13 @@ namespace Kerberos
 		m_MetaService = CreateOwner<AssetMetaService>(m_AssetsRoot);
 		m_ImporterRegistry.Register(CreateRef<GLTFPipelineImporter>());
 		m_ImporterRegistry.Register(CreateRef<TexturePipelineImporter>());
+		m_ImporterRegistry.Register(CreateRef<MaterialPipelineImporter>());
 		for (const auto& [extension, type] : sourceAssetExtensionMap)
 		{
 			if (extension == ".gltf" || extension == ".glb")
 				continue;
 
-			if (type == AssetType::Texture2D)
+			if (type == AssetType::Texture2D || type == AssetType::Material)
 				continue;
 
 			// Register a generic standalone importer for all other asset types
@@ -195,7 +197,7 @@ namespace Kerberos
 		}
 	}
 
-	std::vector<AssetBuildReport> EditorAssetManager::BuildAssets(const bool force) const
+	std::vector<AssetBuildReport> EditorAssetManager::BuildAssets(const bool force)
     {
         KBR_TRACY_FUNCTION();
 
@@ -203,7 +205,15 @@ namespace Kerberos
 			return {};
         constexpr AssetSourceScanner scanner;
 		const auto files = scanner.ScanForAssets(m_AssetsRoot, SourceAssetExtensions());
-		return m_BuildCoordinator->BuildAll(files, force);
+		std::vector<AssetBuildReport> reports = m_BuildCoordinator->BuildAll(files, force);
+
+		const bool rebuiltAny = std::ranges::any_of(reports, [](const AssetBuildReport& report) {
+			return report.Built && report.Reason != AssetStaleReason::None;
+		});
+		if (rebuiltAny)
+			SerializeAssetRegistry();
+
+		return reports;
 	}
 
 	EditorAssetManager::~EditorAssetManager() 

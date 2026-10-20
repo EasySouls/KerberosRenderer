@@ -67,7 +67,7 @@ Entities:
       Offset: [0, 0, -4.2]
     StaticMeshComponent:
       Mesh: 18177791179963863543
-      Material: 8036360350461290503
+      Material: 3828798869134544865
       Texture: 0
   - Entity: 4943794690679386388
     TagComponent:
@@ -93,7 +93,7 @@ Entities:
       Offset: [0, 0, 0]
     StaticMeshComponent:
       Mesh: 5556831655075431416
-      Material: 8036360350461290503
+      Material: 3828798869134544865
       Texture: 0
   - Entity: 44958100548870983
     TagComponent:
@@ -134,7 +134,7 @@ Entities:
         []
     StaticMeshComponent:
       Mesh: 12640333732108170778
-      Material: 3420994376372366335
+      Material: 9492479770809120056
       Texture: 0
   - Entity: 1211823799333201449
     TagComponent:
@@ -149,7 +149,7 @@ Entities:
         []
     StaticMeshComponent:
       Mesh: 5556831655075431416
-      Material: 3148316396032555593
+      Material: 13819414350232774500
       Texture: 0
   - Entity: 6203744401923915243
     TagComponent:
@@ -220,7 +220,7 @@ Entities:
         []
     StaticMeshComponent:
       Mesh: 2975941018568995082
-      Material: 8912166731112440424
+      Material: 5553020161777056314
       Texture: 0
   - Entity: 15955380022833623681
     TagComponent:
@@ -235,7 +235,7 @@ Entities:
         []
     StaticMeshComponent:
       Mesh: 6728996633782092594
-      Material: 1896423241257672216
+      Material: 11514458293772776701
       Texture: 0
   - Entity: 10572231963151751024
     TagComponent:

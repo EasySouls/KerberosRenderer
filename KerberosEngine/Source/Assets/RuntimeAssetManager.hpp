@@ -34,7 +34,12 @@ public:
 		return asset ? std::dynamic_pointer_cast<T>(asset) : nullptr;
 	}
 
-	const AssetRegistry& GetAssetRegistry() const { return m_Registry; }
+	const AssetRegistry& GetAssetRegistry() const override { return m_Registry; }
+
+	std::span<const AssetHandle> GetAssetsOfType(AssetType type) const override
+	{
+		return m_Registry.GetAssetsOfType(type);
+	}
 
 private:
 	AssetRegistry m_Registry;

@@ -4,9 +4,9 @@ Roughness: 0.77
 Metallic: 0
 EmissiveColor: [0, 1, 0]
 EmissiveIntensity: 0
-AlbedoTexture: Assets/Models/avocado/Avocado_baseColor.ktx2
-NormalTexture: Assets/Models/avocado/Avocado_normal.ktx2
-MetallicTexture: ""
-RoughnessTexture: ""
-AOTexture: ""
-EmissiveTexture: ""
+AlbedoTexture: 12586787047323999227
+NormalTexture: 5091245074571244391
+MetallicTexture: 0
+RoughnessTexture: 0
+AOTexture: 0
+EmissiveTexture: 0

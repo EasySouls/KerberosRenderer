@@ -42,6 +42,12 @@ Editor windows live mainly under
 
 - `AssetsPanel`: filesystem browser, previews, context menus, material editor,
   asset drag/drop, source import, and source-asset selection (single click).
+  The material editor loads materials through the asset manager (authored
+  `.kbrmat` sources are imported into cache artifacts) and edits texture slots
+  with a filterable dropdown backed by `AssetManager::GetAssetsOfType`. Saving
+  writes handle-based texture slots to the source YAML, updates the already
+  loaded material instance, and force-reimports the source so the cache artifact
+  and future loads stay in sync.
 - `HierarchyPanel`: entity selection, component add/remove, and component
   editing, including particle emitters.
 - `InspectorPanel`: the unified right-side "Properties" window. It shows entity

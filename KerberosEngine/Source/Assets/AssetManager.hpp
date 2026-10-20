@@ -1,12 +1,14 @@
 #pragma once
 
 #include "Asset.hpp"
+#include "AssetRegistry.hpp"
 #include "Core/Core.hpp"
 #include "Renderer/Mesh.hpp"
 #include "Renderer/Font.hpp"
 #include "Renderer/Textures/Texture2D.hpp"
 #include "Project/Project.hpp"
 
+#include <span>
 #include <type_traits>
 #include <memory>
 
@@ -60,6 +62,16 @@ public:
 	static bool IsAssetHandleValid(const AssetHandle handle)
 	{
 		return Project::GetActive()->GetAssetManager()->IsAssetHandleValid(handle);
+	}
+
+	static const AssetRegistry& GetAssetRegistry()
+	{
+		return Project::GetActive()->GetAssetManager()->GetAssetRegistry();
+	}
+
+	static std::span<const AssetHandle> GetAssetsOfType(const AssetType type)
+	{
+		return Project::GetActive()->GetAssetManager()->GetAssetsOfType(type);
 	}
 
 	static Ref<Mesh> ResolveMeshAsset(AssetHandle handle);

@@ -4,9 +4,9 @@ Roughness: 1
 Metallic: 0
 EmissiveColor: [0, 0, 0]
 EmissiveIntensity: 0
-AlbedoTexture: Assets/Textures/rocks_color_rgba.ktx2
-NormalTexture: Assets/Textures/rocks_normal_height_rgba.ktx2
-MetallicTexture: ""
-RoughnessTexture: ""
-AOTexture: ""
-EmissiveTexture: ""
+AlbedoTexture: 5082567301878459137
+NormalTexture: 8605380196805837796
+MetallicTexture: 0
+RoughnessTexture: 0
+AOTexture: 0
+EmissiveTexture: 0

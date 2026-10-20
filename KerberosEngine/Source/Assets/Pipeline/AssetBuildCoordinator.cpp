@@ -48,6 +48,36 @@ AssetBuildReport AssetBuildCoordinator::Build(const std::filesystem::path& sourc
     {
         report.Reason = AssetStaleReason::SettingsChanged;
     }
+
+    // Metadata can be current while the persisted registry is stale (for example
+    // after a pipeline migration). Artifact-producing importers must have a valid
+    // root LibraryPath and an existing output, otherwise runtime loading would
+    // silently fail for an asset the build previously considered up to date.
+    if (report.Reason == AssetStaleReason::None && m_Registry && importer->Type() != ImporterType::Standalone)
+    {
+        if (!meta.SourceHandle.IsValid() || !m_Registry->Contains(meta.SourceHandle))
+        {
+            report.Reason = AssetStaleReason::RegistryMissing;
+        }
+        else
+        {
+            const auto& metadata = m_Registry->Get(meta.SourceHandle);
+            if (metadata.LibraryPath.empty())
+            {
+                report.Reason = AssetStaleReason::RegistryMissing;
+            }
+            else
+            {
+                const auto artifactPath = metadata.LibraryPath.is_absolute()
+                    ? metadata.LibraryPath
+                    : m_CacheRoot / metadata.LibraryPath;
+                std::error_code artifactError;
+                if (!std::filesystem::is_regular_file(artifactPath, artifactError) || artifactError)
+                    report.Reason = AssetStaleReason::OutputMissing;
+            }
+        }
+    }
+
     if (report.Reason == AssetStaleReason::None) 
     { 
         report.Built = true;
