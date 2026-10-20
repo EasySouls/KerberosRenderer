@@ -159,10 +159,15 @@ hidden-window Vulkan lifecycle tests. Those tests still use the real
 application, renderer, scripting, asset-manager, and scene-loading paths, but
 must close and release project resources before the application is destroyed.
 
-Scene updates drive editor/runtime simulation and then queue rendering. Scene
-serialization must preserve authored component data while leaving transient
-runtime state transient. Scene and project transitions must not leave
-non-owning pointers to destroyed managers or stale selected entities.
+Scene updates drive editor/runtime simulation and then queue rendering. Edit and
+Simulate render through the editor camera; Play renders through the runtime
+scene's primary `CameraComponent`. The runtime view matrix is the inverse of the
+camera entity's world transform, and both editor/runtime scene projection
+matrices apply the Vulkan Y flip. The editor camera is neither updated nor given
+input while Play is active. Scene serialization must preserve authored component
+data while leaving transient runtime state transient. Scene and project
+transitions must not leave non-owning pointers to destroyed managers or stale
+selected entities.
 
 ## Events, selection, and resources
 

@@ -655,7 +655,7 @@ void Renderer::RenderSceneEditor(const Ref<Scene>& scene, const Camera& camera, 
 }
 
 void Renderer::RenderSceneRuntime(const Ref<Scene>& scene,
-                                  const Camera& mainCamera,
+                                  const SceneCamera& mainCamera,
                                   const glm::mat4& mainCameraTransform,
                                   const float dt)
 {

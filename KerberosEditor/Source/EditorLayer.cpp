@@ -216,21 +216,11 @@ namespace PROJECT_NAME
 
 			m_EditorCamera->SetIsInputBlocked(m_DoesImGuiWantInput);
 
-			switch (m_SceneState)
+			/// The editor camera is only used while editing or simulating.
+			/// Play mode renders through the scene's primary CameraComponent.
+			if (m_SceneState != SceneState::Play)
 			{
-			case SceneState::Edit:
-			case SceneState::Simulate:
 				m_EditorCamera->OnUpdate(deltaTime);
-				break;
-			case SceneState::Play:
-			{
-				/// Only update the camera when the viewport is focused
-				/*if (m_ViewportFocused)
-					m_CameraController.OnUpdate(deltaTime);*/
-				// TODO: Update the camera
-				m_EditorCamera->OnUpdate(deltaTime);
-				break;
-			}
 			}
 		}
 
@@ -248,7 +238,7 @@ namespace PROJECT_NAME
 				m_ActiveScene->OnUpdateSimulation(deltaTime, *m_EditorCamera);
 				break;
 			case SceneState::Play:
-				m_ActiveScene->OnUpdateRuntime(deltaTime, *m_EditorCamera);
+				m_ActiveScene->OnUpdateRuntime(deltaTime);
 				break;
 			}
 		}
@@ -266,7 +256,10 @@ namespace PROJECT_NAME
 	{
         KBR_TRACY_FUNCTION();
 
-		m_EditorCamera->OnEvent(event);
+		if (m_SceneState != SceneState::Play)
+		{
+			m_EditorCamera->OnEvent(event);
+		}
 
 		m_HierarchyPanel.OnEvent(event);
 		m_AssetsPanel->OnEvent(event);

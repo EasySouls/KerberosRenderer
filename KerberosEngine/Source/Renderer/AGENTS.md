@@ -35,6 +35,11 @@ Scene rendering is queued before `VulkanContext::Draw()` records commands.
 the current frame descriptor allocator. Descriptors allocated from a
 frame-local allocator must not outlive that frame slot.
 
+`RenderSceneEditor` takes an editor `Camera`; `RenderSceneRuntime` takes the
+scene's `SceneCamera` plus the primary camera entity world transform. Runtime
+view/projection matrices come from the `SceneCamera`, not from the editor
+camera.
+
 Uploads commonly use staging buffers and synchronous waits. This is safe but
 can stall; preserve the existing render-thread assertions and exception
 propagation when changing upload paths.

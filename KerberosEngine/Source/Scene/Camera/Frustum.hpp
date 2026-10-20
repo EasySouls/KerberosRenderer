@@ -4,6 +4,8 @@
 
 #include <vector>
 #include <array>
+#include <functional>
+#include <utility>
 
 namespace Kerberos
 {
@@ -31,4 +33,19 @@ namespace Kerberos
 
 	std::vector<glm::vec4> GetFrustumCornersWorldSpace(const glm::mat4& projview);
 	std::vector<glm::vec4> GetFrustumCornersWorldSpace(const glm::mat4& proj, const glm::mat4& view);
+
+	/**
+	 * Builds the cascaded light-space matrices from a camera view matrix.
+	 *
+	 * @param fov The vertical field of view in radians.
+	 * @param aspectRatio The camera aspect ratio.
+	 */
+	std::pair<std::vector<glm::mat4>, glm::vec4> CalculateLightSpaceMatrices(
+		const glm::mat4& view,
+		float fov,
+		float aspectRatio,
+		float nearClip,
+		float farClip,
+		const glm::vec3& lightDir,
+		const std::function<glm::vec4(float)>& getCascadeSplits);
 }

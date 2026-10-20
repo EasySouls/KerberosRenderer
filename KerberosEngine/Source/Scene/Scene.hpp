@@ -37,7 +37,7 @@ namespace Kerberos
 
 		void OnUpdateEditor(float ts, const Camera& camera);
 		void OnUpdateSimulation(float ts, const Camera& camera);
-		void OnUpdateRuntime(float ts, const Camera& camera);
+		void OnUpdateRuntime(float ts);
 
 		/**
 		 * @brief Create an entity in the scene and assigns it a transform component
@@ -116,7 +116,6 @@ namespace Kerberos
 
 		void Render2DRuntime(const SceneCamera* mainCamera, const glm::mat4& mainCameraTransform, float dt);
 		void Render3DRuntime(const SceneCamera* mainCamera, const glm::mat4& mainCameraTransform, float dt);
-		void Render3DRuntime(const Camera& camera, float dt);
 		void Render3DEditor(const Camera& camera, float dt);
 
 		void UpdateScripts(float ts);
