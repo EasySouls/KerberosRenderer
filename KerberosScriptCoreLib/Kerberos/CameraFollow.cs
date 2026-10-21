@@ -27,7 +27,7 @@ public class CameraFollow : Entity
     protected override void OnCreate()
     {
         _transform = GetComponent<TransformComponent>();
-        _target = FindEntityByName("Dragon");
+        _target = FindEntityByName("donut");
 
         _distance = MinDistance;
     }

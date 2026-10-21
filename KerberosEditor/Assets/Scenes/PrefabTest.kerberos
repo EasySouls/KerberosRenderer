@@ -17,16 +17,16 @@ Entities:
           ScriptFields:
             - Name: BulletMesh
               Type: MeshRef
-              Data: 48
+              Data: 16851151495070434988
             - Name: ShootingCooldownTime
               Type: Float
               Data: 1
             - Name: Speed
               Type: Float
-              Data: 8.4
+              Data: 2
             - Name: JumpForce
               Type: Float
-              Data: 1
+              Data: 5
             - Name: JumpCooldownTime
               Type: Float
               Data: 1
@@ -813,18 +813,18 @@ Entities:
     TagComponent:
       Tag: Camera
     TransformComponent:
-      Translation: [0, 69.606064, 0]
-      Rotation: [0, -0, 0]
-      Scale: [1, 1, 1]
+      Translation: [-130, 100, -50]
+      Rotation: [-0.4, 4.7, 0]
+      Scale: [0.99999905, 1, 0.99999905]
     CameraComponent:
       Camera:
-        ProjectionType: 1
+        ProjectionType: 0
         PerspectiveFOV: 0.7853982
-        PerspectiveNear: 0.01
-        PerspectiveFar: 100
-        OrthographicSize: 10
-        OrthographicNear: -1
-        OrthographicFar: 1
+        PerspectiveNear: 0.1
+        PerspectiveFar: 10000
+        OrthographicSize: 30
+        OrthographicNear: 0.1
+        OrthographicFar: 10000
       IsPrimary: true
       FixedAspectRatio: false
     HierarchyComponent:
@@ -843,19 +843,19 @@ Entities:
               Data: 1.6
             - Name: ShoulderOffset
               Type: Vector2
-              Data: [6.7e-44, 0]
+              Data: [10, 10]
             - Name: SmoothFollow
               Type: Bool
-              Data: true
+              Data: false
             - Name: ZoomSpeed
               Type: Float
-              Data: 6.7e-44
+              Data: 10
             - Name: MinDistance
               Type: Float
-              Data: 6.7e-44
+              Data: 100
             - Name: MaxDistance
               Type: Float
-              Data: 6.7e-44
+              Data: 2000
             - Name: TargetPivotOffset
               Type: Vector3
               Data: [6.7e-44, 0, 0]
