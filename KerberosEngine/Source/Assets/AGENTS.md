@@ -85,7 +85,9 @@ Authored YAML prefabs may also carry per-entity script records
 (`PrefabScriptTemplate`: class name plus serialized field initializers).
 `PrefabSerializer` writes and reads those records, and
 `PrefabEntityTemplate::ToEntity` recreates the entity's `ScriptComponent` and
-field initializers. Native glTF prefabs remain script-free. When a scene is
+field initializers, then reconciles them with the current script class so
+removed fields are dropped and new fields get defaults. Native glTF prefabs
+remain script-free. When a scene is
 running, `Scene::InstantiatePrefab` creates script instances and runs
 `OnCreate` for scripted prefab entities immediately.
 The importer also emits one native material record per glTF material (named

@@ -367,6 +367,13 @@ static void DeserializeScriptFieldInitializers(const YAML::Node& scriptFields, c
 
         scriptFieldInitializers[name] = initializer;
     }
+
+    /// Reconcile the serialized values with the current script class definition
+    /// so fields removed from the script stop showing up (and get dropped on the
+    /// next save) and fields added to the script get defaults immediately,
+    /// before the inspector is ever drawn.
+    if (ScriptEngine::ClassExists(className))
+        ScriptEngine::CreateScriptFieldInitializers(entity, className);
 }
 
 bool SceneSerializer::Deserialize(const std::filesystem::path& filepath) const

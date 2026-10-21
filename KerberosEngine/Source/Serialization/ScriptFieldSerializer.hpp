@@ -63,6 +63,7 @@ namespace Kerberos::ScriptFieldSerializer
 		case ScriptFieldType::TextureRef:
 		case ScriptFieldType::AssetHandle:
 		case ScriptFieldType::PrefabRef:
+		case ScriptFieldType::EntityRef:
 			out << YAML::Key << "Data" << YAML::Value << field.GetValue<uint64_t>();
 			break;
 		}
@@ -123,6 +124,7 @@ namespace Kerberos::ScriptFieldSerializer
 		case ScriptFieldType::TextureRef:
 		case ScriptFieldType::AssetHandle:
 		case ScriptFieldType::PrefabRef:
+		case ScriptFieldType::EntityRef:
 			initializer.SetValue<uint64_t>(node["Data"].as<uint64_t>());
 			break;
 		}

@@ -34,6 +34,8 @@ namespace Kerberos
 		{ "Kerberos.Core.TextureRef",		ScriptFieldType::TextureRef },
 		{ "Kerberos.Core.AssetHandle",	ScriptFieldType::AssetHandle },
         { "Kerberos.Core.PrefabRef",	    ScriptFieldType::PrefabRef },
+
+		{ "Kerberos.Scene.Entity",		ScriptFieldType::EntityRef },
 	};
 
 	ScriptFieldType ScriptUtils::DotNetTypeToScriptFieldType(const std::string& typeName)
@@ -69,6 +71,7 @@ namespace Kerberos
 			case ScriptFieldType::TextureRef:	return "TextureRef"sv;
 			case ScriptFieldType::AssetHandle:	return "AssetHandle"sv;
 			case ScriptFieldType::PrefabRef:	return "PrefabRef"sv;
+			case ScriptFieldType::EntityRef:	return "EntityRef"sv;
 		}
 
 		KBRAssert(false, "Unknown script field type!");
@@ -97,6 +100,7 @@ namespace Kerberos
 		if (type == "TextureRef"sv)		return ScriptFieldType::TextureRef;
 		if (type == "AssetHandle"sv)	return ScriptFieldType::AssetHandle;
 		if (type == "PrefabRef"sv)		return ScriptFieldType::PrefabRef;
+		if (type == "EntityRef"sv)		return ScriptFieldType::EntityRef;
 
 		KBRAssert(false, "Unknown script field type!");
 		return ScriptFieldType::Int;

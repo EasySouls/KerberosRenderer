@@ -71,14 +71,15 @@ void PrefabEntityTemplate::ToEntity(Entity newEntity) const
         {
             scriptComponent.ClassNames.push_back(script.ClassName);
 
-            if (ScriptEngine::ClassExists(script.ClassName))
-                ScriptEngine::CreateScriptFieldInitializers(newEntity, script.ClassName);
-
             auto& initializers = ScriptEngine::GetScriptFieldInitializerMap(newEntity, script.ClassName);
             for (const auto& fieldInitializer : script.FieldInitializers)
             {
                 initializers[fieldInitializer.Field.Name] = fieldInitializer;
             }
+
+            /// Drop fields the script removed and add defaults for new fields.
+            if (ScriptEngine::ClassExists(script.ClassName))
+                ScriptEngine::CreateScriptFieldInitializers(newEntity, script.ClassName);
         }
     }
 }

@@ -204,8 +204,12 @@ namespace Kerberos
                     IntPtr namePtr = Marshal.ReadIntPtr(fieldNamesBuffer, i * IntPtr.Size);
                     IntPtr typePtr = Marshal.ReadIntPtr(fieldTypeNamesBuffer, i * IntPtr.Size);
 
+                    string typeName = typeof(Entity).IsAssignableFrom(fields[i].FieldType)
+                        ? "Kerberos.Scene.Entity"
+                        : fields[i].FieldType.FullName ?? fields[i].FieldType.Name;
+
                     WriteStringToBuffer(fields[i].Name, namePtr, bufferSize);
-                    WriteStringToBuffer(fields[i].FieldType.FullName ?? fields[i].FieldType.Name, typePtr, bufferSize);
+                    WriteStringToBuffer(typeName, typePtr, bufferSize);
                 }
 
                 return count;
@@ -517,7 +521,9 @@ namespace Kerberos
                     return 0;
 
                 object? value = UnmarshalValueFromBuffer(field.FieldType, valuePtr, valueSize);
-                if (value == null)
+
+                // Entity references may legitimately be null (no entity assigned).
+                if (value == null && !typeof(Entity).IsAssignableFrom(field.FieldType))
                     return 0;
 
                 field.SetValue(instance, value);
@@ -579,6 +585,13 @@ namespace Kerberos
 
         private static int MarshalValueToBuffer(object value, IntPtr buffer, int bufferSize)
         {
+            if (value is Entity entity)
+            {
+                if (bufferSize < sizeof(ulong)) return 0;
+                Marshal.WriteInt64(buffer, (long)entity.GetID());
+                return 1;
+            }
+
             switch (value)
             {
                 case bool b:
@@ -637,8 +650,40 @@ namespace Kerberos
             }
         }
 
+        private static Entity? UnmarshalEntityReference(Type fieldType, IntPtr buffer, int bufferSize)
+        {
+            if (bufferSize < sizeof(ulong))
+                return null;
+
+            ulong entityID = (ulong)Marshal.ReadInt64(buffer);
+            if (entityID == 0)
+                return null;
+
+            // Prefer an existing managed script instance when the field is
+            // declared as a concrete script type, so identity is preserved.
+            if (EntityInstances.TryGetValue(entityID, out var instances))
+            {
+                foreach (var instance in instances.Values)
+                {
+                    if (fieldType.IsInstanceOfType(instance))
+                        return instance;
+                }
+            }
+
+            if (fieldType == typeof(Entity))
+                return new Entity(entityID);
+
+            if (UlongConstructors.TryGetValue(fieldType, out var ctor) && ctor != null)
+                return ctor.Invoke([entityID]) as Entity;
+
+            return null;
+        }
+
         private static object? UnmarshalValueFromBuffer(Type fieldType, IntPtr buffer, int bufferSize)
         {
+            if (typeof(Entity).IsAssignableFrom(fieldType))
+                return UnmarshalEntityReference(fieldType, buffer, bufferSize);
+
             if (fieldType == typeof(bool))
                 return Marshal.ReadByte(buffer) != 0;
             if (fieldType == typeof(byte))

@@ -87,7 +87,19 @@ signatures, or the serialized script format changes, update this file and keep
 the native callback/bridge signatures synchronized.
 
 Script fields support `PrefabRef`, `TextureRef`, and `AssetHandle` reference
-types with asset-browser drag/drop. `Entity.Instantiate(PrefabRef)` spawns a
+types with asset-browser drag/drop. They also support `EntityRef`: a C# field
+declared as `Entity` (or a concrete `Entity`-derived script type) is stored and
+serialized as the target entity's UUID and edited by dragging an entity from
+the hierarchy onto the field; `0` means no entity assigned. The managed bridge
+marshals entity references through `Entity.GetID()` and resolves them back to
+an existing script instance or a new `Entity`.
+
+Script field initializers are reconciled against the current `ScriptClass`
+field list when a scene or authored prefab is deserialized and when the
+inspector draws a script component. Initializers for fields that no longer
+exist on the script are dropped (so stale serialized fields stop being shown
+and re-saved), newly added fields get zeroed defaults, and retyped fields are
+reset. `Entity.Instantiate(PrefabRef)` spawns a
 prefab through `Scene::InstantiatePrefab`; while the scene is running, spawned
 scripted-prefab entities get script instances created and `OnCreate` invoked
 immediately. `Scene::UpdateScripts`/`OnRuntimeStart` snapshot the script entity

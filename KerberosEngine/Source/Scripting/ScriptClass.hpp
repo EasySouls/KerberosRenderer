@@ -3,6 +3,7 @@
 #include <string>
 #include <array>
 #include <cstddef>
+#include <cstring>
 #include <unordered_map>
 
 namespace Kerberos
@@ -34,7 +35,8 @@ namespace Kerberos
 		MeshRef,
 		TextureRef,
 		AssetHandle,
-		PrefabRef
+		PrefabRef,
+		EntityRef
 	};
 
 	struct ScriptField
@@ -63,6 +65,11 @@ namespace Kerberos
 			requires (sizeof(T) <= maxFieldSize)
 		{
 			std::memcpy(m_Data.data(), &value, sizeof(T));
+		}
+
+		void ResetValue() const
+        {
+			m_Data.fill(std::byte{ 0 });
 		}
 
 	private:

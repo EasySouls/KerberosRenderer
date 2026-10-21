@@ -634,6 +634,32 @@ Entity Scene::InstantiatePrefab(const AssetHandle prefabHandle, const std::strin
 #endif
 	}
 
+	Entity Scene::TryGetEntityByUUID(const UUID uuid) const
+	{
+		KBR_TRACY_FUNCTION();
+
+		if (!uuid.IsValid())
+			return {};
+
+#if USE_MAP_FOR_UUID
+
+		const auto it = m_UUIDToEntityMap.find(uuid);
+		return it != m_UUIDToEntityMap.end() ? it->second : Entity{};
+#else
+		const auto view = m_Registry.view<IDComponent>();
+		for (auto entity : view)
+		{
+			auto id = view.get<IDComponent>(entity).ID;
+			if (id == uuid)
+			{
+				return { entity, this };
+			}
+		}
+
+		return {};
+#endif
+	}
+
 	void Scene::SetParent(const Entity child, const Entity parent, [[maybe_unused]] bool keepWorldTransform)
 	{
 		KBR_TRACY_FUNCTION();

@@ -56,6 +56,12 @@ namespace Kerberos
 	{
 		for (const auto& [name, initializer] : initialFieldValues)
 		{
+			if (!m_ScriptClass->m_SerializedFields.contains(name))
+			{
+				Log::CoreTrace("Skipping stale script field {0}.{1}", m_ScriptClass->GetFullName(), name);
+				continue;
+			}
+
 			SetFieldValueInternal(name, initializer.m_Data.data());
 		}
 	}

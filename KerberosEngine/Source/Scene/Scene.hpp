@@ -73,6 +73,10 @@ namespace Kerberos
 
 		Entity GetEntityByUUID(UUID uuid) const;
 
+		/// Returns an invalid entity when the UUID is not present in the scene.
+		/// Prefer this over GetEntityByUUID for references that may be stale.
+		Entity TryGetEntityByUUID(UUID uuid) const;
+
 		void SetParent(Entity child, Entity parent, bool keepWorldTransform = true);
 		Entity GetParent(Entity child) const;
 		void RemoveParent(Entity child);

@@ -43,59 +43,63 @@ using namespace std::literals;
 
 namespace Kerberos
 {
-	struct ScriptEngineData
-	{
-		/// .NET hosting state
-		hostfxr_handle HostContext = nullptr;
-		hostfxr_initialize_for_runtime_config_fn InitForConfigFn = nullptr;
-		hostfxr_get_runtime_delegate_fn GetDelegateFn = nullptr;
-		hostfxr_close_fn CloseFn = nullptr;
-		load_assembly_and_get_function_pointer_fn LoadAssemblyFn = nullptr;
+	namespace {
 
-		std::filesystem::path CoreAssemblyPath;
-		std::filesystem::path RuntimeConfigPath;
+    struct ScriptEngineData
+    {
+        /// .NET hosting state
+        hostfxr_handle HostContext = nullptr;
+        hostfxr_initialize_for_runtime_config_fn InitForConfigFn = nullptr;
+        hostfxr_get_runtime_delegate_fn GetDelegateFn = nullptr;
+        hostfxr_close_fn CloseFn = nullptr;
+        load_assembly_and_get_function_pointer_fn LoadAssemblyFn = nullptr;
 
-		ScriptClass EntityClass;
+        std::filesystem::path CoreAssemblyPath;
+        std::filesystem::path RuntimeConfigPath;
 
-		std::unordered_map<std::string, Ref<ScriptClass>> EntityClasses;
+        ScriptClass EntityClass;
 
-		using FieldInitializerMap = std::unordered_map<std::string, ScriptFieldInitializer>;
-		/// Per-entity field initializers, keyed by script class full name.
-		using ClassFieldInitializerMap = std::unordered_map<std::string, FieldInitializerMap>;
-		/// Holds the data for the initial values of the fields of each entity
-		std::unordered_map<UUID, ClassFieldInitializerMap> EntityFieldInitializers;
+        std::unordered_map<std::string, Ref<ScriptClass>> EntityClasses;
 
-		/// Runtime data
-		std::weak_ptr<Scene> SceneContext;
-		/// Per-entity script instances, keyed by script class full name.
-		using ClassInstanceMap = std::unordered_map<std::string, Ref<ScriptInstance>>;
-		std::unordered_map<UUID, ClassInstanceMap> EntityInstances;
+        using FieldInitializerMap = std::unordered_map<std::string, ScriptFieldInitializer>;
+        /// Per-entity field initializers, keyed by script class full name.
+        using ClassFieldInitializerMap = std::unordered_map<std::string, FieldInitializerMap>;
+        /// Holds the data for the initial values of the fields of each entity
+        std::unordered_map<UUID, ClassFieldInitializerMap> EntityFieldInitializers;
 
-		/// User per-project script assembly
-		std::filesystem::path UserProjectDirectory;
-		std::string UserAssemblyName;
-		std::filesystem::path UserCsprojPath;
-		std::filesystem::path UserAssemblyPath;
+        /// Runtime data
+        std::weak_ptr<Scene> SceneContext;
+        /// Per-entity script instances, keyed by script class full name.
+        using ClassInstanceMap = std::unordered_map<std::string, Ref<ScriptInstance>>;
+        std::unordered_map<UUID, ClassInstanceMap> EntityInstances;
 
-		/// Managed function pointers (from ScriptGlue bridge)
-		ManagedLoadAssemblyClassesFn LoadAssemblyClasses = nullptr;
-		ManagedClassExistsFn ManagedClassExists = nullptr;
-		ManagedCreateInstanceFn ManagedCreateInstance = nullptr;
-		ManagedDestroyInstanceFn ManagedDestroyInstance = nullptr;
-		ManagedClearInstancesFn ManagedClearInstances = nullptr;
-		ManagedInvokeOnCreateFn ManagedInvokeOnCreate = nullptr;
-		ManagedInvokeOnUpdateFn ManagedInvokeOnUpdate = nullptr;
-		ManagedInvokeOnCollisionEnterFn ManagedInvokeOnCollisionEnter = nullptr;
-		ManagedInvokeOnCollisionPersistFn ManagedInvokeOnCollisionPersist = nullptr;
-		ManagedInvokeOnCollisionExitFn ManagedInvokeOnCollisionExit = nullptr;
-		ManagedGetFieldCountFn ManagedGetFieldCount = nullptr;
-		ManagedGetFieldsFn ManagedGetFields = nullptr;
-		ManagedGetFieldValueFn ManagedGetFieldValue = nullptr;
-		ManagedSetFieldValueFn ManagedSetFieldValue = nullptr;
-		ManagedGetEntityClassCountFn ManagedGetEntityClassCount = nullptr;
-		ManagedGetEntityClassNamesFn ManagedGetEntityClassNames = nullptr;
-		ManagedSetNativeCallbacksFn ManagedSetNativeCallbacks = nullptr;
-	};
+        /// User per-project script assembly
+        std::filesystem::path UserProjectDirectory;
+        std::string UserAssemblyName;
+        std::filesystem::path UserCsprojPath;
+        std::filesystem::path UserAssemblyPath;
+
+        /// Managed function pointers (from ScriptGlue bridge)
+        ManagedLoadAssemblyClassesFn LoadAssemblyClasses = nullptr;
+        ManagedClassExistsFn ManagedClassExists = nullptr;
+        ManagedCreateInstanceFn ManagedCreateInstance = nullptr;
+        ManagedDestroyInstanceFn ManagedDestroyInstance = nullptr;
+        ManagedClearInstancesFn ManagedClearInstances = nullptr;
+        ManagedInvokeOnCreateFn ManagedInvokeOnCreate = nullptr;
+        ManagedInvokeOnUpdateFn ManagedInvokeOnUpdate = nullptr;
+        ManagedInvokeOnCollisionEnterFn ManagedInvokeOnCollisionEnter = nullptr;
+        ManagedInvokeOnCollisionPersistFn ManagedInvokeOnCollisionPersist = nullptr;
+        ManagedInvokeOnCollisionExitFn ManagedInvokeOnCollisionExit = nullptr;
+        ManagedGetFieldCountFn ManagedGetFieldCount = nullptr;
+        ManagedGetFieldsFn ManagedGetFields = nullptr;
+        ManagedGetFieldValueFn ManagedGetFieldValue = nullptr;
+        ManagedSetFieldValueFn ManagedSetFieldValue = nullptr;
+        ManagedGetEntityClassCountFn ManagedGetEntityClassCount = nullptr;
+        ManagedGetEntityClassNamesFn ManagedGetEntityClassNames = nullptr;
+        ManagedSetNativeCallbacksFn ManagedSetNativeCallbacks = nullptr;
+    };
+
+    }
 
 	static ScriptEngineData* s_ScriptData = nullptr;
 	static Owner<filewatch::FileWatch<std::string>> s_Filewatcher = nullptr;
@@ -425,12 +429,38 @@ namespace Kerberos
 
 		auto& fieldInitializers = s_ScriptData->EntityFieldInitializers[entity.GetUUID()][className];
 
+		/// Drop initializers for fields that the script class no longer declares.
+		/// Serialized scenes (and prefabs) can contain fields from an older
+		/// version of the script, and keeping them around would make the editor
+		/// display and re-save fields that do not exist anymore.
+		for (auto it = fieldInitializers.begin(); it != fieldInitializers.end();)
+		{
+			if (!serializedFields.contains(it->first))
+			{
+				Log::CoreTrace("Removing stale script field {0}.{1}", className, it->first);
+				it = fieldInitializers.erase(it);
+			}
+			else
+			{
+				++it;
+			}
+		}
+
 		/// Merge the class definition into the existing initializer set so that
 		/// authored values survive and newly added script fields get defaults.
 		for (const auto& [name, field] : serializedFields)
 		{
-			ScriptFieldInitializer& fieldInitializer = fieldInitializers[name];
+			const auto [it, inserted] = fieldInitializers.try_emplace(name);
+			ScriptFieldInitializer& fieldInitializer = it->second;
+
+			const bool retyped = !inserted && fieldInitializer.Field.Type != field.Type;
 			fieldInitializer.Field = field;
+
+			/// Newly added (or retyped) fields should start from a zero value
+			/// instead of whatever bytes the initializer buffer happened to hold.
+			/// String initializers store a std::string object and are left alone.
+			if ((inserted || retyped) && field.Type != ScriptFieldType::String)
+				fieldInitializer.ResetValue();
 		}
 	}
 

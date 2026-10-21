@@ -6,7 +6,7 @@ namespace Kerberos;
 
 public class CameraFollow : Entity
 {
-    public string TargetName = "Player";
+    public Entity Target;
     public float RotationSpeed = 2.0f; // Radians per second
     public float ZoomSpeed = 5.0f;
     public float MinDistance = 2.0f;
@@ -16,7 +16,6 @@ public class CameraFollow : Entity
     public bool SmoothFollow = true;
 
     private TransformComponent _transform = null!;
-    private Entity? _target;
     private float _yaw = 0.0f;
     private float _pitch = 10.0f * (float)(Math.PI / 180.0);
     private float _distance = 0.0f;
@@ -27,7 +26,6 @@ public class CameraFollow : Entity
     protected override void OnCreate()
     {
         _transform = GetComponent<TransformComponent>();
-        _target = FindEntityByName("donut");
 
         _distance = MinDistance;
     }
@@ -36,7 +34,7 @@ public class CameraFollow : Entity
     {
         if (_transform == null)
             throw new Exception("Transform cannot be null");
-        if (_target == null)
+        if (Target == null)
             throw new Exception("Target cannot be null");
 
         HandleInput(deltaTime);
@@ -110,10 +108,10 @@ public class CameraFollow : Entity
 
     private void UpdateCameraTransform(float deltaTime)
     {
-        if (_target == null)
+        if (Target == null)
             return;
 
-        Vector3 targetPos = _target.Translation;
+        Vector3 targetPos = Target.Translation;
         Vector3 pivotPosition = targetPos + TargetPivotOffset;
 
         Vector3 forward;

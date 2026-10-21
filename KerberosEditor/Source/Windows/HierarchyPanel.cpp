@@ -111,6 +111,58 @@ namespace
 
         return newHandle;
     }
+
+    std::string GetEntityDisplayName(const Scene* scene, const uint64_t entityID)
+    {
+        if (entityID == 0)
+            return "None";
+
+        const Entity entity = scene != nullptr
+            ? scene->TryGetEntityByUUID(UUID(entityID))
+            : Entity{};
+        if (!entity)
+            return "Missing Entity";
+
+        return std::string(entity.GetName());
+    }
+
+    std::optional<uint64_t> DrawScriptEntityReferenceField(
+        const char* label,
+        const Scene* scene,
+        const uint64_t currentEntityID)
+    {
+        std::optional<uint64_t> newEntityID;
+
+        ImGui::PushID(label);
+
+        const std::string display = std::string(label) + ": " +
+            GetEntityDisplayName(scene, currentEntityID);
+
+        const std::string buttonLabel = display + "##EntityRef";
+        if (ImGui::Button(buttonLabel.c_str(), ImVec2(-70.0f, 0.0f)))
+        {
+        }
+
+        if (ImGui::BeginDragDropTarget())
+        {
+            if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload(hierarchyEntity))
+            {
+                if (payload->DataSize == sizeof(uint64_t))
+                    newEntityID = *static_cast<const uint64_t*>(payload->Data);
+                else
+                    Log::EditorError("Invalid entity drag payload size: {0}", payload->DataSize);
+            }
+            ImGui::EndDragDropTarget();
+        }
+
+        ImGui::SameLine();
+        if (ImGui::Button("Clear", ImVec2(60.0f, 0.0f)))
+            newEntityID = 0;
+
+        ImGui::PopID();
+
+        return newEntityID;
+    }
 }
 
 
@@ -126,6 +178,7 @@ void HierarchyPanel::SetContext(const Ref<Scene>& context)
     /// This is neccessary to avoid having a dangling pointer to the previous context
     /// when loading a new scene
     m_SelectedEntity = {};
+    m_PendingSelectedEntity = {};
 
     /*m_CubeMesh = Mesh::CreateCube(1.0f);
     m_SphereMesh = Mesh::CreateSphere(1.0f, 16, 16);*/
@@ -163,6 +216,19 @@ void HierarchyPanel::OnImGuiRender()
         }
 
         ImGui::TreePop();
+    }
+
+    /// Apply a deferred entity selection once the mouse button is released.
+    /// While a drag-and-drop operation is active the click that started it is
+    /// treated as a drag instead, so the inspector keeps showing the original
+    /// selection (the entity whose script field receives the drop).
+    if (m_PendingSelectedEntity) {
+        if (!ImGui::IsMouseDown(ImGuiMouseButton_Left)) {
+            if (ImGui::IsMouseReleased(ImGuiMouseButton_Left) && !ImGui::IsDragDropActive()) {
+                SetSelectedEntity(m_PendingSelectedEntity);
+            }
+            m_PendingSelectedEntity = {};
+        }
     }
 
     /// If an empty space is clicked, deselect the entity
@@ -237,10 +303,17 @@ void HierarchyPanel::DrawEntityNode(const Entity& entity)
         ImGui::TreeNodeEx(reinterpret_cast<void*>(static_cast<uint64_t>(entity.GetUUID())), flags, "%s", tag.c_str());
 
     if (ImGui::IsItemClicked()) {
-        m_SelectedEntity = entity;
-        if (m_OnEntitySelected) {
-            m_OnEntitySelected(entity);
-        }
+        /// Defer the selection to mouse release so that starting a drag from
+        /// this node does not switch the inspector away from the entity whose
+        /// script field is the drop target.
+        m_PendingSelectedEntity = entity;
+    }
+
+    if (ImGui::BeginDragDropSource()) {
+        const uint64_t entityID = static_cast<uint64_t>(entity.GetUUID());
+        ImGui::SetDragDropPayload(hierarchyEntity, &entityID, sizeof(entityID));
+        ImGui::TextUnformatted(tag.c_str());
+        ImGui::EndDragDropSource();
     }
 
     bool entityDeleted = false;
@@ -919,6 +992,13 @@ void HierarchyPanel::DrawComponents(const Entity entity)
                                     name, static_cast<uint64_t>(*newHandle));
                             }
                         }
+                        else if (scriptField.Type == ScriptFieldType::EntityRef) {
+                            const uint64_t value = scriptInstance->GetFieldValue<uint64_t>(name);
+                            if (const auto newEntityID = DrawScriptEntityReferenceField(
+                                    name.c_str(), m_Context.get(), value)) {
+                                scriptInstance->SetFieldValue<uint64_t>(name, *newEntityID);
+                            }
+                        }
                         else if (scriptField.Type == ScriptFieldType::TextureRef) {
                             const uint64_t value = scriptInstance->GetFieldValue<uint64_t>(name);
                             if (const auto newHandle = DrawScriptAssetReferenceField(
@@ -1117,6 +1197,13 @@ void HierarchyPanel::DrawComponents(const Entity entity)
                             if (const auto newHandle = DrawScriptAssetReferenceField(
                                     fieldName.c_str(), value, assetBrowserPrefab, AssetType::Prefab)) {
                                 fieldInitializer.SetValue(static_cast<uint64_t>(*newHandle));
+                            }
+                        }
+                        else if (scriptField.Type == ScriptFieldType::EntityRef) {
+                            const uint64_t value = fieldInitializer.GetValue<uint64_t>();
+                            if (const auto newEntityID = DrawScriptEntityReferenceField(
+                                    fieldName.c_str(), m_Context.get(), value)) {
+                                fieldInitializer.SetValue<uint64_t>(*newEntityID);
                             }
                         }
                         else if (scriptField.Type == ScriptFieldType::TextureRef) {
