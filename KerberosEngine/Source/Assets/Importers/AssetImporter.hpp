@@ -2,22 +2,22 @@
 
 #include "Assets/Asset.hpp"
 #include "Assets/AssetMetadata.hpp"
+
 #include <future>
 
+namespace Kerberos {
 
-namespace Kerberos
+class Asset;
+struct AssetMetadata;
+
+class AssetImporter
 {
-	class Asset;
-	struct AssetMetadata;
+public:
+    static void Init();
 
-	class AssetImporter
-	{
-	public:
-		static void Init();
+    static Ref<Asset> ImportAsset(AssetHandle handle, const AssetMetadata& metadata);
 
-		static Ref<Asset> ImportAsset(AssetHandle handle, const AssetMetadata& metadata);
+    static std::future<Ref<Asset>> ImportAssetAsync(AssetHandle handle, const AssetMetadata& metadata);
+};
 
-		static std::future<Ref<Asset>> ImportAssetAsync(AssetHandle handle, const AssetMetadata& metadata);
-		
-	};
 }

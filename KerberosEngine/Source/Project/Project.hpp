@@ -6,6 +6,7 @@
 #include "Assets/RuntimeAssetManager.hpp"
 
 #include <filesystem>
+#include <string_view>
 
 namespace Kerberos
 {
@@ -17,38 +18,40 @@ namespace Kerberos
 		std::filesystem::path StartScenePath;
 	};
 
+	struct ProjectLoadOptions
+	{
+		bool InitializeAssetManager = true;
+	};
+
 	class Project
 	{
 	public:
-		static Ref<Project> New();
-		static Ref<Project> Load(const std::filesystem::path& filepath);
+		static Ref<Project> New(const std::filesystem::path& projectDirectory = {});
+		static Ref<Project> Load(const std::filesystem::path& filepath,
+								 const ProjectLoadOptions& options = {});
 		static bool SaveActive();
 
 		/**
-		* Returns the path to the active project's asset directory.
+		* Returns the absolute path to the active project's asset directory.
 		*/
-		static const std::filesystem::path& GetAssetDirectory()
-		{
-			KBR_CORE_ASSERT(s_ActiveProject, "An active project is not set!");
+		static std::filesystem::path GetAssetDirectory();
 
-			return s_ActiveProject->m_Info.AssetDirectory;
-		}
+        /**
+         * Returns the path to the active project's root directory.
+         */
+        static const std::filesystem::path& GetProjectDirectory();
 
-		static const std::filesystem::path& GetProjectDirectory()
-		{
-			KBR_CORE_ASSERT(s_ActiveProject, "An active project is not set!");
+        /**
+         * @brief Returns the full filesystem path for an asset within the active project.
+         * @param assetPath The path to the asset relative to the project's asset directory.
+         * @return The full filesystem path to the asset.
+         */
+        static std::filesystem::path GetAssetFileSystemPath(const std::filesystem::path& assetPath);
 
-			return s_ActiveProject->m_ProjectDirectory;
-		}
+        void SetInfo(const ProjectInfo& info);
 
-		static std::filesystem::path GetAssetFileSystemPath(const std::filesystem::path& assetPath)
-		{
-			KBR_CORE_ASSERT(s_ActiveProject, "An active project is not set!");
-
-			return GetProjectDirectory() / GetAssetDirectory() / assetPath;
-		}
-
-		void SetInfo(const ProjectInfo& info);
+		/// Converts a project name into a valid PascalCase identifier.
+		static std::string ToPascalCaseName(std::string_view name);
 
 		ProjectInfo& GetInfo() { return m_Info; }
 
@@ -56,8 +59,9 @@ namespace Kerberos
 		static void ReleaseActiveProjectResources();
 
 		Ref<AssetManagerBase> GetAssetManager() const { return m_AssetManager; }
-		Ref<EditorAssetManager> GetEditorAssetManager() const { return std::static_pointer_cast<EditorAssetManager>(m_AssetManager); }
-		Ref<RuntimeAssetManager> GetRuntimeAssetManager() const { return std::static_pointer_cast<RuntimeAssetManager>(m_AssetManager); }
+		Ref<EditorAssetManager> GetEditorAssetManager() const { return std::dynamic_pointer_cast<EditorAssetManager>(m_AssetManager); }
+		Ref<RuntimeAssetManager> GetRuntimeAssetManager() const { return std::dynamic_pointer_cast<RuntimeAssetManager>(m_AssetManager); }
+		Ref<RuntimeAssetManager> UseRuntimeAssetManager();
 
 	private:
 		ProjectInfo m_Info;

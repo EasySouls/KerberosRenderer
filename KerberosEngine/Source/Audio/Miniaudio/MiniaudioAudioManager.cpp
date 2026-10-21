@@ -1,9 +1,12 @@
-#include "kbrpch.hpp"
 #include "MiniaudioAudioManager.hpp"
 #include "Application.hpp"
 
+#include "Profiling/Profilers.hpp"
+
 #include <memory>
 #include <ranges>
+
+import Kerberos;
 
 namespace Kerberos
 {
@@ -14,16 +17,20 @@ namespace Kerberos
 
 	void MiniaudioAudioManager::Init()
 	{
+		KBR_TRACY_FUNCTION();
+
 		if (ma_engine_init(nullptr, &m_Engine) != MA_SUCCESS)
 		{
-			KBR_CORE_ERROR("Failed to initialize miniaudio engine");
+			Log::CoreError("Failed to initialize miniaudio engine");
 			throw std::runtime_error("Failed to initialize miniaudio engine");
 		}
-		KBR_CORE_INFO("MiniaudioAudioManager initialized successfully.");
+		Log::CoreInfo("MiniaudioAudioManager initialized successfully.");
 	}
 
 	void MiniaudioAudioManager::Update()
 	{
+		KBR_TRACY_FUNCTION();
+
 		// Cleanup finished sounds
 		for (auto it = m_PlayingSounds.begin(); it != m_PlayingSounds.end(); )
 		{
@@ -32,7 +39,7 @@ namespace Kerberos
 			{
 				ma_sound_stop(sound);
 				ma_sound_uninit(sound);
-				KBR_CORE_TRACE("Finished playing sound (miniaudio)");
+				Log::CoreTrace("Finished playing sound (miniaudio)");
 				it = m_PlayingSounds.erase(it);
 				continue;
 			}
@@ -42,6 +49,8 @@ namespace Kerberos
 
 	void MiniaudioAudioManager::Shutdown()
 	{
+		KBR_TRACY_FUNCTION();
+
 		for (const auto& sound : m_PlayingSounds | std::views::values)
 		{
 			ma_sound_stop(sound);
@@ -55,6 +64,8 @@ namespace Kerberos
 
 	Ref<Sound> MiniaudioAudioManager::Load(const std::filesystem::path& filepath)
 	{
+		KBR_TRACY_FUNCTION();
+
 		// Create Sound asset and remember mapping to filepath
 		const std::string soundName = filepath.stem().string();
 		Sound sound{ soundName };
@@ -69,10 +80,12 @@ namespace Kerberos
 
 	void MiniaudioAudioManager::Play(const std::filesystem::path& filepath)
 	{
+		KBR_TRACY_FUNCTION();
+
 		const auto it = m_FilepathToUUID.find(filepath);
 		if (it == m_FilepathToUUID.end())
 		{
-			KBR_CORE_ERROR("Sound not loaded: {0}", filepath.string());
+			Log::CoreError("Sound not loaded: {0}", filepath.string());
 			return;
 		}
 		const UUID uuid = it->second;
@@ -91,7 +104,7 @@ namespace Kerberos
 		if (ma_sound_init_from_file(&m_Engine, filepath.string().c_str(), MA_SOUND_FLAG_DECODE, nullptr, nullptr, pSound) != MA_SUCCESS)
 		{
 			delete pSound;
-			KBR_CORE_ERROR("Failed to init miniaudio sound for file: {0}", filepath.string());
+			Log::CoreError("Failed to init miniaudio sound for file: {0}", filepath.string());
 			return;
 		}
 
@@ -99,16 +112,18 @@ namespace Kerberos
 		{
 			ma_sound_uninit(pSound);
 			delete pSound;
-			KBR_CORE_ERROR("Failed to start miniaudio sound for file: {0}", filepath.string());
+			Log::CoreError("Failed to start miniaudio sound for file: {0}", filepath.string());
 			return;
 		}
 
 		m_PlayingSounds[uuid] = pSound;
-		KBR_CORE_INFO("Playing (miniaudio): {0}", filepath.string());
+		Log::CoreInfo("Playing (miniaudio): {0}", filepath.string());
 	}
 
 	void MiniaudioAudioManager::Play(const UUID& soundID)
 	{
+		KBR_TRACY_FUNCTION();
+
 		auto it = m_FilepathToUUID.end();
 		// find filepath by reverse lookup in m_FilepathToUUID
 		for (const auto& [path, uuid] : m_FilepathToUUID)
@@ -121,7 +136,7 @@ namespace Kerberos
 		}
 		if (it == m_FilepathToUUID.end())
 		{
-			KBR_CORE_ERROR("Sound ID not found: {0}", static_cast<uint64_t>(soundID));
+			Log::CoreError("Sound ID not found: {0}", static_cast<uint64_t>(soundID));
 			return;
 		}
 		Play(it->first);
@@ -129,10 +144,12 @@ namespace Kerberos
 
 	void MiniaudioAudioManager::Stop(const UUID& soundID)
 	{
+		KBR_TRACY_FUNCTION();
+
 		const auto it = m_PlayingSounds.find(soundID);
 		if (it == m_PlayingSounds.end() || it->second == nullptr)
 		{
-			KBR_CORE_ERROR("Sound is not currently playing");
+			Log::CoreError("Sound is not currently playing");
 			return;
 		}
 		ma_sound* s = it->second;
@@ -147,7 +164,7 @@ namespace Kerberos
 		const auto it = m_PlayingSounds.find(soundID);
 		if (it == m_PlayingSounds.end() || it->second == nullptr)
 		{
-			KBR_CORE_ERROR("You can only increase the volume of a sound currently playing");
+			Log::CoreError("You can only increase the volume of a sound currently playing");
 			return;
 		}
 		const float current = ma_sound_get_volume(it->second);
@@ -159,7 +176,7 @@ namespace Kerberos
 		const auto it = m_PlayingSounds.find(soundID);
 		if (it == m_PlayingSounds.end() || it->second == nullptr)
 		{
-			KBR_CORE_ERROR("You can only decrease the volume of a sound currently playing");
+			Log::CoreError("You can only decrease the volume of a sound currently playing");
 			return;
 		}
 		const float current = ma_sound_get_volume(it->second);
@@ -171,7 +188,7 @@ namespace Kerberos
 		const auto it = m_PlayingSounds.find(soundID);
 		if (it == m_PlayingSounds.end() || it->second == nullptr)
 		{
-			KBR_CORE_ERROR("You can only set the volume of a sound currently playing");
+			Log::CoreError("You can only set the volume of a sound currently playing");
 			return;
 		}
 		ma_sound_set_volume(it->second, volume);

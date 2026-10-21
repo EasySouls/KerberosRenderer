@@ -1,5 +1,3 @@
-project(KerberosScriptCoreLib LANGUAGES NONE)
-
 set(KBR_SCRIPT_CORE_PROJECT "${CMAKE_CURRENT_SOURCE_DIR}/KerberosScriptCoreLib.csproj")
 set(KBR_SCRIPT_CORE_STAGING_DIR "${CMAKE_CURRENT_BINARY_DIR}/artifacts/$<CONFIG>")
 set(KBR_SCRIPT_CORE_TARGET_DIR "${CMAKE_SOURCE_DIR}/KerberosEditor/Resources/Scripts")

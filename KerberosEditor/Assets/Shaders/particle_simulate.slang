@@ -3,8 +3,9 @@ import common;
 
 [vk::binding(0, 0)] RWStructuredBuffer<Particle> particlePool;
 [vk::binding(1, 0)] RWStructuredBuffer<uint> deadList;
-[vk::binding(2, 0)] RWStructuredBuffer<uint> aliveList;
-[vk::binding(3, 0)] RWStructuredBuffer<uint> counters; // [0] = deadCount, [1] = aliveCount
+[vk::binding(2, 0)] RWStructuredBuffer<uint> activeListA;
+[vk::binding(3, 0)] RWStructuredBuffer<uint> counters; // [0] = dead, [1] = active, [2] = next active, [3] = list index
+[vk::binding(4, 0)] RWStructuredBuffer<uint> activeListB;
 
 [vk::binding(1, 1)] ConstantBuffer<ParticleFrameData> scene;
 
@@ -12,17 +13,12 @@ import common;
 [numthreads(256, 1, 1)]
 void computeMain(uint3 threadId: SV_DispatchThreadID)
 {
-    // We dispatch over the MAXIMUM particle pool budget
-    uint poolIndex = threadId.x;
-
-    if (poolIndex >= 1000000)
+    uint activeCount = counters[1];
+    if (threadId.x >= activeCount)
         return;
 
-    // Read particle
+    uint poolIndex = counters[3] == 0 ? activeListA[threadId.x] : activeListB[threadId.x];
     Particle p = particlePool[poolIndex];
-
-    // If it was already dead before this frame, skip entirely
-    if (p.life <= 0.0) return;
 
     // Integrate
     p.life -= scene.deltaTime;
@@ -48,9 +44,12 @@ void computeMain(uint3 threadId: SV_DispatchThreadID)
         // Write the updated particle back to memory
         particlePool[poolIndex] = p;
 
-        // Add to the alive list for rendering
-        uint newAliveIndex;
-        InterlockedAdd(counters[1], 1, newAliveIndex);
-        aliveList[newAliveIndex] = poolIndex;
+        // Add to the next active list for rendering and the next frame.
+        uint newActiveIndex;
+        InterlockedAdd(counters[2], 1, newActiveIndex);
+        if (counters[3] == 0)
+            activeListB[newActiveIndex] = poolIndex;
+        else
+            activeListA[newActiveIndex] = poolIndex;
     }
 }

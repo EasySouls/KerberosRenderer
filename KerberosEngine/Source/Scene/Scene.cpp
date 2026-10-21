@@ -1,22 +1,27 @@
-#include "kbrpch.hpp"
 
 #include "Scene.hpp"
+#include "Core/Core.hpp"
 #include "Entity.hpp"
 #include "Components.hpp"
 #include "Components/PhysicsComponents.hpp"
 #include "Components/AudioComponents.hpp"
 #include "Components/ParticleComponents.hpp"
+#include "Components/AnimationComponents.hpp"
 #include "Application.hpp"
 #include "Assets/AssetManager.hpp"
 #include "Assets/Prefab.hpp"
 #include "Renderer/Renderer.hpp"
 #include "Scripting/ScriptEngine.hpp"
 #include "Physics/Jolt/Utils.hpp"
+#include "Profiling/Profilers.hpp"
+#include "Assets/Model.hpp"
 
 #include <glm/gtx/matrix_decompose.hpp>
 
 #include <utility>
 
+
+import Kerberos;
 
 #define USE_MAP_FOR_UUID 1
 
@@ -36,22 +41,31 @@ namespace Kerberos
 
 	void Scene::OnRuntimeStart()
 	{
-		KBR_PROFILE_FUNCTION();
+		KBR_TRACY_FUNCTION();
+
+		m_IsRunning = true;
 
 		m_PhysicsSystem->Initialize(shared_from_this());
 		m_PhysicsSystem->Update(0.0f); // Sync physics bodies with transforms before scripts run for the first time
 
 		ScriptEngine::OnRuntimeStart(shared_from_this());
 
-		/// Instantiate all scripts
-		m_Registry.view<ScriptComponent>().each([this](auto enttId, ScriptComponent& script) {
-			const Entity entity{ enttId, this };
+		/// Instantiate all scripts. Snapshot the entities first because a
+		/// script's OnCreate may spawn prefabs that add new ScriptComponents.
+		std::vector<Entity> scriptEntities;
+		const auto scriptView = m_Registry.view<ScriptComponent>();
+		scriptEntities.reserve(static_cast<size_t>(m_Registry.storage<ScriptComponent>().size()));
+		for (const auto enttId : scriptView)
+			scriptEntities.emplace_back(enttId, this);
+
+		for (const Entity entity : scriptEntities)
 			ScriptEngine::OnCreateEntity(entity);
-		});
 	}
 
-	void Scene::OnRuntimeStop() const
+	void Scene::OnRuntimeStop()
 	{
+		m_IsRunning = false;
+
 		m_PhysicsSystem->Cleanup();
 
 		ScriptEngine::OnRuntimeStop();
@@ -74,11 +88,15 @@ namespace Kerberos
 
 	void Scene::OnUpdateEditor(const float ts, const Camera& camera)
 	{
+		KBR_TRACY_FUNCTION();
+
 		Render3DEditor(camera, ts);
 	}
 
 	void Scene::OnUpdateSimulation(const float ts, const Camera& camera)
 	{
+		KBR_TRACY_FUNCTION();
+
 		/// If the scene is paused, do not update the physics system, but still render the scene
 		if (!m_IsScenePaused)
 		{
@@ -88,9 +106,9 @@ namespace Kerberos
 		Render3DEditor(camera, ts);
 	}
 
-	void Scene::OnUpdateRuntime(const float ts, const Camera& camera)
+	void Scene::OnUpdateRuntime(const float ts)
 	{
-		KBR_PROFILE_FUNCTION();
+		KBR_TRACY_FUNCTION();
 
 		if (!m_IsScenePaused)
 		{
@@ -111,10 +129,10 @@ namespace Kerberos
 			}
 		}
 
-		/// Render the scene
-
+		/// Render the scene from the primary camera in the scene. Runtime rendering
+		/// never uses the editor camera.
 		const SceneCamera* mainCamera = nullptr;
-		glm::mat4 mainCameraTransform;
+		glm::mat4 mainCameraTransform(1.0f);
 
 		{
 			const auto view = m_Registry.view<CameraComponent, TransformComponent>();
@@ -123,26 +141,24 @@ namespace Kerberos
 				auto [cameraComp, transformComp] = view.get<CameraComponent, TransformComponent>(entity);
 				if (cameraComp.IsPrimary)
 				{
+					mainCameraTransform = transformComp.WorldTransform;
+					cameraComp.Camera.SetViewMatrix(glm::inverse(mainCameraTransform));
 					mainCamera = &cameraComp.Camera;
-					mainCameraTransform = transformComp.GetTransform();
 					break;
 				}
 			}
 		}
 
-		//if (mainCamera)
-		//{
-			if (m_Is3D)
-			{
-				//Render3DRuntime(mainCamera, mainCameraTransform);
-				// TODO: Implement rendering with CameraComponent
-				Render3DRuntime(camera, ts);
-			}
-			else
-			{
-				Render2DRuntime(mainCamera, mainCameraTransform, ts);
-			}
-		//}
+		if (mainCamera == nullptr)
+		{
+			Log::CoreError("Cannot render the scene in play mode: no primary camera was found.");
+			return;
+		}
+
+		if (m_Is3D)
+			Render3DRuntime(mainCamera, mainCameraTransform, ts);
+		else
+			Render2DRuntime(mainCamera, mainCameraTransform, ts);
 	}
 
 	Entity Scene::CreateEntity(const std::string& name, const UUID parentId)
@@ -196,84 +212,121 @@ namespace Kerberos
 
 Entity Scene::InstantiatePrefab(const AssetHandle prefabHandle, const std::string& rootName)
 {
-	KBR_PROFILE_FUNCTION();
+	KBR_TRACY_FUNCTION();
 
 	if (!prefabHandle.IsValid())
 	{
-		KBR_CORE_ERROR("Cannot instantiate prefab with invalid handle.");
+		Log::CoreError("Cannot instantiate prefab with invalid handle.");
 		return {};
 	}
 
 	if (AssetManager::GetAssetType(prefabHandle) != AssetType::Prefab)
 	{
-		KBR_CORE_ERROR("Asset {} is not a prefab asset.", prefabHandle);
+		Log::CoreError("Asset {} is not a prefab asset.", prefabHandle);
 		return {};
 	}
 
 	const Ref<Prefab> prefab = AssetManager::GetAsset<Prefab>(prefabHandle);
 	if (!prefab)
 	{
-		KBR_CORE_ERROR("Failed to load prefab asset: {}", prefabHandle);
+		Log::CoreError("Failed to load prefab asset: {}", prefabHandle);
 		return {};
 	}
 
-	// Map old UUIDs from the prefab template to new instance UUIDs
-	std::unordered_map<UUID, UUID> uuidMapping;
-	std::unordered_map<UUID, Entity> entityMapping;
+	std::unordered_map<PrefabLocalIndex, Entity> entityMapping;
+	std::unordered_map<UUID, PrefabLocalIndex> legacyIndices;
 
 	const std::string resolvedRootName = rootName.empty() ? prefab->GetName() : rootName;
 
-	// First pass: create all entities with new UUIDs
-	for (const auto& prefabEntity : prefab->Entities)
+	for (PrefabLocalIndex i = 0; i < prefab->Entities.size(); ++i)
 	{
-		const UUID newUUID = UUID();
-		uuidMapping[prefabEntity.ID] = newUUID;
-
-		Entity newEntity = CreateEntityWithUUID(prefabEntity.Tag, newUUID);
-		entityMapping[prefabEntity.ID] = newEntity;
-
-		// Restore transform
-		auto& transform = newEntity.GetComponent<TransformComponent>();
-		transform.Translation = prefabEntity.Translation;
-		transform.Rotation = prefabEntity.EulerRotation;
-		transform.Scale = prefabEntity.Scale;
-
-		// If this entity has a static mesh, attempt to resolve and attach it
-		if (prefabEntity.HasStaticMesh && !prefabEntity.MeshAssetPath.empty())
+		const PrefabEntityData& prefabEntity = prefab->Entities[i];
+		const PrefabLocalIndex local = prefabEntity.LocalIndex == InvalidPrefabLocalIndex ? i : prefabEntity.LocalIndex;
+		if (prefabEntity.ID.IsValid()) 
 		{
-			// For now, we store asset paths as relative paths and need to resolve them
-			// TODO: implement proper asset path resolution
-			// For now, we just create the component without assets - they should be saved with handles instead
-			auto& smc = newEntity.AddComponent<StaticMeshComponent>();
-			// TODO: resolve mesh and material handles from paths
+		    legacyIndices[prefabEntity.ID] = local;
 		}
+		const Entity newEntity = CreateEntity(prefabEntity.Name.empty() ? prefabEntity.Tag : prefabEntity.Name);
+		entityMapping[local] = newEntity;
+		prefabEntity.ToEntity(newEntity);
 	}
 
-	// Second pass: establish hierarchy relationships
-	for (const auto& prefabEntity : prefab->Entities)
+	for (size_t i = 0; i < prefab->Entities.size(); ++i)
 	{
-		const UUID oldUUID = prefabEntity.ID;
-		const UUID newUUID = uuidMapping[oldUUID];
-		Entity newEntity = entityMapping[oldUUID];
+		const auto& prefabEntity = prefab->Entities[i];
+		const auto local = prefabEntity.LocalIndex == InvalidPrefabLocalIndex ? static_cast<PrefabLocalIndex>(i) : prefabEntity.LocalIndex;
+		Entity child = entityMapping[local];
 
-		// Handle parent-child relationships
-		if (prefabEntity.Parent.IsValid() && uuidMapping.contains(prefabEntity.Parent))
+		auto parentLocal = prefabEntity.ParentLocalIndex;
+		if (parentLocal == InvalidPrefabLocalIndex && prefabEntity.Parent.IsValid() && legacyIndices.contains(prefabEntity.Parent))
 		{
-			const UUID newParentUUID = uuidMapping[prefabEntity.Parent];
-			Entity parentEntity = GetEntityByUUID(newParentUUID);
-			if (parentEntity)
+			parentLocal = legacyIndices[prefabEntity.Parent];
+		}
+		if (parentLocal != InvalidPrefabLocalIndex && entityMapping.contains(parentLocal))
+		{
+			SetParent(child, entityMapping[parentLocal], false);
+		}
+
+		if (child.HasComponent<SkinComponent>())
+		{
+			for (auto joint : prefabEntity.Skin->JointEntityIndices)
 			{
-				SetParent(newEntity, parentEntity, false);
+				if (entityMapping.contains(joint)) 
+				    child.GetComponent<SkinComponent>().JointEntities.push_back(entityMapping[joint].GetUUID());
+			}
+			for (const auto& jointId : prefabEntity.Skin->JointEntityIDs)
+			{
+				if (legacyIndices.contains(jointId)) 
+				    child.GetComponent<SkinComponent>().JointEntities.push_back(entityMapping[legacyIndices[jointId]].GetUUID());
 			}
 		}
-		else if (prefabEntity.Parent == prefab->RootEntityID || !prefabEntity.Parent.IsValid())
+		if (child.HasComponent<RigidBody3DComponent>()) child.GetComponent<RigidBody3DComponent>().RuntimeBody = nullptr;
+	}
+
+	if (m_IsRunning)
+	{
+		/// Entities spawned while the scene is running do not go through
+		/// OnRuntimeStart, so create their script instances and run OnCreate now.
+		for (size_t i = 0; i < prefab->Entities.size(); ++i)
 		{
-			// This is a root-level entity in the prefab, mark it for later reparenting to the instance root
+			const auto& prefabEntity = prefab->Entities[i];
+			const auto local = prefabEntity.LocalIndex == InvalidPrefabLocalIndex
+				? static_cast<PrefabLocalIndex>(i)
+				: prefabEntity.LocalIndex;
+
+			const auto it = entityMapping.find(local);
+			if (it == entityMapping.end() || !it->second)
+				continue;
+
+			if (it->second.HasComponent<ScriptComponent>())
+				ScriptEngine::OnCreateEntity(it->second);
 		}
 	}
 
-	// Find or identify the root entity in the new instance
-	Entity instanceRoot = entityMapping[prefab->RootEntityID];
+	PrefabLocalIndex rootLocal = prefab->RootLocalIndex;
+	if (rootLocal == InvalidPrefabLocalIndex && legacyIndices.contains(prefab->RootEntityID))
+	{
+	    rootLocal = legacyIndices[prefab->RootEntityID];
+	}
+	Entity instanceRoot = entityMapping.contains(rootLocal) ? entityMapping[rootLocal] : Entity{};
+	if (prefab->RequiresInstanceRoot)
+	{
+		instanceRoot = CreateEntity(resolvedRootName.empty() ? prefab->GetName() : resolvedRootName);
+		instanceRoot.AddComponent<PrefabInstanceComponent>(PrefabInstanceComponent{ prefabHandle });
+		for (size_t i = 0; i < prefab->Entities.size(); ++i)
+		{
+			const auto& prefabEntity = prefab->Entities[i];
+			if (prefabEntity.ParentLocalIndex == InvalidPrefabLocalIndex)
+			{
+				const auto local = prefabEntity.LocalIndex == InvalidPrefabLocalIndex
+					? static_cast<PrefabLocalIndex>(i)
+					: prefabEntity.LocalIndex;
+				if (entityMapping.contains(local))
+					SetParent(entityMapping[local], instanceRoot, false);
+			}
+		}
+		return instanceRoot;
+	}
 	if (instanceRoot)
 	{
 		// Rename the root to match the resolved name
@@ -289,6 +342,8 @@ Entity Scene::InstantiatePrefab(const AssetHandle prefabHandle, const std::strin
 
 	void Scene::DestroyEntity(const Entity entity)
 	{
+		KBR_TRACY_FUNCTION();
+
 		const entt::entity enttId = static_cast<entt::entity>(entity);
 		if (const auto it = std::ranges::find(m_RootEntities, enttId); it != m_RootEntities.end())
 		{
@@ -322,7 +377,7 @@ Entity Scene::InstantiatePrefab(const AssetHandle prefabHandle, const std::strin
 
 	Entity Scene::DuplicateEntity(const Entity entity, const bool duplicateChildren)
 	{
-		KBR_PROFILE_FUNCTION();
+		KBR_TRACY_FUNCTION();
 
 		const std::string name = entity.GetComponent<TagComponent>().Tag;
 		const std::string newName = name + " Copy";
@@ -454,22 +509,24 @@ Entity Scene::InstantiatePrefab(const AssetHandle prefabHandle, const std::strin
 
 	Entity Scene::InstantiateModelAsset(const AssetHandle modelHandle, const std::string& rootName)
 	{
+		KBR_TRACY_FUNCTION();
+
 		if (!modelHandle.IsValid())
 		{
-			KBR_CORE_ERROR("Cannot instantiate model with invalid handle.");
+			Log::CoreError("Cannot instantiate model with invalid handle.");
 			return {};
 		}
 
-		if (AssetManager::GetAssetType(modelHandle) != AssetType::Model)
+		if (AssetManager::GetAssetType(modelHandle) != AssetType::ModelDEPRECATED)
 		{
-			KBR_CORE_ERROR("Asset {} is not a model asset.", modelHandle);
+			Log::CoreError("Asset {} is not a model asset.", modelHandle);
 			return {};
 		}
 
 		const Ref<Model> model = AssetManager::GetAsset<Model>(modelHandle);
 		if (!model)
 		{
-			KBR_CORE_ERROR("Failed to load model asset: {}", modelHandle);
+			Log::CoreError("Failed to load model asset: {}", modelHandle);
 			return {};
 		}
 
@@ -557,7 +614,7 @@ Entity Scene::InstantiatePrefab(const AssetHandle prefabHandle, const std::strin
 
 	Entity Scene::GetEntityByUUID(const UUID uuid) const
 	{
-		KBR_PROFILE_FUNCTION();
+		KBR_TRACY_FUNCTION();
 
 #if USE_MAP_FOR_UUID
 
@@ -577,8 +634,36 @@ Entity Scene::InstantiatePrefab(const AssetHandle prefabHandle, const std::strin
 #endif
 	}
 
-	void Scene::SetParent(const Entity child, const Entity parent, bool keepWorldTransform)
+	Entity Scene::TryGetEntityByUUID(const UUID uuid) const
 	{
+		KBR_TRACY_FUNCTION();
+
+		if (!uuid.IsValid())
+			return {};
+
+#if USE_MAP_FOR_UUID
+
+		const auto it = m_UUIDToEntityMap.find(uuid);
+		return it != m_UUIDToEntityMap.end() ? it->second : Entity{};
+#else
+		const auto view = m_Registry.view<IDComponent>();
+		for (auto entity : view)
+		{
+			auto id = view.get<IDComponent>(entity).ID;
+			if (id == uuid)
+			{
+				return { entity, this };
+			}
+		}
+
+		return {};
+#endif
+	}
+
+	void Scene::SetParent(const Entity child, const Entity parent, [[maybe_unused]] bool keepWorldTransform)
+	{
+		KBR_TRACY_FUNCTION();
+
 		RemoveParent(child);
 
 		if (const auto it = std::ranges::find(m_RootEntities, static_cast<entt::entity>(child)); it != m_RootEntities.end())
@@ -598,7 +683,7 @@ Entity Scene::InstantiatePrefab(const AssetHandle prefabHandle, const std::strin
 
 	Entity Scene::GetParent(const Entity child) const
 	{
-		KBR_PROFILE_FUNCTION();
+		KBR_TRACY_FUNCTION();
 
 		const auto& childHierarchy = child.GetComponent<HierarchyComponent>();
 		if (childHierarchy.Parent.IsValid())
@@ -610,7 +695,7 @@ Entity Scene::InstantiatePrefab(const AssetHandle prefabHandle, const std::strin
 
 	void Scene::RemoveParent(const Entity child)
 	{
-		KBR_PROFILE_FUNCTION();
+		KBR_TRACY_FUNCTION();
 
 		auto& childHierarchy = child.GetComponent<HierarchyComponent>();
 		if (childHierarchy.Parent.IsValid())
@@ -633,7 +718,7 @@ Entity Scene::InstantiatePrefab(const AssetHandle prefabHandle, const std::strin
 
 	std::vector<Entity> Scene::GetChildren(const Entity parent) const
 	{
-		KBR_PROFILE_FUNCTION();
+		KBR_TRACY_FUNCTION();
 
 		const auto& parentHierarchy = parent.GetComponent<HierarchyComponent>();
 
@@ -648,6 +733,8 @@ Entity Scene::InstantiatePrefab(const AssetHandle prefabHandle, const std::strin
 
 	void Scene::OnViewportResize(const uint32_t width, const uint32_t height)
 	{
+		KBR_TRACY_FUNCTION();
+
 		m_ViewportHeight = height;
 		m_ViewportWidth = width;
 
@@ -672,18 +759,20 @@ Entity Scene::InstantiatePrefab(const AssetHandle prefabHandle, const std::strin
 
 	const PhysicsSystem& Scene::GetPhysicsSystem() const
 	{
-		KBR_CORE_ASSERT(m_PhysicsSystem, "Physics system is not initialized");
+		KBRAssert(m_PhysicsSystem != nullptr, "Physics system is not initialized");
 		return *m_PhysicsSystem;
 	}
 
 	PhysicsSystem& Scene::GetPhysicsSystem()
 	{
-		KBR_CORE_ASSERT(m_PhysicsSystem, "Physics system is not initialized");
+		KBRAssert(m_PhysicsSystem != nullptr, "Physics system is not initialized");
 		return *m_PhysicsSystem;
 	}
 
 	void Scene::CopyEntityRecursive(const Ref<Scene>& other, const entt::entity sourceEntity, const Ref<Scene>& newScene, const entt::entity parentNewEntity)
 	{
+		KBR_TRACY_FUNCTION();
+
 		auto& sourceRegistry = other->m_Registry;
 
 		const UUID sourceID = sourceRegistry.get<IDComponent>(sourceEntity).ID;
@@ -773,13 +862,7 @@ Entity Scene::InstantiatePrefab(const AssetHandle prefabHandle, const std::strin
 		return newScene;
 	}
 
-	AssetType Scene::GetType()
-	{
-		return AssetType::Scene;
-	}
-
-
-	void Scene::Render2DRuntime(const SceneCamera* mainCamera, const glm::mat4& mainCameraTransform, const float dt)
+	void Scene::Render2DRuntime([[maybe_unused]] const SceneCamera* mainCamera, [[maybe_unused]] const glm::mat4& mainCameraTransform, [[maybe_unused]] const float dt)
 	{
 		//Renderer2D::BeginScene(*mainCamera, mainCameraTransform);
 
@@ -796,121 +879,15 @@ Entity Scene::InstantiatePrefab(const AssetHandle prefabHandle, const std::strin
 
 	void Scene::Render3DRuntime(const SceneCamera* mainCamera, const glm::mat4& mainCameraTransform, const float dt)
 	{
-		KBR_PROFILE_FUNCTION();
-#pragma region old_rendering_code
-		//DirectionalLightComponent* dlc = nullptr;
-		//const auto sunView = m_Registry.view<DirectionalLightComponent, TransformComponent>();
-		//for (const auto entity : sunView)
-		//{
-		//	auto [light, transform] = sunView.get<DirectionalLightComponent, TransformComponent>(entity);
-		//	if (light.IsEnabled)
-		//	{
-		//		dlc = &light;
-		//		break;
-		//	}
-		//}
+		KBR_TRACY_FUNCTION();
 
-		//if (ShouldRenderShadows(dlc))
-		//{
-		//	/*ShadowMapSettings shadowSettings;
-		//	shadowSettings.Resolution = 1024;
-		//	shadowSettings.OrthoSize = 15.0f;
-		//	shadowSettings.NearPlane = 1.0f;
-		//	shadowSettings.FarPlane = 100.0f;
-		//	shadowSettings.EnableShadows = true;
+		KBRAssert(mainCamera != nullptr, "Cannot render the 3D scene without a primary camera");
+		if (mainCamera == nullptr)
+		{
+			return;
+		}
 
-		//	Renderer3D::BeginShadowPass(dlc->Light, shadowSettings, m_ShadowMapFramebuffer);*/
-
-		//	/// Render all shadow-casting meshes
-		//	const auto meshView = m_Registry.view<StaticMeshComponent, TransformComponent>();
-		//	for (auto entity : meshView)
-		//	{
-		//		auto& meshComp = meshView.get<StaticMeshComponent>(entity);
-		//		auto& transformComp = meshView.get<TransformComponent>(entity);
-
-		//		if (meshComp.StaticMesh && meshComp.MeshMaterial && meshComp.Visible)
-		//		{
-		//			/*Renderer3D::SubmitMesh(meshComp.StaticMesh, transformComp.WorldTransform,
-		//								   meshComp.MeshMaterial, meshComp.MeshTexture, 1.0f,
-		//								   static_cast<int>(entity), meshComp.CastShadows);*/
-		//		}
-		//	}
-
-		//	dlc->NeedsUpdate = false;
-
-		//	//Renderer3D::EndPass();
-		//}
-
-		//std::vector<PointLight> pointLights;
-		//const auto pointLightView = m_Registry.view<PointLightComponent, TransformComponent>();
-		//for (const auto entity : pointLightView)
-		//{
-		//	auto [light, transform] = pointLightView.get<PointLightComponent, TransformComponent>(entity);
-		//	if (light.IsEnabled)
-		//	{
-		//		pointLights.push_back(light.Light);
-		//	}
-		//}
-
-		//Ref<TextureCube> skyboxTexture = nullptr;
-		//const auto skyboxView = m_Registry.view<EnvironmentComponent>();
-		//for (const auto entity : skyboxView)
-		//{
-		//	const auto& skybox = skyboxView.get<EnvironmentComponent>(entity);
-		//	if (skybox.IsSkyboxEnabled && skybox.SkyboxTexture)
-		//	{
-		//		skyboxTexture = AssetManager::GetAsset<TextureCube>(skybox.SkyboxTexture);
-		//		break;
-		//	}
-		//}
-
-		///*m_EditorFramebuffer->Bind();
-
-		//RenderCommand::SetClearColor({ 0.1f, 0.1f, 0.1f, 1 });
-		//RenderCommand::Clear();
-
-		///// Clear our entity ID attachment to -1, so when rendering entities they fill that space with their entity ID,
-		///// and empty spacces will have -1, signaling that there is no entity.
-		///// Used for mouse picking.
-		//m_EditorFramebuffer->ClearAttachment(1, -1);
-
-		//Renderer3D::BeginGeometryPass(*mainCamera, mainCameraTransform, &dlc->Light, pointLights, skyboxTexture);*/
-
-		//const auto view = m_Registry.view<TransformComponent, StaticMeshComponent>();
-		//for (const auto entity : view)
-		//{
-		//	auto [transform, mesh] = view.get<TransformComponent, StaticMeshComponent>(entity);
-
-		//	if (mesh.Visible)
-		//	{
-		//		//Renderer3D::SubmitMesh(mesh.StaticMesh, transform.WorldTransform, mesh.MeshMaterial, mesh.MeshTexture);
-		//	}
-		//}
-
-		////Renderer3D::EndPass();
-
-		//const auto textView = m_Registry.view<TransformComponent, TextComponent>();
-		//for (const auto entity : textView)
-		//{
-		//	auto [transform, text] = textView.get<TransformComponent, TextComponent>(entity);
-
-		//	//Renderer3D::SubmitText(text.Text, text.Font, transform.WorldTransform, text.Color, text.FontSize, static_cast<int>(entity));
-		//}
-
-		////Renderer3D::EndScene();
-
-#pragma endregion
-
-		throw std::runtime_error("Not implemented");
-		//Renderer::RenderSceneRuntime(shared_from_this(), mainCamera, mainCameraTransform);
-	}
-
-	void Scene::Render3DRuntime(const Camera& camera, const float dt) 
-	{
-		glm::mat4 cameraTransform(1.0f);
-		const glm::vec4 camPos = { camera.GetPosition().x, camera.GetPosition().y, camera.GetPosition().z, 1.0f };
-		cameraTransform[3] = camPos;
-		Renderer::RenderSceneRuntime(shared_from_this(), camera, cameraTransform, dt);
+		Renderer::RenderSceneRuntime(shared_from_this(), *mainCamera, mainCameraTransform, dt);
 	}
 
 	void Scene::Render3DEditor(const Camera& camera, const float dt)
@@ -1022,10 +999,10 @@ Entity Scene::InstantiatePrefab(const AssetHandle prefabHandle, const std::strin
 
 	void Scene::UpdateScripts(float ts)
 	{
-		KBR_PROFILE_FUNCTION();
+		KBR_TRACY_FUNCTION();
 
 		{
-			KBR_PROFILE_SCOPE("Scene::UpdateScripts - Native scripts update");
+			KBR_TRACY_SCOPE("Scene::UpdateScripts - Native scripts update");
 
 			m_Registry.view<NativeScriptComponent>().each([this]([[maybe_unused]] auto entity, [[maybe_unused]] const NativeScriptComponent& script)
 			{
@@ -1041,13 +1018,18 @@ Entity Scene::InstantiatePrefab(const AssetHandle prefabHandle, const std::strin
 		}
 
 		{
-			KBR_PROFILE_SCOPE("Scene::UpdateScripts - C# scripts update");
+			KBR_TRACY_SCOPE("Scene::UpdateScripts - C# scripts update");
 
-			m_Registry.view<ScriptComponent>().each([this, ts](auto id, [[maybe_unused]] const ScriptComponent& script)
-			{
-				const Entity entity{ id, this };
+			/// Snapshot first: scripts may instantiate prefabs during OnUpdate,
+			/// which mutates the ScriptComponent storage.
+			std::vector<Entity> scriptEntities;
+			const auto scriptView = m_Registry.view<ScriptComponent>();
+			scriptEntities.reserve(static_cast<size_t>(m_Registry.storage<ScriptComponent>().size()));
+			for (const auto enttId : scriptView)
+				scriptEntities.emplace_back(enttId, this);
+
+			for (const Entity entity : scriptEntities)
 				ScriptEngine::OnUpdateEntity(entity, ts);
-			});
 		}
 	}
 
@@ -1087,7 +1069,7 @@ Entity Scene::InstantiatePrefab(const AssetHandle prefabHandle, const std::strin
 			{
 				if (found)
 				{
-					KBR_CORE_WARN("Multiple directional lights found in the scene. Using the first one found as sunlight.");
+					Kerberos::Log::CoreWarn("Multiple directional lights found in the scene. Using the first one found as sunlight.");
 					break;
 				}
 
@@ -1115,7 +1097,7 @@ Entity Scene::InstantiatePrefab(const AssetHandle prefabHandle, const std::strin
 
 	void Scene::CalculateEntityTransforms()
 	{
-		KBR_PROFILE_FUNCTION();
+		KBR_TRACY_FUNCTION();
 
 		const auto view = m_Registry.view<TransformComponent>();
 		for (const auto id : view)
@@ -1181,7 +1163,7 @@ Entity Scene::InstantiatePrefab(const AssetHandle prefabHandle, const std::strin
 	}
 
 	template <>
-	void Scene::OnComponentAdded<CameraComponent>(Entity entity, CameraComponent& component)
+	void Scene::OnComponentAdded<CameraComponent>([[maybe_unused]] Entity entity, CameraComponent& component)
 	{
 		component.Camera.SetViewportSize(m_ViewportWidth, m_ViewportHeight);
 	}
@@ -1193,6 +1175,21 @@ Entity Scene::InstantiatePrefab(const AssetHandle prefabHandle, const std::strin
 
 	template <>
 	void Scene::OnComponentAdded<TransformComponent>(Entity, TransformComponent&)
+	{
+	}
+
+	template <>
+	void Scene::OnComponentAdded<SkinComponent>(Entity, SkinComponent&)
+	{
+	}
+
+	template <>
+	void Scene::OnComponentAdded<SkeletalMeshComponent>(Entity, SkeletalMeshComponent&)
+	{
+	}
+
+	template <>
+	void Scene::OnComponentAdded<AnimationComponent>(Entity, AnimationComponent&)
 	{
 	}
 
@@ -1284,7 +1281,7 @@ Entity Scene::InstantiatePrefab(const AssetHandle prefabHandle, const std::strin
 		const auto& smc = entity.GetComponent<StaticMeshComponent>();
 		if (smc.StaticMesh == nullptr)
 		{
-			KBR_CORE_WARN("MeshCollider3DComponent on entity {} does not have a valid static mesh!", entity.GetComponent<TagComponent>().Tag);
+			Kerberos::Log::CoreWarn("MeshCollider3DComponent on entity {} does not have a valid static mesh!", entity.GetComponent<TagComponent>().Tag);
 			return;
 		}
 

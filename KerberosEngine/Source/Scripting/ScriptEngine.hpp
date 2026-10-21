@@ -31,20 +31,20 @@ namespace Kerberos
 	};
 
 	/// Function pointer types for calls into the managed ScriptGlue bridge
-	using ManagedLoadAssemblyClassesFn = int(*)(const char* assemblyPath);
+	using ManagedLoadAssemblyClassesFn = int(*)(const char* coreAssemblyPath, const char* userAssemblyPath);
 	using ManagedClassExistsFn = int(*)(const char* className);
 	using ManagedCreateInstanceFn = int(*)(uint64_t entityID, const char* className);
-	using ManagedDestroyInstanceFn = void(*)(uint64_t entityID);
+	using ManagedDestroyInstanceFn = void(*)(uint64_t entityID, const char* className);
 	using ManagedClearInstancesFn = void(*)();
-	using ManagedInvokeOnCreateFn = int(*)(uint64_t entityID);
-	using ManagedInvokeOnUpdateFn = int(*)(uint64_t entityID, float deltaTime);
-	using ManagedInvokeOnCollisionEnterFn = int(*)(uint64_t entityID, const ScriptCollisionPayload* payload);
-	using ManagedInvokeOnCollisionPersistFn = int(*)(uint64_t entityID, const ScriptCollisionPayload* payload);
-	using ManagedInvokeOnCollisionExitFn = int(*)(uint64_t entityID, const ScriptCollisionPayload* payload);
+	using ManagedInvokeOnCreateFn = int(*)(uint64_t entityID, const char* className);
+	using ManagedInvokeOnUpdateFn = int(*)(uint64_t entityID, const char* className, float deltaTime);
+	using ManagedInvokeOnCollisionEnterFn = int(*)(uint64_t entityID, const char* className, const ScriptCollisionPayload* payload);
+	using ManagedInvokeOnCollisionPersistFn = int(*)(uint64_t entityID, const char* className, const ScriptCollisionPayload* payload);
+	using ManagedInvokeOnCollisionExitFn = int(*)(uint64_t entityID, const char* className, const ScriptCollisionPayload* payload);
 	using ManagedGetFieldCountFn = int(*)(const char* className);
 	using ManagedGetFieldsFn = int(*)(const char* className, void** fieldNames, void** fieldTypeNames, int maxFields, int bufferSize);
-	using ManagedGetFieldValueFn = int(*)(uint64_t entityID, const char* fieldName, void* outValue, int bufferSize);
-	using ManagedSetFieldValueFn = int(*)(uint64_t entityID, const char* fieldName, void* value, int valueSize);
+	using ManagedGetFieldValueFn = int(*)(uint64_t entityID, const char* className, const char* fieldName, void* outValue, int bufferSize);
+	using ManagedSetFieldValueFn = int(*)(uint64_t entityID, const char* className, const char* fieldName, void* value, int valueSize);
 	using ManagedGetEntityClassCountFn = int(*)();
 	using ManagedGetEntityClassNamesFn = int(*)(void** namesBuffer, int maxNames, int bufferSize);
 	using ManagedSetNativeCallbacksFn = void(*)(void* nativeCallbacks);
@@ -55,6 +55,11 @@ namespace Kerberos
 		static void Init();
 		static void Shutdown();
 		static void ReloadAssembly();
+
+		/// Configures the user's per-project C# assembly, builds it, and reloads.
+		/// Called when a project is opened or created. Pass an empty
+		/// assemblyName to clear the user assembly (e.g. when no project is open).
+		static void OnProjectOpened(const std::filesystem::path& projectDirectory, const std::string& assemblyName);
 
 		static void OnRuntimeStart(const Ref<Scene>& scene);
 		static void OnRuntimeStop();
@@ -69,20 +74,24 @@ namespace Kerberos
 		static void CopyScriptFieldInitializers(Entity srcEntity, Entity dstEntity);
 
 		static const std::unordered_map<std::string, Ref<ScriptClass>>& GetEntityClasses();
-		static std::unordered_map<std::string, ScriptFieldInitializer>& GetScriptFieldInitializerMap(Entity entity);
-		static Ref<ScriptInstance> GetEntityInstance(UUID entityID);
+		static std::unordered_map<std::string, ScriptFieldInitializer>& GetScriptFieldInitializerMap(Entity entity, const std::string& className);
+		static Ref<ScriptInstance> GetEntityInstance(UUID entityID, const std::string& className);
+
+		/// Returns all script instances attached to the entity, or nullptr when
+		/// the entity has no running script instances.
+		static const std::unordered_map<std::string, Ref<ScriptInstance>>* GetEntityInstances(UUID entityID);
 		static const WeakRef<Scene>& GetSceneContext();
 
 		/// Managed bridge accessors (used by ScriptInstance)
 		static bool CreateManagedInstance(uint64_t entityID, const std::string& className);
-		static void DestroyManagedInstance(uint64_t entityID);
-		static bool InvokeManagedOnCreate(uint64_t entityID);
-		static bool InvokeManagedOnUpdate(uint64_t entityID, float deltaTime);
-		static bool InvokeManagedOnCollisionEnter(uint64_t entityID, const CollisionEvent& event);
-		static bool InvokeManagedOnCollisionPersist(uint64_t entityID, const CollisionEvent& event);
-		static bool InvokeManagedOnCollisionExit(uint64_t entityID, const CollisionEvent& event);
-		static bool GetManagedFieldValue(uint64_t entityID, const std::string& fieldName, void* outValue, int bufferSize);
-		static bool SetManagedFieldValue(uint64_t entityID, const std::string& fieldName, void* value, int valueSize);
+		static void DestroyManagedInstance(uint64_t entityID, const std::string& className);
+		static bool InvokeManagedOnCreate(uint64_t entityID, const std::string& className);
+		static bool InvokeManagedOnUpdate(uint64_t entityID, const std::string& className, float deltaTime);
+		static bool InvokeManagedOnCollisionEnter(uint64_t entityID, const std::string& className, const CollisionEvent& event);
+		static bool InvokeManagedOnCollisionPersist(uint64_t entityID, const std::string& className, const CollisionEvent& event);
+		static bool InvokeManagedOnCollisionExit(uint64_t entityID, const std::string& className, const CollisionEvent& event);
+		static bool GetManagedFieldValue(uint64_t entityID, const std::string& className, const std::string& fieldName, void* outValue, int bufferSize);
+		static bool SetManagedFieldValue(uint64_t entityID, const std::string& className, const std::string& fieldName, void* value, int valueSize);
 
 		/// Passes the native callback table to the managed side
 		static void SetManagedNativeCallbacks(void* callbackTable);
@@ -93,8 +102,10 @@ namespace Kerberos
 
 		static void LoadAssembly(const std::filesystem::path& assemblyPath);
 		static void LoadAssemblyClasses();
+		static bool BuildUserAssembly();
 
 		static void OnAssemblyFileChanged(const std::string& path, const filewatch::Event changeType);
+		static void OnUserScriptFileChanged(const std::string& path, const filewatch::Event changeType);
 
 		/// Loads a single function pointer from the managed assembly
 		template<typename T>

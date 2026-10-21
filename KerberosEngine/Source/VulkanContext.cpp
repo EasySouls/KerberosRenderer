@@ -1,17 +1,13 @@
-#include "kbrpch.hpp"
 #include "VulkanContext.hpp"
 
 #include "Renderer/Textures/Texture.hpp"
-#include <algorithm>
-#include <iostream>
+#include "Renderer/Renderer.hpp"
+#include "Profiling/Profilers.hpp"
+#include "Utils.hpp"
 
 #include "imgui.h"
 #include "backends/imgui_impl_glfw.h"
 #include "backends/imgui_impl_vulkan.h"
-
-#include "Utils.hpp"
-#include "logging/Log.hpp"
-#include "Renderer/Renderer.hpp"
 
 #define VK_USE_PLATFORM_WIN32_KHR
 #define GLFW_INCLUDE_VULKAN
@@ -20,6 +16,19 @@
 #include <GLFW/glfw3native.h>
 
 #include "ImGuizmo.h"
+
+#include <algorithm>
+#include <stacktrace>
+#include <sstream>
+#include <limits>
+#include <iostream>
+
+import Kerberos;
+
+#ifdef _MSC_VER
+	// vk::EXTDescriptorBufferExtensionName is deprecated
+	#pragma warning(disable : 4996)
+#endif
 
 static constexpr std::array validationLayers = {
 	"VK_LAYER_KHRONOS_validation"
@@ -59,61 +68,105 @@ static VKAPI_ATTR vk::Bool32 VKAPI_CALL DebugCallback(
 	const vk::DebugUtilsMessageTypeFlagsEXT type,
 	const vk::DebugUtilsMessengerCallbackDataEXT* pCallbackData,
 	void*)
+
 {
+    const char* messageIdName = pCallbackData->pMessageIdName ? pCallbackData->pMessageIdName : "No message ID name";
+	const char* baseMessage = pCallbackData->pMessage ? pCallbackData->pMessage : "No message";
+
+	std::stringstream extras;
+
+	// Involved objects
+	if (pCallbackData->objectCount > 0) {
+        extras << "\nObjects: " << pCallbackData->objectCount;
+        for (uint32_t i = 0; i < pCallbackData->objectCount; i++) {
+            const auto& obj = pCallbackData->pObjects[i];
+            extras << "\n    [" << i << "] " << vk::to_string(obj.objectType) << " 0x" << std::hex << obj.objectHandle
+                   << std::dec;
+            if (obj.pObjectName) {
+                extras << "[" << obj.pObjectName << "]";
+            }
+        }
+    }
+
+	// Command buffer labels
+	if (pCallbackData->cmdBufLabelCount > 0) {
+        extras << "\nCommand Buffer Labels: " << pCallbackData->cmdBufLabelCount;
+        for (uint32_t i = 0; i < pCallbackData->cmdBufLabelCount; i++) {
+            const auto& label = pCallbackData->pCmdBufLabels[i];
+            extras << "\n    [" << i << "] " << (label.pLabelName ? label.pLabelName : "Unnamed");
+        }
+    }
+
+	// Queue labels
+	if (pCallbackData->queueLabelCount > 0) {
+        extras << "\nQueue Labels: " << pCallbackData->queueLabelCount;
+        for (uint32_t i = 0; i < pCallbackData->queueLabelCount; i++) {
+            const auto& label = pCallbackData->pQueueLabels[i];
+            extras << "\n    [" << i << "] " << (label.pLabelName ? label.pLabelName : "Unnamed");
+        }
+    }
+
+	const std::string fullMessage = std::string(baseMessage) + extras.str();
+    const char* message = fullMessage.c_str();
+
 	if (type & vk::DebugUtilsMessageTypeFlagBitsEXT::eGeneral) {
 		if (severity & vk::DebugUtilsMessageSeverityFlagBitsEXT::eVerbose) {
-			KBR_CORE_TRACE("General|Verbose: {}|{}: {}", pCallbackData->messageIdNumber, pCallbackData->pMessageIdName, pCallbackData->pMessage);
+			Kerberos::Log::CoreTrace("General|Verbose: {}|{}: {}", pCallbackData->messageIdNumber, messageIdName, message);
 		}
 		else if (severity & vk::DebugUtilsMessageSeverityFlagBitsEXT::eInfo) {
-			KBR_CORE_INFO("General|Info: {}|{}: {}", pCallbackData->messageIdNumber, pCallbackData->pMessageIdName, pCallbackData->pMessage);
+			Kerberos::Log::CoreInfo("General|Info: {}|{}: {}", pCallbackData->messageIdNumber, messageIdName, message);
 		}
 		else if (severity & vk::DebugUtilsMessageSeverityFlagBitsEXT::eWarning) {
-			KBR_CORE_WARN("General|Warning: {}|{}: {}", pCallbackData->messageIdNumber, pCallbackData->pMessageIdName, pCallbackData->pMessage);
+			Kerberos::Log::CoreWarn("General|Warning: {}|{}: {}", pCallbackData->messageIdNumber, messageIdName, message);
 		}
 		else if (severity & vk::DebugUtilsMessageSeverityFlagBitsEXT::eError) {
-			KBR_CORE_ERROR("General|Error: {}|{}: {}", pCallbackData->messageIdNumber, pCallbackData->pMessageIdName, pCallbackData->pMessage);
+			Kerberos::Log::CoreError("General|Error: {}|{}: {}", pCallbackData->messageIdNumber, messageIdName, message);
+            Kerberos::Log::CoreDebug("{}", std::stacktrace::current());
 		}
 	}
 	else if (type & vk::DebugUtilsMessageTypeFlagBitsEXT::eValidation) {
 		if (severity & vk::DebugUtilsMessageSeverityFlagBitsEXT::eVerbose) {
-			KBR_CORE_TRACE("Validation|Verbose: {}|{}: {}", pCallbackData->messageIdNumber, pCallbackData->pMessageIdName, pCallbackData->pMessage);
+			Kerberos::Log::CoreTrace("Validation|Verbose: {}|{}: {}", pCallbackData->messageIdNumber, messageIdName, message);
 		}
 		else if (severity & vk::DebugUtilsMessageSeverityFlagBitsEXT::eInfo) {
-			KBR_CORE_INFO("Validation|Info: {}|{}: {}", pCallbackData->messageIdNumber, pCallbackData->pMessageIdName, pCallbackData->pMessage);
+			Kerberos::Log::CoreInfo("Validation|Info: {}|{}: {}", pCallbackData->messageIdNumber, messageIdName, message);
 		}
 		else if (severity & vk::DebugUtilsMessageSeverityFlagBitsEXT::eWarning) {
-			KBR_CORE_WARN("Validation|Warning: {}|{}: {}", pCallbackData->messageIdNumber, pCallbackData->pMessageIdName, pCallbackData->pMessage);
+			Kerberos::Log::CoreWarn("Validation|Warning: {}|{}: {}", pCallbackData->messageIdNumber, messageIdName, message);
 		}
 		else if (severity & vk::DebugUtilsMessageSeverityFlagBitsEXT::eError) {
-			KBR_CORE_ERROR("Validation|Error: {}|{}: {}", pCallbackData->messageIdNumber, pCallbackData->pMessageIdName, pCallbackData->pMessage);
+			Kerberos::Log::CoreError("Validation|Error: {}|{}: {}", pCallbackData->messageIdNumber, messageIdName, message);
+            Kerberos::Log::CoreDebug("{}", std::stacktrace::current());
 		}
 	}
 	else if (type & vk::DebugUtilsMessageTypeFlagBitsEXT::ePerformance) {
 		if (severity & vk::DebugUtilsMessageSeverityFlagBitsEXT::eVerbose) {
-			KBR_CORE_TRACE("Performance|Verbose: {}|{}: {}", pCallbackData->messageIdNumber, pCallbackData->pMessageIdName, pCallbackData->pMessage);
+			Kerberos::Log::CoreTrace("Performance|Verbose: {}|{}: {}", pCallbackData->messageIdNumber, messageIdName, message);
 		}
 		else if (severity & vk::DebugUtilsMessageSeverityFlagBitsEXT::eInfo) {
-			KBR_CORE_INFO("Performance|Info: {}|{}: {}", pCallbackData->messageIdNumber, pCallbackData->pMessageIdName, pCallbackData->pMessage);
+			Kerberos::Log::CoreInfo("Performance|Info: {}|{}: {}", pCallbackData->messageIdNumber, messageIdName, message);
 		}
 		else if (severity & vk::DebugUtilsMessageSeverityFlagBitsEXT::eWarning) {
-			KBR_CORE_WARN("Performance|Warning: {}|{}: {}", pCallbackData->messageIdNumber, pCallbackData->pMessageIdName, pCallbackData->pMessage);
+			Kerberos::Log::CoreWarn("Performance|Warning: {}|{}: {}", pCallbackData->messageIdNumber, messageIdName, message);
 		}
 		else if (severity & vk::DebugUtilsMessageSeverityFlagBitsEXT::eError) {
-			KBR_CORE_ERROR("Performance|Error: {}|{}: {}", pCallbackData->messageIdNumber, pCallbackData->pMessageIdName, pCallbackData->pMessage);
+			Kerberos::Log::CoreError("Performance|Error: {}|{}: {}", pCallbackData->messageIdNumber, messageIdName, message);
+            Kerberos::Log::CoreDebug("{}", std::stacktrace::current());
 		}
 	}
 	else if (type & vk::DebugUtilsMessageTypeFlagBitsEXT::eDeviceAddressBinding) {
 		if (severity & vk::DebugUtilsMessageSeverityFlagBitsEXT::eVerbose) {
-			KBR_CORE_TRACE("DeviceAddressBinding|Verbose: {}|{}: {}", pCallbackData->messageIdNumber, pCallbackData->pMessageIdName, pCallbackData->pMessage);
+			Kerberos::Log::CoreTrace("DeviceAddressBinding|Verbose: {}|{}: {}", pCallbackData->messageIdNumber, messageIdName, message);
 		}
 		else if (severity & vk::DebugUtilsMessageSeverityFlagBitsEXT::eInfo) {
-			KBR_CORE_INFO("DeviceAddressBinding|Info: {}|{}: {}", pCallbackData->messageIdNumber, pCallbackData->pMessageIdName, pCallbackData->pMessage);
+			Kerberos::Log::CoreInfo("DeviceAddressBinding|Info: {}|{}: {}", pCallbackData->messageIdNumber, messageIdName, message);
 		}
 		else if (severity & vk::DebugUtilsMessageSeverityFlagBitsEXT::eWarning) {
-			KBR_CORE_WARN("DeviceAddressBinding|Warning: {}|{}: {}", pCallbackData->messageIdNumber, pCallbackData->pMessageIdName, pCallbackData->pMessage);
+			Kerberos::Log::CoreWarn("DeviceAddressBinding|Warning: {}|{}: {}", pCallbackData->messageIdNumber, messageIdName, message);
 		}
 		else if (severity & vk::DebugUtilsMessageSeverityFlagBitsEXT::eError) {
-			KBR_CORE_ERROR("DeviceAddressBinding|Error: {}|{}: {}", pCallbackData->messageIdNumber, pCallbackData->pMessageIdName, pCallbackData->pMessage);
+			Kerberos::Log::CoreError("DeviceAddressBinding|Error: {}|{}: {}", pCallbackData->messageIdNumber, messageIdName, message);
+            Kerberos::Log::CoreDebug("{}", std::stacktrace::current());
 		}
 	}
 	//std::cerr << "validation layer: type " << to_string(type) << " msg: " << pCallbackData->pMessage << "\n\n";
@@ -128,6 +181,8 @@ namespace Kerberos
 	VulkanContext::VulkanContext(GLFWwindow* window)
 		: m_Window(window)
 	{
+		KBR_TRACY_FUNCTION();
+
 		if (s_Instance != nullptr)
 		{
 			throw std::runtime_error("VulkanContext instance already exists!");
@@ -179,13 +234,14 @@ namespace Kerberos
 
 	void VulkanContext::Draw()
 	{
-		const vk::Result fenceResult = m_Device.waitForFences(*m_InFlightFences[m_FrameIndex], vk::True, UINT64_MAX);
+		KBR_TRACY_FUNCTION();
+		const vk::Result fenceResult = m_Device.waitForFences(*m_InFlightFences[m_FrameIndex], vk::True, std::numeric_limits<uint64_t>::max());
 		if (fenceResult != vk::Result::eSuccess)
 		{
 			throw std::runtime_error("failed to wait for fence!");
 		}
 
-		auto [result, imageIndex] = m_SwapChain.acquireNextImage(UINT64_MAX, *m_PresentCompleteSemaphores[m_FrameIndex], nullptr);
+		auto [result, imageIndex] = m_SwapChain.acquireNextImage(std::numeric_limits<uint64_t>::max(), *m_PresentCompleteSemaphores[m_FrameIndex], nullptr);
 		if (result == vk::Result::eErrorOutOfDateKHR) {
 			RecreateSwapchain();
 			return;
@@ -247,6 +303,8 @@ namespace Kerberos
 
 	void VulkanContext::Present()
 	{
+		KBR_TRACY_FUNCTION();
+
 		const ImGuiIO& io = ImGui::GetIO();
 		if (io.ConfigFlags & ImGuiConfigFlags_ViewportsEnable)
 		{
@@ -283,6 +341,8 @@ namespace Kerberos
 
 	vk::raii::CommandBuffer VulkanContext::BeginSingleTimeCommands() const
 	{
+		KBR_TRACY_FUNCTION();
+
 		const vk::CommandBufferAllocateInfo allocInfo{
 			.commandPool = *m_GraphicsCommandPool,
 			.level = vk::CommandBufferLevel::ePrimary,
@@ -301,6 +361,8 @@ namespace Kerberos
 		const vk::raii::Semaphore* signalTimelineSemaphore,
 		const uint64_t signalTimelineValue) const
 	{
+		KBR_TRACY_FUNCTION();
+
 		commandBuffer.end();
 
 		vk::TimelineSemaphoreSubmitInfo timelineSemaphoreSubmitInfo;
@@ -327,6 +389,8 @@ namespace Kerberos
 
 	void VulkanContext::Submit(const OperationType type, const std::function<void(const vk::raii::CommandBuffer&)>& cmd) const 
 	{
+		KBR_TRACY_FUNCTION();
+
 		vk::CommandPool commandPool;
 		vk::Queue queue;
 		if (type == OperationType::Graphics)
@@ -346,7 +410,7 @@ namespace Kerberos
 		}
 		else 
 		{
-			KBR_CORE_ASSERT(false, "Unsupported operation type!");
+			KBRAssert(false, "Unsupported operation type!");
 			throw std::invalid_argument("unsupported operation type!");
 		}
 
@@ -374,12 +438,14 @@ namespace Kerberos
 			.pCommandBuffers = &*commandBuffer
 		};
 		queue.submit(submitInfo, *oneTimeFence);
-		const vk::Result result = m_Device.waitForFences(*oneTimeFence, vk::True, UINT64_MAX);
-		KBR_CORE_ASSERT(result == vk::Result::eSuccess, "Failed to wait for fence!");
+		const vk::Result result = m_Device.waitForFences(*oneTimeFence, vk::True, std::numeric_limits<uint64_t>::max());
+		KBRAssert(result == vk::Result::eSuccess, "Failed to wait for fence!");
 	}
 
 	vk::raii::CommandBuffer VulkanContext::BeginSingleTimeCommands(OperationType type) const 
 	{
+		KBR_TRACY_FUNCTION();
+
 		vk::CommandPool commandPool;
 		if (type == OperationType::Graphics)
 		{
@@ -395,7 +461,7 @@ namespace Kerberos
 		}
 		else
 		{
-			KBR_CORE_ASSERT(false, "Unsupported operation type!");
+			KBRAssert(false, "Unsupported operation type!");
 			throw std::invalid_argument("unsupported operation type!");
 		}
 
@@ -415,6 +481,8 @@ namespace Kerberos
 
 	void VulkanContext::EndSingleTimeCommands(const vk::raii::CommandBuffer& commandBuffer, const OperationType type) const 
 	{
+		KBR_TRACY_FUNCTION();
+
 		vk::Queue queue;
 		if (type == OperationType::Graphics)
 		{
@@ -430,7 +498,7 @@ namespace Kerberos
 		}
 		else
 		{
-			KBR_CORE_ASSERT(false, "Unsupported operation type!");
+			KBRAssert(false, "Unsupported operation type!");
 			throw std::invalid_argument("unsupported operation type!");
 		}
 
@@ -444,8 +512,8 @@ namespace Kerberos
 			.pCommandBuffers = &*commandBuffer
 		};
 		queue.submit(submitInfo, *oneTimeFence);
-		const vk::Result result = m_Device.waitForFences(*oneTimeFence, vk::True, UINT64_MAX);
-		KBR_CORE_ASSERT(result == vk::Result::eSuccess, "Failed to wait for fence!");
+		const vk::Result result = m_Device.waitForFences(*oneTimeFence, vk::True, std::numeric_limits<uint64_t>::max());
+		KBRAssert(result == vk::Result::eSuccess, "Failed to wait for fence!");
 	}
 
 	void VulkanContext::CopyBuffer(
@@ -456,6 +524,8 @@ namespace Kerberos
 		const vk::raii::Semaphore* signalSemaphore
 	) const
 	{
+		KBR_TRACY_FUNCTION();
+
 		const vk::CommandPool cmdPool = m_QueueFamilyInfo.HasSeparateTransferQueue() ? *m_TransferCommandPool : *m_GraphicsCommandPool;
 		const vk::CommandBufferAllocateInfo allocInfo{
 			.commandPool = cmdPool,
@@ -485,6 +555,8 @@ namespace Kerberos
 
 	void VulkanContext::TransitionImageLayout(const vk::raii::Image& image, const vk::ImageLayout oldLayout, const vk::ImageLayout newLayout, const uint32_t mipLevels) const
 	{
+		KBR_TRACY_FUNCTION();
+
 		const auto commandBuffer = BeginSingleTimeCommands();
 
 		vk::ImageMemoryBarrier2 barrier = {
@@ -535,6 +607,8 @@ namespace Kerberos
 	                                          vk::ImageLayout oldLayout, vk::ImageLayout newLayout, const vk::ImageSubresourceRange& subresourceRange,
 	                                          vk::PipelineStageFlags2 srcStageMask, vk::PipelineStageFlags2 dstStageMask) const
 	{
+		KBR_TRACY_FUNCTION();
+
 		vk::ImageMemoryBarrier2 barrier = {
 			.oldLayout = oldLayout,
 			.newLayout = newLayout,
@@ -673,6 +747,8 @@ namespace Kerberos
 
 	void VulkanContext::WaitIdle() const
 	{
+		KBR_TRACY_FUNCTION();
+
 		m_Device.waitIdle();
 	}
 
@@ -687,6 +763,10 @@ namespace Kerberos
 		};
 
 		m_Device.setDebugUtilsObjectNameEXT(nameInfo);
+#else
+		(void)objectHandle;
+		(void)objectType;
+		(void)name;
 #endif
 	}
 
@@ -694,6 +774,9 @@ namespace Kerberos
 	{
 #ifdef KBR_DEBUG
 		vmaSetAllocationName(m_Allocator.get(), allocation, name.c_str());
+#else
+		(void)allocation;
+		(void)name;
 #endif
 	}
 
@@ -737,13 +820,15 @@ namespace Kerberos
 		return m_PhysicalDevice.getProperties2().properties.limits.maxSamplerAnisotropy;
 	}
 
-	void VulkanContext::FramebufferResized(uint32_t width, uint32_t height)
+	void VulkanContext::FramebufferResized(uint32_t /*width*/, uint32_t /*height*/)
 	{
 		m_FramebufferResized = true;
 	}
 
 	void VulkanContext::RecordCommandBuffer(const uint32_t imageIndex) const
 	{
+		KBR_TRACY_FUNCTION();
+
 		m_CommandBuffers[m_FrameIndex].begin({});
 
 		Renderer::RecordQueuedSceneRender(m_CommandBuffers[m_FrameIndex]);
@@ -896,19 +981,21 @@ namespace Kerberos
 			}
 		}
 
+#ifdef KBR_DEBUG
 		// In debug mode, we would always like to see shader printf's and synchronization validation errors,
 		// the rest is enough to see when configured via the Vulkan Configurator
-		constexpr vk::ValidationFeatureEnableEXT enabledValidationFeatures[] = {
-#ifdef KBR_DEBUG
+		constexpr std::array<vk::ValidationFeatureEnableEXT, 2> enabledValidationFeatures = {
 			vk::ValidationFeatureEnableEXT::eDebugPrintf,
 			vk::ValidationFeatureEnableEXT::eSynchronizationValidation
-#endif
 		};
 
 		const vk::ValidationFeaturesEXT validationFeatures{
-			.enabledValidationFeatureCount = static_cast<uint32_t>(std::size(enabledValidationFeatures)),
-			.pEnabledValidationFeatures = enabledValidationFeatures
+			.enabledValidationFeatureCount = static_cast<uint32_t>(enabledValidationFeatures.size()),
+            .pEnabledValidationFeatures = enabledValidationFeatures.data()
 		};
+#else
+        constexpr vk::ValidationFeaturesEXT validationFeatures{};
+#endif
 
 		constexpr uint32_t shaderDebugPrintfBufferSize = 1024 * 1024; // 1 MB
 
@@ -973,11 +1060,11 @@ namespace Kerberos
 		for (const vk::raii::PhysicalDevice& device : devices)
 		{
 			const auto deviceProperties = device.getProperties2().properties;
-			KBR_CORE_INFO("Evaluating GPU: {}", deviceProperties.deviceName.data());
+			Log::CoreInfo("Evaluating GPU: {}", deviceProperties.deviceName.data());
 
 			if (deviceProperties.apiVersion < VK_API_VERSION_1_3)
 			{
-				KBR_CORE_WARN("  -> Rejected: Vulkan 1.3 not supported.");
+				Log::CoreWarn("  -> Rejected: Vulkan 1.3 not supported.");
 				continue;
 			}
 
@@ -991,7 +1078,7 @@ namespace Kerberos
 
 			if (!hasGraphics)
 			{
-				KBR_CORE_WARN("  -> Rejected: No graphics queue family found.");
+				Log::CoreWarn("  -> Rejected: No graphics queue family found.");
 				continue;
 			}
 
@@ -1006,7 +1093,7 @@ namespace Kerberos
 
 				if (it == availableExtensions.end())
 				{
-					KBR_CORE_WARN("  -> Rejected: Missing required extension '{}'", requiredExt);
+					Log::CoreWarn("  -> Rejected: Missing required extension '{}'", requiredExt);
 					missingRequired = true;
 					break;
 				}
@@ -1017,14 +1104,14 @@ namespace Kerberos
 
 			if (!features2.features.geometryShader)
 			{
-				KBR_CORE_WARN("  -> Rejected: Missing required feature 'geometryShader'");
+				Log::CoreWarn("  -> Rejected: Missing required feature 'geometryShader'");
 				continue;
 			}
 
 			m_PhysicalDevice = device;
 			m_MaxMSAASamples = GetMaxUsableSampleCount(m_PhysicalDevice);
 			m_PhysicalDeviceName = deviceProperties.deviceName.data();
-			KBR_CORE_INFO("Selected GPU: {}", m_PhysicalDeviceName);
+			Log::CoreInfo("Selected GPU: {}", m_PhysicalDeviceName);
 
 			m_ActiveDeviceExtensions.assign(requiredDeviceExtensions.begin(), requiredDeviceExtensions.end());
 
@@ -1038,7 +1125,7 @@ namespace Kerberos
 				if (it != availableExtensions.end())
 				{
 					m_ActiveDeviceExtensions.push_back(optExt);
-					KBR_CORE_TRACE("  -> Enabled optional extension: {}", optExt);
+					Log::CoreTrace("  -> Enabled optional extension: {}", optExt);
 				}
 			}
 
@@ -1082,6 +1169,7 @@ namespace Kerberos
 
 	bool VulkanContext::UseDescriptorBuffers() const
 	{
+
 		return IsExtensionActive(vk::EXTDescriptorBufferExtensionName);
 	}
 
@@ -1233,6 +1321,7 @@ namespace Kerberos
 		 features.features.samplerAnisotropy = true;
 		 features.features.pipelineStatisticsQuery = true;
 		 features.features.shaderInt64 = m_SupportedFeatures.get<vk::PhysicalDeviceFeatures2>().features.shaderInt64;
+         features.features.shaderInt16 = m_SupportedFeatures.get<vk::PhysicalDeviceFeatures2>().features.shaderInt16;
 		 features.features.robustBufferAccess = false;
 		 features.features.fullDrawIndexUint32 = false;
 		 features.features.imageCubeArray = false;
@@ -1252,7 +1341,6 @@ namespace Kerberos
 		 features.features.textureCompressionASTC_LDR = false;
 		 features.features.textureCompressionBC = false;
 		 features.features.occlusionQueryPrecise = false;
-		 features.features.shaderInt16 = false;
 		 features.features.shaderResourceMinLod = false;
 		 features.features.sparseBinding = false;
 		 features.features.sparseResidencyBuffer = false;
@@ -1311,7 +1399,7 @@ namespace Kerberos
 			 ? m_Device.getQueue(m_QueueFamilyInfo.transfer.value(), 0)
 			 : m_GraphicsQueue;
 	
-		 KBR_CORE_INFO(
+		 Log::CoreInfo(
 			 "Queue families selected \n\tgraphics: {}, \n\tpresent: {}, \n\tcompute: {}, \n\ttransfer: {}, \n\tseparateCompute: {}, \n\tseparateTransfer: {}, \n\tdedicatedTransfer: {}",
 			 m_QueueFamilyInfo.graphics,
 			 m_QueueFamilyInfo.present,
@@ -1338,9 +1426,9 @@ namespace Kerberos
 
 	void VulkanContext::CreateAllocator()
 	{
-		KBR_CORE_ASSERT(m_Instance != nullptr, "VkInstance has to be initialized to create allocator!");
-		KBR_CORE_ASSERT(m_PhysicalDevice != nullptr, "VkPhysicalDevice has to be initialized to create allocator!");
-		KBR_CORE_ASSERT(m_Device != nullptr, "VkDevice has to be initialized to create allocator!");
+		KBRAssert(m_Instance != nullptr, "VkInstance has to be initialized to create allocator!");
+		KBRAssert(m_PhysicalDevice != nullptr, "VkPhysicalDevice has to be initialized to create allocator!");
+		KBRAssert(m_Device != nullptr, "VkDevice has to be initialized to create allocator!");
 
 		m_Allocator = VMA::CreateAllocator(m_Instance, m_PhysicalDevice, m_Device);
 	}
@@ -1428,6 +1516,13 @@ namespace Kerberos
 		m_SwapChainExtent = extent;
 
 		m_SwapChainImages = m_SwapChain.getImages();
+
+		Log::CoreInfo("Swapchain created with {} images, format: {}, extent: {}x{}, present mode: {}",
+                      m_SwapChainImages.size(),
+                      vk::to_string(m_SwapChainImageFormat),
+                      m_SwapChainExtent.width,
+                      m_SwapChainExtent.height,
+                      vk::to_string(presentMode));
 	}
 
 	void VulkanContext::CreateSwapChainImageViews()
@@ -1493,7 +1588,7 @@ namespace Kerberos
 
 	void VulkanContext::CreateSyncObjects()
 	{
-		KBR_CORE_ASSERT(m_PresentCompleteSemaphores.empty() && m_RenderFinishedSemaphores.empty() && m_InFlightFences.empty(), "Sync objects are not empty!");
+		KBRAssert(m_PresentCompleteSemaphores.empty() && m_RenderFinishedSemaphores.empty() && m_InFlightFences.empty(), "Sync objects are not empty!");
 
 		for (size_t i = 0; i < m_SwapChainImages.size(); i++)
 		{
@@ -1567,6 +1662,8 @@ namespace Kerberos
 
 	void VulkanContext::RecreateSwapchain()
 	{
+		KBR_TRACY_FUNCTION();
+
 		int width = 0, height = 0;
 		glfwGetFramebufferSize(m_Window, &width, &height);
 		while (width == 0 || height == 0) {
@@ -1594,6 +1691,8 @@ namespace Kerberos
 		const vk::PipelineStageFlags2 dstStageMask,
 		const vk::ImageAspectFlagBits aspectFlags
 	) const {
+		KBR_TRACY_FUNCTION();
+
 		vk::ImageMemoryBarrier2 barrier = {
 			.srcStageMask = srcStageMask,
 			.srcAccessMask = srcAccessMask,
@@ -1625,6 +1724,8 @@ namespace Kerberos
 	vk::DescriptorSet VulkanContext::GenerateImGuiDescriptorSet(const vk::raii::Sampler& sampler,
 																const vk::raii::ImageView& imageView, vk::ImageLayout imageLayout)
 	{
+		KBR_TRACY_FUNCTION();
+
 		return ImGui_ImplVulkan_AddTexture(
 			static_cast<VkSampler>(*sampler),
 			static_cast<VkImageView>(*imageView),
@@ -1818,7 +1919,7 @@ namespace Kerberos
 		io.Fonts->AddFontFromFileTTF("Assets/Fonts/Inter/Inter_18pt-Regular.ttf", scaledFontSize, &fontConfig);
 		ImFont* interRegular = io.Fonts->AddFontFromFileTTF("Assets/Fonts/Inter/Inter_18pt-Regular.ttf", baseFontSize, &fontConfig);
 
-		KBR_CORE_ASSERT(interRegular != nullptr, "Failed to load font!");
+		KBRAssert(interRegular != nullptr, "Failed to load font!");
 		io.FontDefault = interRegular;
 	}
 
@@ -1858,4 +1959,17 @@ namespace Kerberos
 		(void)cmd;
 #endif
 	}
+
+    void InsertDebugLabel(const vk::raii::CommandBuffer& cmd, std::string_view labelName)
+    {
+#ifdef KBR_DEBUG
+        const vk::DebugUtilsLabelEXT labelInfo{
+            .pLabelName = labelName.data()
+        };
+        cmd.insertDebugUtilsLabelEXT(labelInfo);
+#else
+        (void)cmd;
+        (void)labelName;
+#endif
+    }
 }

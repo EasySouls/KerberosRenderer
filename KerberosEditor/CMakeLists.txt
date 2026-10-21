@@ -1,5 +1,3 @@
-project(KerberosEditor)
-
 add_executable(KerberosEditor)
 
 file(GLOB_RECURSE EDITOR_SRC CMAKE_CONFIGURE_DEPENDS
@@ -9,7 +7,14 @@ file(GLOB_RECURSE EDITOR_SRC CMAKE_CONFIGURE_DEPENDS
 
 source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}/Source" PREFIX "Source" FILES ${EDITOR_SRC})
 
-target_sources(KerberosEditor PRIVATE ${EDITOR_SRC} "Source/Notification/NotificationManager.cpp" "Source/Windows/AssetsPanel.cpp" "Source/Windows/HierarchyPanel.cpp" "Source/Windows/ConsolePanel.cpp")
+target_sources(KerberosEditor PRIVATE
+    ${EDITOR_SRC}
+    "${CMAKE_SOURCE_DIR}/KerberosEngine/Source/EntryPoint.cpp"
+    "Source/Notification/NotificationManager.cpp"
+    "Source/Windows/AssetsPanel.cpp"
+    "Source/Windows/HierarchyPanel.cpp"
+    "Source/Windows/ConsolePanel.cpp"
+)
 
 target_include_directories(KerberosEditor PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/Source
@@ -32,5 +37,12 @@ if(WIN32)
         VERBATIM
     )
 endif()
+
+add_custom_command(TARGET KerberosEditor POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            "$<TARGET_FILE:amd_fidelityfx_vk>"
+            "$<TARGET_FILE_DIR:KerberosEditor>"
+        VERBATIM
+)
 
 set_target_properties(KerberosEditor PROPERTIES FOLDER "KerberosEditor")

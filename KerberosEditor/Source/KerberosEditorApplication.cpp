@@ -36,9 +36,11 @@ namespace Kerberos
 			.parent_path()
 			.parent_path()
 			.parent_path()
+			.parent_path()
 			.append("KerberosEditor");
 
 		spec.WorkingDirectory = projectRoot;
+		spec.EngineRoot = projectRoot;
 
 		/*/// This is only needed so when the editor initializes, the static project shouldn't be null
 		Project::New();*/

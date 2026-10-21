@@ -1,22 +1,30 @@
 #pragma once
 
 #include "Core/Core.hpp"
+#include "Assets/Asset.hpp"
 #include "Renderer/Textures/Texture2D.hpp"
 #include "Renderer/Material.hpp"
-#include "Project/Project.hpp"
 #include "EditorWindow.hpp"
 #include "../Notification/NotificationManager.hpp"
 
 #include <imgui/imgui.h>
 
 #include <filesystem>
+#include <vector>
 #include <map>
-#include <set>
 #include <unordered_map>
-#include <string_view>
 
 namespace Kerberos
 {
+	struct AssetMetadata;
+
+    struct AssetSelection
+    {
+        AssetHandle Handle = AssetHandle::Invalid();
+        std::filesystem::path Path;
+        AssetType Type = AssetType::Texture2D;
+    };
+	
 	class AssetsPanel : public EditorWindow
 	{
 	public:
@@ -36,6 +44,21 @@ namespace Kerberos
 		void OnEvent(Event& event) override;
 		void OnImGuiRender() override;
 
+		
+        /**
+         * The currently selected source asset (root), if any.
+         */
+        AssetSelection GetSelectedAsset() const { return m_SelectedAsset; }
+
+        bool HasAssetSelection() const { return !m_SelectedAsset.Path.empty(); }
+
+		void ClearSelection();
+
+		/**
+		* Requests an asset-tree refresh on the next render.
+		*/
+		void RequestRefresh() { m_RefreshRequested = true; }
+
 	private:
 		/**
 		* Context menu displayed when right-clicking on a file in the Assets panel.
@@ -50,19 +73,20 @@ namespace Kerberos
 		/**
 		* Context menu displayed when right-clicking on an empty area of the Assets panel.
 		*/
-		void ShowContextMenu(ImGuiPopupFlags popupFlags) const;
+		void ShowContextMenu(ImGuiPopupFlags popupFlags);
 
 		void RefreshAssetTree();
 
 		void ImportAssetDialog();
 
-		static void HandleAssetDragAndDrop(AssetHandle handle, const std::filesystem::path& filename);
+	    void HandleAssetDragAndDrop(AssetHandle handle, const std::filesystem::path& filename, const AssetMetadata& metadata);
 
 		void OpenMaterialEditor(const std::filesystem::path& materialPath);
 		void RenderMaterialEditors();
-		static void DrawMaterialTextureField(const char* label, Ref<Texture2D>& texture);
+		void DrawMaterialTextureField(const char* label, Ref<Texture2D>& texture);
+		void RebuildTexturePickerEntries();
 
-		std::filesystem::path GetRelativePath(const std::filesystem::path& absolutePath);
+		std::filesystem::path GetRelativePath(const std::filesystem::path& path) const;
 
 		enum class MaterialPreviewMesh : uint8_t
 		{
@@ -73,46 +97,65 @@ namespace Kerberos
 		struct MaterialEditorState
 		{
 			std::filesystem::path Filepath;
+			AssetHandle Handle = AssetHandle::Invalid();
 			Ref<Material> WorkingCopy;
 			MaterialPreviewMesh PreviewMesh = MaterialPreviewMesh::Sphere;
 			bool Open = true;
 		};
 
+		struct TexturePickerEntry
+		{
+			AssetHandle Handle = AssetHandle::Invalid();
+			std::string Label;
+			std::string SearchKey;
+		};
+
 	private:
 		std::filesystem::path m_AssetsDirectory = "Assets";
 		std::filesystem::path m_CurrentDirectory = std::filesystem::current_path();
+        std::filesystem::path m_CurrentDirectoryRelativePath;
+
 		Ref<Texture2D> m_FolderIcon;
 		Ref<Texture2D> m_FileIcon;
 
 		std::map<std::filesystem::path, Ref<Texture2D>> m_AssetImages;
 
-		struct TreeNode
+		struct ContentItem
 		{
 			std::filesystem::path Path;
 			AssetHandle Handle = AssetHandle::Invalid();
-
-			uint32_t Parent = static_cast<uint32_t>(-1);
-			std::map<std::filesystem::path, uint32_t> Children;
-
-			explicit TreeNode(std::filesystem::path path, const AssetHandle handle)
-				: Path(std::move(path)), Handle(handle)
-			{
-			}
+			bool IsDirectory = false;
+            std::filesystem::path RelativePath;
+            std::string Name;
+            std::string RelativePathString;
 		};
 
-		std::vector<TreeNode> m_AssetTreeNodes;
+		std::vector<ContentItem> m_ContentItems;
+		bool m_RefreshRequested = false;
 
-		enum class Mode : uint8_t
-		{
-			Asset = 0,
-			Filesystem = 1
-		};
+		// Selected source asset (root), tracked for the inspector panel.
+        AssetSelection m_SelectedAsset;
 
-		Mode m_Mode = Mode::Filesystem;
+		// Asset-browser data is rebuilt only when the panel refreshes.
+        // Root handle -> generated sub-asset handles, sorted once during refresh.
+        std::map<AssetHandle, std::vector<AssetHandle>> m_SubAssetsByRoot;
+
+        // Snapshot of the artifact existence check; avoids IsAssetHandleValid() and
+        // filesystem::exists() / is_regular_file() calls during every ImGui frame.
+        std::map<AssetHandle, bool> m_CachedArtifactExists;
+
+        // Snapshot of registry metadata, so the render loop doesn't keep querying the manager.
+        std::map<AssetHandle, AssetMetadata> m_MetadataByHandle;
+
+        // Persistent search text for the asset browser.
+        char m_SearchFilter[256]{};
+
+        // Cached, type-indexed texture list used by the material editor picker.
+        std::vector<TexturePickerEntry> m_TexturePickerEntries;
+        bool m_TexturePickerEntriesDirty = true;
+        char m_TexturePickerFilter[256]{};
 
 		std::unordered_map<std::string, MaterialEditorState> m_OpenMaterialEditors;
-
-		std::unordered_map<std::filesystem::path, std::filesystem::path> m_RelativePathCache;
 
 		NotificationManager m_NotificationManager;
 	};

@@ -27,7 +27,7 @@ namespace Kerberos
 		const Ref<Material>& AddAndRetrieve(const std::string& name, const Material& mat);
 		const Ref<Material>& AddAndRetrieve(const std::string& name, const Ref<Material>& mat);
 
-		void SyncWithCurrentMaterials(const std::set<Ref<Material>>& currentMaterials);
+		void SyncWithCurrentMaterials(const std::pmr::set<Ref<Material>>& currentMaterials);
 		void ResolveAllMaterialIndices(TextureManager& textureManager);
 
 		const Ref<Material>& Get(const std::string& name) const;

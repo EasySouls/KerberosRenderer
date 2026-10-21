@@ -1,12 +1,17 @@
-#include "kbrpch.hpp"
 #include "DescriptorAllocator.hpp"
 
 #include "VulkanContext.hpp"
+
+#include "Profiling/Profilers.hpp"
+
+import Kerberos;
 
 namespace Kerberos
 {
 	DescriptorAllocator::DescriptorAllocator(const uint32_t maxSets, vk::DeviceSize bufferHeapSize)
 	{
+		KBR_TRACY_FUNCTION();
+
 		auto& context = VulkanContext::Get();
 		const auto& device = context.GetDevice();
 		const auto& physicalDevice = context.GetPhysicalDevice();
@@ -25,7 +30,7 @@ namespace Kerberos
 
 			VkBuffer buffer = nullptr;
 			if (vmaCreateBuffer(VulkanContext::Get().GetAllocator().get(), &bufferInfo, &allocInfo, &buffer, &m_Allocation, nullptr) != VK_SUCCESS)
-				KBR_CORE_ASSERT(false, "Failed to create descriptor buffer!");
+				KBRAssert(false, "Failed to create descriptor buffer!");
 
 			m_Handle = vk::Buffer(buffer);
 			vmaMapMemory(VulkanContext::Get().GetAllocator().get(), m_Allocation, &m_MappedData);
@@ -63,6 +68,8 @@ namespace Kerberos
 
 	DescriptorAllocator::~DescriptorAllocator()
 	{
+		KBR_TRACY_FUNCTION();
+
 		const auto& allocator = VulkanContext::Get().GetAllocator().get();
 
 		vmaUnmapMemory(allocator, m_Allocation);
@@ -71,6 +78,8 @@ namespace Kerberos
 
 	ShaderResourceSet DescriptorAllocator::Allocate(const vk::raii::DescriptorSetLayout& layout, const std::string& debugName)
 	{
+		KBR_TRACY_FUNCTION();
+
 		ShaderResourceSet set{};
 
 		auto& context = VulkanContext::Get();
@@ -99,8 +108,10 @@ namespace Kerberos
 			{
 				m_AllocationDebugNames[m_CurrentOffset] = debugName;
 
-				KBR_CORE_TRACE("Descriptor Allocator: Bound '{}' at offset {} (size {})", debugName, m_CurrentOffset, layoutSize);
+				Kerberos::Log::CoreTrace("Descriptor Allocator: Bound '{}' at offset {} (size {})", debugName, m_CurrentOffset, layoutSize);
 			}
+#else
+			(void)debugName;
 #endif
 		}
 		else

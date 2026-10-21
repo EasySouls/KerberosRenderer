@@ -1,4 +1,3 @@
-#include "kbrpch.hpp"
 #include "AssetImporter.hpp"
 
 #include "CubemapImporter.hpp"
@@ -10,6 +9,9 @@
 #include "PrefabImporter.hpp"
 #include "SoundImporter.hpp"
 #include "Assets/Asset.hpp"
+#include "Profiling/Profilers.hpp"
+
+import Kerberos;
 
 namespace Kerberos
 {
@@ -20,6 +22,8 @@ namespace Kerberos
 
 	Ref<Asset> AssetImporter::ImportAsset(const AssetHandle handle, const AssetMetadata& metadata)
 	{
+		KBR_TRACY_FUNCTION();
+
 		switch (metadata.Type)
 		{
 			case AssetType::Texture2D:
@@ -28,8 +32,9 @@ namespace Kerberos
 				return CubemapImporter::ImportCubemap(handle, metadata);
 			case AssetType::Material:
 				return MaterialImporter::ImportMaterial(handle, metadata);
-			case AssetType::Model:
+			case AssetType::ModelDEPRECATED:
 			{
+				// Deprecated: model loading must move to imported engine artifacts.
 				const auto extension = metadata.Filepath.extension().string();
 				if (extension == ".gltf" || extension == ".glb")
 					return GLTFModelImporter::ImportModel(handle, metadata);
@@ -47,17 +52,21 @@ namespace Kerberos
 				break;
 			case AssetType::Animation:
 				// TODO: Implement AnimationImporter
-				KBR_CORE_WARN("Animation import not yet implemented");
+				Log::CoreWarn("Animation import not yet implemented");
 				break;
-		}
+            case AssetType::Skin:
+                break;
+        }
 
-		KBR_CORE_ASSERT(false, "Unsupported asset type by AssetImporter!");
+		KBRAssert(false, "Unsupported asset type by AssetImporter!");
 		return nullptr;
 	}
 
 
 	std::future<Ref<Asset>> AssetImporter::ImportAssetAsync(AssetHandle handle, const AssetMetadata& metadata) 
 	{
+		KBR_TRACY_FUNCTION();
+
 		return std::async(std::launch::async, ImportAsset, handle, metadata);
 	}
 }

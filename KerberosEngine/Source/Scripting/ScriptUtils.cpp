@@ -1,10 +1,11 @@
-#include "kbrpch.hpp"
 #include "ScriptUtils.hpp"
 
 #include "ScriptClass.hpp"
 
 #include <unordered_map>
 #include <string_view>
+
+import Kerberos;
 
 using namespace std::literals;
 
@@ -24,14 +25,17 @@ namespace Kerberos
 		{ "System.Byte",									ScriptFieldType::Byte },
 		{ "System.String",								ScriptFieldType::String },
 
-		{ "Kerberos.Source.Kerberos.Core.Vector2",		ScriptFieldType::Vec2 },
-		{ "Kerberos.Source.Kerberos.Core.Vector3",		ScriptFieldType::Vec3 },
-		{ "Kerberos.Source.Kerberos.Core.Vector4",		ScriptFieldType::Vec4 },
+		{ "Kerberos.Core.Vector2",		ScriptFieldType::Vec2 },
+		{ "Kerberos.Core.Vector3",		ScriptFieldType::Vec3 },
+		{ "Kerberos.Core.Vector4",		ScriptFieldType::Vec4 },
 
-		{ "Kerberos.Source.Kerberos.Core.MaterialRef",	ScriptFieldType::MaterialRef },
-		{ "Kerberos.Source.Kerberos.Core.MeshRef",		ScriptFieldType::MeshRef },
-		{ "Kerberos.Source.Kerberos.Core.TextureRef",		ScriptFieldType::TextureRef },
-		{ "Kerberos.Source.Kerberos.Core.AssetHandle",	ScriptFieldType::AssetHandle },
+		{ "Kerberos.Core.MaterialRef",	ScriptFieldType::MaterialRef },
+		{ "Kerberos.Core.MeshRef",		ScriptFieldType::MeshRef },
+		{ "Kerberos.Core.TextureRef",		ScriptFieldType::TextureRef },
+		{ "Kerberos.Core.AssetHandle",	ScriptFieldType::AssetHandle },
+        { "Kerberos.Core.PrefabRef",	    ScriptFieldType::PrefabRef },
+
+		{ "Kerberos.Scene.Entity",		ScriptFieldType::EntityRef },
 	};
 
 	ScriptFieldType ScriptUtils::DotNetTypeToScriptFieldType(const std::string& typeName)
@@ -39,7 +43,7 @@ namespace Kerberos
 		if (s_ScriptFieldTypeMap.contains(typeName))
 			return s_ScriptFieldTypeMap.at(typeName);
 
-		KBR_CORE_WARN("Unrecognized .NET field type: {0}", typeName);
+		Kerberos::Log::CoreWarn("Unrecognized .NET field type: {0}", typeName);
 		return ScriptFieldType::Char;
 	}
 
@@ -66,9 +70,11 @@ namespace Kerberos
 			case ScriptFieldType::MeshRef:		return "MeshRef"sv;
 			case ScriptFieldType::TextureRef:	return "TextureRef"sv;
 			case ScriptFieldType::AssetHandle:	return "AssetHandle"sv;
+			case ScriptFieldType::PrefabRef:	return "PrefabRef"sv;
+			case ScriptFieldType::EntityRef:	return "EntityRef"sv;
 		}
 
-		KBR_CORE_ASSERT(false, "Unknown script field type!");
+		KBRAssert(false, "Unknown script field type!");
 		return ""sv;
 	}
 
@@ -91,10 +97,30 @@ namespace Kerberos
 		if (type == "Vector4"sv)		return ScriptFieldType::Vec4;
 		if (type == "MaterialRef"sv)	return ScriptFieldType::MaterialRef;
 		if (type == "MeshRef"sv)		return ScriptFieldType::MeshRef;
-		if (type == "TextureRef"sv)	return ScriptFieldType::TextureRef;
+		if (type == "TextureRef"sv)		return ScriptFieldType::TextureRef;
 		if (type == "AssetHandle"sv)	return ScriptFieldType::AssetHandle;
+		if (type == "PrefabRef"sv)		return ScriptFieldType::PrefabRef;
+		if (type == "EntityRef"sv)		return ScriptFieldType::EntityRef;
 
-		KBR_CORE_ASSERT(false, "Unknown script field type!");
+		KBRAssert(false, "Unknown script field type!");
 		return ScriptFieldType::Int;
+	}
+
+	std::string ScriptUtils::MigrateLegacyScriptClassName(const std::string_view fullName)
+	{
+		std::string name(fullName);
+
+		constexpr std::string_view legacyPrefix = "Kerberos.Source.Kerberos.";
+		if (name.starts_with(legacyPrefix))
+		{
+			name.replace(0, legacyPrefix.size(), "Kerberos.");
+			return name;
+		}
+
+		constexpr std::string_view legacyShortPrefix = "Kerberos.Source.";
+		if (name.starts_with(legacyShortPrefix))
+			name.replace(0, legacyShortPrefix.size(), "Kerberos.");
+
+		return name;
 	}
 }

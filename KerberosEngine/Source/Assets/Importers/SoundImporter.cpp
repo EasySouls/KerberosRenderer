@@ -13,6 +13,8 @@ namespace Kerberos
 
 	Ref<Sound> SoundImporter::ImportSound(const std::filesystem::path& filepath)
 	{
+		KBR_TRACY_FUNCTION();
+
 		return Application::Get().GetAudioManager()->Load(filepath);
 	}
 }

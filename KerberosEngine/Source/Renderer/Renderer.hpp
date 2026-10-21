@@ -1,7 +1,10 @@
 #pragma once
 
+#include "DescriptorAllocator.hpp"
 #include "Scene/Camera/EditorCamera.hpp"
+#include "Scene/Camera/SceneCamera.hpp"
 #include "Scene/Scene.hpp"
+#include "Upscaling/UpscalerTypes.hpp"
 #include "Vulkan.hpp"
 
 #include <functional>
@@ -9,6 +12,7 @@
 #include <set>
 #include <string_view>
 #include <vector>
+#include <memory_resource>
 
 namespace Kerberos {
 struct GPULight;
@@ -40,6 +44,7 @@ struct GPUTimings
     float AmbientOcclusionPassMilliseconds = 0.0f;
     float TonemappingPassMilliseconds = 0.0f;
     float AntialiasingPassMilliseconds = 0.0f;
+    float UpscalingPassMilliseconds = 0.0f;
     bool IsValid = false;
 };
 
@@ -78,7 +83,7 @@ struct RenderObject
     uint32_t EntityID = 0;
     AABB WorldAABB{};
     uint32_t UBOIndex = 0;
-    std::string DebugName{};
+    std::string_view DebugName{};
 };
 
 struct GTAOConstants
@@ -115,27 +120,32 @@ enum class BloomMode : std::uint8_t
     BrightPassPrefilter = 1
 };
 
+
 class Renderer
 {
 public:
     static void Init();
     static void Shutdown();
 
+    using DeferredAction = std::move_only_function<void()>;
+    
     static void RenderSceneEditor(const Ref<Scene>& scene, const Camera& camera, float dt);
     static void RenderSceneRuntime(const Ref<Scene>& scene,
-                                   const Camera& mainCamera,
+                                   const SceneCamera& mainCamera,
                                    const glm::mat4& mainCameraTransform,
                                    float dt);
-    static void
-    RenderScene(const Ref<Scene>& scene,
-                const glm::mat4& view,
-                const glm::mat4& projection,
-                const glm::vec3& camPos,
-                const std::function<std::pair<std::vector<glm::mat4>, glm::vec4>(
-                    const glm::vec3&, const std::function<glm::vec4(float)>&)>& calculateLightSpaceMatricesFunc,
-                float dt,
-                float nearPlane,
-                float farPlane);
+    using CalcLightSpaceMatricesFunc = std::function<std::pair<std::vector<glm::mat4>, glm::vec4>(
+        const glm::vec3&, const std::function<glm::vec4(float)>&)>;
+
+    static void RenderScene(const Ref<Scene>& scene,
+                            const glm::mat4& view,
+                            const glm::mat4& projection,
+                            const glm::vec3& camPos,
+                            const CalcLightSpaceMatricesFunc& calculateLightSpaceMatricesFunc,
+                            float dt,
+                            float nearPlane,
+                            float farPlane);
+    
     static void RecordQueuedSceneRender(const vk::raii::CommandBuffer& cmd);
 
     static void ResizeResources(uint32_t width, uint32_t height);
@@ -171,8 +181,13 @@ public:
     static uint32_t GetAllObjectCount();
     static uint32_t GetVisibleObjectCount();
     static uint32_t GetCulledObjectCount();
+    static UpscalerType GetUpscalingMode();
+    static void SetUpscalingMode(UpscalerType mode);
+    static UpscalerQuality GetUpscalingQuality();
+    static void SetUpscalingQuality(UpscalerQuality quality);
 
     static glm::vec2 GetOutputImageSize();
+    static glm::vec2 GetRenderImageSize();
 
     static uint64_t GetCompositedOutputImageID();
     static uint64_t GetShadowMapDepthImageID(uint32_t index);
@@ -214,19 +229,71 @@ private:
                                              const Material& material,
                                              uint32_t entityID);
 
+    using RenderObjectContainer = std::pmr::vector<RenderObject>;
+
     static std::vector<GPULight> GetLightsFromScene(const Scene& scene);
-    static std::pair<std::vector<RenderObject>, std::set<Ref<Material>>>
-    GetRenderObjectsAndUniqueMaterialsFromScene(const Scene& scene);
+    static std::pair<RenderObjectContainer, std::pmr::set<Ref<Material>>>
+    GetRenderObjectsAndUniqueMaterialsFromScene(const Scene& scene, std::pmr::memory_resource* arena);
     static std::vector<LineVertex> GetColliderLineVerticesFromScene(const Scene& scene);
 
-    static std::vector<RenderObject> FrustumCullRenderObjects(const std::vector<RenderObject>& renderObjects,
-                                                              const Frustum& frustum);
+    static RenderObjectContainer FrustumCullRenderObjects(const RenderObjectContainer& renderObjects,
+                                                          const Frustum& frustum,
+                                                          std::pmr::memory_resource* arena);
+
+    static void CompileAndExecuteRenderGraph(const vk::raii::CommandBuffer& cmd,
+                                             uint32_t frameIndex,
+                                             uint32_t currentImage,
+                                             const RenderObjectContainer& allObjects,
+                                             const RenderObjectContainer& renderObjects,
+                                             std::pmr::memory_resource* frameArena,
+                                             const std::vector<LineVertex>& colliderLineVertices);
 
     static void RenderShadowPass(const vk::raii::CommandBuffer& cmd,
                                  uint32_t frameIndex,
-                                 const std::vector<RenderObject>& renderObjects);
+                                 const RenderObjectContainer& renderObjects,
+                                 std::pmr::memory_resource* arena);
+
+    static void UpdateParticles(const vk::raii::CommandBuffer& cmd,
+                                uint32_t frameIndex,
+                                DescriptorAllocator& frameDescriptorAllocator,
+                                float time,
+                                const glm::mat4& projection);
+
+    static void RenderPrePass(const vk::raii::CommandBuffer& cmd,
+                              uint32_t frameIndex,
+                              const RenderObjectContainer& renderObjects,
+                              uint32_t currentImage);
+
+    static void RenderGTAO(const vk::raii::CommandBuffer& cmd, uint32_t frameIndex, uint32_t currentImage);
+
+    static void RenderOpaque(const vk::raii::CommandBuffer& cmd,
+                             uint32_t frameIndex,
+                             const RenderObjectContainer& renderObjects,
+                             uint32_t currentImage,
+                             const vk::Viewport& viewport,
+                             vk::Rect2D renderArea);
+
+    static void RenderTransparent(const vk::raii::CommandBuffer& cmd,
+                                  uint32_t frameIndex,
+                                  const RenderObjectContainer& renderObjects,
+                                  uint32_t currentImage,
+                                  const vk::Viewport& viewport,
+                                  vk::Rect2D renderArea);
+
+    static void RenderPhysicsColliders(const vk::raii::CommandBuffer& cmd,
+                                       const std::vector<LineVertex>& colliderLineVertices,
+                                       uint32_t currentImage,
+                                       const vk::Viewport& viewport,
+                                       vk::Rect2D renderArea);
+
+    static void ResolveTransparencyPass(const vk::raii::CommandBuffer& cmd,
+                                        uint32_t frameIndex,
+                                        uint32_t currentImage,
+                                        const vk::Viewport& viewport,
+                                        vk::Rect2D renderArea);
 
     static void RenderParticles(const vk::raii::CommandBuffer& cmd, uint32_t frameIndex);
+
     static void RenderGrass(const vk::raii::CommandBuffer& cmd, uint32_t frameIndex);
 
     static void ApplyTonemapping(const vk::raii::CommandBuffer& cmd, uint32_t frameIndex);
@@ -245,6 +312,8 @@ private:
                           const vk::Rect2D& renderArea,
                           const vk::Viewport& viewport);
 
+    static void ApplyUpscaling(const vk::raii::CommandBuffer& cmd, uint32_t frameIndex);
+
     static void ApplyBloom(const vk::raii::CommandBuffer& cmd, uint32_t frameIndex);
 
     static void WriteGPUTimestamp(const vk::raii::CommandBuffer& cmd, uint32_t frameIndex, uint32_t index);
@@ -255,6 +324,9 @@ private:
     static glm::mat4 CalculateLightSpaceMatrix();
 
     static void HandleMousePickingReadback(const vk::raii::CommandBuffer& cmd);
+
+    static void EnqueueDeferredAction(DeferredAction&& action);
+    static void ApplyDeferredActions();
 
     static bool IsUsingAccelerationStructures();
 
@@ -279,10 +351,15 @@ private:
 
     static void CreateTonemappedImage(uint32_t width, uint32_t height);
     static void SetupTonemappingResolveDescriptors();
+    static void CreateOutputImage(uint32_t width, uint32_t height);
+    static void CreateFinalImage(uint32_t width, uint32_t height);
 
     static void CreateSMAATextures();
     static void CreateSMAADescriptorSetAndPipelineLayouts();
     static void CreateSMAAImages(uint32_t width, uint32_t height);
     static void SetupSMAADescriptors();
+
+    static void CreateReactiveImage(uint32_t width, uint32_t height);
 };
-} // namespace Kerberos
+
+}

@@ -3,30 +3,50 @@ project(KerberosEngine)
 # Add third party first
 add_subdirectory(ThirdParty)
 
+include("${CMAKE_SOURCE_DIR}/Config/FidelityFX.cmake")
+
 add_library(KerberosEngine STATIC)
+add_dependencies(KerberosEngine KerberosFidelityFXRuntime)
 
 # Collect only Source files
-file(GLOB_RECURSE ENGINE_SRC CMAKE_CONFIGURE_DEPENDS
-    Source/**.cpp
-    Source/**.hpp
-    Source/**.ixx
-    Source/**.h
+file(GLOB_RECURSE ENGINE_REGULAR_SOURCES CMAKE_CONFIGURE_DEPENDS
+    "${CMAKE_CURRENT_SOURCE_DIR}/Source/*.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/Source/*.h"
+    "${CMAKE_CURRENT_SOURCE_DIR}/Source/*.hpp"
 )
 
-source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}/Source" PREFIX "Source" FILES ${ENGINE_SRC})
+list(FILTER ENGINE_REGULAR_SOURCES EXCLUDE REGEX ".*/EntryPoint\\.cpp$")
 
-target_sources(KerberosEngine PRIVATE ${ENGINE_SRC} "Source/Assets/AssetRegistry.cpp" "Source/Assets/EditorAssetManager.cpp" "Source/Assets/RuntimeAssetManager.cpp" "Source/Assets/Importers/AssetImporter.cpp" "Source/Audio/Sound.cpp" "Source/Audio/AudioManager.cpp" "Source/Audio/Windows/XAudio2AudioManager.cpp" "Source/Audio/Miniaudio/MiniaudioAudioManager.cpp" "Source/Assets/Importers/SoundImporter.cpp" "Source/Assets/Importers/TextureImporter.cpp" "Source/Utils/Windows/WindowsSystemOperations.cpp" "Source/Assets/Importers/CubemapImporter.cpp" "Source/Assets/Importers/AssimpModelImporter.cpp" "Source/Renderer/Textures/Texture.cpp" "Source/Renderer/Textures/Texture2D.cpp" "Source/Renderer/VMA/VMA.cpp" "Source/Renderer/Textures/TextureCube.cpp" "Source/Assets/Importers/GLTFModelImporter.cpp" "Source/Scene/Scene.cpp" "Source/Physics/Jolt/JoltPhysicsSystem.cpp" "Source/Renderer/Font.cpp" "Source/Scene/Camera/SceneCamera.cpp" "Source/Assets/AssetManager.cpp" "Source/Serialization/SceneSerializer.cpp" "Source/Renderer/ImGuiDescriptorSetManager.cpp" "Source/Renderer/Renderer.cpp" "Source/Assets/Importers/MaterialImporter.cpp" "Source/Renderer/RayTracingSceneCache.cpp" "Source/Renderer/GraphicsPipeline.cpp" "Source/Scene/Camera/Frustum.cpp" "Source/Renderer/ComputePipeline.cpp" "Source/Utils/Windows/WindowsProcess.cpp" "Source/Scripting/ScriptClass.cpp" "Source/Scripting/ScriptEngine.cpp" "Source/Scripting/ScriptInstance.cpp" "Source/Scripting/ScriptInterface.cpp" "Source/Scripting/ScriptUtils.cpp" "Source/Logging/CrashHandler.cpp" "Source/Renderer/SMAA/SMAAUtils.cpp" "Source/Renderer/ParticleSystem.cpp" "Source/Renderer/GrassSystem.cpp" "Source/Renderer/TextureManager.cpp" "Source/Scene/AABB.cpp")
+file (GLOB_RECURSE ENGINE_MODULE_SOURCES CMAKE_CONFIGURE_DEPENDS
+    "${CMAKE_CURRENT_SOURCE_DIR}/Source/*.cppm"
+    "${CMAKE_CURRENT_SOURCE_DIR}/Source/*.ixx"
+)
 
-# Precompiled header
-target_precompile_headers(KerberosEngine PRIVATE Source/kbrpch.hpp)
+source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}/Source" PREFIX "Source" FILES ${ENGINE_REGULAR_SOURCES})
+
+target_sources(KerberosEngine PRIVATE ${ENGINE_REGULAR_SOURCES})
+
+source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}/Source" PREFIX "Source" FILES ${ENGINE_MODULE_SOURCES})
+
+target_sources(KerberosEngine
+    PUBLIC
+    FILE_SET CXX_MODULES
+        BASE_DIRS "${CMAKE_CURRENT_SOURCE_DIR}/Source"
+        FILES ${ENGINE_MODULE_SOURCES})
+
+# Precompiled header is intentionally disabled during the mixed module/header migration.
+# Legacy TUs continue to use the old header path, while module TUs are kept isolated
+# from the legacy PCH to avoid duplicate standard-library and logger declarations.
+# target_precompile_headers(KerberosEngine PRIVATE Source/kbrpch.hpp)
 
 # Include directories
 target_include_directories(KerberosEngine
     PUBLIC
         ${CMAKE_CURRENT_SOURCE_DIR}/Source
+    SYSTEM PUBLIC
         ${CMAKE_CURRENT_SOURCE_DIR}/ThirdParty
         ${KBR_VULKAN_DIR}/Include # This shouldn't be public in the future
-    PRIVATE
+    SYSTEM PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/ThirdParty/imgui
         ${CMAKE_CURRENT_SOURCE_DIR}/ThirdParty/glm
         ${CMAKE_CURRENT_SOURCE_DIR}/ThirdParty/ktx/lib/include
@@ -39,12 +59,14 @@ target_compile_definitions(KerberosEngine PUBLIC
     _CRT_SECURE_NO_WARNINGS
     GLFW_INCLUDE_NONE
     IMGUI_DOCKING_BRANCH
-    YAML_CPP_STATIC_DEFINE
     KBR_USE_MINIAUDIO
-    $<$<CONFIG:Debug>:KBR_DEBUG>
-    $<$<CONFIG:Release>:KBR_RELEASE>
-    $<$<CONFIG:Dist>:KBR_DIST>
+    NOMINMAX
 )
+
+if(KBR_ENABLE_TRACY)
+    target_compile_definitions(KerberosEngine PUBLIC KBR_ENABLE_TRACY)
+    target_link_libraries(KerberosEngine PUBLIC Tracy::TracyClient)
+endif()
 
 # Enable these later, but a few libraries are compiled as part of the engine that have warnings
 #target_compile_options(KerberosEngine PRIVATE
@@ -56,6 +78,9 @@ target_compile_definitions(KerberosEngine PUBLIC
 # Link engine build settings
 target_link_libraries(KerberosEngine PRIVATE KerberosBuildSettings)
 
+# Link the custom FidelityFX target
+target_link_libraries(KerberosEngine PRIVATE Kerberos::FidelityFX)
+
 # Link third party
 target_link_libraries(KerberosEngine
     PUBLIC
@@ -63,7 +88,7 @@ target_link_libraries(KerberosEngine
     PRIVATE
         glfw
         imgui
-        yaml-cpp
+        yaml-cpp::yaml-cpp
         msdf-atlas-gen
         ImGuizmo
         assimp::assimp
@@ -81,15 +106,19 @@ target_link_directories(KerberosEngine PRIVATE
 target_link_libraries(KerberosEngine PRIVATE
     ${KBR_VULKAN_DIR}/Lib/vulkan-1.lib
 
-    $<$<CONFIG:Debug>:${KBR_VULKAN_DIR}/Lib/shaderc_sharedd.lib>
-    $<$<CONFIG:Debug>:${KBR_VULKAN_DIR}/Lib/spirv-cross-cored.lib>
-    $<$<CONFIG:Debug>:${KBR_VULKAN_DIR}/Lib/spirv-cross-glsld.lib>
-    $<$<CONFIG:Debug>:${KBR_VULKAN_DIR}/Lib/slangd.lib>
+    $<$<CONFIG:Debug>:
+        ${KBR_VULKAN_DIR}/Lib/shaderc_sharedd.lib
+        ${KBR_VULKAN_DIR}/Lib/spirv-cross-cored.lib
+        ${KBR_VULKAN_DIR}/Lib/spirv-cross-glsld.lib
+        ${KBR_VULKAN_DIR}/Lib/slangd.lib
+    >
 
-    $<$<CONFIG:Release>:${KBR_VULKAN_DIR}/Lib/shaderc_shared.lib>
-    $<$<CONFIG:Release>:${KBR_VULKAN_DIR}/Lib/spirv-cross-core.lib>
-    $<$<CONFIG:Release>:${KBR_VULKAN_DIR}/Lib/spirv-cross-glsl.lib>
-    $<$<CONFIG:Release>:${KBR_VULKAN_DIR}/Lib/slang.lib>
+    $<$<NOT:$<CONFIG:Debug>>:
+        ${KBR_VULKAN_DIR}/Lib/shaderc_shared.lib
+        ${KBR_VULKAN_DIR}/Lib/spirv-cross-core.lib
+        ${KBR_VULKAN_DIR}/Lib/spirv-cross-glsl.lib
+        ${KBR_VULKAN_DIR}/Lib/slang.lib
+    >
 )
 
 # Windows system libs
@@ -104,6 +133,10 @@ if(WIN32)
         Winmm
         Version
         Bcrypt
+        ole32
+        uuid
+        shell32
+        comdlg32
     )
 endif()
 

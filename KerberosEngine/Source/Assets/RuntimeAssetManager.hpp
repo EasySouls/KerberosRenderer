@@ -2,18 +2,52 @@
 
 #include "Core/Core.hpp"
 #include "AssetManagerBase.hpp"
+#include "AssetRegistry.hpp"
+#include "Runtime/RuntimeAssetResolver.hpp"
 
-namespace Kerberos
+#include <filesystem>
+
+namespace Kerberos {
+
+class RuntimeAssetManager final : public AssetManagerBase
 {
-	class RuntimeAssetManager final : public AssetManagerBase
+public:
+	RuntimeAssetManager() = default;
+	explicit RuntimeAssetManager(const AssetRegistry& registry,
+		std::filesystem::path assetRoot = {}, std::filesystem::path libraryRoot = {},
+		std::filesystem::path engineLibraryRoot = {});
+
+	void Configure(const AssetRegistry& registry,
+		std::filesystem::path assetRoot = {}, std::filesystem::path libraryRoot = {},
+		std::filesystem::path engineLibraryRoot = {});
+	Ref<Asset> GetAsset(AssetHandle handle) override;
+
+	bool IsAssetHandleValid(AssetHandle handle) const override;
+	bool IsAssetLoaded(AssetHandle handle) const override;
+
+	AssetType GetAssetType(AssetHandle handle) const override;
+
+	template<typename T>
+	Ref<T> GetAsset(const AssetHandle handle)
 	{
-	public:
-		Ref<Asset> GetAsset(AssetHandle handle) override;
+		const auto asset = GetAsset(handle);
+		return asset ? std::dynamic_pointer_cast<T>(asset) : nullptr;
+	}
 
-		bool IsAssetHandleValid(AssetHandle handle) const override;
-		bool IsAssetLoaded(AssetHandle handle) const override;
+	const AssetRegistry& GetAssetRegistry() const override { return m_Registry; }
 
-		AssetType GetAssetType(AssetHandle handle) const override;
-	};
+	std::span<const AssetHandle> GetAssetsOfType(AssetType type) const override
+	{
+		return m_Registry.GetAssetsOfType(type);
+	}
+
+private:
+	AssetRegistry m_Registry;
+	bool m_Configured = false;
+	std::filesystem::path m_LibraryRoot;
+	std::filesystem::path m_EngineLibraryRoot;
+	RuntimeAssetResolver m_Resolver;
+	AssetMap m_LoadedAssets;
+};
+
 }
-

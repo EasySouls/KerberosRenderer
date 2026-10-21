@@ -1,25 +1,32 @@
-#include "kbrpch.hpp"
 
 #include "Core/Timer.hpp"
 #include "AssimpModelImporter.hpp"
 #include "TextureImporter.hpp"
 #include "Renderer/Vertex.hpp"
+#include "Profiling/Profilers.hpp"
 
 #include <Assimp/scene.h>
 #include <Assimp/postprocess.h>
 #include <Assimp/material.h>
 #include <Assimp/Importer.hpp>
+#include <fstream>
 
+
+import Kerberos;
 
 namespace Kerberos
 {
-	Ref<Mesh> AssimpModelImporter::ImportModel(AssetHandle handle, const AssetMetadata& metadata)
+	// Deprecated: retained only for migration/reference. New model loading must
+	// use registered imported engine artifacts.
+	Ref<Mesh> AssimpModelImporter::ImportModel(AssetHandle /*handle*/, const AssetMetadata& metadata)
 	{
 		return ImportModel(metadata.Filepath);
 	}
 
 	Ref<Mesh> AssimpModelImporter::ImportModel(const std::filesystem::path& filepath)
 	{
+		KBR_TRACY_FUNCTION();
+
 		const auto res = LoadModel(filepath);
 
 		if (!res)
@@ -27,13 +34,13 @@ namespace Kerberos
 			switch (const auto error = res.error())
 			{
 				case ModelLoadingError::CannotOpenFile:
-					KBR_CORE_ERROR("Cannot open model file: {}", filepath.string());
+					Log::CoreError("Cannot open model file: {}", filepath.string());
 					break;
 				case ModelLoadingError::ImportFailed:
-					KBR_CORE_ERROR("Model import failed for file: {}", filepath.string());
+					Log::CoreError("Model import failed for file: {}", filepath.string());
 					break;
 				default:
-					KBR_CORE_ERROR("Unknown error occurred while loading model: {}", filepath.string());
+					Log::CoreError("Unknown error occurred while loading model: {}", filepath.string());
 					break;
 			}
 			return nullptr;
@@ -42,7 +49,7 @@ namespace Kerberos
 		const auto info = res.value();
 		if (info.submeshes.empty())
 		{
-			KBR_CORE_ERROR("No meshes found in the model at {}", filepath.string());
+			Log::CoreError("No meshes found in the model at {}", filepath.string());
 			return nullptr;
 		}
 		return info.submeshes[0].Mesh;
@@ -50,9 +57,11 @@ namespace Kerberos
 
 	std::expected<AssimpModelImporter::ModelLoadingInfo, AssimpModelImporter::ModelLoadingError> AssimpModelImporter::LoadModel(const std::filesystem::path& path)
 	{
+		KBR_TRACY_FUNCTION();
+
 		Timer timer("Model Loading", [&](const TimerData& data)
 		{
-			KBR_CORE_INFO("Loading model from {} took {:.2f} ms", path.string(), data.DurationMs);
+			Log::CoreInfo("Loading model from {} took {:.2f} ms", path.string(), data.DurationMs);
 		});
 
 		ModelLoadingInfo loadingInfo{};
@@ -61,7 +70,7 @@ namespace Kerberos
 			std::ifstream file(path);
 			if (!file.is_open())
 			{
-				KBR_CORE_ERROR("Failed to open model file: {}", path.string());
+				Log::CoreError("Failed to open model file: {}", path.string());
 				return std::unexpected(ModelLoadingError::CannotOpenFile);
 			}
 			const std::string data = std::string((std::istreambuf_iterator<char>(file)),
@@ -78,7 +87,7 @@ namespace Kerberos
 
 		if (!scene || scene->mFlags & AI_SCENE_FLAGS_INCOMPLETE || !scene->mRootNode)
 		{
-			KBR_CORE_ERROR("Assimp error: {}", importer.GetErrorString());
+			Log::CoreError("Assimp error: {}", importer.GetErrorString());
 			return std::unexpected(ModelLoadingError::ImportFailed);
 		}
 
@@ -87,11 +96,15 @@ namespace Kerberos
 		ProcessMaterials(scene, loadingInfo);
 
 		ProcessMeshes(scene, loadingInfo);
+
+		return loadingInfo;
 	}
 
 	void AssimpModelImporter::ProcessMaterials(const aiScene* scene, ModelLoadingInfo& info)
 	{
-		KBR_CORE_TRACE("Loading {} materials...", scene->mNumMaterials);
+		KBR_TRACY_FUNCTION();
+
+		Log::CoreTrace("Loading {} materials...", scene->mNumMaterials);
 		info.materials.reserve(scene->mNumMaterials);
 
 		for (unsigned int i = 0; i < scene->mNumMaterials; ++i)
@@ -148,6 +161,8 @@ namespace Kerberos
 
 	void AssimpModelImporter::ProcessMeshes(const aiScene* scene, ModelLoadingInfo& info)
 	{
+		KBR_TRACY_FUNCTION();
+
 		// This map will hold all the geometry, grouped by material index.
 		std::map<uint32_t, std::vector<aiMesh*>> meshesByMaterial;
 
@@ -167,7 +182,7 @@ namespace Kerberos
 		};
 		collectMeshes(scene->mRootNode);
 
-		KBR_CORE_TRACE("Model has been sorted into {} material groups.", meshesByMaterial.size());
+		Log::CoreTrace("Model has been sorted into {} material groups.", meshesByMaterial.size());
 
 		// Now, for each material group, merge the meshes into one.
 		for (auto const& [materialIndex, meshGroup] : meshesByMaterial)

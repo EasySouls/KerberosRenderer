@@ -1,6 +1,6 @@
-#include "kbrpch.hpp"
 #include "Application.hpp"
 
+#include "Core/EnginePaths.hpp"
 #include "Events/KeyPressedEvent.hpp"
 #include "Events/KeyReleasedEvent.hpp"
 #include "Events/KeyTypedEvent.hpp"
@@ -13,7 +13,7 @@
 #include "Events/WindowResizedEvent.hpp"
 #include "Renderer/Renderer.hpp"
 #include "Scripting/ScriptEngine.hpp"
-#include "Logging/Log.hpp"
+#include "Profiling/Profilers.hpp"
 
 #include <GLFW/glfw3.h>
 
@@ -23,8 +23,11 @@
 
 #include "imgui.h"
 
+import Kerberos;
+
 
 #ifdef KBR_PLATFORM_WINDOWS
+#include <ole2.h>
 extern "C"
 {
 	__declspec(dllexport) DWORD NvOptimusEnablement = 0x00000001;
@@ -38,27 +41,55 @@ namespace Kerberos
 
 	static void GLFWErrorCallback(const int error, const char* description)
 	{
-		KBR_CORE_ERROR("GLFW Error ({0}): {1}", error, description);
+		Log::CoreError("GLFW Error ({0}): {1}", error, description);
 	}
+
+    const char* ApplicationCommandLineArgs::operator[](const int index) const
+    {
+        KBRAssert(index < Count, "Wrong index into ApplicationCommandLineArgs");
+        return Args[index];
+    }
 
 	Application::Application(const ApplicationSpecification& spec)
 	{
-		KBR_CORE_ASSERT(!s_Instance, "Application already exists!");
+		KBR_TRACY_FUNCTION();
+
+		KBRAssert(!s_Instance, "Application already exists!");
 		s_Instance = this;
+		m_RenderThreadId = std::this_thread::get_id();
 
 		m_Specification = spec;
+
+#ifdef KBR_PLATFORM_WINDOWS
+		/// The UI thread must be a single-threaded apartment for shell dialogs and
+		/// OLE. Initialize it before audio/other libraries, which otherwise
+		/// initialize this thread as MTA and make IFileOpenDialog::Show hang.
+		const HRESULT oleResult = OleInitialize(nullptr);
+		m_OleInitialized = SUCCEEDED(oleResult);
+		if (!m_OleInitialized)
+		{
+			Log::CoreError("Failed to initialize OLE on the UI thread. HRESULT: 0x{:08x}",
+				static_cast<uint32_t>(oleResult));
+		}
+#endif
 
 		/// Set the working directory
 		if (!spec.WorkingDirectory.empty())
 		{
+			KBRAssert(std::filesystem::exists(std::filesystem::current_path()), "Working directory does not exist");
+
 			std::filesystem::current_path(spec.WorkingDirectory);
-			KBR_CORE_INFO("Working directory set to: {0}", std::filesystem::current_path().string());
+			Log::CoreInfo("Working directory set to: {0}", std::filesystem::current_path().string());
 		}
 		else
 		{
 			m_Specification.WorkingDirectory = std::filesystem::current_path();
-			KBR_CORE_WARN("No working directory specified, using current path: {0}", std::filesystem::current_path().string());
+			Log::CoreWarn("No working directory specified, using current path: {0}", std::filesystem::current_path().string());
 		}
+
+		/// The engine content root defaults to the working directory but can be
+		/// overridden (e.g. by a packaged editor) via ApplicationSpecification.
+		EnginePaths::Initialize(spec.EngineRoot.empty() ? m_Specification.WorkingDirectory : spec.EngineRoot);
 
 		m_AudioManager.reset(AudioManager::Create());
 		m_AudioManager->Init();
@@ -74,6 +105,7 @@ namespace Kerberos
 		// Create a GLFW window
 		glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
 		glfwWindowHint(GLFW_MAXIMIZED, GLFW_TRUE);
+		glfwWindowHint(GLFW_VISIBLE, spec.Headless ? GLFW_FALSE : GLFW_TRUE);
 		m_Window = glfwCreateWindow(1200, 800, "Kerberos Renderer", nullptr, nullptr);
 		if (!m_Window)
 		{
@@ -87,7 +119,7 @@ namespace Kerberos
 		{
 			const auto& app = *static_cast<Application*>(glfwGetWindowUserPointer(window));
 
-			KBR_CORE_INFO("Framebuffer resized: ({}, {})", width, height);
+			Log::CoreInfo("Framebuffer resized: ({}, {})", width, height);
 			app.m_VulkanContext->FramebufferResized(static_cast<uint32_t>(width), static_cast<uint32_t>(height));
 		});
 
@@ -108,7 +140,7 @@ namespace Kerberos
 			app.OnEvent(event);
 		});
 
-		glfwSetKeyCallback(m_Window, [](GLFWwindow* window, const int key, const int scancode, const int action, const int mods)
+		glfwSetKeyCallback(m_Window, [](GLFWwindow* window, const int key, const int /*scancode*/, const int action, const int /*mods*/)
 		{
 			auto& app = *static_cast<Application*>(glfwGetWindowUserPointer(window));
 
@@ -148,7 +180,7 @@ namespace Kerberos
 			app.OnEvent(event);
 		});
 
-		glfwSetMouseButtonCallback(m_Window, [](GLFWwindow* window, const int button, const int action, const int mods)
+		glfwSetMouseButtonCallback(m_Window, [](GLFWwindow* window, const int button, const int action, const int /*mods*/)
 		{
 			auto& app = *static_cast<Application*>(glfwGetWindowUserPointer(window));
 			switch (action)
@@ -208,6 +240,8 @@ namespace Kerberos
 
 	Application::~Application()
 	{
+		KBR_TRACY_FUNCTION();
+
 		for (const auto& layer : m_Layers)
 		{
 			layer->OnDetach();
@@ -216,16 +250,30 @@ namespace Kerberos
 		Renderer::Shutdown();
 		ScriptEngine::Shutdown();
 
+		/// Release COM-owning subsystems before OLE/COM is uninitialized.
+		m_AudioManager.reset();
+
 		Project::ReleaseActiveProjectResources();
 
 		glfwDestroyWindow(m_Window);
 		glfwTerminate();
+
+#ifdef KBR_PLATFORM_WINDOWS
+		if (m_OleInitialized)
+		{
+			OleUninitialize();
+			m_OleInitialized = false;
+		}
+#endif
 	}
 
 	void Application::Run() 
 	{
+		KBR_TRACY_FUNCTION();
+
 		while (!glfwWindowShouldClose(m_Window) && m_IsRunning)
 		{
+			KBR_TRACY_SCOPE("Application::Run frame");
 			glfwPollEvents();
 
 			const float time = static_cast<float>(glfwGetTime());
@@ -248,8 +296,13 @@ namespace Kerberos
 
 			m_VulkanContext->RenderImGui();
 
+			// Upload jobs are the only worker-produced queue drained at the
+			// Vulkan boundary. Their callbacks run here, never on the producer
+			// thread, and own their captured staging data until completion.
+			ExecuteGPUUploadQueue();
 			m_VulkanContext->Draw();
 			m_VulkanContext->Present();
+			KBR_TRACY_FRAME_MARK();
 		}
 	}
 
@@ -260,6 +313,8 @@ namespace Kerberos
 
 	void Application::OnEvent(Event& event) 
 	{
+		KBR_TRACY_FUNCTION();
+
 		EventDispatcher dispatcher(event);
 		dispatcher.Dispatch<WindowClosedEvent>(KBR_BIND_FN(Application::OnWindowClose));
 		// dispatcher.Dispatch<WindowResizeEvent>(KBR_BIND_FN(Application::OnWindowResize));
@@ -281,9 +336,26 @@ namespace Kerberos
 
 	void Application::SubmitToMainThreadQueue(const std::function<void()>& fn) 
 	{
+		KBR_TRACY_FUNCTION();
+
 		std::scoped_lock lock(m_QueueMutex);
 
 		m_MainThreadQueue.push(fn);
+	}
+
+	std::shared_future<void> Application::SubmitToGPUUploadQueue(GPUUploadJob job)
+	{
+		KBR_TRACY_FUNCTION();
+
+		GPUUploadQueueEntry entry{ .Job = std::move(job) };
+		std::shared_future<void> completion = entry.Completion.get_future().share();
+
+		{
+			std::scoped_lock lock(m_GPUUploadQueueMutex);
+			m_GPUUploadQueue.push(std::move(entry));
+		}
+
+		return completion;
 	}
 
 	void Application::BlockEvents(const bool shouldBlock)
@@ -293,6 +365,8 @@ namespace Kerberos
 
 	void Application::ExecuteMainThreadQueue() 
 	{
+		KBR_TRACY_FUNCTION();
+
 		std::queue<std::function<void()>> functions;
 		{
 			std::scoped_lock lock(m_QueueMutex);
@@ -304,6 +378,36 @@ namespace Kerberos
 			const auto fn = functions.front();
 			functions.pop();
 			fn();
+		}
+	}
+
+	void Application::ExecuteGPUUploadQueue()
+	{
+		KBR_TRACY_FUNCTION();
+
+		KBRAssert(std::this_thread::get_id() == m_RenderThreadId,
+			"GPU upload queue must be drained by the render thread");
+
+		std::queue<GPUUploadQueueEntry> uploads;
+		{
+			std::scoped_lock lock(m_GPUUploadQueueMutex);
+			uploads.swap(m_GPUUploadQueue);
+		}
+
+		while (!uploads.empty())
+		{
+			GPUUploadQueueEntry entry = std::move(uploads.front());
+			uploads.pop();
+
+			try
+			{
+				entry.Job(*m_VulkanContext);
+				entry.Completion.set_value();
+			}
+			catch (...)
+			{
+				entry.Completion.set_exception(std::current_exception());
+			}
 		}
 	}
 

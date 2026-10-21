@@ -1,11 +1,13 @@
-#include "kbrpch.hpp"
 #include "MaterialRegistry.hpp"
 
 #include <ranges>
 
 #include "VulkanContext.hpp"
-#include "Logging/Log.hpp"
 #include "TextureManager.hpp"
+
+#include "Profiling/Profilers.hpp"
+
+import Kerberos;
 
 namespace Kerberos 
 {
@@ -19,7 +21,7 @@ namespace Kerberos
 	void MaterialRegistry::Add(const std::string& name, const Material& mat) 
 	{
 		if (m_Materials.contains(name)) {
-			KBR_CORE_ERROR("Material with name {} already exists!", name);
+			Log::CoreError("Material with name {} already exists!", name);
 		}
 
 		m_Materials[name] = std::make_shared<Material>(mat);
@@ -28,7 +30,7 @@ namespace Kerberos
 	void MaterialRegistry::Add(const std::string& name, const Ref<Material>& mat)
 	{
 		if (m_Materials.contains(name)) {
-			KBR_CORE_ERROR("Material with name {} already exists!", name);
+			Log::CoreError("Material with name {} already exists!", name);
 		}
 
 		m_Materials[name] = mat;
@@ -48,8 +50,10 @@ namespace Kerberos
 		return m_Materials.at(name);
 	}
 
-	void MaterialRegistry::SyncWithCurrentMaterials(const std::set<Ref<Material>>& currentMaterials)
+	void MaterialRegistry::SyncWithCurrentMaterials(const std::pmr::set<Ref<Material>>& currentMaterials)
 	{
+		KBR_TRACY_FUNCTION();
+
 		// This way of clearing the registry is not ideal, as it will remove all materials that are not in the currentMaterials set, which breaks the engine
 		// for example, when assigning the DebugPink material to a mesh, when it doesn't have any.
 		// For now, just keep adding any new materials, and do not remove them.
@@ -81,6 +85,8 @@ namespace Kerberos
 
 	void MaterialRegistry::ResolveAllMaterialIndices(TextureManager& textureManager)
 	{
+		KBR_TRACY_FUNCTION();
+
 		for (const auto& material : m_Materials | std::views::values)
 		{
 			material->ResolveIndices(textureManager);
@@ -91,7 +97,7 @@ namespace Kerberos
 	{
 		const auto& mat = m_Materials.at(name);
 		if (mat == nullptr) {
-			KBR_CORE_ERROR("Material with name {} doesn't exist in the registry!", name);
+			Log::CoreError("Material with name {} doesn't exist in the registry!", name);
 		}
 		return mat;
 	}
@@ -100,7 +106,7 @@ namespace Kerberos
 	{
 		auto& mat = m_Materials[name];
 		if (mat == nullptr) {
-			KBR_CORE_ERROR("Material with name {} doesn't exist in the registry!", name);
+			Log::CoreError("Material with name {} doesn't exist in the registry!", name);
 		}
 		return mat;
 	}

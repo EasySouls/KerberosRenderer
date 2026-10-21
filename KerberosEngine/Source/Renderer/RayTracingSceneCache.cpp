@@ -1,9 +1,12 @@
-#include "kbrpch.hpp"
 #include "RayTracingSceneCache.hpp"
+#include "Core/Core.hpp"
 
 #include "Core/Timer.hpp"
 #include "Scene/Scene.hpp"
 #include "Scene/Entity.hpp"
+#include "Profiling/Profilers.hpp"
+
+import Kerberos;
 
 namespace
 {
@@ -66,9 +69,9 @@ namespace Kerberos
 
 	void RayTracingSceneCache::BuildAccelerationStructures(const Ref<Scene>& scene, const vk::raii::CommandBuffer& cmd, const uint32_t frameIndex)
 	{
-        KBR_PROFILE_FUNCTION();
+        KBR_TRACY_FUNCTION();
 
-		KBR_CORE_ASSERT(scene, "Scene cannot be null!");
+		KBRAssert(scene != nullptr, "Scene cannot be null!");
 
         auto& context = VulkanContext::Get();
         const auto& device = context.GetDevice();
@@ -86,7 +89,7 @@ namespace Kerberos
 
 			if (!meshRef)
             {
-                KBR_CORE_WARN("Entity {} has a StaticMeshComponent with a null StaticMesh reference. Skipping acceleration structure build for this entity.", static_cast<uint32_t>(entity));
+                Log::CoreWarn("Entity {} has a StaticMeshComponent with a null StaticMesh reference. Skipping acceleration structure build for this entity.", static_cast<uint32_t>(entity));
                 continue;
 			}
 
@@ -98,7 +101,7 @@ namespace Kerberos
             }
 
             vk::AccelerationStructureInstanceKHR instance{
-                .transform = ToVkTransformMatrix(transformComp.GetTransform()),
+                .transform = ToVkTransformMatrix(transformComp.WorldTransform),
                 .instanceCustomIndex = static_cast<uint32_t>(entity),
                 .mask = 0xFF,
                 .flags = static_cast<uint32_t>(vk::GeometryInstanceFlagBitsKHR::eTriangleFacingCullDisable),
@@ -120,7 +123,7 @@ namespace Kerberos
 
         if (instancesCache.AllocatedInstances < instancesCache.InstanceData.size())
         {
-            instancesCache.AllocatedInstances = instancesCache.InstanceData.size();
+            instancesCache.AllocatedInstances = static_cast<uint32_t>(instancesCache.InstanceData.size());
             instancesCache.Buffer = nullptr;
             instancesCache.Memory = nullptr;
 
@@ -210,14 +213,16 @@ namespace Kerberos
 		return *m_TLASCache[frameIndex].Handle;
 	}
 
-	void RayTracingSceneCache::UpdateTLAS(const Ref<Scene>& scene) 
+	void RayTracingSceneCache::UpdateTLAS([[maybe_unused]] const Ref<Scene>& scene)
     {
 		
 	}
 
 	void RayTracingSceneCache::BuildBLAS(const vk::raii::CommandBuffer& cmd, Mesh* mesh)
     {
-		KBR_CORE_ASSERT(mesh, "Mesh cannot be null!");
+	    KBR_TRACY_FUNCTION();
+
+		KBRAssert(mesh != nullptr, "Mesh cannot be null!");
 
 		auto& context = VulkanContext::Get();
 		const auto& device = context.GetDevice();

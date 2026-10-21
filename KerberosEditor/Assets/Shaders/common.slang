@@ -4,6 +4,8 @@ public struct SceneData
 {
     public float4x4 projection;
     public float4x4 view;
+    public float4x4 previousProjection;
+    public float4x4 previousView;
     public float4x4 lightSpaceMatrices[4];
     public float4 cascadeSplits;
     public float3 camPos;
@@ -13,6 +15,7 @@ public struct SceneData
     public float deltaTime;
     public float3 cameraUp;
     public float time;
+    public float4x4 motionProjection; // Unjittered projection for motion vectors
 };
 
 public struct Material 
@@ -34,10 +37,12 @@ public struct Material
 public struct PerObject 
 {
     public float4x4 model;
+    public float4x4 previousModel;
     public float4x4 worldNormal;
     public Material material;
+    float _Padding1;
     public uint entityID;
-    private float3 _Padding;
+    float3 _Padding2;
 };
 
 public struct GlobalLighting

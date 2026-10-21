@@ -1,6 +1,7 @@
 #include "kbrpch.hpp"
 #include "SceneCamera.hpp"
 
+#include "Frustum.hpp"
 
 #include <glm/gtc/matrix_transform.hpp>
 
@@ -43,10 +44,14 @@ namespace Kerberos
 
 	void SceneCamera::RecalculateProjection()
 	{
+		KBR_TRACY_FUNCTION();
+
+		const float aspectRatio = GetAspectRatio();
+
 		if (m_ProjectionType == ProjectionType::Orthographic)
 		{
-			const float orthoLeft = -m_OrthoSize * m_AspectRatio * 0.5f;
-			const float orthoRight = m_OrthoSize * m_AspectRatio * 0.5f;
+			const float orthoLeft = -m_OrthoSize * aspectRatio * 0.5f;
+			const float orthoRight = m_OrthoSize * aspectRatio * 0.5f;
 			const float orthoBottom = -m_OrthoSize * 0.5f;
 			const float orthoTop = m_OrthoSize * 0.5f;
 
@@ -54,12 +59,33 @@ namespace Kerberos
 		}
 		else
 		{
-			m_Projection = glm::perspective(m_PerspectiveFov, m_AspectRatio, m_PerspectiveNear, m_PerspectiveFar);
+			m_Projection = glm::perspective(m_PerspectiveFov, aspectRatio, m_PerspectiveNear, m_PerspectiveFar);
 		}
+
+		// Vulkan's normalized device coordinates have Y pointing down.
+		m_Projection[1][1] *= -1.0f;
 	}
 
-	void SceneCamera::RecalculateView()
+	float SceneCamera::GetNearClip() const
 	{
-		
+		return m_ProjectionType == ProjectionType::Orthographic ? m_OrthoNear : m_PerspectiveNear;
+	}
+
+	float SceneCamera::GetFarClip() const
+	{
+		return m_ProjectionType == ProjectionType::Orthographic ? m_OrthoFar : m_PerspectiveFar;
+	}
+
+	std::pair<std::vector<glm::mat4>, glm::vec4> SceneCamera::GetLightSpaceMatrices(
+		const glm::vec3& lightDir,
+		const std::function<glm::vec4(float)>& getCascadeSplits) const
+	{
+		return CalculateLightSpaceMatrices(m_View,
+		                                   m_PerspectiveFov,
+		                                   GetAspectRatio(),
+		                                   m_PerspectiveNear,
+		                                   m_PerspectiveFar,
+		                                   lightDir,
+		                                   getCascadeSplits);
 	}
 }

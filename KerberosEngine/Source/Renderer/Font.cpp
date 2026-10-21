@@ -1,9 +1,16 @@
-#include "kbrpch.hpp"
 #include "Font.hpp"
+#include "Core/Core.hpp"
 
 #include "Core/Timer.hpp"
 
 #undef INFINITE
+#include "Profiling/Profilers.hpp"
+
+#ifdef _MSC_VER
+	#pragma warning(push)
+	#pragma warning(disable : 4505)
+#endif
+
 #include <msdfgen.h>
 #include "ext/import-font.h"
 #include <msdf-atlas-gen/msdf-atlas-gen.h>
@@ -11,8 +18,14 @@
 #include <msdf-atlas-gen/msdf-atlas-gen/GlyphGeometry.h>
 #include "msdf-atlas-gen/AtlasGenerator.h"
 
-#include <algorithm>
+#ifdef _MSC_VER
+#pragma warning(pop)
+#endif
 
+#include <algorithm>
+#include <thread>
+
+import Kerberos;
 
 namespace Kerberos
 {
@@ -25,7 +38,16 @@ namespace Kerberos
 	template<typename T, typename S, int N, msdf_atlas::GeneratorFunction<S, N> GenFunc>
 	static Ref<Texture2D> GenerateAtlas(const std::vector<msdf_atlas::GlyphGeometry>& glyphs, int width, int height)
 	{
+		KBR_TRACY_FUNCTION();
+
+#ifdef _MSC_VER
+	#pragma warning(push)
+	#pragma warning(disable : 4458)
+#endif
 		msdf_atlas::ImmediateAtlasGenerator<S, N, GenFunc, msdf_atlas::BitmapAtlasStorage<T, N>> generator(width, height);
+#ifdef _MSC_VER
+	#pragma warning(pop)
+#endif
 
 		msdf_atlas::GeneratorAttributes genAttributes;
 		genAttributes.config.overlapSupport = true;
@@ -57,22 +79,22 @@ namespace Kerberos
 	Font::Font(std::string name, const std::filesystem::path& filepath)
 		: m_Name(std::move(name)), m_Filepath(filepath), m_MSDFData(new MSDFData{})
 	{
-		KBR_PROFILE_FUNCTION();
+		KBR_TRACY_FUNCTION();
 
 		Timer timer("Font::Font", [&](const TimerData& data) {
-			KBR_CORE_INFO("Timer: Loading font {0} from {1} took {2}ms", m_Name, filepath.string(), data.DurationMs);
+			Log::CoreInfo("Timer: Loading font {0} from {1} took {2}ms", m_Name, filepath.string(), data.DurationMs);
 		});
 
 		if (!std::filesystem::exists(filepath))
 		{
-			KBR_CORE_ASSERT(false, "Font file does not exist: {0}", filepath.string());
+			KBRAssert(false, "Font file does not exist: {0}", filepath.string());
 			return;
 		}
 
 		msdfgen::FreetypeHandle* ft = msdfgen::initializeFreetype();
 		if (!ft)
 		{
-			KBR_CORE_ASSERT(false, "Could not initialize FreeType library!");
+			KBRAssert(false, "Could not initialize FreeType library!");
 			return;
 		}
 
@@ -80,7 +102,7 @@ namespace Kerberos
 		msdfgen::FontHandle* font = msdfgen::loadFont(ft, filepathStr.c_str());
 		if (!font)
 		{
-			KBR_CORE_ASSERT(false, "Could not load font: {0}", filepath.string());
+			KBRAssert(false, "Could not load font: {0}", filepath.string());
 			msdfgen::deinitializeFreetype(ft);
 			return;
 		}
@@ -111,6 +133,7 @@ namespace Kerberos
 
 		m_MSDFData->FontGeometry = msdf_atlas::FontGeometry(&m_MSDFData->Glyphs);
 		int glyphsLoaded = m_MSDFData->FontGeometry.loadCharset(font, fontScale, charset);
+		Log::CoreDebug("{} glyphs loaded from font {}", glyphsLoaded, m_Name);
 
 		msdf_atlas::TightAtlasPacker atlasPacker;
 		atlasPacker.setPixelRange(2.0);
@@ -122,7 +145,7 @@ namespace Kerberos
 		atlasPacker.setScale(emSize);
 
 		int remaining = atlasPacker.pack(m_MSDFData->Glyphs.data(), static_cast<int>(m_MSDFData->Glyphs.size()));
-		KBR_CORE_ASSERT(remaining == 0, "Could not pack all glyphs into the atlas! {} glyphs remaining", remaining);
+		KBRAssert(remaining == 0, "Could not pack all glyphs into the atlas! {} glyphs remaining", remaining);
 
 		int width, height;
 		atlasPacker.getDimensions(width, height);
@@ -184,7 +207,7 @@ namespace Kerberos
 	void Font::GetQuadAtlasBounds(char character, double& al, double& ab, double& ar, double& at) const
 	{
 		const auto& glyph = m_MSDFData->FontGeometry.getGlyph(character);
-		KBR_CORE_ASSERT(glyph, "Font does not contain character: {0}", character);
+		KBRAssert(glyph != nullptr, "Font does not contain character: {0}", character);
 
 		glyph->getQuadAtlasBounds(al, ab, ar, at);
 
@@ -193,7 +216,7 @@ namespace Kerberos
 	void Font::GetQuadPlaneBounds(char character, double& pl, double& pb, double& pr, double& pt) const
 	{
 		const auto& glyph = m_MSDFData->FontGeometry.getGlyph(character);
-		KBR_CORE_ASSERT(glyph, "Font does not contain character: {0}", character);
+		KBRAssert(glyph != nullptr, "Font does not contain character: {0}", character);
 
 		glyph->getQuadPlaneBounds(pl, pb, pr, pt);
 	}
@@ -201,7 +224,7 @@ namespace Kerberos
 	double Font::GetAdvance(char character) const
 	{
 		const auto& glyph = m_MSDFData->FontGeometry.getGlyph(character);
-		KBR_CORE_ASSERT(glyph, "Font does not contain character: {0}", character);
+		KBRAssert(glyph != nullptr, "Font does not contain character: {0}", character);
 
 		return glyph->getAdvance();
 	}

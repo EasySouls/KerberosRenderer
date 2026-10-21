@@ -3,8 +3,9 @@ import common;
 
 [vk::binding(0, 0)] RWStructuredBuffer<Particle> particlePool;
 [vk::binding(1, 0)] RWStructuredBuffer<uint> deadList;
-[vk::binding(2, 0)] RWStructuredBuffer<uint> aliveList;
-[vk::binding(3, 0)] RWStructuredBuffer<uint> counters; // [0] = deadCount, [1] = aliveCount
+[vk::binding(2, 0)] RWStructuredBuffer<uint> activeListA;
+[vk::binding(3, 0)] RWStructuredBuffer<uint> counters; // [0] = deadCount, [1] = activeCount, [3] = list index
+[vk::binding(4, 0)] RWStructuredBuffer<uint> activeListB;
 
 [vk::binding(0, 1)] StructuredBuffer<SpawnRequest> spawnRequests;
 [vk::binding(1, 1)] ConstantBuffer<ParticleFrameData> scene;
@@ -78,6 +79,19 @@ void computeMain(uint3 threadId: SV_DispatchThreadID)
         p.subUVGrid = req.subUVGrid;
         p.frameAspect = req.frameAspect;
         p.texIndex = req.texIdx;
+
+        // Append the new particle to the current active list so it is simulated this frame.
+        uint activeIndex;
+        InterlockedAdd(counters[1], 1, activeIndex);
+        if (activeIndex >= 1000000) {
+            InterlockedAdd(counters[0], 1);
+            break;
+        }
+
+        if (counters[3] == 0)
+            activeListA[activeIndex] = poolIndex;
+        else
+            activeListB[activeIndex] = poolIndex;
 
         // Write back to pool
         particlePool[poolIndex] = p;

@@ -16,11 +16,13 @@ struct VSOutput
 {
     float4 Position : SV_Position;
     float3 ViewNormal : TEXCOORD0;
+    float2 Motion : TEXCOORD1;
 };
 
 struct PSOutput
 {
     float4 Normal : SV_Target0;
+    float2 Motion : SV_Target1;
 }
 
 [shader("vertex")]
@@ -30,6 +32,16 @@ VSOutput vertexMain(VSInput input)
 
     float4 worldPos = mul(perObject.model, float4(input.Pos, 1.0));
     output.Position = mul(scene.projection, mul(scene.view, worldPos));
+
+    // Motion vectors are computed in unjittered space. FSR3 receives the
+    // sub-pixel jitter separately, so the motion buffer must not contain it.
+    float4 currentClipPosition = mul(scene.motionProjection, mul(scene.view, worldPos));
+    float4 previousClipPosition = mul(scene.previousProjection,
+                                      mul(scene.previousView,
+                                          mul(perObject.previousModel, float4(input.Pos, 1.0))));
+    float2 currentNdc = currentClipPosition.xy / currentClipPosition.w;
+    float2 previousNdc = previousClipPosition.xy / previousClipPosition.w;
+    output.Motion = (previousNdc - currentNdc) * 0.5 * scene.viewportSize;
 
     float3 worldNormal = mul((float3x3)perObject.model, input.Normal);
     output.ViewNormal = mul((float3x3)scene.view, worldNormal);
@@ -47,6 +59,7 @@ PSOutput fragmentMain(VSOutput inVert)
     // Mapping normal from [-1, 1] to [0, 1] to store in a UNORM texture
     // If using a SFLOAT texture format (like R16G16B16A16_SFLOAT), just return float4(N, 1.0);
     output.Normal = float4(N * 0.5 + 0.5, 1.0);
+    output.Motion = inVert.Motion;
 
     return output;
 }

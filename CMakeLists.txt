@@ -1,47 +1,80 @@
-cmake_minimum_required(VERSION 3.27)
+cmake_minimum_required(VERSION 3.30)
 
-set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+if(NOT DEFINED CMAKE_CXX_COMPILER_CLANG_SCAN_DEPS AND CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
+    # Attempt to find the scanner in the system path or compiler directory
+    find_program(CMAKE_CXX_COMPILER_CLANG_SCAN_DEPS NAMES clang-scan-deps clang-scan-deps.exe)
+    
+    if(CMAKE_CXX_COMPILER_CLANG_SCAN_DEPS)
+        message(STATUS "Found clang-scan-deps: ${CMAKE_CXX_COMPILER_CLANG_SCAN_DEPS}")
+    else()
+        message(FATAL_ERROR "clang-scan-deps NOT FOUND! C++20 Modules cannot be compiled. Ensure LLVM bin folder is in your PATH.")
+    endif()
+endif()
 
-project(KerberosEngine LANGUAGES CXX)
+project(KerberosRenderer LANGUAGES CXX)
+
+option(KBR_BUILD_TESTS "Build KerberosRenderer tests." ON)
+
+message(STATUS "--- MODULE DIAGNOSTICS ---")
+message(STATUS "CMake Version:      ${CMAKE_VERSION}")
+message(STATUS "Compiler ID:        ${CMAKE_CXX_COMPILER_ID}")
+message(STATUS "Compiler Version:   ${CMAKE_CXX_COMPILER_VERSION}")
+message(STATUS "Simulated MSVC:     ${CMAKE_CXX_SIMULATE_VERSION}")
+message(STATUS "ScanDeps Tool:      ${CMAKE_CXX_COMPILER_CLANG_SCAN_DEPS}")
+message(STATUS "Internal Scanner:   ${CMAKE_CXX_SCANDEP_SOURCE}")
+message(STATUS "Compiler Launcher:  ${CMAKE_CXX_COMPILER_LAUNCHER}")
+message(STATUS "--------------------------")
 
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS OFF)
 
 set_property(GLOBAL PROPERTY USE_FOLDERS ON)
 
-# Instrumentation options
+# Keep source-built dependencies deterministic. Individual dependencies can
+# still override this when they expose a dedicated option.
+option(BUILD_SHARED_LIBS "Build libraries as shared libraries by default." OFF)
+
 option(KBR_ENABLE_ASAN "Enable AddressSanitizer for Kerberos targets." OFF)
-option(KBR_ENABLE_FUZZING "Enable libFuzzer instrumentation (-fsanitize=fuzzer-no-link) for Kerberos targets (Clang only)." OFF)
-option(KBR_ENABLE_THIRDPARTY_INSTRUMENTATION "Enable selected sanitizer/fuzz instrumentation for third-party targets too." OFF)
-
-# Disable Basis Universal SSE support to avoid C++23 implicit-move
-# incompatibility in cppspmd_sse.h (rvalue-ref return binding to lvalue-ref).
-set(BASISU_SSE OFF CACHE BOOL "Compile with SSE support so applications can choose to use it." FORCE)
-
-# Vulkan SDK fallback
-if(DEFINED ENV{VULKAN_SDK})
-    set(KBR_VULKAN_DIR $ENV{VULKAN_SDK})
-else()
-    set(KBR_VULKAN_DIR "${CMAKE_SOURCE_DIR}/KerberosEngine/ThirdParty/VulkanSDK")
-endif()
-
-message(STATUS "Vulkan SDK: ${KBR_VULKAN_DIR}")
-
-include(Config/KerberosBuildSettings.cmake)
-
-target_compile_options(KerberosBuildSettings INTERFACE
-    $<$<CXX_COMPILER_ID:MSVC>:/W4 /MP>
-    $<$<CXX_COMPILER_ID:GNU>:-Wall -Wextra -Wpedantic>
-    $<$<CXX_COMPILER_ID:Clang>:-Wall -Wextra -Wpedantic>
-)
+option(KBR_ENABLE_FUZZING "Enable libFuzzer instrumentation for Kerberos targets (Clang only)." OFF)
+option(KBR_ENABLE_THIRDPARTY_INSTRUMENTATION
+       "Enable selected sanitizer/fuzz instrumentation for third-party targets too."
+       OFF)
+option(KBR_ENABLE_TRACY "Enable Tracy client profiling instrumentation." OFF)
 
 if(MSVC)
-    add_compile_options(/FC)
-    add_compile_options(/EHsc)
+    # Use the DLL runtime consistently for the engine and static third-party
+    # libraries. This is independent from whether a library is a DLL.
+    set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>DLL")
+endif()
+
+if(DEFINED ENV{VULKAN_SDK})
+    set(KBR_VULKAN_DIR "$ENV{VULKAN_SDK}" CACHE PATH "Vulkan SDK root directory")
+else()
+    set(KBR_VULKAN_DIR
+        "${CMAKE_CURRENT_SOURCE_DIR}/KerberosEngine/ThirdParty/VulkanSDK"
+        CACHE PATH "Vulkan SDK root directory")
+endif()
+message(STATUS "Vulkan SDK: ${KBR_VULKAN_DIR}")
+
+include("${CMAKE_CURRENT_SOURCE_DIR}/Config/KerberosBuildSettings.cmake")
+
+if(KBR_BUILD_TESTS)
+    enable_testing()
+
+    set(INSTALL_GTEST OFF CACHE BOOL "" FORCE)
+    set(gtest_build_samples OFF CACHE BOOL "" FORCE)
+    set(gtest_build_tests OFF CACHE BOOL "" FORCE)
+    set(BUILD_GMOCK OFF CACHE BOOL "" FORCE)
+    add_subdirectory(KerberosEngine/ThirdParty/googletest EXCLUDE_FROM_ALL)
 endif()
 
 add_subdirectory(KerberosEngine)
 add_subdirectory(KerberosScriptCoreLib)
 add_subdirectory(KerberosEditor)
 
-set_property(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} PROPERTY VS_STARTUP_PROJECT KerberosEditor)
+if(KBR_BUILD_TESTS)
+    add_subdirectory(Tests)
+endif()
+
+set_property(DIRECTORY PROPERTY VS_STARTUP_PROJECT KerberosEditor)

@@ -1,0 +1,305 @@
+# Asset system context
+
+Applies to `KerberosEngine/Source/Assets/**`, `KerberosEngine/Source/Project/**`,
+`KerberosEditor/Source/Windows/AssetsPanel.cpp`,
+`KerberosEditor/Source/AssetConstants.hpp`, and `KerberosEditor/Assets/**`.
+
+## Responsibilities and ownership
+
+The asset system has four related layers:
+
+- Identity/contracts: `AssetHandle` is a `UUID`; `AssetType`, `AssetMetadata`,
+  and `AssetRegistry` define identity and relationships.
+- Editor management: `EditorAssetManager` owns the editor registry, loaded
+  asset cache, metadata service, importer registry, build coordinator, and
+  file watcher.
+- Build/import pipeline: `.meta` files, source scanning, staleness checks,
+  staged cache transactions, and registered pipeline importers.
+- Runtime loading: `RuntimeAssetManager`, `RuntimeAssetResolver`, and
+  `RuntimeAssetLoader` resolve registry entries and load supported native data.
+
+The active manager is selected through `Project`; `AssetManager` is the static
+facade used by engine and editor consumers. See
+`KerberosEngine/Source/Assets/Asset.hpp`,
+`AssetMetadata.hpp`, `AssetRegistry.hpp`,
+`EditorAssetManager.hpp`, `RuntimeAssetManager.hpp`, and
+`KerberosEngine/Source/Project/Project.cpp`.
+Normal editor project loads create and activate an `EditorAssetManager`;
+headless `Project::Load` callers may intentionally omit manager initialization
+for project-state tests and must not use asset-manager APIs in that mode.
+
+## Root assets versus generated sub-assets
+
+Do not confuse a source asset with its generated library outputs.
+
+- Root source metadata uses a source-relative `Filepath`.
+- Generated entries use a cache-relative `LibraryPath`, point to the root with
+  `RootSourceHandle`/`ParentHandle`, and have a stable `SubAssetKey`.
+- glTF/GLB sources are imported as prefab root assets and can generate meshes,
+  materials, textures, skeletons, animations, and prefab subassets.
+- Stable local keys are required to reuse sub-asset handles across rebuilds.
+- Generated cache/staging outputs must not recursively become watched sources.
+- Source files may live anywhere below the assets root; importers must not
+  require user-facing folders such as `Assets/Prefabs`. Cache subdirectories
+  are an internal organization choice only.
+
+The active in-memory registry is `std::map<AssetHandle, AssetMetadata>`.
+`AssetRegistry` also maintains a dense per-`AssetType` handle index (vector plus
+handle-to-slot map) that is updated by `Add`/`Remove`/`Clear`; `GetAssetsOfType`
+returns a span over that index without scanning the registry or rereading
+`AssetRegistry.kbrar`. Treat metadata `Type` as immutable after insertion;
+re-adding a handle through `Add` is the supported way to change its type.
+`AssetRegistryTypes.hpp` contains a newer serialized-entry model that is not
+the active in-memory representation; do not assume both models are equivalent.
+`AssetRegistry.kbrar` is required persisted editor/runtime index state, but it
+is derived and repairable: source `.meta` files own importer state and stable
+source/subasset identity, while successful builds reconcile the registry's
+handle-to-library metadata. Path lookups are linear and case-normalized.
+
+## Source formats and import paths
+
+`EditorAssetManager.cpp` currently defines source extensions for textures
+(`.png`, `.jpg`, `.jpeg`, `.ktx`, `.ktx2`), cubemaps, FBX/OBJ/glTF/GLB models,
+Kerberos scenes, WAV audio, materials, prefabs, and animations.
+
+There are two import concepts:
+
+- `AssetImporter` is the legacy/direct object-loading switch used by
+  `GetAsset()` and `ImportAsset()`.
+- `ImporterRegistry`/`IAssetImporter` are build-pipeline importers used by
+  `AssetBuildCoordinator`.
+
+`GLTFPipelineImporter` performs real conversion and emits derived native
+outputs. Its public root type is `Prefab`: a glTF file is the source input,
+while the imported binary `.kbrprefab` artifact plus its `.kbrscene` manifest
+are what runtime loading consumes. A scene must not resolve the glTF source
+directly, and native cache prefabs must not be sent through the legacy YAML
+`PrefabSerializer`.
+The `.kbrscene` manifest stores the imported node graph and one record for
+each mesh primitive, including its generated mesh and material indices. Native
+glTF loading preserves source parent relationships, creates primitive child
+entities, assigns `StaticMeshComponent::MeshMaterial`, and adds a synthetic
+instance root so files with multiple glTF roots remain grouped. Legacy YAML
+prefabs do not receive this wrapper behavior.
+Authored YAML prefabs may also carry per-entity script records
+(`PrefabScriptTemplate`: class name plus serialized field initializers).
+`PrefabSerializer` writes and reads those records, and
+`PrefabEntityTemplate::ToEntity` recreates the entity's `ScriptComponent` and
+field initializers, then reconciles them with the current script class so
+removed fields are dropped and new fields get defaults. Native glTF prefabs
+remain script-free. When a scene is
+running, `Scene::InstantiatePrefab` creates script instances and runs
+`OnCreate` for scripted prefab entities immediately.
+The importer also emits one native material record per glTF material (named
+after the material, not just its index) and one `.ktx2` texture artifact per
+referenced image. Material records reference their textures by image index so
+runtime loading can resolve the corresponding `texture:<imageIndex>`
+sub-assets. Decoded glTF images are flipped vertically before encoding to KTX2
+so they match the renderer's sampling convention; this is the same flip
+`TextureImporter::LoadTextureData` applies to standalone images and cubemap
+faces. The combined glTF `metallicRoughnessTexture` is bound to both the
+metallic and roughness material slots; shaders read roughness from the G
+channel and metallic from the B channel (R and A are unused), per the glTF 2.0
+spec. Texture color space follows glTF slot semantics: base color and emissive
+images are encoded as sRGB formats (hardware-decoded to linear on sampling)
+while normal, metallic-roughness, and occlusion images stay linear. Images
+referenced by no material slot default to sRGB; an image used by both color
+and data slots is encoded as sRGB with a warning. Raster texture sources use
+the `TextureSrgb["source"]` value from their source `.meta` (default sRGB)
+because raster formats cannot reliably describe their color space; KTX/KTX2
+sources self-describe via their embedded format. Cubemap faces are loaded
+linear and `CubemapData::IsSRGB` selects the sRGB image format in `TextureCube`.
+
+All artifacts produced by a glTF import are written under a per-source cache
+namespace derived from the source path relative to the assets root (extension
+stripped), e.g. `Models/FlightHelmet/glTF/FlightHelmet/...`. This guarantees
+one source's cache entries never overwrite another source's, even when two
+glTF files share the same stem. Within that namespace, sub-asset file names
+are readable hints rather than bare indices: meshes use
+`mesh_<m>_<p>[_<meshName>]`, textures use `texture_<i>[_<imageName>]`, and
+materials/skeletons/animations use their glTF name with an index fallback.
+The leading index tokens are the source of the stable `SubAssetKey`
+(`mesh:<m>_<p>`, `texture:<i>`, etc.), so the readable suffix never changes
+sub-asset identity.
+
+`TexturePipelineImporter` converts texture sources into cached `.ktx2`
+artifacts so runtime loading only consumes KTX2. Raster images are decoded
+(flipped) and encoded; KTX1 sources are converted with the `ktx2ktx2` tool;
+KTX2 sources are copied as-is. Each texture source gets its own cache
+namespace that keeps the source extension (e.g. `Textures/foo.png/foo.ktx2`),
+so same-stem sources such as `foo.png` and `foo.ktx2` never overwrite each
+other. Generated artifacts live only in the cache, never in the source tree,
+so they are never rescanned as sources.
+
+`StandaloneAssetPipelineImporter` remains a lightweight adapter for the
+non-texture single-file sources (FBX/OBJ, audio, authored prefabs, animations,
+cubemaps): it supplies extension/type/build registration but emits no cache
+payload. Do not describe it as a full format converter; add a format-specific
+pipeline importer when a format gains cache conversion.
+
+`MaterialPipelineImporter` handles `.kbrmat` authored materials. It copies the
+YAML source into the cache at the source-relative path (for example
+`Materials/armor.kbrmat`) and records that as the root `LibraryPath`, so editor
+and runtime material loading always consumes an imported artifact rather than
+reaching back into the source tree. Material texture slots serialize stable
+`Texture2D` asset handles (`0` means unset); `MaterialImporter` resolves those
+handles through the active asset manager and loads the texture artifacts. It
+must not call `Texture2D::FromFile` on source or legacy paths; unresolved or
+non-handle references are warnings that leave the slot empty. `SaveMaterial`
+writes handles for registered `Texture2D` assets.
+
+Deferred texture features (not yet implemented):
+- Generated `.ktx2` artifacts have no mip chain (`KTX2Encoder` writes one
+  level); mip generation is a separate follow-up.
+- HDR and 16-bit raster sources are decoded as 8-bit by `LoadTextureData`.
+- The cubemap pipeline (`.kbrcubemap`) still uses the no-payload standalone
+  adapter and is not converted to cache artifacts yet.
+- The legacy `TextureImporter`/`AssetImporter` direct-loading path remains in
+  the codebase.
+- The sRGB import option is editable only for raster sources. Authored KTX/KTX2
+  files self-describe sRGB and the option is ignored; a future read-only sRGB
+  display (derived from the embedded format) is planned for the inspector.
+
+Importer extension lookup normalizes the leading dot and case. Unknown file
+types must not silently become `Texture2D`; preserve explicit error/warning
+behavior when changing type classification.
+
+## Known glTF import limitations
+
+The glTF pipeline currently handles opaque, single-UV, unanimated
+metallic-roughness content. Valid glTF files using the following are not yet
+imported, or are imported lossily:
+
+- Per-texture `texCoord` indices beyond `TEXCOORD_0` (lightmaps, multi-UV).
+- `COLOR_0` vertex colors and `TEXCOORD_1+` attribute sets.
+- Morph targets, and `JOINTS_0`/`WEIGHTS_0` skinning weights (skeletons are
+  recorded but skinned meshes do not deform).
+- Animation keyframes (only channel/sampler counts are stored).
+- `alphaMode`, `alphaCutoff`, and `doubleSided` material settings.
+- Texture sampler wrap/filter modes and `KHR_texture_transform`.
+- 16-bit per-channel source images.
+- Draco / meshopt mesh compression and `KHR_materials_*` extensions.
+- Multiple scenes per file and punctual lights (`KHR_lights_punctual`).
+
+Extend the importer deliberately rather than assuming full glTF coverage.
+
+## Metadata, registry, and staleness
+
+Registry entries carry an `AssetSourceRoot` (`Project` or `Engine`) serialized
+as the `SourceRoot` field; missing values default to `Project` so older
+registries stay readable. `AssetUri` (`Assets/AssetUri.hpp`) formats and parses
+`project::/<rel>` and `engine::/<rel>` URIs, which are the authoring/tooling
+form of `(SourceRoot, relative path)`. Project assets resolve against
+`Project::GetAssetDirectory()`; engine assets (when registered) resolve against
+`EnginePaths::Assets()` and their artifacts against the engine cache root
+(`EditorAssetManager::GetEngineCacheRoot()`). `EditorAssetManager` and
+`RuntimeAssetResolver` both pick the cache/library root per `SourceRoot`.
+
+`AssetMetaService` owns source `.meta` files. Metadata includes schema version,
+source handle, importer type/version, source hash, and sub-asset handle/key
+records. Missing metadata is created; writes use a temporary file and rename.
+Meta files are named by appending `.meta` to the full source filename (e.g.
+`foo.png.meta`, `foo.ktx.meta`), so sources that share a stem get distinct
+metadata. Older stem-named metas (e.g. `foo.meta`) are not migrated
+automatically; renaming them is a manual/offline operation.
+`AssetStalenessEvaluator` checks force rebuilds, source existence/hash, and
+registry completeness, and the build coordinator additionally verifies that
+artifact-producing importers have a root `LibraryPath` and an existing root
+artifact. Generated sub-asset output existence is not currently fully
+validated, so changes involving cache artifacts should address that gap
+deliberately.
+
+Import options also live in the `.meta` (`AssetMetaFile::TextureSrgb`), a map
+from a stable key to an sRGB boolean. glTF sources use `texture:<imageIndex>`
+keys; a standalone texture source uses the key `source`. Importers materialize
+derived defaults into this map on first import (so a glTF's slot-derived sRGB
+choices persist until the user changes them) and the build coordinator writes
+the importer's materialized map back to the `.meta`. The inspector panel edits
+these values and applies them via
+`EditorAssetManager::SetTextureSrgbOptions` (which persists the `.meta` and
+force-rebuilds via `ReimportAsset`, evicting cached loaded artifacts).
+
+`AssetBuildCoordinator` serializes builds, finds the registered importer,
+ensures metadata, evaluates staleness, imports into a staging transaction,
+commits outputs, updates metadata, reconciles obsolete generated entries, and
+updates the registry. `EditorAssetManager::ImportAsset` persists the resulting
+registry. `EditorAssetManager::BuildAssets` also persists the registry when any
+source is rebuilt, so pipeline migrations repair previously persisted entries
+during project load. For artifact-producing importers, the build coordinator
+treats a missing root `LibraryPath` or missing root artifact as stale even when
+the source meta is current; `Standalone` sources without payload are exempt.
+Preserve stable handles and avoid partial registry updates on failed builds;
+stale registry data must be repaired from successful metadata/build results
+rather than treated as authoritative.
+
+## File watching and events
+
+`AssetFileWatchService` normalizes paths/extensions, filters paths outside the
+assets root, ignores hidden/cache/staging components, debounces events, and
+converts filewatch notifications into Added/Modified/Removed/Renamed events.
+Its callback runs off the main thread. `EditorAssetManager` must hand events
+to the application main-thread queue and guard queued callbacks with its
+lifetime flag.
+
+Removal must remove the root and associated generated sub-assets from both the
+loaded cache and registry. Rename must update registry paths and rebind the
+source `.meta` file before rebuilding the new path. Deletion currently does
+not automatically remove stale `.meta` or cache files; do not assume cleanup
+is complete.
+
+`AssetSourceScanner` recursively scans normalized source extensions and skips
+hidden paths, cache/staging directories, and `.meta` files. Keep initial
+scanning and watcher filtering based on the same source policy.
+
+## Editor/runtime integration
+
+`EditorAssetManager::GetAsset()` must load through the imported artifact loader
+using registry `LibraryPath` values. Native glTF prefab records resolve their
+generated mesh handles through registry `RootSourceHandle` and
+`SubAssetKey`. It must not call the legacy `AssetImporter` source-loading
+switch. `ImportSource`/build operations are the only source ingestion path;
+the returned root handle represents the imported prefab or other imported
+artifact, not a live source-file object.
+
+`RuntimeAssetManager` owns a registry snapshot and resolves runtime entries
+only through their imported `LibraryPath`. It must not retain an editor-manager
+pointer, fall back to `Filepath`, invoke source importers, or mutate metadata.
+Invalid handles are errors rather than defaulting to an unrelated asset type.
+Both managers expose `GetAssetsOfType` (backed by the registry's dense type
+index) through `AssetManagerBase` and the `AssetManager` facade; UI code should
+use that query instead of scanning the registry or walking the filesystem when
+it needs assets of a particular type.
+The runtime loader still supports only part of the selected artifact set; add
+loaders explicitly and preserve unsupported-asset errors until they exist.
+glTF imports now emit native texture artifacts: each referenced image is
+imported as a `.ktx2` file under `Textures/` (via `KTX2Encoder`/`KtxConversion`)
+and registered as a `Texture2D` sub-asset keyed `texture:<imageIndex>`. Native
+material records carry the base color, metallic, roughness, and emissive
+factors plus per-slot texture references by image index. `LoadNativeMaterial`
+resolves those references through the registry (`RootSourceHandle` +
+`SubAssetKey`) and loads the matching textures. Authored YAML material files
+are loaded from their cached copies through `MaterialImporter`; their texture
+slots are asset handles resolved through the active manager, so the material
+reader no longer depends on source paths or the legacy texture loader.
+
+The asset browser is `KerberosEditor/Source/Windows/AssetsPanel.cpp`. It
+enumerates the filesystem, looks up handles, previews textures, opens files,
+supports drag/drop payloads, and edits materials. Drag/drop payloads use
+`AssetDragPayload` and carry both the selected handle and its root source
+handle; consumers must decode through `ReadAssetDragPayload` rather than
+casting the payload to a bare handle. Refreshing its content list must not
+occur while iterating it.
+
+## Validation
+
+Configure/build from the repository root:
+
+```powershell
+cmake --preset vs2026
+cmake --build --preset vs2026-debug
+```
+
+For asset changes, validate initial source scanning and watcher add/modify/
+remove/rename behavior, metadata/registry persistence, extension normalization,
+and glTF sub-asset handle reuse. Keep this context file updated whenever the
+asset architecture or any of these invariants changes.

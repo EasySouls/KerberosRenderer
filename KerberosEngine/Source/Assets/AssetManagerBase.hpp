@@ -1,13 +1,11 @@
 #pragma once
 
-#include "Renderer/Mesh.hpp"
-#include "Renderer/Textures/Texture.hpp"
 #include "Assets/Asset.hpp"
+#include "Assets/AssetRegistry.hpp"
 #include "Core/Core.hpp"
 
 #include <map>
-
-#include "Asset.hpp"
+#include <span>
 
 namespace Kerberos
 {
@@ -29,5 +27,16 @@ namespace Kerberos
 		virtual bool IsAssetLoaded(AssetHandle handle) const = 0;
 
 		virtual AssetType GetAssetType(AssetHandle handle) const = 0;
+
+		virtual const AssetRegistry& GetAssetRegistry() const = 0;
+
+		/**
+		 * Returns every registered asset of the given type.
+		 *
+		 * Backed by AssetRegistry's dense per-type index, so this does not scan the
+		 * registry or touch AssetRegistry.kbrar. The returned view is valid until the
+		 * registry is mutated.
+		 */
+		virtual std::span<const AssetHandle> GetAssetsOfType(AssetType type) const = 0;
 	};
 }

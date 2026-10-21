@@ -10,6 +10,7 @@
 #include <optional>
 #include <vector>
 #include <type_traits>
+#include <functional>
 
 
 struct GLFWwindow;
@@ -283,6 +284,8 @@ namespace Kerberos
 		static VulkanContext* s_Instance;
 	};
 
-	void BeginRenderPassDebugLabel(const vk::raii::CommandBuffer& cmd, const std::string_view labelName);
+	void BeginRenderPassDebugLabel(const vk::raii::CommandBuffer& cmd, std::string_view labelName);
 	void EndRenderPassDebugLabel(const vk::raii::CommandBuffer& cmd);
-} 
+    void InsertDebugLabel(const vk::raii::CommandBuffer& cmd, std::string_view labelName);
+
+    } 

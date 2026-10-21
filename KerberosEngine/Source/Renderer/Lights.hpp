@@ -6,10 +6,11 @@ namespace Kerberos
 {
     struct DirectionalLight
     {
-        alignas(4) bool IsEnabled = true;
         alignas(16) glm::vec3 Direction = glm::vec3(0.0f, -1.0f, 0.0f);
-        alignas(16) glm::vec3 Color = glm::vec3(1.0f);
         alignas(4) float Intensity = 1.0f;
+        alignas(16) glm::vec3 Color = glm::vec3(1.0f);
+        alignas(4) bool IsEnabled = true;
+        uint8_t _pad[3];
     };
 
     struct alignas(16) PointLight

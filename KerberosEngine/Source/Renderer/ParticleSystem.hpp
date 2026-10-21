@@ -28,6 +28,7 @@ struct alignas(16) ParticleFrameData
     float NearPlane{ 0.1f };
     glm::vec2 ViewportSize{ 800.0f, 600.0f };
     float FarPlane{ 1000.0f };
+    uint8_t _pad[4];
 };
 
 class ParticleSystem
@@ -38,6 +39,7 @@ public:
 
     void Initialize(vk::Format colorFormat,
                     vk::Format depthFormat,
+                    vk::Format reactiveFormat,
                     vk::ImageView sceneDepthImageView,
                     const Owner<DescriptorAllocator>& allocator);
 
@@ -54,7 +56,7 @@ public:
 
 private:
     void SetupDescriptors();
-    void SetupPipelines(vk::Format colorFormat, vk::Format depthFormat);
+    void SetupPipelines(vk::Format colorFormat, vk::Format depthFormat, vk::Format reactiveFormat);
 
     void AllocateParticleFrameBuffers();
     void AllocateIndirectDrawBuffers();
@@ -69,7 +71,7 @@ private:
 
     StorageBuffer m_ParticlePoolBuffer;
     StorageBuffer m_DeadListBuffer;
-    StorageBuffer m_AliveListBuffer;
+    std::vector<StorageBuffer> m_ActiveListBuffers;
     StorageBuffer m_CountersBuffer;
 
     struct VulkanBuffer
@@ -103,6 +105,7 @@ private:
     Ref<ComputePipeline> m_SpawnPipeline;
     Ref<ComputePipeline> m_PrepareSimulatePipeline;
     Ref<ComputePipeline> m_UpdatePipeline;
+    Ref<ComputePipeline> m_FinalizeSimulatePipeline;
     Ref<GraphicsPipeline> m_RenderPipeline;
 };
 

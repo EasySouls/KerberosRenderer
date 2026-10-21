@@ -8,7 +8,6 @@
 #include "Assets/Asset.hpp"
 
 #include <entt/single_include/entt/entt.hpp>
-#include <set>
 #include <string_view>
 #include <memory>
 
@@ -17,21 +16,28 @@ namespace Kerberos
 	class Entity;
 	class HierarchyPanel;
 
-	class Scene : public std::enable_shared_from_this<Scene>, public Asset
+	class Scene final : public std::enable_shared_from_this<Scene>, public Asset
 	{
-	public:
-		Scene();
+    public:
+        Scene();
 		~Scene() override;
 
+        Scene(const Scene& other) = delete;
+        Scene(Scene&& other) noexcept = delete;
+        Scene& operator=(const Scene& other) = delete;
+        Scene& operator=(Scene&& other) noexcept = delete;
+
 		void OnRuntimeStart();
-		void OnRuntimeStop() const;
+		void OnRuntimeStop();
 		void OnSimulationStart();
 		void OnSimulationStop() const;
 		void SetScenePaused(bool isPaused);
 
+		bool IsRunning() const { return m_IsRunning; }
+
 		void OnUpdateEditor(float ts, const Camera& camera);
 		void OnUpdateSimulation(float ts, const Camera& camera);
-		void OnUpdateRuntime(float ts, const Camera& camera);
+		void OnUpdateRuntime(float ts);
 
 		/**
 		 * @brief Create an entity in the scene and assigns it a transform component
@@ -61,10 +67,15 @@ namespace Kerberos
 		Entity DuplicateEntity(Entity entity, bool duplicateChildren);
 
 		void CreateChild(Entity entity);
+		[[deprecated("Import glTF as a prefab and call InstantiatePrefab")]]
 		Entity InstantiateModelAsset(AssetHandle modelHandle, const std::string& rootName = std::string());
 		Entity InstantiatePrefab(AssetHandle prefabHandle, const std::string& rootName = std::string());
 
 		Entity GetEntityByUUID(UUID uuid) const;
+
+		/// Returns an invalid entity when the UUID is not present in the scene.
+		/// Prefer this over GetEntityByUUID for references that may be stale.
+		Entity TryGetEntityByUUID(UUID uuid) const;
 
 		void SetParent(Entity child, Entity parent, bool keepWorldTransform = true);
 		Entity GetParent(Entity child) const;
@@ -96,7 +107,12 @@ namespace Kerberos
 
 		static Ref<Scene> Copy(const Ref<Scene>& other);
 
-		AssetType GetType() override;
+		static constexpr AssetType Type = AssetType::Scene;
+
+		AssetType GetType() override
+		{
+            return Type;
+		}
 
 	private:
 		template<typename T>
@@ -104,7 +120,6 @@ namespace Kerberos
 
 		void Render2DRuntime(const SceneCamera* mainCamera, const glm::mat4& mainCameraTransform, float dt);
 		void Render3DRuntime(const SceneCamera* mainCamera, const glm::mat4& mainCameraTransform, float dt);
-		void Render3DRuntime(const Camera& camera, float dt);
 		void Render3DEditor(const Camera& camera, float dt);
 
 		void UpdateScripts(float ts);
@@ -130,6 +145,7 @@ namespace Kerberos
 		uint32_t m_ViewportHeight = 0;
 
 		bool m_IsScenePaused = false;
+		bool m_IsRunning = false;
 
 		bool m_Is3D = true;
 		bool m_EnableShadowMapping = true;

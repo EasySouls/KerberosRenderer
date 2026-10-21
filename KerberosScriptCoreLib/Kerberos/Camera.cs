@@ -1,15 +1,15 @@
-using Kerberos.Source.Kerberos.Core;
-using Kerberos.Source.Kerberos.Scene;
+using Kerberos.Core;
+using Kerberos.Scene;
 using System;
 
-namespace Kerberos.Source.Kerberos
+namespace Kerberos
 {
     public class Camera : Entity
     {
         public float DistanceFromPlayer;
         public float FOV = 45.0f;
 
-        private TransformComponent _transform;
+        private TransformComponent _transform = null!;
         private Entity? _target;
 
         public Camera() : base()

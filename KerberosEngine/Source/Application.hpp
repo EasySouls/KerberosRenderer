@@ -4,7 +4,6 @@
 #include "Events/Event.hpp"
 #include "Events/WindowClosedEvent.hpp"
 #include "Audio/AudioManager.hpp"
-#include "Logging/Log.hpp"
 #include "Core/Core.hpp"
 #include "Layer.hpp"
 
@@ -14,6 +13,8 @@
 #include <queue>
 #include <functional>
 #include <filesystem>
+#include <future>
+#include <thread>
 
 
 struct GLFWwindow;
@@ -25,23 +26,26 @@ namespace Kerberos
 		int Count = 0;
 		char** Args = nullptr;
 
-		const char* operator[](const int index) const
-		{
-			KBR_CORE_ASSERT(index < Count, "Wrong index into ApplicationCommandLineArgs");
-			return Args[index];
-		}
-	};
+		const char* operator[](int index) const;
+    };
 
 	struct ApplicationSpecification
 	{
 		std::string Name = "Kerberos Application";
 		std::filesystem::path WorkingDirectory;
+		std::filesystem::path EngineRoot;
 		ApplicationCommandLineArgs CommandLineArgs;
+		bool Headless = false;
 	};
 
 	class Application
 	{
 	public:
+		// GPU upload jobs are produced by workers but are always executed by the
+		// render thread with a live Vulkan context. Captures transfer ownership of
+		// any staging data to the queue until the returned completion is signaled.
+		using GPUUploadJob = std::function<void(VulkanContext&)>;
+
 		explicit Application(const ApplicationSpecification& spec);
 		virtual ~Application();
 
@@ -54,13 +58,14 @@ namespace Kerberos
 
 		void Close();
 
-		template<typename T> 
+		template<typename T, typename... Args>
 			requires std::is_base_of_v<Layer, T>
-		void PushLayer();
+		void PushLayer(Args&&... args);
 
 		void OnEvent(Event& event);
 
 		void SubmitToMainThreadQueue(const std::function<void()>& fn);
+		std::shared_future<void> SubmitToGPUUploadQueue(GPUUploadJob job);
 
 		void BlockEvents(bool shouldBlock);
 
@@ -72,6 +77,7 @@ namespace Kerberos
 
 	private:
 		void ExecuteMainThreadQueue();
+		void ExecuteGPUUploadQueue();
 
 		bool OnWindowClose(const WindowClosedEvent& event);
 
@@ -82,24 +88,35 @@ namespace Kerberos
 		Owner<VulkanContext> m_VulkanContext;
 		Owner<AudioManager> m_AudioManager;
 
-		std::vector<std::unique_ptr<Layer>> m_Layers;
+		std::vector<Owner<Layer>> m_Layers;
 		float m_LastFrameTime = 0.0f;
 
 		bool m_IsRunning = true;
+		bool m_OleInitialized = false;
 
 		std::queue<std::function<void()>> m_MainThreadQueue;
 		std::mutex m_QueueMutex;
+
+		struct GPUUploadQueueEntry
+		{
+			GPUUploadJob Job;
+			std::promise<void> Completion;
+		};
+
+		std::queue<GPUUploadQueueEntry> m_GPUUploadQueue;
+		std::mutex m_GPUUploadQueueMutex;
+		std::thread::id m_RenderThreadId;
 
 		bool m_BlockEvents = false;
 
 		static Application* s_Instance;
 	};
 
-	template <typename T> 
+	template <typename T, typename... Args>
 		requires std::is_base_of_v<Layer, T>
-	void Application::PushLayer() 
+	void Application::PushLayer(Args&&... args)
 	{
-        auto layer = CreateOwner<T>();
+        auto layer = CreateOwner<T>(std::forward<Args>(args)...);
 		layer->OnAttach();
 
 		m_Layers.emplace_back(std::move(layer));

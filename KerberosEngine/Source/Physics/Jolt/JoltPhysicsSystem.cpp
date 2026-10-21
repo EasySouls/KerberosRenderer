@@ -1,6 +1,6 @@
-#include "kbrpch.hpp"
 
 #include "JoltPhysicsSystem.hpp"
+#include "Core/Core.hpp"
 #include "Physics/PhysicsSystem.hpp"
 #include "BodyActivationListener.hpp"
 #include "ContactListener.hpp"
@@ -10,6 +10,7 @@
 #include "Scene/Entity.hpp"
 #include "Scene/Scene.hpp"
 #include "Scene/Components/PhysicsComponents.hpp"
+#include "Profiling/Profilers.hpp"
 
 #include <Jolt/Jolt.h>
 #include <Jolt/Core/TempAllocator.h>
@@ -29,6 +30,8 @@
 #include "Jolt/Physics/Collision/CastResult.h"
 
 
+import Kerberos;
+
 namespace Kerberos
 {
 	JoltPhysicsSystem::~JoltPhysicsSystem()
@@ -38,7 +41,7 @@ namespace Kerberos
 
 	void JoltPhysicsSystem::Initialize(const Ref<Scene>& scene)
 	{
-		KBR_PROFILE_FUNCTION();
+		KBR_TRACY_FUNCTION();
 
 		m_Scene = scene;
 
@@ -122,7 +125,7 @@ namespace Kerberos
 
 	void JoltPhysicsSystem::Update(const float deltaTime)
 	{
-		KBR_PROFILE_FUNCTION();
+		KBR_TRACY_FUNCTION();
 
 		UpdateAndCreatePhysicsBodies();
 
@@ -160,6 +163,8 @@ namespace Kerberos
 	bool JoltPhysicsSystem::Raycast(const glm::vec3& origin, const glm::vec3& direction, const float maxDistance,
 		RaycastHit& outHit) const 
 	{
+		KBR_TRACY_FUNCTION();
+
 		if (maxDistance <= 0.0f)
 		{
 			return false;
@@ -179,9 +184,7 @@ namespace Kerberos
 			JPH::Vec3(normalizedDirection.x, normalizedDirection.y, normalizedDirection.z) * maxDistance
 		};
 
-		JPH::RayCastResult hit;
-
-		if (m_JoltSystem->GetNarrowPhaseQuery().CastRay(ray, hit))
+		if (JPH::RayCastResult hit; m_JoltSystem->GetNarrowPhaseQuery().CastRay(ray, hit))
 		{
 			const JPH::Vec3 joltPoint = ray.GetPointOnRay(hit.mFraction);
 			const glm::vec3 point = Physics::Utils::ToGlmVec3(joltPoint);
@@ -192,7 +195,7 @@ namespace Kerberos
 			const UUID entityId = m_BodyIDToEntityID.at(bodyId);
 			if (!entityId.IsValid())
 			{
-				KBR_CORE_ASSERT(false, "Invalid body ID in raycast hit!");
+				KBRAssert(false, "Invalid body ID in raycast hit!");
 				return false;
 			}
 
@@ -223,10 +226,10 @@ namespace Kerberos
 
 	void JoltPhysicsSystem::UpdateAndCreatePhysicsBodies()
 	{
-		KBR_PROFILE_FUNCTION();
+		KBR_TRACY_FUNCTION();
 
-		KBR_CORE_ASSERT(!m_Scene.expired(), "Scene is not initialized!");
-		KBR_CORE_ASSERT(m_JoltSystem, "Jolt Physics System is not initialized!");
+		KBRAssert(!m_Scene.expired(), "Scene is not initialized!");
+		KBRAssert(m_JoltSystem != nullptr, "Jolt Physics System is not initialized!");
 
 		// Handle entities with rigidbodies but no physics body created yet
 		const auto newBodies = m_Scene.lock()->m_Registry.view<RigidBody3DComponent, TransformComponent>(/*entt::exclude<>*/);
@@ -275,8 +278,10 @@ namespace Kerberos
 
 	void JoltPhysicsSystem::SyncTransforms() const
 	{
-		KBR_CORE_ASSERT(!m_Scene.expired(), "Scene is not initialized!");
-		KBR_CORE_ASSERT(m_JoltSystem, "Jolt Physics System is not initialized!");
+		KBR_TRACY_FUNCTION();
+
+		KBRAssert(!m_Scene.expired(), "Scene is not initialized!");
+		KBRAssert(m_JoltSystem != nullptr, "Jolt Physics System is not initialized!");
 
 		const auto view = m_Scene.lock()->m_Registry.view<RigidBody3DComponent, TransformComponent>();
 		for (const auto e : view)
@@ -334,6 +339,8 @@ namespace Kerberos
 
 	void JoltPhysicsSystem::CreatePhysicsBody(const Entity& entity)
 	{
+		KBR_TRACY_FUNCTION();
+
 		auto& rigidBody = entity.GetComponent<RigidBody3DComponent>();
 		auto& transform = entity.GetComponent<TransformComponent>();
 
@@ -462,7 +469,7 @@ namespace Kerberos
 		const JPH::ShapeSettings::ShapeResult compoundResult = compoundSettings.Create();
 		if (compoundResult.HasError())
 		{
-			KBR_CORE_ERROR("Jolt: failed to create compound shape for entity {}: {}", entity.GetName(), compoundResult.GetError().c_str());
+			Kerberos::Log::CoreError("Jolt: failed to create compound shape for entity {}: {}", entity.GetName(), compoundResult.GetError().c_str());
 			return nullptr;
 		}
 		return compoundResult.Get();
@@ -491,7 +498,7 @@ namespace Kerberos
 
 	void JoltPhysicsSystem::Cleanup()
 	{
-		KBR_PROFILE_FUNCTION();
+		KBR_TRACY_FUNCTION();
 
 		//const auto view = m_Scene->m_Registry.view<RigidBody3DComponent>();
 		//for (const auto e : view)

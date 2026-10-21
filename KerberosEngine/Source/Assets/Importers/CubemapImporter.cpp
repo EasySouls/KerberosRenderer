@@ -1,4 +1,3 @@
-#include "kbrpch.hpp"
 #include "CubemapImporter.hpp"
 
 #include "Renderer/Textures/TextureCube.hpp"
@@ -9,9 +8,11 @@
 #include <yaml-cpp/yaml.h>
 #include <stb_image.h>
 
+import Kerberos;
+
 namespace Kerberos
 {
-	Ref<TextureCube> CubemapImporter::ImportCubemap(AssetHandle handle, const AssetMetadata& metadata)
+	Ref<TextureCube> CubemapImporter::ImportCubemap(AssetHandle /*handle*/, const AssetMetadata& metadata)
 	{
 		return ImportCubemap(metadata.Filepath);
 	}
@@ -31,7 +32,7 @@ namespace Kerberos
 		}
 		catch (const YAML::Exception& e)
 		{
-			KBR_CORE_ERROR("CubemapImporter::ImportCubemap - Failed to load yaml file: {}", e.what());
+			Log::CoreError("CubemapImporter::ImportCubemap - Failed to load yaml file: {}", e.what());
 			return nullptr;
 		}
 
@@ -44,7 +45,7 @@ namespace Kerberos
 			if (NeedsConvertingToKTX2(texPath))
 			{
 				const Process::ProcessResult result = KtxConversion::ConvertKtxToKtx2(texPath);
-				KBR_CORE_ASSERT(
+				KBRAssert(
 					result.Succeeded,
 					"CubemapImporter::ImportCubemap - failed to convert KTX to KTX2 for file: {} (started: {}, exit code: {}, error code: {}, error: {})",
 					texPath.string(),
@@ -57,7 +58,7 @@ namespace Kerberos
 			const Ref<TextureCube> cubemapTexture = CreateRef<TextureCube>(texPath);
 			if (!cubemapTexture)
 			{
-				KBR_CORE_ERROR("CubemapImporter::ImportCubemap - Failed to create cubemap texture from file: {}", texPath.string());
+				Log::CoreError("CubemapImporter::ImportCubemap - Failed to create cubemap texture from file: {}", texPath.string());
 				return nullptr;
 			}
 			return cubemapTexture;
@@ -76,7 +77,7 @@ namespace Kerberos
 		}
 		else
 		{
-			KBR_CORE_ERROR("CubemapImporter::ImportCubemap - Failed to load cubemap descriptor from file: {}", filepath.string());
+			Log::CoreError("CubemapImporter::ImportCubemap - Failed to load cubemap descriptor from file: {}", filepath.string());
 			return nullptr;
 		}
 
@@ -90,8 +91,12 @@ namespace Kerberos
 
 			constexpr int desiredChannels = 4;
 			constexpr bool flip = true;
+			// Faces are loaded as linear data.
+			// TextureCube applies the
+			// descriptor's IsSRGB flag when creating the image.
+			constexpr bool srgb = false;
 
-			const auto [spec, buffer] = TextureImporter::LoadTextureData(facePath, flip, desiredChannels);
+			const auto [spec, buffer] = TextureImporter::LoadTextureData(facePath, flip, desiredChannels, srgb);
 			faceData.Specification = spec;
 			faceData.Buffer = Buffer::Copy(buffer);
 			return faceData;
@@ -113,7 +118,7 @@ namespace Kerberos
 
 		if (!cubemapTexture)
 		{
-			KBR_CORE_ERROR("CubemapImporter::ImportCubemap - Failed to create cubemap texture from descriptor: {}", filepath.string());
+			Log::CoreError("CubemapImporter::ImportCubemap - Failed to create cubemap texture from descriptor: {}", filepath.string());
 			return nullptr;
 		}
 

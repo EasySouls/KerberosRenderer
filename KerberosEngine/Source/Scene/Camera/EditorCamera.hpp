@@ -72,8 +72,6 @@ namespace Kerberos
 
 		void OnMouseScrolled(const MouseScrolledEvent& mouseScrolled);
 
-		glm::mat4 GetLightSpaceMatrix(float nearPlane, float farPlane, const glm::vec3& lightDir) const;
-
 	private:
 		float m_Fov = 45.0f;
 		float m_AspectRatio = 1.778f;
@@ -87,7 +85,7 @@ namespace Kerberos
 		glm::vec3 m_Position = { 0.0f, 0.0f, 0.0f };
 		glm::vec3 m_FocalPoint = { 0.0f, 0.0f, 0.0f };
 
-		glm::vec2 m_InitialMousePosition = { 0.0f, 0.0f };
+		glm::vec2 m_InitialMousePosition{ 0.0f, 0.0f };
 
 		float m_Distance = 5.0f;
 		float m_Pitch = 0.0f;

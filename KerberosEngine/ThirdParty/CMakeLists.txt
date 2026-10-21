@@ -1,5 +1,15 @@
 set(BUILD_TESTING OFF CACHE BOOL "" FORCE)
 
+if(KBR_ENABLE_TRACY)
+    set(TRACY_ENABLE ON CACHE BOOL "Enable Tracy profiling." FORCE)
+    set(TRACY_STATIC ON CACHE BOOL "Build Tracy as a static library." FORCE)
+    add_subdirectory(tracy EXCLUDE_FROM_ALL)
+endif()
+
+# These are source dependencies, so keep their build products out of the
+# default build unless one of our targets consumes them.
+set(BASISU_SSE OFF CACHE BOOL "Disable Basis Universal SSE support." FORCE)
+
 # Optional instrumentation for third-party libraries.
 # This is intentionally directory-scoped so it propagates into each vendor
 # subdirectory without patching upstream CMake files.
@@ -26,6 +36,7 @@ if(KBR_ENABLE_THIRDPARTY_INSTRUMENTATION)
 endif()
 
 # GLFW
+set(GLFW_LIBRARY_TYPE STATIC CACHE STRING "Build GLFW as a static library." FORCE)
 set(GLFW_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
 set(GLFW_BUILD_TESTS OFF CACHE BOOL "" FORCE)
 set(GLFW_BUILD_DOCS OFF CACHE BOOL "" FORCE)
@@ -34,6 +45,9 @@ add_subdirectory(GLFW EXCLUDE_FROM_ALL)
 # YAML-CPP
 set(YAML_CPP_BUILD_TESTS OFF CACHE BOOL "" FORCE)
 set(YAML_CPP_BUILD_TOOLS OFF CACHE BOOL "" FORCE)
+set(YAML_CPP_BUILD_CONTRIB OFF CACHE BOOL "" FORCE)
+set(YAML_BUILD_SHARED_LIBS OFF CACHE BOOL "Build yaml-cpp as a shared library." FORCE)
+set(YAML_MSVC_SHARED_RT ON CACHE BOOL "" FORCE)
 add_subdirectory(yaml-cpp EXCLUDE_FROM_ALL)
 
 # Assimp
@@ -56,12 +70,12 @@ add_subdirectory(ktx EXCLUDE_FROM_ALL)
 # Similarly, ktx/lib/CMakeLists.txt line 301 uses ${CMAKE_SOURCE_DIR}/external/dfdutils
 # which only resolves correctly when KTX is the top-level project.
 # Patch the ktx target here without modifying any third-party sources.
-target_include_directories(ktx PUBLIC
+target_include_directories(ktx SYSTEM PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/ktx/external/dfdutils>
 )
 
 # FreeType
-add_subdirectory(freetype)
+add_subdirectory(freetype EXCLUDE_FROM_ALL)
 add_library(Freetype::Freetype ALIAS freetype)
 
 # msdf-atlas-gen
@@ -83,6 +97,7 @@ set(ENTT_BUILD_TESTING OFF CACHE BOOL "" FORCE)
 add_subdirectory(entt EXCLUDE_FROM_ALL)
 
 # Jolt Physics
+set(JPH_BUILD_SHARED_LIBS OFF CACHE BOOL "Build Jolt as a shared library." FORCE)
 set(JPH_DEBUG_RENDERER ON CACHE BOOL "" FORCE)
 set(TARGET_UNIT_TESTS OFF CACHE BOOL "" FORCE)
 set(TARGET_HELLO_WORLD OFF CACHE BOOL "" FORCE)
@@ -102,11 +117,11 @@ target_sources(imgui PRIVATE
     imgui/backends/imgui_impl_vulkan.cpp
 )
 
-target_include_directories(imgui PUBLIC
+target_include_directories(imgui SYSTEM PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/imgui
 )
 
-target_include_directories(imgui PRIVATE
+target_include_directories(imgui SYSTEM PRIVATE
     ${KBR_VULKAN_DIR}/Include
 )
 
@@ -129,11 +144,11 @@ target_sources(ImGuizmo PRIVATE
     ImGuizmo/src/ImGuizmo.h
 )
 
-target_include_directories(ImGuizmo PUBLIC
+target_include_directories(ImGuizmo SYSTEM PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/ImGuizmo/src
 )
 
-target_include_directories(ImGuizmo PRIVATE
+target_include_directories(ImGuizmo SYSTEM PRIVATE
     ${CMAKE_SOURCE_DIR}/KerberosEngine/ThirdParty/imgui
 )
 
@@ -143,43 +158,48 @@ target_link_libraries(ImGuizmo PUBLIC imgui)
 
 # glm
 add_library(glm INTERFACE)
-target_include_directories(glm INTERFACE 
+target_include_directories(glm SYSTEM INTERFACE
     ${CMAKE_CURRENT_SOURCE_DIR}/glm
+)
+target_compile_definitions(glm INTERFACE
+        GLM_FORCE_DEPTH_ZERO_TO_ONE
+        GLM_ENABLE_EXPERIMENTAL
+        # GLM_FORCE_RADIANS
 )
 
 # tinygltf
 add_library(tinygltf INTERFACE)
-target_include_directories(tinygltf INTERFACE
+target_include_directories(tinygltf SYSTEM INTERFACE
     ${CMAKE_CURRENT_SOURCE_DIR}/tinygltf
 )
 
 # stb_image
 add_library(stb INTERFACE)
-target_include_directories(stb INTERFACE
+target_include_directories(stb SYSTEM INTERFACE
     ${CMAKE_CURRENT_SOURCE_DIR}/stb
 )
 
 # spdlog
 add_library(spdlog INTERFACE)
-target_include_directories(spdlog INTERFACE
+target_include_directories(spdlog SYSTEM INTERFACE
     ${CMAKE_CURRENT_SOURCE_DIR}/spdlog
 )
 
 # filewatch
 add_library(filewatch INTERFACE)
-target_include_directories(filewatch INTERFACE
+target_include_directories(filewatch SYSTEM INTERFACE
     ${CMAKE_CURRENT_SOURCE_DIR}/filewatch
 )
 
 # miniaudio
 add_library(miniaudio INTERFACE)
-target_include_directories(miniaudio INTERFACE
+target_include_directories(miniaudio SYSTEM INTERFACE
     ${CMAKE_CURRENT_SOURCE_DIR}/miniaudio
 )
 
 # dotnet
 add_library(dotnet INTERFACE)
-target_include_directories(dotnet INTERFACE
+target_include_directories(dotnet SYSTEM INTERFACE
     ${CMAKE_CURRENT_SOURCE_DIR}/dotnet/include
 )
 target_link_libraries(dotnet INTERFACE

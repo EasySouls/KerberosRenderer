@@ -1,9 +1,11 @@
-#include "kbrpch.hpp"
 #include "ProjectSerializer.hpp"
+#include "Profiling/Profilers.hpp"
 
 #include <yaml-cpp/yaml.h>
 
 #include <fstream>
+
+import Kerberos;
 
 namespace Kerberos
 {
@@ -14,6 +16,8 @@ namespace Kerberos
 
 	bool ProjectSerializer::Serialize(const std::filesystem::path& filepath) const
 	{
+		KBR_TRACY_FUNCTION();
+
 		const auto& info = m_Project->GetInfo();
 
 		YAML::Emitter out;
@@ -33,7 +37,7 @@ namespace Kerberos
 
 		if (fout.fail())
 		{
-			KBR_CORE_ERROR("Failed to write project file to '{}'", filepath.string());
+			Log::CoreError("Failed to write project file to '{}'", filepath.string());
 			return false;
 		}
 
@@ -42,6 +46,8 @@ namespace Kerberos
 
 	bool ProjectSerializer::Deserialize(const std::filesystem::path& filepath) const
 	{
+		KBR_TRACY_FUNCTION();
+
 		auto& info = m_Project->GetInfo();
 
 		YAML::Node data;
@@ -51,14 +57,14 @@ namespace Kerberos
 		}
 		catch (YAML::ParserException& ex)
 		{
-			KBR_CORE_ERROR("Failed to load .kerberos file '{}'\n\t{}", filepath.string(), ex.what());
+			Log::CoreError("Failed to load .kerberos file '{}'\n\t{}", filepath.string(), ex.what());
 			return false;
 		}
 
 		const auto projectNode = data["Project"];
 		if (!projectNode)
 		{
-			KBR_CORE_ERROR("Invalid project file");
+			Log::CoreError("Invalid project file");
 			return false;
 		}
 

@@ -1,46 +1,56 @@
 #include "kbrpch.hpp"
 #include "AssetManager.hpp"
+#include "Model.hpp"
 
-namespace Kerberos
+import Kerberos;
+
+namespace Kerberos {
+
+Ref<Mesh> AssetManager::ResolveMeshAsset(const AssetHandle handle)
 {
-	Ref<Mesh> AssetManager::ResolveMeshAsset(const AssetHandle handle)
-	{
-		if (!handle.IsValid() || !IsAssetHandleValid(handle))
-			return nullptr;
+	KBR_TRACY_FUNCTION();
 
-		switch (GetAssetType(handle))
+	if (!handle.IsValid() || !IsAssetHandleValid(handle))
+		return nullptr;
+
+	switch (GetAssetType(handle))
+	{
+		case AssetType::Mesh:
+			return GetAsset<Mesh>(handle);
+		case AssetType::ModelDEPRECATED:
 		{
-			case AssetType::Mesh:
-				return GetAsset<Mesh>(handle);
-			case AssetType::Model:
-			{
-				const Ref<Model> model = GetAsset<Model>(handle);
-				if (!model)
-					return nullptr;
+            KBRAssert(false, "We should use prefabs instead of Model");
 
-				const Ref<Mesh> mesh = model->GetPrimaryMesh();
-				if (mesh && !mesh->GetHandle().IsValid())
-					mesh->GetHandle() = handle;
-
-				return mesh;
-			}
-			default:
+			const Ref<Model> model = GetAsset<Model>(handle);
+			if (!model)
 				return nullptr;
+
+			// TODO: Very ugly, remove later when sure that nothing uses it anymore
+			const Ref<Mesh> mesh = model->GetPrimaryMesh();
+			if (mesh && !mesh->GetHandle().IsValid())
+				mesh->GetHandle() = handle;
+
+			return mesh;
 		}
-	}
 
-	Ref<Texture2D> AssetManager::GetDefaultTexture2D()
-	{
-		return Project::GetActive()->GetEditorAssetManager()->GetDefaultColorTexture();
+	default:
+		return nullptr;
 	}
+}
 
-	Ref<Mesh> AssetManager::GetDefaultCubeMesh() 
-	{
-		return Project::GetActive()->GetEditorAssetManager()->GetDefaultCubeMesh();
-	}
+Ref<Texture2D> AssetManager::GetDefaultTexture2D()
+{
+	return Project::GetActive()->GetEditorAssetManager()->GetDefaultColorTexture();
+}
 
-	Ref<Font> AssetManager::GetDefaultFont() 
-	{
-		return Project::GetActive()->GetEditorAssetManager()->GetDefaultFont();
-	}
+Ref<Mesh> AssetManager::GetDefaultCubeMesh() 
+{
+	return Project::GetActive()->GetEditorAssetManager()->GetDefaultCubeMesh();
+}
+
+Ref<Font> AssetManager::GetDefaultFont() 
+{
+	return Project::GetActive()->GetEditorAssetManager()->GetDefaultFont();
+}
+
 }

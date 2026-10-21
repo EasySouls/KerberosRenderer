@@ -1,5 +1,4 @@
 #include "CrashHandler.hpp"
-#include "Log.hpp"
 
 #ifdef KBR_PLATFORM_WINDOWS
 #include <windows.h>
@@ -13,19 +12,22 @@
 #endif
 
 #include <cstdlib>
+#include <format>
 #include <stacktrace>
+
+import Kerberos;
 
 static void LogCrashAndStackTrace(const std::string& crashReason) 
 {
-    KBR_CORE_CRITICAL("========================================");
-    KBR_CORE_CRITICAL("ENGINE CRASH DETECTED!");
-    KBR_CORE_CRITICAL("Reason: {}", crashReason);
-    KBR_CORE_CRITICAL("--- Stack Trace ---");
+    Kerberos::Log::CoreCritical("========================================");
+    Kerberos::Log::CoreCritical("ENGINE CRASH DETECTED!");
+    Kerberos::Log::CoreCritical("Reason: {}", crashReason);
+    Kerberos::Log::CoreCritical("--- Stack Trace ---");
 
     const auto trace = std::stacktrace::current();
 
-    KBR_CORE_CRITICAL("\n{}", std::to_string(trace));
-    KBR_CORE_CRITICAL("========================================");
+    Kerberos::Log::CoreCritical("\n{}", std::to_string(trace));
+    Kerberos::Log::CoreCritical("========================================");
 
     Kerberos::Log::Flush();
 }
@@ -34,7 +36,7 @@ static void LogCrashAndStackTrace(const std::string& crashReason)
 
 static void GenerateMiniDump(EXCEPTION_POINTERS* exceptionInfo)
 {
-    KBR_CORE_INFO("Generating Minidump...");
+    Kerberos::Log::CoreInfo("Generating Minidump...");
 
     const HANDLE hFile = CreateFileA("KerberosEngineCrash.dmp",
                                GENERIC_READ | GENERIC_WRITE,
@@ -59,15 +61,15 @@ static void GenerateMiniDump(EXCEPTION_POINTERS* exceptionInfo)
         );
 
         if (success) {
-            KBR_CORE_INFO("Minidump saved to KerberosEngineCrash.dmp");
+            Kerberos::Log::CoreInfo("Minidump saved to KerberosEngineCrash.dmp");
         }
         else {
-            KBR_CORE_ERROR("Failed to write Minidump. Error Code: {}", GetLastError());
+            Kerberos::Log::CoreError("Failed to write Minidump. Error Code: {}", GetLastError());
         }
         CloseHandle(hFile);
     }
     else {
-        KBR_CORE_ERROR("Failed to create Minidump file.");
+        Kerberos::Log::CoreError("Failed to create Minidump file.");
     }
 
     Kerberos::Log::Flush();
@@ -118,6 +120,6 @@ namespace Kerberos
         std::signal(SIGFPE, SignalHandler);
         std::signal(SIGILL, SignalHandler);
 #endif
-        KBR_CORE_INFO("CrashHandler initialized successfully.");
+        Log::CoreInfo("CrashHandler initialized successfully.");
     }
 }

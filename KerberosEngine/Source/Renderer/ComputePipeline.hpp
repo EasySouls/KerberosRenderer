@@ -1,5 +1,6 @@
 #pragma once
 
+#include "Core/Core.hpp"
 #include "Vulkan.hpp"
 #include "Shaders/Shader.hpp"
 

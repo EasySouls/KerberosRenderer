@@ -75,7 +75,7 @@ namespace Kerberos
 		std::vector<ModelAnimationChannel> Channels;
 	};
 
-	class Model : public Asset
+	class [[deprecated("Use Prefab for imported glTF sources instead of Model")]] Model : public Asset
 	{
 	public:
 		Model() = default;
@@ -84,7 +84,8 @@ namespace Kerberos
 		{
 		}
 
-		AssetType GetType() override { return AssetType::Model; }
+		static constexpr AssetType Type = AssetType::ModelDEPRECATED;
+        AssetType GetType() override { return Type; }
 
 		const std::string& GetName() const { return m_Name; }
 		void SetName(std::string name) { m_Name = std::move(name); }

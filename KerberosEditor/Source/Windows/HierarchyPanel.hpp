@@ -34,12 +34,19 @@ namespace Kerberos
 
 		void SetOnEntityDeleted(const std::function<void(Entity)>& callback);
 
+		/**
+		 * Called whenever the selected entity changes through user interaction or
+		 * SetSelectedEntity(), so other panels can react to the new selection.
+		 */
+		void SetOnEntitySelected(const std::function<void(Entity)>& callback);
+
+		void AddComponentPopup(Entity entity);
+
 	private:
 		void DrawEntityNode(const Entity& entity);
 		void DrawEntityNodeContextMenu(const Entity& entity, bool& entityDeleted) const;
 		void DrawEntityNodeChildren(const Entity& entity);
 		void QueueEntityDeletion(const Entity& entity);
-		void AddComponentPopup(Entity entity);
 
 		bool OnKeyPressed(const KeyPressedEvent& event);
 
@@ -62,9 +69,15 @@ namespace Kerberos
 
 		Entity m_SelectedEntity;
 
+		/// Set on mouse-down over an entity node and applied on mouse release.
+		/// This keeps the inspector on the current entity while another entity is
+		/// being dragged onto its script fields.
+		Entity m_PendingSelectedEntity;
+
 		std::vector<Entity> m_DeletionQueue;
 
 		std::function<void(Entity)> m_OnEntityDeleted;
+		std::function<void(Entity)> m_OnEntitySelected;
 
 		// Examples
 		Ref<Texture2D> m_WhiteTexture;

@@ -6,26 +6,21 @@
 #include "Windows/AssetsPanel.hpp"
 #include "Windows/HierarchyPanel.hpp"
 #include "Windows/ConsolePanel.hpp"
+#include "Windows/InspectorPanel.hpp"
 
-#include "Renderer/Mesh.hpp"
 #include "Renderer/Textures/Texture2D.hpp"
-#include "Renderer/Textures/TextureCube.hpp"
 #include "Buffer.hpp"
-#include "Renderer/Material.hpp"
 #include "Core/Core.hpp"
-#include "Scene/Node.hpp"
 #include "Scene/Camera/Camera.hpp"
-#include "Renderer/MaterialRegistry.hpp"
 #include "Events/MouseButtonPressedEvent.hpp"
 #include "Events/WindowDropEvent.hpp"
 
+#include <glm/glm.hpp>
+
 #include <string>
-#include <vector>
 #include <array>
 #include <memory>
-#include <optional>
-#include <unordered_map>
-
+#include <filesystem>
 
 
 namespace Kerberos
@@ -51,8 +46,10 @@ namespace Kerberos
 		void HandleMousePicking();
 
 		void NewProject();
+		void CreateProject(const std::filesystem::path& projectDirectory, const std::string& projectName);
 		void OpenProject(const std::filesystem::path& filepath);
 		[[nodiscard]] bool OpenProject();
+		void RequestOpenProject();
 
 		bool CanSaveScene();
 		void SaveScene();
@@ -86,6 +83,8 @@ namespace Kerberos
 
 		static bool DoesImGuiWantInput();
 
+        static std::filesystem::path LookForNameForNewScene(const std::filesystem::path& startingPath, const std::string& defaultName);
+
 	private:
 		float m_Time = 0.0f;
 		float m_Fps = 0.0f;
@@ -93,12 +92,15 @@ namespace Kerberos
 		HierarchyPanel m_HierarchyPanel;
 		Owner<AssetsPanel> m_AssetsPanel;
 		ConsolePanel m_ConsolePanel;
+		InspectorPanel m_InspectorPanel;
 
 		NotificationManager m_NotificationManager;
 
 		Ref<Scene> m_ActiveScene;
 		Ref<Scene> m_EditorScene;
 		Ref<Scene> m_RuntimeScene;
+
+		std::filesystem::path m_ActiveScenePath{};
 
 		Entity m_CameraEntity;
 
@@ -141,15 +143,7 @@ namespace Kerberos
 
 		Owner<Camera> m_EditorCamera = nullptr;
 		// Size of the ImGui viewport.
-		glm::vec2 m_ViewportSize{ 0.f };
-
-		std::unordered_map<std::string, Ref<Mesh>> m_Meshes;
-		std::optional<Mesh> m_SkyboxMesh;
-		std::vector<Ref<Texture2D>> m_Textures;
-
-		std::vector<Owner<Node>> m_SceneNodes;
-
-		MaterialRegistry m_MaterialRegistry;
+		glm::vec2 m_ViewportSize{ 0.0f };
 	};
 
 }

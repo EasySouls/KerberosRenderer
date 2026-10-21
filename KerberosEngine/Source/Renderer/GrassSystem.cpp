@@ -1,9 +1,12 @@
-#include "kbrpch.hpp"
 #include "GrassSystem.hpp"
 
 #include "VulkanContext.hpp"
 #include "Utils.hpp"
 #include "Shaders/SlangCompiler.hpp"
+
+#include "Profiling/Profilers.hpp"
+
+import Kerberos;
 
 namespace
 {
@@ -23,6 +26,8 @@ namespace Kerberos
 
 	void GrassSystem::Init(const Owner<DescriptorAllocator>& allocator)
 	{
+		KBR_TRACY_FUNCTION();
+
         m_DescriptorAllocator = allocator.get();
 
 		InitGrassDataBuffer();
@@ -31,8 +36,10 @@ namespace Kerberos
 		InitDescriptorBuffer();
 	}
 
-	void GrassSystem::RecordDraw(const vk::raii::CommandBuffer& cmd, uint32_t frameIndex, const GrassConstants& constants)
+	void GrassSystem::RecordDraw(const vk::raii::CommandBuffer& cmd, uint32_t /*frameIndex*/, const GrassConstants& constants)
 	{
+		KBR_TRACY_FUNCTION();
+
 		SetDefaultGraphicsState(cmd);
 
 		constexpr std::array unusedStages = {
@@ -104,7 +111,7 @@ namespace Kerberos
 
         VkBuffer buffer = nullptr;
         if (vmaCreateBuffer(allocator, &bufferInfo, &allocInfo, &buffer, &m_ChunkBuffer.allocation, nullptr) != VK_SUCCESS)
-            KBR_CORE_ASSERT(false, "Failed to create Grass Chunk SSBO!");
+            KBRAssert(false, "Failed to create Grass Chunk SSBO!");
 
         m_ChunkBuffer.Handle = vk::Buffer(buffer);
         vmaMapMemory(allocator, m_ChunkBuffer.allocation, &m_ChunkBuffer.MappedData);
@@ -156,6 +163,8 @@ namespace Kerberos
 
     void GrassSystem::InitShaderObjects()
     {
+		KBR_TRACY_FUNCTION();
+
         auto& context = VulkanContext::Get();
         const auto& device = context.GetDevice();
 

@@ -1,26 +1,34 @@
 {
-  "version": 3,
+  "version": 6,
   "configurePresets": [
     {
-      "name": "vs2022",
-      "generator": "Visual Studio 17 2022",
-      "architecture": "x64",
-      "binaryDir": "build/vs2022"
-    },
-    {
-      "name": "vs2026",
-      "generator": "Visual Studio 18 2026",
-      "architecture": "x64",
-      "binaryDir": "build/vs2026",
+      "name": "windows-base",
+      "hidden": true,
       "cacheVariables": {
         "CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
+        "BUILD_SHARED_LIBS": "OFF",
         "KBR_ENABLE_ASAN": "OFF",
         "KBR_ENABLE_FUZZING": "OFF",
         "KBR_ENABLE_THIRDPARTY_INSTRUMENTATION": "OFF"
       }
     },
     {
+      "name": "vs2026",
+      "inherits": "windows-base",
+      "generator": "Visual Studio 18 2026",
+      "architecture": "x64",
+      "binaryDir": "${sourceDir}/out/build/vs2026"
+    },
+    {
+      "name": "vs2022",
+      "inherits": "windows-base",
+      "generator": "Visual Studio 17 2022",
+      "architecture": "x64",
+      "binaryDir": "${sourceDir}/out/build/vs2022"
+    },
+    {
       "name": "ninja-msvc-debug",
+      "inherits": "windows-base",
       "displayName": "Ninja + MSVC (Debug)",
       "generator": "Ninja",
       "architecture": {
@@ -29,7 +37,6 @@
       },
       "binaryDir": "${sourceDir}/out/build/${presetName}",
       "cacheVariables": {
-        "CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
         "CMAKE_BUILD_TYPE": "Debug",
         "CMAKE_C_COMPILER": "cl",
         "CMAKE_CXX_COMPILER": "cl"
@@ -37,6 +44,7 @@
     },
     {
       "name": "ninja-msvc-release",
+      "inherits": "windows-base",
       "displayName": "Ninja + MSVC (Release)",
       "generator": "Ninja",
       "architecture": {
@@ -45,20 +53,59 @@
       },
       "binaryDir": "${sourceDir}/out/build/${presetName}",
       "cacheVariables": {
-        "CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
         "CMAKE_BUILD_TYPE": "Release",
         "CMAKE_C_COMPILER": "cl",
         "CMAKE_CXX_COMPILER": "cl"
       }
     },
     {
+      "name": "ninja-msvc-relwithdebinfo",
+      "inherits": "windows-base",
+      "displayName": "Ninja + MSVC (RelWihDebInfo)",
+      "generator": "Ninja",
+      "architecture": {
+        "value": "x64",
+        "strategy": "external"
+      },
+      "binaryDir": "${sourceDir}/out/build/${presetName}",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "RelWithDebInfo",
+        "CMAKE_C_COMPILER": "cl",
+        "CMAKE_CXX_COMPILER": "cl"
+      }
+    },
+    {
       "name": "ninja-clang-debug",
+      "inherits": "windows-base",
       "displayName": "Ninja (Clang-CL Debug)",
       "generator": "Ninja",
       "binaryDir": "${sourceDir}/out/build/${presetName}",
       "cacheVariables": {
-        "CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
         "CMAKE_BUILD_TYPE": "Debug",
+        "CMAKE_C_COMPILER": "clang-cl",
+        "CMAKE_CXX_COMPILER": "clang-cl"
+      }
+    },
+    {
+      "name": "ninja-clang-release",
+      "inherits": "windows-base",
+      "displayName": "Ninja (Clang-CL Release)",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/out/build/${presetName}",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "CMAKE_C_COMPILER": "clang-cl",
+        "CMAKE_CXX_COMPILER": "clang-cl"
+      }
+    },
+    {
+      "name": "ninja-clang-relwithdebinfo",
+      "inherits": "windows-base",
+      "displayName": "Ninja (Clang-CL RelWithDebInfo)",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/out/build/${presetName}",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "RelWithDebInfo",
         "CMAKE_C_COMPILER": "clang-cl",
         "CMAKE_CXX_COMPILER": "clang-cl"
       }
@@ -66,12 +113,100 @@
     {
       "name": "vs2026-asan",
       "inherits": "vs2026",
-      "binaryDir": "build/vs2026-asan",
+      "binaryDir": "${sourceDir}/out/build/vs2026-asan",
       "cacheVariables": {
         "KBR_ENABLE_ASAN": "ON",
         "KBR_ENABLE_FUZZING": "OFF",
         "KBR_ENABLE_THIRDPARTY_INSTRUMENTATION": "OFF"
       }
+    },
+    {
+      "name": "vs2026-tracy-relwithdebinfo",
+      "inherits": "vs2026",
+      "displayName": "VS2026 Tracy (RelWithDebInfo)",
+      "binaryDir": "${sourceDir}/out/build/vs2026-tracy-relwithdebinfo",
+      "cacheVariables": {
+        "KBR_ENABLE_TRACY": "ON"
+      }
+    }
+  ],
+  "buildPresets": [
+    {
+      "name":"build-base",
+      "hidden": true,
+      "environment": {
+        "CMAKE_BUILD_PARALLEL_LEVEL": ""
+      }
+    },
+    {
+      "name": "vs2026-debug",
+      "inherits": "build-base",
+      "displayName": "VS2026 (Debug)",
+      "configurePreset": "vs2026",
+      "configuration": "Debug"
+    },
+    {
+      "name": "vs2026-release",
+      "inherits": "build-base",
+      "displayName": "VS2026 (Release)",
+      "configurePreset": "vs2026",
+      "configuration": "Release"
+    },
+    {
+      "name": "vs2026-relwithdebinfo",
+      "inherits": "build-base",
+      "displayName": "VS2026 (RelWithDebInfo)",
+      "configurePreset": "vs2026",
+      "configuration": "RelWithDebInfo"
+    },
+    {
+      "name": "ninja-msvc-debug",
+      "inherits": "build-base",
+      "displayName": "MSVC Ninja Debug",
+      "configurePreset": "ninja-msvc-debug",
+      "configuration": "Debug"
+    },
+    {
+      "name": "ninja-msvc-release",
+      "inherits": "build-base",
+      "displayName": "MSVC Ninja Release",
+      "configurePreset": "ninja-msvc-release",
+      "configuration": "Release"
+    },
+    {
+      "name": "ninja-msvc-relwithdebinfo",
+      "inherits": "build-base",
+      "displayName": "MSVC Ninja RelWithDebInfo",
+      "configurePreset": "ninja-msvc-relwithdebinfo",
+      "configuration": "RelWithDebInfo"
+    },
+    {
+      "name": "clangcl-debug",
+      "inherits": "build-base",
+      "displayName": "ClangCL Debug",
+      "configurePreset": "ninja-clang-debug",
+      "configuration": "Debug"
+    },
+    {
+      "name": "clangcl-release",
+      "inherits": "build-base",
+      "displayName": "ClangCL Release",
+      "configurePreset": "ninja-clang-release",
+      "configuration": "Release"
+    },
+    {
+      "name": "clangcl-relwithdebinfo",
+      "inherits": "build-base",
+      "displayName": "ClangCL RelWithDebInfo",
+      "configurePreset": "ninja-clang-relwithdebinfo",
+      "configuration": "RelWithDebInfo"
+    },
+    {
+      "name": "vs2026-tracy-relwithdebinfo",
+      "inherits": "build-base",
+      "displayName": "VS2026 Tracy (RelWithDebInfo)",
+      "configurePreset": "vs2026-tracy-relwithdebinfo",
+      "configuration": "RelWithDebInfo"
     }
   ]
 }

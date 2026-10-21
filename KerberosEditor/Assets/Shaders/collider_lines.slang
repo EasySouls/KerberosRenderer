@@ -12,6 +12,12 @@ struct VSOutput
     float3 Color : TEXCOORD0;
 };
 
+struct PSOutput
+{
+    float4 Color : SV_Target0;
+    float Reactive : SV_Target1;
+};
+
 [[vk::binding(0, 0)]]
 ConstantBuffer<SceneData> scene;
 
@@ -25,7 +31,10 @@ VSOutput vertexMain(VSInput input)
 }
 
 [shader("fragment")]
-float4 fragmentMain(VSOutput input) : SV_Target0
+PSOutput fragmentMain(VSOutput input)
 {
-    return float4(input.Color, 1.0);
+    PSOutput output;
+    output.Color = float4(input.Color, 1.0);
+    output.Reactive = 1.0;
+    return output;
 }

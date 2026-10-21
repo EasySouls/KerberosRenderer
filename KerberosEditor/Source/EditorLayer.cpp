@@ -6,15 +6,15 @@
 #include "Application.hpp"
 #include "AssetConstants.hpp"
 #include "Assets/AssetManager.hpp"
+#include "Core/EnginePaths.hpp"
 #include "Assets/Importers/TextureImporter.hpp"
-#include "Profiling/Instrumentor.hpp"
+#include "Profiling/Profilers.hpp"
 #include "Input/InputSystem.hpp"
 #include "Utils/SystemOperations.hpp"
-#include "ModelLoader.hpp"
 #include "Scene/Camera/FirstPersonCamera.hpp"
 #include "Serialization/SceneSerializer.hpp"
 #include "Input/KeyCodes.hpp"
-#include "Logging/Log.hpp"
+#include "Renderer/Upscaling/UpscalerTypes.hpp"
 #include "Scripting/ScriptEngine.hpp"
 
 #include <glm/gtc/matrix_inverse.hpp>
@@ -24,11 +24,88 @@
 
 #include <limits>
 #include <ranges>
+#include <fstream>
+#include <string_view>
 
-#include "Core/Timer.hpp"
+import Kerberos;
 
 namespace Kerberos
 {
+	namespace
+	{
+		std::string ReplaceAll(std::string input, const std::string& from, const std::string& to)
+		{
+			size_t pos = 0;
+			while ((pos = input.find(from, pos)) != std::string::npos)
+			{
+				input.replace(pos, from.size(), to);
+				pos += to.size();
+			}
+			return input;
+		}
+
+		/// Creates the user's C# scripting project (<name>.csproj + starter script)
+		/// under <project>/Assets/Scripts. The generated project references the
+		/// engine's KerberosScriptCoreLib through the KerberosEnginePath property.
+		void WriteUserScriptProject(const std::filesystem::path& projectDirectory, const std::string& pascalName)
+		{
+			const std::filesystem::path scriptsDirectory = projectDirectory / "Assets" / "Scripts";
+			std::error_code ec;
+			std::filesystem::create_directories(scriptsDirectory, ec);
+
+			constexpr std::string_view csprojTemplate = R"(<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <AssemblyName>PROJECT_NAME</AssemblyName>
+    <RootNamespace>PROJECT_NAME</RootNamespace>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Reference Include="KerberosScriptCoreLib">
+      <HintPath>$(KerberosEnginePath)/Resources/Scripts/KerberosScriptCoreLib.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+  </ItemGroup>
+
+</Project>
+)";
+
+			constexpr std::string_view scriptTemplate = R"(using Kerberos.Scene;
+
+namespace PROJECT_NAME
+{
+    public class PROJECT_NAMEScript : Entity
+    {
+        protected override void OnCreate()
+        {
+        }
+
+        protected override void OnUpdate(float deltaTime)
+        {
+        }
+    }
+}
+)";
+
+			const std::string csproj = ReplaceAll(std::string(csprojTemplate), "PROJECT_NAME", pascalName);
+			const std::string script = ReplaceAll(ReplaceAll(std::string(scriptTemplate), "PROJECT_NAMEScript", pascalName + "Script"),
+				"PROJECT_NAME", pascalName);
+
+			{
+				std::ofstream file(scriptsDirectory / (pascalName + ".csproj"));
+				file << csproj;
+			}
+			{
+				std::ofstream file(scriptsDirectory / (pascalName + "Script.cs"));
+				file << script;
+			}
+		}
+	}
+
 	EditorLayer::EditorLayer()
 			: Layer("EditorLayer")
 	{
@@ -39,16 +116,25 @@ namespace Kerberos
 				m_HoveredEntity = {};
 				m_HoveredEntityDeletedLastFrame = true;
 			} });
+
+		// Selecting an entity in the hierarchy takes over the inspector from any
+		// asset import-options selection, which would otherwise keep precedence.
+		m_HierarchyPanel.SetOnEntitySelected([this](const Entity entity)
+		{
+			if (entity && m_AssetsPanel)
+				m_AssetsPanel->ClearSelection();
+		});
 	}
 
 	EditorLayer::~EditorLayer()
 	{
-		m_SceneNodes.clear();
 	}
 
 	void EditorLayer::OnAttach()
 	{
-		KBR_CORE_INFO("EditorLayer attached!");
+        KBR_TRACY_FUNCTION();
+
+		Log::EditorInfo("EditorLayer attached!");
 
 		constexpr bool isTesting = true;
 		if (isTesting)
@@ -83,114 +169,35 @@ namespace Kerberos
 
 		m_BasicFont = AssetManager::GetDefaultFont();
 
-		m_EditorCamera = std::make_unique<FirstPersonCamera>(45.0f, 16.0f / 9.0f, 0.1f, 1000.0f);
+
+		constexpr float nearClip = 0.1f;
+        constexpr float farClip = 10000.0f;
+        constexpr float cameraMoveSpeed = 50.0f;
+		m_EditorCamera = std::make_unique<FirstPersonCamera>(45.0f, 16.0f / 9.0f, nearClip, farClip);
 		// m_EditorCamera = std::make_unique<EditorCamera>(45.0f, 16.0f / 9.0f, 0.1f, 1000.0f);
 		m_EditorCamera->SetFlipY(true);
 		m_EditorCamera->SetPosition(glm::vec3(0.0f, 15.0f, -45.0f));
 		m_EditorCamera->SetRotation(glm::vec3(0.0f, 90.0f, 0.0f));
+		m_EditorCamera->SetMoveSpeed(cameraMoveSpeed);
 
 		m_ViewportSize = {1280.0f, 720.0f};
 
-		{
-			Timer timer("Loading sample assets", [](const TimerData &data)
-									{ KBR_EDITOR_INFO("Loading sample meshes and textures took {} ms!", data.DurationMs); });
-
-			constexpr GLTFLoadingFlags loadingFlags = GLTFLoadingFlags::None;
-
-			// Load models
-			m_Meshes["avocado"] = CreateRef<Mesh>(ModelLoader::LoadModel("assets/models/avocado/Avocado.gltf", loadingFlags));
-			m_Meshes["cube"] = CreateRef<Mesh>(ModelLoader::LoadModel("assets/models/cube.gltf", loadingFlags));
-			m_Meshes["sphere"] = CreateRef<Mesh>(ModelLoader::LoadModel("assets/models/sphere.gltf", loadingFlags));
-			m_Meshes["cerberus"] = CreateRef<Mesh>(ModelLoader::LoadModel("assets/models/cerberus/cerberus.gltf", loadingFlags));
-
-			KBR_EDITOR_INFO("Loaded {} mesh(es)!", m_Meshes.size());
-
-			const std::vector<std::pair<std::string, vk::Format>> textureFiles = {
-					{"assets/models/avocado/Avocado_baseColor.ktx2", vk::Format::eR8G8B8A8Srgb},
-					{"assets/models/avocado/Avocado_normal.ktx2", vk::Format::eR8G8B8A8Unorm},
-					{"assets/textures/stonefloor01_color_rgba.ktx", vk::Format::eR8G8B8A8Srgb},
-					{"assets/textures/stonefloor01_normal_rgba.ktx", vk::Format::eR8G8B8A8Unorm},
-					{"assets/textures/stonefloor02_color_rgba.ktx", vk::Format::eR8G8B8A8Srgb},
-					{"assets/textures/stonefloor02_normal_rgba.ktx", vk::Format::eR8G8B8A8Unorm},
-
-					{"assets/models/cerberus/albedo.ktx", vk::Format::eR8G8B8A8Unorm},
-					{"assets/models/cerberus/normal.ktx", vk::Format::eR8G8B8A8Unorm},
-					{"assets/models/cerberus/ao.ktx", vk::Format::eR8Unorm},
-					{"assets/models/cerberus/metallic.ktx", vk::Format::eR8Unorm},
-					{"assets/models/cerberus/roughness.ktx", vk::Format::eR8Unorm},
-			};
-
-			m_Textures.reserve(textureFiles.size());
-			for (const auto &filepath : textureFiles | std::views::keys)
-			{
-				auto texture = Texture2D::FromFile(filepath);
-				m_Textures.push_back(texture);
-			}
-
-			KBR_EDITOR_INFO("Loaded {} texture(s)!", m_Textures.size());
-
-			const auto &avocadoMaterial = m_MaterialRegistry.AddAndRetrieve("Avocado", std::make_shared<Material>("Avocado", glm::vec4(1.0f, 1.0f, 1.0f, 1.0f), 0.9f, 0.03f, m_Textures[0], m_Textures[1]));
-			const auto &stoneFloorMaterial = m_MaterialRegistry.AddAndRetrieve("Stone Floor", std::make_shared<Material>("Stone Floor", glm::vec4(1.0f, 1.0f, 1.0f, 1.0f), 0.8f, 0.05f, m_Textures[2], m_Textures[3]));
-			const auto &stoneFloor2Material = m_MaterialRegistry.AddAndRetrieve("Stone Floor 2", std::make_shared<Material>("Stone Floor 2", glm::vec4(0.4f, 0.15f, 0.0f, 1.0f), 1.0f, 0.0f, m_Textures[4], m_Textures[5]));
-			const auto &cerberusMaterial = m_MaterialRegistry.AddAndRetrieve("Cerberus", std::make_shared<Material>("Cerberus", glm::vec4(1.0f, 1.0f, 1.0f, 1.0f), 1.0f, 0.0f, m_Textures[6], m_Textures[7]));
-
-			m_SceneNodes.push_back(CreateOwner<Node>(Node{
-					.Position = glm::vec3(6.0f, 9.5f, 0.0f),
-					.Rotation = glm::vec3(0.0f),
-					.Scale = glm::vec3(50.0f),
-					.Mesh = m_Meshes["avocado"],
-					.Material = avocadoMaterial,
-					.Name = "Avocado"}));
-
-			m_SceneNodes.push_back(CreateOwner<Node>(Node{
-					.Position = glm::vec3(2.0f, 0.0f, 0.0f),
-					.Rotation = glm::vec3(0.0f),
-					.Scale = glm::vec3(1.0f),
-					.Mesh = m_Meshes["cube"],
-					.Material = stoneFloorMaterial,
-					.Name = "Cube"}));
-
-			m_SceneNodes.push_back(CreateOwner<Node>(Node{
-					.Position = glm::vec3(2.0f, 6.0f, 3.0f),
-					.Rotation = glm::vec3(0.0f),
-					.Scale = glm::vec3(1.0f),
-					.Mesh = m_Meshes["sphere"],
-					.Material = m_MaterialRegistry.Get("Avocado"),
-					.Name = "Sphere"}));
-
-			m_SceneNodes.push_back(CreateOwner<Node>(Node{
-					.Position = glm::vec3(2.0f, -10.0f, 3.0f),
-					.Rotation = glm::vec3(0.0f),
-					.Scale = glm::vec3(20.0f, 0.1f, 20.0f),
-					.Mesh = m_Meshes["cube"],
-					.Material = stoneFloor2Material,
-					.Name = "Floor"}));
-
-			m_SceneNodes.push_back(CreateOwner<Node>(Node{
-					.Position = glm::vec3(-8.0f, 10.0f, 8.0f),
-					.Rotation = glm::vec3(-1.6f, 1.4, 0.0),
-					.Scale = glm::vec3(8.0f),
-					.Mesh = m_Meshes["cerberus"],
-					.Material = cerberusMaterial,
-					.Name = "Revolver"}));
-		}
-
 		m_AssetsPanel = CreateOwner<AssetsPanel>(m_NotificationManager);
 
-		m_IconPlay = TextureImporter::ImportTexture("Assets/Editor/play_button.png");
-		m_IconStop = TextureImporter::ImportTexture("Assets/Editor/stop_button.png");
-		m_IconPause = TextureImporter::ImportTexture("Assets/Editor/pause_button.png");
-		m_IconResume = TextureImporter::ImportTexture("Assets/Editor/outlined_play_button.png");
+		m_IconPlay = TextureImporter::ImportTexture(EnginePaths::Assets() / "Editor/play_button.png");
+		m_IconStop = TextureImporter::ImportTexture(EnginePaths::Assets() / "Editor/stop_button.png");
+		m_IconPause = TextureImporter::ImportTexture(EnginePaths::Assets() / "Editor/pause_button.png");
+		m_IconResume = TextureImporter::ImportTexture(EnginePaths::Assets() / "Editor/outlined_play_button.png");
 	}
 
 	void EditorLayer::OnDetach()
 	{
-		KBR_CORE_INFO("EditorLayer detached!");
+        Log::EditorInfo("EditorLayer detached!");
 	}
 
 	void EditorLayer::OnUpdate(const float deltaTime)
 	{
-		KBR_PROFILE_FUNCTION();
+		KBR_TRACY_FUNCTION();
 
 		m_Fps = 1.0f / deltaTime;
 		m_Time += deltaTime;
@@ -205,30 +212,20 @@ namespace Kerberos
 		}
 
 		{
-			KBR_PROFILE_SCOPE("EditorCamera::OnUpdate");
+			KBR_TRACY_SCOPE("EditorCamera::OnUpdate");
 
 			m_EditorCamera->SetIsInputBlocked(m_DoesImGuiWantInput);
 
-			switch (m_SceneState)
+			/// The editor camera is only used while editing or simulating.
+			/// Play mode renders through the scene's primary CameraComponent.
+			if (m_SceneState != SceneState::Play)
 			{
-			case SceneState::Edit:
-			case SceneState::Simulate:
 				m_EditorCamera->OnUpdate(deltaTime);
-				break;
-			case SceneState::Play:
-			{
-				/// Only update the camera when the viewport is focused
-				/*if (m_ViewportFocused)
-					m_CameraController.OnUpdate(deltaTime);*/
-				// TODO: Update the camera
-				m_EditorCamera->OnUpdate(deltaTime);
-				break;
-			}
 			}
 		}
 
 		{
-			KBR_PROFILE_SCOPE("Scene::OnUpdate");
+			KBR_TRACY_SCOPE("Scene::OnUpdate");
 
 			m_ActiveScene->CalculateEntityTransforms();
 
@@ -241,13 +238,13 @@ namespace Kerberos
 				m_ActiveScene->OnUpdateSimulation(deltaTime, *m_EditorCamera);
 				break;
 			case SceneState::Play:
-				m_ActiveScene->OnUpdateRuntime(deltaTime, *m_EditorCamera);
+				m_ActiveScene->OnUpdateRuntime(deltaTime);
 				break;
 			}
 		}
 
 		{
-			KBR_PROFILE_SCOPE("HandleMousePicking");
+			KBR_TRACY_SCOPE("HandleMousePicking");
 
 			HandleMousePicking();
 		}
@@ -257,7 +254,12 @@ namespace Kerberos
 
 	void EditorLayer::OnEvent(Event &event)
 	{
-		m_EditorCamera->OnEvent(event);
+        KBR_TRACY_FUNCTION();
+
+		if (m_SceneState != SceneState::Play)
+		{
+			m_EditorCamera->OnEvent(event);
+		}
 
 		m_HierarchyPanel.OnEvent(event);
 		m_AssetsPanel->OnEvent(event);
@@ -271,6 +273,8 @@ namespace Kerberos
 
 	void EditorLayer::OnImGuiRender()
 	{
+        KBR_TRACY_FUNCTION();
+
 		static bool dockspaceOpen = true;
 		static ImGuiDockNodeFlags dockspaceFlags = ImGuiDockNodeFlags_None;
 
@@ -313,6 +317,9 @@ namespace Kerberos
 		m_HierarchyPanel.OnImGuiRender();
 		m_AssetsPanel->OnImGuiRender();
 		m_ConsolePanel.OnImGuiRender();
+
+		m_InspectorPanel.SetContext(&m_HierarchyPanel, m_AssetsPanel.get());
+		m_InspectorPanel.OnImGuiRender();
 
 		DrawViewport();
 
@@ -370,13 +377,13 @@ namespace Kerberos
 
 	void EditorLayer::OnSceneStop()
 	{
-		m_SceneState = SceneState::Edit;
-		m_IsScenePaused = false;
-
 		if (m_SceneState == SceneState::Play)
 			m_ActiveScene->OnRuntimeStop();
 		else if (m_SceneState == SceneState::Simulate)
 			m_ActiveScene->OnSimulationStop();
+
+		m_SceneState = SceneState::Edit;
+		m_IsScenePaused = false;
 
 		m_RuntimeScene = nullptr;
 
@@ -386,12 +393,14 @@ namespace Kerberos
 
 	void EditorLayer::HandleDragAndDrop()
 	{
+        KBR_TRACY_FUNCTION();
+
 		if (ImGui::BeginDragDropTarget())
 		{
 			if (const ImGuiPayload *payload = ImGui::AcceptDragDropPayload(assetBrowserItem))
 			{
 				const auto &path = static_cast<const char *>(payload->Data);
-				KBR_EDITOR_INFO("Drag and drop payload: {0}", path);
+				Log::EditorInfo("Drag and drop payload: {0}", path);
 
 				const std::string message = "Drag and drop payload: " + std::string(path);
 				m_NotificationManager.AddNotification(message, Notification::Type::Info);
@@ -407,22 +416,40 @@ namespace Kerberos
 
 			if (const ImGuiPayload *payload = ImGui::AcceptDragDropPayload(assetBrowserMesh))
 			{
-				const AssetHandle handle = *static_cast<AssetHandle *>(payload->Data);
+				const AssetHandle handle = ReadAssetDragPayload(payload->Data, payload->DataSize).Handle;
 				const AssetType assetType = AssetManager::GetAssetType(handle);
 
-				if (assetType == AssetType::Model)
-				{
-					if (const Entity modelEntity = m_ActiveScene->InstantiateModelAsset(handle))
-						m_HierarchyPanel.SetSelectedEntity(modelEntity);
-				}
-				else if (assetType == AssetType::Mesh)
-				{
-					Entity meshEntity = m_ActiveScene->CreateEntity("Mesh");
-					auto &smc = meshEntity.AddComponent<StaticMeshComponent>();
-					smc.StaticMesh = AssetManager::ResolveMeshAsset(handle);
-					m_HierarchyPanel.SetSelectedEntity(meshEntity);
-				}
+				if (assetType != AssetType::Mesh) {
+                    const std::filesystem::path assetPath =  Project::GetActive()->GetEditorAssetManager()->GetMetadata(handle).Filepath;
+                    Log::EditorError("Asset is not a mesh: {0}", assetPath.string());
+                    m_NotificationManager.AddNotification("Asset is not a mesh: " + assetPath.string(),
+                                                          Notification::Type::Error);
+                    return;
+                }
+
+				Entity meshEntity = m_ActiveScene->CreateEntity("Mesh");
+				auto &smc = meshEntity.AddComponent<StaticMeshComponent>();
+				smc.StaticMesh = AssetManager::ResolveMeshAsset(handle);
+				m_HierarchyPanel.SetSelectedEntity(meshEntity);
 			}
+
+			if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload(assetBrowserPrefab)) 
+			{
+                const AssetHandle handle = ReadAssetDragPayload(payload->Data, payload->DataSize).Handle;
+                const AssetType assetType = AssetManager::GetAssetType(handle);
+
+				if (assetType != AssetType::Prefab)
+				{
+                    const std::filesystem::path assetPath = Project::GetActive()->GetEditorAssetManager()->GetMetadata(handle).Filepath;
+                    Log::EditorError("Asset is not a prefab: {0}", assetPath.string());
+                    m_NotificationManager.AddNotification("Asset is not a prefab: " + assetPath.string(),
+                                                          Notification::Type::Error);
+                    return;
+                }
+
+				if (const Entity prefabEntity = m_ActiveScene->InstantiatePrefab(handle))
+                    m_HierarchyPanel.SetSelectedEntity(prefabEntity);
+            }
 
 			ImGui::EndDragDropTarget();
 		}
@@ -430,7 +457,7 @@ namespace Kerberos
 
 	void EditorLayer::HandleMousePicking()
 	{
-		KBR_PROFILE_FUNCTION();
+		KBR_TRACY_FUNCTION();
 
 		if (m_HoveredEntityDeletedLastFrame)
 		{
@@ -471,42 +498,180 @@ namespace Kerberos
 
 	void EditorLayer::NewProject()
 	{
-		/// Choose location for the new project
-		// const std::string filepathString = FileDialog::SaveFile("Kerberos Project (*.kbrproj)\0*.kbrproj\0");
+        KBR_TRACY_FUNCTION();
 
-		const auto newProject = Project::New();
+		if (m_SceneState != SceneState::Edit)
+			OnSceneStop();
 
-		NewScene();
-		const std::string newSceneName = "Unnamed Scene.kerberos";
-		const std::filesystem::path scenePath = Project::GetAssetDirectory() / "Scenes" / newSceneName;
+		/// Ask the user where the new project should live. The selected folder
+		/// becomes the project directory and its name becomes the project name.
+		const std::string selectedFolder = FileDialog::SelectFolder(
+			"Select an empty folder for the new project (the folder name becomes the project name)");
+		if (selectedFolder.empty())
+			return;
 
-		const SceneSerializer serializer(m_ActiveScene);
-		serializer.Serialize(scenePath.string());
+		std::error_code ec;
+		const std::filesystem::path projectDirectory =
+			std::filesystem::weakly_canonical(std::filesystem::path(selectedFolder), ec);
+		if (ec || !std::filesystem::is_directory(projectDirectory))
+		{
+			m_NotificationManager.AddNotification(
+				"The selected project location is not a valid directory.", Notification::Type::Error);
+			return;
+		}
 
-		m_NotificationManager.AddNotification("Scene saved to " + scenePath.string(), Notification::Type::Info);
+		const std::string projectName = projectDirectory.filename().string();
+		if (projectName.empty())
+		{
+			m_NotificationManager.AddNotification(
+				"The selected folder cannot be used as a project name. Choose or create a named folder.",
+				Notification::Type::Error);
+			return;
+		}
 
-		ProjectInfo projInfo;
-		projInfo.Name = newProject->GetInfo().Name;
-		projInfo.StartScenePath = "Scenes/" + newSceneName;
-		projInfo.AssetDirectory = Project::GetAssetDirectory();
-		newProject->SetInfo(projInfo);
+		/// Never create a project in a non-empty folder: the generated project
+		/// file, asset registry, and scenes could otherwise overwrite user files.
+		const std::filesystem::directory_iterator directoryIterator(projectDirectory, ec);
+		if (ec)
+		{
+			m_NotificationManager.AddNotification(
+				"Could not inspect the selected project folder: " + ec.message(), Notification::Type::Error);
+			return;
+		}
+		if (directoryIterator != std::filesystem::directory_iterator())
+		{
+			m_NotificationManager.AddNotification(
+				"The selected folder is not empty. Choose an empty folder or create a new one.",
+				Notification::Type::Error);
+			return;
+		}
 
-		m_AssetsPanel = CreateOwner<AssetsPanel>(m_NotificationManager);
+		/// Switch projects on the main-thread queue so the old project's GPU
+		/// resources are not destroyed while the current frame is still in
+		/// flight.
+		Application::Get().SubmitToMainThreadQueue([this, projectDirectory, projectName]() {
+			CreateProject(projectDirectory, projectName);
+		});
 	}
 
-	void EditorLayer::OpenProject(const std::filesystem::path &filepath)
+	void EditorLayer::CreateProject(const std::filesystem::path& projectDirectory, const std::string& projectName)
 	{
+        KBR_TRACY_FUNCTION();
+
+		/// The previous project's meshes/textures may still be referenced by an
+		/// in-flight frame. Wait for the device before releasing them.
+		VulkanContext::Get().WaitIdle();
+
+		std::error_code ec;
+		const std::filesystem::path assetsDirectory = projectDirectory / "Assets";
+		const std::filesystem::path scenesDirectory = assetsDirectory / "Scenes";
+		std::filesystem::create_directories(scenesDirectory, ec);
+		if (ec)
+		{
+			m_NotificationManager.AddNotification(
+				"Failed to create the project directories: " + ec.message(), Notification::Type::Error);
+			return;
+		}
+
+		const std::string assemblyName = Project::ToPascalCaseName(projectName);
+		WriteUserScriptProject(projectDirectory, assemblyName);
+
+		const std::filesystem::path scenePath =
+			LookForNameForNewScene(scenesDirectory, "Untitled Scene.kerberos");
+
+		/// Build and persist the default scene before activating the project so
+		/// a failure leaves the currently open project untouched.
+		const Ref<Scene> defaultScene = CreateRef<Scene>();
+		defaultScene->OnViewportResize(static_cast<uint32_t>(m_ViewportSize.x),
+			static_cast<uint32_t>(m_ViewportSize.y));
+
+		const SceneSerializer serializer(defaultScene);
+		serializer.Serialize(scenePath);
+
+		if (!std::filesystem::exists(scenePath, ec) || ec)
+		{
+			m_NotificationManager.AddNotification("Failed to create the default project scene.",
+				Notification::Type::Error);
+			return;
+		}
+
+		const auto newProject = Project::New(projectDirectory);
+
+		ProjectInfo projInfo;
+		projInfo.Name = projectName;
+		projInfo.AssetDirectory = "Assets";
+		projInfo.StartScenePath = std::filesystem::path("Scenes") / scenePath.filename();
+		newProject->SetInfo(projInfo);
+
+		/// Register the start scene immediately so the asset browser and the
+		/// persisted registry know about it before the watcher fires.
+		if (const Ref<EditorAssetManager> editorAssetManager = newProject->GetEditorAssetManager())
+			editorAssetManager->ImportAsset(scenePath);
+
+		m_ActiveScene = defaultScene;
+		m_EditorScene = m_ActiveScene;
+		m_ActiveScenePath = scenePath;
+		m_HierarchyPanel.SetContext(m_ActiveScene);
+
+		m_AssetsPanel = CreateOwner<AssetsPanel>(m_NotificationManager);
+
+		if (!Project::SaveActive())
+		{
+			m_NotificationManager.AddNotification(
+				"The project was created, but saving the project file failed.", Notification::Type::Error);
+			return;
+		}
+
+		ScriptEngine::OnProjectOpened(projectDirectory, assemblyName);
+
+		m_NotificationManager.AddNotification(
+			"Created project '" + projectName + "' at " + projectDirectory.string(), Notification::Type::Info);
+	}
+
+	void EditorLayer::OpenProject(const std::filesystem::path& filepath)
+	{
+        KBR_TRACY_FUNCTION();
+
+		/// The previous project's GPU resources may still be in use by an in-flight frame.
+		VulkanContext::Get().WaitIdle();
+
 		if (const auto project = Project::Load(filepath))
 		{
+			ScriptEngine::OnProjectOpened(Project::GetProjectDirectory(), Project::ToPascalCaseName(project->GetInfo().Name));
+
 			const auto startScenePath = Project::GetAssetDirectory() / project->GetInfo().StartScenePath;
 			OpenScene(startScenePath);
 
 			m_AssetsPanel = CreateOwner<AssetsPanel>(m_NotificationManager);
 		}
+		else
+		{
+			Log::EditorError("Failed to open project: {0}", filepath.string());
+			m_NotificationManager.AddNotification("Failed to open project.", Notification::Type::Warning);
+		}
+	}
+
+	void EditorLayer::RequestOpenProject()
+	{
+        KBR_TRACY_FUNCTION();
+
+		const std::string filepathString = FileDialog::OpenFile("Kerberos Project (*.kbrproj)\0*.kbrproj\0");
+		if (filepathString.empty())
+			return;
+
+		const std::filesystem::path filepath = filepathString;
+
+		/// Defer the project switch to the start of the next frame so the old
+		/// project's GPU resources are released after the device is idle.
+		Application::Get().SubmitToMainThreadQueue([this, filepath]() {
+			OpenProject(filepath);
+		});
 	}
 
 	bool EditorLayer::OpenProject()
 	{
+        KBR_TRACY_FUNCTION();
+
 		const std::string filepathString = FileDialog::OpenFile("Kerberos Project (*.kbrproj)\0*.kbrproj\0");
 
 		if (filepathString.empty())
@@ -539,23 +704,24 @@ namespace Kerberos
 
 	void EditorLayer::SaveScene()
 	{
+        KBR_TRACY_FUNCTION();
+
 		const bool canSave = CanSaveScene();
 		if (!canSave)
 			return;
 
-		// TODO: Store the current scene path in the project and save to that path instead of hardcoding it here
-		const std::filesystem::path scenePath = "assets/scenes/Example.kerberos";
-
 		const SceneSerializer serializer(m_ActiveScene);
-		serializer.Serialize(scenePath.string());
+		serializer.Serialize(m_ActiveScenePath.string());
 
-		m_NotificationManager.AddNotification("Scene saved to " + scenePath.string(), Notification::Type::Info);
+		m_NotificationManager.AddNotification("Scene saved to " + m_ActiveScenePath.string(), Notification::Type::Info);
 
 		Project::SaveActive();
 	}
 
 	void EditorLayer::SaveSceneAs()
 	{
+		KBR_TRACY_FUNCTION();
+
 		const bool canSave = CanSaveScene();
 		if (!canSave)
 			return;
@@ -567,6 +733,9 @@ namespace Kerberos
 		const SceneSerializer serializer(m_ActiveScene);
 		serializer.Serialize(filepath);
 
+		// When saving a scene as a new file, we update the active scene path to the new file path
+		m_ActiveScenePath = filepath;
+
 		m_NotificationManager.AddNotification("Scene saved to " + filepath, Notification::Type::Info);
 
 		Project::SaveActive();
@@ -574,6 +743,8 @@ namespace Kerberos
 
 	void EditorLayer::LoadScene()
 	{
+		KBR_TRACY_FUNCTION();
+
 		const std::string filepathString = FileDialog::OpenFile("Kerberos Scene (*.kerberos)\0*.kerberos\0");
 
 		if (filepathString.empty())
@@ -582,12 +753,16 @@ namespace Kerberos
 		OpenScene(filepathString);
 	}
 
-	void EditorLayer::OpenScene(const std::filesystem::path &filepath)
+	void EditorLayer::OpenScene(const std::filesystem::path& filepath)
 	{
+		KBR_TRACY_FUNCTION();
+
 		if (m_SceneState != SceneState::Edit)
 		{
 			OnSceneStop();
 		}
+
+		m_HoveredEntity = {};
 
 		/// TODO: Prompt to save the current scene if there are unsaved changes
 
@@ -596,9 +771,11 @@ namespace Kerberos
 
 		if (!serializer.Deserialize(filepath))
 		{
-			KBR_EDITOR_ERROR("Failed to load scene from {0}", filepath.string());
+            Log::EditorInfo("Failed to load scene from {0}", filepath.string());
 			return;
 		}
+
+		m_ActiveScenePath = filepath;
 
 		m_EditorScene = newScene;
 		m_EditorScene->OnViewportResize(static_cast<uint32_t>(m_ViewportSize.x), static_cast<uint32_t>(m_ViewportSize.y));
@@ -609,20 +786,28 @@ namespace Kerberos
 
 	void EditorLayer::OpenScene(const Ref<Scene> &scene)
 	{
-		const auto &[Type, Filepath] = Project::GetActive()->GetEditorAssetManager()->GetMetadata(scene->GetHandle());
+		KBR_TRACY_FUNCTION();
 
-		OpenScene(Filepath);
+        const auto& metadata = Project::GetActive()->GetEditorAssetManager()->GetMetadata(scene->GetHandle());
+
+		OpenScene(Project::GetAssetFileSystemPath(metadata.Filepath));
 	}
 
 	void EditorLayer::NewScene()
 	{
+		KBR_TRACY_FUNCTION();
+
 		m_ActiveScene = CreateRef<Scene>();
 		m_ActiveScene->OnViewportResize(static_cast<uint32_t>(m_ViewportSize.x), static_cast<uint32_t>(m_ViewportSize.y));
+		m_EditorScene = m_ActiveScene;
+		m_ActiveScenePath.clear();
 		m_HierarchyPanel.SetContext(m_ActiveScene);
 	}
 
 	void EditorLayer::DrawViewport()
 	{
+		KBR_TRACY_FUNCTION();
+
 		ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.0f, 0.0f));
 		ImGui::Begin("Viewport");
 		ImGui::PopStyleVar();
@@ -667,7 +852,7 @@ namespace Kerberos
 
 			/// Entity transform
 			auto &tc = selectedEntity.GetComponent<TransformComponent>();
-			auto transform = tc.GetTransform();
+			auto transform = tc.WorldTransform;
 
 			/// Snapping
 			const bool snap = Input::IsKeyPressed(Key::LeftControl);
@@ -682,8 +867,17 @@ namespace Kerberos
 
 			if (ImGuizmo::IsUsing())
 			{
+                glm::mat4 parentWorld = glm::mat4(1.0f);
+                if (const Entity parent = m_ActiveScene->GetParent(selectedEntity); parent)
+                    parentWorld = parent.GetComponent<TransformComponent>().WorldTransform;
+
+                const glm::mat4 localTransform = glm::inverse(parentWorld) * transform;
+
 				glm::vec3 translation, rotationDegrees, scale;
-				ImGuizmo::DecomposeMatrixToComponents(glm::value_ptr(transform), glm::value_ptr(translation), glm::value_ptr(rotationDegrees), glm::value_ptr(scale));
+                ImGuizmo::DecomposeMatrixToComponents(glm::value_ptr(localTransform),
+                                                      glm::value_ptr(translation),
+                                                      glm::value_ptr(rotationDegrees),
+                                                      glm::value_ptr(scale));
 
 				tc.Translation = translation;
 				tc.Rotation = glm::radians(rotationDegrees);
@@ -698,6 +892,8 @@ namespace Kerberos
 
 	void EditorLayer::DrawUIToolbar()
 	{
+		KBR_TRACY_FUNCTION();
+
 		constexpr ImGuiWindowFlags flags = ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse;
 
 		ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.0f, 0.0f, 0.0f, 0.0f));
@@ -809,6 +1005,8 @@ namespace Kerberos
 
 	void EditorLayer::DrawMenuBar()
 	{
+		KBR_TRACY_FUNCTION();
+
 		if (ImGui::BeginMenuBar())
 		{
 			if (ImGui::BeginMenu("File"))
@@ -820,6 +1018,16 @@ namespace Kerberos
 				}
 
 				ImGui::MenuItem("Fullscreen", nullptr, &m_IsFullScreenPersistent);
+
+				if (ImGui::MenuItem("Open Project...", "Ctrl+Shift+O"))
+                {
+                    RequestOpenProject();
+                }
+
+				if (ImGui::MenuItem("New Project...", "Ctrl+Shift+N"))
+                {
+                    NewProject();
+                }
 
 				if (ImGui::MenuItem("New Scene", "Ctrl+N"))
 				{
@@ -904,6 +1112,8 @@ namespace Kerberos
 
 	void EditorLayer::DrawDebugWindow() const
 	{
+		KBR_TRACY_FUNCTION();
+
 		ImGui::Begin("Debug");
 
 		ImGui::Text("Time: %.2f seconds", m_Time);
@@ -926,6 +1136,7 @@ namespace Kerberos
 			ImGui::Text("Ambient Occlusion: %.3f ms", gpuTimings.AmbientOcclusionPassMilliseconds);
 			ImGui::Text("Antialiasing: %.3f ms", gpuTimings.AntialiasingPassMilliseconds);
 			ImGui::Text("Tonemapping: %.3f ms", gpuTimings.TonemappingPassMilliseconds);
+			ImGui::Text("Upscaling: %.3f ms", gpuTimings.UpscalingPassMilliseconds);
 		}
 		else
 		{
@@ -997,10 +1208,12 @@ namespace Kerberos
 
 		const std::string activeGizmoTypeString = GetActiveGizmoTypeString();
 		ImGui::Text("Gizmo Type: %s", activeGizmoTypeString.c_str());
-		ImGui::Text("Viewport size: %.2f x %.2f", m_ViewportSize.x, m_ViewportSize.y);
+        ImGui::Text("Viewport size: %.2f x %.2f", m_ViewportSize.x, m_ViewportSize.y);
 		ImGui::Text("Viewport Focused: %s", m_ViewportFocused ? "Yes" : "No");
 		ImGui::Text("Viewport Hovered: %s", m_ViewportHovered ? "Yes" : "No");
 		ImGui::Text("ImGui Capturing Input: %s", m_DoesImGuiWantInput ? "Yes" : "No");
+        const glm::vec2 renderImageSize = Renderer::GetRenderImageSize();
+        ImGui::Text("Render image size: %.2f x %.2f", renderImageSize.x, renderImageSize.y);
 
 		std::string hoveredEntityName = "None";
 		if (m_HoveredEntity)
@@ -1083,7 +1296,34 @@ namespace Kerberos
 			ImGui::Checkbox("Enable PCF", &Renderer::GetIsPCFEnabledForShadowMap());
 		}
 
-		bool &useGTAO = Renderer::GetUseGTAO();
+		UpscalerType upscalingMode = Renderer::GetUpscalingMode();
+		const char *upscalingModeItems[] = {"Disabled", "FSR3"};
+		if (ImGui::Combo("Upscaling mode", reinterpret_cast<int*>(&upscalingMode), upscalingModeItems, IM_ARRAYSIZE(upscalingModeItems)))
+		{
+            Renderer::SetUpscalingMode(static_cast<UpscalerType>(upscalingMode));
+		}
+        if (upscalingMode != UpscalerType::Native) 
+		{
+            ImGui::Indent();
+
+            UpscalerQuality upscalingQuality = Renderer::GetUpscalingQuality();
+            const char* upscalingModeQualityItems[] = { "Ultra Quality", "Quality", "Balanced", "Performance", "Ultra Performance" };
+            if (ImGui::Combo("Quality",
+                             reinterpret_cast<int*>(&upscalingQuality),
+                             upscalingModeQualityItems,
+                             IM_ARRAYSIZE(upscalingModeQualityItems))) {
+                Renderer::SetUpscalingQuality(static_cast<UpscalerQuality>(upscalingQuality));
+            }
+
+			ImGui::Unindent();
+        }
+        /*if (upscalingMode == UpscalerType::FSR3) {
+            ImGui::Indent();
+            ImGui::Checkbox("Use FSR3 Auto Exposure", &Renderer::GetUseFSR3AutoExposure());
+            ImGui::Unindent();
+        }*/
+
+		bool& useGTAO = Renderer::GetUseGTAO();
 		ImGui::Checkbox("Use GTAO", &useGTAO);
 		if (useGTAO)
 		{
@@ -1172,6 +1412,8 @@ namespace Kerberos
 
 	void EditorLayer::CalculateEntityTransform(const Entity &entity) const
 	{
+		KBR_TRACY_FUNCTION();
+
 		m_ActiveScene->CalculateEntityTransform(entity);
 	}
 
@@ -1197,13 +1439,21 @@ namespace Kerberos
 			}
 			break;
 		case Key::N:
-			if (ctrl)
+			if (ctrl && shift)
+			{
+				NewProject();
+			}
+			else if (ctrl)
 			{
 				NewScene();
 			}
 			break;
 		case Key::O:
-			if (ctrl)
+			if (ctrl && shift)
+			{
+				RequestOpenProject();
+			}
+			else if (ctrl)
 			{
 				LoadScene();
 			}
@@ -1249,7 +1499,7 @@ namespace Kerberos
 		return false;
 	}
 
-	bool EditorLayer::OnWindowDrop(const WindowDropEvent &event)
+	bool EditorLayer::OnWindowDrop([[maybe_unused]] const WindowDropEvent &event)
 	{
 		/// TODO: Implement file dropping to load scenes or import models
 		throw std::logic_error("Not implemented");
@@ -1269,7 +1519,7 @@ namespace Kerberos
 			return "Scale";
 		}
 
-		KBR_CORE_ASSERT(false, "Invalid gizmo type");
+		KBRAssert(false, "Invalid gizmo type");
 		return "";
 	}
 
@@ -1278,4 +1528,25 @@ namespace Kerberos
 		// Check if any ImGui item is actively being interacted with
 		return ImGui::IsAnyItemActive() || ImGui::IsAnyItemFocused();
 	}
+
+    std::filesystem::path EditorLayer::LookForNameForNewScene(const std::filesystem::path& startingPath, const std::string& defaultName)
+    {
+        const std::filesystem::path defaultPath = startingPath / defaultName;
+        if (!std::filesystem::exists(defaultPath))
+        {
+            return defaultPath;
+        }
+
+        // If the default name is taken, try to find a unique name
+        int counter = 1;
+        while (true)
+        {
+            const std::filesystem::path newPath = startingPath / (defaultName + std::to_string(counter));
+            if (!std::filesystem::exists(newPath))
+            {
+                return newPath;
+            }
+            counter++;
+        }
+    }
 }

@@ -1,7 +1,5 @@
 #pragma once
 
-#include "Logging/Log.hpp"
-
 #include <memory>
 
 namespace Kerberos
@@ -19,27 +17,6 @@ namespace Kerberos
     #endif
 #else
     #define KBR_DEBUGBREAK()
-#endif
-
-#ifdef KBR_ENABLE_ASSERTS
-#define KBR_ASSERT(x, ...) \
-        do { \
-            if (!(x)) { \
-                KBR_ERROR("Assertion Failed: {0}", __VA_ARGS__); \
-                KBR_DEBUGBREAK(); \
-            } \
-        } while (0)
-
-#define KBR_CORE_ASSERT(x, ...) \
-        do { \
-            if (!(x)) { \
-                KBR_CORE_ERROR("Assertion Failed: {0}", __VA_ARGS__); \
-                KBR_DEBUGBREAK(); \
-            } \
-        } while (0)
-#else
-#define KBR_ASSERT(x, ...) do {} while (0)
-#define KBR_CORE_ASSERT(x, ...) do {} while (0)
 #endif
 
 #define KBR_BIND_FN(fn) [this](auto&&... args) -> decltype(auto) { return fn(std::forward<decltype(args)>(args)...); }

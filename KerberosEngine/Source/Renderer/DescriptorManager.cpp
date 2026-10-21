@@ -12,6 +12,8 @@ namespace Kerberos
 		const uint32_t firstSet,
 		const std::vector<ShaderResourceSet>& sets)
 	{
+		KBR_TRACY_FUNCTION();
+
 		if (sets.empty())
 			return;
 
@@ -46,6 +48,8 @@ namespace Kerberos
 	vk::raii::DescriptorSetLayout DescriptorManager::CreateDescriptorSetLayout(
 		const std::vector<vk::DescriptorSetLayoutBinding>& bindings)
 	{
+		KBR_TRACY_FUNCTION();
+
 		auto& context = VulkanContext::Get();
 		vk::DescriptorSetLayoutCreateFlags flags{};
 

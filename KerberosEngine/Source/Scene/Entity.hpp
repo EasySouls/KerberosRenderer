@@ -2,7 +2,6 @@
 
 #include "Scene.hpp"
 #include "Components.hpp"
-#include "Logging/Log.hpp"
 #include "Core/UUID.hpp"
 
 #include <entt/single_include/entt/entt.hpp>
@@ -27,8 +26,13 @@ namespace Kerberos
 
 		template<typename T, typename... Args>
 		T& AddComponent(Args&&... args)
-		{
-			KBR_CORE_ASSERT(!HasComponent<T>(), "Entity already has component!");
+        {
+            // TODO: Asserts do not work in headers
+            // KBR_CORE_ASSERT(!HasComponent<T>(), "Entity already has component!");
+            if (HasComponent<T>()) {
+                throw std::runtime_error("Entity already has component!");
+            }
+
 			T& component = m_Scene->m_Registry.emplace<T>(m_EntityHandle, std::forward<Args>(args)...);
 			m_Scene->OnComponentAdded<T>(*this, component);
 			return component;
@@ -37,7 +41,11 @@ namespace Kerberos
 		template<typename T>
 		T& GetComponent() const
 		{
-			KBR_CORE_ASSERT(HasComponent<T>(), "Entity does not have component!");
+			// TODO: Asserts do not work in headers
+			// KBR_CORE_ASSERT(HasComponent<T>(), "Entity does not have component!");
+            if (!HasComponent<T>()) {
+                throw std::runtime_error("Entity does not have component!");
+            }
 
 			return m_Scene->m_Registry.get<T>(m_EntityHandle);
 		}
@@ -45,7 +53,11 @@ namespace Kerberos
 		template<typename T>
 		void RemoveComponent() const
 		{
-			KBR_CORE_ASSERT(HasComponent<T>(), "Entity does not have component!");
+            // TODO: Asserts do not work in headers
+            // KBR_CORE_ASSERT(HasComponent<T>(), "Entity does not have component!");
+            if (!HasComponent<T>()) {
+                throw std::runtime_error("Entity does not have component!");
+            }
 
 			m_Scene->m_Registry.remove<T>(m_EntityHandle);
 		}

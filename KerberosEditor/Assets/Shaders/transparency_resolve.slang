@@ -33,8 +33,14 @@ VSOutput vertexMain(uint vertexID: SV_VertexID)
     return output;
 }
 
+struct ResolveOutput
+{
+    float4 sceneColor : SV_Target0;
+    float bloomMask : SV_Target1;
+};
+
 [shader("fragment")]
-float4 resolveMain(VSOutput input) : SV_Target
+ResolveOutput resolveMain(VSOutput input)
 {
     float2 uv = input.TexCoord;
     float4 accum = texAccumulation.Sample(uv);
@@ -67,5 +73,8 @@ float4 resolveMain(VSOutput input) : SV_Target
     float transparentOpacity = 1.0f - revealage;
     float bloomMask = transparentOpacity + (backgroundBloomMask * revealage);
 
-    return float4(sceneColor, bloomMask);
+    ResolveOutput output;
+    output.sceneColor = float4(sceneColor, 1.0f);
+    output.bloomMask = saturate(bloomMask);
+    return output;
 }

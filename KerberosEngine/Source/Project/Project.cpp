@@ -1,18 +1,32 @@
-#include "kbrpch.hpp"
 #include "Project.hpp"
+#include "Core/Core.hpp"
+#include "Profiling/Profilers.hpp"
 #include "Serialization/ProjectSerializer.hpp"
+
+#include <cctype>
+
+import Kerberos;
 
 namespace Kerberos
 {
-	Ref<Project> Project::New()
+	Ref<Project> Project::New(const std::filesystem::path& projectDirectory)
 	{
 		s_ActiveProject = CreateRef<Project>();
+
+		if (!projectDirectory.empty())
+		{
+			std::error_code ec;
+			const std::filesystem::path absolutePath = std::filesystem::absolute(projectDirectory, ec);
+			s_ActiveProject->m_ProjectDirectory = ec ? projectDirectory : absolutePath;
+		}
 
 		return s_ActiveProject;
 	}
 
-	Ref<Project> Project::Load(const std::filesystem::path& filepath)
+	Ref<Project> Project::Load(const std::filesystem::path& filepath, const ProjectLoadOptions& options)
 	{
+        KBR_TRACY_FUNCTION();
+
 		const Ref<Project> projectToLoad = CreateRef<Project>();
 
 		const ProjectSerializer deserializer(projectToLoad);
@@ -21,15 +35,38 @@ namespace Kerberos
 			const auto absolutePath = std::filesystem::absolute(filepath);
 			projectToLoad->m_ProjectDirectory = absolutePath.parent_path();
 			s_ActiveProject = projectToLoad;
-			KBR_CORE_INFO("Project is loaded from {}", absolutePath.string());
+			Log::CoreInfo("Project is loaded from {}", absolutePath.string());
+
+			if (!options.InitializeAssetManager)
+				return s_ActiveProject;
 
 			/// Initialize the asset manager for the project
 			/// TODO: Load Editor or Runtime Asset Manager based on the project type
-			const Ref<EditorAssetManager> editorAssetManager = CreateRef<EditorAssetManager>();
+			const auto assetsRoot = projectToLoad->m_ProjectDirectory / projectToLoad->m_Info.AssetDirectory;
+			const Ref<EditorAssetManager> editorAssetManager = CreateRef<EditorAssetManager>(assetsRoot, assetsRoot / "Cache");
 			s_ActiveProject->m_AssetManager = editorAssetManager;
-			editorAssetManager->DeserializeAssetRegistry();
 
-			return s_ActiveProject;
+			editorAssetManager->DeserializeAssetRegistry();
+			editorAssetManager->EnsureAssetMetas();
+			const std::vector<AssetBuildReport> buildReports = editorAssetManager->BuildAssets();
+            for (const auto& report : buildReports) {
+                if (report.Warnings.size() > 0) {
+                    Log::CoreWarn("Asset build completed with warnings: {}", report.Source.string());
+                    for (const auto& warning : report.Warnings) {
+                        Log::CoreWarn("  - {}", warning);
+                    }
+                }
+                else if (report.Errors.size() > 0) {
+                    Log::CoreError("Asset build failed with errors: {}", report.Source.string());
+                    for (const auto& error : report.Errors) {
+                        Log::CoreError("  - {}", error);
+                    }
+                }
+            }
+
+            editorAssetManager->StartWatching();
+
+            return s_ActiveProject;
 		}
 
 		return nullptr;
@@ -37,7 +74,9 @@ namespace Kerberos
 
 	bool Project::SaveActive()
 	{
-		KBR_CORE_ASSERT(s_ActiveProject, "Active project has not been set!");
+        KBR_TRACY_FUNCTION();
+
+		KBRAssert(s_ActiveProject != nullptr, "Active project has not been set!");
 
 		const auto savePath = GetActive()->m_ProjectDirectory / (GetActive()->m_Info.Name + ".kbrproj");
 
@@ -45,7 +84,7 @@ namespace Kerberos
 		if (serializer.Serialize(savePath))
 		{
 			s_ActiveProject->m_ProjectDirectory = savePath.parent_path();
-			KBR_CORE_INFO("Project is saved to {}", std::filesystem::absolute(savePath).string());
+			Log::CoreInfo("Project is saved to {}", std::filesystem::absolute(savePath).string());
 
 			if (const auto editorAssetManager = std::dynamic_pointer_cast<EditorAssetManager>(s_ActiveProject->m_AssetManager))
 			{
@@ -56,19 +95,99 @@ namespace Kerberos
 		}
 		else
 		{
-			KBR_CORE_WARN("Could not save project to {}", std::filesystem::absolute(savePath).string());
+			Log::CoreWarn("Could not save project to {}", std::filesystem::absolute(savePath).string());
 			return false;
 		}
 	}
 
-	void Project::SetInfo(const ProjectInfo& info)
+    std::filesystem::path Project::GetAssetDirectory()
+    {
+        KBRAssert(s_ActiveProject != nullptr, "An active project is not set!");
+
+        return s_ActiveProject->m_ProjectDirectory / s_ActiveProject->m_Info.AssetDirectory;
+    }
+
+    const std::filesystem::path& Project::GetProjectDirectory()
+    {
+        KBRAssert(s_ActiveProject != nullptr, "An active project is not set!");
+
+        return s_ActiveProject->m_ProjectDirectory;
+    }
+
+    std::filesystem::path Project::GetAssetFileSystemPath(const std::filesystem::path& assetPath)
+    {
+        KBRAssert(s_ActiveProject != nullptr, "An active project is not set!");
+
+        return GetProjectDirectory() / GetAssetDirectory() / assetPath;
+    }
+
+    std::string Project::ToPascalCaseName(const std::string_view name)
+    {
+        std::string result;
+        bool startNewWord = true;
+
+        for (size_t i = 0; i < name.size(); ++i)
+        {
+            const char c = name[i];
+            if (!std::isalnum(static_cast<unsigned char>(c)))
+            {
+                startNewWord = true;
+                continue;
+            }
+
+            if (!startNewWord && i > 0 && std::isupper(static_cast<unsigned char>(c)) &&
+                (std::islower(static_cast<unsigned char>(name[i - 1])) ||
+                 std::isdigit(static_cast<unsigned char>(name[i - 1]))))
+            {
+                startNewWord = true;
+            }
+
+            if (startNewWord)
+            {
+                result += static_cast<char>(std::toupper(static_cast<unsigned char>(c)));
+                startNewWord = false;
+            }
+            else
+            {
+                result += static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+            }
+        }
+
+        if (result.empty())
+            return "Game";
+
+        if (std::isdigit(static_cast<unsigned char>(result.front())))
+            result.insert(result.begin(), '_');
+
+        return result;
+    }
+
+    void Project::SetInfo(const ProjectInfo& info)
 	{
-		KBR_CORE_ASSERT(s_ActiveProject, "Active project has not been set!");
+        KBR_TRACY_FUNCTION();
+
+		KBRAssert(s_ActiveProject != nullptr, "Active project has not been set!");
 
 		m_Info = info;
 
 		/// The project info has changed, so we might need to update the assets
-		s_ActiveProject->m_AssetManager = CreateRef<EditorAssetManager>();
+		const auto assetsRoot = s_ActiveProject->m_ProjectDirectory / info.AssetDirectory;
+		s_ActiveProject->m_AssetManager = CreateRef<EditorAssetManager>(assetsRoot, assetsRoot / "Cache");
+		const auto editorAssetManager = std::dynamic_pointer_cast<EditorAssetManager>(s_ActiveProject->m_AssetManager);
+		editorAssetManager->EnsureAssetMetas();
+		editorAssetManager->StartWatching();
+	}
+
+	Ref<RuntimeAssetManager> Project::UseRuntimeAssetManager()
+	{
+		const auto editor = std::dynamic_pointer_cast<EditorAssetManager>(m_AssetManager);
+		if (!editor)
+			return std::dynamic_pointer_cast<RuntimeAssetManager>(m_AssetManager);
+		auto runtime = CreateRef<RuntimeAssetManager>(
+			editor->GetAssetRegistry(), editor->GetAssetsRoot(), editor->GetCacheRoot(),
+			editor->GetEngineCacheRoot());
+		m_AssetManager = runtime;
+		return runtime;
 	}
 
 	void Project::ReleaseActiveProjectResources() 

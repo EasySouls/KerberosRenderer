@@ -3,7 +3,7 @@
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
     <AssemblyName>KerberosScriptCoreLib</AssemblyName>
-    <RootNamespace>Kerberos.Source</RootNamespace>
+    <RootNamespace>Kerberos</RootNamespace>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>

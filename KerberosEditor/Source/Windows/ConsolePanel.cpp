@@ -1,10 +1,11 @@
 #include "ConsolePanel.hpp"
 
-#include "Logging/Log.hpp"
-
 #include <imgui/imgui.h>
+#include  <spdlog/spdlog.h>
 
 #include <mutex>
+
+import Kerberos;
 
 namespace Kerberos
 {
@@ -63,7 +64,7 @@ namespace Kerberos
 		ImGui::End();
 	}
 
-	void ConsolePanel::OnEvent(Event& event) 
+	void ConsolePanel::OnEvent([[maybe_unused]] Event& event)
 	{
 	}
 }

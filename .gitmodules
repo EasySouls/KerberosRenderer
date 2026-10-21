@@ -26,3 +26,12 @@
 [submodule "KerberosEngine/ThirdParty/entt"]
 	path = KerberosEngine/ThirdParty/entt
 	url = https://github.com/skypjack/entt.git
+[submodule "KerberosEngine/ThirdParty/tracy"]
+	path = KerberosEngine/ThirdParty/tracy
+	url = https://github.com/wolfpld/tracy.git
+[submodule "KerberosEngine/ThirdParty/FidelityFX-SDK"]
+	path = KerberosEngine/ThirdParty/FidelityFX-SDK
+	url = https://github.com/EasySouls/FidelityFX-SDK.git
+[submodule "KerberosEngine/ThirdParty/googletest"]
+	path = KerberosEngine/ThirdParty/googletest
+	url = https://github.com/google/googletest.git

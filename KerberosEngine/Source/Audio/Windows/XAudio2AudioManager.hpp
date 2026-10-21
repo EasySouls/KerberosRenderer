@@ -64,6 +64,7 @@ namespace Kerberos
 		void LoadWavFile(const std::filesystem::path& filepath);
 
 	private:
+		bool m_ComInitialized = false;
 		IXAudio2* m_XAudio2 = nullptr;
 		IXAudio2MasteringVoice* m_MasteringVoice = nullptr;
 

@@ -1,9 +1,9 @@
 using System;
 using System.Runtime.InteropServices;
-using Kerberos.Source.Kerberos.Core;
-using Kerberos.Source.Kerberos.Scene;
+using Kerberos.Core;
+using Kerberos.Scene;
 
-namespace Kerberos.Source
+namespace Kerberos
 {
     /// <summary>
     /// Provides access to native engine functions via function pointers.
@@ -29,6 +29,9 @@ namespace Kerberos.Source
 
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
         internal delegate ulong EntityInstantiateFn(IntPtr name);
+
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        internal delegate ulong EntityInstantiatePrefabFn(ulong prefabHandle);
 
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
         internal delegate void GetVec3Fn(ulong entityID, out Vector3 value);
@@ -93,6 +96,7 @@ namespace Kerberos.Source
         private static EntityAddComponentFn? s_EntityAddComponent;
         private static EntityFindByNameFn? s_EntityFindByName;
         private static EntityInstantiateFn? s_EntityInstantiate;
+        private static EntityInstantiatePrefabFn? s_EntityInstantiatePrefab;
 
         private static GetVec3Fn? s_TransformGetTranslation;
         private static SetVec3Fn? s_TransformSetTranslation;
@@ -205,6 +209,7 @@ namespace Kerberos.Source
             s_AudioSource3DIsLooping = Marshal.GetDelegateForFunctionPointer<GetBoolFn>(ReadNext());
 
             s_PhysicsRaycast = Marshal.GetDelegateForFunctionPointer<PhysicsRaycastFn>(ReadNext());
+            s_EntityInstantiatePrefab = Marshal.GetDelegateForFunctionPointer<EntityInstantiatePrefabFn>(ReadNext());
         }
 
         // ====================================================================
@@ -239,9 +244,9 @@ namespace Kerberos.Source
             finally { Marshal.FreeHGlobal(ptr); }
         }
 
-        internal static object? Entity_GetScriptInstance(ulong entityID)
+        internal static object? Entity_GetScriptInstance(ulong entityID, Type type)
         {
-            return ScriptGlue.GetInstance(entityID);
+            return ScriptGlue.GetInstance(entityID, type);
         }
 
         internal static ulong Entity_Instantiate(string name)
@@ -249,6 +254,11 @@ namespace Kerberos.Source
             IntPtr ptr = Marshal.StringToHGlobalAnsi(name);
             try { return s_EntityInstantiate?.Invoke(ptr) ?? 0; }
             finally { Marshal.FreeHGlobal(ptr); }
+        }
+
+        internal static ulong Entity_InstantiatePrefab(ulong prefabHandle)
+        {
+            return s_EntityInstantiatePrefab?.Invoke(prefabHandle) ?? 0;
         }
 
         // ----------------------------- TransformComponent -----------------------------

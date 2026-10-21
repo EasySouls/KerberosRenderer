@@ -1,6 +1,7 @@
 #pragma once
 
 #include <xhash>
+#include <format>
 
 namespace Kerberos
 {
@@ -52,4 +53,13 @@ struct std::hash<Kerberos::UUID>
 	{
 		return hash<uint64_t>()((uint64_t)uuid);
 	}
+};
+
+template<> 
+struct std::formatter<Kerberos::UUID> : std::formatter<std::string>
+{
+    auto format(const Kerberos::UUID& uuid, std::format_context& ctx) const
+    {
+        return std::formatter<std::string>::format(std::format("{}", static_cast<uint64_t>(uuid)), ctx);
+    }
 };

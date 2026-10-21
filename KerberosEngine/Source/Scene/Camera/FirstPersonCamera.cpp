@@ -1,4 +1,3 @@
-#include "kbrpch.hpp"
 #include "FirstPersonCamera.hpp"
 
 #include <algorithm>
@@ -7,7 +6,9 @@
 #include "Events/MouseButtonPressedEvent.hpp"
 #include "Events/MouseButtonReleasedEvent.hpp"
 #include "Input/InputSystem.hpp"
-#include "Renderer/Renderer.hpp"
+#include "Profiling/Profilers.hpp"
+
+import Kerberos;
 
 namespace Kerberos
 {
@@ -20,6 +21,8 @@ namespace Kerberos
 
 	void FirstPersonCamera::OnUpdate(const float deltaTime)
 	{
+		KBR_TRACY_FUNCTION();
+
 		if (IsInputBlocked())
 			return;
 
@@ -104,11 +107,11 @@ namespace Kerberos
 		return 0.0f;
 	}
 
-	void FirstPersonCamera::SetDistance(const float distance)
+	void FirstPersonCamera::SetDistance([[maybe_unused]] const float distance)
 	{
 	}
 
-	void FirstPersonCamera::Focus(const glm::vec3& focusPoint)
+	void FirstPersonCamera::Focus([[maybe_unused]] const glm::vec3& focusPoint)
 	{
 	}
 
@@ -191,26 +194,13 @@ namespace Kerberos
 	std::pair<std::vector<glm::mat4>, glm::vec4> FirstPersonCamera::GetLightSpaceMatrices(const glm::vec3& lightDir,
 																					 const std::function<glm::vec4(float)>& getCascadeSplits) const
 	{
-		const glm::vec4 cascadeSplits = getCascadeSplits(m_FarClip);
-
-		std::vector<glm::mat4> matrices;
-		for (size_t i = 0; i < 3 + 1; ++i)
-		{
-			if (i == 0)
-			{
-				matrices.push_back(GetLightSpaceMatrix(m_NearClip, cascadeSplits[i], lightDir));
-			}
-			else if (i < 3)
-			{
-				matrices.push_back(GetLightSpaceMatrix(cascadeSplits[i - 1], cascadeSplits[i], lightDir));
-			}
-			else
-			{
-				matrices.push_back(GetLightSpaceMatrix(cascadeSplits[i - 1], m_FarClip, lightDir));
-			}
-		}
-
-		return { matrices, cascadeSplits };
+		return CalculateLightSpaceMatrices(GetViewMatrix(),
+		                                   glm::radians(m_Fov),
+		                                   m_AspectRatio,
+		                                   m_NearClip,
+		                                   m_FarClip,
+		                                   lightDir,
+		                                   getCascadeSplits);
 	}
 
 	glm::vec3 FirstPersonCamera::GetUp() const
@@ -338,81 +328,5 @@ namespace Kerberos
 		m_ViewDirty = true;
 
 		return true;
-	}
-
-	glm::mat4 FirstPersonCamera::GetLightSpaceMatrix(const float nearPlane, const float farPlane, const glm::vec3& lightDir) const
-	{
-		const glm::mat4 proj = glm::perspective(
-			glm::radians(m_Fov), m_AspectRatio, nearPlane, farPlane);
-
-		const auto corners = GetFrustumCornersWorldSpace(proj, GetViewMatrix());
-
-		glm::vec3 center = glm::vec3(0, 0, 0);
-		for (const auto& v : corners)
-		{
-			center += glm::vec3(v);
-		}
-		center /= corners.size();
-
-		glm::vec3 lightUp = glm::vec3(0.0f, 1.0f, 0.0f);
-		if (glm::abs(glm::dot(lightDir, lightUp)) > 0.99f)
-		{
-			lightUp = glm::vec3(1.0f, 0.0f, 0.0f);
-		}
-
-		const auto lightView = glm::lookAt(center + lightDir, center, lightUp);
-
-		float minX = std::numeric_limits<float>::max();
-		float maxX = std::numeric_limits<float>::lowest();
-		float minY = std::numeric_limits<float>::max();
-		float maxY = std::numeric_limits<float>::lowest();
-		float minZ = std::numeric_limits<float>::max();
-		float maxZ = std::numeric_limits<float>::lowest();
-		for (const auto& v : corners)
-		{
-			const auto trf = lightView * v;
-			minX = std::min(minX, trf.x);
-			maxX = std::max(maxX, trf.x);
-			minY = std::min(minY, trf.y);
-			maxY = std::max(maxY, trf.y);
-			minZ = std::min(minZ, trf.z);
-			maxZ = std::max(maxZ, trf.z);
-		}
-
-		// Tune this parameter according to the scene
-		constexpr float zMult = 10.0f;
-		if (minZ < 0)
-		{
-			minZ *= zMult;
-		}
-		else
-		{
-			minZ /= zMult;
-		}
-		if (maxZ < 0)
-		{
-			maxZ /= zMult;
-		}
-		else
-		{
-			maxZ *= zMult;
-		}
-
-		// Add a slight offset to prevent negative near plane bounding issues if scene bounds are close to near clip
-		minZ = std::min(minZ, -100.0f);
-		maxZ = std::max(maxZ, 100.0f);
-
-		// Apply texel snapping
-		const float orthoWidth = maxX - minX;
-		const uint32_t shadowMapResolution = Renderer::GetShadowMapResolution();
-		const float worldUnitsPerTexel = orthoWidth / static_cast<float>(shadowMapResolution);
-
-		minX = std::floor(minX / worldUnitsPerTexel) * worldUnitsPerTexel;
-		maxX = std::floor(maxX / worldUnitsPerTexel) * worldUnitsPerTexel;
-		minY = std::floor(minY / worldUnitsPerTexel) * worldUnitsPerTexel;
-		maxY = std::floor(maxY / worldUnitsPerTexel) * worldUnitsPerTexel;
-
-		const glm::mat4 lightProjection = glm::ortho(minX, maxX, minY, maxY, minZ, maxZ);
-		return lightProjection * lightView;
 	}
 }
