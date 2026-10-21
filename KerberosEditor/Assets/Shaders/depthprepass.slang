@@ -33,10 +33,13 @@ VSOutput vertexMain(VSInput input)
     float4 worldPos = mul(perObject.model, float4(input.Pos, 1.0));
     output.Position = mul(scene.projection, mul(scene.view, worldPos));
 
+    // Motion vectors are computed in unjittered space. FSR3 receives the
+    // sub-pixel jitter separately, so the motion buffer must not contain it.
+    float4 currentClipPosition = mul(scene.motionProjection, mul(scene.view, worldPos));
     float4 previousClipPosition = mul(scene.previousProjection,
                                       mul(scene.previousView,
                                           mul(perObject.previousModel, float4(input.Pos, 1.0))));
-    float2 currentNdc = output.Position.xy / output.Position.w;
+    float2 currentNdc = currentClipPosition.xy / currentClipPosition.w;
     float2 previousNdc = previousClipPosition.xy / previousClipPosition.w;
     output.Motion = (previousNdc - currentNdc) * 0.5 * scene.viewportSize;
 

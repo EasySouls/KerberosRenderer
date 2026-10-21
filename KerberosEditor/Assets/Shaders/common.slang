@@ -15,6 +15,7 @@ public struct SceneData
     public float deltaTime;
     public float3 cameraUp;
     public float time;
+    public float4x4 motionProjection; // Unjittered projection for motion vectors
 };
 
 public struct Material 

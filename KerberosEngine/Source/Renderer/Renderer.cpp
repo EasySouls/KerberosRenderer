@@ -158,6 +158,7 @@ struct SceneUniformData
     float deltaTime = 0.0f;
     glm::vec3 cameraUp{ 0.f };
     float time = 0.0f;
+    glm::mat4 motionProjection{ 0.f }; /// Unjittered current projection, used for motion vectors
 };
 
 static_assert(offsetof(SceneUniformData, camPos) == 528);
@@ -165,7 +166,8 @@ static_assert(offsetof(SceneUniformData, cameraRight) == 560);
 static_assert(offsetof(SceneUniformData, deltaTime) == 572);
 static_assert(offsetof(SceneUniformData, cameraUp) == 576);
 static_assert(offsetof(SceneUniformData, time) == 588);
-static_assert(sizeof(SceneUniformData) == 592);
+static_assert(offsetof(SceneUniformData, motionProjection) == 592);
+static_assert(sizeof(SceneUniformData) == 656);
 
 struct GlobalLighting
 {
@@ -706,10 +708,14 @@ void Renderer::RenderScene(
     s_Data->PendingRender.IsValid = scene != nullptr;
 }
 
-void Renderer::UpdateParticles(const vk::raii::CommandBuffer& cmd, const uint32_t frameIndex, DescriptorAllocator& frameDescriptorAllocator, const float time)
+void Renderer::UpdateParticles(const vk::raii::CommandBuffer& cmd,
+                               const uint32_t frameIndex,
+                               DescriptorAllocator& frameDescriptorAllocator,
+                               const float time,
+                               const glm::mat4& projection)
 {
     const ParticleFrameData particleFrameData{
-        .ViewProj = s_Data->PendingRender.Projection * s_Data->PendingRender.View,
+        .ViewProj = projection * s_Data->PendingRender.View,
         .CameraUp = s_Data->PendingRender.CameraUp,
         .DeltaTime = s_Data->PendingRender.DeltaTime,
         .CameraRight = s_Data->PendingRender.CameraRight,
@@ -1361,11 +1367,15 @@ void Renderer::RecordQueuedSceneRender(const vk::raii::CommandBuffer& cmd)
     const glm::mat4 previousView = s_Data->HasTemporalHistory ? s_Data->PreviousView : s_Data->PendingRender.View;
     const glm::mat4 previousProjection =
         s_Data->HasTemporalHistory ? s_Data->PreviousProjection : s_Data->PendingRender.Projection;
-    glm::mat4 currentProjection = s_Data->PendingRender.Projection;
+
+    // Unjittered projection
+    const glm::mat4 motionProjection = s_Data->PendingRender.Projection;
+    // Jittered projection
+    glm::mat4 currentProjection = motionProjection;
     currentProjection[2][0] += 2.0f * jitter.x / s_Data->RenderSize.x;
-    currentProjection[2][1] -= 2.0f * jitter.y / s_Data->RenderSize.y;
+    currentProjection[2][1] += 2.0f * jitter.y / s_Data->RenderSize.y;
     s_Data->PreviousView = s_Data->PendingRender.View;
-    s_Data->PreviousProjection = currentProjection;
+    s_Data->PreviousProjection = motionProjection;
 
     DescriptorAllocator& frameDescriptorAllocator = *s_Data->FrameDescriptorAllocators[frameIndex];
     frameDescriptorAllocator.Reset();
@@ -1483,6 +1493,7 @@ void Renderer::RecordQueuedSceneRender(const vk::raii::CommandBuffer& cmd)
     UpdateLights(currentImage, gpuLights);
     s_Data->SceneUniformData.previousView = previousView;
     s_Data->SceneUniformData.previousProjection = previousProjection;
+    s_Data->SceneUniformData.motionProjection = motionProjection;
     UpdateSceneUniformBuffers(currentImage,
                               s_Data->PendingRender.View,
                               currentProjection,
@@ -1496,7 +1507,7 @@ void Renderer::RecordQueuedSceneRender(const vk::raii::CommandBuffer& cmd)
     static float time = 0.0f;
     time += s_Data->PendingRender.DeltaTime;
 
-    UpdateParticles(cmd, frameIndex, frameDescriptorAllocator, time);
+    UpdateParticles(cmd, frameIndex, frameDescriptorAllocator, time, currentProjection);
 
     CompileAndExecuteRenderGraph(
         cmd, frameIndex, currentImage, allObjects, renderObjects, &frameArena, colliderLineVertices);

@@ -160,7 +160,6 @@ namespace Kerberos {
         };
         upscaleDesc.flags = FFX_UPSCALE_ENABLE_HIGH_DYNAMIC_RANGE |
                             FFX_UPSCALE_ENABLE_AUTO_EXPOSURE |
-                            FFX_UPSCALE_ENABLE_MOTION_VECTORS_JITTER_CANCELLATION |
                             FFX_UPSCALE_ENABLE_DEBUG_CHECKING;
 
         upscaleDesc.fpMessage = [](const uint32_t type, const wchar_t* message) {
@@ -234,7 +233,6 @@ namespace Kerberos {
         phaseCountDesc.pOutPhaseCount = &phaseCount;
 
         ffx::QueryDescUpscaleGetJitterOffset jitterDesc{};
-        jitterDesc.phaseCount = std::max(phaseCount, 1);
         jitterDesc.pOutX = &m_JitterX;
         jitterDesc.pOutY = &m_JitterY;
  
@@ -247,8 +245,9 @@ namespace Kerberos {
         }
         else
         {
-            jitterDesc.index = static_cast<int32_t>(
-                m_Frame.frameIndex % static_cast<uint64_t>(std::max(phaseCount, 1)));
+            jitterDesc.phaseCount = std::max(phaseCount, 1);
+            jitterDesc.index = static_cast<int32_t>(m_Frame.frameIndex % static_cast<uint64_t>(std::max(phaseCount, 1)));
+
             if (const ffx::ReturnCode queryRet = ffx::Query(m_Context, jitterDesc); !queryRet)
             {
                 Log::CoreError("FidelityFX FSR3: Error querying jitter offset");

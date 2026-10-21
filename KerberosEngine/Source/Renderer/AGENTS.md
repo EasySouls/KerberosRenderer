@@ -95,6 +95,17 @@ consumes the pre-AA HDR resolve so its internal temporal history receives the
 original jittered samples. Native presentation continues to use the
 anti-aliasing pass and composite image.
 
+FSR3 receives the sub-pixel jitter through `UpscalerDispatchInfo`/the upscaler
+dispatch; the scene projection carries that jitter for rendering, while the
+motion-vector pass uses unjittered current/previous projections. Because the
+motion buffer is jitter-free, FSR must not enable motion-vector jitter
+cancellation, and pixels without prepass geometry (sky, transparent-only
+areas) legitimately keep a zero motion vector. The projection already applies
+the Vulkan Y flip, so both jitter axes use the same sign in the projection;
+the jitter offset reported to FSR must always equal the resulting image
+displacement. Keep these conventions in sync or the accumulated image shakes
+every frame.
+
 `RenderGraph.hpp/.cpp` is a legacy graph with different resource ownership,
 semaphores, and queue submissions. Do not extend or mix it with `Graph`
 without first proving it is still used.

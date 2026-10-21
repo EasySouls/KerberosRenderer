@@ -256,7 +256,8 @@ private:
     static void UpdateParticles(const vk::raii::CommandBuffer& cmd,
                                 uint32_t frameIndex,
                                 DescriptorAllocator& frameDescriptorAllocator,
-                                float time);
+                                float time,
+                                const glm::mat4& projection);
 
     static void RenderPrePass(const vk::raii::CommandBuffer& cmd,
                               uint32_t frameIndex,
