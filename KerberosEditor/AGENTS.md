@@ -176,7 +176,16 @@ Simulate render through the editor camera; Play renders through the runtime
 scene's primary `CameraComponent`. The runtime view matrix is the inverse of the
 camera entity's world transform, and both editor/runtime scene projection
 matrices apply the Vulkan Y flip. The editor camera is neither updated nor given
-input while Play is active. Scene serialization must preserve authored component
+input while Play is active.
+
+All camera types must share `CalculateLightSpaceMatrices` for shadow cascades.
+It fits each cascade to the camera frustum and snaps the light-space origin to
+shadow-map texels while preserving the ortho extents. Duplicating the
+calculation without snapping, or snapping min/max independently, makes the
+shadow grid swim as the camera moves; temporal upscaling turns that into
+lagging/snapping shadows.
+
+Scene serialization must preserve authored component
 data while leaving transient runtime state transient. Scene and project
 transitions must not leave non-owning pointers to destroyed managers or stale
 selected entities.

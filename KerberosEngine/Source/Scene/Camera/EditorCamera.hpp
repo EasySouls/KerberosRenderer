@@ -72,8 +72,6 @@ namespace Kerberos
 
 		void OnMouseScrolled(const MouseScrolledEvent& mouseScrolled);
 
-		glm::mat4 GetLightSpaceMatrix(float nearPlane, float farPlane, const glm::vec3& lightDir) const;
-
 	private:
 		float m_Fov = 45.0f;
 		float m_AspectRatio = 1.778f;

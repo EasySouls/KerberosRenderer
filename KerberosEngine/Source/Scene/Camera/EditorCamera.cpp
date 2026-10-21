@@ -130,26 +130,13 @@ namespace Kerberos
 	std::pair<std::vector<glm::mat4>, glm::vec4> EditorCamera::GetLightSpaceMatrices(const glm::vec3& lightDir,
 		const std::function<glm::vec4(float)>& getCascadeSplits) const 
 	{
-		const glm::vec4 cascadeSplits = getCascadeSplits(m_FarClip);
-
-		std::vector<glm::mat4> matrices;
-		for (uint32_t i = 0; i < 3 + 1; ++i)
-		{
-			if (i == 0)
-			{
-				matrices.push_back(GetLightSpaceMatrix(m_NearClip, cascadeSplits[i], lightDir));
-			}
-			else if (i < 3)
-			{
-				matrices.push_back(GetLightSpaceMatrix(cascadeSplits[i - 1], cascadeSplits[i], lightDir));
-			}
-			else
-			{
-				matrices.push_back(GetLightSpaceMatrix(cascadeSplits[i - 1], m_FarClip, lightDir));
-			}
-		}
-
-		return { matrices, cascadeSplits };
+		return CalculateLightSpaceMatrices(GetViewMatrix(),
+		                                   glm::radians(m_Fov),
+		                                   m_AspectRatio,
+		                                   m_NearClip,
+		                                   m_FarClip,
+		                                   lightDir,
+		                                   getCascadeSplits);
 	}
 
 	glm::vec3 EditorCamera::GetUp() const
@@ -315,59 +302,4 @@ namespace Kerberos
 		UpdateView();
 	}
 
-	glm::mat4 EditorCamera::GetLightSpaceMatrix(const float nearPlane, const float farPlane, const glm::vec3& lightDir) const 
-	{
-		const auto proj = glm::perspective(
-			glm::radians(m_Fov), m_AspectRatio, nearPlane,
-			farPlane);
-		const auto corners = GetFrustumCornersWorldSpace(proj, GetViewMatrix());
-
-		glm::vec3 center = glm::vec3(0, 0, 0);
-		for (const auto& v : corners)
-		{
-			center += glm::vec3(v);
-		}
-		center /= static_cast<float>(corners.size());
-
-		const auto lightView = glm::lookAt(center + lightDir, center, glm::vec3(0.0f, 1.0f, 0.0f));
-
-		float minX = std::numeric_limits<float>::max();
-		float maxX = std::numeric_limits<float>::lowest();
-		float minY = std::numeric_limits<float>::max();
-		float maxY = std::numeric_limits<float>::lowest();
-		float minZ = std::numeric_limits<float>::max();
-		float maxZ = std::numeric_limits<float>::lowest();
-		for (const auto& v : corners)
-		{
-			const auto trf = lightView * v;
-			minX = std::min(minX, trf.x);
-			maxX = std::max(maxX, trf.x);
-			minY = std::min(minY, trf.y);
-			maxY = std::max(maxY, trf.y);
-			minZ = std::min(minZ, trf.z);
-			maxZ = std::max(maxZ, trf.z);
-		}
-
-		// Tune this parameter according to the scene
-		constexpr float zMult = 10.0f;
-		if (minZ < 0)
-		{
-			minZ *= zMult;
-		}
-		else
-		{
-			minZ /= zMult;
-		}
-		if (maxZ < 0)
-		{
-			maxZ /= zMult;
-		}
-		else
-		{
-			maxZ *= zMult;
-		}
-
-		const glm::mat4 lightProjection = glm::ortho(minX, maxX, minY, maxY, minZ, maxZ);
-		return lightProjection * lightView;
-	}
 }

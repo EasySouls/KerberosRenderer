@@ -35,6 +35,22 @@ namespace Kerberos
 	std::vector<glm::vec4> GetFrustumCornersWorldSpace(const glm::mat4& proj, const glm::mat4& view);
 
 	/**
+	 * Builds a single light-space matrix for the given view frustum slice.
+	 * The result is fitted to the frustum and texel-snapped to the shadow map
+	 * resolution so cascades do not swim while the camera moves.
+	 *
+	 * @param fov The vertical field of view in radians.
+	 * @param aspectRatio The camera aspect ratio.
+	 */
+	glm::mat4 CalculateLightSpaceMatrix(
+		const glm::mat4& view,
+		float fov,
+		float aspectRatio,
+		float nearClip,
+		float farClip,
+		const glm::vec3& lightDir);
+
+	/**
 	 * Builds the cascaded light-space matrices from a camera view matrix.
 	 *
 	 * @param fov The vertical field of view in radians.
