@@ -40,6 +40,7 @@ namespace Kerberos
 			.append("KerberosEditor");
 
 		spec.WorkingDirectory = projectRoot;
+		spec.EngineRoot = projectRoot;
 
 		/*/// This is only needed so when the editor initializes, the static project shouldn't be null
 		Project::New();*/

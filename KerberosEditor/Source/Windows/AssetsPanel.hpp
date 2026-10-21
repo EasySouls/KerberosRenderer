@@ -83,7 +83,8 @@ namespace Kerberos
 
 		void OpenMaterialEditor(const std::filesystem::path& materialPath);
 		void RenderMaterialEditors();
-		static void DrawMaterialTextureField(const char* label, Ref<Texture2D>& texture);
+		void DrawMaterialTextureField(const char* label, Ref<Texture2D>& texture);
+		void RebuildTexturePickerEntries();
 
 		std::filesystem::path GetRelativePath(const std::filesystem::path& path) const;
 
@@ -96,9 +97,17 @@ namespace Kerberos
 		struct MaterialEditorState
 		{
 			std::filesystem::path Filepath;
+			AssetHandle Handle = AssetHandle::Invalid();
 			Ref<Material> WorkingCopy;
 			MaterialPreviewMesh PreviewMesh = MaterialPreviewMesh::Sphere;
 			bool Open = true;
+		};
+
+		struct TexturePickerEntry
+		{
+			AssetHandle Handle = AssetHandle::Invalid();
+			std::string Label;
+			std::string SearchKey;
 		};
 
 	private:
@@ -140,6 +149,11 @@ namespace Kerberos
 
         // Persistent search text for the asset browser.
         char m_SearchFilter[256]{};
+
+        // Cached, type-indexed texture list used by the material editor picker.
+        std::vector<TexturePickerEntry> m_TexturePickerEntries;
+        bool m_TexturePickerEntriesDirty = true;
+        char m_TexturePickerFilter[256]{};
 
 		std::unordered_map<std::string, MaterialEditorState> m_OpenMaterialEditors;
 

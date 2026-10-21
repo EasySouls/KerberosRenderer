@@ -106,7 +106,7 @@ namespace Kerberos
 		Render3DEditor(camera, ts);
 	}
 
-	void Scene::OnUpdateRuntime(const float ts, const Camera& camera)
+	void Scene::OnUpdateRuntime(const float ts)
 	{
 		KBR_TRACY_FUNCTION();
 
@@ -129,10 +129,10 @@ namespace Kerberos
 			}
 		}
 
-		/// Render the scene
-
+		/// Render the scene from the primary camera in the scene. Runtime rendering
+		/// never uses the editor camera.
 		const SceneCamera* mainCamera = nullptr;
-		glm::mat4 mainCameraTransform;
+		glm::mat4 mainCameraTransform(1.0f);
 
 		{
 			const auto view = m_Registry.view<CameraComponent, TransformComponent>();
@@ -141,26 +141,24 @@ namespace Kerberos
 				auto [cameraComp, transformComp] = view.get<CameraComponent, TransformComponent>(entity);
 				if (cameraComp.IsPrimary)
 				{
+					mainCameraTransform = transformComp.WorldTransform;
+					cameraComp.Camera.SetViewMatrix(glm::inverse(mainCameraTransform));
 					mainCamera = &cameraComp.Camera;
-					mainCameraTransform = transformComp.GetTransform();
 					break;
 				}
 			}
 		}
 
-		//if (mainCamera)
-		//{
-			if (m_Is3D)
-			{
-				//Render3DRuntime(mainCamera, mainCameraTransform);
-				// TODO: Implement rendering with CameraComponent
-				Render3DRuntime(camera, ts);
-			}
-			else
-			{
-				Render2DRuntime(mainCamera, mainCameraTransform, ts);
-			}
-		//}
+		if (mainCamera == nullptr)
+		{
+			Log::CoreError("Cannot render the scene in play mode: no primary camera was found.");
+			return;
+		}
+
+		if (m_Is3D)
+			Render3DRuntime(mainCamera, mainCameraTransform, ts);
+		else
+			Render2DRuntime(mainCamera, mainCameraTransform, ts);
 	}
 
 	Entity Scene::CreateEntity(const std::string& name, const UUID parentId)
@@ -636,6 +634,32 @@ Entity Scene::InstantiatePrefab(const AssetHandle prefabHandle, const std::strin
 #endif
 	}
 
+	Entity Scene::TryGetEntityByUUID(const UUID uuid) const
+	{
+		KBR_TRACY_FUNCTION();
+
+		if (!uuid.IsValid())
+			return {};
+
+#if USE_MAP_FOR_UUID
+
+		const auto it = m_UUIDToEntityMap.find(uuid);
+		return it != m_UUIDToEntityMap.end() ? it->second : Entity{};
+#else
+		const auto view = m_Registry.view<IDComponent>();
+		for (auto entity : view)
+		{
+			auto id = view.get<IDComponent>(entity).ID;
+			if (id == uuid)
+			{
+				return { entity, this };
+			}
+		}
+
+		return {};
+#endif
+	}
+
 	void Scene::SetParent(const Entity child, const Entity parent, [[maybe_unused]] bool keepWorldTransform)
 	{
 		KBR_TRACY_FUNCTION();
@@ -853,123 +877,17 @@ Entity Scene::InstantiatePrefab(const AssetHandle prefabHandle, const std::strin
 		//Renderer2D::EndScene();
 	}
 
-	void Scene::Render3DRuntime([[maybe_unused]] const SceneCamera* mainCamera, [[maybe_unused]] const glm::mat4& mainCameraTransform, [[maybe_unused]] const float dt)
+	void Scene::Render3DRuntime(const SceneCamera* mainCamera, const glm::mat4& mainCameraTransform, const float dt)
 	{
 		KBR_TRACY_FUNCTION();
-#pragma region old_rendering_code
-		//DirectionalLightComponent* dlc = nullptr;
-		//const auto sunView = m_Registry.view<DirectionalLightComponent, TransformComponent>();
-		//for (const auto entity : sunView)
-		//{
-		//	auto [light, transform] = sunView.get<DirectionalLightComponent, TransformComponent>(entity);
-		//	if (light.IsEnabled)
-		//	{
-		//		dlc = &light;
-		//		break;
-		//	}
-		//}
 
-		//if (ShouldRenderShadows(dlc))
-		//{
-		//	/*ShadowMapSettings shadowSettings;
-		//	shadowSettings.Resolution = 1024;
-		//	shadowSettings.OrthoSize = 15.0f;
-		//	shadowSettings.NearPlane = 1.0f;
-		//	shadowSettings.FarPlane = 100.0f;
-		//	shadowSettings.EnableShadows = true;
+		KBRAssert(mainCamera != nullptr, "Cannot render the 3D scene without a primary camera");
+		if (mainCamera == nullptr)
+		{
+			return;
+		}
 
-		//	Renderer3D::BeginShadowPass(dlc->Light, shadowSettings, m_ShadowMapFramebuffer);*/
-
-		//	/// Render all shadow-casting meshes
-		//	const auto meshView = m_Registry.view<StaticMeshComponent, TransformComponent>();
-		//	for (auto entity : meshView)
-		//	{
-		//		auto& meshComp = meshView.get<StaticMeshComponent>(entity);
-		//		auto& transformComp = meshView.get<TransformComponent>(entity);
-
-		//		if (meshComp.StaticMesh && meshComp.MeshMaterial && meshComp.Visible)
-		//		{
-		//			/*Renderer3D::SubmitMesh(meshComp.StaticMesh, transformComp.WorldTransform,
-		//								   meshComp.MeshMaterial, meshComp.MeshTexture, 1.0f,
-		//								   static_cast<int>(entity), meshComp.CastShadows);*/
-		//		}
-		//	}
-
-		//	dlc->NeedsUpdate = false;
-
-		//	//Renderer3D::EndPass();
-		//}
-
-		//std::vector<PointLight> pointLights;
-		//const auto pointLightView = m_Registry.view<PointLightComponent, TransformComponent>();
-		//for (const auto entity : pointLightView)
-		//{
-		//	auto [light, transform] = pointLightView.get<PointLightComponent, TransformComponent>(entity);
-		//	if (light.IsEnabled)
-		//	{
-		//		pointLights.push_back(light.Light);
-		//	}
-		//}
-
-		//Ref<TextureCube> skyboxTexture = nullptr;
-		//const auto skyboxView = m_Registry.view<EnvironmentComponent>();
-		//for (const auto entity : skyboxView)
-		//{
-		//	const auto& skybox = skyboxView.get<EnvironmentComponent>(entity);
-		//	if (skybox.IsSkyboxEnabled && skybox.SkyboxTexture)
-		//	{
-		//		skyboxTexture = AssetManager::GetAsset<TextureCube>(skybox.SkyboxTexture);
-		//		break;
-		//	}
-		//}
-
-		///*m_EditorFramebuffer->Bind();
-
-		//RenderCommand::SetClearColor({ 0.1f, 0.1f, 0.1f, 1 });
-		//RenderCommand::Clear();
-
-		///// Clear our entity ID attachment to -1, so when rendering entities they fill that space with their entity ID,
-		///// and empty spacces will have -1, signaling that there is no entity.
-		///// Used for mouse picking.
-		//m_EditorFramebuffer->ClearAttachment(1, -1);
-
-		//Renderer3D::BeginGeometryPass(*mainCamera, mainCameraTransform, &dlc->Light, pointLights, skyboxTexture);*/
-
-		//const auto view = m_Registry.view<TransformComponent, StaticMeshComponent>();
-		//for (const auto entity : view)
-		//{
-		//	auto [transform, mesh] = view.get<TransformComponent, StaticMeshComponent>(entity);
-
-		//	if (mesh.Visible)
-		//	{
-		//		//Renderer3D::SubmitMesh(mesh.StaticMesh, transform.WorldTransform, mesh.MeshMaterial, mesh.MeshTexture);
-		//	}
-		//}
-
-		////Renderer3D::EndPass();
-
-		//const auto textView = m_Registry.view<TransformComponent, TextComponent>();
-		//for (const auto entity : textView)
-		//{
-		//	auto [transform, text] = textView.get<TransformComponent, TextComponent>(entity);
-
-		//	//Renderer3D::SubmitText(text.Text, text.Font, transform.WorldTransform, text.Color, text.FontSize, static_cast<int>(entity));
-		//}
-
-		////Renderer3D::EndScene();
-
-#pragma endregion
-
-		throw std::runtime_error("Not implemented");
-		//Renderer::RenderSceneRuntime(shared_from_this(), mainCamera, mainCameraTransform);
-	}
-
-	void Scene::Render3DRuntime(const Camera& camera, const float dt) 
-	{
-		glm::mat4 cameraTransform(1.0f);
-		const glm::vec4 camPos = { camera.GetPosition().x, camera.GetPosition().y, camera.GetPosition().z, 1.0f };
-		cameraTransform[3] = camPos;
-		Renderer::RenderSceneRuntime(shared_from_this(), camera, cameraTransform, dt);
+		Renderer::RenderSceneRuntime(shared_from_this(), *mainCamera, mainCameraTransform, dt);
 	}
 
 	void Scene::Render3DEditor(const Camera& camera, const float dt)

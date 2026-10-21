@@ -33,6 +33,7 @@ namespace Kerberos
 	{
 		std::string Name = "Kerberos Application";
 		std::filesystem::path WorkingDirectory;
+		std::filesystem::path EngineRoot;
 		ApplicationCommandLineArgs CommandLineArgs;
 		bool Headless = false;
 	};
@@ -91,6 +92,7 @@ namespace Kerberos
 		float m_LastFrameTime = 0.0f;
 
 		bool m_IsRunning = true;
+		bool m_OleInitialized = false;
 
 		std::queue<std::function<void()>> m_MainThreadQueue;
 		std::mutex m_QueueMutex;

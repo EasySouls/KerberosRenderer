@@ -6,6 +6,7 @@
 #include "Application.hpp"
 #include "AssetConstants.hpp"
 #include "Assets/AssetManager.hpp"
+#include "Core/EnginePaths.hpp"
 #include "Assets/Importers/TextureImporter.hpp"
 #include "Profiling/Profilers.hpp"
 #include "Input/InputSystem.hpp"
@@ -23,11 +24,88 @@
 
 #include <limits>
 #include <ranges>
+#include <fstream>
+#include <string_view>
 
 import Kerberos;
 
 namespace Kerberos
 {
+	namespace
+	{
+		std::string ReplaceAll(std::string input, const std::string& from, const std::string& to)
+		{
+			size_t pos = 0;
+			while ((pos = input.find(from, pos)) != std::string::npos)
+			{
+				input.replace(pos, from.size(), to);
+				pos += to.size();
+			}
+			return input;
+		}
+
+		/// Creates the user's C# scripting project (<name>.csproj + starter script)
+		/// under <project>/Assets/Scripts. The generated project references the
+		/// engine's KerberosScriptCoreLib through the KerberosEnginePath property.
+		void WriteUserScriptProject(const std::filesystem::path& projectDirectory, const std::string& pascalName)
+		{
+			const std::filesystem::path scriptsDirectory = projectDirectory / "Assets" / "Scripts";
+			std::error_code ec;
+			std::filesystem::create_directories(scriptsDirectory, ec);
+
+			constexpr std::string_view csprojTemplate = R"(<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <AssemblyName>PROJECT_NAME</AssemblyName>
+    <RootNamespace>PROJECT_NAME</RootNamespace>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Reference Include="KerberosScriptCoreLib">
+      <HintPath>$(KerberosEnginePath)/Resources/Scripts/KerberosScriptCoreLib.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+  </ItemGroup>
+
+</Project>
+)";
+
+			constexpr std::string_view scriptTemplate = R"(using Kerberos.Scene;
+
+namespace PROJECT_NAME
+{
+    public class PROJECT_NAMEScript : Entity
+    {
+        protected override void OnCreate()
+        {
+        }
+
+        protected override void OnUpdate(float deltaTime)
+        {
+        }
+    }
+}
+)";
+
+			const std::string csproj = ReplaceAll(std::string(csprojTemplate), "PROJECT_NAME", pascalName);
+			const std::string script = ReplaceAll(ReplaceAll(std::string(scriptTemplate), "PROJECT_NAMEScript", pascalName + "Script"),
+				"PROJECT_NAME", pascalName);
+
+			{
+				std::ofstream file(scriptsDirectory / (pascalName + ".csproj"));
+				file << csproj;
+			}
+			{
+				std::ofstream file(scriptsDirectory / (pascalName + "Script.cs"));
+				file << script;
+			}
+		}
+	}
+
 	EditorLayer::EditorLayer()
 			: Layer("EditorLayer")
 	{
@@ -106,10 +184,10 @@ namespace Kerberos
 
 		m_AssetsPanel = CreateOwner<AssetsPanel>(m_NotificationManager);
 
-		m_IconPlay = TextureImporter::ImportTexture("Assets/Editor/play_button.png");
-		m_IconStop = TextureImporter::ImportTexture("Assets/Editor/stop_button.png");
-		m_IconPause = TextureImporter::ImportTexture("Assets/Editor/pause_button.png");
-		m_IconResume = TextureImporter::ImportTexture("Assets/Editor/outlined_play_button.png");
+		m_IconPlay = TextureImporter::ImportTexture(EnginePaths::Assets() / "Editor/play_button.png");
+		m_IconStop = TextureImporter::ImportTexture(EnginePaths::Assets() / "Editor/stop_button.png");
+		m_IconPause = TextureImporter::ImportTexture(EnginePaths::Assets() / "Editor/pause_button.png");
+		m_IconResume = TextureImporter::ImportTexture(EnginePaths::Assets() / "Editor/outlined_play_button.png");
 	}
 
 	void EditorLayer::OnDetach()
@@ -138,21 +216,11 @@ namespace Kerberos
 
 			m_EditorCamera->SetIsInputBlocked(m_DoesImGuiWantInput);
 
-			switch (m_SceneState)
+			/// The editor camera is only used while editing or simulating.
+			/// Play mode renders through the scene's primary CameraComponent.
+			if (m_SceneState != SceneState::Play)
 			{
-			case SceneState::Edit:
-			case SceneState::Simulate:
 				m_EditorCamera->OnUpdate(deltaTime);
-				break;
-			case SceneState::Play:
-			{
-				/// Only update the camera when the viewport is focused
-				/*if (m_ViewportFocused)
-					m_CameraController.OnUpdate(deltaTime);*/
-				// TODO: Update the camera
-				m_EditorCamera->OnUpdate(deltaTime);
-				break;
-			}
 			}
 		}
 
@@ -170,7 +238,7 @@ namespace Kerberos
 				m_ActiveScene->OnUpdateSimulation(deltaTime, *m_EditorCamera);
 				break;
 			case SceneState::Play:
-				m_ActiveScene->OnUpdateRuntime(deltaTime, *m_EditorCamera);
+				m_ActiveScene->OnUpdateRuntime(deltaTime);
 				break;
 			}
 		}
@@ -188,7 +256,10 @@ namespace Kerberos
 	{
         KBR_TRACY_FUNCTION();
 
-		m_EditorCamera->OnEvent(event);
+		if (m_SceneState != SceneState::Play)
+		{
+			m_EditorCamera->OnEvent(event);
+		}
 
 		m_HierarchyPanel.OnEvent(event);
 		m_AssetsPanel->OnEvent(event);
@@ -306,13 +377,13 @@ namespace Kerberos
 
 	void EditorLayer::OnSceneStop()
 	{
-		m_SceneState = SceneState::Edit;
-		m_IsScenePaused = false;
-
 		if (m_SceneState == SceneState::Play)
 			m_ActiveScene->OnRuntimeStop();
 		else if (m_SceneState == SceneState::Simulate)
 			m_ActiveScene->OnSimulationStop();
+
+		m_SceneState = SceneState::Edit;
+		m_IsScenePaused = false;
 
 		m_RuntimeScene = nullptr;
 
@@ -429,43 +500,172 @@ namespace Kerberos
 	{
         KBR_TRACY_FUNCTION();
 
-		/// Choose location for the new project
-		// const std::string filepathString = FileDialog::SaveFile("Kerberos Project (*.kbrproj)\0*.kbrproj\0");
+		if (m_SceneState != SceneState::Edit)
+			OnSceneStop();
 
-		const auto newProject = Project::New();
+		/// Ask the user where the new project should live. The selected folder
+		/// becomes the project directory and its name becomes the project name.
+		const std::string selectedFolder = FileDialog::SelectFolder(
+			"Select an empty folder for the new project (the folder name becomes the project name)");
+		if (selectedFolder.empty())
+			return;
 
-		NewScene();
+		std::error_code ec;
+		const std::filesystem::path projectDirectory =
+			std::filesystem::weakly_canonical(std::filesystem::path(selectedFolder), ec);
+		if (ec || !std::filesystem::is_directory(projectDirectory))
+		{
+			m_NotificationManager.AddNotification(
+				"The selected project location is not a valid directory.", Notification::Type::Error);
+			return;
+		}
 
-		const std::string newSceneName = "Unnamed Scene.kerberos";
-		const std::filesystem::path scenePath = LookForNameForNewScene(Project::GetAssetDirectory(), newSceneName);
+		const std::string projectName = projectDirectory.filename().string();
+		if (projectName.empty())
+		{
+			m_NotificationManager.AddNotification(
+				"The selected folder cannot be used as a project name. Choose or create a named folder.",
+				Notification::Type::Error);
+			return;
+		}
 
-		const SceneSerializer serializer(m_ActiveScene);
-		serializer.Serialize(scenePath.string());
+		/// Never create a project in a non-empty folder: the generated project
+		/// file, asset registry, and scenes could otherwise overwrite user files.
+		const std::filesystem::directory_iterator directoryIterator(projectDirectory, ec);
+		if (ec)
+		{
+			m_NotificationManager.AddNotification(
+				"Could not inspect the selected project folder: " + ec.message(), Notification::Type::Error);
+			return;
+		}
+		if (directoryIterator != std::filesystem::directory_iterator())
+		{
+			m_NotificationManager.AddNotification(
+				"The selected folder is not empty. Choose an empty folder or create a new one.",
+				Notification::Type::Error);
+			return;
+		}
 
-		m_NotificationManager.AddNotification("Scene saved to " + scenePath.string(), Notification::Type::Info);
+		/// Switch projects on the main-thread queue so the old project's GPU
+		/// resources are not destroyed while the current frame is still in
+		/// flight.
+		Application::Get().SubmitToMainThreadQueue([this, projectDirectory, projectName]() {
+			CreateProject(projectDirectory, projectName);
+		});
+	}
+
+	void EditorLayer::CreateProject(const std::filesystem::path& projectDirectory, const std::string& projectName)
+	{
+        KBR_TRACY_FUNCTION();
+
+		/// The previous project's meshes/textures may still be referenced by an
+		/// in-flight frame. Wait for the device before releasing them.
+		VulkanContext::Get().WaitIdle();
+
+		std::error_code ec;
+		const std::filesystem::path assetsDirectory = projectDirectory / "Assets";
+		const std::filesystem::path scenesDirectory = assetsDirectory / "Scenes";
+		std::filesystem::create_directories(scenesDirectory, ec);
+		if (ec)
+		{
+			m_NotificationManager.AddNotification(
+				"Failed to create the project directories: " + ec.message(), Notification::Type::Error);
+			return;
+		}
+
+		const std::string assemblyName = Project::ToPascalCaseName(projectName);
+		WriteUserScriptProject(projectDirectory, assemblyName);
+
+		const std::filesystem::path scenePath =
+			LookForNameForNewScene(scenesDirectory, "Untitled Scene.kerberos");
+
+		/// Build and persist the default scene before activating the project so
+		/// a failure leaves the currently open project untouched.
+		const Ref<Scene> defaultScene = CreateRef<Scene>();
+		defaultScene->OnViewportResize(static_cast<uint32_t>(m_ViewportSize.x),
+			static_cast<uint32_t>(m_ViewportSize.y));
+
+		const SceneSerializer serializer(defaultScene);
+		serializer.Serialize(scenePath);
+
+		if (!std::filesystem::exists(scenePath, ec) || ec)
+		{
+			m_NotificationManager.AddNotification("Failed to create the default project scene.",
+				Notification::Type::Error);
+			return;
+		}
+
+		const auto newProject = Project::New(projectDirectory);
 
 		ProjectInfo projInfo;
-		projInfo.Name = newProject->GetInfo().Name;
-        projInfo.StartScenePath = "Scenes/" + scenePath.filename().string();
-		projInfo.AssetDirectory = Project::GetAssetDirectory();
+		projInfo.Name = projectName;
+		projInfo.AssetDirectory = "Assets";
+		projInfo.StartScenePath = std::filesystem::path("Scenes") / scenePath.filename();
 		newProject->SetInfo(projInfo);
 
+		/// Register the start scene immediately so the asset browser and the
+		/// persisted registry know about it before the watcher fires.
+		if (const Ref<EditorAssetManager> editorAssetManager = newProject->GetEditorAssetManager())
+			editorAssetManager->ImportAsset(scenePath);
+
+		m_ActiveScene = defaultScene;
+		m_EditorScene = m_ActiveScene;
 		m_ActiveScenePath = scenePath;
+		m_HierarchyPanel.SetContext(m_ActiveScene);
 
 		m_AssetsPanel = CreateOwner<AssetsPanel>(m_NotificationManager);
+
+		if (!Project::SaveActive())
+		{
+			m_NotificationManager.AddNotification(
+				"The project was created, but saving the project file failed.", Notification::Type::Error);
+			return;
+		}
+
+		ScriptEngine::OnProjectOpened(projectDirectory, assemblyName);
+
+		m_NotificationManager.AddNotification(
+			"Created project '" + projectName + "' at " + projectDirectory.string(), Notification::Type::Info);
 	}
 
 	void EditorLayer::OpenProject(const std::filesystem::path& filepath)
 	{
         KBR_TRACY_FUNCTION();
 
+		/// The previous project's GPU resources may still be in use by an in-flight frame.
+		VulkanContext::Get().WaitIdle();
+
 		if (const auto project = Project::Load(filepath))
 		{
+			ScriptEngine::OnProjectOpened(Project::GetProjectDirectory(), Project::ToPascalCaseName(project->GetInfo().Name));
+
 			const auto startScenePath = Project::GetAssetDirectory() / project->GetInfo().StartScenePath;
 			OpenScene(startScenePath);
 
 			m_AssetsPanel = CreateOwner<AssetsPanel>(m_NotificationManager);
 		}
+		else
+		{
+			Log::EditorError("Failed to open project: {0}", filepath.string());
+			m_NotificationManager.AddNotification("Failed to open project.", Notification::Type::Warning);
+		}
+	}
+
+	void EditorLayer::RequestOpenProject()
+	{
+        KBR_TRACY_FUNCTION();
+
+		const std::string filepathString = FileDialog::OpenFile("Kerberos Project (*.kbrproj)\0*.kbrproj\0");
+		if (filepathString.empty())
+			return;
+
+		const std::filesystem::path filepath = filepathString;
+
+		/// Defer the project switch to the start of the next frame so the old
+		/// project's GPU resources are released after the device is idle.
+		Application::Get().SubmitToMainThreadQueue([this, filepath]() {
+			OpenProject(filepath);
+		});
 	}
 
 	bool EditorLayer::OpenProject()
@@ -553,7 +753,7 @@ namespace Kerberos
 		OpenScene(filepathString);
 	}
 
-	void EditorLayer::OpenScene(const std::filesystem::path &filepath)
+	void EditorLayer::OpenScene(const std::filesystem::path& filepath)
 	{
 		KBR_TRACY_FUNCTION();
 
@@ -561,6 +761,8 @@ namespace Kerberos
 		{
 			OnSceneStop();
 		}
+
+		m_HoveredEntity = {};
 
 		/// TODO: Prompt to save the current scene if there are unsaved changes
 
@@ -588,7 +790,7 @@ namespace Kerberos
 
         const auto& metadata = Project::GetActive()->GetEditorAssetManager()->GetMetadata(scene->GetHandle());
 
-		OpenScene(metadata.Filepath);
+		OpenScene(Project::GetAssetFileSystemPath(metadata.Filepath));
 	}
 
 	void EditorLayer::NewScene()
@@ -597,6 +799,8 @@ namespace Kerberos
 
 		m_ActiveScene = CreateRef<Scene>();
 		m_ActiveScene->OnViewportResize(static_cast<uint32_t>(m_ViewportSize.x), static_cast<uint32_t>(m_ViewportSize.y));
+		m_EditorScene = m_ActiveScene;
+		m_ActiveScenePath.clear();
 		m_HierarchyPanel.SetContext(m_ActiveScene);
 	}
 
@@ -814,6 +1018,16 @@ namespace Kerberos
 				}
 
 				ImGui::MenuItem("Fullscreen", nullptr, &m_IsFullScreenPersistent);
+
+				if (ImGui::MenuItem("Open Project...", "Ctrl+Shift+O"))
+                {
+                    RequestOpenProject();
+                }
+
+				if (ImGui::MenuItem("New Project...", "Ctrl+Shift+N"))
+                {
+                    NewProject();
+                }
 
 				if (ImGui::MenuItem("New Scene", "Ctrl+N"))
 				{
@@ -1225,13 +1439,21 @@ namespace Kerberos
 			}
 			break;
 		case Key::N:
-			if (ctrl)
+			if (ctrl && shift)
+			{
+				NewProject();
+			}
+			else if (ctrl)
 			{
 				NewScene();
 			}
 			break;
 		case Key::O:
-			if (ctrl)
+			if (ctrl && shift)
+			{
+				RequestOpenProject();
+			}
+			else if (ctrl)
 			{
 				LoadScene();
 			}

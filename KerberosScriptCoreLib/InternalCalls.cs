@@ -1,9 +1,9 @@
 using System;
 using System.Runtime.InteropServices;
-using Kerberos.Source.Kerberos.Core;
-using Kerberos.Source.Kerberos.Scene;
+using Kerberos.Core;
+using Kerberos.Scene;
 
-namespace Kerberos.Source
+namespace Kerberos
 {
     /// <summary>
     /// Provides access to native engine functions via function pointers.

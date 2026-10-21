@@ -7,19 +7,22 @@
 namespace Kerberos {
 
 RuntimeAssetResolver::RuntimeAssetResolver(const AssetRegistry* registry,
-	std::filesystem::path assetRoot, std::filesystem::path libraryRoot)
+	std::filesystem::path assetRoot, std::filesystem::path libraryRoot,
+	std::filesystem::path engineLibraryRoot)
 {
 	KBR_TRACY_FUNCTION();
 
-	Configure(registry, std::move(assetRoot), std::move(libraryRoot));
+	Configure(registry, std::move(assetRoot), std::move(libraryRoot), std::move(engineLibraryRoot));
 }
 
 void RuntimeAssetResolver::Configure(const AssetRegistry* registry,
-	std::filesystem::path assetRoot, std::filesystem::path libraryRoot)
+	std::filesystem::path assetRoot, std::filesystem::path libraryRoot,
+	std::filesystem::path engineLibraryRoot)
 {
 	m_Registry = registry;
 	m_AssetRoot = std::move(assetRoot);
 	m_LibraryRoot = std::move(libraryRoot);
+	m_EngineLibraryRoot = std::move(engineLibraryRoot);
 }
 
 std::optional<RuntimeAssetLocation> RuntimeAssetResolver::Resolve(const AssetHandle handle) const
@@ -30,11 +33,16 @@ std::optional<RuntimeAssetLocation> RuntimeAssetResolver::Resolve(const AssetHan
 		return std::nullopt;
 
 	const AssetMetadata& metadata = m_Registry->Get(handle);
+
+	const std::filesystem::path& libraryRoot = metadata.SourceRoot == AssetSourceRoot::Engine
+		? (m_EngineLibraryRoot.empty() ? m_LibraryRoot : m_EngineLibraryRoot)
+		: m_LibraryRoot;
+
 	std::vector<std::filesystem::path> candidates;
 	if (metadata.LibraryPath.is_absolute())
 		candidates.push_back(metadata.LibraryPath);
-	else if (!metadata.LibraryPath.empty() && !m_LibraryRoot.empty())
-		candidates.push_back(m_LibraryRoot / metadata.LibraryPath);
+	else if (!metadata.LibraryPath.empty() && !libraryRoot.empty())
+		candidates.push_back(libraryRoot / metadata.LibraryPath);
 	else if (!metadata.LibraryPath.empty())
 		candidates.push_back(metadata.LibraryPath);
 

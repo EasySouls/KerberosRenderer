@@ -14,10 +14,12 @@ class RuntimeAssetManager final : public AssetManagerBase
 public:
 	RuntimeAssetManager() = default;
 	explicit RuntimeAssetManager(const AssetRegistry& registry,
-		std::filesystem::path assetRoot = {}, std::filesystem::path libraryRoot = {});
+		std::filesystem::path assetRoot = {}, std::filesystem::path libraryRoot = {},
+		std::filesystem::path engineLibraryRoot = {});
 
 	void Configure(const AssetRegistry& registry,
-		std::filesystem::path assetRoot = {}, std::filesystem::path libraryRoot = {});
+		std::filesystem::path assetRoot = {}, std::filesystem::path libraryRoot = {},
+		std::filesystem::path engineLibraryRoot = {});
 	Ref<Asset> GetAsset(AssetHandle handle) override;
 
 	bool IsAssetHandleValid(AssetHandle handle) const override;
@@ -32,12 +34,18 @@ public:
 		return asset ? std::dynamic_pointer_cast<T>(asset) : nullptr;
 	}
 
-	const AssetRegistry& GetAssetRegistry() const { return m_Registry; }
+	const AssetRegistry& GetAssetRegistry() const override { return m_Registry; }
+
+	std::span<const AssetHandle> GetAssetsOfType(AssetType type) const override
+	{
+		return m_Registry.GetAssetsOfType(type);
+	}
 
 private:
 	AssetRegistry m_Registry;
 	bool m_Configured = false;
 	std::filesystem::path m_LibraryRoot;
+	std::filesystem::path m_EngineLibraryRoot;
 	RuntimeAssetResolver m_Resolver;
 	AssetMap m_LoadedAssets;
 };

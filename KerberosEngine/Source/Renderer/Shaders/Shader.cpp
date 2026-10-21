@@ -1,5 +1,6 @@
 #include "Shader.hpp"
 #include "Core/Core.hpp"
+#include "Core/EnginePaths.hpp"
 
 #include "IO.hpp"
 #include "VulkanContext.hpp"
@@ -18,18 +19,14 @@ namespace Kerberos
 	namespace Utils 
 	{
 
-		static const char* GetCacheDirectory()
+		static std::filesystem::path GetCacheDirectory()
 		{
-#ifdef KBR_DEBUG
-			return "Assets/Cache/Shaders/Debug";
-#else
-			return "Assets/Cache/Shaders";
-#endif
+			return EnginePaths::ShaderCache();
 		}
 
 		static void CreateCacheDirectoryIfNeeded()
 		{
-			const std::string cacheDirectory = GetCacheDirectory();
+			const std::filesystem::path cacheDirectory = GetCacheDirectory();
 			if (!std::filesystem::exists(cacheDirectory))
 				std::filesystem::create_directories(cacheDirectory);
 		}
@@ -120,7 +117,7 @@ namespace Kerberos
 
 		Utils::CreateCacheDirectoryIfNeeded();
 
-		std::filesystem::path shadersPath = std::filesystem::path("assets") / "shaders";
+		std::filesystem::path shadersPath = EnginePaths::Shaders();
 		std::filesystem::path cacheDirectory = Utils::GetCacheDirectory();
 		m_Filepath = shadersPath / (filepath.string() + std::string(".slang"));
 

@@ -1,9 +1,11 @@
 #include "ScriptEngine.hpp"
 
+#include "Core/EnginePaths.hpp"
 #include "Scripting/ScriptInterface.hpp"
 #include "Scripting/ScriptClass.hpp"
 #include "Scripting/ScriptInstance.hpp"
 #include "Scripting/ScriptUtils.hpp"
+#include "Utils/Process.hpp"
 //#include "Core/Filesystem.hpp"
 #include "Scene/Scene.hpp"
 #include "Scene/Entity.hpp"
@@ -41,56 +43,67 @@ using namespace std::literals;
 
 namespace Kerberos
 {
-	struct ScriptEngineData
-	{
-		/// .NET hosting state
-		hostfxr_handle HostContext = nullptr;
-		hostfxr_initialize_for_runtime_config_fn InitForConfigFn = nullptr;
-		hostfxr_get_runtime_delegate_fn GetDelegateFn = nullptr;
-		hostfxr_close_fn CloseFn = nullptr;
-		load_assembly_and_get_function_pointer_fn LoadAssemblyFn = nullptr;
+	namespace {
 
-		std::filesystem::path CoreAssemblyPath;
-		std::filesystem::path RuntimeConfigPath;
+    struct ScriptEngineData
+    {
+        /// .NET hosting state
+        hostfxr_handle HostContext = nullptr;
+        hostfxr_initialize_for_runtime_config_fn InitForConfigFn = nullptr;
+        hostfxr_get_runtime_delegate_fn GetDelegateFn = nullptr;
+        hostfxr_close_fn CloseFn = nullptr;
+        load_assembly_and_get_function_pointer_fn LoadAssemblyFn = nullptr;
 
-		ScriptClass EntityClass;
+        std::filesystem::path CoreAssemblyPath;
+        std::filesystem::path RuntimeConfigPath;
 
-		std::unordered_map<std::string, Ref<ScriptClass>> EntityClasses;
+        ScriptClass EntityClass;
 
-		using FieldInitializerMap = std::unordered_map<std::string, ScriptFieldInitializer>;
-		/// Per-entity field initializers, keyed by script class full name.
-		using ClassFieldInitializerMap = std::unordered_map<std::string, FieldInitializerMap>;
-		/// Holds the data for the initial values of the fields of each entity
-		std::unordered_map<UUID, ClassFieldInitializerMap> EntityFieldInitializers;
+        std::unordered_map<std::string, Ref<ScriptClass>> EntityClasses;
 
-		/// Runtime data
-		std::weak_ptr<Scene> SceneContext;
-		/// Per-entity script instances, keyed by script class full name.
-		using ClassInstanceMap = std::unordered_map<std::string, Ref<ScriptInstance>>;
-		std::unordered_map<UUID, ClassInstanceMap> EntityInstances;
+        using FieldInitializerMap = std::unordered_map<std::string, ScriptFieldInitializer>;
+        /// Per-entity field initializers, keyed by script class full name.
+        using ClassFieldInitializerMap = std::unordered_map<std::string, FieldInitializerMap>;
+        /// Holds the data for the initial values of the fields of each entity
+        std::unordered_map<UUID, ClassFieldInitializerMap> EntityFieldInitializers;
 
-		/// Managed function pointers (from ScriptGlue bridge)
-		ManagedLoadAssemblyClassesFn LoadAssemblyClasses = nullptr;
-		ManagedClassExistsFn ManagedClassExists = nullptr;
-		ManagedCreateInstanceFn ManagedCreateInstance = nullptr;
-		ManagedDestroyInstanceFn ManagedDestroyInstance = nullptr;
-		ManagedClearInstancesFn ManagedClearInstances = nullptr;
-		ManagedInvokeOnCreateFn ManagedInvokeOnCreate = nullptr;
-		ManagedInvokeOnUpdateFn ManagedInvokeOnUpdate = nullptr;
-		ManagedInvokeOnCollisionEnterFn ManagedInvokeOnCollisionEnter = nullptr;
-		ManagedInvokeOnCollisionPersistFn ManagedInvokeOnCollisionPersist = nullptr;
-		ManagedInvokeOnCollisionExitFn ManagedInvokeOnCollisionExit = nullptr;
-		ManagedGetFieldCountFn ManagedGetFieldCount = nullptr;
-		ManagedGetFieldsFn ManagedGetFields = nullptr;
-		ManagedGetFieldValueFn ManagedGetFieldValue = nullptr;
-		ManagedSetFieldValueFn ManagedSetFieldValue = nullptr;
-		ManagedGetEntityClassCountFn ManagedGetEntityClassCount = nullptr;
-		ManagedGetEntityClassNamesFn ManagedGetEntityClassNames = nullptr;
-		ManagedSetNativeCallbacksFn ManagedSetNativeCallbacks = nullptr;
-	};
+        /// Runtime data
+        std::weak_ptr<Scene> SceneContext;
+        /// Per-entity script instances, keyed by script class full name.
+        using ClassInstanceMap = std::unordered_map<std::string, Ref<ScriptInstance>>;
+        std::unordered_map<UUID, ClassInstanceMap> EntityInstances;
+
+        /// User per-project script assembly
+        std::filesystem::path UserProjectDirectory;
+        std::string UserAssemblyName;
+        std::filesystem::path UserCsprojPath;
+        std::filesystem::path UserAssemblyPath;
+
+        /// Managed function pointers (from ScriptGlue bridge)
+        ManagedLoadAssemblyClassesFn LoadAssemblyClasses = nullptr;
+        ManagedClassExistsFn ManagedClassExists = nullptr;
+        ManagedCreateInstanceFn ManagedCreateInstance = nullptr;
+        ManagedDestroyInstanceFn ManagedDestroyInstance = nullptr;
+        ManagedClearInstancesFn ManagedClearInstances = nullptr;
+        ManagedInvokeOnCreateFn ManagedInvokeOnCreate = nullptr;
+        ManagedInvokeOnUpdateFn ManagedInvokeOnUpdate = nullptr;
+        ManagedInvokeOnCollisionEnterFn ManagedInvokeOnCollisionEnter = nullptr;
+        ManagedInvokeOnCollisionPersistFn ManagedInvokeOnCollisionPersist = nullptr;
+        ManagedInvokeOnCollisionExitFn ManagedInvokeOnCollisionExit = nullptr;
+        ManagedGetFieldCountFn ManagedGetFieldCount = nullptr;
+        ManagedGetFieldsFn ManagedGetFields = nullptr;
+        ManagedGetFieldValueFn ManagedGetFieldValue = nullptr;
+        ManagedSetFieldValueFn ManagedSetFieldValue = nullptr;
+        ManagedGetEntityClassCountFn ManagedGetEntityClassCount = nullptr;
+        ManagedGetEntityClassNamesFn ManagedGetEntityClassNames = nullptr;
+        ManagedSetNativeCallbacksFn ManagedSetNativeCallbacks = nullptr;
+    };
+
+    }
 
 	static ScriptEngineData* s_ScriptData = nullptr;
 	static Owner<filewatch::FileWatch<std::string>> s_Filewatcher = nullptr;
+	static Owner<filewatch::FileWatch<std::string>> s_UserScriptFilewatcher = nullptr;
 
 	static ScriptCollisionPayload BuildScriptCollisionPayload(const uint64_t selfEntityID, const CollisionEvent& event)
 	{
@@ -200,14 +213,14 @@ namespace Kerberos
 
 		InitDotNet();
 
-		const std::filesystem::path assemblyPath = std::filesystem::current_path() / "Resources"sv / "Scripts"sv / "KerberosScriptCoreLib.dll"sv;
+		const std::filesystem::path assemblyPath = EnginePaths::ScriptAssemblies() / "KerberosScriptCoreLib.dll"sv;
 		LoadAssembly(assemblyPath);
 		LoadAssemblyClasses();
 
 		ScriptInterface::RegisterFunctions();
 
 		/// Setup filewatcher to reload assembly on changes
-		const std::filesystem::path watchPath = std::filesystem::current_path() / "Resources"sv / "Scripts"sv;
+		const std::filesystem::path watchPath = EnginePaths::ScriptAssemblies();
 		s_Filewatcher = CreateOwner<filewatch::FileWatch<std::string>>(
 			watchPath.string(),
 			OnAssemblyFileChanged
@@ -233,6 +246,73 @@ namespace Kerberos
 
 		LoadAssembly(s_ScriptData->CoreAssemblyPath);
 		LoadAssemblyClasses();
+	}
+
+	void ScriptEngine::OnProjectOpened(const std::filesystem::path& projectDirectory, const std::string& assemblyName)
+	{
+		KBR_TRACY_FUNCTION();
+
+		if (assemblyName.empty())
+		{
+			s_ScriptData->UserProjectDirectory.clear();
+			s_ScriptData->UserAssemblyName.clear();
+			s_ScriptData->UserCsprojPath.clear();
+			s_ScriptData->UserAssemblyPath.clear();
+		}
+		else
+		{
+			s_ScriptData->UserProjectDirectory = projectDirectory;
+			s_ScriptData->UserAssemblyName = assemblyName;
+			s_ScriptData->UserCsprojPath = projectDirectory / "Assets" / "Scripts" / (assemblyName + ".csproj");
+			s_ScriptData->UserAssemblyPath = projectDirectory / "Library" / "Scripts" / (assemblyName + ".dll");
+		}
+
+		BuildUserAssembly();
+		ReloadAssembly();
+
+		/// Watch the user's script folder and rebuild on change.
+		s_UserScriptFilewatcher.reset();
+		if (!s_ScriptData->UserCsprojPath.empty())
+		{
+			const std::filesystem::path scriptsDirectory = s_ScriptData->UserCsprojPath.parent_path();
+			if (std::filesystem::exists(scriptsDirectory))
+			{
+				s_UserScriptFilewatcher = CreateOwner<filewatch::FileWatch<std::string>>(
+					scriptsDirectory.string(), OnUserScriptFileChanged);
+			}
+		}
+	}
+
+	bool ScriptEngine::BuildUserAssembly()
+	{
+		KBR_TRACY_FUNCTION();
+
+		if (s_ScriptData->UserCsprojPath.empty() || !std::filesystem::exists(s_ScriptData->UserCsprojPath))
+			return false;
+
+		const std::filesystem::path outputDirectory = s_ScriptData->UserAssemblyPath.parent_path();
+		std::error_code ec;
+		std::filesystem::create_directories(outputDirectory, ec);
+
+		const std::vector<std::string> arguments = {
+			"build",
+			s_ScriptData->UserCsprojPath.string(),
+			"-c", "Debug",
+			"-o", outputDirectory.string(),
+			"--nologo",
+			"-p:KerberosEnginePath=" + EnginePaths::GetRoot().string()
+		};
+
+		const Process::ProcessResult result = Process::Execute("dotnet", arguments);
+		if (!result.Succeeded)
+		{
+			Log::CoreError("Failed to build user script assembly '{}' (exit code {}): {}",
+				s_ScriptData->UserAssemblyName, result.ExitCode, result.ErrorMessage);
+			return false;
+		}
+
+		Log::CoreInfo("Built user script assembly '{}'", s_ScriptData->UserAssemblyName);
+		return true;
 	}
 
 	void ScriptEngine::OnRuntimeStart(const Ref<Scene>& scene)
@@ -349,12 +429,38 @@ namespace Kerberos
 
 		auto& fieldInitializers = s_ScriptData->EntityFieldInitializers[entity.GetUUID()][className];
 
+		/// Drop initializers for fields that the script class no longer declares.
+		/// Serialized scenes (and prefabs) can contain fields from an older
+		/// version of the script, and keeping them around would make the editor
+		/// display and re-save fields that do not exist anymore.
+		for (auto it = fieldInitializers.begin(); it != fieldInitializers.end();)
+		{
+			if (!serializedFields.contains(it->first))
+			{
+				Log::CoreTrace("Removing stale script field {0}.{1}", className, it->first);
+				it = fieldInitializers.erase(it);
+			}
+			else
+			{
+				++it;
+			}
+		}
+
 		/// Merge the class definition into the existing initializer set so that
 		/// authored values survive and newly added script fields get defaults.
 		for (const auto& [name, field] : serializedFields)
 		{
-			ScriptFieldInitializer& fieldInitializer = fieldInitializers[name];
+			const auto [it, inserted] = fieldInitializers.try_emplace(name);
+			ScriptFieldInitializer& fieldInitializer = it->second;
+
+			const bool retyped = !inserted && fieldInitializer.Field.Type != field.Type;
 			fieldInitializer.Field = field;
+
+			/// Newly added (or retyped) fields should start from a zero value
+			/// instead of whatever bytes the initializer buffer happened to hold.
+			/// String initializers store a std::string object and are left alone.
+			if ((inserted || retyped) && field.Type != ScriptFieldType::String)
+				fieldInitializer.ResetValue();
 		}
 	}
 
@@ -589,7 +695,8 @@ namespace Kerberos
 		}
 
 		const std::string assemblyPath = s_ScriptData->CoreAssemblyPath.string();
-		const int result = s_ScriptData->LoadAssemblyClasses(assemblyPath.c_str());
+		const std::string userAssemblyPath = s_ScriptData->UserAssemblyPath.string();
+		const int result = s_ScriptData->LoadAssemblyClasses(assemblyPath.c_str(), userAssemblyPath.c_str());
 		if (!result)
 		{
 			Log::CoreError("Failed to load assembly classes from {}", assemblyPath);
@@ -612,7 +719,7 @@ namespace Kerberos
 			std::string fullName = nameBuffers[i];
 			Log::CoreTrace("Loaded C# class: {}", fullName);
 
-			/// Parse namespace and class name from full name (e.g. "Kerberos.Source.Kerberos.Player" -> ns="Kerberos.Source.Kerberos", name="Player")
+			/// Parse namespace and class name from full name (e.g. "Kerberos.Player" -> ns="Kerberos", name="Player")
 			std::string nameSpace;
 			std::string className;
 			const size_t lastDot = fullName.rfind('.');
@@ -657,7 +764,7 @@ namespace Kerberos
 		}
 
 		/// Register the Entity base class reference
-		s_ScriptData->EntityClass = ScriptClass("Kerberos.Source.Kerberos.Scene", "Entity", "Kerberos.Source.Kerberos.Scene.Entity");
+		s_ScriptData->EntityClass = ScriptClass("Kerberos.Scene", "Entity", "Kerberos.Scene.Entity");
 	}
 
 	template<typename T>
@@ -691,8 +798,8 @@ namespace Kerberos
 	{
 		KBR_TRACY_FUNCTION();
 
-		const char* glueType = "Kerberos.Source.ScriptGlue, KerberosScriptCoreLib";
-		const char* callbacksType = "Kerberos.Source.InternalCalls, KerberosScriptCoreLib";
+		const char* glueType = "Kerberos.ScriptGlue, KerberosScriptCoreLib";
+		const char* callbacksType = "Kerberos.InternalCalls, KerberosScriptCoreLib";
 
 		s_ScriptData->LoadAssemblyClasses = LoadManagedFunction<ManagedLoadAssemblyClassesFn>(glueType, "LoadAssemblyClasses");
 		s_ScriptData->ManagedClassExists = LoadManagedFunction<ManagedClassExistsFn>(glueType, "ClassExists");
@@ -739,5 +846,20 @@ namespace Kerberos
 				ReloadAssembly();
 			});
 		}
+	}
+
+	void ScriptEngine::OnUserScriptFileChanged(const std::string& path, const filewatch::Event changeType)
+	{
+		KBR_TRACY_FUNCTION();
+
+		const std::string extension = std::filesystem::path(path).extension().string();
+		if (extension != ".cs" && extension != ".csproj")
+			return;
+
+		Log::CoreInfo("User script {0}: {1}", FileWatchEventToString(changeType), path);
+		Application::Get().SubmitToMainThreadQueue([]() {
+			if (BuildUserAssembly())
+				ReloadAssembly();
+		});
 	}
 }

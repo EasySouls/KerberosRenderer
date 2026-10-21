@@ -3,13 +3,22 @@
 #include "Profiling/Profilers.hpp"
 #include "Serialization/ProjectSerializer.hpp"
 
+#include <cctype>
+
 import Kerberos;
 
 namespace Kerberos
 {
-	Ref<Project> Project::New()
+	Ref<Project> Project::New(const std::filesystem::path& projectDirectory)
 	{
 		s_ActiveProject = CreateRef<Project>();
+
+		if (!projectDirectory.empty())
+		{
+			std::error_code ec;
+			const std::filesystem::path absolutePath = std::filesystem::absolute(projectDirectory, ec);
+			s_ActiveProject->m_ProjectDirectory = ec ? projectDirectory : absolutePath;
+		}
 
 		return s_ActiveProject;
 	}
@@ -91,11 +100,11 @@ namespace Kerberos
 		}
 	}
 
-    const std::filesystem::path& Project::GetAssetDirectory()
+    std::filesystem::path Project::GetAssetDirectory()
     {
         KBRAssert(s_ActiveProject != nullptr, "An active project is not set!");
 
-        return s_ActiveProject->m_Info.AssetDirectory;
+        return s_ActiveProject->m_ProjectDirectory / s_ActiveProject->m_Info.AssetDirectory;
     }
 
     const std::filesystem::path& Project::GetProjectDirectory()
@@ -110,6 +119,47 @@ namespace Kerberos
         KBRAssert(s_ActiveProject != nullptr, "An active project is not set!");
 
         return GetProjectDirectory() / GetAssetDirectory() / assetPath;
+    }
+
+    std::string Project::ToPascalCaseName(const std::string_view name)
+    {
+        std::string result;
+        bool startNewWord = true;
+
+        for (size_t i = 0; i < name.size(); ++i)
+        {
+            const char c = name[i];
+            if (!std::isalnum(static_cast<unsigned char>(c)))
+            {
+                startNewWord = true;
+                continue;
+            }
+
+            if (!startNewWord && i > 0 && std::isupper(static_cast<unsigned char>(c)) &&
+                (std::islower(static_cast<unsigned char>(name[i - 1])) ||
+                 std::isdigit(static_cast<unsigned char>(name[i - 1]))))
+            {
+                startNewWord = true;
+            }
+
+            if (startNewWord)
+            {
+                result += static_cast<char>(std::toupper(static_cast<unsigned char>(c)));
+                startNewWord = false;
+            }
+            else
+            {
+                result += static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+            }
+        }
+
+        if (result.empty())
+            return "Game";
+
+        if (std::isdigit(static_cast<unsigned char>(result.front())))
+            result.insert(result.begin(), '_');
+
+        return result;
     }
 
     void Project::SetInfo(const ProjectInfo& info)
@@ -134,7 +184,8 @@ namespace Kerberos
 		if (!editor)
 			return std::dynamic_pointer_cast<RuntimeAssetManager>(m_AssetManager);
 		auto runtime = CreateRef<RuntimeAssetManager>(
-			editor->GetAssetRegistry(), editor->GetAssetsRoot(), editor->GetCacheRoot());
+			editor->GetAssetRegistry(), editor->GetAssetsRoot(), editor->GetCacheRoot(),
+			editor->GetEngineCacheRoot());
 		m_AssetManager = runtime;
 		return runtime;
 	}

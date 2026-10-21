@@ -2,11 +2,12 @@ using System;
 using System.Collections.Generic;
 using System.Reflection;
 using System.Runtime.InteropServices;
-using Kerberos.Source.Kerberos;
-using Kerberos.Source.Kerberos.Core;
-using Kerberos.Source.Kerberos.Scene;
+using System.Runtime.Loader;
+using Kerberos;
+using Kerberos.Core;
+using Kerberos.Scene;
 
-namespace Kerberos.Source
+namespace Kerberos
 {
     /// <summary>
     /// Bridge between the C++ engine and the C# scripting system.
@@ -28,6 +29,8 @@ namespace Kerberos.Source
         }
 
         private static Assembly? s_CoreAssembly;
+        private static Assembly? s_UserAssembly;
+        private static AssemblyLoadContext? s_UserContext;
         private static Type? s_EntityBaseClass;
         private static readonly Dictionary<string, Type> EntityClasses = new();
         private static readonly Dictionary<ulong, Dictionary<string, Entity>> EntityInstances = new();
@@ -44,16 +47,38 @@ namespace Kerberos.Source
         // Assembly Loading
         // ====================================================================
 
+        /// <summary>
+        /// Collectible load context for the user's project assembly. The core
+        /// KerberosScriptCoreLib assembly is shared from the default context so
+        /// user script types derive from the exact same Entity base type.
+        /// </summary>
+        private sealed class UserScriptLoadContext : AssemblyLoadContext
+        {
+            public UserScriptLoadContext() : base(isCollectible: true) { }
+
+            protected override Assembly? Load(AssemblyName assemblyName)
+            {
+                // Share the already-loaded core library so user script types
+                // derive from the exact same Entity base type. Do not probe the
+                // output directory: the user assembly is built against this
+                // assembly instance.
+                if (s_CoreAssembly != null && assemblyName.Name == s_CoreAssembly.GetName().Name)
+                    return s_CoreAssembly;
+
+                return null;
+            }
+        }
+
         [UnmanagedCallersOnly]
-        public static int LoadAssemblyClasses(IntPtr assemblyPathPtr)
+        public static int LoadAssemblyClasses(IntPtr coreAssemblyPathPtr, IntPtr userAssemblyPathPtr)
         {
             try
             {
-                string assemblyPath = Marshal.PtrToStringAnsi(assemblyPathPtr)!;
                 // This bridge executes from KerberosScriptCoreLib itself.
                 // Loading the same DLL again via Assembly.LoadFrom can create a second
                 // assembly identity, which breaks `constructed as Entity` casts.
                 s_CoreAssembly = typeof(ScriptGlue).Assembly;
+
                 EntityClasses.Clear();
                 OnCreateMethods.Clear();
                 OnUpdateMethods.Clear();
@@ -63,51 +88,71 @@ namespace Kerberos.Source
                 UlongConstructors.Clear();
                 EntityInstances.Clear();
 
-                s_EntityBaseClass = s_CoreAssembly.GetType("Kerberos.Source.Kerberos.Scene.Entity");
+                // Unload any previously loaded user assembly.
+                if (s_UserContext != null)
+                {
+                    s_UserAssembly = null;
+                    s_UserContext.Unload();
+                    s_UserContext = null;
+                }
+
+                s_EntityBaseClass = s_CoreAssembly.GetType("Kerberos.Scene.Entity");
                 if (s_EntityBaseClass == null)
                     return 0;
 
-                Logger.Log($"Assembly name from path: {s_CoreAssembly.FullName}");
-                Logger.Log($"Assembly name from Entity base class: {s_EntityBaseClass.Assembly.FullName}");
-                Console.Out.WriteLine($"Assembly name from path: {s_CoreAssembly.FullName}");
-                Console.Out.WriteLine($"Assembly name from Entity base class: {s_EntityBaseClass.Assembly.FullName}");
-                Console.Error.WriteLine($"[ScriptGlue] Loaded assembly: {s_CoreAssembly.FullName}");
-                Console.Error.WriteLine($"[ScriptGlue] Requested assembly path: {assemblyPath}");
-
-                foreach (var type in s_CoreAssembly.GetTypes())
+                // Load the user project assembly into a collectible context.
+                string? userAssemblyPath = userAssemblyPathPtr == IntPtr.Zero
+                    ? null
+                    : Marshal.PtrToStringAnsi(userAssemblyPathPtr);
+                if (!string.IsNullOrEmpty(userAssemblyPath) && File.Exists(userAssemblyPath))
                 {
-                    if (type.IsSubclassOf(s_EntityBaseClass) && !type.IsAbstract)
-                    {
-                        string fullName = type.FullName ?? type.Name;
-                        EntityClasses[fullName] = type;
-
-                        // Cache method lookups
-                        OnCreateMethods[type] = type.GetMethod("OnCreate",
-                            BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public);
-                        OnUpdateMethods[type] = type.GetMethod("OnUpdate",
-                            BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public,
-                            null, new[] { typeof(float) }, null);
-                        OnCollisionEnterMethods[type] = type.GetMethod("OnCollisionEnter",
-                            BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public,
-                            null, new[] { typeof(Collision) }, null);
-                        OnCollisionPersistMethods[type] = type.GetMethod("OnCollisionPersist",
-                            BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public,
-                            null, new[] { typeof(Collision) }, null);
-                        OnCollisionExitMethods[type] = type.GetMethod("OnCollisionExit",
-                            BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public,
-                            null, new[] { typeof(Collision) }, null);
-                        UlongConstructors[type] = type.GetConstructor(
-                            BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public,
-                            null, new[] { typeof(ulong) }, null);
-                    }
+                    s_UserContext = new UserScriptLoadContext();
+                    s_UserAssembly = s_UserContext.LoadFromAssemblyPath(userAssemblyPath);
                 }
 
+                RegisterEntityTypes(s_CoreAssembly);
+                if (s_UserAssembly != null)
+                    RegisterEntityTypes(s_UserAssembly);
+
+                Console.Error.WriteLine($"[ScriptGlue] Loaded core assembly: {s_CoreAssembly.FullName}");
+                Console.Error.WriteLine($"[ScriptGlue] Loaded user assembly: {s_UserAssembly?.FullName ?? "<none>"}");
                 return 1;
             }
             catch (Exception ex)
             {
                 Console.Error.WriteLine($"[ScriptGlue] LoadAssemblyClasses failed: {ex}");
                 return 0;
+            }
+        }
+
+        private static void RegisterEntityTypes(Assembly assembly)
+        {
+            foreach (var type in assembly.GetTypes())
+            {
+                if (!type.IsSubclassOf(s_EntityBaseClass!) || type.IsAbstract)
+                    continue;
+
+                string fullName = type.FullName ?? type.Name;
+                EntityClasses[fullName] = type;
+
+                // Cache method lookups
+                OnCreateMethods[type] = type.GetMethod("OnCreate",
+                    BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public);
+                OnUpdateMethods[type] = type.GetMethod("OnUpdate",
+                    BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public,
+                    null, new[] { typeof(float) }, null);
+                OnCollisionEnterMethods[type] = type.GetMethod("OnCollisionEnter",
+                    BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public,
+                    null, new[] { typeof(Collision) }, null);
+                OnCollisionPersistMethods[type] = type.GetMethod("OnCollisionPersist",
+                    BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public,
+                    null, new[] { typeof(Collision) }, null);
+                OnCollisionExitMethods[type] = type.GetMethod("OnCollisionExit",
+                    BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public,
+                    null, new[] { typeof(Collision) }, null);
+                UlongConstructors[type] = type.GetConstructor(
+                    BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public,
+                    null, new[] { typeof(ulong) }, null);
             }
         }
 
@@ -159,8 +204,12 @@ namespace Kerberos.Source
                     IntPtr namePtr = Marshal.ReadIntPtr(fieldNamesBuffer, i * IntPtr.Size);
                     IntPtr typePtr = Marshal.ReadIntPtr(fieldTypeNamesBuffer, i * IntPtr.Size);
 
+                    string typeName = typeof(Entity).IsAssignableFrom(fields[i].FieldType)
+                        ? "Kerberos.Scene.Entity"
+                        : fields[i].FieldType.FullName ?? fields[i].FieldType.Name;
+
                     WriteStringToBuffer(fields[i].Name, namePtr, bufferSize);
-                    WriteStringToBuffer(fields[i].FieldType.FullName ?? fields[i].FieldType.Name, typePtr, bufferSize);
+                    WriteStringToBuffer(typeName, typePtr, bufferSize);
                 }
 
                 return count;
@@ -472,7 +521,9 @@ namespace Kerberos.Source
                     return 0;
 
                 object? value = UnmarshalValueFromBuffer(field.FieldType, valuePtr, valueSize);
-                if (value == null)
+
+                // Entity references may legitimately be null (no entity assigned).
+                if (value == null && !typeof(Entity).IsAssignableFrom(field.FieldType))
                     return 0;
 
                 field.SetValue(instance, value);
@@ -534,6 +585,13 @@ namespace Kerberos.Source
 
         private static int MarshalValueToBuffer(object value, IntPtr buffer, int bufferSize)
         {
+            if (value is Entity entity)
+            {
+                if (bufferSize < sizeof(ulong)) return 0;
+                Marshal.WriteInt64(buffer, (long)entity.GetID());
+                return 1;
+            }
+
             switch (value)
             {
                 case bool b:
@@ -592,8 +650,40 @@ namespace Kerberos.Source
             }
         }
 
+        private static Entity? UnmarshalEntityReference(Type fieldType, IntPtr buffer, int bufferSize)
+        {
+            if (bufferSize < sizeof(ulong))
+                return null;
+
+            ulong entityID = (ulong)Marshal.ReadInt64(buffer);
+            if (entityID == 0)
+                return null;
+
+            // Prefer an existing managed script instance when the field is
+            // declared as a concrete script type, so identity is preserved.
+            if (EntityInstances.TryGetValue(entityID, out var instances))
+            {
+                foreach (var instance in instances.Values)
+                {
+                    if (fieldType.IsInstanceOfType(instance))
+                        return instance;
+                }
+            }
+
+            if (fieldType == typeof(Entity))
+                return new Entity(entityID);
+
+            if (UlongConstructors.TryGetValue(fieldType, out var ctor) && ctor != null)
+                return ctor.Invoke([entityID]) as Entity;
+
+            return null;
+        }
+
         private static object? UnmarshalValueFromBuffer(Type fieldType, IntPtr buffer, int bufferSize)
         {
+            if (typeof(Entity).IsAssignableFrom(fieldType))
+                return UnmarshalEntityReference(fieldType, buffer, bufferSize);
+
             if (fieldType == typeof(bool))
                 return Marshal.ReadByte(buffer) != 0;
             if (fieldType == typeof(byte))

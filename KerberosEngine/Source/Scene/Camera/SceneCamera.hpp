@@ -2,6 +2,10 @@
 
 #include <glm/glm.hpp>
 
+#include <functional>
+#include <utility>
+#include <vector>
+
 namespace Kerberos
 {
 	class SceneCamera
@@ -25,6 +29,24 @@ namespace Kerberos
 		void SetPerspective(float fov, float nearClip, float farClip);
 		void SetViewportSize(uint32_t width, uint32_t height);
 
+		/**
+		 * Sets the world-space view matrix. Runtime cameras derive it by
+		 * inverting the camera entity's world transform.
+		 */
+		void SetViewMatrix(const glm::mat4& view) { m_View = view; }
+
+		const glm::mat4& GetViewMatrix() const { return m_View; }
+		const glm::mat4& GetProjectionMatrix() const { return m_Projection; }
+		glm::mat4 GetViewProjectionMatrix() const { return m_Projection * m_View; }
+
+		float GetNearClip() const;
+		float GetFarClip() const;
+		float GetAspectRatio() const { return m_AspectRatio > 0.0f ? m_AspectRatio : 1.0f; }
+
+		std::pair<std::vector<glm::mat4>, glm::vec4> GetLightSpaceMatrices(
+			const glm::vec3& lightDir,
+			const std::function<glm::vec4(float)>& getCascadeSplits) const;
+
 		ProjectionType GetProjectionType() const { return m_ProjectionType; }
 		float GetOrthographicSize() const { return m_OrthoSize; }
 		float GetOrthographicNearClip() const { return m_OrthoNear; }
@@ -43,7 +65,6 @@ namespace Kerberos
 
 	private:
 		void RecalculateProjection();
-		void RecalculateView();
 
 	private:
 		ProjectionType m_ProjectionType = ProjectionType::Orthographic;

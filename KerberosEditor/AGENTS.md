@@ -42,6 +42,12 @@ Editor windows live mainly under
 
 - `AssetsPanel`: filesystem browser, previews, context menus, material editor,
   asset drag/drop, source import, and source-asset selection (single click).
+  The material editor loads materials through the asset manager (authored
+  `.kbrmat` sources are imported into cache artifacts) and edits texture slots
+  with a filterable dropdown backed by `AssetManager::GetAssetsOfType`. Saving
+  writes handle-based texture slots to the source YAML, updates the already
+  loaded material instance, and force-reimports the source so the cache artifact
+  and future loads stay in sync.
 - `HierarchyPanel`: entity selection, component add/remove, and component
   editing, including particle emitters.
 - `InspectorPanel`: the unified right-side "Properties" window. It shows entity
@@ -81,14 +87,76 @@ signatures, or the serialized script format changes, update this file and keep
 the native callback/bridge signatures synchronized.
 
 Script fields support `PrefabRef`, `TextureRef`, and `AssetHandle` reference
-types with asset-browser drag/drop. `Entity.Instantiate(PrefabRef)` spawns a
+types with asset-browser drag/drop. They also support `EntityRef`: a C# field
+declared as `Entity` (or a concrete `Entity`-derived script type) is stored and
+serialized as the target entity's UUID and edited by dragging an entity from
+the hierarchy onto the field; `0` means no entity assigned. The managed bridge
+marshals entity references through `Entity.GetID()` and resolves them back to
+an existing script instance or a new `Entity`.
+
+Script field initializers are reconciled against the current `ScriptClass`
+field list when a scene or authored prefab is deserialized and when the
+inspector draws a script component. Initializers for fields that no longer
+exist on the script are dropped (so stale serialized fields stop being shown
+and re-saved), newly added fields get zeroed defaults, and retyped fields are
+reset. `Entity.Instantiate(PrefabRef)` spawns a
 prefab through `Scene::InstantiatePrefab`; while the scene is running, spawned
 scripted-prefab entities get script instances created and `OnCreate` invoked
 immediately. `Scene::UpdateScripts`/`OnRuntimeStart` snapshot the script entity
 list before invoking callbacks so scripts may spawn prefabs during lifecycle
 methods.
 
+Script classes use the `Kerberos.*` namespace (renamed from
+`Kerberos.Source.Kerberos.*`); `ScriptUtils::MigrateLegacyScriptClassName`
+rewrites the old prefix when scenes/prefabs are deserialized. The built-in
+sample scripts (`Player`, `Camera`, `CameraFollow`) live in `KerberosScriptCoreLib`
+under `Kerberos`; user scripts live in their own per-project assembly.
+
+Each project owns a C# project at `<project>/Assets/Scripts/<PascalName>.csproj`
+(referencing `KerberosScriptCoreLib` through `$(KerberosEnginePath)`, with
+`<Private>false</Private>` so the core library is provided by the host),
+generated on project creation by `WriteUserScriptProject` with the project name
+PascalCased (`Project::ToPascalCaseName`). `ScriptEngine::OnProjectOpened`
+builds it with `dotnet build -c Debug -o <project>/Library/Scripts`, loads it
+into a collectible `AssemblyLoadContext`, and watches `Assets/Scripts` for
+rebuilds. The user load context resolves `KerberosScriptCoreLib` to the already
+loaded core assembly (not a copy from the output directory) so user script
+types derive from the same `Entity` base type. The core assembly path comes from
+`EnginePaths::ScriptAssemblies()`.
+
 ## Project and scene flow
+
+`File > New Project...` asks for an empty folder through
+`FileDialog::SelectFolder`; the selected folder becomes the project directory
+and its name becomes the project name. The editor creates `Assets/Scenes`,
+writes a default `Untitled Scene.kerberos`, activates the new project, registers
+the start scene, and persists `<ProjectName>.kbrproj`. The default scene is
+written before the project is activated so a failure leaves the current project
+untouched.
+
+The UI thread is initialized as a single-threaded apartment with `OleInitialize`
+at the start of `Application` construction, before audio/other COM consumers
+run. Shell dialogs (`IFileOpenDialog`) require an STA thread; the audio backends
+otherwise initialize the thread as MTA. `FileDialog::SelectFolder` shows the
+modern dialog synchronously on the UI thread and falls back to the legacy
+`SHBrowseForFolder` only if the thread is unexpectedly MTA.
+
+Project switches triggered from the menu (`New Project...` and `Open Project...`)
+are deferred with `Application::SubmitToMainThreadQueue` and run at the start of
+the next frame; `CreateProject`/`OpenProject` call `VulkanContext::WaitIdle()`
+before releasing the old project. Never replace the active project or scene
+synchronously from an ImGui callback: releasing the old project destroys cached
+GPU mesh/texture buffers while the current frame's command buffer may still
+reference them (validation error `vkFreeMemory ... currently in use`, followed
+by a fence wait hang).
+
+Project-relative paths must resolve through `Project::GetProjectDirectory()` and
+`Project::GetAssetDirectory()`. `GetAssetDirectory()` returns an absolute
+project-directory/asset-directory path; do not assume the process working
+directory is the project directory. Engine-owned content (fonts, icons, shaders,
+and the managed script assembly) resolves through `Core/EnginePaths`
+(`EnginePaths::Assets()`, `Shaders()`, `ScriptAssemblies()`, ...), initialized
+by `Application` from `ApplicationSpecification::EngineRoot`.
 
 Project loading creates/activates an editor asset manager, loads the asset
 registry, ensures metadata, builds sources, logs build diagnostics, and starts
@@ -103,10 +171,15 @@ hidden-window Vulkan lifecycle tests. Those tests still use the real
 application, renderer, scripting, asset-manager, and scene-loading paths, but
 must close and release project resources before the application is destroyed.
 
-Scene updates drive editor/runtime simulation and then queue rendering. Scene
-serialization must preserve authored component data while leaving transient
-runtime state transient. Scene and project transitions must not leave
-non-owning pointers to destroyed managers or stale selected entities.
+Scene updates drive editor/runtime simulation and then queue rendering. Edit and
+Simulate render through the editor camera; Play renders through the runtime
+scene's primary `CameraComponent`. The runtime view matrix is the inverse of the
+camera entity's world transform, and both editor/runtime scene projection
+matrices apply the Vulkan Y flip. The editor camera is neither updated nor given
+input while Play is active. Scene serialization must preserve authored component
+data while leaving transient runtime state transient. Scene and project
+transitions must not leave non-owning pointers to destroyed managers or stale
+selected entities.
 
 ## Events, selection, and resources
 

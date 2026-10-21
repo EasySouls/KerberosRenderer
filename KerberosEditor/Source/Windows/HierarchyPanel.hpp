@@ -69,6 +69,11 @@ namespace Kerberos
 
 		Entity m_SelectedEntity;
 
+		/// Set on mouse-down over an entity node and applied on mouse release.
+		/// This keeps the inspector on the current entity while another entity is
+		/// being dragged onto its script fields.
+		Entity m_PendingSelectedEntity;
+
 		std::vector<Entity> m_DeletionQueue;
 
 		std::function<void(Entity)> m_OnEntityDeleted;

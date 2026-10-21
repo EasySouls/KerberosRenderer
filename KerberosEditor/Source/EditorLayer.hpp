@@ -46,8 +46,10 @@ namespace Kerberos
 		void HandleMousePicking();
 
 		void NewProject();
+		void CreateProject(const std::filesystem::path& projectDirectory, const std::string& projectName);
 		void OpenProject(const std::filesystem::path& filepath);
 		[[nodiscard]] bool OpenProject();
+		void RequestOpenProject();
 
 		bool CanSaveScene();
 		void SaveScene();

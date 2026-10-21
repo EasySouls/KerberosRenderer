@@ -1,4 +1,4 @@
-namespace Kerberos.Source.Kerberos.Core;
+namespace Kerberos.Core;
 
 using System.Runtime.InteropServices;
 

@@ -1,8 +1,98 @@
 #include "kbrpch.hpp"
 #include "Frustum.hpp"
 
+#include "Profiling/Profilers.hpp"
+#include "Renderer/Renderer.hpp"
+
+#include <algorithm>
+#include <cmath>
+#include <limits>
+
 namespace Kerberos
 {
+	namespace
+	{
+		glm::mat4 CalculateLightSpaceMatrix(const glm::mat4& view,
+		                                    const float fov,
+		                                    const float aspectRatio,
+		                                    const float nearPlane,
+		                                    const float farPlane,
+		                                    const glm::vec3& lightDir)
+		{
+			const glm::mat4 proj = glm::perspective(fov, aspectRatio, nearPlane, farPlane);
+
+			const auto corners = GetFrustumCornersWorldSpace(proj, view);
+
+			glm::vec3 center = glm::vec3(0, 0, 0);
+			for (const auto& v : corners)
+			{
+				center += glm::vec3(v);
+			}
+			center /= static_cast<float>(corners.size());
+
+			glm::vec3 lightUp = glm::vec3(0.0f, 1.0f, 0.0f);
+			if (glm::abs(glm::dot(lightDir, lightUp)) > 0.99f)
+			{
+				lightUp = glm::vec3(1.0f, 0.0f, 0.0f);
+			}
+
+			const auto lightView = glm::lookAt(center + lightDir, center, lightUp);
+
+			float minX = std::numeric_limits<float>::max();
+			float maxX = std::numeric_limits<float>::lowest();
+			float minY = std::numeric_limits<float>::max();
+			float maxY = std::numeric_limits<float>::lowest();
+			float minZ = std::numeric_limits<float>::max();
+			float maxZ = std::numeric_limits<float>::lowest();
+			for (const auto& v : corners)
+			{
+				const auto trf = lightView * v;
+				minX = std::min(minX, trf.x);
+				maxX = std::max(maxX, trf.x);
+				minY = std::min(minY, trf.y);
+				maxY = std::max(maxY, trf.y);
+				minZ = std::min(minZ, trf.z);
+				maxZ = std::max(maxZ, trf.z);
+			}
+
+			// Tune this parameter according to the scene
+			constexpr float zMult = 10.0f;
+			if (minZ < 0)
+			{
+				minZ *= zMult;
+			}
+			else
+			{
+				minZ /= zMult;
+			}
+			if (maxZ < 0)
+			{
+				maxZ /= zMult;
+			}
+			else
+			{
+				maxZ *= zMult;
+			}
+
+			// Add a slight offset to prevent negative near plane bounding issues if scene bounds are close to near clip
+			minZ = std::min(minZ, -100.0f);
+			maxZ = std::max(maxZ, 100.0f);
+
+			// Apply texel snapping
+			const float orthoWidth = maxX - minX;
+			const uint32_t shadowMapResolution = Renderer::GetShadowMapResolution();
+			const float worldUnitsPerTexel = orthoWidth / static_cast<float>(shadowMapResolution);
+
+			minX = std::floor(minX / worldUnitsPerTexel) * worldUnitsPerTexel;
+			maxX = std::floor(maxX / worldUnitsPerTexel) * worldUnitsPerTexel;
+			minY = std::floor(minY / worldUnitsPerTexel) * worldUnitsPerTexel;
+			maxY = std::floor(maxY / worldUnitsPerTexel) * worldUnitsPerTexel;
+
+			const glm::mat4 lightProjection = glm::ortho(minX, maxX, minY, maxY, minZ, maxZ);
+			return lightProjection * lightView;
+		}
+	}
+
 	void Frustum::Update(const glm::mat4& viewProj)
 	{
 		KBR_TRACY_FUNCTION();
@@ -79,4 +169,37 @@ namespace Kerberos
     {
         return GetFrustumCornersWorldSpace(proj * view);
     }
+
+	std::pair<std::vector<glm::mat4>, glm::vec4> CalculateLightSpaceMatrices(
+		const glm::mat4& view,
+		const float fov,
+		const float aspectRatio,
+		const float nearClip,
+		const float farClip,
+		const glm::vec3& lightDir,
+		const std::function<glm::vec4(float)>& getCascadeSplits)
+	{
+		KBR_TRACY_FUNCTION();
+
+		const glm::vec4 cascadeSplits = getCascadeSplits(farClip);
+
+		std::vector<glm::mat4> matrices;
+		for (uint32_t i = 0; i < 3 + 1; ++i)
+		{
+			if (i == 0)
+			{
+				matrices.push_back(CalculateLightSpaceMatrix(view, fov, aspectRatio, nearClip, cascadeSplits[i], lightDir));
+			}
+			else if (i < 3)
+			{
+				matrices.push_back(CalculateLightSpaceMatrix(view, fov, aspectRatio, cascadeSplits[i - 1], cascadeSplits[i], lightDir));
+			}
+			else
+			{
+				matrices.push_back(CalculateLightSpaceMatrix(view, fov, aspectRatio, cascadeSplits[i - 1], farClip, lightDir));
+			}
+		}
+
+		return { matrices, cascadeSplits };
+	}
 }

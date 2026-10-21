@@ -1,7 +1,7 @@
 using System;
 using System.IO;
 
-namespace Kerberos.Source.Kerberos.Core
+namespace Kerberos.Core
 {
     public static class Constants
     {

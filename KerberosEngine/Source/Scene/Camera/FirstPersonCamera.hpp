@@ -63,8 +63,6 @@ namespace Kerberos
 		bool OnMouseButtonReleased(const MouseButtonReleasedEvent& event);
 		bool OnMouseMoved(const MouseMovedEvent& event);
 
-		glm::mat4 GetLightSpaceMatrix(float nearPlane, float farPlane, const glm::vec3& lightDir) const;
-
 	private:
 		glm::vec3 m_Position{ 0.0f, 0.0f, 0.0f };
 		float m_MoveSpeed = 20.0f;

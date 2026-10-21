@@ -35,6 +35,11 @@ Scene rendering is queued before `VulkanContext::Draw()` records commands.
 the current frame descriptor allocator. Descriptors allocated from a
 frame-local allocator must not outlive that frame slot.
 
+`RenderSceneEditor` takes an editor `Camera`; `RenderSceneRuntime` takes the
+scene's `SceneCamera` plus the primary camera entity world transform. Runtime
+view/projection matrices come from the `SceneCamera`, not from the editor
+camera.
+
 Uploads commonly use staging buffers and synchronous waits. This is safe but
 can stall; preserve the existing render-thread assertions and exception
 propagation when changing upload paths.
@@ -131,12 +136,13 @@ declarations must resolve to compatible mip/layer counts and layouts.
 
 ## Shaders and working directory
 
-Runtime shader loading expects paths below the project `assets\shaders`
-directory, compiles Slang to SPIR-V 1.6, caches `.spv`, reflects resources,
-and supports recompilation. `Application` changes to the project directory
-before creating the Vulkan context/renderer; shader path assumptions depend
-on this working-directory invariant.
-Tests may request a hidden GLFW window through
+Runtime shader loading resolves source and cache paths through
+`Core/EnginePaths` (`EnginePaths::Shaders()` and `EnginePaths::ShaderCache()`),
+not the process working directory. `EnginePaths` is initialized by
+`Application` from the engine content root (defaulting to the working
+directory, overridable via `ApplicationSpecification::EngineRoot`). Shader
+compilation compiles Slang to SPIR-V 1.6, caches `.spv`, reflects resources,
+and supports recompilation. Tests may request a hidden GLFW window through
 `ApplicationSpecification::Headless`; this still creates the normal Vulkan
 context and renderer and is not a software or no-GPU mode.
 

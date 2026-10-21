@@ -44,6 +44,11 @@ Do not confuse a source asset with its generated library outputs.
   are an internal organization choice only.
 
 The active in-memory registry is `std::map<AssetHandle, AssetMetadata>`.
+`AssetRegistry` also maintains a dense per-`AssetType` handle index (vector plus
+handle-to-slot map) that is updated by `Add`/`Remove`/`Clear`; `GetAssetsOfType`
+returns a span over that index without scanning the registry or rereading
+`AssetRegistry.kbrar`. Treat metadata `Type` as immutable after insertion;
+re-adding a handle through `Add` is the supported way to change its type.
 `AssetRegistryTypes.hpp` contains a newer serialized-entry model that is not
 the active in-memory representation; do not assume both models are equivalent.
 `AssetRegistry.kbrar` is required persisted editor/runtime index state, but it
@@ -80,7 +85,9 @@ Authored YAML prefabs may also carry per-entity script records
 (`PrefabScriptTemplate`: class name plus serialized field initializers).
 `PrefabSerializer` writes and reads those records, and
 `PrefabEntityTemplate::ToEntity` recreates the entity's `ScriptComponent` and
-field initializers. Native glTF prefabs remain script-free. When a scene is
+field initializers, then reconciles them with the current script class so
+removed fields are dropped and new fields get defaults. Native glTF prefabs
+remain script-free. When a scene is
 running, `Scene::InstantiatePrefab` creates script instances and runs
 `OnCreate` for scripted prefab entities immediately.
 The importer also emits one native material record per glTF material (named
@@ -125,10 +132,21 @@ other. Generated artifacts live only in the cache, never in the source tree,
 so they are never rescanned as sources.
 
 `StandaloneAssetPipelineImporter` remains a lightweight adapter for the
-non-texture single-file sources (FBX/OBJ, audio, authored materials/prefabs,
-animations, cubemaps): it supplies extension/type/build registration but emits
-no cache payload. Do not describe it as a full format converter; add a
-format-specific pipeline importer when a format gains cache conversion.
+non-texture single-file sources (FBX/OBJ, audio, authored prefabs, animations,
+cubemaps): it supplies extension/type/build registration but emits no cache
+payload. Do not describe it as a full format converter; add a format-specific
+pipeline importer when a format gains cache conversion.
+
+`MaterialPipelineImporter` handles `.kbrmat` authored materials. It copies the
+YAML source into the cache at the source-relative path (for example
+`Materials/armor.kbrmat`) and records that as the root `LibraryPath`, so editor
+and runtime material loading always consumes an imported artifact rather than
+reaching back into the source tree. Material texture slots serialize stable
+`Texture2D` asset handles (`0` means unset); `MaterialImporter` resolves those
+handles through the active asset manager and loads the texture artifacts. It
+must not call `Texture2D::FromFile` on source or legacy paths; unresolved or
+non-handle references are warnings that leave the slot empty. `SaveMaterial`
+writes handles for registered `Texture2D` assets.
 
 Deferred texture features (not yet implemented):
 - Generated `.ktx2` artifacts have no mip chain (`KTX2Encoder` writes one
@@ -167,6 +185,16 @@ Extend the importer deliberately rather than assuming full glTF coverage.
 
 ## Metadata, registry, and staleness
 
+Registry entries carry an `AssetSourceRoot` (`Project` or `Engine`) serialized
+as the `SourceRoot` field; missing values default to `Project` so older
+registries stay readable. `AssetUri` (`Assets/AssetUri.hpp`) formats and parses
+`project::/<rel>` and `engine::/<rel>` URIs, which are the authoring/tooling
+form of `(SourceRoot, relative path)`. Project assets resolve against
+`Project::GetAssetDirectory()`; engine assets (when registered) resolve against
+`EnginePaths::Assets()` and their artifacts against the engine cache root
+(`EditorAssetManager::GetEngineCacheRoot()`). `EditorAssetManager` and
+`RuntimeAssetResolver` both pick the cache/library root per `SourceRoot`.
+
 `AssetMetaService` owns source `.meta` files. Metadata includes schema version,
 source handle, importer type/version, source hash, and sub-asset handle/key
 records. Missing metadata is created; writes use a temporary file and rename.
@@ -174,10 +202,12 @@ Meta files are named by appending `.meta` to the full source filename (e.g.
 `foo.png.meta`, `foo.ktx.meta`), so sources that share a stem get distinct
 metadata. Older stem-named metas (e.g. `foo.meta`) are not migrated
 automatically; renaming them is a manual/offline operation.
-`AssetStalenessEvaluator` checks force rebuilds, source existence/hash,
-registry completeness, and sub-asset handle validity. Generated output
-existence is not currently fully validated, so changes involving cache
-artifacts should address that gap deliberately.
+`AssetStalenessEvaluator` checks force rebuilds, source existence/hash, and
+registry completeness, and the build coordinator additionally verifies that
+artifact-producing importers have a root `LibraryPath` and an existing root
+artifact. Generated sub-asset output existence is not currently fully
+validated, so changes involving cache artifacts should address that gap
+deliberately.
 
 Import options also live in the `.meta` (`AssetMetaFile::TextureSrgb`), a map
 from a stable key to an sRGB boolean. glTF sources use `texture:<imageIndex>`
@@ -193,9 +223,14 @@ force-rebuilds via `ReimportAsset`, evicting cached loaded artifacts).
 ensures metadata, evaluates staleness, imports into a staging transaction,
 commits outputs, updates metadata, reconciles obsolete generated entries, and
 updates the registry. `EditorAssetManager::ImportAsset` persists the resulting
-registry. Preserve stable handles and avoid partial registry updates on failed
-builds; stale registry data must be repaired from successful metadata/build
-results rather than treated as authoritative.
+registry. `EditorAssetManager::BuildAssets` also persists the registry when any
+source is rebuilt, so pipeline migrations repair previously persisted entries
+during project load. For artifact-producing importers, the build coordinator
+treats a missing root `LibraryPath` or missing root artifact as stale even when
+the source meta is current; `Standalone` sources without payload are exempt.
+Preserve stable handles and avoid partial registry updates on failed builds;
+stale registry data must be repaired from successful metadata/build results
+rather than treated as authoritative.
 
 ## File watching and events
 
@@ -230,6 +265,10 @@ artifact, not a live source-file object.
 only through their imported `LibraryPath`. It must not retain an editor-manager
 pointer, fall back to `Filepath`, invoke source importers, or mutate metadata.
 Invalid handles are errors rather than defaulting to an unrelated asset type.
+Both managers expose `GetAssetsOfType` (backed by the registry's dense type
+index) through `AssetManagerBase` and the `AssetManager` facade; UI code should
+use that query instead of scanning the registry or walking the filesystem when
+it needs assets of a particular type.
 The runtime loader still supports only part of the selected artifact set; add
 loaders explicitly and preserve unsupported-asset errors until they exist.
 glTF imports now emit native texture artifacts: each referenced image is
@@ -239,8 +278,9 @@ material records carry the base color, metallic, roughness, and emissive
 factors plus per-slot texture references by image index. `LoadNativeMaterial`
 resolves those references through the registry (`RootSourceHandle` +
 `SubAssetKey`) and loads the matching textures. Authored YAML material files
-still fall back to `MaterialImporter`; that reader remains transitional until
-authored materials are fully migrated.
+are loaded from their cached copies through `MaterialImporter`; their texture
+slots are asset handles resolved through the active manager, so the material
+reader no longer depends on source paths or the legacy texture loader.
 
 The asset browser is `KerberosEditor/Source/Windows/AssetsPanel.cpp`. It
 enumerates the filesystem, looks up handles, previews textures, opens files,

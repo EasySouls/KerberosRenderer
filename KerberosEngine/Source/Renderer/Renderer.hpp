@@ -2,6 +2,7 @@
 
 #include "DescriptorAllocator.hpp"
 #include "Scene/Camera/EditorCamera.hpp"
+#include "Scene/Camera/SceneCamera.hpp"
 #include "Scene/Scene.hpp"
 #include "Upscaling/UpscalerTypes.hpp"
 #include "Vulkan.hpp"
@@ -130,7 +131,7 @@ public:
     
     static void RenderSceneEditor(const Ref<Scene>& scene, const Camera& camera, float dt);
     static void RenderSceneRuntime(const Ref<Scene>& scene,
-                                   const Camera& mainCamera,
+                                   const SceneCamera& mainCamera,
                                    const glm::mat4& mainCameraTransform,
                                    float dt);
     using CalcLightSpaceMatricesFunc = std::function<std::pair<std::vector<glm::mat4>, glm::vec4>(
