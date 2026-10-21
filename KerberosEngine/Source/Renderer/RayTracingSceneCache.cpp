@@ -101,7 +101,7 @@ namespace Kerberos
             }
 
             vk::AccelerationStructureInstanceKHR instance{
-                .transform = ToVkTransformMatrix(transformComp.GetTransform()),
+                .transform = ToVkTransformMatrix(transformComp.WorldTransform),
                 .instanceCustomIndex = static_cast<uint32_t>(entity),
                 .mask = 0xFF,
                 .flags = static_cast<uint32_t>(vk::GeometryInstanceFlagBitsKHR::eTriangleFacingCullDisable),
