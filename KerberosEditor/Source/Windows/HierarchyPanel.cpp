@@ -14,12 +14,17 @@
 #include "Scripting/ScriptInstance.hpp"
 #include "Profiling/Profilers.hpp"
 #include "VulkanContext.hpp"
+#include "Undo/CreateEntityCommand.hpp"
+#include "Undo/DestroyEntityCommand.hpp"
+#include "Undo/SetComponentValueCommand.hpp"
+#include "Undo/UndoRedoManager.hpp"
 
 #include <glm/gtc/type_ptr.hpp>
 #include <imgui/imgui.h>
 #include <imgui/imgui_internal.h>
 
 #include <filesystem>
+#include <memory>
 #include <optional>
 
 
@@ -179,6 +184,10 @@ void HierarchyPanel::SetContext(const Ref<Scene>& context)
     /// when loading a new scene
     m_SelectedEntity = {};
     m_PendingSelectedEntity = {};
+    m_Vec3EditSnapshots.clear();
+    m_TagBeforeEdit.clear();
+    m_TagEditEntity = UUID::Invalid();
+    m_TagEditActive = false;
 
     /*m_CubeMesh = Mesh::CreateCube(1.0f);
     m_SphereMesh = Mesh::CreateSphere(1.0f, 16, 16);*/
@@ -242,7 +251,7 @@ void HierarchyPanel::OnImGuiRender()
     /// If the right mouse button is clicked, show the context menu
     if (ImGui::BeginPopupContextWindow(nullptr, 1 | ImGuiPopupFlags_NoOpenOverItems)) {
         if (ImGui::MenuItem("Create Empty Entity")) {
-            m_Context->CreateEntity("Empty Entity");
+            ExecuteCreateEntity("Empty Entity");
         }
 
         ImGui::EndPopup();
@@ -254,9 +263,14 @@ void HierarchyPanel::OnImGuiRender()
     ImGui::End();
 
     for (const auto& e : m_DeletionQueue) {
-        m_NotificationManager.AddNotification("Entity deleted: " + e.GetComponent<TagComponent>().Tag,
-                                              Notification::Type::Info);
-        m_Context->DestroyEntity(e);
+        const std::string tag = e.GetComponent<TagComponent>().Tag;
+        m_NotificationManager.AddNotification("Entity deleted: " + tag, Notification::Type::Info);
+
+        if (m_UndoRedo)
+            m_UndoRedo->Execute(std::make_unique<DestroyEntityCommand>(m_Context, e));
+        else
+            m_Context->DestroyEntity(e);
+
         if (m_OnEntityDeleted) {
             m_OnEntityDeleted(e);
         }
@@ -264,6 +278,11 @@ void HierarchyPanel::OnImGuiRender()
     m_DeletionQueue.clear();
 
     m_NotificationManager.RenderNotifications();
+}
+
+void HierarchyPanel::SetUndoRedoManager(UndoRedoManager* manager)
+{
+    m_UndoRedo = manager;
 }
 
 void HierarchyPanel::SetSelectedEntity(const Entity entity)
@@ -361,6 +380,14 @@ void HierarchyPanel::QueueEntityDeletion(const Entity& entity)
     if (m_SelectedEntity == entity) {
         m_SelectedEntity = {};
     }
+}
+
+void HierarchyPanel::ExecuteCreateEntity(const std::string& name)
+{
+    if (m_UndoRedo)
+        m_UndoRedo->Execute(std::make_unique<CreateEntityCommand>(m_Context, name));
+    else
+        m_Context->CreateEntity(name);
 }
 
 void HierarchyPanel::AddComponentPopup(const Entity entity)
@@ -525,16 +552,41 @@ bool HierarchyPanel::HandleHierarchyPanelDragAndDrop()
     return true;
 }
 
-static void DrawVec3Control(const std::string& label,
-                            glm::vec3& values,
-                            const float resetValue = 0.0f,
-                            const float columnWidth = 80.0f,
-                            const std::function<void()>& onValueChanged = nullptr)
+void HierarchyPanel::DrawVec3Control(const std::string& label,
+                                     const UUID entityID,
+                                     glm::vec3& values,
+                                     const float resetValue,
+                                     const float columnWidth,
+                                     const std::function<void()>& onValueChanged,
+                                     const std::function<void(const glm::vec3&)>& onEditCommitted)
 {
     const ImGuiIO& io = ImGui::GetIO();
     const auto boldFont = io.Fonts->Fonts[1];
 
     ImGui::PushID(label.c_str());
+
+    const auto trackEdit = [this, entityID, &values, &onEditCommitted]() {
+        const ImGuiID itemID = ImGui::GetItemID();
+        if (ImGui::IsItemActivated())
+            m_Vec3EditSnapshots[itemID] = { entityID, values };
+
+        if (ImGui::IsItemDeactivatedAfterEdit()) {
+            if (const auto it = m_Vec3EditSnapshots.find(itemID); it != m_Vec3EditSnapshots.end()) {
+                if (onEditCommitted && it->second.EntityID == entityID)
+                    onEditCommitted(it->second.Value);
+                m_Vec3EditSnapshots.erase(it);
+            }
+        }
+    };
+
+    const auto resetAxis = [&](float& axis) {
+        const glm::vec3 before = values;
+        axis = resetValue;
+        if (onValueChanged)
+            onValueChanged();
+        if (onEditCommitted)
+            onEditCommitted(before);
+    };
 
     ImGui::Columns(2);
     ImGui::SetColumnWidth(0, columnWidth);
@@ -553,9 +605,7 @@ static void DrawVec3Control(const std::string& label,
 
     ImGui::PushFont(boldFont);
     if (ImGui::Button("X", buttonSize)) {
-        values.x = resetValue;
-        if (onValueChanged)
-            onValueChanged();
+        resetAxis(values.x);
     }
     ImGui::PopFont();
 
@@ -567,6 +617,7 @@ static void DrawVec3Control(const std::string& label,
         if (onValueChanged)
             onValueChanged();
     }
+    trackEdit();
 
     ImGui::PopItemWidth();
     ImGui::SameLine(0.0f, ImGui::GetStyle().ItemInnerSpacing.x);
@@ -577,9 +628,7 @@ static void DrawVec3Control(const std::string& label,
 
     ImGui::PushFont(boldFont);
     if (ImGui::Button("Y", buttonSize)) {
-        values.y = resetValue;
-        if (onValueChanged)
-            onValueChanged();
+        resetAxis(values.y);
     }
     ImGui::PopFont();
 
@@ -591,6 +640,7 @@ static void DrawVec3Control(const std::string& label,
         if (onValueChanged)
             onValueChanged();
     }
+    trackEdit();
 
     ImGui::PopItemWidth();
     ImGui::SameLine(0.0f, ImGui::GetStyle().ItemInnerSpacing.x);
@@ -601,9 +651,7 @@ static void DrawVec3Control(const std::string& label,
 
     ImGui::PushFont(boldFont);
     if (ImGui::Button("Z", buttonSize)) {
-        values.z = resetValue;
-        if (onValueChanged)
-            onValueChanged();
+        resetAxis(values.z);
     }
     ImGui::PopFont();
 
@@ -615,6 +663,7 @@ static void DrawVec3Control(const std::string& label,
         if (onValueChanged)
             onValueChanged();
     }
+    trackEdit();
     ImGui::PopItemWidth();
 
     ImGui::PopStyleVar();
@@ -638,6 +687,26 @@ void HierarchyPanel::DrawComponents(const Entity entity)
                 tag = buffer;
             }
 
+            if (ImGui::IsItemActivated()) {
+                m_TagBeforeEdit = tag;
+                m_TagEditEntity = entity.GetUUID();
+                m_TagEditActive = true;
+            }
+
+            if (ImGui::IsItemDeactivatedAfterEdit()) {
+                if (m_TagEditActive && m_TagEditEntity == entity.GetUUID() && m_UndoRedo) {
+                    TagComponent before;
+                    before.Tag = m_TagBeforeEdit;
+
+                    TagComponent after;
+                    after.Tag = tag;
+
+                    m_UndoRedo->Record(std::make_unique<SetComponentValueCommand<TagComponent>>(
+                        m_Context, entity.GetUUID(), before, after, "Rename Entity"));
+                }
+                m_TagEditActive = false;
+            }
+
             ImGui::TreePop();
         }
     }
@@ -653,9 +722,30 @@ void HierarchyPanel::DrawComponents(const Entity entity)
                 m_Context->CalculateEntityTransform(entity);
             };
 
-            DrawVec3Control("Position", transform.Translation, 0.0f, 80.0f, onValueChanged);
-            DrawVec3Control("Rotation", transform.Rotation, 0.0f, 80.0f, onValueChanged);
-            DrawVec3Control("Scale", transform.Scale, 1.0f, 80.f, onValueChanged);
+            const auto makeCommit = [this, entity](glm::vec3 TransformComponent::*field, const char* commandName) {
+                return [this, entity, field, commandName](const glm::vec3& before) {
+                    if (!m_UndoRedo)
+                        return;
+
+                    const TransformComponent after = entity.GetComponent<TransformComponent>();
+                    TransformComponent beforeComponent = after;
+                    beforeComponent.*field = before;
+
+                    m_UndoRedo->Record(std::make_unique<SetComponentValueCommand<TransformComponent>>(
+                        m_Context, entity.GetUUID(), beforeComponent, after, commandName,
+                        [scene = m_Context](const Entity target) {
+                            if (scene)
+                                scene->CalculateEntityTransform(target);
+                        }));
+                };
+            };
+
+            DrawVec3Control("Position", entity.GetUUID(), transform.Translation, 0.0f, 80.0f, onValueChanged,
+                            makeCommit(&TransformComponent::Translation, "Transform Position"));
+            DrawVec3Control("Rotation", entity.GetUUID(), transform.Rotation, 0.0f, 80.0f, onValueChanged,
+                            makeCommit(&TransformComponent::Rotation, "Transform Rotation"));
+            DrawVec3Control("Scale", entity.GetUUID(), transform.Scale, 1.0f, 80.0f, onValueChanged,
+                            makeCommit(&TransformComponent::Scale, "Transform Scale"));
 
             ImGui::TreePop();
         }
@@ -1306,9 +1396,8 @@ void HierarchyPanel::DrawComponents(const Entity entity)
             if (ImGui::DragFloat("Intensity", &directionalLight.Light.Intensity, 1.0f, 0.0f)) {
                 directionalLight.NeedsUpdate = true;
             }
-            DrawVec3Control("Direction", directionalLight.Light.Direction, 0.0f, 80.0f, [&directionalLight]() {
-                directionalLight.NeedsUpdate = true;
-            });
+            DrawVec3Control("Direction", entity.GetUUID(), directionalLight.Light.Direction, 0.0f, 80.0f,
+                            [&directionalLight]() { directionalLight.NeedsUpdate = true; });
             ImGui::Checkbox("Enabled", &directionalLight.IsEnabled);
             ImGui::Checkbox("Cast Shadows", &directionalLight.CastShadows);
 

@@ -12,9 +12,13 @@
 
 #include <vector>
 #include <functional>
+#include <string>
+#include <unordered_map>
 
 namespace Kerberos
 {
+	class UndoRedoManager;
+
 	class HierarchyPanel : public EditorWindow
 	{
 	public:
@@ -23,6 +27,10 @@ namespace Kerberos
 		~HierarchyPanel() override = default;
 
 		void SetContext(const Ref<Scene>& context);
+
+		/// Routes scene edits through the given history. Pass nullptr while the
+		/// editor is running a runtime copy so edits are not recorded.
+		void SetUndoRedoManager(UndoRedoManager* manager);
 
 		void OnImGuiRender() override;
 		void DrawComponents(Entity entity);
@@ -52,6 +60,16 @@ namespace Kerberos
 
 		bool HandleHierarchyPanelDragAndDrop();
 
+		void ExecuteCreateEntity(const std::string& name);
+
+		void DrawVec3Control(const std::string& label,
+			UUID entityID,
+			glm::vec3& values,
+			float resetValue = 0.0f,
+			float columnWidth = 80.0f,
+			const std::function<void()>& onValueChanged = nullptr,
+			const std::function<void(const glm::vec3&)>& onEditCommitted = nullptr);
+
 		template<typename T>
 		void AddComponentWithCheck(Entity entity)
 		{
@@ -78,6 +96,22 @@ namespace Kerberos
 
 		std::function<void(Entity)> m_OnEntityDeleted;
 		std::function<void(Entity)> m_OnEntitySelected;
+
+		UndoRedoManager* m_UndoRedo = nullptr;
+
+		struct Vec3EditSnapshot
+		{
+			UUID EntityID = UUID::Invalid();
+			glm::vec3 Value{ 0.0f };
+		};
+
+		/// Snapshot of a vector field taken when an ImGui drag starts, keyed by the
+		/// widget ID so Position, Rotation, and Scale stay independent.
+		std::unordered_map<unsigned int, Vec3EditSnapshot> m_Vec3EditSnapshots;
+
+		std::string m_TagBeforeEdit;
+		UUID m_TagEditEntity = UUID::Invalid();
+		bool m_TagEditActive = false;
 
 		// Examples
 		Ref<Texture2D> m_WhiteTexture;

@@ -77,6 +77,10 @@ namespace Kerberos
 		/// Prefer this over GetEntityByUUID for references that may be stale.
 		Entity TryGetEntityByUUID(UUID uuid) const;
 
+		/// Returns true while the entity handle still refers to a live entity.
+		/// Safe to call on handles that may have been destroyed.
+		bool IsEntityValid(const Entity& entity) const;
+
 		void SetParent(Entity child, Entity parent, bool keepWorldTransform = true);
 		Entity GetParent(Entity child) const;
 		void RemoveParent(Entity child);
@@ -105,6 +109,8 @@ namespace Kerberos
 		void SetName(const std::string& name) { m_Name = name; }
 		const std::string& GetName() const { return m_Name; }
 
+		/// Creates a deep copy that preserves UUIDs and authored component data
+		/// while resetting transient runtime state.
 		static Ref<Scene> Copy(const Ref<Scene>& other);
 
 		static constexpr AssetType Type = AssetType::Scene;

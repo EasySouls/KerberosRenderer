@@ -7,6 +7,7 @@
 #include "Windows/HierarchyPanel.hpp"
 #include "Windows/ConsolePanel.hpp"
 #include "Windows/InspectorPanel.hpp"
+#include "Undo/UndoRedoManager.hpp"
 
 #include "Renderer/Textures/Texture2D.hpp"
 #include "Buffer.hpp"
@@ -79,6 +80,10 @@ namespace Kerberos
 		bool OnMouseButtonPressed(const MouseButtonPressedEvent& event);
 		bool OnWindowDrop(const WindowDropEvent& event);
 
+		void Undo();
+		void Redo();
+		void RefreshSelectionAfterHistoryChange();
+
 		std::string GetActiveGizmoTypeString() const;
 
 		static bool DoesImGuiWantInput();
@@ -95,6 +100,8 @@ namespace Kerberos
 		InspectorPanel m_InspectorPanel;
 
 		NotificationManager m_NotificationManager;
+
+		UndoRedoManager m_UndoRedo;
 
 		Ref<Scene> m_ActiveScene;
 		Ref<Scene> m_EditorScene;

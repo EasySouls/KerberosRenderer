@@ -476,7 +476,12 @@ namespace Kerberos
 
 		for (const std::string& className : dstClassNames)
 		{
-			if (std::find(srcClassNames.begin(), srcClassNames.end(), className) == srcClassNames.end())
+			if (std::ranges::find(srcClassNames, className) == srcClassNames.end())
+				continue;
+
+			/// A scene may reference a script whose assembly failed to load. Copying
+			/// must not throw in that case, otherwise Play/Simulate would fail.
+			if (!ClassExists(className))
 				continue;
 
 			CreateScriptFieldInitializers(dstEntity, className);

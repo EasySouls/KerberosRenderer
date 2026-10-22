@@ -109,6 +109,8 @@ namespace PROJECT_NAME
 	EditorLayer::EditorLayer()
 			: Layer("EditorLayer")
 	{
+		m_HierarchyPanel.SetUndoRedoManager(&m_UndoRedo);
+
 		m_HierarchyPanel.SetOnEntityDeleted([this](const Entity entity)
 																				{
 			if (m_HoveredEntity == entity)
@@ -349,6 +351,9 @@ namespace PROJECT_NAME
 
 		m_SceneState = SceneState::Play;
 
+		/// Runtime edits target the scene copy, so the editor history must not record them.
+		m_HierarchyPanel.SetUndoRedoManager(nullptr);
+
 		m_RuntimeScene = Scene::Copy(m_EditorScene);
 
 		m_RuntimeScene->OnRuntimeStart();
@@ -363,6 +368,8 @@ namespace PROJECT_NAME
 	void EditorLayer::OnSceneSimulate()
 	{
 		m_SceneState = SceneState::Simulate;
+
+		m_HierarchyPanel.SetUndoRedoManager(nullptr);
 
 		m_RuntimeScene = Scene::Copy(m_EditorScene);
 
@@ -389,6 +396,7 @@ namespace PROJECT_NAME
 
 		m_ActiveScene = m_EditorScene;
 		m_HierarchyPanel.SetContext(m_ActiveScene);
+		m_HierarchyPanel.SetUndoRedoManager(&m_UndoRedo);
 	}
 
 	void EditorLayer::HandleDragAndDrop()
@@ -781,6 +789,8 @@ namespace PROJECT_NAME
 		m_EditorScene->OnViewportResize(static_cast<uint32_t>(m_ViewportSize.x), static_cast<uint32_t>(m_ViewportSize.y));
 		m_HierarchyPanel.SetContext(m_EditorScene);
 
+		m_UndoRedo.Clear();
+
 		m_ActiveScene = m_EditorScene;
 	}
 
@@ -802,6 +812,7 @@ namespace PROJECT_NAME
 		m_EditorScene = m_ActiveScene;
 		m_ActiveScenePath.clear();
 		m_HierarchyPanel.SetContext(m_ActiveScene);
+		m_UndoRedo.Clear();
 	}
 
 	void EditorLayer::DrawViewport()
@@ -1054,14 +1065,26 @@ namespace PROJECT_NAME
 
 			if (ImGui::BeginMenu("Edit"))
 			{
-				/// Todo: Implement undo/redo system
-				if (ImGui::MenuItem("Undo", "Ctrl+Z", false, false))
+				const bool canEdit = m_SceneState == SceneState::Edit;
+				const bool canUndo = canEdit && m_UndoRedo.CanUndo();
+				const bool canRedo = canEdit && m_UndoRedo.CanRedo();
+
+				const std::string undoName = m_UndoRedo.GetUndoName();
+				const std::string redoName = m_UndoRedo.GetRedoName();
+				const std::string undoLabel = (undoName.empty() ? "Undo" : "Undo " + undoName) + "##Undo";
+				const std::string redoLabel = (redoName.empty() ? "Redo" : "Redo " + redoName) + "##Redo";
+
+				if (ImGui::MenuItem(undoLabel.c_str(), "Ctrl+Z", false, canUndo))
 				{
+					Undo();
 				}
-				if (ImGui::MenuItem("Redo", "Ctrl+Y", false, false))
+				if (ImGui::MenuItem(redoLabel.c_str(), "Ctrl+Y", false, canRedo))
 				{
+					Redo();
 				}
+
 				ImGui::Separator();
+
 				if (ImGui::MenuItem("Cut", "Ctrl+X", false, false))
 				{
 				}
@@ -1108,6 +1131,25 @@ namespace PROJECT_NAME
 
 			ImGui::EndMenuBar();
 		}
+	}
+
+	void EditorLayer::Undo()
+	{
+		m_UndoRedo.Undo();
+		RefreshSelectionAfterHistoryChange();
+	}
+
+	void EditorLayer::Redo()
+	{
+		m_UndoRedo.Redo();
+		RefreshSelectionAfterHistoryChange();
+	}
+
+	void EditorLayer::RefreshSelectionAfterHistoryChange()
+	{
+		const Entity selected = m_HierarchyPanel.GetSelectedEntity();
+		if (selected && m_ActiveScene && !m_ActiveScene->IsEntityValid(selected))
+			m_HierarchyPanel.SetSelectedEntity({});
 	}
 
 	void EditorLayer::DrawDebugWindow() const
@@ -1426,6 +1468,9 @@ namespace PROJECT_NAME
 		const bool ctrl = Input::IsKeyPressed(Key::LeftControl) || Input::IsKeyPressed(Key::RightControl);
 		const bool shift = Input::IsKeyPressed(Key::LeftShift) || Input::IsKeyPressed(Key::RightShift);
 
+		const bool isInputCaptured = ImGui::GetIO().WantTextInput || ImGui::IsAnyItemActive();
+        const bool isInEditMode = m_SceneState == SceneState::Edit;
+
 		switch (event.GetKeyCode())
 		{
 		case Key::S:
@@ -1458,20 +1503,44 @@ namespace PROJECT_NAME
 				LoadScene();
 			}
 			break;
+		case Key::Z:
+			if (ctrl && isInEditMode && !ImGui::GetIO().WantTextInput && !ImGui::IsAnyItemActive())
+			{
+				Undo();
+			}
+			break;
+		case Key::Y:
+			if (ctrl && isInEditMode && !ImGui::GetIO().WantTextInput && !ImGui::IsAnyItemActive())
+			{
+				Redo();
+			}
+			break;
 
 			/// Gizmos
-		case Key::Q:
-			m_GizmoType = GizmoType::None;
+		case Key::Q: 
+		    if (!isInputCaptured)
+		    {
+			    m_GizmoType = GizmoType::None;
+		    }
 			break;
 		case Key::W:
-			m_GizmoType = GizmoType::Translate;
-			break;
+            if (!isInputCaptured)
+            {
+			    m_GizmoType = GizmoType::Translate;
+            }
+            break;
 		case Key::E:
-			m_GizmoType = GizmoType::Scale;
-			break;
+            if (!isInputCaptured)
+            {
+			    m_GizmoType = GizmoType::Scale;
+            }
+            break;
 		case Key::R:
-			m_GizmoType = GizmoType::Rotate;
-			break;
+            if (!isInputCaptured)
+            {
+			    m_GizmoType = GizmoType::Rotate;
+            }
+            break;
 		case Key::F:
 		{
 			if (const Entity &entity = m_HierarchyPanel.GetSelectedEntity())
