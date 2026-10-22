@@ -112,12 +112,13 @@ namespace PROJECT_NAME
 		m_HierarchyPanel.SetUndoRedoManager(&m_UndoRedo);
 
 		m_HierarchyPanel.SetOnEntityDeleted([this](const Entity entity)
-																				{
+		{
 			if (m_HoveredEntity == entity)
 			{
 				m_HoveredEntity = {};
 				m_HoveredEntityDeletedLastFrame = true;
-			} });
+			} 
+		});
 
 		// Selecting an entity in the hierarchy takes over the inspector from any
 		// asset import-options selection, which would otherwise keep precedence.
@@ -1149,7 +1150,13 @@ namespace PROJECT_NAME
 	{
 		const Entity selected = m_HierarchyPanel.GetSelectedEntity();
 		if (selected && m_ActiveScene && !m_ActiveScene->IsEntityValid(selected))
+		{
 			m_HierarchyPanel.SetSelectedEntity({});
+		    
+			m_HoveredEntity = {};
+			m_HoveredEntityDeletedLastFrame = true;
+		}
+
 	}
 
 	void EditorLayer::DrawDebugWindow() const
