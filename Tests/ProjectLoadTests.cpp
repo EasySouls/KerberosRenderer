@@ -44,5 +44,5 @@ TEST_F(ProjectLoadTest, OpensEditorProject)
 	EXPECT_EQ(Kerberos::Project::GetProjectDirectory(), projectPath.parent_path());
 	EXPECT_EQ(project->GetInfo().AssetDirectory, std::filesystem::path{"Assets"});
 	EXPECT_EQ(project->GetInfo().StartScenePath,
-			  std::filesystem::path{"Scenes"} / "Example.kerberos");
+			  std::filesystem::path{"Scenes"} / "PrefabTest.kerberos");
 }
