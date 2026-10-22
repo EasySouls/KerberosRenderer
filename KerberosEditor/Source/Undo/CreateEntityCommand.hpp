@@ -27,6 +27,8 @@ namespace Kerberos {
 		std::string m_EntityName;
 		std::string m_CommandName;
 		UUID m_EntityID = UUID::Invalid();
+        UUID m_ParentID = UUID::Invalid();
+        std::string m_SerializedSubtree;
 	};
 
 }
