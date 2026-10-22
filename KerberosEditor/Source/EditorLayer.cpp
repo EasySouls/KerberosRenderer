@@ -624,6 +624,8 @@ namespace PROJECT_NAME
 
 		m_AssetsPanel = CreateOwner<AssetsPanel>(m_NotificationManager);
 
+		m_UndoRedo.Clear();
+
 		if (!Project::SaveActive())
 		{
 			m_NotificationManager.AddNotification(
