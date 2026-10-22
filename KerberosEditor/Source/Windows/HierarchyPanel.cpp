@@ -361,7 +361,14 @@ void HierarchyPanel::DrawEntityNodeContextMenu(const Entity& entity, bool& entit
         m_Context->DuplicateEntity(entity, true);
     }
     if (ImGui::MenuItem("Create child")) {
-        m_Context->CreateChild(entity);
+        if (m_UndoRedo)
+        {
+            m_UndoRedo->Execute(std::make_unique<CreateEntityCommand>(m_Context, "Unnamed", entity.GetUUID()));
+        }
+        else
+        {
+            m_Context->CreateChild(entity);
+        }
     }
 
     ImGui::EndPopup();

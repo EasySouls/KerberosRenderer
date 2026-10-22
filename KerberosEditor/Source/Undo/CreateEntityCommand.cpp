@@ -7,10 +7,11 @@
 
 namespace Kerberos {
 
-	CreateEntityCommand::CreateEntityCommand(Ref<Scene> scene, std::string name)
+	CreateEntityCommand::CreateEntityCommand(Ref<Scene> scene, std::string name, UUID parentID)
 		: m_Scene(std::move(scene)),
 		m_EntityName(std::move(name)),
-		m_CommandName("Create Entity")
+		m_CommandName("Create Entity"),
+		m_ParentID(parentID)
 	{
 	}
 
@@ -33,12 +34,24 @@ namespace Kerberos {
             }
             else
             {
-                m_Scene->CreateEntityWithUUID(m_EntityName, m_EntityID);
+                const Entity entity = m_Scene->CreateEntityWithUUID(m_EntityName, m_EntityID);
+
+				if (m_ParentID.IsValid())
+                {
+                    if (const Entity parent = m_Scene->TryGetEntityByUUID(m_ParentID))
+                        m_Scene->SetParent(entity, parent, false);
+                }
             }
             return;
 		}
 
 		const Entity entity = m_Scene->CreateEntity(m_EntityName);
+        if (m_ParentID.IsValid())
+        {
+            if (const Entity parent = m_Scene->TryGetEntityByUUID(m_ParentID))
+                m_Scene->SetParent(entity, parent, false);
+        }
+
 		m_EntityID = entity.GetUUID();
 	}
 

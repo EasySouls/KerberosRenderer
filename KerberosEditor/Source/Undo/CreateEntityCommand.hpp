@@ -15,7 +15,7 @@ namespace Kerberos {
 	public:
 		/// Creates the named entity when first executed. Redo recreates it with the
 		/// same UUID so later commands still resolve the entity.
-		CreateEntityCommand(Ref<Scene> scene, std::string name);
+		CreateEntityCommand(Ref<Scene> scene, std::string name, UUID parentID = UUID::Invalid());
 
 		void Execute() override;
 		void Undo() override;
