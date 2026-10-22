@@ -2,6 +2,7 @@
 
 #include "Assets/AssetManager.hpp"
 #include "Scene/Components.hpp"
+#include "Scene/Components/AnimationComponents.hpp"
 #include "Scene/Components/AudioComponents.hpp"
 #include "Scene/Components/ParticleComponents.hpp"
 #include "Scene/Components/PhysicsComponents.hpp"
@@ -308,6 +309,51 @@ static void SerializeEntity(YAML::Emitter& out, const Entity entity)
         out << YAML::EndMap;
     }
 
+    if (entity.HasComponent<PrefabInstanceComponent>()) {
+        out << YAML::Key << "PrefabInstanceComponent";
+        out << YAML::BeginMap;
+        const auto& prefabInstance = entity.GetComponent<PrefabInstanceComponent>();
+        out << YAML::Key << "PrefabAsset" << YAML::Value << prefabInstance.PrefabAsset;
+        out << YAML::Key << "IsExpandedInHierarchy" << YAML::Value << prefabInstance.IsExpandedInHierarchy;
+        out << YAML::EndMap;
+    }
+
+    if (entity.HasComponent<SkeletalMeshComponent>()) {
+        out << YAML::Key << "SkeletalMeshComponent";
+        out << YAML::BeginMap;
+        const auto& skeletalMesh = entity.GetComponent<SkeletalMeshComponent>();
+        out << YAML::Key << "MeshAsset" << YAML::Value << skeletalMesh.MeshAsset;
+        out << YAML::Key << "SkeletonAsset" << YAML::Value << skeletalMesh.SkeletonAsset;
+        out << YAML::Key << "MaterialAsset" << YAML::Value << skeletalMesh.MaterialAsset;
+        out << YAML::Key << "Visible" << YAML::Value << skeletalMesh.Visible;
+        out << YAML::Key << "CastShadows" << YAML::Value << skeletalMesh.CastShadows;
+        out << YAML::EndMap;
+    }
+
+    if (entity.HasComponent<SkinComponent>()) {
+        out << YAML::Key << "SkinComponent";
+        out << YAML::BeginMap;
+        const auto& skin = entity.GetComponent<SkinComponent>();
+        out << YAML::Key << "SkeletonAsset" << YAML::Value << skin.SkeletonAsset;
+        out << YAML::Key << "JointEntities" << YAML::Value << YAML::BeginSeq;
+        for (const auto& jointEntity : skin.JointEntities) {
+            out << jointEntity;
+        }
+        out << YAML::EndSeq;
+        out << YAML::EndMap;
+    }
+
+    if (entity.HasComponent<AnimationComponent>()) {
+        out << YAML::Key << "AnimationComponent";
+        out << YAML::BeginMap;
+        const auto& animation = entity.GetComponent<AnimationComponent>();
+        out << YAML::Key << "AnimationAsset" << YAML::Value << animation.AnimationAsset;
+        out << YAML::Key << "PlaybackSpeed" << YAML::Value << animation.PlaybackSpeed;
+        out << YAML::Key << "IsPlaying" << YAML::Value << animation.IsPlaying;
+        out << YAML::Key << "IsLooping" << YAML::Value << animation.IsLooping;
+        out << YAML::EndMap;
+    }
+
     out << YAML::EndMap;
 }
 
@@ -376,6 +422,272 @@ static void DeserializeScriptFieldInitializers(const YAML::Node& scriptFields, c
         ScriptEngine::CreateScriptFieldInitializers(entity, className);
 }
 
+Entity SceneSerializer::DeserializeEntity(const Ref<Scene>& scene, const YAML::Node& node)
+{
+    uint64_t uuid = node["Entity"].as<uint64_t>();
+    std::string tag;
+    if (node["TagComponent"])
+        tag = node["TagComponent"]["Tag"].as<std::string>();
+
+    /// Create the entity with the given tag and id
+    Entity deserializedEntity = scene->CreateEntityWithUUID(tag, uuid);
+
+    if (auto transformComponent = node["TransformComponent"]) {
+        auto& transform = deserializedEntity.GetComponent<TransformComponent>();
+        transform.Translation = transformComponent["Translation"].as<glm::vec3>();
+        transform.Rotation = transformComponent["Rotation"].as<glm::vec3>();
+        transform.Scale = transformComponent["Scale"].as<glm::vec3>();
+    }
+
+    if (auto cameraComponent = node["CameraComponent"]) {
+        auto& comp = deserializedEntity.AddComponent<CameraComponent>();
+        auto cameraData = cameraComponent["Camera"];
+
+        comp.Camera.SetProjectionType(
+            static_cast<SceneCamera::ProjectionType>(cameraData["ProjectionType"].as<int>()));
+
+        comp.Camera.SetPerspectiveFov(cameraData["PerspectiveFOV"].as<float>());
+        comp.Camera.SetPerspectiveNearClip(cameraData["PerspectiveNear"].as<float>());
+        comp.Camera.SetPerspectiveFarClip(cameraData["PerspectiveFar"].as<float>());
+
+        comp.Camera.SetOrthographicSize(cameraData["OrthographicSize"].as<float>());
+        comp.Camera.SetOrthographicNearClip(cameraData["OrthographicNear"].as<float>());
+        comp.Camera.SetOrthographicFarClip(cameraData["OrthographicFar"].as<float>());
+
+        comp.IsPrimary = cameraComponent["IsPrimary"].as<bool>();
+        comp.FixedAspectRatio = cameraComponent["FixedAspectRatio"].as<bool>();
+    }
+
+    if (auto spriteRendererComponent = node["SpriteRendererComponent"]) {
+        auto& spriteRenderer = deserializedEntity.AddComponent<SpriteRendererComponent>();
+        spriteRenderer.Color = spriteRendererComponent["Color"].as<glm::vec4>();
+    }
+
+    if (auto hierarchyComponent = node["HierarchyComponent"]) {
+        /// The entity must have a HierarchyComponent already when created
+        auto& hierarchy = deserializedEntity.GetComponent<HierarchyComponent>();
+        const UUID parentId = static_cast<UUID>(hierarchyComponent["Parent"].as<uint64_t>());
+
+        hierarchy.Parent = parentId;
+        if (parentId.IsValid()) {
+            /// If the entity has a parent, it should not be a root entity
+            auto& rootEntities = scene->m_RootEntities;
+            auto it = std::ranges::find(rootEntities, static_cast<entt::entity>(deserializedEntity));
+            if (it != rootEntities.end())
+                rootEntities.erase(it);
+        }
+
+        for (const auto& child : hierarchyComponent["Children"]) {
+            const uint64_t childUUID = child.as<uint64_t>();
+            hierarchy.Children.emplace_back(childUUID);
+        }
+    }
+
+    if (auto scriptComponent = node["ScriptComponent"]) {
+        auto& script = deserializedEntity.AddComponent<ScriptComponent>();
+
+        if (auto scripts = scriptComponent["Scripts"]) {
+            for (const auto& scriptNode : scripts) {
+                const std::string className =
+                    ScriptUtils::MigrateLegacyScriptClassName(scriptNode["ClassName"].as<std::string>());
+                script.ClassNames.push_back(className);
+                if (auto scriptFields = scriptNode["ScriptFields"]) {
+                    DeserializeScriptFieldInitializers(scriptFields, deserializedEntity, className);
+                }
+            }
+        }
+        else if (auto className = scriptComponent["ClassName"]) {
+            /// Legacy single-script format.
+            const std::string legacyClassName =
+                ScriptUtils::MigrateLegacyScriptClassName(className.as<std::string>());
+            script.ClassNames.push_back(legacyClassName);
+            if (auto scriptFields = scriptComponent["ScriptFields"]) {
+                DeserializeScriptFieldInitializers(scriptFields, deserializedEntity, legacyClassName);
+            }
+        }
+    }
+
+    if (auto nativeScriptComponent = node["NativeScriptComponent"]) {
+        // Handle NativeScriptComponent deserialization here
+        // This is a placeholder as the actual implementation depends on the scripting system used
+    }
+
+    if (auto directionalLightComponent = node["DirectionalLightComponent"]) {
+        auto& directionalLight = deserializedEntity.AddComponent<DirectionalLightComponent>();
+        directionalLight.Light.Color = directionalLightComponent["Color"].as<glm::vec3>();
+        directionalLight.Light.Direction = directionalLightComponent["Direction"].as<glm::vec3>();
+        directionalLight.Light.Intensity = directionalLightComponent["Intensity"].as<float>();
+    }
+
+    if (auto pointLightComponent = node["PointLightComponent"]) {
+        auto& pointLight = deserializedEntity.AddComponent<PointLightComponent>();
+        pointLight.Light.Color = pointLightComponent["Color"].as<glm::vec3>();
+        pointLight.Light.Intensity = pointLightComponent["Intensity"].as<float>();
+        pointLight.Light.Radius = pointLightComponent["Radius"].as<float>();
+    }
+
+    if (auto spotLightComponent = node["SpotLightComponent"]) {
+        auto& spotLight = deserializedEntity.AddComponent<SpotLightComponent>();
+        spotLight.Light.Color = spotLightComponent["Color"].as<glm::vec3>();
+        spotLight.Light.Direction = spotLightComponent["Direction"].as<glm::vec3>();
+        spotLight.Light.Intensity = spotLightComponent["Intensity"].as<float>();
+        spotLight.Light.Radius = spotLightComponent["Radius"].as<float>();
+        spotLight.Light.CutOffAngleRadians = spotLightComponent["CutOffAngleRadians"].as<float>();
+        spotLight.Light.OuterCutOffAngleRadians = spotLightComponent["OuterCutOffAngleRadians"].as<float>();
+    }
+
+    if (auto rigidBodyComponent = node["RigidBody3DComponent"]) {
+        auto& rigidBody = deserializedEntity.AddComponent<RigidBody3DComponent>();
+        rigidBody.Mass = rigidBodyComponent["Mass"].as<float>();
+        rigidBody.Type = static_cast<RigidBody3DComponent::BodyType>(rigidBodyComponent["Type"].as<int>());
+        rigidBody.Velocity = rigidBodyComponent["Velocity"].as<glm::vec3>();
+        rigidBody.AngularVelocity = rigidBodyComponent["AngularVelocity"].as<glm::vec3>();
+        rigidBody.UseGravity = rigidBodyComponent["UseGravity"].as<bool>();
+        rigidBody.Friction = rigidBodyComponent["Friction"].as<float>();
+        rigidBody.Restitution = rigidBodyComponent["Restitution"].as<float>();
+    }
+
+    if (auto boxColliderComponent = node["BoxCollider3DComponent"]) {
+        auto& boxCollider = deserializedEntity.AddComponent<BoxCollider3DComponent>();
+        boxCollider.Size = boxColliderComponent["Size"].as<glm::vec3>();
+        boxCollider.Offset = boxColliderComponent["Offset"].as<glm::vec3>();
+    }
+
+    if (auto sphereColliderComponent = node["SphereCollider3DComponent"]) {
+        auto& sphereCollider = deserializedEntity.AddComponent<SphereCollider3DComponent>();
+        sphereCollider.Radius = sphereColliderComponent["Radius"].as<float>();
+        sphereCollider.Offset = sphereColliderComponent["Offset"].as<glm::vec3>();
+    }
+
+    if (auto capsuleColliderComponent = node["CapsuleCollider3DComponent"]) {
+        auto& capsuleCollider = deserializedEntity.AddComponent<CapsuleCollider3DComponent>();
+        capsuleCollider.Radius = capsuleColliderComponent["Radius"].as<float>();
+        capsuleCollider.Height = capsuleColliderComponent["Height"].as<float>();
+        capsuleCollider.Offset = capsuleColliderComponent["Offset"].as<glm::vec3>();
+    }
+
+    if (auto meshColliderComponent = node["MeshCollider3DComponent"]) {
+        auto& meshCollider = deserializedEntity.AddComponent<MeshCollider3DComponent>();
+        meshCollider.IsTrigger = meshColliderComponent["IsTrigger"].as<bool>();
+        const AssetHandle meshHandle = AssetHandle(meshColliderComponent["Mesh"].as<uint64_t>());
+        if (meshHandle.IsValid()) {
+            meshCollider.Mesh = AssetManager::GetAsset<Mesh>(meshHandle);
+        }
+    }
+
+    if (auto staticMeshComponent = node["StaticMeshComponent"]) {
+        auto& staticMesh = deserializedEntity.AddComponent<StaticMeshComponent>();
+
+        const AssetHandle materialHandle = AssetHandle(staticMeshComponent["Material"].as<uint64_t>());
+        if (materialHandle.IsValid())
+            staticMesh.MeshMaterial = AssetManager::GetAsset<Material>(materialHandle);
+
+        const AssetHandle meshHandle = AssetHandle(staticMeshComponent["Mesh"].as<uint64_t>());
+        if (meshHandle.IsValid()) {
+            staticMesh.StaticMesh = AssetManager::GetAsset<Mesh>(meshHandle);
+        }
+        else {
+            Log::CoreWarn("AssetHandle for mesh is invalid, using default cube mesh.");
+            staticMesh.StaticMesh = AssetManager::GetDefaultCubeMesh();
+        }
+    }
+
+    if (auto modelComponent = node["ModelComponent"]) {
+        auto& model = deserializedEntity.AddComponent<ModelComponent>();
+        model.ModelAsset = AssetHandle(modelComponent["ModelAsset"].as<uint64_t>());
+        model.Visible = modelComponent["Visible"].as<bool>(true);
+    }
+
+    if (auto environmentComponent = node["EnvironmentComponent"]) {
+        auto& environment = deserializedEntity.AddComponent<EnvironmentComponent>();
+        environment.SkyboxTexture = AssetHandle(environmentComponent["SkyboxTexture"].as<uint64_t>());
+        environment.IsSkyboxEnabled = environmentComponent["IsSkyboxEnabled"].as<bool>();
+    }
+
+    if (auto textComponent = node["TextComponent"]) {
+        auto& text = deserializedEntity.AddComponent<TextComponent>();
+        text.Text = textComponent["Text"].as<std::string>();
+        text.Color = textComponent["Color"].as<glm::vec4>();
+        text.FontSize = textComponent["FontSize"].as<float>();
+    }
+
+    if (auto audioSource3DComponent = node["AudioSource3DComponent"]) {
+        auto& audioSource3D = deserializedEntity.AddComponent<AudioSource3DComponent>();
+        audioSource3D.SoundAsset =
+            AssetManager::GetAsset<Sound>(AssetHandle(audioSource3DComponent["SoundAsset"].as<uint64_t>()));
+        audioSource3D.Loop = audioSource3DComponent["Loop"].as<bool>();
+        audioSource3D.Volume = audioSource3DComponent["Volume"].as<float>();
+    }
+
+    if (auto audioSource2DComponent = node["AudioSource2DComponent"]) {
+        auto& audioSource2D = deserializedEntity.AddComponent<AudioSource2DComponent>();
+        audioSource2D.SoundAsset =
+            AssetManager::GetAsset<Sound>(AssetHandle(audioSource2DComponent["SoundAsset"].as<uint64_t>()));
+        audioSource2D.Loop = audioSource2DComponent["Loop"].as<bool>();
+        audioSource2D.Volume = audioSource2DComponent["Volume"].as<float>();
+    }
+
+    if (auto audioListenerComponent = node["AudioListenerComponent"]) {
+        auto& audioListener = deserializedEntity.AddComponent<AudioListenerComponent>();
+        audioListener.Volume = audioListenerComponent["Volume"].as<float>();
+    }
+
+    if (auto particleEmitterComponent = node["ParticleEmitterComponent"]) {
+        auto& particleEmitter = deserializedEntity.AddComponent<ParticleEmitterComponent>();
+        particleEmitter.IsActive = particleEmitterComponent["IsActive"].as<bool>();
+        particleEmitter.SpawnRate = particleEmitterComponent["SpawnRate"].as<float>();
+        particleEmitter.MinLifetime = particleEmitterComponent["MinLifetime"].as<float>();
+        particleEmitter.MaxLifetime = particleEmitterComponent["MaxLifetime"].as<float>();
+        particleEmitter.MinVelocity = particleEmitterComponent["MinVelocity"].as<glm::vec3>();
+        particleEmitter.MaxVelocity = particleEmitterComponent["MaxVelocity"].as<glm::vec3>();
+        particleEmitter.MinAcceleration = particleEmitterComponent["MinAcceleration"].as<glm::vec3>();
+        particleEmitter.MaxAcceleration = particleEmitterComponent["MaxAcceleration"].as<glm::vec3>();
+        particleEmitter.StartColor = particleEmitterComponent["StartColor"].as<glm::vec4>();
+        particleEmitter.EndColor = particleEmitterComponent["EndColor"].as<glm::vec4>();
+        particleEmitter.StartSize = particleEmitterComponent["StartSize"].as<float>();
+        particleEmitter.EndSize = particleEmitterComponent["EndSize"].as<float>();
+        particleEmitter.SubUVGrid = particleEmitterComponent["SubUVGrid"].as<glm::vec2>();
+        particleEmitter.ParticleTexture =
+            AssetHandle(particleEmitterComponent["ParticleTexture"].as<uint64_t>());
+    }
+
+    if (auto prefabInstanceComponent = node["PrefabInstanceComponent"]) {
+        auto& prefabInstance = deserializedEntity.AddComponent<PrefabInstanceComponent>();
+        prefabInstance.PrefabAsset = AssetHandle(prefabInstanceComponent["PrefabAsset"].as<uint64_t>());
+        prefabInstance.IsExpandedInHierarchy =
+            prefabInstanceComponent["IsExpandedInHierarchy"].as<bool>(true);
+    }
+
+    if (auto skeletalMeshComponent = node["SkeletalMeshComponent"]) {
+        auto& skeletalMesh = deserializedEntity.AddComponent<SkeletalMeshComponent>();
+        skeletalMesh.MeshAsset = AssetHandle(skeletalMeshComponent["MeshAsset"].as<uint64_t>());
+        skeletalMesh.SkeletonAsset = AssetHandle(skeletalMeshComponent["SkeletonAsset"].as<uint64_t>());
+        skeletalMesh.MaterialAsset = AssetHandle(skeletalMeshComponent["MaterialAsset"].as<uint64_t>());
+        skeletalMesh.Visible = skeletalMeshComponent["Visible"].as<bool>(true);
+        skeletalMesh.CastShadows = skeletalMeshComponent["CastShadows"].as<bool>(true);
+    }
+
+    if (auto skinComponent = node["SkinComponent"]) {
+        auto& skin = deserializedEntity.AddComponent<SkinComponent>();
+        skin.SkeletonAsset = AssetHandle(skinComponent["SkeletonAsset"].as<uint64_t>());
+        if (auto jointEntities = skinComponent["JointEntities"]) {
+            for (const auto& jointEntity : jointEntities) {
+                skin.JointEntities.emplace_back(jointEntity.as<uint64_t>());
+            }
+        }
+    }
+
+    if (auto animationComponent = node["AnimationComponent"]) {
+        auto& animation = deserializedEntity.AddComponent<AnimationComponent>();
+        animation.AnimationAsset = AssetHandle(animationComponent["AnimationAsset"].as<uint64_t>());
+        animation.PlaybackSpeed = animationComponent["PlaybackSpeed"].as<float>(1.0f);
+        animation.IsPlaying = animationComponent["IsPlaying"].as<bool>(false);
+        animation.IsLooping = animationComponent["IsLooping"].as<bool>(true);
+    }
+
+    return deserializedEntity;
+}
+
 bool SceneSerializer::Deserialize(const std::filesystem::path& filepath) const
 {
     KBR_TRACY_FUNCTION();
@@ -395,232 +707,7 @@ bool SceneSerializer::Deserialize(const std::filesystem::path& filepath) const
 
     if (auto entities = data["Entities"]) {
         for (const auto& entity : entities) {
-            uint64_t uuid = entity["Entity"].as<uint64_t>();
-            std::string tag;
-            if (entity["TagComponent"])
-                tag = entity["TagComponent"]["Tag"].as<std::string>();
-
-            /// Create the entity with the given tag and id
-            Entity deserializedEntity = m_Scene->CreateEntityWithUUID(tag, uuid);
-
-            if (auto transformComponent = entity["TransformComponent"]) {
-                auto& transform = deserializedEntity.GetComponent<TransformComponent>();
-                transform.Translation = transformComponent["Translation"].as<glm::vec3>();
-                transform.Rotation = transformComponent["Rotation"].as<glm::vec3>();
-                transform.Scale = transformComponent["Scale"].as<glm::vec3>();
-            }
-
-            if (auto cameraComponent = entity["CameraComponent"]) {
-                auto& comp = deserializedEntity.AddComponent<CameraComponent>();
-                auto cameraData = cameraComponent["Camera"];
-
-                comp.Camera.SetProjectionType(
-                    static_cast<SceneCamera::ProjectionType>(cameraData["ProjectionType"].as<int>()));
-
-                comp.Camera.SetPerspectiveFov(cameraData["PerspectiveFOV"].as<float>());
-                comp.Camera.SetPerspectiveNearClip(cameraData["PerspectiveNear"].as<float>());
-                comp.Camera.SetPerspectiveFarClip(cameraData["PerspectiveFar"].as<float>());
-
-                comp.Camera.SetOrthographicSize(cameraData["OrthographicSize"].as<float>());
-                comp.Camera.SetOrthographicNearClip(cameraData["OrthographicNear"].as<float>());
-                comp.Camera.SetOrthographicFarClip(cameraData["OrthographicFar"].as<float>());
-
-                comp.IsPrimary = cameraComponent["IsPrimary"].as<bool>();
-                comp.FixedAspectRatio = cameraComponent["FixedAspectRatio"].as<bool>();
-            }
-
-            if (auto spriteRendererComponent = entity["SpriteRendererComponent"]) {
-                auto& spriteRenderer = deserializedEntity.AddComponent<SpriteRendererComponent>();
-                spriteRenderer.Color = spriteRendererComponent["Color"].as<glm::vec4>();
-            }
-
-            if (auto hierarchyComponent = entity["HierarchyComponent"]) {
-                /// The entity must have a HierarchyComponent already when created
-                auto& hierarchy = deserializedEntity.GetComponent<HierarchyComponent>();
-                const UUID parentId = static_cast<UUID>(hierarchyComponent["Parent"].as<uint64_t>());
-
-                hierarchy.Parent = parentId;
-                if (parentId.IsValid()) {
-                    /// If the entity has a parent, it should not be a root entity
-                    auto& rootEntities = m_Scene->m_RootEntities;
-                    auto it = std::ranges::find(rootEntities, static_cast<entt::entity>(deserializedEntity));
-                    if (it != rootEntities.end())
-                        rootEntities.erase(it);
-                }
-
-                for (const auto& child : hierarchyComponent["Children"]) {
-                    const uint64_t childUUID = child.as<uint64_t>();
-                    hierarchy.Children.emplace_back(childUUID);
-                }
-            }
-
-            if (auto scriptComponent = entity["ScriptComponent"]) {
-                auto& script = deserializedEntity.AddComponent<ScriptComponent>();
-
-                if (auto scripts = scriptComponent["Scripts"]) {
-                    for (const auto& scriptNode : scripts) {
-                        const std::string className =
-                            ScriptUtils::MigrateLegacyScriptClassName(scriptNode["ClassName"].as<std::string>());
-                        script.ClassNames.push_back(className);
-                        if (auto scriptFields = scriptNode["ScriptFields"]) {
-                            DeserializeScriptFieldInitializers(scriptFields, deserializedEntity, className);
-                        }
-                    }
-                }
-                else if (auto className = scriptComponent["ClassName"]) {
-                    /// Legacy single-script format.
-                    const std::string legacyClassName =
-                        ScriptUtils::MigrateLegacyScriptClassName(className.as<std::string>());
-                    script.ClassNames.push_back(legacyClassName);
-                    if (auto scriptFields = scriptComponent["ScriptFields"]) {
-                        DeserializeScriptFieldInitializers(scriptFields, deserializedEntity, legacyClassName);
-                    }
-                }
-            }
-
-            if (auto nativeScriptComponent = entity["NativeScriptComponent"]) {
-                // Handle NativeScriptComponent deserialization here
-                // This is a placeholder as the actual implementation depends on the scripting system used
-            }
-
-            if (auto directionalLightComponent = entity["DirectionalLightComponent"]) {
-                auto& directionalLight = deserializedEntity.AddComponent<DirectionalLightComponent>();
-                directionalLight.Light.Color = directionalLightComponent["Color"].as<glm::vec3>();
-                directionalLight.Light.Direction = directionalLightComponent["Direction"].as<glm::vec3>();
-                directionalLight.Light.Intensity = directionalLightComponent["Intensity"].as<float>();
-            }
-
-            if (auto pointLightComponent = entity["PointLightComponent"]) {
-                auto& pointLight = deserializedEntity.AddComponent<PointLightComponent>();
-                pointLight.Light.Color = pointLightComponent["Color"].as<glm::vec3>();
-                pointLight.Light.Intensity = pointLightComponent["Intensity"].as<float>();
-                pointLight.Light.Radius = pointLightComponent["Radius"].as<float>();
-            }
-
-            if (auto spotLightComponent = entity["SpotLightComponent"]) {
-                auto& spotLight = deserializedEntity.AddComponent<SpotLightComponent>();
-                spotLight.Light.Color = spotLightComponent["Color"].as<glm::vec3>();
-                spotLight.Light.Direction = spotLightComponent["Direction"].as<glm::vec3>();
-                spotLight.Light.Intensity = spotLightComponent["Intensity"].as<float>();
-                spotLight.Light.Radius = spotLightComponent["Radius"].as<float>();
-                spotLight.Light.CutOffAngleRadians = spotLightComponent["CutOffAngleRadians"].as<float>();
-                spotLight.Light.OuterCutOffAngleRadians = spotLightComponent["OuterCutOffAngleRadians"].as<float>();
-            }
-
-            if (auto rigidBodyComponent = entity["RigidBody3DComponent"]) {
-                auto& rigidBody = deserializedEntity.AddComponent<RigidBody3DComponent>();
-                rigidBody.Mass = rigidBodyComponent["Mass"].as<float>();
-                rigidBody.Type = static_cast<RigidBody3DComponent::BodyType>(rigidBodyComponent["Type"].as<int>());
-                rigidBody.Velocity = rigidBodyComponent["Velocity"].as<glm::vec3>();
-                rigidBody.AngularVelocity = rigidBodyComponent["AngularVelocity"].as<glm::vec3>();
-                rigidBody.UseGravity = rigidBodyComponent["UseGravity"].as<bool>();
-                rigidBody.Friction = rigidBodyComponent["Friction"].as<float>();
-                rigidBody.Restitution = rigidBodyComponent["Restitution"].as<float>();
-            }
-
-            if (auto boxColliderComponent = entity["BoxCollider3DComponent"]) {
-                auto& boxCollider = deserializedEntity.AddComponent<BoxCollider3DComponent>();
-                boxCollider.Size = boxColliderComponent["Size"].as<glm::vec3>();
-                boxCollider.Offset = boxColliderComponent["Offset"].as<glm::vec3>();
-            }
-
-            if (auto sphereColliderComponent = entity["SphereCollider3DComponent"]) {
-                auto& sphereCollider = deserializedEntity.AddComponent<SphereCollider3DComponent>();
-                sphereCollider.Radius = sphereColliderComponent["Radius"].as<float>();
-                sphereCollider.Offset = sphereColliderComponent["Offset"].as<glm::vec3>();
-            }
-
-            if (auto capsuleColliderComponent = entity["CapsuleCollider3DComponent"]) {
-                auto& capsuleCollider = deserializedEntity.AddComponent<CapsuleCollider3DComponent>();
-                capsuleCollider.Radius = capsuleColliderComponent["Radius"].as<float>();
-                capsuleCollider.Height = capsuleColliderComponent["Height"].as<float>();
-                capsuleCollider.Offset = capsuleColliderComponent["Offset"].as<glm::vec3>();
-            }
-
-            if (auto meshColliderComponent = entity["MeshCollider3DComponent"]) {
-                auto& meshCollider = deserializedEntity.AddComponent<MeshCollider3DComponent>();
-                meshCollider.IsTrigger = meshColliderComponent["IsTrigger"].as<bool>();
-                const AssetHandle meshHandle = AssetHandle(meshColliderComponent["Mesh"].as<uint64_t>());
-                if (meshHandle.IsValid()) {
-                    meshCollider.Mesh = AssetManager::GetAsset<Mesh>(meshHandle);
-                }
-            }
-
-            if (auto staticMeshComponent = entity["StaticMeshComponent"]) {
-                auto& staticMesh = deserializedEntity.AddComponent<StaticMeshComponent>();
-
-                const AssetHandle materialHandle = AssetHandle(staticMeshComponent["Material"].as<uint64_t>());
-                if (materialHandle.IsValid())
-                    staticMesh.MeshMaterial = AssetManager::GetAsset<Material>(materialHandle);
-
-                const AssetHandle meshHandle = AssetHandle(staticMeshComponent["Mesh"].as<uint64_t>());
-                if (meshHandle.IsValid()) {
-                    staticMesh.StaticMesh = AssetManager::GetAsset<Mesh>(meshHandle);
-                }
-                else {
-                    Log::CoreWarn("AssetHandle for mesh is invalid, using default cube mesh.");
-                    staticMesh.StaticMesh = AssetManager::GetDefaultCubeMesh();
-                }
-            }
-
-            if (auto modelComponent = entity["ModelComponent"]) {
-                auto& model = deserializedEntity.AddComponent<ModelComponent>();
-                model.ModelAsset = AssetHandle(modelComponent["ModelAsset"].as<uint64_t>());
-                model.Visible = modelComponent["Visible"].as<bool>(true);
-            }
-
-            if (auto environmentComponent = entity["EnvironmentComponent"]) {
-                auto& environment = deserializedEntity.AddComponent<EnvironmentComponent>();
-                environment.SkyboxTexture = AssetHandle(environmentComponent["SkyboxTexture"].as<uint64_t>());
-                environment.IsSkyboxEnabled = environmentComponent["IsSkyboxEnabled"].as<bool>();
-            }
-
-            if (auto textComponent = entity["TextComponent"]) {
-                auto& text = deserializedEntity.AddComponent<TextComponent>();
-                text.Text = textComponent["Text"].as<std::string>();
-                text.Color = textComponent["Color"].as<glm::vec4>();
-                text.FontSize = textComponent["FontSize"].as<float>();
-            }
-
-            if (auto audioSource3DComponent = entity["AudioSource3DComponent"]) {
-                auto& audioSource3D = deserializedEntity.AddComponent<AudioSource3DComponent>();
-                audioSource3D.SoundAsset =
-                    AssetManager::GetAsset<Sound>(AssetHandle(audioSource3DComponent["SoundAsset"].as<uint64_t>()));
-                audioSource3D.Loop = audioSource3DComponent["Loop"].as<bool>();
-                audioSource3D.Volume = audioSource3DComponent["Volume"].as<float>();
-            }
-
-            if (auto audioSource2DComponent = entity["AudioSource2DComponent"]) {
-                auto& audioSource2D = deserializedEntity.AddComponent<AudioSource2DComponent>();
-                audioSource2D.SoundAsset =
-                    AssetManager::GetAsset<Sound>(AssetHandle(audioSource2DComponent["SoundAsset"].as<uint64_t>()));
-                audioSource2D.Loop = audioSource2DComponent["Loop"].as<bool>();
-                audioSource2D.Volume = audioSource2DComponent["Volume"].as<float>();
-            }
-
-            if (auto audioListenerComponent = entity["AudioListenerComponent"]) {
-                auto& audioListener = deserializedEntity.AddComponent<AudioListenerComponent>();
-                audioListener.Volume = audioListenerComponent["Volume"].as<float>();
-            }
-
-            if (auto particleEmitterComponent = entity["ParticleEmitterComponent"]) {
-                auto& particleEmitter = deserializedEntity.AddComponent<ParticleEmitterComponent>();
-                particleEmitter.IsActive = particleEmitterComponent["IsActive"].as<bool>();
-                particleEmitter.SpawnRate = particleEmitterComponent["SpawnRate"].as<float>();
-                particleEmitter.MinLifetime = particleEmitterComponent["MinLifetime"].as<float>();
-                particleEmitter.MaxLifetime = particleEmitterComponent["MaxLifetime"].as<float>();
-                particleEmitter.MinVelocity = particleEmitterComponent["MinVelocity"].as<glm::vec3>();
-                particleEmitter.MaxVelocity = particleEmitterComponent["MaxVelocity"].as<glm::vec3>();
-                particleEmitter.MinAcceleration = particleEmitterComponent["MinAcceleration"].as<glm::vec3>();
-                particleEmitter.MaxAcceleration = particleEmitterComponent["MaxAcceleration"].as<glm::vec3>();
-                particleEmitter.StartColor = particleEmitterComponent["StartColor"].as<glm::vec4>();
-                particleEmitter.EndColor = particleEmitterComponent["EndColor"].as<glm::vec4>();
-                particleEmitter.StartSize = particleEmitterComponent["StartSize"].as<float>();
-                particleEmitter.EndSize = particleEmitterComponent["EndSize"].as<float>();
-                particleEmitter.SubUVGrid = particleEmitterComponent["SubUVGrid"].as<glm::vec2>();
-                particleEmitter.ParticleTexture =
-                    AssetHandle(particleEmitterComponent["ParticleTexture"].as<uint64_t>());
-            }
+            DeserializeEntity(m_Scene, entity);
         }
     }
 
@@ -630,6 +717,54 @@ bool SceneSerializer::Deserialize(const std::filesystem::path& filepath) const
 bool SceneSerializer::DeserializeRuntime([[maybe_unused]] const std::filesystem::path& filepath) const
 {
     throw std::logic_error("Not implemented");
+}
+
+static void SerializeEntitySubtreeRecursive(YAML::Emitter& out, const Ref<Scene>& scene, const Entity& entity)
+{
+    SerializeEntity(out, entity);
+
+    if (!entity.HasComponent<HierarchyComponent>())
+        return;
+
+    for (const UUID& childID : entity.GetComponent<HierarchyComponent>().Children) {
+        if (const Entity child = scene->TryGetEntityByUUID(childID))
+            SerializeEntitySubtreeRecursive(out, scene, child);
+    }
+}
+
+std::string SceneSerializer::SerializeEntitySubtree(const Ref<Scene>& scene, const Entity& entity)
+{
+    if (!scene || !entity)
+        return {};
+
+    YAML::Emitter out;
+    out << YAML::BeginMap;
+    out << YAML::Key << "Root" << YAML::Value << entity.GetUUID();
+    out << YAML::Key << "Entities" << YAML::Value << YAML::BeginSeq;
+    SerializeEntitySubtreeRecursive(out, scene, entity);
+    out << YAML::EndSeq;
+    out << YAML::EndMap;
+
+    return out.c_str();
+}
+
+Entity SceneSerializer::DeserializeEntitySubtree(const Ref<Scene>& scene, const std::string& data)
+{
+    if (!scene || data.empty())
+        return {};
+
+    const YAML::Node root = YAML::Load(data);
+    if (const auto entities = root["Entities"]) {
+        for (const auto& entity : entities) {
+            DeserializeEntity(scene, entity);
+        }
+    }
+
+    if (const auto rootID = root["Root"]) {
+        return scene->TryGetEntityByUUID(UUID(rootID.as<uint64_t>()));
+    }
+
+    return {};
 }
 
 }
