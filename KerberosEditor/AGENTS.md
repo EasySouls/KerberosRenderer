@@ -75,7 +75,8 @@ resources belong to Vulkan/renderer owners.
 
 `EditorLayer` owns the `UndoRedoManager` (`KerberosEditor/Source/Undo`) and
 hands it to `HierarchyPanel`. Commands are polymorphic `ICommand`
-implementations: `CreateEntityCommand`, `DestroyEntityCommand`, and
+implementations: `CreateEntityCommand`, `DestroyEntityCommand`,
+`DuplicateEntityCommand`, `InstantiatePrefabCommand`, and
 `SetComponentValueCommand<T>`. `UndoRedoManager::Execute` runs then records a
 command, while `Record` records an edit an ImGui widget already applied. The
 undo and redo stacks are bounded `std::vector<std::unique_ptr<ICommand>>`
@@ -88,7 +89,9 @@ Commands address entities by `UUID` and resolve them through
 handles are recycled after destroy and recreate. `CreateEntityCommand` recreates
 the same UUID on redo. `DestroyEntityCommand` captures the entity subtree as a
 self-contained YAML blob before deleting it, restores it on undo, and reparents
-the restored root.
+the restored root. `DuplicateEntityCommand` and `InstantiatePrefabCommand`
+capture the subtree they create on the first execute and restore that blob on
+redo, so the created entities keep their UUIDs for later commands.
 
 Undo recording is edit-mode only. `OnScenePlay`/`OnSceneSimulate` clear the
 panel's manager pointer so runtime-copy edits are not recorded, and

@@ -7,7 +7,7 @@
 
 namespace Kerberos {
 
-	CreateEntityCommand::CreateEntityCommand(Ref<Scene> scene, std::string name, UUID parentID)
+	CreateEntityCommand::CreateEntityCommand(Ref<Scene> scene, std::string name, const UUID parentID)
 		: m_Scene(std::move(scene)),
 		m_EntityName(std::move(name)),
 		m_CommandName("Create Entity"),

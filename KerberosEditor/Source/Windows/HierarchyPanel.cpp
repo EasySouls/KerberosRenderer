@@ -16,6 +16,8 @@
 #include "VulkanContext.hpp"
 #include "Undo/CreateEntityCommand.hpp"
 #include "Undo/DestroyEntityCommand.hpp"
+#include "Undo/DuplicateEntityCommand.hpp"
+#include "Undo/InstantiatePrefabCommand.hpp"
 #include "Undo/SetComponentValueCommand.hpp"
 #include "Undo/UndoRedoManager.hpp"
 
@@ -26,6 +28,7 @@
 #include <filesystem>
 #include <memory>
 #include <optional>
+#include <utility>
 
 
 import Kerberos;
@@ -353,14 +356,24 @@ void HierarchyPanel::DrawEntityNodeContextMenu(const Entity& entity, bool& entit
     if (!ImGui::BeginPopupContextItem())
         return;
 
-    if (ImGui::MenuItem("Delete Entity", "Delete")) {
+    if (ImGui::MenuItem("Delete Entity", "Delete")) 
+    {
         /// Defer the deletion of the entity until the popup is closed to avoid invalidating the iterator
         entityDeleted = true;
     }
-    if (ImGui::MenuItem("Duplicate Entity", "Ctrl + D")) {
-        m_Context->DuplicateEntity(entity, true);
+    if (ImGui::MenuItem("Duplicate Entity", "Ctrl + D")) 
+    {
+        if (m_UndoRedo)
+        {
+            m_UndoRedo->Execute(std::make_unique<DuplicateEntityCommand>(m_Context, entity, true));
+        }
+        else
+        {
+            m_Context->DuplicateEntity(entity, true);
+        }
     }
-    if (ImGui::MenuItem("Create child")) {
+    if (ImGui::MenuItem("Create child")) 
+    {
         if (m_UndoRedo)
         {
             m_UndoRedo->Execute(std::make_unique<CreateEntityCommand>(m_Context, "Unnamed", entity.GetUUID()));
@@ -522,7 +535,10 @@ bool HierarchyPanel::OnKeyPressed(const KeyPressedEvent& event)
         break;
     case Key::D:
         if (m_SelectedEntity && ctrl) {
-            m_Context->DuplicateEntity(m_SelectedEntity, true);
+            if (m_UndoRedo)
+                m_UndoRedo->Execute(std::make_unique<DuplicateEntityCommand>(m_Context, m_SelectedEntity, true));
+            else
+                m_Context->DuplicateEntity(m_SelectedEntity, true);
             return true;
         }
         break;
@@ -545,8 +561,19 @@ bool HierarchyPanel::HandleHierarchyPanelDragAndDrop()
         const AssetType assetType = AssetManager::GetAssetType(handle);
 
         if (assetType == AssetType::Prefab) {
-            if (const Entity prefabEntity = m_Context->InstantiatePrefab(handle))
+            if (m_UndoRedo) {
+                auto command = std::make_unique<InstantiatePrefabCommand>(m_Context, handle);
+                command->Execute();
+
+                if (command->GetEntityID().IsValid()) {
+                    if (const Entity prefabEntity = m_Context->TryGetEntityByUUID(command->GetEntityID()))
+                        m_SelectedEntity = prefabEntity;
+                    m_UndoRedo->Record(std::move(command));
+                }
+            }
+            else if (const Entity prefabEntity = m_Context->InstantiatePrefab(handle)) {
                 m_SelectedEntity = prefabEntity;
+            }
         }
         else if (assetType == AssetType::Mesh) {
             Entity meshEntity = m_Context->CreateEntity("Mesh");

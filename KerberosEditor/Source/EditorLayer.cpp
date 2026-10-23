@@ -16,6 +16,7 @@
 #include "Input/KeyCodes.hpp"
 #include "Renderer/Upscaling/UpscalerTypes.hpp"
 #include "Scripting/ScriptEngine.hpp"
+#include "Undo/InstantiatePrefabCommand.hpp"
 
 #include <glm/gtc/matrix_inverse.hpp>
 #include <glm/gtc/type_ptr.hpp>
@@ -26,6 +27,7 @@
 #include <ranges>
 #include <fstream>
 #include <string_view>
+#include <utility>
 
 import Kerberos;
 
@@ -456,8 +458,23 @@ namespace PROJECT_NAME
                     return;
                 }
 
-				if (const Entity prefabEntity = m_ActiveScene->InstantiatePrefab(handle))
-                    m_HierarchyPanel.SetSelectedEntity(prefabEntity);
+				if (m_SceneState == SceneState::Edit)
+				{
+					auto command = std::make_unique<InstantiatePrefabCommand>(m_ActiveScene, handle);
+					command->Execute();
+
+					// First checking if succeeded. only then adding it to the undo stack
+					if (command->GetEntityID().IsValid())
+					{
+						if (const Entity prefabEntity = m_ActiveScene->TryGetEntityByUUID(command->GetEntityID()))
+							m_HierarchyPanel.SetSelectedEntity(prefabEntity);
+						m_UndoRedo.Record(std::move(command));
+					}
+				}
+				else if (const Entity prefabEntity = m_ActiveScene->InstantiatePrefab(handle))
+				{
+					m_HierarchyPanel.SetSelectedEntity(prefabEntity);
+				}
             }
 
 			ImGui::EndDragDropTarget();
