@@ -354,6 +354,9 @@ namespace PROJECT_NAME
 
 		m_SceneState = SceneState::Play;
 
+		m_HoveredEntity = {};
+		m_HoveredEntityDeletedLastFrame = true;
+
 		/// Runtime edits target the scene copy, so the editor history must not record them.
 		m_HierarchyPanel.SetUndoRedoManager(nullptr);
 
@@ -371,6 +374,9 @@ namespace PROJECT_NAME
 	void EditorLayer::OnSceneSimulate()
 	{
 		m_SceneState = SceneState::Simulate;
+
+		m_HoveredEntity = {};
+		m_HoveredEntityDeletedLastFrame = true;
 
 		m_HierarchyPanel.SetUndoRedoManager(nullptr);
 
@@ -394,6 +400,10 @@ namespace PROJECT_NAME
 
 		m_SceneState = SceneState::Edit;
 		m_IsScenePaused = false;
+
+		/// The runtime scene is released below, so the hover cannot keep a pointer into it.
+		m_HoveredEntity = {};
+		m_HoveredEntityDeletedLastFrame = true;
 
 		m_RuntimeScene = nullptr;
 
@@ -512,7 +522,8 @@ namespace PROJECT_NAME
 				}
 				else
 				{
-					m_HoveredEntity = Entity{static_cast<entt::entity>(*pickedEntityID), m_ActiveScene.get()};
+					const Entity pickedEntity{static_cast<entt::entity>(*pickedEntityID), m_ActiveScene.get()};
+					m_HoveredEntity = m_ActiveScene->IsEntityValid(pickedEntity) ? pickedEntity : Entity{};
 				}
 			}
 		}
@@ -791,6 +802,7 @@ namespace PROJECT_NAME
 		}
 
 		m_HoveredEntity = {};
+		m_HoveredEntityDeletedLastFrame = true;
 
 		/// TODO: Prompt to save the current scene if there are unsaved changes
 
@@ -831,6 +843,10 @@ namespace PROJECT_NAME
 		m_ActiveScene->OnViewportResize(static_cast<uint32_t>(m_ViewportSize.x), static_cast<uint32_t>(m_ViewportSize.y));
 		m_EditorScene = m_ActiveScene;
 		m_ActiveScenePath.clear();
+
+		m_HoveredEntity = {};
+		m_HoveredEntityDeletedLastFrame = true;
+
 		m_HierarchyPanel.SetContext(m_ActiveScene);
 		m_UndoRedo.Clear();
 	}
@@ -1169,13 +1185,15 @@ namespace PROJECT_NAME
 	{
 		const Entity selected = m_HierarchyPanel.GetSelectedEntity();
 		if (selected && m_ActiveScene && !m_ActiveScene->IsEntityValid(selected))
-		{
 			m_HierarchyPanel.SetSelectedEntity({});
-		    
+
+		/// Undo/redo can destroy the hovered entity without going through the
+		/// hierarchy's deletion callback, so its handle has to be invalidated here.
+		if (m_HoveredEntity && m_ActiveScene && !m_ActiveScene->IsEntityValid(m_HoveredEntity))
+		{
 			m_HoveredEntity = {};
 			m_HoveredEntityDeletedLastFrame = true;
 		}
-
 	}
 
 	void EditorLayer::DrawDebugWindow() const
@@ -1284,7 +1302,7 @@ namespace PROJECT_NAME
         ImGui::Text("Render image size: %.2f x %.2f", renderImageSize.x, renderImageSize.y);
 
 		std::string hoveredEntityName = "None";
-		if (m_HoveredEntity)
+		if (m_HoveredEntity && m_ActiveScene && m_ActiveScene->IsEntityValid(m_HoveredEntity))
 		{
 			hoveredEntityName = m_HoveredEntity.GetComponent<TagComponent>().Tag;
 		}
@@ -1589,7 +1607,10 @@ namespace PROJECT_NAME
 		/// TODO: Check if isViewportHovered is needed, Application::BlockEvents should prevent this from firing
 		if (event.GetButton() == Mouse::ButtonLeft && !ImGuizmo::IsOver() && !Input::IsKeyPressed(Key::LeftAlt) && m_ViewportHovered)
 		{
-			m_HierarchyPanel.SetSelectedEntity(m_HoveredEntity);
+			if (m_HoveredEntity && m_ActiveScene && m_ActiveScene->IsEntityValid(m_HoveredEntity))
+				m_HierarchyPanel.SetSelectedEntity(m_HoveredEntity);
+			else
+				m_HierarchyPanel.SetSelectedEntity({});
 		}
 		return false;
 	}
