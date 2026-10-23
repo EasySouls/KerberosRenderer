@@ -634,6 +634,11 @@ Entity Scene::InstantiatePrefab(const AssetHandle prefabHandle, const std::strin
 #endif
 	}
 
+	bool Scene::IsEntityValid(const Entity& entity) const
+	{
+		return entity && m_Registry.valid(static_cast<entt::entity>(entity));
+	}
+
 	Entity Scene::TryGetEntityByUUID(const UUID uuid) const
 	{
 		KBR_TRACY_FUNCTION();
@@ -792,11 +797,16 @@ Entity Scene::InstantiatePrefab(const AssetHandle prefabHandle, const std::strin
 			newEntity.GetComponent<CameraComponent>().Camera.SetViewportSize(newScene->m_ViewportWidth, newScene->m_ViewportHeight);
 		}
 		if (sourceRegistry.all_of<ScriptComponent>(sourceEntity))
+		{
 			newEntity.AddComponent<ScriptComponent>(sourceRegistry.get<ScriptComponent>(sourceEntity));
+			ScriptEngine::CopyScriptFieldInitializers(Entity{ sourceEntity, other.get() }, newEntity);
+		}
 		if (sourceRegistry.all_of<StaticMeshComponent>(sourceEntity))
 			newEntity.AddComponent<StaticMeshComponent>(sourceRegistry.get<StaticMeshComponent>(sourceEntity));
 		if (sourceRegistry.all_of<ModelComponent>(sourceEntity))
 			newEntity.AddComponent<ModelComponent>(sourceRegistry.get<ModelComponent>(sourceEntity));
+		if (sourceRegistry.all_of<PrefabInstanceComponent>(sourceEntity))
+			newEntity.AddComponent<PrefabInstanceComponent>(sourceRegistry.get<PrefabInstanceComponent>(sourceEntity));
 		if (sourceRegistry.all_of<RigidBody3DComponent>(sourceEntity))
 		{
 			auto& rigidBodyComp = sourceRegistry.get<RigidBody3DComponent>(sourceEntity);
@@ -804,13 +814,29 @@ Entity Scene::InstantiatePrefab(const AssetHandle prefabHandle, const std::strin
 			newEntity.GetComponent<RigidBody3DComponent>().RuntimeBody = nullptr;
 		}
 		if (sourceRegistry.all_of<BoxCollider3DComponent>(sourceEntity))
-			newEntity.AddComponent<BoxCollider3DComponent>(sourceRegistry.get<BoxCollider3DComponent>(sourceEntity));
+		{
+			auto collider = sourceRegistry.get<BoxCollider3DComponent>(sourceEntity);
+			collider.RuntimeCollider = nullptr;
+			newEntity.AddComponent<BoxCollider3DComponent>(collider);
+		}
 		if (sourceRegistry.all_of<SphereCollider3DComponent>(sourceEntity))
-			newEntity.AddComponent<SphereCollider3DComponent>(sourceRegistry.get<SphereCollider3DComponent>(sourceEntity));
+		{
+			auto collider = sourceRegistry.get<SphereCollider3DComponent>(sourceEntity);
+			collider.RuntimeCollider = nullptr;
+			newEntity.AddComponent<SphereCollider3DComponent>(collider);
+		}
 		if (sourceRegistry.all_of<CapsuleCollider3DComponent>(sourceEntity))
-			newEntity.AddComponent<CapsuleCollider3DComponent>(sourceRegistry.get<CapsuleCollider3DComponent>(sourceEntity));
+		{
+			auto collider = sourceRegistry.get<CapsuleCollider3DComponent>(sourceEntity);
+			collider.RuntimeCollider = nullptr;
+			newEntity.AddComponent<CapsuleCollider3DComponent>(collider);
+		}
 		if (sourceRegistry.all_of<MeshCollider3DComponent>(sourceEntity))
-			newEntity.AddComponent<MeshCollider3DComponent>(sourceRegistry.get<MeshCollider3DComponent>(sourceEntity));
+		{
+			auto collider = sourceRegistry.get<MeshCollider3DComponent>(sourceEntity);
+			collider.RuntimeCollider = nullptr;
+			newEntity.AddComponent<MeshCollider3DComponent>(collider);
+		}
 		if (sourceRegistry.all_of<DirectionalLightComponent>(sourceEntity))
 			newEntity.AddComponent<DirectionalLightComponent>(sourceRegistry.get<DirectionalLightComponent>(sourceEntity));
 		if (sourceRegistry.all_of<PointLightComponent>(sourceEntity))
@@ -827,6 +853,23 @@ Entity Scene::InstantiatePrefab(const AssetHandle prefabHandle, const std::strin
 			newEntity.AddComponent<AudioSource3DComponent>(sourceRegistry.get<AudioSource3DComponent>(sourceEntity));
 		if (sourceRegistry.all_of<AudioListenerComponent>(sourceEntity))
 			newEntity.AddComponent<AudioListenerComponent>(sourceRegistry.get<AudioListenerComponent>(sourceEntity));
+		if (sourceRegistry.all_of<ParticleEmitterComponent>(sourceEntity))
+		{
+			auto particleEmitter = sourceRegistry.get<ParticleEmitterComponent>(sourceEntity);
+			particleEmitter.spawnAccumulator = 0.0f;
+			newEntity.AddComponent<ParticleEmitterComponent>(particleEmitter);
+		}
+		if (sourceRegistry.all_of<SkinComponent>(sourceEntity))
+			newEntity.AddComponent<SkinComponent>(sourceRegistry.get<SkinComponent>(sourceEntity));
+		if (sourceRegistry.all_of<SkeletalMeshComponent>(sourceEntity))
+			newEntity.AddComponent<SkeletalMeshComponent>(sourceRegistry.get<SkeletalMeshComponent>(sourceEntity));
+		if (sourceRegistry.all_of<AnimationComponent>(sourceEntity))
+		{
+			auto animation = sourceRegistry.get<AnimationComponent>(sourceEntity);
+			animation.CurrentTime = 0.0f;
+			animation.IsPlaying = false;
+			newEntity.AddComponent<AnimationComponent>(animation);
+		}
 
 		/// Set parent if this is a child entity
 		if (parentNewEntity != entt::null)
@@ -852,6 +895,9 @@ Entity Scene::InstantiatePrefab(const AssetHandle prefabHandle, const std::strin
 
 		newScene->m_ViewportWidth = other->m_ViewportWidth;
 		newScene->m_ViewportHeight = other->m_ViewportHeight;
+		newScene->m_Is3D = other->m_Is3D;
+		newScene->m_EnableShadowMapping = other->m_EnableShadowMapping;
+		newScene->m_OnlyRenderShadowMapIfLightHasChanged = other->m_OnlyRenderShadowMapIfLightHasChanged;
 
 		/// Copy root entities first preserving order, then recursively copy children
 		for (const auto sourceRootEntity : other->m_RootEntities)

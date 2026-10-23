@@ -2,7 +2,8 @@
 
 Applies to `KerberosEditor/Source/**`,
 `KerberosEngine/Source/Editor*`, `KerberosEngine/Source/Application*`,
-`KerberosEngine/Source/Project/**`, and `KerberosEngine/Source/Scene/**`.
+`KerberosEngine/Source/Project/**`, `KerberosEngine/Source/Scene/**`, and
+`KerberosEngine/Source/Serialization/**`.
 
 ## Lifecycle and ownership
 
@@ -69,6 +70,49 @@ Panels consume engine-owned project, scene, asset, renderer, and event
 systems. Keep ownership clear: UI state belongs to the panel, persistent
 scene/project state belongs to the corresponding engine object, and GPU
 resources belong to Vulkan/renderer owners.
+
+## Undo and redo
+
+`EditorLayer` owns the `UndoRedoManager` (`KerberosEditor/Source/Undo`) and
+hands it to `HierarchyPanel`. Commands are polymorphic `ICommand`
+implementations: `CreateEntityCommand`, `DestroyEntityCommand`,
+`DuplicateEntityCommand`, `InstantiatePrefabCommand`, and
+`SetComponentValueCommand<T>`. `UndoRedoManager::Execute` runs then records a
+command, while `Record` records an edit an ImGui widget already applied. The
+undo and redo stacks are bounded `std::vector<std::unique_ptr<ICommand>>`
+containers, and any new edit clears the redo stack. `CanMerge`/`Merge` remain
+available for commands that deliberately coalesce, but widget edits already
+produce one command per gesture.
+
+Commands address entities by `UUID` and resolve them through
+`Scene::TryGetEntityByUUID` on every execute/undo, because `entt::entity`
+handles are recycled after destroy and recreate. `CreateEntityCommand` recreates
+the same UUID on redo. `DestroyEntityCommand` captures the entity subtree as a
+self-contained YAML blob before deleting it, restores it on undo, and reparents
+the restored root. `DuplicateEntityCommand` and `InstantiatePrefabCommand`
+capture the subtree they create on the first execute and restore that blob on
+redo, so the created entities keep their UUIDs for later commands.
+
+Undo recording is edit-mode only. `OnScenePlay`/`OnSceneSimulate` clear the
+panel's manager pointer so runtime-copy edits are not recorded, and
+`OnSceneStop` restores it. `NewScene`/`OpenScene` clear the history. Menu and
+keyboard undo/redo are gated on `SceneState::Edit` and skip while an ImGui text
+field is active.
+
+ImGui-driven edits capture the before value on `ImGui::IsItemActivated()` and
+record one command on `ImGui::IsItemDeactivatedAfterEdit()`.
+`SetComponentValueCommand<T>` applies absolute values, so recording after the
+widget already changed the component is safe. Transform commands also
+recalculate entity transforms after applying, and vector-field snapshots are
+keyed by widget ID plus entity UUID so a selection change cannot mix them up.
+
+`SceneSerializer` exposes `SerializeEntitySubtree`/`DeserializeEntitySubtree`
+and shares per-entity deserialization with whole-scene loading. The whole-scene
+path still loads every entity in the file, while the subtree path restores only
+the entities present in the blob. `Scene::Copy` covers the serializer's authored
+components, including prefab instances, particles, skins, skeletal meshes,
+animations, and script field initializers, resets transient runtime state, and
+intentionally does not copy `NativeScriptComponent` runtime instances.
 
 ## C# script components
 
@@ -228,7 +272,10 @@ cmake --build --preset vs2026-debug
 
 For editor changes, validate startup/project load, scene open/save, panel
 navigation, selection/entity deletion, viewport resize, ImGui stack balance,
-drag/drop payloads, asset watcher updates, and runtime/editor transitions.
+drag/drop payloads, asset watcher updates, and runtime/editor transitions. For
+undo changes, validate create/delete round-trips (including entity subtrees),
+component field edits, history clearing on new/open scene, and that history is
+inert during Play/Simulate.
 Run shader compilation when the editor changes shader assets. Update this
 file whenever editor lifecycle, panel ownership, threading, UI conventions,
 project/scene integration, or validation procedures change.

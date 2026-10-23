@@ -16,6 +16,7 @@
 #include "Input/KeyCodes.hpp"
 #include "Renderer/Upscaling/UpscalerTypes.hpp"
 #include "Scripting/ScriptEngine.hpp"
+#include "Undo/InstantiatePrefabCommand.hpp"
 
 #include <glm/gtc/matrix_inverse.hpp>
 #include <glm/gtc/type_ptr.hpp>
@@ -26,6 +27,7 @@
 #include <ranges>
 #include <fstream>
 #include <string_view>
+#include <utility>
 
 import Kerberos;
 
@@ -109,13 +111,15 @@ namespace PROJECT_NAME
 	EditorLayer::EditorLayer()
 			: Layer("EditorLayer")
 	{
+		m_HierarchyPanel.SetUndoRedoManager(&m_UndoRedo);
+
 		m_HierarchyPanel.SetOnEntityDeleted([this](const Entity entity)
-																				{
+		{
 			if (m_HoveredEntity == entity)
 			{
-				m_HoveredEntity = {};
-				m_HoveredEntityDeletedLastFrame = true;
-			} });
+                ResetHoveredEntity();
+			} 
+		});
 
 		// Selecting an entity in the hierarchy takes over the inspector from any
 		// asset import-options selection, which would otherwise keep precedence.
@@ -349,6 +353,11 @@ namespace PROJECT_NAME
 
 		m_SceneState = SceneState::Play;
 
+		ResetHoveredEntity();
+
+		/// Runtime edits target the scene copy, so the editor history must not record them.
+		m_HierarchyPanel.SetUndoRedoManager(nullptr);
+
 		m_RuntimeScene = Scene::Copy(m_EditorScene);
 
 		m_RuntimeScene->OnRuntimeStart();
@@ -363,6 +372,10 @@ namespace PROJECT_NAME
 	void EditorLayer::OnSceneSimulate()
 	{
 		m_SceneState = SceneState::Simulate;
+
+		ResetHoveredEntity();
+
+		m_HierarchyPanel.SetUndoRedoManager(nullptr);
 
 		m_RuntimeScene = Scene::Copy(m_EditorScene);
 
@@ -385,10 +398,14 @@ namespace PROJECT_NAME
 		m_SceneState = SceneState::Edit;
 		m_IsScenePaused = false;
 
+		/// The runtime scene is released below, so the hover cannot keep a pointer into it.
+        ResetHoveredEntity();
+
 		m_RuntimeScene = nullptr;
 
 		m_ActiveScene = m_EditorScene;
 		m_HierarchyPanel.SetContext(m_ActiveScene);
+		m_HierarchyPanel.SetUndoRedoManager(&m_UndoRedo);
 	}
 
 	void EditorLayer::HandleDragAndDrop()
@@ -447,8 +464,23 @@ namespace PROJECT_NAME
                     return;
                 }
 
-				if (const Entity prefabEntity = m_ActiveScene->InstantiatePrefab(handle))
-                    m_HierarchyPanel.SetSelectedEntity(prefabEntity);
+				if (m_SceneState == SceneState::Edit)
+				{
+					auto command = std::make_unique<InstantiatePrefabCommand>(m_ActiveScene, handle);
+					command->Execute();
+
+					// First checking if succeeded. only then adding it to the undo stack
+					if (command->GetEntityID().IsValid())
+					{
+						if (const Entity prefabEntity = m_ActiveScene->TryGetEntityByUUID(command->GetEntityID()))
+							m_HierarchyPanel.SetSelectedEntity(prefabEntity);
+						m_UndoRedo.Record(std::move(command));
+					}
+				}
+				else if (const Entity prefabEntity = m_ActiveScene->InstantiatePrefab(handle))
+				{
+					m_HierarchyPanel.SetSelectedEntity(prefabEntity);
+				}
             }
 
 			ImGui::EndDragDropTarget();
@@ -486,7 +518,8 @@ namespace PROJECT_NAME
 				}
 				else
 				{
-					m_HoveredEntity = Entity{static_cast<entt::entity>(*pickedEntityID), m_ActiveScene.get()};
+					const Entity pickedEntity{static_cast<entt::entity>(*pickedEntityID), m_ActiveScene.get()};
+					m_HoveredEntity = m_ActiveScene->IsEntityValid(pickedEntity) ? pickedEntity : Entity{};
 				}
 			}
 		}
@@ -614,6 +647,9 @@ namespace PROJECT_NAME
 		m_HierarchyPanel.SetContext(m_ActiveScene);
 
 		m_AssetsPanel = CreateOwner<AssetsPanel>(m_NotificationManager);
+
+		ResetHoveredEntity();
+		m_UndoRedo.Clear();
 
 		if (!Project::SaveActive())
 		{
@@ -762,7 +798,7 @@ namespace PROJECT_NAME
 			OnSceneStop();
 		}
 
-		m_HoveredEntity = {};
+		ResetHoveredEntity();
 
 		/// TODO: Prompt to save the current scene if there are unsaved changes
 
@@ -780,6 +816,8 @@ namespace PROJECT_NAME
 		m_EditorScene = newScene;
 		m_EditorScene->OnViewportResize(static_cast<uint32_t>(m_ViewportSize.x), static_cast<uint32_t>(m_ViewportSize.y));
 		m_HierarchyPanel.SetContext(m_EditorScene);
+
+		m_UndoRedo.Clear();
 
 		m_ActiveScene = m_EditorScene;
 	}
@@ -801,7 +839,11 @@ namespace PROJECT_NAME
 		m_ActiveScene->OnViewportResize(static_cast<uint32_t>(m_ViewportSize.x), static_cast<uint32_t>(m_ViewportSize.y));
 		m_EditorScene = m_ActiveScene;
 		m_ActiveScenePath.clear();
+
+		ResetHoveredEntity();
+
 		m_HierarchyPanel.SetContext(m_ActiveScene);
+		m_UndoRedo.Clear();
 	}
 
 	void EditorLayer::DrawViewport()
@@ -1054,14 +1096,26 @@ namespace PROJECT_NAME
 
 			if (ImGui::BeginMenu("Edit"))
 			{
-				/// Todo: Implement undo/redo system
-				if (ImGui::MenuItem("Undo", "Ctrl+Z", false, false))
+				const bool canEdit = m_SceneState == SceneState::Edit;
+				const bool canUndo = canEdit && m_UndoRedo.CanUndo();
+				const bool canRedo = canEdit && m_UndoRedo.CanRedo();
+
+				const std::string undoName = m_UndoRedo.GetUndoName();
+				const std::string redoName = m_UndoRedo.GetRedoName();
+				const std::string undoLabel = (undoName.empty() ? "Undo" : "Undo " + undoName) + "##Undo";
+				const std::string redoLabel = (redoName.empty() ? "Redo" : "Redo " + redoName) + "##Redo";
+
+				if (ImGui::MenuItem(undoLabel.c_str(), "Ctrl+Z", false, canUndo))
 				{
+					Undo();
 				}
-				if (ImGui::MenuItem("Redo", "Ctrl+Y", false, false))
+				if (ImGui::MenuItem(redoLabel.c_str(), "Ctrl+Y", false, canRedo))
 				{
+					Redo();
 				}
+
 				ImGui::Separator();
+
 				if (ImGui::MenuItem("Cut", "Ctrl+X", false, false))
 				{
 				}
@@ -1107,6 +1161,32 @@ namespace PROJECT_NAME
 			}
 
 			ImGui::EndMenuBar();
+		}
+	}
+
+	void EditorLayer::Undo()
+	{
+		m_UndoRedo.Undo();
+		RefreshSelectionAfterHistoryChange();
+	}
+
+	void EditorLayer::Redo()
+	{
+		m_UndoRedo.Redo();
+		RefreshSelectionAfterHistoryChange();
+	}
+
+	void EditorLayer::RefreshSelectionAfterHistoryChange()
+	{
+		const Entity selected = m_HierarchyPanel.GetSelectedEntity();
+		if (selected && m_ActiveScene && !m_ActiveScene->IsEntityValid(selected))
+			m_HierarchyPanel.SetSelectedEntity({});
+
+		/// Undo/redo can destroy the hovered entity without going through the
+		/// hierarchy's deletion callback, so its handle has to be invalidated here.
+		if (m_HoveredEntity && m_ActiveScene && !m_ActiveScene->IsEntityValid(m_HoveredEntity))
+		{
+            ResetHoveredEntity();
 		}
 	}
 
@@ -1216,7 +1296,7 @@ namespace PROJECT_NAME
         ImGui::Text("Render image size: %.2f x %.2f", renderImageSize.x, renderImageSize.y);
 
 		std::string hoveredEntityName = "None";
-		if (m_HoveredEntity)
+		if (m_HoveredEntity && m_ActiveScene && m_ActiveScene->IsEntityValid(m_HoveredEntity))
 		{
 			hoveredEntityName = m_HoveredEntity.GetComponent<TagComponent>().Tag;
 		}
@@ -1426,6 +1506,9 @@ namespace PROJECT_NAME
 		const bool ctrl = Input::IsKeyPressed(Key::LeftControl) || Input::IsKeyPressed(Key::RightControl);
 		const bool shift = Input::IsKeyPressed(Key::LeftShift) || Input::IsKeyPressed(Key::RightShift);
 
+		const bool isInputCaptured = ImGui::GetIO().WantTextInput || ImGui::IsAnyItemActive();
+        const bool isInEditMode = m_SceneState == SceneState::Edit;
+
 		switch (event.GetKeyCode())
 		{
 		case Key::S:
@@ -1458,20 +1541,44 @@ namespace PROJECT_NAME
 				LoadScene();
 			}
 			break;
+		case Key::Z:
+			if (ctrl && isInEditMode && !ImGui::GetIO().WantTextInput && !ImGui::IsAnyItemActive())
+			{
+				Undo();
+			}
+			break;
+		case Key::Y:
+			if (ctrl && isInEditMode && !ImGui::GetIO().WantTextInput && !ImGui::IsAnyItemActive())
+			{
+				Redo();
+			}
+			break;
 
 			/// Gizmos
-		case Key::Q:
-			m_GizmoType = GizmoType::None;
+		case Key::Q: 
+		    if (!isInputCaptured)
+		    {
+			    m_GizmoType = GizmoType::None;
+		    }
 			break;
 		case Key::W:
-			m_GizmoType = GizmoType::Translate;
-			break;
+            if (!isInputCaptured)
+            {
+			    m_GizmoType = GizmoType::Translate;
+            }
+            break;
 		case Key::E:
-			m_GizmoType = GizmoType::Scale;
-			break;
+            if (!isInputCaptured)
+            {
+			    m_GizmoType = GizmoType::Scale;
+            }
+            break;
 		case Key::R:
-			m_GizmoType = GizmoType::Rotate;
-			break;
+            if (!isInputCaptured)
+            {
+			    m_GizmoType = GizmoType::Rotate;
+            }
+            break;
 		case Key::F:
 		{
 			if (const Entity &entity = m_HierarchyPanel.GetSelectedEntity())
@@ -1494,7 +1601,10 @@ namespace PROJECT_NAME
 		/// TODO: Check if isViewportHovered is needed, Application::BlockEvents should prevent this from firing
 		if (event.GetButton() == Mouse::ButtonLeft && !ImGuizmo::IsOver() && !Input::IsKeyPressed(Key::LeftAlt) && m_ViewportHovered)
 		{
-			m_HierarchyPanel.SetSelectedEntity(m_HoveredEntity);
+			if (m_HoveredEntity && m_ActiveScene && m_ActiveScene->IsEntityValid(m_HoveredEntity))
+				m_HierarchyPanel.SetSelectedEntity(m_HoveredEntity);
+			else
+				m_HierarchyPanel.SetSelectedEntity({});
 		}
 		return false;
 	}
@@ -1548,5 +1658,11 @@ namespace PROJECT_NAME
             }
             counter++;
         }
+    }
+
+    void EditorLayer::ResetHoveredEntity()
+    {
+        m_HoveredEntity = {};
+        m_HoveredEntityDeletedLastFrame = true;
     }
 }
