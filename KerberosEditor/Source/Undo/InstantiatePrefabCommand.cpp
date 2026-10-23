@@ -49,7 +49,11 @@ namespace Kerberos {
 			return;
 
 		if (const Entity root = m_Scene->TryGetEntityByUUID(m_EntityID))
+		{
+            m_ParentID = root.GetComponent<HierarchyComponent>().Parent;
+            m_SerializedSubtree = SceneSerializer::SerializeEntitySubtree(m_Scene, root);
 			m_Scene->DestroyEntity(root);
+		}
 	}
 
 	const std::string& InstantiatePrefabCommand::GetName() const

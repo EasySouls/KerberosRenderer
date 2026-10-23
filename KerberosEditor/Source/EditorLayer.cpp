@@ -117,8 +117,7 @@ namespace PROJECT_NAME
 		{
 			if (m_HoveredEntity == entity)
 			{
-				m_HoveredEntity = {};
-				m_HoveredEntityDeletedLastFrame = true;
+                ResetHoveredEntity();
 			} 
 		});
 
@@ -354,8 +353,7 @@ namespace PROJECT_NAME
 
 		m_SceneState = SceneState::Play;
 
-		m_HoveredEntity = {};
-		m_HoveredEntityDeletedLastFrame = true;
+		ResetHoveredEntity();
 
 		/// Runtime edits target the scene copy, so the editor history must not record them.
 		m_HierarchyPanel.SetUndoRedoManager(nullptr);
@@ -375,8 +373,7 @@ namespace PROJECT_NAME
 	{
 		m_SceneState = SceneState::Simulate;
 
-		m_HoveredEntity = {};
-		m_HoveredEntityDeletedLastFrame = true;
+		ResetHoveredEntity();
 
 		m_HierarchyPanel.SetUndoRedoManager(nullptr);
 
@@ -402,8 +399,7 @@ namespace PROJECT_NAME
 		m_IsScenePaused = false;
 
 		/// The runtime scene is released below, so the hover cannot keep a pointer into it.
-		m_HoveredEntity = {};
-		m_HoveredEntityDeletedLastFrame = true;
+        ResetHoveredEntity();
 
 		m_RuntimeScene = nullptr;
 
@@ -652,6 +648,7 @@ namespace PROJECT_NAME
 
 		m_AssetsPanel = CreateOwner<AssetsPanel>(m_NotificationManager);
 
+		ResetHoveredEntity();
 		m_UndoRedo.Clear();
 
 		if (!Project::SaveActive())
@@ -801,8 +798,7 @@ namespace PROJECT_NAME
 			OnSceneStop();
 		}
 
-		m_HoveredEntity = {};
-		m_HoveredEntityDeletedLastFrame = true;
+		ResetHoveredEntity();
 
 		/// TODO: Prompt to save the current scene if there are unsaved changes
 
@@ -844,8 +840,7 @@ namespace PROJECT_NAME
 		m_EditorScene = m_ActiveScene;
 		m_ActiveScenePath.clear();
 
-		m_HoveredEntity = {};
-		m_HoveredEntityDeletedLastFrame = true;
+		ResetHoveredEntity();
 
 		m_HierarchyPanel.SetContext(m_ActiveScene);
 		m_UndoRedo.Clear();
@@ -1191,8 +1186,7 @@ namespace PROJECT_NAME
 		/// hierarchy's deletion callback, so its handle has to be invalidated here.
 		if (m_HoveredEntity && m_ActiveScene && !m_ActiveScene->IsEntityValid(m_HoveredEntity))
 		{
-			m_HoveredEntity = {};
-			m_HoveredEntityDeletedLastFrame = true;
+            ResetHoveredEntity();
 		}
 	}
 
@@ -1664,5 +1658,11 @@ namespace PROJECT_NAME
             }
             counter++;
         }
+    }
+
+    void EditorLayer::ResetHoveredEntity()
+    {
+        m_HoveredEntity = {};
+        m_HoveredEntityDeletedLastFrame = true;
     }
 }

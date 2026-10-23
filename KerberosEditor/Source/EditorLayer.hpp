@@ -90,6 +90,8 @@ namespace Kerberos
 
         static std::filesystem::path LookForNameForNewScene(const std::filesystem::path& startingPath, const std::string& defaultName);
 
+		void ResetHoveredEntity();
+
 	private:
 		float m_Time = 0.0f;
 		float m_Fps = 0.0f;

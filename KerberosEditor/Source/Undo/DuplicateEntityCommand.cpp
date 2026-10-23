@@ -53,7 +53,11 @@ namespace Kerberos {
 			return;
 
 		if (const Entity duplicate = m_Scene->TryGetEntityByUUID(m_DuplicateID))
+		{
+            m_ParentID = duplicate.GetComponent<HierarchyComponent>().Parent;
+            m_SerializedSubtree = SceneSerializer::SerializeEntitySubtree(m_Scene, duplicate);
 			m_Scene->DestroyEntity(duplicate);
+		}
 	}
 
 	const std::string& DuplicateEntityCommand::GetName() const
