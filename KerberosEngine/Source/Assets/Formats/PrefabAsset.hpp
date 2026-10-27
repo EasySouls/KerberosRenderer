@@ -25,7 +25,7 @@ struct SkinComponentTemplate
     std::vector<UUID> JointEntityIDs; // legacy UUID refs
 };
 
-struct SkeletalMeshComponentTemplate
+struct SkinnedMeshComponentTemplate
 {
     AssetHandle MeshAsset = AssetHandle::Invalid();
     AssetHandle SkeletonAsset = AssetHandle::Invalid();
@@ -64,7 +64,7 @@ struct PrefabEntityTemplate
     glm::vec3 EulerRotation = glm::vec3(0.0f);
 
     std::optional<SkinComponentTemplate> Skin;
-    std::optional<SkeletalMeshComponentTemplate> SkeletalMesh;
+    std::optional<SkinnedMeshComponentTemplate> SkinnedMesh;
     std::optional<AnimationComponentTemplate> Animation;
     std::optional<RigidBody3DComponent> RigidBody;
     std::optional<BoxCollider3DComponent> BoxCollider;

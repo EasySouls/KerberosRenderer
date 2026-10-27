@@ -267,17 +267,17 @@ Entity Scene::InstantiatePrefab(const AssetHandle prefabHandle, const std::strin
 			SetParent(child, entityMapping[parentLocal], false);
 		}
 
-		if (child.HasComponent<SkinComponent>())
+		if (child.HasComponent<SkeletonComponent>())
 		{
 			for (auto joint : prefabEntity.Skin->JointEntityIndices)
 			{
 				if (entityMapping.contains(joint)) 
-				    child.GetComponent<SkinComponent>().JointEntities.push_back(entityMapping[joint].GetUUID());
+				    child.GetComponent<SkeletonComponent>().JointEntities.push_back(entityMapping[joint].GetUUID());
 			}
 			for (const auto& jointId : prefabEntity.Skin->JointEntityIDs)
 			{
 				if (legacyIndices.contains(jointId)) 
-				    child.GetComponent<SkinComponent>().JointEntities.push_back(entityMapping[legacyIndices[jointId]].GetUUID());
+				    child.GetComponent<SkeletonComponent>().JointEntities.push_back(entityMapping[legacyIndices[jointId]].GetUUID());
 			}
 		}
 		if (child.HasComponent<RigidBody3DComponent>()) child.GetComponent<RigidBody3DComponent>().RuntimeBody = nullptr;
@@ -859,10 +859,10 @@ Entity Scene::InstantiatePrefab(const AssetHandle prefabHandle, const std::strin
 			particleEmitter.spawnAccumulator = 0.0f;
 			newEntity.AddComponent<ParticleEmitterComponent>(particleEmitter);
 		}
-		if (sourceRegistry.all_of<SkinComponent>(sourceEntity))
-			newEntity.AddComponent<SkinComponent>(sourceRegistry.get<SkinComponent>(sourceEntity));
-		if (sourceRegistry.all_of<SkeletalMeshComponent>(sourceEntity))
-			newEntity.AddComponent<SkeletalMeshComponent>(sourceRegistry.get<SkeletalMeshComponent>(sourceEntity));
+		if (sourceRegistry.all_of<SkeletonComponent>(sourceEntity))
+			newEntity.AddComponent<SkeletonComponent>(sourceRegistry.get<SkeletonComponent>(sourceEntity));
+		if (sourceRegistry.all_of<SkinnedMeshComponent>(sourceEntity))
+			newEntity.AddComponent<SkinnedMeshComponent>(sourceRegistry.get<SkinnedMeshComponent>(sourceEntity));
 		if (sourceRegistry.all_of<AnimationComponent>(sourceEntity))
 		{
 			auto animation = sourceRegistry.get<AnimationComponent>(sourceEntity);
@@ -870,6 +870,8 @@ Entity Scene::InstantiatePrefab(const AssetHandle prefabHandle, const std::strin
 			animation.IsPlaying = false;
 			newEntity.AddComponent<AnimationComponent>(animation);
 		}
+		if (sourceRegistry.all_of<JointComponent>(sourceEntity))
+			newEntity.AddComponent<JointComponent>(sourceRegistry.get<JointComponent>(sourceEntity));
 
 		/// Set parent if this is a child entity
 		if (parentNewEntity != entt::null)
@@ -1224,13 +1226,18 @@ Entity Scene::InstantiatePrefab(const AssetHandle prefabHandle, const std::strin
 	{
 	}
 
-	template <>
-	void Scene::OnComponentAdded<SkinComponent>(Entity, SkinComponent&)
+    template <>
+	void Scene::OnComponentAdded<JointComponent>(Entity, JointComponent&)
 	{
 	}
 
 	template <>
-	void Scene::OnComponentAdded<SkeletalMeshComponent>(Entity, SkeletalMeshComponent&)
+	void Scene::OnComponentAdded<SkeletonComponent>(Entity, SkeletonComponent&)
+	{
+	}
+
+	template <>
+	void Scene::OnComponentAdded<SkinnedMeshComponent>(Entity, SkinnedMeshComponent&)
 	{
 	}
 

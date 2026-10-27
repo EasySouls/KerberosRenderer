@@ -101,7 +101,7 @@ ImportResult GLTFPipelineImporter::Import(const ImportContext &context)
                 continue;
 
             if (record.Kind == "material") type = AssetType::Material;
-            else if (record.Kind == "skeleton") type = AssetType::Skin;
+            else if (record.Kind == "skeleton") type = AssetType::Skeleton;
             else if (record.Kind == "animation") type = AssetType::Animation;
         }
 
@@ -133,7 +133,7 @@ ImportResult GLTFPipelineImporter::Import(const ImportContext &context)
         else if (output.Type == AssetType::Prefab)
         {
             for (const auto& candidate : result.Outputs)
-                if (candidate.Type == AssetType::Mesh || candidate.Type == AssetType::Material || candidate.Type == AssetType::Skin || candidate.Type == AssetType::Animation)
+                if (candidate.Type == AssetType::Mesh || candidate.Type == AssetType::Material || candidate.Type == AssetType::Skeleton || candidate.Type == AssetType::Animation)
                     if (candidate.Handle.IsValid()) output.Dependencies.push_back(candidate.Handle);
         }
     }

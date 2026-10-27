@@ -46,19 +46,25 @@ namespace Kerberos
 				return SoundImporter::ImportSound(handle, metadata);
 			case AssetType::Mesh:
 				return MeshImporter::ImportMesh(handle, metadata);
-				break;
 			case AssetType::Prefab:
 				return PrefabImporter::ImportPrefab(handle, metadata);
-				break;
 			case AssetType::Animation:
 				// TODO: Implement AnimationImporter
 				Log::CoreWarn("Animation import not yet implemented");
 				break;
-            case AssetType::Skin:
+            case AssetType::Skeleton:
+                // TODO: Implement SkeletonImporter
+                Log::CoreWarn("Skeleton import not yet implemented");
+                break;
+            case AssetType::SkinnedMesh:
+                // TODO: Implement SkinnedMeshImporter
+                Log::CoreWarn("SkinnedMesh import not yet implemented");
+                break;
+            default:
                 break;
         }
 
-		KBRAssert(false, "Unsupported asset type by AssetImporter!");
+		KBRAssert("Unsupported asset type by AssetImporter!");
 		return nullptr;
 	}
 

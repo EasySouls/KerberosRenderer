@@ -19,8 +19,11 @@ enum class AssetType : uint8_t
 	Sound,
     ModelDEPRECATED [[deprecated("Use Prefab for imported glTF sources instead of Model")]],
 	Prefab,
+	Skeleton,
+	SkinnedMesh,
 	Animation,
-	Skin
+
+	Count
 };
 
 class Asset

@@ -318,22 +318,22 @@ static void SerializeEntity(YAML::Emitter& out, const Entity entity)
         out << YAML::EndMap;
     }
 
-    if (entity.HasComponent<SkeletalMeshComponent>()) {
-        out << YAML::Key << "SkeletalMeshComponent";
+    if (entity.HasComponent<SkinnedMeshComponent>()) {
+        out << YAML::Key << "SkinnedMeshComponent";
         out << YAML::BeginMap;
-        const auto& skeletalMesh = entity.GetComponent<SkeletalMeshComponent>();
-        out << YAML::Key << "MeshAsset" << YAML::Value << skeletalMesh.MeshAsset;
-        out << YAML::Key << "SkeletonAsset" << YAML::Value << skeletalMesh.SkeletonAsset;
-        out << YAML::Key << "MaterialAsset" << YAML::Value << skeletalMesh.MaterialAsset;
-        out << YAML::Key << "Visible" << YAML::Value << skeletalMesh.Visible;
-        out << YAML::Key << "CastShadows" << YAML::Value << skeletalMesh.CastShadows;
+        const auto& skinnedMesh = entity.GetComponent<SkinnedMeshComponent>();
+        out << YAML::Key << "MeshAsset" << YAML::Value << skinnedMesh.MeshAsset;
+        out << YAML::Key << "SkeletonAsset" << YAML::Value << skinnedMesh.SkeletonAsset;
+        out << YAML::Key << "MaterialAsset" << YAML::Value << skinnedMesh.MaterialAsset;
+        out << YAML::Key << "Visible" << YAML::Value << skinnedMesh.Visible;
+        out << YAML::Key << "CastShadows" << YAML::Value << skinnedMesh.CastShadows;
         out << YAML::EndMap;
     }
 
-    if (entity.HasComponent<SkinComponent>()) {
-        out << YAML::Key << "SkinComponent";
+    if (entity.HasComponent<SkeletonComponent>()) {
+        out << YAML::Key << "SkeletonComponent";
         out << YAML::BeginMap;
-        const auto& skin = entity.GetComponent<SkinComponent>();
+        const auto& skin = entity.GetComponent<SkeletonComponent>();
         out << YAML::Key << "SkeletonAsset" << YAML::Value << skin.SkeletonAsset;
         out << YAML::Key << "JointEntities" << YAML::Value << YAML::BeginSeq;
         for (const auto& jointEntity : skin.JointEntities) {
@@ -658,17 +658,17 @@ Entity SceneSerializer::DeserializeEntity(const Ref<Scene>& scene, const YAML::N
             prefabInstanceComponent["IsExpandedInHierarchy"].as<bool>(true);
     }
 
-    if (auto skeletalMeshComponent = node["SkeletalMeshComponent"]) {
-        auto& skeletalMesh = deserializedEntity.AddComponent<SkeletalMeshComponent>();
-        skeletalMesh.MeshAsset = AssetHandle(skeletalMeshComponent["MeshAsset"].as<uint64_t>());
-        skeletalMesh.SkeletonAsset = AssetHandle(skeletalMeshComponent["SkeletonAsset"].as<uint64_t>());
-        skeletalMesh.MaterialAsset = AssetHandle(skeletalMeshComponent["MaterialAsset"].as<uint64_t>());
-        skeletalMesh.Visible = skeletalMeshComponent["Visible"].as<bool>(true);
-        skeletalMesh.CastShadows = skeletalMeshComponent["CastShadows"].as<bool>(true);
+    if (auto skinnedMeshComponent = node["SkinnedMeshComponent"]) {
+        auto& skinnedMesh = deserializedEntity.AddComponent<SkinnedMeshComponent>();
+        skinnedMesh.MeshAsset = AssetHandle(skinnedMeshComponent["MeshAsset"].as<uint64_t>());
+        skinnedMesh.SkeletonAsset = AssetHandle(skinnedMeshComponent["SkeletonAsset"].as<uint64_t>());
+        skinnedMesh.MaterialAsset = AssetHandle(skinnedMeshComponent["MaterialAsset"].as<uint64_t>());
+        skinnedMesh.Visible = skinnedMeshComponent["Visible"].as<bool>(true);
+        skinnedMesh.CastShadows = skinnedMeshComponent["CastShadows"].as<bool>(true);
     }
 
-    if (auto skinComponent = node["SkinComponent"]) {
-        auto& skin = deserializedEntity.AddComponent<SkinComponent>();
+    if (auto skinComponent = node["SkeletonComponent"]) {
+        auto& skin = deserializedEntity.AddComponent<SkeletonComponent>();
         skin.SkeletonAsset = AssetHandle(skinComponent["SkeletonAsset"].as<uint64_t>());
         if (auto jointEntities = skinComponent["JointEntities"]) {
             for (const auto& jointEntity : jointEntities) {

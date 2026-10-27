@@ -24,6 +24,8 @@
 #include "Profiling/Profilers.hpp"
 #include "Upscaling/FSR/FSR3Upscaler.hpp"
 #include "Upscaling/Native/NativeUpscaler.hpp"
+#include "Animation/AnimationSystem.hpp"
+#include "Animation/SkinningSystem.hpp"
 
 #include <glm/gtc/matrix_inverse.hpp>
 
@@ -498,6 +500,8 @@ struct RendererData
     RayTracingSceneCache RayTracingCache{};
     ParticleSystem ParticleSystem{};
     GrassSystem GrassSystem{};
+    AnimationSystem AnimationSystem{};
+    SkinningSystem SkinningSystem{};
 
     /**
      * Size of the viewport, and the final image presented to the swapchain
@@ -634,6 +638,8 @@ void Renderer::Shutdown()
     }
     
     s_Data->Upscaler->Release();
+    s_Data->SkinningSystem.Shutdown();
+    s_Data->AnimationSystem.Shutdown();
 
     s_Data.reset();
     s_Data = nullptr;
@@ -1384,7 +1390,12 @@ void Renderer::RecordQueuedSceneRender(const vk::raii::CommandBuffer& cmd)
     std::array<std::byte, frameArenaSize> frameArenaBuffer;
     std::pmr::monotonic_buffer_resource frameArena(frameArenaBuffer.data(), frameArenaBuffer.size());
 
+    s_Data->AnimationSystem.BeginFrame(s_Data->PendingRender.Scene, s_Data->PendingRender.DeltaTime, false);
+    s_Data->SkinningSystem.BeginFrame(s_Data->PendingRender.Scene, s_Data->AnimationSystem.GetSkinningSnapshot());
+
     if (IsUsingAccelerationStructures()) {
+        // TODO: This should happen after animation and skinning passes, so that the acceleration structures are built
+        // with the final vertex positions.
         s_Data->RayTracingCache.BuildAccelerationStructures(s_Data->PendingRender.Scene, cmd, frameIndex);
 
         const auto& tlas = s_Data->RayTracingCache.GetTLAS(frameIndex);
@@ -2585,6 +2596,9 @@ void Renderer::CreateResources()
         s_Data->SkyboxPipeline = CreateRef<GraphicsPipeline>(skyboxPipelineSpec);
     }
 
+    s_Data->AnimationSystem.Initialize(s_Data->PersistentDescriptorAllocator);
+    s_Data->SkinningSystem.Initialize();
+
     s_Data->ParticleSystem.Initialize(s_Data->ColorImage.Format,
                                       s_Data->DepthImage.Format,
                                       s_Data->ReactiveImage.Format,
@@ -3714,6 +3728,10 @@ void Renderer::RecompileShaders()
         smaaBlendPipeline->Recompile();
     if (const auto& smaaNeighborhoodPipeline = s_Data->SMAAResources.NeighborhoodBlendingPipeline)
         smaaNeighborhoodPipeline->Recompile();
+
+    s_Data->AnimationSystem.RecompileShaders();
+    s_Data->ParticleSystem.RecompileShaders();
+    s_Data->SkinningSystem.RecompileShaders();
 }
 
 glm::vec3 Renderer::GetLightPositionForShadowMapCalculation()
@@ -5017,6 +5035,9 @@ void Renderer::CompileAndExecuteRenderGraph(const vk::raii::CommandBuffer& cmd,
                 Renderer::HandleMousePickingReadback(execCmd);
             };
         });
+
+        s_Data->AnimationSystem.AddPasses(s_Data->RenderGraph, frameIndex);
+        s_Data->SkinningSystem.AddPasses(s_Data->RenderGraph, frameIndex);
 
         s_Data->RenderGraph.Compile();
     }

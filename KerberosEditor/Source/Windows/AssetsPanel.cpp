@@ -13,7 +13,6 @@
 #include <imgui/imgui.h>
 
 #include <algorithm>
-#include <cctype>
 #include <string_view>
 
 #include "VulkanContext.hpp"
@@ -63,8 +62,10 @@ const char* AssetTypeIcon(const AssetType type)
         return "[AUDIO]";
     case AssetType::Animation:
         return "[ANIM]";
-    case AssetType::Skin:
-        return "[SKIN]";
+    case AssetType::Skeleton:
+        return "[SKELETON]";
+    case AssetType::SkinnedMesh:
+        return "[SKINNED]";
     default:
         return "[ASSET]";
     }
@@ -79,7 +80,7 @@ std::string AssetDisplayName(const AssetMetadata& metadata, const AssetHandle ha
     return std::format("Asset {}", static_cast<uint64_t>(handle));
 }
 
-std::string ToLowerCopy(std::string_view text)
+std::string ToLowerCopy(const std::string_view text)
 {
     std::string result(text);
     std::ranges::transform(result, result.begin(), [](const unsigned char c) {
@@ -1165,6 +1166,12 @@ std::string AssetStatusLabel(const AssetHandle handle,
             break;
         case AssetType::Material:
             payloadType = assetBrowserMaterial;
+            break;
+        case AssetType::Skeleton:
+            payloadType = assetBrowserSkeleton;
+            break;
+        case AssetType::SkinnedMesh:
+            payloadType = assetBrowserSkinnedMesh;
             break;
         default:
             payloadType = assetBrowserItem;

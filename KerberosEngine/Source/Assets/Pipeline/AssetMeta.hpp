@@ -26,6 +26,7 @@ enum class SubAssetKind : uint8_t
     Skeleton,
     AnimationClip,
     Texture,
+    SkinnedMesh
 };
 
 struct SubAssetMetaEntry

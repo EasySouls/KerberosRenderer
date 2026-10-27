@@ -13,14 +13,14 @@ void PrefabEntityTemplate::ToEntity(Entity newEntity) const
     transform.Rotation = Transform.Rotation;
     transform.Scale = Transform.Scale;
     transform.WorldTransform = glm::mat4(1.0f);
-    if (SkeletalMesh)
+    if (SkinnedMesh)
     {
-        auto& c = newEntity.AddComponent<SkeletalMeshComponent>();
-        c.MeshAsset = SkeletalMesh->MeshAsset;
-        c.SkeletonAsset = SkeletalMesh->SkeletonAsset;
-        c.MaterialAsset = SkeletalMesh->MaterialAsset;
-        c.Visible = SkeletalMesh->Visible;
-        c.CastShadows = SkeletalMesh->CastShadows;
+        auto& c = newEntity.AddComponent<SkinnedMeshComponent>();
+        c.MeshAsset = SkinnedMesh->MeshAsset;
+        c.SkeletonAsset = SkinnedMesh->SkeletonAsset;
+        c.MaterialAsset = SkinnedMesh->MaterialAsset;
+        c.Visible = SkinnedMesh->Visible;
+        c.CastShadows = SkinnedMesh->CastShadows;
     }
     if (Animation)
     {
@@ -33,9 +33,8 @@ void PrefabEntityTemplate::ToEntity(Entity newEntity) const
     }
     if (Skin)
     {
-        auto& c = newEntity.AddComponent<SkinComponent>();
+        auto& c = newEntity.AddComponent<SkeletonComponent>();
         c.SkeletonAsset = Skin->SkeletonAsset;
-        c.JointMatrices.clear();
     }
     if (HasStaticMesh && StaticMeshAsset.IsValid())
     {

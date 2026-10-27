@@ -18,16 +18,16 @@ AssetType AssetTypeFromString(const std::string_view typeStr)
         return AssetType::Scene;
     if (typeStr == "Sound")
         return AssetType::Sound;
-    if (typeStr == "Model")
-        return AssetType::ModelDEPRECATED;
     if (typeStr == "Prefab")
         return AssetType::Prefab;
+    if (typeStr == "Skeleton")
+        return AssetType::Skeleton;
+    if (typeStr == "SkinnedMesh")
+        return AssetType::SkinnedMesh;
     if (typeStr == "Animation")
         return AssetType::Animation;
-    if (typeStr == "Skin")
-        return AssetType::Skin;
 
-    KBRAssert(false, "Unknown asset type: {0}", typeStr);
+    KBRAssert("Unknown asset type: {0}", typeStr);
     return AssetType::Texture2D;
 }
 
@@ -46,17 +46,19 @@ std::string_view AssetTypeToString(const AssetType type)
         return "Scene";
     case AssetType::Sound:
         return "Sound";
-    case AssetType::ModelDEPRECATED:
-        return "Model";
     case AssetType::Prefab:
         return "Prefab";
+    case AssetType::Skeleton:
+        return "Skeleton";
+    case AssetType::SkinnedMesh:
+        return "SkinnedMesh";
     case AssetType::Animation:
         return "Animation";
-    case AssetType::Skin:
-        return "Skin";
+    default:
+        break;
     }
 
-    KBRAssert(false, "Unknown Asset Type!");
+    KBRAssert("Unknown Asset Type!");
     return "";
 }
 

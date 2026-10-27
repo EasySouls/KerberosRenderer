@@ -127,11 +127,14 @@ AssetBuildReport AssetBuildCoordinator::Build(const std::filesystem::path& sourc
     meta.SubAssets.clear();
     for (const auto& output : result.Outputs)
     {
-        const auto kind = output.Type == AssetType::Mesh ? SubAssetKind::Mesh :
+        const SubAssetKind kind = output.Type == AssetType::Mesh ? SubAssetKind::Mesh :
             output.Type == AssetType::Material ? SubAssetKind::Material :
             output.Type == AssetType::Texture2D ? SubAssetKind::Texture :
             output.Type == AssetType::Animation ? SubAssetKind::AnimationClip :
-            output.Type == AssetType::Skin ? SubAssetKind::Skeleton : SubAssetKind::Prefab;
+            output.Type == AssetType::Skeleton ? SubAssetKind::Skeleton : 
+            output.Type == AssetType::SkinnedMesh ? SubAssetKind::SkinnedMesh 
+            : SubAssetKind::Prefab;
+
         meta.SubAssets.push_back({ .LocalKey = output.SubAssetKey, .Handle = output.Handle, .Kind = kind });
     }
     if (!m_MetaService.SaveMeta(source, meta)) 

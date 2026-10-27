@@ -29,6 +29,8 @@ namespace Kerberos
 	constexpr const char* assetBrowserFont = "ASSET_BROWSER_FONT";
     constexpr const char* assetBrowserMaterial = "ASSET_BROWSER_MATERIAL";
     constexpr const char* assetBrowserPrefab = "ASSET_BROWSER_PREFAB";
+    constexpr const char* assetBrowserSkeleton = "ASSET_BROWSER_SKELETON";
+    constexpr const char* assetBrowserSkinnedMesh = "ASSET_BROWSER_SKINNED_MESH";
 
     /// Dragging an entity out of the hierarchy. The payload is a uint64_t UUID.
     constexpr const char* hierarchyEntity = "HIERARCHY_ENTITY";

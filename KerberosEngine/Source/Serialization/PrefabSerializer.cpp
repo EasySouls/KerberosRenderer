@@ -70,14 +70,14 @@ namespace Kerberos
 				for (auto joint : e.Skin->JointEntityIndices) out << joint;
 				out << YAML::EndSeq << YAML::EndMap;
 			}
-			if (e.SkeletalMesh)
+			if (e.SkinnedMesh)
 			{
-				out << YAML::Key << "SkeletalMesh" << YAML::Value << YAML::BeginMap;
-				WriteHandle(out, "MeshAsset", e.SkeletalMesh->MeshAsset);
-				WriteHandle(out, "SkeletonAsset", e.SkeletalMesh->SkeletonAsset);
-				WriteHandle(out, "MaterialAsset", e.SkeletalMesh->MaterialAsset);
-				out << YAML::Key << "Visible" << YAML::Value << e.SkeletalMesh->Visible
-					<< YAML::Key << "CastShadows" << YAML::Value << e.SkeletalMesh->CastShadows << YAML::EndMap;
+				out << YAML::Key << "SkinnedMesh" << YAML::Value << YAML::BeginMap;
+				WriteHandle(out, "MeshAsset", e.SkinnedMesh->MeshAsset);
+				WriteHandle(out, "SkeletonAsset", e.SkinnedMesh->SkeletonAsset);
+				WriteHandle(out, "MaterialAsset", e.SkinnedMesh->MaterialAsset);
+				out << YAML::Key << "Visible" << YAML::Value << e.SkinnedMesh->Visible
+					<< YAML::Key << "CastShadows" << YAML::Value << e.SkinnedMesh->CastShadows << YAML::EndMap;
 			}
 			if (e.Animation)
 			{
@@ -192,45 +192,45 @@ namespace Kerberos
 			e.MeshAssetPath = n["MeshAssetPath"].as<std::string>("");
 			e.MaterialAssetPath = n["MaterialAssetPath"].as<std::string>("");
 
-			if (n["Skin"]) 
+			if (const YAML::Node& skinNode = n["Skin"]) 
 			{
 				SkinComponentTemplate s;
-				s.SkeletonAsset = AssetHandle(n["Skin"]["SkeletonAsset"].as<uint64_t>(0));
-				if (n["Skin"]["JointEntityIndices"])
+				s.SkeletonAsset = AssetHandle(skinNode["SkeletonAsset"].as<uint64_t>(0));
+				if (skinNode["JointEntityIndices"])
 				{
-					for (const auto& j : n["Skin"]["JointEntityIndices"]) 
+					for (const auto& j : skinNode["JointEntityIndices"]) 
 						s.JointEntityIndices.push_back(j.as<PrefabLocalIndex>());
 				}
 				e.Skin = s;
 			}
 
-			if (n["SkeletalMesh"]) 
+			if (const YAML::Node& skinnedMeshNode = n["SkinnedMesh"]) 
 			{
-				SkeletalMeshComponentTemplate s;
-				s.MeshAsset = AssetHandle(n["SkeletalMesh"]["MeshAsset"].as<uint64_t>(0));
-				s.SkeletonAsset = AssetHandle(n["SkeletalMesh"]["SkeletonAsset"].as<uint64_t>(0));
-				s.MaterialAsset = AssetHandle(n["SkeletalMesh"]["MaterialAsset"].as<uint64_t>(0));
-				s.Visible = n["SkeletalMesh"]["Visible"].as<bool>(true);
-				s.CastShadows = n["SkeletalMesh"]["CastShadows"].as<bool>(true);
-				e.SkeletalMesh = s;
+				SkinnedMeshComponentTemplate s;
+				s.MeshAsset = AssetHandle(skinnedMeshNode["MeshAsset"].as<uint64_t>(0));
+				s.SkeletonAsset = AssetHandle(skinnedMeshNode["SkeletonAsset"].as<uint64_t>(0));
+				s.MaterialAsset = AssetHandle(skinnedMeshNode["MaterialAsset"].as<uint64_t>(0));
+				s.Visible = skinnedMeshNode["Visible"].as<bool>(true);
+				s.CastShadows = skinnedMeshNode["CastShadows"].as<bool>(true);
+				e.SkinnedMesh = s;
 			}
 
-			if (n["Animation"]) 
+			if (const YAML::Node& animationNode = n["Animation"]) 
 			{
 				AnimationComponentTemplate a;
-				a.AnimationAsset = AssetHandle(n["Animation"]["AnimationAsset"].as<uint64_t>(0));
-				a.PlaybackSpeed = n["Animation"]["PlaybackSpeed"].as<float>(1.0f);
-				a.Loop = n["Animation"]["Loop"].as<bool>(true);
-				a.AutoPlay = n["Animation"]["AutoPlay"].as<bool>(true);
+				a.AnimationAsset = AssetHandle(animationNode["AnimationAsset"].as<uint64_t>(0));
+				a.PlaybackSpeed = animationNode["PlaybackSpeed"].as<float>(1.0f);
+				a.Loop = animationNode["Loop"].as<bool>(true);
+				a.AutoPlay = animationNode["AutoPlay"].as<bool>(true);
 				e.Animation = a;
 			}
 
-			if (n["RigidBody"])
+			if (const YAML::Node& rigidBodyNode = n["RigidBody"])
 			{
 				RigidBody3DComponent r;
-				r.Type = static_cast<RigidBody3DComponent::BodyType>(n["RigidBody"]["Type"].as<int>(1));
-				r.Mass = n["RigidBody"]["Mass"].as<float>(1.0f);
-				r.UseGravity = n["RigidBody"]["UseGravity"].as<bool>(true);
+				r.Type = static_cast<RigidBody3DComponent::BodyType>(rigidBodyNode["Type"].as<int>(1));
+				r.Mass = rigidBodyNode["Mass"].as<float>(1.0f);
+				r.UseGravity = rigidBodyNode["UseGravity"].as<bool>(true);
 				r.RuntimeBody = nullptr;
 				e.RigidBody = r;
 			}
