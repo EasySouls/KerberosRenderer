@@ -26,6 +26,7 @@
 #include "Upscaling/Native/NativeUpscaler.hpp"
 #include "Animation/AnimationSystem.hpp"
 #include "Animation/SkinningSystem.hpp"
+#include "Scene/Components/AnimationComponents.hpp"
 
 #include <glm/gtc/matrix_inverse.hpp>
 
@@ -870,7 +871,7 @@ void Renderer::RenderPrePass(const vk::raii::CommandBuffer& cmd, const uint32_t 
             { s_Data->DescriptorSets[currentImage].scene, s_Data->TextureManager.GetGlobalDescriptorSet() },
             { dynamicOffset });
 
-        renderObject.Mesh->Draw(cmd);
+        RenderMesh(cmd, renderObject);
     }
 
     cmd.endRendering();
@@ -1118,7 +1119,7 @@ void Renderer::RenderOpaque(const vk::raii::CommandBuffer& cmd,
                 { s_Data->DescriptorSets[currentImage].scene, s_Data->TextureManager.GetGlobalDescriptorSet() },
                 { dynamicOffset });
     
-            renderObject.Mesh->Draw(cmd);
+            RenderMesh(cmd, renderObject);
         }
     }
     
@@ -1134,7 +1135,7 @@ void Renderer::RenderOpaque(const vk::raii::CommandBuffer& cmd,
                                    { s_Data->DescriptorSets[currentImage].scene },
                                    { dynamicOffset });
     
-            renderObject.Mesh->Draw(cmd);
+            RenderMesh(cmd, renderObject);
         }
     }
     
@@ -1222,7 +1223,7 @@ void Renderer::RenderTransparent(const vk::raii::CommandBuffer& cmd,
             { s_Data->DescriptorSets[currentImage].scene, s_Data->TextureManager.GetGlobalDescriptorSet() },
             { dynamicOffset });
 
-        renderObject.Mesh->Draw(cmd);
+        RenderMesh(cmd, renderObject);
     }
 
     cmd.endRendering();
@@ -1390,7 +1391,7 @@ void Renderer::RecordQueuedSceneRender(const vk::raii::CommandBuffer& cmd)
     std::array<std::byte, frameArenaSize> frameArenaBuffer;
     std::pmr::monotonic_buffer_resource frameArena(frameArenaBuffer.data(), frameArenaBuffer.size());
 
-    s_Data->AnimationSystem.BeginFrame(s_Data->PendingRender.Scene, s_Data->PendingRender.DeltaTime, false);
+    s_Data->AnimationSystem.BeginFrame(s_Data->PendingRender.Scene, s_Data->PendingRender.DeltaTime, s_Data->PendingRender.Scene->IsPaused());
     s_Data->SkinningSystem.BeginFrame(s_Data->PendingRender.Scene, s_Data->AnimationSystem.GetSkinningSnapshot());
 
     if (IsUsingAccelerationStructures()) {
@@ -1420,7 +1421,7 @@ void Renderer::RecordQueuedSceneRender(const vk::raii::CommandBuffer& cmd)
 
     // Update all per-object uniform buffers once
     for (const auto& renderObject : allObjects) {
-        const auto& [Transform, Mesh, Material, EntityID, WorldAABB, UBOIndex, DebugName] = renderObject;
+        const auto& [Transform, Mesh, Material, EntityID, WorldAABB, UBOIndex, Skinned, DebugName] = renderObject;
 
         Ref<Kerberos::Material> material = Material;
         if (material == nullptr)
@@ -2597,7 +2598,7 @@ void Renderer::CreateResources()
     }
 
     s_Data->AnimationSystem.Initialize(s_Data->PersistentDescriptorAllocator);
-    s_Data->SkinningSystem.Initialize();
+    s_Data->SkinningSystem.Initialize(s_Data->PersistentDescriptorAllocator);
 
     s_Data->ParticleSystem.Initialize(s_Data->ColorImage.Format,
                                       s_Data->DepthImage.Format,
@@ -4441,6 +4442,43 @@ std::pair<std::pmr::vector<RenderObject>, std::pmr::set<Ref<Material>>> Renderer
             uniqueMaterials.insert(renderObject.Material);
     }
 
+    const auto skinnedView = scene.m_Registry.view<TransformComponent, SkinnedMeshComponent, TagComponent>();
+    for (const auto entity : skinnedView) {
+        auto& transform = skinnedView.get<TransformComponent>(entity);
+        auto& skinnedMesh = skinnedView.get<SkinnedMeshComponent>(entity);
+        if (!skinnedMesh.Visible || !skinnedMesh.Mesh)
+            continue;
+
+        RenderObject renderObject{};
+        renderObject.Transform = transform.WorldTransform;
+        renderObject.Material = skinnedMesh.Material;
+        renderObject.EntityID = static_cast<uint32_t>(entity);
+        renderObject.DebugName = skinnedView.get<TagComponent>(entity).Tag;
+
+        renderObject.WorldAABB = CalculateWorldAABB(skinnedMesh.Mesh->GetBoundingBox(), renderObject.Transform);
+
+        const std::optional<SkinnedDrawView> skinnedMeshDataOpt = s_Data->SkinningSystem.FindMesh(skinnedMesh.Mesh->GetHandle());
+        KBRAssert(skinnedMeshDataOpt.has_value(), "Failed to find skinned mesh data for entity {} with mesh {}", entity, skinnedMesh.Mesh->GetHandle());
+
+        const SkinnedDrawView skinnedMeshData = skinnedMeshDataOpt.value();
+
+        renderObject.Skinned = SkinnedDraw{
+            .VertexBuffer = skinnedMeshData.VertexBuffer,
+            .VertexOffset = skinnedMeshData.VertexOffsetBytes,
+            .VertexCount = skinnedMeshData.VertexCount,
+            .IndexBuffer = skinnedMeshData.IndexBuffer,
+            .IndexOffset = skinnedMeshData.IndexOffsetBytes,
+            .IndexCount = skinnedMeshData.IndexCount,
+            .SkinVersion = skinnedMeshData.SkinVersion
+        };
+
+        renderObject.UBOIndex = entityCount++;
+
+        renderObjects.push_back(renderObject);
+        if (renderObject.Material)
+            uniqueMaterials.insert(renderObject.Material);
+    }
+
     renderObjectCountFromLastFrame = static_cast<uint32_t>(renderObjects.size());
 
     return { renderObjects, uniqueMaterials };
@@ -5156,7 +5194,7 @@ void Renderer::RenderShadowPass(const vk::raii::CommandBuffer& cmd,
                                    { s_Data->DescriptorSets[frameIndex].scene },
                                    { dynamicOffset });
 
-            renderObject.Mesh->Draw(cmd);
+            RenderMesh(cmd, renderObject);
         }
 
         cmd.endRendering();
@@ -6282,6 +6320,21 @@ void Renderer::HandleMousePickingReadback(const vk::raii::CommandBuffer& cmd)
         s_Data->MousePickingReadback.WriteIndex =
             (s_Data->MousePickingReadback.WriteIndex + 1) % Renderer::MousePickingReadbackFrameLag;
         s_Data->MousePickingReadback.RequestPending = false;
+    }
+}
+
+void Renderer::RenderMesh(const vk::raii::CommandBuffer& cmd, const Kerberos::RenderObject& renderObject)
+{
+    if (const auto skinnedMeshDataOpt = renderObject.Skinned)
+    {
+        const SkinnedDraw skinnedDraw = skinnedMeshDataOpt.value();
+        cmd.bindVertexBuffers(0, { skinnedDraw.VertexBuffer }, { skinnedDraw.VertexOffset });
+        cmd.bindIndexBuffer(skinnedDraw.IndexBuffer, skinnedDraw.IndexOffset, vk::IndexType::eUint16);
+        cmd.drawIndexed(skinnedDraw.IndexCount, 1, 0, 0, 0);
+    }
+    else
+    {
+        renderObject.Mesh->Draw(cmd);
     }
 }
 

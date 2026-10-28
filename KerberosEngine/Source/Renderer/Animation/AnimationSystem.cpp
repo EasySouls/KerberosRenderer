@@ -2,9 +2,9 @@
 
 namespace Kerberos {
 
-void AnimationSystem::Initialize(const Owner<DescriptorAllocator>& frameAllocator)
+void AnimationSystem::Initialize(const Owner<DescriptorAllocator>& allocator)
 {
-    throw std::logic_error("Not implemented");
+    m_DescriptorAllocator = allocator.get();
 }
 
 void AnimationSystem::Shutdown()

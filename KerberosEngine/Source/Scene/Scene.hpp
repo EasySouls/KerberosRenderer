@@ -33,6 +33,7 @@ namespace Kerberos
 		void OnSimulationStop() const;
 		void SetScenePaused(bool isPaused);
 
+		bool IsPaused() const { return m_IsScenePaused; }
 		bool IsRunning() const { return m_IsRunning; }
 
 		void OnUpdateEditor(float ts, const Camera& camera);
@@ -170,5 +171,7 @@ namespace Kerberos
 		friend class SceneSerializer;
 		friend class RayTracingSceneCache;
 		friend class ParticleSystem;
+        friend class AnimationSystem;
+        friend class SkinningSystem;
 	};
 }

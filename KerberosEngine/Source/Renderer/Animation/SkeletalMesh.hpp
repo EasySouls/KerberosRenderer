@@ -19,6 +19,13 @@ struct SkinVertex
     glm::vec4 JointWeights;
 };
 
+/**
+ * Holds a mesh with skinning data, including joint indices and weights for each vertex. This is used for skeletal
+ * animation, where the mesh deforms based on the transformations of its associated skeleton.
+ * It stores the vertex data as @ref SkinVertex, which includes position, normal, tangent, texture coordinates, joint
+ * indices, and joint weights, while it gets uploaded to the GPU as an array of @ref Vertex, and separate arrays for
+ * joint indices and weights.
+ */
 class SkeletalMesh : public Asset
 {
 public:

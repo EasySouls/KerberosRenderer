@@ -75,6 +75,17 @@ struct PipelineStatistics
     uint64_t TessellationEvaluationShaderInvocations = 0;
 };
 
+struct SkinnedDraw
+{
+    vk::Buffer VertexBuffer;
+    vk::DeviceSize VertexOffset;
+    uint32_t VertexCount;
+    vk::Buffer IndexBuffer;
+    vk::DeviceSize IndexOffset;
+    uint32_t IndexCount;
+    uint64_t SkinVersion;
+};
+
 struct RenderObject
 {
     glm::mat4 Transform{};
@@ -83,6 +94,7 @@ struct RenderObject
     uint32_t EntityID = 0;
     AABB WorldAABB{};
     uint32_t UBOIndex = 0;
+    std::optional<SkinnedDraw> Skinned{};
     std::string_view DebugName{};
 };
 
@@ -98,7 +110,7 @@ struct GTAOConstants
     float temporalIndex = 1.0f;  // For jittering over time
 };
 
-enum class AntiAliasingMode
+enum class AntiAliasingMode : std::uint8_t
 {
     None = 0,
     FXAA = 1,
@@ -324,6 +336,8 @@ private:
     static glm::mat4 CalculateLightSpaceMatrix();
 
     static void HandleMousePickingReadback(const vk::raii::CommandBuffer& cmd);
+
+    static void RenderMesh(const vk::raii::CommandBuffer& cmd, const RenderObject& renderObject);
 
     static void EnqueueDeferredAction(DeferredAction&& action);
     static void ApplyDeferredActions();

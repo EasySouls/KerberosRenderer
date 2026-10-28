@@ -143,16 +143,17 @@ struct PrecomputePush
 };
 static_assert(sizeof(PrecomputePush) == 16);
 
-struct SkinPush
+struct SkinningPushConstant
 {
     uint32_t sourceFirst;
+    uint32_t outputFirst;
     uint32_t vertexCount;
     uint32_t outputByteOffset;
     uint32_t firstSkinMatrix;
     uint32_t jointCount;
-    uint32_t _pad[3];
+    uint32_t _pad[2];
 };
-static_assert(sizeof(SkinPush) == 32);
+static_assert(sizeof(SkinningPushConstant) == 32);
 
 using SkeletonInstanceId = uint32_t;
 

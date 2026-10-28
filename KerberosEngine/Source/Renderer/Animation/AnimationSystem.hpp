@@ -10,7 +10,7 @@ namespace Kerberos {
 class AnimationSystem
 {
 public:
-    void Initialize(const Owner<DescriptorAllocator>& frameAllocator);
+    void Initialize(const Owner<DescriptorAllocator>& allocator);
     void Shutdown();
 
     void BeginFrame(const Ref<Scene>& scene, float dt, bool paused);
@@ -23,6 +23,9 @@ public:
     void RecompileShaders() const;
 
     void Reset();
+
+private:
+    DescriptorAllocator* m_DescriptorAllocator = nullptr;
 };
 
 }

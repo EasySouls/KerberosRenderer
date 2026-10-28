@@ -21,7 +21,13 @@ struct OutputVertex {
 [[vk::binding(4, 0)]] StructuredBuffer<float4>         jointWeights;
 
 struct SkinPushConstants {
-    uint vertexCount;
+    uint32_t sourceFirst;
+    uint32_t outputFirst;
+    uint32_t vertexCount;
+    uint32_t outputByteOffset;
+    uint32_t firstSkinMatrix;
+    uint32_t jointCount;
+    uint32_t _pad[2];
 };
 [[vk::push_constant]] SkinPushConstants pushConstants;
 
@@ -33,18 +39,20 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     if (vertexId >= pushConstants.vertexCount) 
         return;
 
-    InputVertex v = inputVertices[vertexId];
-    uint4  j_idx  = jointIndices[vertexId];
-    float4 j_w    = jointWeights[vertexId];
+    uint inIndex = pushConstants.sourceFirst + vertexId;
+
+    InputVertex v = inputVertices[inIndex];
+    uint4  j_idx  = jointIndices[inIndex];
+    float4 j_w    = jointWeights[inIndex];
 
     // Build the blended skin matrix from the four joint influences.
     // This is the core of the Linear Blend Skinning (LBS) equation:
     // SkinMatrix = sum(weight_i * JointMatrix_i) for i in [0, 3]
     float4x4 skinMatrix =
-        j_w.x * jointMatrices[j_idx.x] +
-        j_w.y * jointMatrices[j_idx.y] +
-        j_w.z * jointMatrices[j_idx.z] +
-        j_w.w * jointMatrices[j_idx.w];
+        j_w.x * jointMatrices[pushConstants.firstSkinMatrix + j_idx.x] +
+        j_w.y * jointMatrices[pushConstants.firstSkinMatrix + j_idx.y] +
+        j_w.z * jointMatrices[pushConstants.firstSkinMatrix + j_idx.z] +
+        j_w.w * jointMatrices[pushConstants.firstSkinMatrix + j_idx.w];
 
     float3 vPos = float3(v.p[0], v.p[1], v.p[2]);
     float3 vNormal = float3(v.n[0], v.n[1], v.n[2]);
@@ -80,5 +88,6 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     outVertex.uv[0] = v.uv[0];
     outVertex.uv[1] = v.uv[1];
 
-    outputVertices[vertexId] = outVertex;
+    uint outIndex = pushConstants.outputFirst + vertexId;
+    outputVertices[outIndex] = outVertex;
 }
