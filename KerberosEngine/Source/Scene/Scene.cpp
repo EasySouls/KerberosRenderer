@@ -267,7 +267,7 @@ Entity Scene::InstantiatePrefab(const AssetHandle prefabHandle, const std::strin
 			SetParent(child, entityMapping[parentLocal], false);
 		}
 
-		if (child.HasComponent<SkeletonComponent>())
+		if (child.HasComponent<SkeletonComponent>() && prefabEntity.Skin.has_value())
 		{
 			for (auto joint : prefabEntity.Skin->JointEntityIndices)
 			{
@@ -478,6 +478,22 @@ Entity Scene::InstantiatePrefab(const AssetHandle prefabHandle, const std::strin
 		if (entity.HasComponent<AudioListenerComponent>())
 		{
 			newEntity.AddComponent<AudioListenerComponent>(entity.GetComponent<AudioListenerComponent>());
+		}
+		if (entity.HasComponent<JointComponent>())
+		{
+			newEntity.AddComponent<JointComponent>(entity.GetComponent<JointComponent>());
+		}
+		if (entity.HasComponent<SkeletonComponent>())
+		{
+			newEntity.AddComponent<SkeletonComponent>(entity.GetComponent<SkeletonComponent>());
+		}
+		if (entity.HasComponent<SkinnedMeshComponent>())
+		{
+			newEntity.AddComponent<SkinnedMeshComponent>(entity.GetComponent<SkinnedMeshComponent>());
+		}
+		if (entity.HasComponent<AnimationComponent>())
+		{
+			newEntity.AddComponent<AnimationComponent>(entity.GetComponent<AnimationComponent>());
 		}
 
 		if (duplicateChildren)

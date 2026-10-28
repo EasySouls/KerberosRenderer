@@ -9,6 +9,9 @@
 #include "Scene/Components/AudioComponents.hpp"
 #include "Scene/Components/ParticleComponents.hpp"
 #include "Scene/Components/PhysicsComponents.hpp"
+#include "Scene/Components/AnimationComponents.hpp"
+#include "Renderer/Animation/Skeleton.hpp"
+#include "Renderer/Animation/SkeletalMesh.hpp"
 #include "Scripting/ScriptClass.hpp"
 #include "Scripting/ScriptEngine.hpp"
 #include "Scripting/ScriptInstance.hpp"
@@ -59,6 +62,93 @@ namespace
         }
 
         return false;
+    }
+
+    void CreateProceduralSkinnedTest(const Ref<Scene>& scene)
+    {
+        if (!scene)
+            return;
+
+        std::vector<SkeletonJoint> joints;
+        joints.push_back({
+            .Name = "Root",
+            .Parent = -1,
+            .SourceNode = 0,
+            .RestTranslation = { 0.0f, 0.0f, 0.0f },
+            .RestRotation = { 1.0f, 0.0f, 0.0f, 0.0f },
+            .RestScale = { 1.0f, 1.0f, 1.0f },
+            .InverseBind = glm::mat4(1.0f),
+        });
+        joints.push_back({
+            .Name = "Tip",
+            .Parent = 0,
+            .SourceNode = 1,
+            .RestTranslation = { 0.0f, 2.0f, 0.0f },
+            .RestRotation = { 1.0f, 0.0f, 0.0f, 0.0f },
+            .RestScale = { 1.0f, 1.0f, 1.0f },
+            .InverseBind = glm::mat4(1.0f),
+        });
+
+        auto skeleton = CreateRef<Skeleton>(joints);
+        skeleton->GetHandle() = UUID();
+
+        constexpr int Rows = 5;
+        constexpr int Cols = 2;
+
+        std::vector<SkinVertex> vertices;
+        vertices.reserve(Rows * Cols);
+        for (int row = 0; row < Rows; ++row)
+        {
+            const float v = static_cast<float>(row) / static_cast<float>(Rows - 1);
+            for (int col = 0; col < Cols; ++col)
+            {
+                const float u = static_cast<float>(col) / static_cast<float>(Cols - 1);
+                SkinVertex vertex{};
+                vertex.Position = { -0.75f + 1.5f * u, -0.5f + 2.0f * v, 0.0f };
+                vertex.Normal = { 0.0f, 0.0f, 1.0f };
+                vertex.Tangent = { 1.0f, 0.0f, 0.0f, 1.0f };
+                vertex.TexCoord = { u, v };
+                vertex.JointIndices = { 0, 1, 0, 0 };
+                vertex.JointWeights = { 1.0f - v, v, 0.0f, 0.0f };
+                vertices.push_back(vertex);
+            }
+        }
+
+        std::vector<uint32_t> indices;
+        for (int row = 0; row + 1 < Rows; ++row)
+        {
+            for (int col = 0; col + 1 < Cols; ++col)
+            {
+                const uint32_t i0 = static_cast<uint32_t>(row * Cols + col);
+                const uint32_t i1 = i0 + 1;
+                const uint32_t i2 = i0 + Cols;
+                const uint32_t i3 = i2 + 1;
+
+                indices.insert(indices.end(), { i0, i1, i3, i0, i3, i2 });
+                // Reverse winding so the test mesh is visible from both sides.
+                indices.insert(indices.end(), { i0, i3, i1, i0, i2, i3 });
+            }
+        }
+
+        auto mesh = CreateRef<SkeletalMesh>("Procedural Skinned Strip", vertices, indices);
+        mesh->GetHandle() = UUID();
+
+        Entity skeletonEntity = scene->CreateEntity("Skinned Test Skeleton");
+        auto& skeletonComponent = skeletonEntity.AddComponent<SkeletonComponent>();
+        skeletonComponent.SkeletonAsset = skeleton->GetHandle();
+        skeletonComponent.Skeleton = skeleton;
+
+        Entity meshEntity = scene->CreateEntity("Skinned Test Mesh");
+        auto& meshComponent = meshEntity.AddComponent<SkinnedMeshComponent>();
+        meshComponent.MeshAsset = mesh->GetHandle();
+        meshComponent.SkeletonAsset = skeleton->GetHandle();
+        meshComponent.SkeletonEntity = skeletonEntity.GetUUID();
+        meshComponent.Mesh = mesh;
+        meshComponent.Visible = true;
+
+        scene->SetParent(meshEntity, skeletonEntity, false);
+
+        Log::EditorInfo("Created procedural skinned test mesh (bind pose)");
     }
 
     std::string GetAssetDisplayName(const uint64_t handle)
@@ -255,6 +345,10 @@ void HierarchyPanel::OnImGuiRender()
     if (ImGui::BeginPopupContextWindow(nullptr, 1 | ImGuiPopupFlags_NoOpenOverItems)) {
         if (ImGui::MenuItem("Create Empty Entity")) {
             ExecuteCreateEntity("Empty Entity");
+        }
+
+        if (ImGui::MenuItem("Create Skinned Test Mesh")) {
+            CreateProceduralSkinnedTest(m_Context);
         }
 
         ImGui::EndPopup();
@@ -2175,6 +2269,114 @@ void HierarchyPanel::DrawComponents(const Entity entity)
 
         if (componentDeleted) {
             entity.RemoveComponent<ParticleEmitterComponent>();
+        }
+    }
+    if (entity.HasComponent<SkeletonComponent>())
+    {
+        ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(6, 6));
+        const bool opened = ImGui::TreeNodeEx(
+            reinterpret_cast<void*>(typeid(SkeletonComponent).hash_code()), treeNodeFlags, "Skeleton");
+        ImGui::SameLine(ImGui::GetContentRegionAvail().x - 20.f);
+        if (ImGui::Button("+", ImVec2{ 20, 20 }))
+        {
+            ImGui::OpenPopup("ComponentSettings");
+        }
+        ImGui::PopStyleVar();
+        bool componentDeleted = false;
+        if (ImGui::BeginPopup("ComponentSettings"))
+        {
+            ImGui::Text("Skeleton Settings");
+            ImGui::Separator();
+            if (ImGui::MenuItem("Remove Component"))
+            {
+                componentDeleted = true;
+                ImGui::CloseCurrentPopup();
+            }
+            ImGui::EndPopup();
+        }
+        if (opened)
+        {
+            auto& skeletonComp = entity.GetComponent<SkeletonComponent>();
+
+            ImGui::Text("Skeleton Asset Handle: %d", skeletonComp.SkeletonAsset);
+
+            ImGui::TreePop();
+        }
+        if (componentDeleted)
+        {
+            entity.RemoveComponent<SkeletonComponent>();
+        }
+    }
+    if (entity.HasComponent<SkinnedMeshComponent>())
+    {
+        ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(6, 6));
+        const bool opened = ImGui::TreeNodeEx(
+            reinterpret_cast<void*>(typeid(SkinnedMeshComponent).hash_code()), treeNodeFlags, "Skinned Mesh");
+        ImGui::SameLine(ImGui::GetContentRegionAvail().x - 20.f);
+        if (ImGui::Button("+", ImVec2{ 20, 20 }))
+        {
+            ImGui::OpenPopup("ComponentSettings");
+        }
+        ImGui::PopStyleVar();
+        bool componentDeleted = false;
+        if (ImGui::BeginPopup("ComponentSettings"))
+        {
+            ImGui::Text("Skinned Mesh Settings");
+            ImGui::Separator();
+            if (ImGui::MenuItem("Remove Component"))
+            {
+                componentDeleted = true;
+                ImGui::CloseCurrentPopup();
+            }
+            ImGui::EndPopup();
+        }
+        if (opened)
+        {
+            auto& skinnedMeshComp = entity.GetComponent<SkinnedMeshComponent>();
+
+            ImGui::Text("Skinned Mesh Asset Handle: %d", skinnedMeshComp.MeshAsset);
+
+            ImGui::TreePop();
+        }
+        if (componentDeleted)
+        {
+            entity.RemoveComponent<SkinnedMeshComponent>();
+        }
+    }
+    if (entity.HasComponent<JointComponent>())
+    {
+        ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(6, 6));
+        const bool opened = ImGui::TreeNodeEx(
+            reinterpret_cast<void*>(typeid(JointComponent).hash_code()), treeNodeFlags, "Joint");
+        ImGui::SameLine(ImGui::GetContentRegionAvail().x - 20.f);
+        if (ImGui::Button("+", ImVec2{ 20, 20 }))
+        {
+            ImGui::OpenPopup("ComponentSettings");
+        }
+        ImGui::PopStyleVar();
+        bool componentDeleted = false;
+        if (ImGui::BeginPopup("ComponentSettings"))
+        {
+            ImGui::Text("Joint Settings");
+            ImGui::Separator();
+            if (ImGui::MenuItem("Remove Component"))
+            {
+                componentDeleted = true;
+                ImGui::CloseCurrentPopup();
+            }
+            ImGui::EndPopup();
+        }
+        if (opened)
+        {
+            auto& jointComp = entity.GetComponent<JointComponent>();
+
+            ImGui::Text("Joint Index: %d", jointComp.JointIndex);
+
+            ImGui::TreePop();
+        }
+        if (componentDeleted)
+        {
+            entity.RemoveComponent<JointComponent>();
         }
     }
 }

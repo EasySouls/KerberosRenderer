@@ -75,20 +75,27 @@ the next frame.
 
 The active pass order is approximately:
 
-1. depth pre-pass
-2. shadows
-3. GTAO
-4. opaque
-5. particles
-6. grass
-7. transparent
-8. transparency resolve
-9. bloom
-10. anti-aliasing
-11. upscaling
-12. tonemapping
-13. presentation
-14. mouse picking
+1. animation evaluation / skin-matrix precompute (when animation is implemented)
+2. skinning (skinned meshes)
+3. depth pre-pass
+4. shadows
+5. GTAO
+6. opaque
+7. particles
+8. grass
+9. transparent
+10. transparency resolve
+11. bloom
+12. anti-aliasing
+13. upscaling
+14. tonemapping
+15. presentation
+16. mouse picking
+
+Animation and skinning passes are added before the depth pre-pass. The
+skinning pass currently ends with an explicit compute-write to vertex-read
+barrier because the SVB is bound directly by raster passes and is not declared
+as a render-graph resource.
 
 When FSR3 is active, the spatial anti-aliasing pass is skipped and FSR3
 consumes the pre-AA HDR resolve so its internal temporal history receives the
@@ -182,6 +189,80 @@ swapchain/viewport resize, frame synchronization, graph barriers/layouts,
 descriptor lifetime, and shader compilation. Keep this file updated whenever
 renderer ownership, pass order, synchronization, resource lifetime, or
 validation procedures change.
+
+# Animation and skinning context
+
+## Ownership
+
+`AnimationSystem` (`Renderer/Animation/AnimationSystem.*`) owns immutable
+skeleton/clip data and per-skeleton-instance pose/skin-matrix data. In the
+bind-pose milestone it owns one host-visible global skin-matrix buffer, filled
+from each skeleton's inverse-bind matrices, and publishes a
+`SkinningFrameSnapshot` (buffer + per-instance `SkeletonFrame` records).
+
+`SkinningSystem` (`Renderer/Animation/SkinningSystem.*`) owns the global source
+vertex/joint/weight/index buffers, the shared vertex buffer (SVB), the SVB
+region allocator, the skinning descriptor set, and the skinning compute
+pipeline. It consumes the snapshot from `AnimationSystem`; it does not resolve
+or mutate skeleton assets.
+
+`Renderer` owns both systems as value members, calls `BeginFrame` in the order
+Animation → Skinning, adds their graph passes before the depth pre-pass, and
+resets both when the rendered scene pointer changes.
+
+`RayTracingSceneCache` and physics integration are not wired to the SVB yet.
+
+## Buffers and shader contract
+
+`skinning.slang` bindings:
+
+- 0: `StructuredBuffer<InputVertex>` source vertices (48 B: position, normal,
+  tangent, UV; same layout as `Renderer::Vertex`)
+- 1: `RWStructuredBuffer<OutputVertex>` shared vertex buffer (same 48 B layout)
+- 2: `StructuredBuffer<BoneMatrix>` skin matrices, owned by `AnimationSystem`
+- 3: `StructuredBuffer<uint4>` joint indices
+- 4: `StructuredBuffer<float4>` joint weights
+
+`BoneMatrix` is three explicit `float4` rows (48 B). `SkinningPushConstant`
+carries `sourceFirst`, `outputFirst`, `vertexCount`, `outputByteOffset`,
+`firstSkinMatrix`, and `jointCount`. The shader indexes source data and the
+skin matrix buffer with those offsets; do not bind per-mesh slices at offset 0.
+Weights are normalized defensively in the shader.
+
+The SVB stores model-space vertices. Raster uses the existing per-object model
+matrix; RT and physics, when added, must apply the instance transform to the
+SVB rather than expecting world-space output.
+
+## Bind-pose milestone limitations
+
+- Skin matrices are filled on the CPU from inverse-bind matrices; there is no
+  animation evaluation/precompute pass yet.
+- Only direct per-mesh dispatches are recorded; no indirect dispatch or
+  per-frame job buffer exists.
+- SVB regions are bump-allocated and only returned by `Reset()`; there is no
+  per-entity free list yet.
+- The SVB and index buffer do not yet request
+  `ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_KHR`; add it when skinned BLAS
+  support is implemented.
+- Skinned meshes are not added to the TLAS.
+- Gameplay/physics should consume the pose/matrices, not the SVB.
+
+## Validation
+
+Build and compile shaders:
+
+```powershell
+cmake --preset vs2026
+cmake --build --preset vs2026-debug
+cd KerberosEditor\Assets\Shaders
+.\compile_shaders.bat
+```
+
+The editor hierarchy window context menu has "Create Skinned Test Mesh", which
+creates a procedural two-bone strip for validating the bind-pose path before
+glTF import exists. Validate that it appears in depth/shadow/opaque passes,
+that resize and scene switching do not leave stale instances, and that Vulkan
+validation reports no buffer synchronization errors.
 
 # Particle system context
 

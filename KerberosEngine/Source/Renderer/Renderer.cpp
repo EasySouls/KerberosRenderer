@@ -503,6 +503,7 @@ struct RendererData
     GrassSystem GrassSystem{};
     AnimationSystem AnimationSystem{};
     SkinningSystem SkinningSystem{};
+    const Scene* LastRenderedScene = nullptr;
 
     /**
      * Size of the viewport, and the final image presented to the swapchain
@@ -1391,6 +1392,13 @@ void Renderer::RecordQueuedSceneRender(const vk::raii::CommandBuffer& cmd)
     std::array<std::byte, frameArenaSize> frameArenaBuffer;
     std::pmr::monotonic_buffer_resource frameArena(frameArenaBuffer.data(), frameArenaBuffer.size());
 
+    if (s_Data->LastRenderedScene != s_Data->PendingRender.Scene.get())
+    {
+        s_Data->AnimationSystem.Reset();
+        s_Data->SkinningSystem.Reset();
+        s_Data->LastRenderedScene = s_Data->PendingRender.Scene.get();
+    }
+
     s_Data->AnimationSystem.BeginFrame(s_Data->PendingRender.Scene, s_Data->PendingRender.DeltaTime, s_Data->PendingRender.Scene->IsPaused());
     s_Data->SkinningSystem.BeginFrame(s_Data->PendingRender.Scene, s_Data->AnimationSystem.GetSkinningSnapshot());
 
@@ -1781,7 +1789,7 @@ void Renderer::CreateResources()
 
     constexpr vk::DeviceSize colliderLineBufferSize = sizeof(LineVertex) * ColliderDebugHelpers::ColliderDebugMaxVertices;
     for (auto& [Buffer, Memory, MappedData] : s_Data->ColliderLineBuffers) {
-        CreateBuffer(device,
+        ::CreateBuffer(device,
                      colliderLineBufferSize,
                      vk::BufferUsageFlagBits::eVertexBuffer,
                      vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent,
@@ -2598,7 +2606,9 @@ void Renderer::CreateResources()
     }
 
     s_Data->AnimationSystem.Initialize(s_Data->PersistentDescriptorAllocator);
-    s_Data->SkinningSystem.Initialize(s_Data->PersistentDescriptorAllocator);
+    s_Data->SkinningSystem.Initialize(s_Data->PersistentDescriptorAllocator,
+                                      s_Data->AnimationSystem.GetSkinMatricesBuffer(),
+                                      s_Data->AnimationSystem.GetSkinMatricesBufferSize());
 
     s_Data->ParticleSystem.Initialize(s_Data->ColorImage.Format,
                                       s_Data->DepthImage.Format,
@@ -3097,7 +3107,7 @@ void Renderer::CreateResources()
 
     for (uint32_t i = 0; i < Renderer::MousePickingReadbackFrameLag; ++i) {
         auto& slot = s_Data->MousePickingReadback.Slots[i];
-        CreateBuffer(device,
+        ::CreateBuffer(device,
                      sizeof(uint32_t),
                      vk::BufferUsageFlagBits::eTransferDst,
                      vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent,
@@ -4457,8 +4467,14 @@ std::pair<std::pmr::vector<RenderObject>, std::pmr::set<Ref<Material>>> Renderer
 
         renderObject.WorldAABB = CalculateWorldAABB(skinnedMesh.Mesh->GetBoundingBox(), renderObject.Transform);
 
-        const std::optional<SkinnedDrawView> skinnedMeshDataOpt = s_Data->SkinningSystem.FindMesh(skinnedMesh.Mesh->GetHandle());
-        KBRAssert(skinnedMeshDataOpt.has_value(), "Failed to find skinned mesh data for entity {} with mesh {}", entity, skinnedMesh.Mesh->GetHandle());
+        const UUID entityUUID = scene.m_Registry.get<IDComponent>(entity).ID;
+        const std::optional<SkinnedDrawView> skinnedMeshDataOpt = s_Data->SkinningSystem.FindMesh(entityUUID);
+        if (!skinnedMeshDataOpt.has_value())
+        {
+            Log::CoreWarn("Skipping skinned mesh render object for entity {}: no runtime skinning instance",
+                          static_cast<uint32_t>(entity));
+            continue;
+        }
 
         const SkinnedDrawView skinnedMeshData = skinnedMeshDataOpt.value();
 
@@ -4746,6 +4762,9 @@ void Renderer::CompileAndExecuteRenderGraph(const vk::raii::CommandBuffer& cmd,
         const auto hComposite = s_Data->RenderGraph.ImportImage(*s_Data->CompositeImage.Image, compositeState, colorRange);
         const auto hOutput = s_Data->RenderGraph.ImportImage(*s_Data->OutputImage.Image, outputState, colorRange);
         const auto hFinal = s_Data->RenderGraph.ImportImage(*s_Data->FinalImage.Image, finalState, colorRange);
+
+        s_Data->AnimationSystem.AddPasses(s_Data->RenderGraph, frameIndex);
+        s_Data->SkinningSystem.AddPasses(s_Data->RenderGraph, frameIndex);
 
         s_Data->RenderGraph.AddPass("Depth Pre-Pass", [&](Graph::PassBuilder& builder) -> PassExecuteFunction {
             builder.Write(hDepth,
@@ -5073,9 +5092,6 @@ void Renderer::CompileAndExecuteRenderGraph(const vk::raii::CommandBuffer& cmd,
                 Renderer::HandleMousePickingReadback(execCmd);
             };
         });
-
-        s_Data->AnimationSystem.AddPasses(s_Data->RenderGraph, frameIndex);
-        s_Data->SkinningSystem.AddPasses(s_Data->RenderGraph, frameIndex);
 
         s_Data->RenderGraph.Compile();
     }
@@ -6329,7 +6345,7 @@ void Renderer::RenderMesh(const vk::raii::CommandBuffer& cmd, const Kerberos::Re
     {
         const SkinnedDraw skinnedDraw = skinnedMeshDataOpt.value();
         cmd.bindVertexBuffers(0, { skinnedDraw.VertexBuffer }, { skinnedDraw.VertexOffset });
-        cmd.bindIndexBuffer(skinnedDraw.IndexBuffer, skinnedDraw.IndexOffset, vk::IndexType::eUint16);
+        cmd.bindIndexBuffer(skinnedDraw.IndexBuffer, skinnedDraw.IndexOffset, vk::IndexType::eUint32);
         cmd.drawIndexed(skinnedDraw.IndexCount, 1, 0, 0, 0);
     }
     else
@@ -7674,7 +7690,7 @@ void Renderer::CreateSMAATextures()
                          const std::string& debugName) {
         vk::raii::Buffer stagingBuffer = nullptr;
         vk::raii::DeviceMemory stagingMemory = nullptr;
-        CreateBuffer(device,
+        ::CreateBuffer(device,
                      size,
                      vk::BufferUsageFlagBits::eTransferSrc,
                      vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent,

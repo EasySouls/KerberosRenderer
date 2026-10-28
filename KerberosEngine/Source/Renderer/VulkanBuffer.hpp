@@ -16,4 +16,6 @@ struct VulkanBuffer
     void Reset();
 };
 
+void CreateBuffer(VulkanBuffer& buffer, vk::DeviceSize size, vk::BufferUsageFlags usage, bool hostVisible, const char* name);
+
 }

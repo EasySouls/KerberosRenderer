@@ -164,6 +164,10 @@ Importer extension lookup normalizes the leading dot and case. Unknown file
 types must not silently become `Texture2D`; preserve explicit error/warning
 behavior when changing type classification.
 
+`AssetTypeFromString` accepts the legacy serialized names `Skin` and
+`AnimationClip` as aliases for `Skeleton` and `Animation` so projects written
+before the rename continue to load. New data should use the canonical names.
+
 ## Known glTF import limitations
 
 The glTF pipeline currently handles opaque, single-UV, unanimated

@@ -20,11 +20,11 @@ AssetType AssetTypeFromString(const std::string_view typeStr)
         return AssetType::Sound;
     if (typeStr == "Prefab")
         return AssetType::Prefab;
-    if (typeStr == "Skeleton")
+    if (typeStr == "Skeleton" || typeStr == "Skin") // "Skin" is the legacy serialized name
         return AssetType::Skeleton;
     if (typeStr == "SkinnedMesh")
         return AssetType::SkinnedMesh;
-    if (typeStr == "Animation")
+    if (typeStr == "Animation" || typeStr == "AnimationClip") // "AnimationClip" is the legacy serialized name
         return AssetType::Animation;
 
     KBRAssert("Unknown asset type: {0}", typeStr);

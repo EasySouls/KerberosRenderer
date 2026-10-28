@@ -50,7 +50,9 @@ Editor windows live mainly under
   loaded material instance, and force-reimports the source so the cache artifact
   and future loads stay in sync.
 - `HierarchyPanel`: entity selection, component add/remove, and component
-  editing, including particle emitters.
+  editing, including particle emitters. Its window context menu also has a
+  debug "Create Skinned Test Mesh" action that builds a procedural two-bone
+  strip for validating the bind-pose skinning path before glTF import exists.
 - `InspectorPanel`: the unified right-side "Properties" window. It shows entity
   components when an entity is selected and asset import options when a source
   asset is selected in `AssetsPanel` (asset selection takes display precedence).

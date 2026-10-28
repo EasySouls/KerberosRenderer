@@ -325,6 +325,7 @@ static void SerializeEntity(YAML::Emitter& out, const Entity entity)
         out << YAML::Key << "MeshAsset" << YAML::Value << skinnedMesh.MeshAsset;
         out << YAML::Key << "SkeletonAsset" << YAML::Value << skinnedMesh.SkeletonAsset;
         out << YAML::Key << "MaterialAsset" << YAML::Value << skinnedMesh.MaterialAsset;
+        out << YAML::Key << "SkeletonEntity" << YAML::Value << skinnedMesh.SkeletonEntity;
         out << YAML::Key << "Visible" << YAML::Value << skinnedMesh.Visible;
         out << YAML::Key << "CastShadows" << YAML::Value << skinnedMesh.CastShadows;
         out << YAML::EndMap;
@@ -663,6 +664,7 @@ Entity SceneSerializer::DeserializeEntity(const Ref<Scene>& scene, const YAML::N
         skinnedMesh.MeshAsset = AssetHandle(skinnedMeshComponent["MeshAsset"].as<uint64_t>());
         skinnedMesh.SkeletonAsset = AssetHandle(skinnedMeshComponent["SkeletonAsset"].as<uint64_t>());
         skinnedMesh.MaterialAsset = AssetHandle(skinnedMeshComponent["MaterialAsset"].as<uint64_t>());
+        skinnedMesh.SkeletonEntity = UUID(skinnedMeshComponent["SkeletonEntity"].as<uint64_t>(0));
         skinnedMesh.Visible = skinnedMeshComponent["Visible"].as<bool>(true);
         skinnedMesh.CastShadows = skinnedMeshComponent["CastShadows"].as<bool>(true);
     }
