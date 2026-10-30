@@ -68,8 +68,7 @@ namespace Kerberos
 		Entity DuplicateEntity(Entity entity, bool duplicateChildren);
 
 		void CreateChild(Entity entity);
-		[[deprecated("Import glTF as a prefab and call InstantiatePrefab")]]
-		Entity InstantiateModelAsset(AssetHandle modelHandle, const std::string& rootName = std::string());
+
 		Entity InstantiatePrefab(AssetHandle prefabHandle, const std::string& rootName = std::string());
 
 		Entity GetEntityByUUID(UUID uuid) const;

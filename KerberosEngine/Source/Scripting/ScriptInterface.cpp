@@ -356,7 +356,7 @@ namespace Kerberos
 		// TODO: when using asset handles for assets, simply set it, maybe check if correct
 
 		StaticMeshComponent& staticMeshComponent = entity.GetComponent<StaticMeshComponent>();
-		const Ref<Mesh> mesh = AssetManager::ResolveMeshAsset(AssetHandle(meshRef));
+		const Ref<Mesh> mesh = AssetManager::AsAsset<Mesh>(AssetHandle(meshRef));
 		if (!mesh)
 		{
 			Kerberos::Log::CoreWarn("Failed to set static mesh for entity ID: {}, mesh asset ID: {}", entityID, meshRef);

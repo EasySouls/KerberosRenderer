@@ -446,7 +446,7 @@ namespace PROJECT_NAME
 
 				Entity meshEntity = m_ActiveScene->CreateEntity("Mesh");
 				auto &smc = meshEntity.AddComponent<StaticMeshComponent>();
-				smc.StaticMesh = AssetManager::ResolveMeshAsset(handle);
+				smc.StaticMesh = AssetManager::AsAsset<Mesh>(handle);
 				m_HierarchyPanel.SetSelectedEntity(meshEntity);
 			}
 

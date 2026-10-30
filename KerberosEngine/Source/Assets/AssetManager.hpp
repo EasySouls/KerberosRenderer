@@ -74,8 +74,6 @@ public:
 		return Project::GetActive()->GetAssetManager()->GetAssetsOfType(type);
 	}
 
-	static Ref<Mesh> ResolveMeshAsset(AssetHandle handle);
-
 	static Ref<Texture2D> GetDefaultTexture2D();
 	static Ref<Mesh> GetDefaultCubeMesh();
 	static Ref<Font> GetDefaultFont();

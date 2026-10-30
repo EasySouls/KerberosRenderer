@@ -3,7 +3,6 @@
 #include "CubemapImporter.hpp"
 #include "TextureImporter.hpp"
 #include "AssimpModelImporter.hpp"
-#include "GLTFModelImporter.hpp"
 #include "MaterialImporter.hpp"
 #include "MeshImporter.hpp"
 #include "PrefabImporter.hpp"
@@ -32,14 +31,6 @@ namespace Kerberos
 				return CubemapImporter::ImportCubemap(handle, metadata);
 			case AssetType::Material:
 				return MaterialImporter::ImportMaterial(handle, metadata);
-			case AssetType::ModelDEPRECATED:
-			{
-				// Deprecated: model loading must move to imported engine artifacts.
-				const auto extension = metadata.Filepath.extension().string();
-				if (extension == ".gltf" || extension == ".glb")
-					return GLTFModelImporter::ImportModel(handle, metadata);
-				return AssimpModelImporter::ImportModel(metadata.Filepath);
-			}
 			case AssetType::Scene:
 				break;
 			case AssetType::Sound:

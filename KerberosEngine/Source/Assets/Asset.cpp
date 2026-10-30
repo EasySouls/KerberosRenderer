@@ -46,8 +46,6 @@ std::string_view AssetTypeToString(const AssetType type)
         return "Scene";
     case AssetType::Sound:
         return "Sound";
-    case AssetType::ModelDEPRECATED:
-        return "ModelDEPRECATED";
     case AssetType::Prefab:
         return "Prefab";
     case AssetType::Skeleton:

@@ -35,7 +35,6 @@
 #include <iterator>
 #include <memory>
 #include <optional>
-#include <ranges>
 #include <utility>
 
 
@@ -130,18 +129,6 @@ namespace
         scene->SetParent(meshEntity, skeletonEntity, false);
 
         Log::EditorInfo("Created procedural skinned test mesh (bind pose)");
-    }
-
-    std::string GetAssetDisplayName(const uint64_t handle)
-    {
-        if (handle != 0 && AssetManager::IsAssetHandleValid(UUID(handle)))
-        {
-            const auto& metadata =
-                Project::GetActive()->GetEditorAssetManager()->GetMetadata(UUID(handle));
-            return metadata.Filepath.filename().string();
-        }
-
-        return "None";
     }
 
     std::string GetAssetStemLabel(const AssetHandle handle)
@@ -741,7 +728,7 @@ bool HierarchyPanel::HandleHierarchyPanelDragAndDrop()
         else if (assetType == AssetType::Mesh) {
             Entity meshEntity = m_Context->CreateEntity("Mesh");
             auto& smc = meshEntity.AddComponent<StaticMeshComponent>();
-            smc.StaticMesh = AssetManager::ResolveMeshAsset(handle);
+            smc.StaticMesh = AssetManager::AsAsset<Mesh>(handle);
             m_SelectedEntity = meshEntity;
         }
     }
@@ -765,7 +752,7 @@ void HierarchyPanel::DrawVec3Control(const std::string& label,
     const auto trackEdit = [this, entityID, &values, &onEditCommitted]() {
         const ImGuiID itemID = ImGui::GetItemID();
         if (ImGui::IsItemActivated())
-            m_Vec3EditSnapshots[itemID] = { entityID, values };
+            m_Vec3EditSnapshots[itemID] = { .EntityID = entityID, .Value = values };
 
         if (ImGui::IsItemDeactivatedAfterEdit()) {
             if (const auto it = m_Vec3EditSnapshots.find(itemID); it != m_Vec3EditSnapshots.end()) {

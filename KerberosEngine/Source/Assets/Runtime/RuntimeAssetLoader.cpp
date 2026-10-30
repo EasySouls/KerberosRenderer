@@ -4,7 +4,6 @@
 #include "Assets/Formats/AnimationFormat.hpp"
 #include "Assets/Formats/SkeletonFormat.hpp"
 #include "Assets/Importers/MaterialImporter.hpp"
-#include "Assets/Model.hpp"
 #include "Assets/Prefab.hpp"
 #include "Serialization/PrefabSerializer.hpp"
 #include "Renderer/Mesh.hpp"
@@ -169,29 +168,6 @@ Ref<AnimationClip> LoadAnimation(const AssetHandle handle, const std::filesystem
     auto clip = CreateRef<AnimationClip>(native.Name, tracks, native.DurationSeconds);
     clip->GetHandle() = handle;
     return clip;
-}
-
-Ref<Model> LoadSceneManifest(AssetHandle handle, const std::filesystem::path& path)
-{
-	KBR_TRACY_FUNCTION();
-
-	GltfSceneManifest manifest;
-	if (!NativeAssetSerializer::DeserializeSceneManifest(path, manifest))
-		return nullptr;
-	auto model = CreateRef<Model>(path.stem().string());
-	model->GetHandle() = handle;
-	auto& nodes = model->GetNodes();
-	nodes.reserve(manifest.Nodes.size());
-	for (const auto& source : manifest.Nodes)
-	{
-		ModelNode node;
-		node.Name = source.Name;
-		node.ParentIndex = source.ParentIndex;
-		node.SkinIndex = source.SkinIndex;
-		nodes.emplace_back(std::move(node));
-	}
-
-	return model;
 }
 
 AssetHandle FindSubasset(const AssetRegistry* registry, const AssetHandle rootHandle,
@@ -555,8 +531,6 @@ Ref<Asset> RuntimeAssetLoader::Load(const AssetHandle handle,
 		}
 		case AssetType::Mesh:
 			return LoadMesh(handle, path);
-		case AssetType::ModelDEPRECATED:
-			return LoadSceneManifest(handle, path);
 	    case AssetType::Skeleton:
             return LoadSkeleton(handle, path);
         case AssetType::SkinnedMesh:

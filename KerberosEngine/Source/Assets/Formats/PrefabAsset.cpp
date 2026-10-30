@@ -48,7 +48,7 @@ void PrefabEntityTemplate::ToEntity(Entity newEntity) const
     if (HasStaticMesh && StaticMeshAsset.IsValid())
     {
         auto& c = newEntity.AddComponent<StaticMeshComponent>();
-        c.StaticMesh = AssetManager::ResolveMeshAsset(StaticMeshAsset);
+        c.StaticMesh = AssetManager::AsAsset<Mesh>(StaticMeshAsset);
         c.MeshMaterial = AssetManager::AsAsset<Material>(StaticMaterialAsset);
     }
     if (RigidBody)
