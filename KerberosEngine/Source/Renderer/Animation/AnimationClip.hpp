@@ -14,7 +14,8 @@ enum class AnimationPath : uint8_t
 {
     Translation = 0,
     Rotation,
-    Scale
+    Scale,
+    // TODO: Weights
 };
 
 enum class AnimationInterpolation : uint8_t
@@ -29,8 +30,12 @@ struct AnimationTrack
     uint32_t Joint;
     AnimationPath Path;
     AnimationInterpolation Interpolation;
+
     std::vector<float> Times;
     std::vector<glm::vec4> Values;
+
+    std::vector<glm::vec4> InTangents;
+    std::vector<glm::vec4> OutTangents;
 };
 
 class AnimationClip : public Asset

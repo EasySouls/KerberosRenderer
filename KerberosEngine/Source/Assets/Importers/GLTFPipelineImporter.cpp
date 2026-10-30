@@ -1,8 +1,10 @@
 #include "GLTFPipelineImporter.hpp"
 
 #include "GLTFSceneImporter.hpp"
+#include "Assets/Formats/AnimationFormat.hpp"
 #include "Assets/Formats/NativeAssetFormat.hpp"
 #include "Assets/Formats/NativeAssetSerializer.hpp"
+#include "Assets/Formats/SkeletonFormat.hpp"
 
 #include "Profiling/Profilers.hpp"
 
@@ -44,6 +46,25 @@ std::string TextureKeyFromStem(const std::string_view stem)
     return std::string("texture:") + std::string(end == std::string_view::npos ? rest : rest.substr(0, end));
 }
 
+// Skinned mesh artifacts are named "skinnedmesh_<m>_<p>[_<name>].kbrskinnedmesh";
+// recover the stable sub-asset key "skinnedmesh:<m>_<p>".
+std::string SkinnedMeshKeyFromStem(const std::string_view stem)
+{
+    constexpr std::string_view prefix = "skinnedmesh_";
+    if (!stem.starts_with(prefix))
+        return {};
+
+    const std::string_view rest = stem.substr(prefix.size());
+    const size_t first = rest.find('_');
+    if (first == std::string_view::npos)
+        return std::string("skinnedmesh:") + std::string(rest);
+    const size_t second = rest.find('_', first + 1);
+    const std::string_view primitive = second == std::string_view::npos
+        ? rest.substr(first + 1)
+        : rest.substr(first + 1, second - first - 1);
+    return std::string("skinnedmesh:") + std::string(rest.substr(0, first)) + "_" + std::string(primitive);
+}
+
 }
 
 bool GLTFPipelineImporter::SupportsExtension(const std::string_view extension) const
@@ -83,7 +104,8 @@ ImportResult GLTFPipelineImporter::Import(const ImportContext &context)
         const auto extension = entry.path().extension();
         const bool isOutput = extension == ".kbrmesh" || extension == ".kbrmaterial" ||
             extension == ".ktx2" || extension == ".kbrskeleton" ||
-            extension == ".kbranimation" || extension == ".kbrprefab";
+            extension == ".kbranimation" || extension == ".kbrskinnedmesh" ||
+            extension == ".kbrprefab";
         if (ec || !entry.is_regular_file() || extension == ".kbrscene" || !isOutput)
             continue;
 
@@ -92,10 +114,25 @@ ImportResult GLTFPipelineImporter::Import(const ImportContext &context)
         if (entry.path().extension() == ".kbrmesh") {
             type = AssetType::Mesh;
             record.LocalKey = MeshKeyFromStem(entry.path().stem().string());
+        } else if (entry.path().extension() == ".kbrskinnedmesh") {
+            type = AssetType::SkinnedMesh;
+            record.LocalKey = SkinnedMeshKeyFromStem(entry.path().stem().string());
         } else if (entry.path().extension() == ".ktx2") {
             // Textures are imported as KTX2 artifacts named texture_<imageIndex>[<name>].ktx2.
             type = AssetType::Texture2D;
             record.LocalKey = TextureKeyFromStem(entry.path().stem().string());
+        } else if (entry.path().extension() == ".kbrskeleton") {
+            SkeletonFile skeleton;
+            if (!NativeAssetSerializer::DeserializeSkeleton(entry.path(), skeleton))
+                continue;
+            type = AssetType::Skeleton;
+            record.LocalKey = skeleton.LocalKey;
+        } else if (entry.path().extension() == ".kbranimation") {
+            AnimationClipFile animation;
+            if (!NativeAssetSerializer::DeserializeAnimationClip(entry.path(), animation))
+                continue;
+            type = AssetType::Animation;
+            record.LocalKey = animation.LocalKey;
         } else {
             if (!NativeAssetSerializer::DeserializeRecord(entry.path(), record))
                 continue;
@@ -133,8 +170,16 @@ ImportResult GLTFPipelineImporter::Import(const ImportContext &context)
         else if (output.Type == AssetType::Prefab)
         {
             for (const auto& candidate : result.Outputs)
-                if (candidate.Type == AssetType::Mesh || candidate.Type == AssetType::Material || candidate.Type == AssetType::Skeleton || candidate.Type == AssetType::Animation)
-                    if (candidate.Handle.IsValid()) output.Dependencies.push_back(candidate.Handle);
+            {
+                const bool correctType =
+                    candidate.Type == AssetType::Mesh || candidate.Type == AssetType::SkinnedMesh ||
+                    candidate.Type == AssetType::Material || candidate.Type == AssetType::Skeleton ||
+                    candidate.Type == AssetType::Animation;
+                if (correctType && candidate.Handle.IsValid())
+                {
+                    output.Dependencies.push_back(candidate.Handle);
+                }
+            }
         }
     }
     return result;
@@ -147,7 +192,7 @@ ImporterType GLTFPipelineImporter::Type() const
 
 uint32_t GLTFPipelineImporter::Version() const
 {
-    return 6;
+    return 7;
 }
 
 AssetType GLTFPipelineImporter::SourceAssetType() const

@@ -30,16 +30,21 @@ struct SkinnedMeshComponentTemplate
     AssetHandle MeshAsset = AssetHandle::Invalid();
     AssetHandle SkeletonAsset = AssetHandle::Invalid();
     AssetHandle MaterialAsset = AssetHandle::Invalid();
+    UUID SkeletonEntityID = UUID::Invalid(); // legacy UUID ref
+    PrefabLocalIndex SkeletonEntityLocalIndex = InvalidPrefabLocalIndex;
     bool Visible = true;
     bool CastShadows = true;
 };
 
-struct AnimationComponentTemplate
+struct AnimatorComponentTemplate
 {
-    AssetHandle AnimationAsset = AssetHandle::Invalid();
+    UUID SkeletonEntityID = UUID::Invalid();
+    PrefabLocalIndex SkeletonEntityLocalIndex = InvalidPrefabLocalIndex;
+    std::vector<AssetHandle> Clips;
+    int32_t ActiveClip = -1;
     float PlaybackSpeed = 1.0f;
     bool Loop = true;
-    bool AutoPlay = true;
+    bool AutoPlay = false;
 };
 
 struct PrefabScriptTemplate
@@ -63,9 +68,10 @@ struct PrefabEntityTemplate
     glm::vec3 Translation = glm::vec3(0.0f);
     glm::vec3 EulerRotation = glm::vec3(0.0f);
 
+    std::optional<uint32_t> JointIndex;
     std::optional<SkinComponentTemplate> Skin;
     std::optional<SkinnedMeshComponentTemplate> SkinnedMesh;
-    std::optional<AnimationComponentTemplate> Animation;
+    std::optional<AnimatorComponentTemplate> Animator;
     std::optional<RigidBody3DComponent> RigidBody;
     std::optional<BoxCollider3DComponent> BoxCollider;
     std::optional<SphereCollider3DComponent> SphereCollider;

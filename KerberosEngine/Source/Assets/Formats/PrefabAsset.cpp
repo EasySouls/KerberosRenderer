@@ -19,17 +19,26 @@ void PrefabEntityTemplate::ToEntity(Entity newEntity) const
         c.MeshAsset = SkinnedMesh->MeshAsset;
         c.SkeletonAsset = SkinnedMesh->SkeletonAsset;
         c.MaterialAsset = SkinnedMesh->MaterialAsset;
+        c.SkeletonEntity = SkinnedMesh->SkeletonEntityID;
         c.Visible = SkinnedMesh->Visible;
         c.CastShadows = SkinnedMesh->CastShadows;
+        c.Mesh = AssetManager::AsAsset<SkeletalMesh>(c.MeshAsset);
+        c.Material = AssetManager::AsAsset<Material>(c.MaterialAsset);
     }
-    if (Animation)
+    if (Animator)
     {
-        auto& c = newEntity.AddComponent<AnimationComponent>();
-        c.AnimationAsset = Animation->AnimationAsset;
-        c.PlaybackSpeed = Animation->PlaybackSpeed;
-        c.IsLooping = Animation->Loop;
-        c.IsPlaying = Animation->AutoPlay;
+        auto& c = newEntity.AddComponent<AnimatorComponent>();
+        c.SkeletonEntity = Animator->SkeletonEntityID;
+        c.AnimationClips = Animator->Clips;
+        c.ActiveClip = Animator->ActiveClip;
+        c.PlaybackSpeed = Animator->PlaybackSpeed;
+        c.IsLooping = Animator->Loop;
+        c.IsPlaying = Animator->AutoPlay;
         c.CurrentTime = 0.0f;
+    }
+    if (JointIndex)
+    {
+        newEntity.AddComponent<JointComponent>(JointComponent{ .JointIndex = *JointIndex });
     }
     if (Skin)
     {

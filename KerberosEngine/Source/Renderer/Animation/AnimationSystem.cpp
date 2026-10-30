@@ -9,12 +9,18 @@
 #include <cstring>
 #include <unordered_set>
 
+#include <glm/gtc/matrix_transform.hpp>
+#include <glm/gtc/quaternion.hpp>
+#include <glm/gtx/quaternion.hpp>
+
 import Kerberos;
 
 namespace Kerberos {
 
 void AnimationSystem::Initialize(const Owner<DescriptorAllocator>& allocator)
 {
+    KBR_TRACY_FUNCTION();
+
     m_DescriptorAllocator = allocator.get();
 
     AllocateSkinMatricesBuffer();
@@ -24,6 +30,8 @@ void AnimationSystem::Initialize(const Owner<DescriptorAllocator>& allocator)
 
 void AnimationSystem::Shutdown()
 {
+    KBR_TRACY_FUNCTION();
+
     Reset();
     m_SkinMatricesBuffer.Reset();
     m_Snapshot = {};
@@ -31,6 +39,8 @@ void AnimationSystem::Shutdown()
 
 void AnimationSystem::AllocateSkinMatricesBuffer()
 {
+    KBR_TRACY_FUNCTION();
+
     auto& context = VulkanContext::Get();
 
     VkBufferCreateInfo bufferInfo{};
@@ -163,6 +173,8 @@ void AnimationSystem::BeginFrame(const Ref<Scene>& scene, float dt, bool paused)
 
 void AnimationSystem::WriteBindPose(const SkeletonInstanceState& instance)
 {
+    KBR_TRACY_FUNCTION();
+
     if (!instance.Skeleton || m_SkinMatricesBuffer.MappedData == nullptr)
         return;
 
@@ -170,9 +182,24 @@ void AnimationSystem::WriteBindPose(const SkeletonInstanceState& instance)
     auto* destination = static_cast<std::byte*>(m_SkinMatricesBuffer.MappedData) +
         static_cast<size_t>(instance.FirstSkinMatrix) * sizeof(BoneMatrix);
 
+    // Bind pose bone matrices are jointGlobal * inverseBind. With consistent glTF
+    // rest transforms and inverse-bind matrices this evaluates to identity, but
+    // computing it from the rest pose keeps the path correct for skeletal data
+    // whose bind pose is not the model-space origin.
+    std::vector<glm::mat4> globalTransforms(joints.size(), glm::mat4(1.0f));
     for (size_t i = 0; i < joints.size(); ++i)
     {
-        const BoneMatrix bone = ToBoneMatrix(joints[i].InverseBind);
+        const SkeletonJoint& joint = joints[i];
+        const glm::mat4 local =
+            glm::translate(glm::mat4(1.0f), joint.RestTranslation) *
+            glm::toMat4(joint.RestRotation) *
+            glm::scale(glm::mat4(1.0f), joint.RestScale);
+        const glm::mat4 parent = joint.Parent >= 0 && static_cast<size_t>(joint.Parent) < i
+            ? globalTransforms[static_cast<size_t>(joint.Parent)]
+            : glm::mat4(1.0f);
+        globalTransforms[i] = parent * local;
+
+        const BoneMatrix bone = ToBoneMatrix(globalTransforms[i] * joint.InverseBind);
         std::memcpy(destination + i * sizeof(BoneMatrix), &bone, sizeof(BoneMatrix));
     }
 
@@ -183,7 +210,7 @@ void AnimationSystem::WriteBindPose(const SkeletonInstanceState& instance)
     m_Snapshot.SkinMatrixBuffer = m_SkinMatricesBuffer.Handle;
 }
 
-void AnimationSystem::AddPasses(RenderGraph::Graph& graph, uint32_t frameIndex)
+void AnimationSystem::AddPasses(RenderGraph::Graph& graph, const uint32_t frameIndex)
 {
     // The bind-pose milestone fills the skin matrices on the CPU during BeginFrame, so there is no
     // animation or precompute pass yet. Evaluation/precompute passes will be added here later.

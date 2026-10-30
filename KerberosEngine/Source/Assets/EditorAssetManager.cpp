@@ -170,13 +170,14 @@ namespace Kerberos
 		});
 	}
 
-	void EditorAssetManager::EnsureAssetMetas() const
+	void EditorAssetManager::EnsureAssetMetas()
     {
         KBR_TRACY_FUNCTION();
 
 		if (!m_MetaService || m_AssetsRoot.empty())
 			return;
 
+        bool registryRepaired = false;
         constexpr AssetSourceScanner scanner;
 		const auto files = scanner.ScanForAssets(m_AssetsRoot, SourceAssetExtensions());
 		for (const auto& file : files)
@@ -194,7 +195,42 @@ namespace Kerberos
 					Log::CoreError("Failed to save asset metadata for {0}", file.string());
 				}
 			}
+
+			if (!meta.SourceHandle.IsValid())
+				continue;
+
+			// Remove root entries left behind by an older .meta handle for this
+			// same source path. Path lookup is linear and ordered by handle, so a
+			// stale root can otherwise keep resolving after a source rebuild.
+			std::vector<AssetHandle> staleRoots;
+			const auto normalizedRelative = relativeFile.lexically_normal();
+			const auto normalizedAbsolute = file.lexically_normal();
+			for (const auto& [handle, metadata] : m_AssetRegistry)
+			{
+				if (handle == meta.SourceHandle)
+					continue;
+				const auto metadataPath = metadata.Filepath.lexically_normal();
+				if (metadata.SourceRoot == AssetSourceRoot::Project
+					&& metadata.RootSourceHandle == handle
+					&& (metadataPath == normalizedRelative || metadataPath == normalizedAbsolute))
+					staleRoots.push_back(handle);
+			}
+
+			for (const auto staleRoot : staleRoots)
+			{
+				// Keep the obsolete root's generated sub-assets, including older
+				// prefab wrappers: saved scenes, script fields, and prefab instances
+				// may still reference those handles directly. Only the stale root
+				// entry itself is removed so path lookup resolves to the current
+				// source handle.
+				m_LoadedAssets.erase(staleRoot);
+				m_AssetRegistry.Remove(staleRoot);
+				registryRepaired = true;
+			}
 		}
+
+        if (registryRepaired)
+            SerializeAssetRegistry();
 	}
 
 	std::vector<AssetBuildReport> EditorAssetManager::BuildAssets(const bool force)

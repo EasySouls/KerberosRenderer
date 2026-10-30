@@ -66,36 +66,31 @@ struct SkinnedMeshComponent
     Ref<Material> Material = nullptr;
 };
 
-struct AnimationComponent
+struct AnimatorComponent
 {
-    /**
-     * @brief Handle to the assigned animation asset.
-     *
-     * Refers specifically to an @ref Animation asset. Passing any other 
-     * asset type will result in a runtime validation failure.
-     * 
-     * @see Animation
-     * @see AssetHandle
-     */
-    AssetHandle AnimationAsset = AssetHandle::Invalid();
+    UUID SkeletonEntity = UUID::Invalid();
 
+    std::vector<AssetHandle> AnimationClips;
+
+    int32_t ActiveClip = -1;
     float CurrentTime = 0.0f;
     float PlaybackSpeed = 1.0f;
     bool IsPlaying = false;
     bool IsLooping = true;
 
-    AnimationComponent() = default;
-    explicit AnimationComponent(const AssetHandle& animationAsset)
-        : AnimationAsset(animationAsset)
-    {
-    }
+    AnimatorComponent() = default;
+    explicit AnimatorComponent(const UUID& skeletonEntity) : SkeletonEntity(skeletonEntity) {}
 
-    AnimationComponent(const AnimationComponent&) = default;
-    AnimationComponent(AnimationComponent&&) = default;
-    AnimationComponent& operator=(const AnimationComponent&) = default;
-    AnimationComponent& operator=(AnimationComponent&&) = default;
+    AnimatorComponent(const UUID& skeletonEntity, const std::vector<AssetHandle>& animationClips)
+        : SkeletonEntity(skeletonEntity), AnimationClips(animationClips) {}
 
-    Ref<AnimationClip> Clip = nullptr;
+    AnimatorComponent(const AnimatorComponent&) = default;
+    AnimatorComponent(AnimatorComponent&&) = default;
+    AnimatorComponent& operator=(const AnimatorComponent&) = default;
+    AnimatorComponent& operator=(AnimatorComponent&&) = default;
+
+    Ref<Skeleton> Skeleton = nullptr;
+    std::vector<Ref<AnimationClip>> LoadedClips;
 };
 
 }

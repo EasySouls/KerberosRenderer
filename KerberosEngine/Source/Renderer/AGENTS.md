@@ -197,8 +197,16 @@ validation procedures change.
 `AnimationSystem` (`Renderer/Animation/AnimationSystem.*`) owns immutable
 skeleton/clip data and per-skeleton-instance pose/skin-matrix data. In the
 bind-pose milestone it owns one host-visible global skin-matrix buffer, filled
-from each skeleton's inverse-bind matrices, and publishes a
+from each skeleton's rest-pose globals multiplied by its inverse-bind matrices
+(which evaluates to identity for consistent bind data), and publishes a
 `SkinningFrameSnapshot` (buffer + per-instance `SkeletonFrame` records).
+
+Entities use `SkeletonComponent` for the skeleton instance and joint list,
+`JointComponent` for joint ordering, `SkinnedMeshComponent` for the mesh /
+skeleton-entity link, and `AnimatorComponent` for the skeleton-entity reference,
+clip handles, and playback state. The animator replaces the old single-clip
+`AnimationComponent`; legacy serialized animation components are migrated on
+load.
 
 `SkinningSystem` (`Renderer/Animation/SkinningSystem.*`) owns the global source
 vertex/joint/weight/index buffers, the shared vertex buffer (SVB), the SVB
@@ -235,8 +243,13 @@ SVB rather than expecting world-space output.
 
 ## Bind-pose milestone limitations
 
-- Skin matrices are filled on the CPU from inverse-bind matrices; there is no
-  animation evaluation/precompute pass yet.
+- Skin matrices are filled on the CPU from each joint's rest-pose global
+  transform multiplied by its inverse-bind matrix; there is no animation
+  evaluation/precompute pass yet. `AnimatorComponent` already carries the
+  skeleton reference, clip handles, and playback state for that milestone.
+- Imported `AnimationClip` data includes all skeletal T/R/S keyframes,
+  interpolation modes, and cubic-spline tangents, so adding evaluation should
+  not require importer or loader changes.
 - Only direct per-mesh dispatches are recorded; no indirect dispatch or
   per-frame job buffer exists.
 - SVB regions are bump-allocated and only returned by `Reset()`; there is no

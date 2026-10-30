@@ -331,6 +331,13 @@ static void SerializeEntity(YAML::Emitter& out, const Entity entity)
         out << YAML::EndMap;
     }
 
+    if (entity.HasComponent<JointComponent>()) {
+        out << YAML::Key << "JointComponent";
+        out << YAML::BeginMap;
+        out << YAML::Key << "JointIndex" << YAML::Value << entity.GetComponent<JointComponent>().JointIndex;
+        out << YAML::EndMap;
+    }
+
     if (entity.HasComponent<SkeletonComponent>()) {
         out << YAML::Key << "SkeletonComponent";
         out << YAML::BeginMap;
@@ -344,11 +351,17 @@ static void SerializeEntity(YAML::Emitter& out, const Entity entity)
         out << YAML::EndMap;
     }
 
-    if (entity.HasComponent<AnimationComponent>()) {
-        out << YAML::Key << "AnimationComponent";
+    if (entity.HasComponent<AnimatorComponent>()) {
+        out << YAML::Key << "AnimatorComponent";
         out << YAML::BeginMap;
-        const auto& animation = entity.GetComponent<AnimationComponent>();
-        out << YAML::Key << "AnimationAsset" << YAML::Value << animation.AnimationAsset;
+        const auto& animation = entity.GetComponent<AnimatorComponent>();
+        out << YAML::Key << "SkeletonEntity" << YAML::Value << animation.SkeletonEntity;
+        out << YAML::Key << "AnimationClips" << YAML::Value << YAML::BeginSeq;
+        for (const auto& clip : animation.AnimationClips) {
+            out << clip;
+        }
+        out << YAML::EndSeq;
+        out << YAML::Key << "ActiveClip" << YAML::Value << animation.ActiveClip;
         out << YAML::Key << "PlaybackSpeed" << YAML::Value << animation.PlaybackSpeed;
         out << YAML::Key << "IsPlaying" << YAML::Value << animation.IsPlaying;
         out << YAML::Key << "IsLooping" << YAML::Value << animation.IsLooping;
@@ -667,6 +680,13 @@ Entity SceneSerializer::DeserializeEntity(const Ref<Scene>& scene, const YAML::N
         skinnedMesh.SkeletonEntity = UUID(skinnedMeshComponent["SkeletonEntity"].as<uint64_t>(0));
         skinnedMesh.Visible = skinnedMeshComponent["Visible"].as<bool>(true);
         skinnedMesh.CastShadows = skinnedMeshComponent["CastShadows"].as<bool>(true);
+        skinnedMesh.Mesh = AssetManager::AsAsset<SkeletalMesh>(skinnedMesh.MeshAsset);
+        skinnedMesh.Material = AssetManager::AsAsset<Material>(skinnedMesh.MaterialAsset);
+    }
+
+    if (auto jointComponent = node["JointComponent"]) {
+        auto& joint = deserializedEntity.AddComponent<JointComponent>();
+        joint.JointIndex = jointComponent["JointIndex"].as<uint32_t>(0);
     }
 
     if (auto skinComponent = node["SkeletonComponent"]) {
@@ -677,14 +697,33 @@ Entity SceneSerializer::DeserializeEntity(const Ref<Scene>& scene, const YAML::N
                 skin.JointEntities.emplace_back(jointEntity.as<uint64_t>());
             }
         }
+        skin.Skeleton = AssetManager::AsAsset<Skeleton>(skin.SkeletonAsset);
     }
 
-    if (auto animationComponent = node["AnimationComponent"]) {
-        auto& animation = deserializedEntity.AddComponent<AnimationComponent>();
-        animation.AnimationAsset = AssetHandle(animationComponent["AnimationAsset"].as<uint64_t>());
+    if (auto animationComponent = node["AnimatorComponent"]) {
+        auto& animation = deserializedEntity.AddComponent<AnimatorComponent>();
+        animation.SkeletonEntity = UUID(animationComponent["SkeletonEntity"].as<uint64_t>(0));
+        const YAML::Node clipsNode = animationComponent["AnimationClips"].IsDefined()
+            ? animationComponent["AnimationClips"] : animationComponent["Clips"];
+        if (clipsNode) {
+            for (const auto& clip : clipsNode) {
+                animation.AnimationClips.emplace_back(AssetHandle(clip.as<uint64_t>()));
+            }
+        }
+        animation.ActiveClip = animationComponent["ActiveClip"].as<int32_t>(-1);
         animation.PlaybackSpeed = animationComponent["PlaybackSpeed"].as<float>(1.0f);
         animation.IsPlaying = animationComponent["IsPlaying"].as<bool>(false);
         animation.IsLooping = animationComponent["IsLooping"].as<bool>(true);
+    }
+    else if (auto legacyAnimationComponent = node["AnimationComponent"]) {
+        auto& animation = deserializedEntity.AddComponent<AnimatorComponent>();
+        const AssetHandle clip = AssetHandle(legacyAnimationComponent["AnimationAsset"].as<uint64_t>(0));
+        if (clip.IsValid())
+            animation.AnimationClips.push_back(clip);
+        animation.ActiveClip = animation.AnimationClips.empty() ? -1 : 0;
+        animation.PlaybackSpeed = legacyAnimationComponent["PlaybackSpeed"].as<float>(1.0f);
+        animation.IsPlaying = legacyAnimationComponent["IsPlaying"].as<bool>(false);
+        animation.IsLooping = legacyAnimationComponent["IsLooping"].as<bool>(true);
     }
 
     return deserializedEntity;

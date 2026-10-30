@@ -71,7 +71,7 @@ namespace Kerberos
 		void ConfigurePipeline(const std::filesystem::path& assetsRoot, const std::filesystem::path& cacheRoot = {});
 
 		void StartWatching();
-		void EnsureAssetMetas() const;
+		void EnsureAssetMetas();
 		std::vector<AssetBuildReport> BuildAssets(bool force = false);
 
 		ImporterRegistry& GetImporterRegistry() { return m_ImporterRegistry; }

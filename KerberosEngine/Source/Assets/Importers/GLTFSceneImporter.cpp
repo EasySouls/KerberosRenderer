@@ -1,7 +1,10 @@
 #include "Assets/Importers/GLTFSceneImporter.hpp"
+#include "Assets/Formats/AnimationFormat.hpp"
 #include "Assets/Formats/NativeAssetSerializer.hpp"
+#include "Assets/Formats/SkeletonFormat.hpp"
 #include "Assets/Asset.hpp"
 #include "Assets/Pipeline/ImportPipeline.hpp"
+#include "Renderer/Animation/SkeletalMesh.hpp"
 #include "Renderer/Vertex.hpp"
 #include "Renderer/Textures/KTX2Encoder.hpp"
 #include "Renderer/Textures/KTX2FormatSelector.hpp"
@@ -11,10 +14,17 @@
 #include <tinygltf/tiny_gltf.h>
 #include <ktx.h>
 
+#include <glm/gtc/quaternion.hpp>
+#include <glm/gtx/matrix_decompose.hpp>
+
 #include <algorithm>
+#include <array>
+#include <cstring>
 #include <fstream>
 #include <map>
+#include <ranges>
 #include <sstream>
+#include <unordered_map>
 #include <unordered_set>
 #include <limits>
 
@@ -83,11 +93,18 @@ std::string SanitizeFileName(std::string value)
     return value;
 }
 
-// Artifact filename stems (no extension). The leading index tokens are stable
-// and mirror the sub-asset key, while the trailing name is a readability hint.
 std::string MeshArtifactName(const size_t mesh, const size_t primitive, const std::string& meshName)
 {
     std::string name = "mesh_" + std::to_string(mesh) + "_" + std::to_string(primitive);
+    const std::string sanitized = SanitizeFileName(meshName);
+    if (!sanitized.empty())
+        name += "_" + sanitized;
+    return name;
+}
+
+std::string SkinnedMeshArtifactName(const size_t mesh, const size_t primitive, const std::string& meshName)
+{
+    std::string name = "skinnedmesh_" + std::to_string(mesh) + "_" + std::to_string(primitive);
     const std::string sanitized = SanitizeFileName(meshName);
     if (!sanitized.empty())
         name += "_" + sanitized;
@@ -114,6 +131,380 @@ std::string UniqueArtifactName(std::unordered_set<std::string>& used, const std:
     return candidate;
 }
 
+size_t ComponentCount(const int type)
+{
+    switch (type)
+    {
+    case TINYGLTF_TYPE_SCALAR: return 1;
+    case TINYGLTF_TYPE_VEC2: return 2;
+    case TINYGLTF_TYPE_VEC3: return 3;
+    case TINYGLTF_TYPE_VEC4: return 4;
+    case TINYGLTF_TYPE_MAT4: return 16;
+    default: return 0;
+    }
+}
+
+size_t ComponentSize(const int componentType)
+{
+    switch (componentType)
+    {
+    case TINYGLTF_COMPONENT_TYPE_BYTE:
+    case TINYGLTF_COMPONENT_TYPE_UNSIGNED_BYTE: return 1;
+    case TINYGLTF_COMPONENT_TYPE_SHORT:
+    case TINYGLTF_COMPONENT_TYPE_UNSIGNED_SHORT: return 2;
+    case TINYGLTF_COMPONENT_TYPE_UNSIGNED_INT:
+    case TINYGLTF_COMPONENT_TYPE_FLOAT: return 4;
+    default: return 0;
+    }
+}
+
+bool AccessorElement(const tinygltf::Model& model, const tinygltf::Accessor& accessor,
+    const size_t index, float* destination, const size_t componentCount)
+{
+    if (accessor.bufferView < 0 || index >= accessor.count)
+        return false;
+
+    const size_t availableComponents = ComponentCount(accessor.type);
+    const size_t componentSize = ComponentSize(accessor.componentType);
+    if (availableComponents < componentCount || componentSize == 0)
+        return false;
+
+    const auto& view = model.bufferViews[accessor.bufferView];
+    if (view.buffer < 0 || static_cast<size_t>(view.buffer) >= model.buffers.size())
+        return false;
+    const auto& buffer = model.buffers[view.buffer];
+
+    const size_t elementSize = componentSize * availableComponents;
+    const size_t stride = accessor.ByteStride(view) ? static_cast<size_t>(accessor.ByteStride(view)) : elementSize;
+    const size_t offset = static_cast<size_t>(view.byteOffset) + static_cast<size_t>(accessor.byteOffset) + index * stride;
+    if (offset > buffer.data.size() || elementSize > buffer.data.size() - offset)
+        return false;
+
+    const uint8_t* data = buffer.data.data() + offset;
+    const double normalization = accessor.normalized
+        ? (accessor.componentType == TINYGLTF_COMPONENT_TYPE_UNSIGNED_BYTE ? 255.0
+            : accessor.componentType == TINYGLTF_COMPONENT_TYPE_UNSIGNED_SHORT ? 65535.0
+            : accessor.componentType == TINYGLTF_COMPONENT_TYPE_UNSIGNED_INT ? 4294967295.0 : 1.0)
+        : 1.0;
+
+    for (size_t component = 0; component < componentCount; ++component)
+    {
+        const uint8_t* source = data + component * componentSize;
+        switch (accessor.componentType)
+        {
+        case TINYGLTF_COMPONENT_TYPE_FLOAT:
+        {
+            float value = 0.0f;
+            std::memcpy(&value, source, sizeof(value));
+            destination[component] = value;
+            break;
+        }
+        case TINYGLTF_COMPONENT_TYPE_UNSIGNED_BYTE:
+            destination[component] = static_cast<float>(*source) / static_cast<float>(normalization);
+            break;
+        case TINYGLTF_COMPONENT_TYPE_UNSIGNED_SHORT:
+        {
+            uint16_t value = 0;
+            std::memcpy(&value, source, sizeof(value));
+            destination[component] = static_cast<float>(value) / static_cast<float>(normalization);
+            break;
+        }
+        case TINYGLTF_COMPONENT_TYPE_UNSIGNED_INT:
+        {
+            uint32_t value = 0;
+            std::memcpy(&value, source, sizeof(value));
+            destination[component] = static_cast<float>(value) / static_cast<float>(normalization);
+            break;
+        }
+        default:
+            return false;
+        }
+    }
+    return true;
+}
+
+bool AccessorUnsignedElement(const tinygltf::Model& model, const tinygltf::Accessor& accessor,
+    const size_t index, uint32_t* destination, const size_t componentCount)
+{
+    if (accessor.bufferView < 0 || index >= accessor.count)
+        return false;
+
+    const size_t availableComponents = ComponentCount(accessor.type);
+    const size_t componentSize = ComponentSize(accessor.componentType);
+    if (availableComponents < componentCount || componentSize == 0)
+        return false;
+
+    const auto& view = model.bufferViews[accessor.bufferView];
+    if (view.buffer < 0 || static_cast<size_t>(view.buffer) >= model.buffers.size())
+        return false;
+    const auto& buffer = model.buffers[view.buffer];
+
+    const size_t elementSize = componentSize * availableComponents;
+    const size_t stride = accessor.ByteStride(view) ? static_cast<size_t>(accessor.ByteStride(view)) : elementSize;
+    const size_t offset = static_cast<size_t>(view.byteOffset) + static_cast<size_t>(accessor.byteOffset) + index * stride;
+    if (offset > buffer.data.size() || elementSize > buffer.data.size() - offset)
+        return false;
+
+    const uint8_t* data = buffer.data.data() + offset;
+    for (size_t component = 0; component < componentCount; ++component)
+    {
+        const uint8_t* source = data + component * componentSize;
+        switch (accessor.componentType)
+        {
+        case TINYGLTF_COMPONENT_TYPE_UNSIGNED_BYTE:
+            destination[component] = *source;
+            break;
+        case TINYGLTF_COMPONENT_TYPE_UNSIGNED_SHORT:
+        {
+            uint16_t value = 0;
+            std::memcpy(&value, source, sizeof(value));
+            destination[component] = value;
+            break;
+        }
+        case TINYGLTF_COMPONENT_TYPE_UNSIGNED_INT:
+        {
+            uint32_t value = 0;
+            std::memcpy(&value, source, sizeof(value));
+            destination[component] = value;
+            break;
+        }
+        default:
+            return false;
+        }
+    }
+    return true;
+}
+
+bool ReadIndices(const tinygltf::Model& model, const tinygltf::Accessor& accessor, std::vector<uint32_t>& out)
+{
+    out.clear();
+    out.resize(accessor.count);
+    for (size_t i = 0; i < accessor.count; ++i)
+    {
+        uint32_t value = 0;
+        if (!AccessorUnsignedElement(model, accessor, i, &value, 1))
+            return false;
+        out[i] = value;
+    }
+    return true;
+}
+
+glm::mat4 ReadNodeMatrix(const tinygltf::Node& node)
+{
+    glm::mat4 matrix(1.0f);
+    if (node.matrix.size() != 16)
+        return matrix;
+
+    // glTF stores matrices column-major.
+    for (int column = 0; column < 4; ++column)
+        for (int row = 0; row < 4; ++row)
+            matrix[column][row] = static_cast<float>(node.matrix[static_cast<size_t>(column) * 4 + static_cast<size_t>(row)]);
+    return matrix;
+}
+
+void ReadNodeTransform(const tinygltf::Node& node, glm::vec3& translation, glm::quat& rotation, glm::vec3& scale)
+{
+    translation = glm::vec3(0.0f);
+    rotation = glm::quat(1.0f, 0.0f, 0.0f, 0.0f);
+    scale = glm::vec3(1.0f);
+
+    if (node.matrix.size() == 16)
+    {
+        glm::vec3 skew;
+        glm::vec4 perspective;
+        glm::decompose(ReadNodeMatrix(node), scale, rotation, translation, skew, perspective);
+        rotation = glm::normalize(rotation);
+        return;
+    }
+
+    if (node.translation.size() == 3)
+        translation = glm::vec3(node.translation[0], node.translation[1], node.translation[2]);
+    if (node.rotation.size() == 4)
+        rotation = glm::normalize(glm::quat(
+            static_cast<float>(node.rotation[3]),
+            static_cast<float>(node.rotation[0]),
+            static_cast<float>(node.rotation[1]),
+            static_cast<float>(node.rotation[2])));
+    if (node.scale.size() == 3)
+        scale = glm::vec3(node.scale[0], node.scale[1], node.scale[2]);
+}
+
+std::vector<int32_t> BuildNodeParents(const tinygltf::Model& model)
+{
+    std::vector<int32_t> parents(model.nodes.size(), -1);
+    for (size_t parent = 0; parent < model.nodes.size(); ++parent)
+    {
+        for (const int child : model.nodes[parent].children)
+        {
+            if (child >= 0 && static_cast<size_t>(child) < parents.size())
+                parents[static_cast<size_t>(child)] = static_cast<int32_t>(parent);
+        }
+    }
+    return parents;
+}
+
+bool HasSkinAttribute(const tinygltf::Primitive& primitive)
+{
+    return primitive.attributes.find("JOINTS_0") != primitive.attributes.end()
+        && primitive.attributes.find("WEIGHTS_0") != primitive.attributes.end();
+}
+
+struct SkeletonImportInfo
+{
+    bool Valid = false;
+    size_t SkinIndex = 0;
+    std::string LocalKey;
+    int32_t SkeletonNode = -1;
+    uint32_t JointCount = 0;
+    std::vector<int32_t> JointNodes;                         // final order
+    std::unordered_map<uint32_t, uint32_t> OldToNewJoint;    // skin.joints index -> final index
+    std::unordered_map<int32_t, uint32_t> NodeToJoint;       // glTF node -> final index
+    SkeletonFile File;
+};
+
+SkeletonImportInfo BuildSkeleton(const tinygltf::Model& model, const std::vector<int32_t>& nodeParents,
+    const size_t skinIndex)
+{
+    SkeletonImportInfo info;
+    info.SkinIndex = skinIndex;
+    info.LocalKey = Key("skeleton", skinIndex);
+
+    const auto& skin = model.skins[skinIndex];
+    const size_t jointCount = skin.joints.size();
+    if (jointCount == 0)
+        return info;
+
+    std::unordered_map<int32_t, size_t> nodeToOldIndex;
+    nodeToOldIndex.reserve(jointCount);
+    for (size_t i = 0; i < jointCount; ++i)
+        nodeToOldIndex.emplace(skin.joints[i], i);
+
+    std::vector<int32_t> oldParents(jointCount, -1);
+    std::vector<std::vector<size_t>> children(jointCount);
+    for (size_t i = 0; i < jointCount; ++i)
+    {
+        int32_t parentNode = skin.joints[i] >= 0 && static_cast<size_t>(skin.joints[i]) < nodeParents.size()
+            ? nodeParents[static_cast<size_t>(skin.joints[i])]
+            : -1;
+        while (parentNode >= 0 && !nodeToOldIndex.contains(parentNode))
+        {
+            parentNode = static_cast<size_t>(parentNode) < nodeParents.size()
+                ? nodeParents[static_cast<size_t>(parentNode)]
+                : -1;
+        }
+        if (parentNode >= 0)
+        {
+            const size_t parentIndex = nodeToOldIndex[parentNode];
+            oldParents[i] = static_cast<int32_t>(parentIndex);
+            children[parentIndex].push_back(i);
+        }
+    }
+
+    // Stable Kahn topological sort so Skeleton's parent-before-child invariant holds.
+    std::vector<size_t> indegree(jointCount, 0);
+    for (size_t i = 0; i < jointCount; ++i)
+        if (oldParents[i] >= 0)
+            indegree[i] = 1;
+
+    std::vector<size_t> queue;
+    queue.reserve(jointCount);
+    for (size_t i = 0; i < jointCount; ++i)
+        if (indegree[i] == 0)
+            queue.push_back(i);
+
+    std::vector<size_t> order;
+    order.reserve(jointCount);
+    for (size_t cursor = 0; cursor < queue.size(); ++cursor)
+    {
+        const size_t current = queue[cursor];
+        order.push_back(current);
+        for (const size_t child : children[current])
+        {
+            if (--indegree[child] == 0)
+                queue.push_back(child);
+        }
+    }
+    if (order.size() != jointCount)
+    {
+        Log::CoreWarn("glTF skin {} has cyclic joint hierarchy; appending remaining joints in source order",
+            skinIndex);
+        for (size_t i = 0; i < jointCount; ++i)
+            if (std::ranges::find(order, i) == order.end())
+                order.push_back(i);
+    }
+
+    std::vector<size_t> oldToNew(jointCount, 0);
+    std::vector<size_t> newToOld(jointCount, 0);
+    for (size_t newIndex = 0; newIndex < jointCount; ++newIndex)
+    {
+        const size_t oldIndex = order[newIndex];
+        oldToNew[oldIndex] = newIndex;
+        newToOld[newIndex] = oldIndex;
+        info.OldToNewJoint[static_cast<uint32_t>(oldIndex)] = static_cast<uint32_t>(newIndex);
+    }
+
+    std::vector<glm::mat4> inverseBinds(jointCount, glm::mat4(1.0f));
+    if (skin.inverseBindMatrices >= 0)
+    {
+        const auto& accessor = model.accessors[skin.inverseBindMatrices];
+        if (accessor.type == TINYGLTF_TYPE_MAT4 && static_cast<size_t>(accessor.count) >= jointCount)
+        {
+            for (size_t oldIndex = 0; oldIndex < jointCount; ++oldIndex)
+            {
+                std::array<float, 16> values{};
+                if (!AccessorElement(model, accessor, oldIndex, values.data(), 16))
+                {
+                    Log::CoreWarn("glTF skin {} could not read inverse bind matrix {}", skinIndex, oldIndex);
+                    continue;
+                }
+                glm::mat4 matrix(1.0f);
+                for (int column = 0; column < 4; ++column)
+                    for (int row = 0; row < 4; ++row)
+                        matrix[column][row] = values[static_cast<size_t>(column) * 4 + static_cast<size_t>(row)];
+                inverseBinds[oldIndex] = matrix;
+            }
+        }
+        else
+        {
+            Log::CoreWarn("glTF skin {} has an invalid inverse bind accessor", skinIndex);
+        }
+    }
+
+    info.JointCount = static_cast<uint32_t>(jointCount);
+    info.JointNodes.reserve(jointCount);
+    info.NodeToJoint.reserve(jointCount);
+    info.SkeletonNode = skin.skeleton;
+
+    info.File.Joints.reserve(jointCount);
+    for (size_t newIndex = 0; newIndex < jointCount; ++newIndex)
+    {
+        const size_t oldIndex = newToOld[newIndex];
+        const int32_t jointNode = skin.joints[oldIndex];
+        info.JointNodes.push_back(jointNode);
+        info.NodeToJoint[jointNode] = static_cast<uint32_t>(newIndex);
+
+        SkeletonJointFile joint;
+        const auto& node = model.nodes[static_cast<size_t>(jointNode)];
+        joint.Name = Name(node.name, "Joint_", newIndex);
+        joint.SourceNode = jointNode;
+        ReadNodeTransform(node, joint.RestTranslation, joint.RestRotation, joint.RestScale);
+        joint.InverseBind = inverseBinds[oldIndex];
+
+        const int32_t oldParent = oldParents[oldIndex];
+        if (oldParent >= 0)
+        {
+            const auto parentNew = std::ranges::find(order, static_cast<size_t>(oldParent));
+            joint.ParentJoint = parentNew != order.end()
+                ? static_cast<int32_t>(std::distance(order.begin(), parentNew))
+                : -1;
+        }
+        info.File.Joints.push_back(std::move(joint));
+    }
+
+    info.Valid = true;
+    return info;
+}
+
 bool WriteRecord(const std::filesystem::path& root, const std::string& folder, const std::string& key,
                  const std::string& kind, const uint32_t index, const std::string& data,
                  const std::string& filename = {})
@@ -129,7 +520,8 @@ bool WriteRecord(const std::filesystem::path& root, const std::string& folder, c
     return !ec && NativeAssetSerializer::SerializeRecord({ .Version = NativeAssetFormatVersion, .Kind = kind, .SourceIndex = index, .LocalKey = key, .Data = data }, path);
 }
 
-bool WriteMesh(const std::filesystem::path& root, const size_t mesh, const size_t primitive, const tinygltf::Model& model, const tinygltf::Primitive& p)
+bool WriteMesh(const std::filesystem::path& root, const size_t mesh, const size_t primitive,
+    const tinygltf::Model& model, const tinygltf::Primitive& p)
 {
     KBR_TRACY_FUNCTION();
 
@@ -139,102 +531,148 @@ bool WriteMesh(const std::filesystem::path& root, const size_t mesh, const size_
         return false;
 
     const auto& positionAccessor = model.accessors[it->second];
-    if (positionAccessor.bufferView < 0 || positionAccessor.componentType != TINYGLTF_COMPONENT_TYPE_FLOAT
-        || positionAccessor.type != TINYGLTF_TYPE_VEC3)
+    if (positionAccessor.bufferView < 0 || positionAccessor.type != TINYGLTF_TYPE_VEC3)
         return false;
-
-    const auto readAttribute = [&model, &p](const char* name, const size_t vertex,
-        const size_t componentCount, float* destination) -> bool
-    {
-        std::fill_n(destination, componentCount, 0.0f);
-        const auto attribute = p.attributes.find(name);
-        if (attribute == p.attributes.end())
-            return true;
-
-        const auto& accessor = model.accessors[attribute->second];
-        if (accessor.bufferView < 0 || accessor.componentType != TINYGLTF_COMPONENT_TYPE_FLOAT
-            || accessor.count <= vertex)
-            return false;
-        const auto& view = model.bufferViews[accessor.bufferView];
-        if (view.buffer < 0 || static_cast<size_t>(view.buffer) >= model.buffers.size())
-            return false;
-        const auto& buffer = model.buffers[view.buffer];
-        const size_t elementSize = componentCount * sizeof(float);
-        const size_t stride = accessor.ByteStride(view) ? accessor.ByteStride(view) : elementSize;
-        const size_t offset = view.byteOffset + accessor.byteOffset + vertex * stride;
-        if (offset > buffer.data.size() || elementSize > buffer.data.size() - offset)
-            return false;
-        std::memcpy(destination, buffer.data.data() + offset, elementSize);
-        return true;
-    };
 
     std::vector<Vertex> vertices(positionAccessor.count);
     for (size_t i = 0; i < vertices.size(); ++i)
     {
-        if (!readAttribute("POSITION", i, 3, &vertices[i].Position.x)
-            || !readAttribute("NORMAL", i, 3, &vertices[i].Normal.x)
-            || !readAttribute("TEXCOORD_0", i, 2, &vertices[i].TexCoord.x))
+        if (!AccessorElement(model, positionAccessor, i, &vertices[i].Position.x, 3))
             return false;
+        vertices[i].Normal = glm::vec3(0.0f);
         vertices[i].Tangent = glm::vec4(0.0f, 0.0f, 0.0f, 1.0f);
-        if (!readAttribute("TANGENT", i, 4, &vertices[i].Tangent.x))
+        vertices[i].TexCoord = glm::vec2(0.0f);
+
+        const auto normal = p.attributes.find("NORMAL");
+        if (normal != p.attributes.end()
+            && !AccessorElement(model, model.accessors[normal->second], i, &vertices[i].Normal.x, 3))
+            return false;
+        const auto texCoord = p.attributes.find("TEXCOORD_0");
+        if (texCoord != p.attributes.end()
+            && !AccessorElement(model, model.accessors[texCoord->second], i, &vertices[i].TexCoord.x, 2))
+            return false;
+        const auto tangent = p.attributes.find("TANGENT");
+        if (tangent != p.attributes.end()
+            && !AccessorElement(model, model.accessors[tangent->second], i, &vertices[i].Tangent.x, 4))
             return false;
     }
+
     payload.VertexStride = sizeof(Vertex);
     payload.VertexData.resize(vertices.size() * sizeof(Vertex));
     if (!vertices.empty())
         std::memcpy(payload.VertexData.data(), vertices.data(), payload.VertexData.size());
 
-    if (p.indices >= 0) {
-        const auto& a = model.accessors[p.indices]; 
-        if (a.bufferView < 0)
-            return false;
-        const auto& view = model.bufferViews[a.bufferView]; 
-        const auto& buffer = model.buffers[view.buffer];
+    if (p.indices >= 0 && !ReadIndices(model, model.accessors[p.indices], payload.Indices))
+        return false;
 
-        const size_t componentSize = a.componentType == TINYGLTF_COMPONENT_TYPE_UNSIGNED_BYTE ? 1 :
-            a.componentType == TINYGLTF_COMPONENT_TYPE_UNSIGNED_SHORT ? 2 :
-            a.componentType == TINYGLTF_COMPONENT_TYPE_UNSIGNED_INT ? 4 : 0;
-        const size_t stride = a.ByteStride(view) ? a.ByteStride(view) : componentSize;
-        if (stride == 0 || view.buffer < 0 || static_cast<size_t>(view.buffer) >= model.buffers.size())
-            return false;
-        payload.Indices.reserve(a.count);
-
-        for (size_t i = 0; i < a.count; ++i) {
-            uint32_t value = 0;
-            const size_t offset = view.byteOffset + a.byteOffset + i * stride;
-            if (offset > buffer.data.size() || componentSize > buffer.data.size() - offset)
-                return false;
-            const auto* index = buffer.data.data() + offset;
-            if (a.componentType == TINYGLTF_COMPONENT_TYPE_UNSIGNED_BYTE)
-                value = *index;
-            else if (a.componentType == TINYGLTF_COMPONENT_TYPE_UNSIGNED_SHORT)
-            {
-                uint16_t v;
-                std::memcpy(&v, index, sizeof(v));
-                value = v;
-            }
-            else if (a.componentType == TINYGLTF_COMPONENT_TYPE_UNSIGNED_INT)
-                std::memcpy(&value, index, sizeof(value));
-            else
-                return false;
-            payload.Indices.push_back(value);
-        }
-    }
     std::error_code ec;
     const auto path = root / "Meshes" / (MeshArtifactName(mesh, primitive, model.meshes[mesh].name) + ".kbrmesh");
     std::filesystem::create_directories(path.parent_path(), ec);
-    if (ec) {
+    if (ec)
+    {
         Log::CoreError("Failed to create directories for mesh: {}", ec.message());
         return false;
     }
 
-    const bool success = NativeAssetSerializer::SerializeMesh(payload, path);
-    if (!success) {
-        Log::CoreError("Failed to serialize mesh to path: {}", path.string());
+    return NativeAssetSerializer::SerializeMesh(payload, path);
+}
+
+bool WriteSkinnedMesh(const std::filesystem::path& root, const size_t mesh, const size_t primitive,
+    const tinygltf::Model& model, const tinygltf::Primitive& p, const SkeletonImportInfo& skeleton)
+{
+    KBR_TRACY_FUNCTION();
+
+    const auto positionIt = p.attributes.find("POSITION");
+    const auto jointsIt = p.attributes.find("JOINTS_0");
+    const auto weightsIt = p.attributes.find("WEIGHTS_0");
+    if (positionIt == p.attributes.end() || jointsIt == p.attributes.end() || weightsIt == p.attributes.end())
+        return false;
+
+    const auto& positionAccessor = model.accessors[positionIt->second];
+    if (positionAccessor.bufferView < 0 || positionAccessor.type != TINYGLTF_TYPE_VEC3)
+        return false;
+
+    const auto& jointsAccessor = model.accessors[jointsIt->second];
+    const auto& weightsAccessor = model.accessors[weightsIt->second];
+    if (jointsAccessor.count < positionAccessor.count || weightsAccessor.count < positionAccessor.count)
+        return false;
+
+    std::vector<SkinVertex> vertices(positionAccessor.count);
+    for (size_t i = 0; i < vertices.size(); ++i)
+    {
+        SkinVertex& vertex = vertices[i];
+        vertex.JointIndices = glm::uvec4(0);
+        vertex.JointWeights = glm::vec4(0.0f);
+        vertex.Tangent = glm::vec4(0.0f, 0.0f, 0.0f, 1.0f);
+        vertex.TexCoord = glm::vec2(0.0f);
+        vertex.Normal = glm::vec3(0.0f);
+
+        if (!AccessorElement(model, positionAccessor, i, &vertex.Position.x, 3))
+            return false;
+
+        const auto normal = p.attributes.find("NORMAL");
+        if (normal != p.attributes.end()
+            && !AccessorElement(model, model.accessors[normal->second], i, &vertex.Normal.x, 3))
+            return false;
+        const auto texCoord = p.attributes.find("TEXCOORD_0");
+        if (texCoord != p.attributes.end()
+            && !AccessorElement(model, model.accessors[texCoord->second], i, &vertex.TexCoord.x, 2))
+            return false;
+        const auto tangent = p.attributes.find("TANGENT");
+        if (tangent != p.attributes.end()
+            && !AccessorElement(model, model.accessors[tangent->second], i, &vertex.Tangent.x, 4))
+            return false;
+
+        uint32_t joints[4]{};
+        float weights[4]{};
+        if (!AccessorUnsignedElement(model, jointsAccessor, i, joints, 4)
+            || !AccessorElement(model, weightsAccessor, i, weights, 4))
+            return false;
+
+        for (int component = 0; component < 4; ++component)
+        {
+            const size_t componentIndex = static_cast<size_t>(component);
+            const auto remapped = skeleton.OldToNewJoint.find(joints[componentIndex]);
+            if (remapped != skeleton.OldToNewJoint.end())
+            {
+                vertex.JointIndices[component] = remapped->second;
+                vertex.JointWeights[component] = weights[componentIndex];
+            }
+            else
+            {
+                vertex.JointIndices[component] = 0;
+                vertex.JointWeights[component] = 0.0f;
+            }
+        }
+
+        const float weightSum = vertex.JointWeights.x + vertex.JointWeights.y
+            + vertex.JointWeights.z + vertex.JointWeights.w;
+        if (weightSum > 1e-6f)
+            vertex.JointWeights /= weightSum;
+        else
+            vertex.JointWeights = glm::vec4(1.0f, 0.0f, 0.0f, 0.0f);
+    }
+
+    NativeMeshPayload payload;
+    payload.VertexStride = sizeof(SkinVertex);
+    payload.VertexData.resize(vertices.size() * sizeof(SkinVertex));
+    if (!vertices.empty())
+        std::memcpy(payload.VertexData.data(), vertices.data(), payload.VertexData.size());
+
+    if (p.indices >= 0 && !ReadIndices(model, model.accessors[p.indices], payload.Indices))
+        return false;
+
+    std::error_code ec;
+    const auto path = root / "Meshes"
+        / (SkinnedMeshArtifactName(mesh, primitive, model.meshes[mesh].name) + ".kbrskinnedmesh");
+    std::filesystem::create_directories(path.parent_path(), ec);
+    if (ec)
+    {
+        Log::CoreError("Failed to create directories for skinned mesh: {}", ec.message());
         return false;
     }
 
-    return true;
+    return NativeAssetSerializer::SerializeSkeletalMesh(payload, path);
 }
 
 bool IsKtxData(const unsigned char* bytes, const int size)
@@ -398,6 +836,128 @@ bool LoadImageDataWithKtxFallback(
         }
         return KTX2Encoder::Encode(destPath, spec, pixels);
     }
+
+    AnimationClipInterpolation ToInterpolation(const std::string& interpolation)
+    {
+        if (interpolation == "STEP")
+            return AnimationClipInterpolation::Step;
+        if (interpolation == "CUBICSPLINE")
+            return AnimationClipInterpolation::CubicSpline;
+        return AnimationClipInterpolation::Linear;
+    }
+
+    bool ReadAnimationTrack(const tinygltf::Model& model, const tinygltf::Animation& animation,
+        const tinygltf::AnimationChannel& channel, const SkeletonImportInfo& skeleton,
+        AnimationTrackFile& track)
+    {
+        if (channel.target_node < 0 || channel.sampler < 0
+            || static_cast<size_t>(channel.sampler) >= animation.samplers.size())
+            return false;
+
+        const auto jointIt = skeleton.NodeToJoint.find(channel.target_node);
+        if (jointIt == skeleton.NodeToJoint.end())
+            return false;
+
+        AnimTrackPath path;
+        if (channel.target_path == "translation")
+            path = AnimTrackPath::Translation;
+        else if (channel.target_path == "rotation")
+            path = AnimTrackPath::Rotation;
+        else if (channel.target_path == "scale")
+            path = AnimTrackPath::Scale;
+        else
+            return false; // TODO: Morph target weights and unknown paths are unsupported.
+
+        const auto& sampler = animation.samplers[static_cast<size_t>(channel.sampler)];
+        if (sampler.input < 0 || sampler.output < 0)
+            return false;
+
+        const auto& inputAccessor = model.accessors[sampler.input];
+        if (inputAccessor.type != TINYGLTF_TYPE_SCALAR || inputAccessor.count == 0)
+            return false;
+
+        track.TargetNode = static_cast<uint32_t>(channel.target_node);
+        track.JointIndex = static_cast<int32_t>(jointIt->second);
+        track.Path = path;
+        track.Interpolation = ToInterpolation(sampler.interpolation);
+        track.Times.resize(inputAccessor.count);
+        for (size_t i = 0; i < inputAccessor.count; ++i)
+        {
+            if (!AccessorElement(model, inputAccessor, i, &track.Times[i], 1))
+                return false;
+        }
+
+        const auto& outputAccessor = model.accessors[sampler.output];
+        const size_t componentCount = path == AnimTrackPath::Rotation ? 4 : 3;
+        const bool cubic = track.Interpolation == AnimationClipInterpolation::CubicSpline;
+        const size_t keyCount = inputAccessor.count;
+        if (outputAccessor.count < keyCount * (cubic ? 3 : 1))
+            return false;
+
+        const auto readValue = [&](const size_t valueIndex, glm::vec4& value) -> bool
+        {
+            std::array<float, 4> components{ 0.0f, 0.0f, 0.0f, 0.0f };
+            if (!AccessorElement(model, outputAccessor, valueIndex, components.data(), componentCount))
+                return false;
+            value = glm::vec4(components[0], components[1], components[2], components[3]);
+            return true;
+        };
+
+        track.Values.resize(keyCount);
+        if (cubic)
+        {
+            track.InTangents.resize(keyCount);
+            track.OutTangents.resize(keyCount);
+        }
+
+        for (size_t key = 0; key < keyCount; ++key)
+        {
+            if (cubic)
+            {
+                if (!readValue(key * 3 + 0, track.InTangents[key])
+                    || !readValue(key * 3 + 1, track.Values[key])
+                    || !readValue(key * 3 + 2, track.OutTangents[key]))
+                    return false;
+            }
+            else if (!readValue(key, track.Values[key]))
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    bool WriteAnimation(const std::filesystem::path& root, const size_t animationIndex,
+        const tinygltf::Model& model, const SkeletonImportInfo& skeleton, AnimationClipFile& clip,
+        const std::string& filename)
+    {
+        const auto& animation = model.animations[animationIndex];
+        clip.Version = 1;
+        clip.LocalKey = Key("animation", animationIndex);
+        clip.SourceIndex = static_cast<uint32_t>(animationIndex);
+        clip.Name = Name(animation.name, "Animation_", animationIndex);
+        clip.SkeletonKey = skeleton.Valid ? skeleton.LocalKey : std::string();
+        clip.JointCount = skeleton.JointCount;
+        clip.DurationSeconds = 0.0f;
+
+        for (const auto& channel : animation.channels)
+        {
+            AnimationTrackFile track;
+            if (!ReadAnimationTrack(model, animation, channel, skeleton, track))
+                continue;
+            if (!track.Times.empty())
+                clip.DurationSeconds = std::max(clip.DurationSeconds, track.Times.back());
+            clip.Tracks.push_back(std::move(track));
+        }
+
+        std::error_code ec;
+        const auto path = root / "Animations" / (filename + ".kbranimation");
+        std::filesystem::create_directories(path.parent_path(), ec);
+        if (ec)
+            return false;
+        return NativeAssetSerializer::SerializeAnimationClip(clip, path);
+    }
 }
 
 bool GLTFSceneImporter::Import(const std::filesystem::path& source, const std::filesystem::path& outputDirectory,
@@ -428,6 +988,41 @@ bool GLTFSceneImporter::Import(const std::filesystem::path& source, const std::f
         return false;
     }
 
+    if (model.skins.size() > 1)
+        Log::CoreWarn("glTF '{}' has {} skins; only the first skeleton is supported", source.string(), model.skins.size());
+
+    const std::vector<int32_t> nodeParents = BuildNodeParents(model);
+    SkeletonImportInfo skeleton;
+    if (!model.skins.empty())
+        skeleton = BuildSkeleton(model, nodeParents, 0);
+
+    // Determine which skin each primitive belongs to. The same mesh primitive
+    // may be referenced by several nodes; the first reference wins.
+    struct PrimitiveSkin
+    {
+        int32_t SkinIndex = -1;
+        bool Conflicting = false;
+    };
+    std::map<std::pair<uint32_t, uint32_t>, PrimitiveSkin> primitiveSkins;
+    for (const auto& node : model.nodes)
+    {
+        if (node.mesh < 0 || static_cast<size_t>(node.mesh) >= model.meshes.size())
+            continue;
+        const auto& mesh = model.meshes[static_cast<size_t>(node.mesh)];
+        for (size_t primitiveIndex = 0; primitiveIndex < mesh.primitives.size(); ++primitiveIndex)
+        {
+            const auto key = std::make_pair(static_cast<uint32_t>(node.mesh), static_cast<uint32_t>(primitiveIndex));
+            auto& entry = primitiveSkins[key];
+            if (entry.SkinIndex < 0)
+                entry.SkinIndex = node.skin;
+            else if (node.skin >= 0 && entry.SkinIndex != node.skin)
+                entry.Conflicting = true;
+        }
+    }
+    for (const auto& [key, value] : primitiveSkins)
+        if (value.Conflicting)
+            Log::CoreWarn("glTF mesh {}:{} is referenced by multiple skins, using the first one", key.first, key.second);
+
     GltfSceneManifest manifest; 
     manifest.SourcePath = source.lexically_normal().generic_string();
 
@@ -439,8 +1034,9 @@ bool GLTFSceneImporter::Import(const std::filesystem::path& source, const std::f
         manifest.Subassets.push_back({ .StableId = StableId(manifest.SourcePath, "material", i), .Kind = "material", .Name = Name(model.materials[i].name, "Material_", i), .SourceIndex = static_cast<uint32_t>(i) });
     for (size_t i = 0; i < model.images.size(); ++i) 
         manifest.Subassets.push_back({ .StableId = StableId(manifest.SourcePath, "texture", i), .Kind = "texture", .Name = Name(model.images[i].name, "Texture_", i), .SourceIndex = static_cast<uint32_t>(i) });
-    for (size_t i = 0; i < model.skins.size(); ++i) 
-        manifest.Subassets.push_back({ .StableId = StableId(manifest.SourcePath, "skeleton", i), .Kind = "skeleton", .Name = Name(model.skins[i].name, "Skeleton_", i), .SourceIndex = static_cast<uint32_t>(i) });
+    if (skeleton.Valid)
+        manifest.Subassets.push_back({ .StableId = StableId(manifest.SourcePath, "skeleton", 0), .Kind = "skeleton",
+            .Name = Name(model.skins[0].name, "Skeleton_", 0), .SourceIndex = 0 });
     for (size_t i = 0; i < model.animations.size(); ++i) 
         manifest.Subassets.push_back({ .StableId = StableId(manifest.SourcePath, "animation", i), .Kind = "animation", .Name = Name(model.animations[i].name, "Animation_", i), .SourceIndex = static_cast<uint32_t>(i) });
     
@@ -455,28 +1051,37 @@ bool GLTFSceneImporter::Import(const std::filesystem::path& source, const std::f
     for (size_t i = 0; i < model.nodes.size(); ++i) {
         auto& n = manifest.Nodes[i]; n.StableId = StableId(manifest.SourcePath, "node", i);
         n.Name = Name(model.nodes[i].name, "Node_", i); n.SkinIndex = model.nodes[i].skin;
+        n.ParentIndex = nodeParents[i];
+        ReadNodeTransform(model.nodes[i], n.Translation, n.Rotation, n.Scale);
+
         if (model.nodes[i].mesh >= 0 && static_cast<size_t>(model.nodes[i].mesh) < model.meshes.size())
         {
             const auto& mesh = model.meshes[model.nodes[i].mesh];
             n.Primitives.reserve(mesh.primitives.size());
             for (size_t primitiveIndex = 0; primitiveIndex < mesh.primitives.size(); ++primitiveIndex)
             {
+                const auto skinIt = primitiveSkins.find({ static_cast<uint32_t>(model.nodes[i].mesh), static_cast<uint32_t>(primitiveIndex) });
+                const int32_t primitiveSkin = skinIt != primitiveSkins.end() ? skinIt->second.SkinIndex : -1;
+                const bool skinned = skeleton.Valid && primitiveSkin == 0
+                    && HasSkinAttribute(mesh.primitives[primitiveIndex]);
                 n.Primitives.push_back({
                     .MeshIndex = static_cast<uint32_t>(model.nodes[i].mesh),
                     .PrimitiveIndex = static_cast<uint32_t>(primitiveIndex),
-                    .MaterialIndex = mesh.primitives[primitiveIndex].material
+                    .MaterialIndex = mesh.primitives[primitiveIndex].material,
+                    .Skinned = skinned,
                 });
             }
         }
-        for (size_t p = 0; p < model.nodes.size(); ++p)
-        {
-            if (std::ranges::find(model.nodes[p].children, static_cast<int>(i)) != model.nodes[p].children.end()) 
-            { 
-                n.ParentIndex = static_cast<int32_t>(p);
-                break; 
-            }
-        }
     }
+
+    if (skeleton.Valid)
+    {
+        NativeSkin nativeSkin;
+        nativeSkin.SkeletonNode = skeleton.SkeletonNode;
+        nativeSkin.JointNodes = skeleton.JointNodes;
+        manifest.Skins.push_back(std::move(nativeSkin));
+    }
+
     if (output) *output = manifest;
     if (outputDirectory.empty()) 
         return true;
@@ -488,11 +1093,24 @@ bool GLTFSceneImporter::Import(const std::filesystem::path& source, const std::f
 
     // Emit one native record per primitive and source records for all other GLTF domains.
     for (size_t mi = 0; mi < model.meshes.size(); ++mi)
-        for (size_t pi = 0; pi < model.meshes[mi].primitives.size(); ++pi) {
+    {
+        for (size_t pi = 0; pi < model.meshes[mi].primitives.size(); ++pi)
+        {
             const auto& prim = model.meshes[mi].primitives[pi];
-            if (!WriteMesh(artifactRoot, mi, pi, model, prim)) 
+            const auto skinIt = primitiveSkins.find({ static_cast<uint32_t>(mi), static_cast<uint32_t>(pi) });
+            const int32_t primitiveSkin = skinIt != primitiveSkins.end() ? skinIt->second.SkinIndex : -1;
+            if (skeleton.Valid && primitiveSkin == 0 && HasSkinAttribute(prim))
+            {
+                if (!WriteSkinnedMesh(artifactRoot, mi, pi, model, prim, skeleton))
+                    return false;
+            }
+            else if (!WriteMesh(artifactRoot, mi, pi, model, prim))
+            {
                 return false;
+            }
         }
+    }
+
     // Materials: emit one native record per glTF material, with a readable name
     // and references (by image index) to the imported texture sub-assets.
     std::unordered_set<std::string> usedMaterialNames;
@@ -560,8 +1178,6 @@ bool GLTFSceneImporter::Import(const std::filesystem::path& source, const std::f
             Log::CoreWarn("glTF image '{}' (index {}) is referenced by both color and data texture slots; encoding it as sRGB, so data slots will receive sRGB-decoded samples.", im.name, i);
         }
 
-        // Resolve sRGB: user override wins, otherwise fall back to the
-        // slot-derived default (sRGB unless exclusively used as linear data).
         const std::string key = "texture:" + std::to_string(i);
         bool srgb = usedAsColor || !usedAsData;
         if (textureSrgbOverrides)
@@ -578,22 +1194,37 @@ bool GLTFSceneImporter::Import(const std::filesystem::path& source, const std::f
             Log::CoreWarn("Failed to import texture for glTF image '{}' (index {}); material references to it will be left unbound.", im.name, i);
         }
     }
-    std::unordered_set<std::string> usedSkeletonNames;
-    usedSkeletonNames.reserve(model.skins.size());
-    for (size_t i = 0; i < model.skins.size(); ++i) {
-        const auto& s = model.skins[i]; std::ostringstream d; d << "name=" << s.name << ";inverseBindAccessor=" << s.inverseBindMatrices << ";skeleton=" << s.skeleton << ";joints="; for (int j : s.joints) d << j << ",";
-        const std::string fileName = UniqueArtifactName(usedSkeletonNames, SanitizeFileName(Name(s.name, "Skeleton_", i)), i);
-        if (!WriteRecord(artifactRoot, "Skeletons", Key("skeleton", i), "skeleton", static_cast<uint32_t>(i), d.str(), fileName))
+
+    if (skeleton.Valid)
+    {
+        SkeletonFile skeletonFile = skeleton.File;
+        skeletonFile.Version = 1;
+        skeletonFile.LocalKey = skeleton.LocalKey;
+        skeletonFile.SourceIndex = 0;
+        skeletonFile.Name = Name(model.skins[0].name, "Skeleton_", 0);
+
+        std::error_code skeletonEc;
+        const auto path = artifactRoot / "Skeletons"
+            / (SanitizeFileName(skeletonFile.Name) + ".kbrskeleton");
+        std::filesystem::create_directories(path.parent_path(), skeletonEc);
+        if (skeletonEc || !NativeAssetSerializer::SerializeSkeleton(skeletonFile, path))
             return false;
     }
+
     std::unordered_set<std::string> usedAnimationNames;
     usedAnimationNames.reserve(model.animations.size());
-    for (size_t i = 0; i < model.animations.size(); ++i) {
-        const auto& a = model.animations[i]; std::ostringstream d; d << "name=" << a.name << ";channels=" << a.channels.size() << ";samplers=" << a.samplers.size();
-        const std::string fileName = UniqueArtifactName(usedAnimationNames, SanitizeFileName(Name(a.name, "Animation_", i)), i);
-        if (!WriteRecord(artifactRoot, "Animations", Key("animation", i), "animation", static_cast<uint32_t>(i), d.str(), fileName))
+    for (size_t i = 0; i < model.animations.size(); ++i)
+    {
+        const auto& a = model.animations[i];
+        const std::string fileName = UniqueArtifactName(usedAnimationNames,
+            SanitizeFileName(Name(a.name, "Animation_", i)), i);
+        AnimationClipFile clip;
+        if (!WriteAnimation(artifactRoot, i, model, skeleton, clip, fileName))
             return false;
+        if (skeleton.Valid && !clip.Tracks.empty())
+            manifest.Skins[0].AnimationKeys.push_back(clip.LocalKey);
     }
+
     std::ostringstream prefab; prefab << "name=" << source.stem().string() << ";nodes=" << model.nodes.size() << ";";
     for (size_t i = 0; i < manifest.Nodes.size(); ++i) {
         prefab << i << ":" << manifest.Nodes[i].Name << ":" << manifest.Nodes[i].ParentIndex << ":" << manifest.Nodes[i].SkinIndex << ";";
@@ -602,6 +1233,7 @@ bool GLTFSceneImporter::Import(const std::filesystem::path& source, const std::f
         prefab.str(), source.stem().string()))
         return false;
 
+    if (output) *output = manifest;
     return NativeAssetSerializer::SerializeSceneManifest(manifest, artifactRoot / (source.stem().string() + ".kbrscene"));
 }
 

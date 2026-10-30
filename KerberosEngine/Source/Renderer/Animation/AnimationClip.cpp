@@ -25,6 +25,15 @@ AnimationClip::AnimationClip(std::string name, const std::vector<AnimationTrack>
         }
         // Validate that the joint indices are valid
         KBRAssert(track.Joint < 65535, "Animation joint index is out of bounds");
+
+        // If using CubicSpline interpolation, ensure that the in and out tangents are the same size as the values
+        if (track.Interpolation == AnimationInterpolation::CubicSpline)
+        {
+            KBRAssert(track.InTangents.size() == track.Values.size(),
+                      "Animation in tangents and values are not the same size");
+            KBRAssert(track.OutTangents.size() == track.Values.size(),
+                      "Animation out tangents and values are not the same size");
+        }
     }
 }
 

@@ -170,6 +170,29 @@ AssetBuildReport AssetBuildCoordinator::Build(const std::filesystem::path& sourc
 
         root.RootSourceHandle = meta.SourceHandle;
 
+        // Repair stale root entries for the same source path. This happens when a
+        // source .meta is regenerated with a new handle.
+        // Without this, path lookup and asset-browser resolution can keep returning 
+        // the obsolete handle even though a successful build replaced its artifacts.
+        std::vector<AssetHandle> staleRoots;
+        const auto normalizedRootPath = root.Filepath.lexically_normal();
+        for (const auto& [assetHandle, assetMetadata] : *m_Registry)
+        {
+            if (assetHandle == meta.SourceHandle)
+                continue;
+
+            if (assetMetadata.SourceRoot == root.SourceRoot
+                && assetMetadata.RootSourceHandle == assetHandle
+                && assetMetadata.Filepath.lexically_normal() == normalizedRootPath)
+            {
+                staleRoots.push_back(assetHandle);
+            }
+        }
+        for (const auto staleRoot : staleRoots)
+        {
+            m_Registry->Remove(staleRoot);
+        }
+
         m_Registry->Add(meta.SourceHandle, root);
         
         for (const auto& [Handle, Type, LibraryRelPath, SubAssetKey, Dependencies] : result.Outputs)
@@ -207,7 +230,9 @@ std::vector<AssetBuildReport> AssetBuildCoordinator::BuildAll(const std::vector<
     return reports;
 }
 
-void AssetBuildCoordinator::Shutdown() 
-{}
+void AssetBuildCoordinator::Shutdown()
+{
+    // TODO: Wait for the all the build operations to finish and clean up any resources if necessary
+}
 
 }

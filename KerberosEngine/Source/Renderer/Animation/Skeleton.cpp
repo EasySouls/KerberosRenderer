@@ -22,9 +22,12 @@ Skeleton::Skeleton(const std::vector<SkeletonJoint>& joints)
 
 const SkeletonJoint& Skeleton::GetJointBySourceNode(int32_t sourceNode) const
 {
-    KBRAssert(sourceNode >= 0 && sourceNode < static_cast<int32_t>(m_Joints.size()), "Invalid source node: {}", sourceNode);
-
-    return std::ranges::find_if(m_Joints, [sourceNode](const SkeletonJoint& joint) { return joint.SourceNode == sourceNode; }).operator*();
+    const auto it = std::ranges::find_if(m_Joints, [sourceNode](const SkeletonJoint& joint)
+    {
+        return joint.SourceNode == sourceNode;
+    });
+    KBRAssert(it != m_Joints.end(), "Invalid source node: {}", sourceNode);
+    return *it;
 }
 
 }

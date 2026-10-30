@@ -280,6 +280,24 @@ Entity Scene::InstantiatePrefab(const AssetHandle prefabHandle, const std::strin
 				    child.GetComponent<SkeletonComponent>().JointEntities.push_back(entityMapping[legacyIndices[jointId]].GetUUID());
 			}
 		}
+		if (child.HasComponent<SkinnedMeshComponent>() && prefabEntity.SkinnedMesh.has_value())
+		{
+			auto& skinnedMesh = child.GetComponent<SkinnedMeshComponent>();
+			const auto localSkeleton = prefabEntity.SkinnedMesh->SkeletonEntityLocalIndex;
+			if (localSkeleton != InvalidPrefabLocalIndex && entityMapping.contains(localSkeleton))
+				skinnedMesh.SkeletonEntity = entityMapping[localSkeleton].GetUUID();
+			else if (prefabEntity.SkinnedMesh->SkeletonEntityID.IsValid() && legacyIndices.contains(prefabEntity.SkinnedMesh->SkeletonEntityID))
+				skinnedMesh.SkeletonEntity = entityMapping[legacyIndices[prefabEntity.SkinnedMesh->SkeletonEntityID]].GetUUID();
+		}
+		if (child.HasComponent<AnimatorComponent>() && prefabEntity.Animator.has_value())
+		{
+			auto& animator = child.GetComponent<AnimatorComponent>();
+			const auto localSkeleton = prefabEntity.Animator->SkeletonEntityLocalIndex;
+			if (localSkeleton != InvalidPrefabLocalIndex && entityMapping.contains(localSkeleton))
+				animator.SkeletonEntity = entityMapping[localSkeleton].GetUUID();
+			else if (prefabEntity.Animator->SkeletonEntityID.IsValid() && legacyIndices.contains(prefabEntity.Animator->SkeletonEntityID))
+				animator.SkeletonEntity = entityMapping[legacyIndices[prefabEntity.Animator->SkeletonEntityID]].GetUUID();
+		}
 		if (child.HasComponent<RigidBody3DComponent>()) child.GetComponent<RigidBody3DComponent>().RuntimeBody = nullptr;
 	}
 
@@ -491,9 +509,9 @@ Entity Scene::InstantiatePrefab(const AssetHandle prefabHandle, const std::strin
 		{
 			newEntity.AddComponent<SkinnedMeshComponent>(entity.GetComponent<SkinnedMeshComponent>());
 		}
-		if (entity.HasComponent<AnimationComponent>())
+		if (entity.HasComponent<AnimatorComponent>())
 		{
-			newEntity.AddComponent<AnimationComponent>(entity.GetComponent<AnimationComponent>());
+			newEntity.AddComponent<AnimatorComponent>(entity.GetComponent<AnimatorComponent>());
 		}
 
 		if (duplicateChildren)
@@ -879,12 +897,12 @@ Entity Scene::InstantiatePrefab(const AssetHandle prefabHandle, const std::strin
 			newEntity.AddComponent<SkeletonComponent>(sourceRegistry.get<SkeletonComponent>(sourceEntity));
 		if (sourceRegistry.all_of<SkinnedMeshComponent>(sourceEntity))
 			newEntity.AddComponent<SkinnedMeshComponent>(sourceRegistry.get<SkinnedMeshComponent>(sourceEntity));
-		if (sourceRegistry.all_of<AnimationComponent>(sourceEntity))
+		if (sourceRegistry.all_of<AnimatorComponent>(sourceEntity))
 		{
-			auto animation = sourceRegistry.get<AnimationComponent>(sourceEntity);
-			animation.CurrentTime = 0.0f;
-			animation.IsPlaying = false;
-			newEntity.AddComponent<AnimationComponent>(animation);
+			auto animator = sourceRegistry.get<AnimatorComponent>(sourceEntity);
+			animator.CurrentTime = 0.0f;
+			animator.IsPlaying = false;
+			newEntity.AddComponent<AnimatorComponent>(animator);
 		}
 		if (sourceRegistry.all_of<JointComponent>(sourceEntity))
 			newEntity.AddComponent<JointComponent>(sourceRegistry.get<JointComponent>(sourceEntity));
@@ -1258,7 +1276,7 @@ Entity Scene::InstantiatePrefab(const AssetHandle prefabHandle, const std::strin
 	}
 
 	template <>
-	void Scene::OnComponentAdded<AnimationComponent>(Entity, AnimationComponent&)
+	void Scene::OnComponentAdded<AnimatorComponent>(Entity, AnimatorComponent&)
 	{
 	}
 

@@ -62,6 +62,8 @@ namespace Kerberos
 			writeVec("Translation", e.Transform.Translation);
 			writeVec("Rotation", e.Transform.Rotation);
 			writeVec("Scale", e.Transform.Scale);
+			if (e.JointIndex)
+				out << YAML::Key << "JointIndex" << YAML::Value << *e.JointIndex;
 			if (e.Skin)
 			{
 				out << YAML::Key << "Skin" << YAML::Value << YAML::BeginMap;
@@ -76,16 +78,25 @@ namespace Kerberos
 				WriteHandle(out, "MeshAsset", e.SkinnedMesh->MeshAsset);
 				WriteHandle(out, "SkeletonAsset", e.SkinnedMesh->SkeletonAsset);
 				WriteHandle(out, "MaterialAsset", e.SkinnedMesh->MaterialAsset);
-				out << YAML::Key << "Visible" << YAML::Value << e.SkinnedMesh->Visible
+				WriteHandle(out, "SkeletonEntity", e.SkinnedMesh->SkeletonEntityID);
+				out << YAML::Key << "SkeletonEntityLocalIndex" << YAML::Value << e.SkinnedMesh->SkeletonEntityLocalIndex
+					<< YAML::Key << "Visible" << YAML::Value << e.SkinnedMesh->Visible
 					<< YAML::Key << "CastShadows" << YAML::Value << e.SkinnedMesh->CastShadows << YAML::EndMap;
 			}
-			if (e.Animation)
+			if (e.Animator)
 			{
-				out << YAML::Key << "Animation" << YAML::Value << YAML::BeginMap;
-				WriteHandle(out, "AnimationAsset", e.Animation->AnimationAsset);
-				out << YAML::Key << "PlaybackSpeed" << YAML::Value << e.Animation->PlaybackSpeed
-					<< YAML::Key << "Loop" << YAML::Value << e.Animation->Loop
-					<< YAML::Key << "AutoPlay" << YAML::Value << e.Animation->AutoPlay << YAML::EndMap;
+				out << YAML::Key << "Animator" << YAML::Value << YAML::BeginMap;
+				WriteHandle(out, "SkeletonEntity", e.Animator->SkeletonEntityID);
+				out << YAML::Key << "SkeletonEntityLocalIndex" << YAML::Value << e.Animator->SkeletonEntityLocalIndex;
+				out << YAML::Key << "AnimationClips" << YAML::Value << YAML::Flow << YAML::BeginSeq;
+				for (const auto& clip : e.Animator->Clips) {
+					out << clip;
+				}
+				out << YAML::EndSeq;
+				out << YAML::Key << "ActiveClip" << YAML::Value << e.Animator->ActiveClip;
+				out << YAML::Key << "PlaybackSpeed" << YAML::Value << e.Animator->PlaybackSpeed
+					<< YAML::Key << "Loop" << YAML::Value << e.Animator->Loop
+					<< YAML::Key << "AutoPlay" << YAML::Value << e.Animator->AutoPlay << YAML::EndMap;
 			}
 			if (e.RigidBody)
 			{
@@ -176,6 +187,8 @@ namespace Kerberos
 			ReadVec3(n["Scale"], e.Transform.Scale);
 			e.Translation = e.Transform.Translation;
 			e.EulerRotation = e.Transform.Rotation;
+			if (n["JointIndex"])
+				e.JointIndex = n["JointIndex"].as<uint32_t>();
 			e.ParentLocalIndex = n["ParentLocalIndex"].as<PrefabLocalIndex>(InvalidPrefabLocalIndex);
 			e.Parent = UUID(n["Parent"].as<uint64_t>(0));
             if (n["Children"]) 
@@ -210,19 +223,45 @@ namespace Kerberos
 				s.MeshAsset = AssetHandle(skinnedMeshNode["MeshAsset"].as<uint64_t>(0));
 				s.SkeletonAsset = AssetHandle(skinnedMeshNode["SkeletonAsset"].as<uint64_t>(0));
 				s.MaterialAsset = AssetHandle(skinnedMeshNode["MaterialAsset"].as<uint64_t>(0));
+				s.SkeletonEntityID = UUID(skinnedMeshNode["SkeletonEntity"].as<uint64_t>(0));
+				s.SkeletonEntityLocalIndex = skinnedMeshNode["SkeletonEntityLocalIndex"].as<PrefabLocalIndex>(InvalidPrefabLocalIndex);
 				s.Visible = skinnedMeshNode["Visible"].as<bool>(true);
 				s.CastShadows = skinnedMeshNode["CastShadows"].as<bool>(true);
 				e.SkinnedMesh = s;
 			}
 
-			if (const YAML::Node& animationNode = n["Animation"]) 
+			if (const YAML::Node& animatorNode = n["Animator"])
 			{
-				AnimationComponentTemplate a;
-				a.AnimationAsset = AssetHandle(animationNode["AnimationAsset"].as<uint64_t>(0));
-				a.PlaybackSpeed = animationNode["PlaybackSpeed"].as<float>(1.0f);
-				a.Loop = animationNode["Loop"].as<bool>(true);
-				a.AutoPlay = animationNode["AutoPlay"].as<bool>(true);
-				e.Animation = a;
+				AnimatorComponentTemplate a;
+				const YAML::Node skeletonEntityNode =
+					animatorNode["SkeletonEntity"].IsDefined() ? animatorNode["SkeletonEntity"] : animatorNode["SkeletonAsset"];
+				a.SkeletonEntityID = UUID(skeletonEntityNode.as<uint64_t>(UUID::Invalid()));
+				a.SkeletonEntityLocalIndex = animatorNode["SkeletonEntityLocalIndex"].as<PrefabLocalIndex>(InvalidPrefabLocalIndex);
+				const YAML::Node clipsNode = animatorNode["AnimationClips"].IsDefined()
+					? animatorNode["AnimationClips"] : animatorNode["Clips"];
+				if (clipsNode)
+				{
+					for (const auto& clip : clipsNode)
+						a.Clips.emplace_back(AssetHandle(clip.as<uint64_t>()));
+				}
+				a.ActiveClip = animatorNode["ActiveClip"].as<int32_t>(-1);
+				a.PlaybackSpeed = animatorNode["PlaybackSpeed"].as<float>(1.0f);
+				a.Loop = animatorNode["Loop"].as<bool>(true);
+				a.AutoPlay = animatorNode["AutoPlay"].as<bool>(false);
+				e.Animator = a;
+			}
+			else if (const YAML::Node& legacyAnimationNode = n["Animation"])
+			{
+				// Migrate the old single-clip animation record into the animator.
+				AnimatorComponentTemplate a;
+				const AssetHandle clip = AssetHandle(legacyAnimationNode["AnimationAsset"].as<uint64_t>(0));
+				if (clip.IsValid())
+					a.Clips.push_back(clip);
+				a.ActiveClip = a.Clips.empty() ? -1 : 0;
+				a.PlaybackSpeed = legacyAnimationNode["PlaybackSpeed"].as<float>(1.0f);
+				a.Loop = legacyAnimationNode["Loop"].as<bool>(true);
+				a.AutoPlay = legacyAnimationNode["AutoPlay"].as<bool>(true);
+				e.Animator = a;
 			}
 
 			if (const YAML::Node& rigidBodyNode = n["RigidBody"])

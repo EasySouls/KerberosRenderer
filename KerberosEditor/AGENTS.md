@@ -50,9 +50,11 @@ Editor windows live mainly under
   loaded material instance, and force-reimports the source so the cache artifact
   and future loads stay in sync.
 - `HierarchyPanel`: entity selection, component add/remove, and component
-  editing, including particle emitters. Its window context menu also has a
-  debug "Create Skinned Test Mesh" action that builds a procedural two-bone
-  strip for validating the bind-pose skinning path before glTF import exists.
+  editing, including particle emitters and the animation components
+  (skeletons, skinned meshes, joints, and animators). Its window context menu
+  also has a debug "Create Skinned Test Mesh" action that builds a procedural
+  two-bone strip for validating the bind-pose skinning path without imported
+  glTF data.
 - `InspectorPanel`: the unified right-side "Properties" window. It shows entity
   components when an entity is selected and asset import options when a source
   asset is selected in `AssetsPanel` (asset selection takes display precedence).
@@ -112,9 +114,12 @@ keyed by widget ID plus entity UUID so a selection change cannot mix them up.
 and shares per-entity deserialization with whole-scene loading. The whole-scene
 path still loads every entity in the file, while the subtree path restores only
 the entities present in the blob. `Scene::Copy` covers the serializer's authored
-components, including prefab instances, particles, skins, skeletal meshes,
-animations, and script field initializers, resets transient runtime state, and
-intentionally does not copy `NativeScriptComponent` runtime instances.
+components, including prefab instances, particles, joints, skeletons, skinned
+meshes, animators, and script field initializers, resets transient runtime
+state, and intentionally does not copy `NativeScriptComponent` runtime
+instances. The scene serializer persists `JointComponent`, `SkeletonComponent`,
+`SkinnedMeshComponent`, and `AnimatorComponent`; legacy `AnimationComponent`
+records are migrated to a single-clip animator on load.
 
 ## C# script components
 

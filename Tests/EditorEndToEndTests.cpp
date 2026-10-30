@@ -40,4 +40,7 @@ TEST_F(EditorEndToEndTest, LoadsProjectAndStartScene)
 	ASSERT_TRUE(result.AssetManagerInitialized);
 	ASSERT_TRUE(result.StartSceneLoaded);
 	EXPECT_GT(result.StartSceneRootEntityCount, 0);
+	EXPECT_GT(result.StartSceneStaticMeshCount, 0u);
+	EXPECT_EQ(result.StartSceneResolvedMeshCount, result.StartSceneStaticMeshCount);
+	EXPECT_GT(result.StartSceneResolvedMaterialCount, 0u);
 }

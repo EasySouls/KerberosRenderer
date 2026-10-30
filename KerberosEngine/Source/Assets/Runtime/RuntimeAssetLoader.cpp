@@ -1,20 +1,27 @@
 #include "RuntimeAssetLoader.hpp"
 
 #include "Assets/Formats/NativeAssetSerializer.hpp"
+#include "Assets/Formats/AnimationFormat.hpp"
+#include "Assets/Formats/SkeletonFormat.hpp"
 #include "Assets/Importers/MaterialImporter.hpp"
 #include "Assets/Model.hpp"
 #include "Assets/Prefab.hpp"
 #include "Serialization/PrefabSerializer.hpp"
 #include "Renderer/Mesh.hpp"
+#include "Renderer/Animation/AnimationClip.hpp"
+#include "Renderer/Animation/Skeleton.hpp"
 #include "Renderer/Textures/Texture2D.hpp"
 #include "Renderer/Vertex.hpp"
 #include "Profiling/Profilers.hpp"
+#include "Renderer/Animation/SkeletalMesh.hpp"
 
 #include <cstring>
 #include <fstream>
 #include <limits>
 #include <sstream>
 #include <utility>
+
+#include <glm/gtc/quaternion.hpp>
 
 import Kerberos;
 
@@ -83,6 +90,87 @@ Ref<Mesh> LoadMesh(AssetHandle handle, const std::filesystem::path& path)
 	return mesh;
 }
 
+Ref<SkeletalMesh> LoadSkeletalMesh(const AssetHandle handle, const std::filesystem::path& path)
+{
+    KBR_TRACY_FUNCTION();
+
+    NativeMeshPayload native;
+    if (NativeAssetSerializer::DeserializeSkeletalMesh(path, native))
+    {
+        if (native.VertexStride != sizeof(SkinVertex) || native.VertexData.size() % sizeof(SkinVertex) != 0 ||
+            native.VertexData.size() / sizeof(SkinVertex) > MaxVertices || native.Indices.size() > MaxIndices)
+            return nullptr;
+        std::vector<SkinVertex> vertices(native.VertexData.size() / sizeof(SkinVertex));
+        if (!native.VertexData.empty())
+            std::memcpy(vertices.data(), native.VertexData.data(), native.VertexData.size());
+        auto mesh = CreateRef<SkeletalMesh>(path.stem().string(), vertices, native.Indices);
+        mesh->GetHandle() = handle;
+        return mesh;
+    }
+
+	Log::CoreError("Failed to load skeletal mesh artifact: {}", path.string());
+    return nullptr;
+}
+
+Ref<Skeleton> LoadSkeleton(const AssetHandle handle, const std::filesystem::path& path)
+{
+    KBR_TRACY_FUNCTION();
+
+    SkeletonFile native;
+    if (!NativeAssetSerializer::DeserializeSkeleton(path, native))
+        return nullptr;
+
+    std::vector<SkeletonJoint> joints;
+    joints.reserve(native.Joints.size());
+    for (const auto& source : native.Joints)
+    {
+        SkeletonJoint joint;
+        joint.Name = source.Name;
+        joint.Parent = source.ParentJoint;
+        joint.SourceNode = source.SourceNode;
+        joint.RestTranslation = source.RestTranslation;
+        joint.RestRotation = source.RestRotation;
+        joint.RestScale = source.RestScale;
+        joint.InverseBind = source.InverseBind;
+        joints.push_back(std::move(joint));
+    }
+
+    auto skeleton = CreateRef<Skeleton>(joints);
+    skeleton->GetHandle() = handle;
+    return skeleton;
+}
+
+Ref<AnimationClip> LoadAnimation(const AssetHandle handle, const std::filesystem::path& path)
+{
+    KBR_TRACY_FUNCTION();
+
+    AnimationClipFile native;
+    if (!NativeAssetSerializer::DeserializeAnimationClip(path, native))
+        return nullptr;
+
+    std::vector<AnimationTrack> tracks;
+    tracks.reserve(native.Tracks.size());
+    for (const auto& source : native.Tracks)
+    {
+        if (source.JointIndex < 0)
+            continue;
+
+        AnimationTrack track;
+        track.Joint = static_cast<uint32_t>(source.JointIndex);
+        track.Path = static_cast<AnimationPath>(source.Path);
+        track.Interpolation = static_cast<AnimationInterpolation>(source.Interpolation);
+        track.Times = source.Times;
+        track.Values = source.Values;
+        track.InTangents = source.InTangents;
+        track.OutTangents = source.OutTangents;
+        tracks.push_back(std::move(track));
+    }
+
+    auto clip = CreateRef<AnimationClip>(native.Name, tracks, native.DurationSeconds);
+    clip->GetHandle() = handle;
+    return clip;
+}
+
 Ref<Model> LoadSceneManifest(AssetHandle handle, const std::filesystem::path& path)
 {
 	KBR_TRACY_FUNCTION();
@@ -149,21 +237,101 @@ Ref<Prefab> LoadNativePrefab(const AssetHandle handle, const AssetMetadata& meta
 		entity.LocalIndex = static_cast<PrefabLocalIndex>(prefab->Entities.size());
 		entity.Name = node.Name;
 		entity.Tag = node.Name;
+		entity.Transform.Translation = node.Translation;
+		entity.Transform.Rotation = glm::eulerAngles(node.Rotation);
+		entity.Transform.Scale = node.Scale;
+		entity.Transform.WorldTransform = glm::mat4(1.0f);
+		entity.Translation = node.Translation;
+		entity.EulerRotation = entity.Transform.Rotation;
 		nodeLocalIndices.push_back(entity.LocalIndex);
 		prefab->Entities.push_back(std::move(entity));
+	}
+
+	struct SkinBuild
+	{
+		bool Valid = false;
+		AssetHandle SkeletonAsset = AssetHandle::Invalid();
+		PrefabLocalIndex SkeletonLocalIndex = InvalidPrefabLocalIndex;
+		std::vector<PrefabLocalIndex> JointLocalIndices;
+	};
+
+	std::vector<SkinBuild> skinBuilds(manifest.Skins.size());
+	for (size_t skinIndex = 0; skinIndex < manifest.Skins.size(); ++skinIndex)
+	{
+		const auto& sourceSkin = manifest.Skins[skinIndex];
+		SkinBuild build;
+		build.SkeletonAsset = FindSubasset(registry, rootHandle, "skeleton:" + std::to_string(skinIndex));
+		if (!build.SkeletonAsset.IsValid())
+		{
+			Log::CoreError("Native prefab {} is missing skeleton subasset {}", path.string(), "skeleton:" + std::to_string(skinIndex));
+			skinBuilds[skinIndex] = std::move(build);
+			continue;
+		}
+
+		int32_t skeletonNode = sourceSkin.SkeletonNode;
+		if ((skeletonNode < 0 || static_cast<size_t>(skeletonNode) >= nodeLocalIndices.size())
+			&& !sourceSkin.JointNodes.empty())
+			skeletonNode = sourceSkin.JointNodes.front();
+		if (skeletonNode < 0 || static_cast<size_t>(skeletonNode) >= nodeLocalIndices.size())
+		{
+			Log::CoreError("Native prefab {} has a skin without a usable skeleton root node", path.string());
+			skinBuilds[skinIndex] = std::move(build);
+			continue;
+		}
+
+		build.SkeletonLocalIndex = nodeLocalIndices[static_cast<size_t>(skeletonNode)];
+		build.JointLocalIndices.reserve(sourceSkin.JointNodes.size());
+		for (const int32_t jointNode : sourceSkin.JointNodes)
+		{
+			if (jointNode < 0 || static_cast<size_t>(jointNode) >= nodeLocalIndices.size())
+			{
+				Log::CoreError("Native prefab {} has an invalid joint node {}", path.string(), jointNode);
+				continue;
+			}
+			build.JointLocalIndices.push_back(nodeLocalIndices[static_cast<size_t>(jointNode)]);
+		}
+
+		for (size_t jointIndex = 0; jointIndex < build.JointLocalIndices.size(); ++jointIndex)
+			prefab->Entities[build.JointLocalIndices[jointIndex]].JointIndex = static_cast<uint32_t>(jointIndex);
+
+		auto& skeletonEntity = prefab->Entities[build.SkeletonLocalIndex];
+		SkinComponentTemplate skinTemplate;
+		skinTemplate.SkeletonAsset = build.SkeletonAsset;
+		skinTemplate.JointEntityIndices = build.JointLocalIndices;
+		skeletonEntity.Skin = std::move(skinTemplate);
+
+		AnimatorComponentTemplate animator;
+		animator.SkeletonEntityLocalIndex = build.SkeletonLocalIndex;
+		for (const auto& key : sourceSkin.AnimationKeys)
+		{
+			const AssetHandle clipHandle = FindSubasset(registry, rootHandle, key);
+			if (clipHandle.IsValid())
+				animator.Clips.push_back(clipHandle);
+			else
+				Log::CoreWarn("Native prefab {} is missing animation subasset {}", path.string(), key);
+		}
+		animator.ActiveClip = animator.Clips.empty() ? -1 : 0;
+		animator.AutoPlay = false;
+		skeletonEntity.Animator = std::move(animator);
+
+		build.Valid = true;
+		skinBuilds[skinIndex] = std::move(build);
 	}
 
 	for (size_t i = 0; i < manifest.Nodes.size(); ++i)
 	{
 		const auto& node = manifest.Nodes[i];
-		auto& nodeEntity = prefab->Entities[nodeLocalIndices[i]];
-		nodeEntity.ParentLocalIndex = node.ParentIndex >= 0
-			&& static_cast<size_t>(node.ParentIndex) < nodeLocalIndices.size()
-			? nodeLocalIndices[static_cast<size_t>(node.ParentIndex)]
-			: InvalidPrefabLocalIndex;
-		if (nodeEntity.ParentLocalIndex == InvalidPrefabLocalIndex
-			&& prefab->RootLocalIndex == InvalidPrefabLocalIndex)
-			prefab->RootLocalIndex = nodeEntity.LocalIndex;
+		const PrefabLocalIndex nodeLocal = nodeLocalIndices[i];
+		{
+			auto& nodeEntity = prefab->Entities[nodeLocal];
+			nodeEntity.ParentLocalIndex = node.ParentIndex >= 0
+				&& static_cast<size_t>(node.ParentIndex) < nodeLocalIndices.size()
+				? nodeLocalIndices[static_cast<size_t>(node.ParentIndex)]
+				: InvalidPrefabLocalIndex;
+			if (nodeEntity.ParentLocalIndex == InvalidPrefabLocalIndex
+				&& prefab->RootLocalIndex == InvalidPrefabLocalIndex)
+				prefab->RootLocalIndex = nodeEntity.LocalIndex;
+		}
 
 		for (const auto& primitive : node.Primitives)
 		{
@@ -171,28 +339,67 @@ Ref<Prefab> LoadNativePrefab(const AssetHandle handle, const AssetMetadata& meta
 			primitiveEntity.LocalIndex = static_cast<PrefabLocalIndex>(prefab->Entities.size());
 			primitiveEntity.Name = node.Name + "_Primitive_" + std::to_string(primitive.PrimitiveIndex);
 			primitiveEntity.Tag = primitiveEntity.Name;
-			primitiveEntity.ParentLocalIndex = nodeEntity.LocalIndex;
+			primitiveEntity.ParentLocalIndex = nodeLocal;
 
-			const std::string meshKey = "mesh:" + std::to_string(primitive.MeshIndex)
-				+ "_" + std::to_string(primitive.PrimitiveIndex);
-			const AssetHandle meshHandle = FindSubasset(registry, rootHandle, meshKey);
-			if (meshHandle.IsValid())
+			const AssetHandle materialHandle = primitive.MaterialIndex >= 0
+				? FindSubasset(registry, rootHandle, "material:" + std::to_string(primitive.MaterialIndex))
+				: AssetHandle::Invalid();
+			if (primitive.MaterialIndex >= 0 && !materialHandle.IsValid())
+				Log::CoreError("Native prefab {} is missing material subasset {}", path.string(), "material:" + std::to_string(primitive.MaterialIndex));
+
+			bool skinned = primitive.Skinned;
+			const size_t nodeSkinIndex = node.SkinIndex >= 0 ? static_cast<size_t>(node.SkinIndex) : 0;
+			const SkinBuild* skin = nodeSkinIndex < skinBuilds.size() ? &skinBuilds[nodeSkinIndex] : nullptr;
+
+			AssetHandle meshHandle = AssetHandle::Invalid();
+			if (skinned)
 			{
-				primitiveEntity.StaticMeshAsset = meshHandle;
-				primitiveEntity.HasStaticMesh = true;
+				const std::string skinnedKey = "skinnedmesh:" + std::to_string(primitive.MeshIndex)
+					+ "_" + std::to_string(primitive.PrimitiveIndex);
+				meshHandle = FindSubasset(registry, rootHandle, skinnedKey);
+				if (!meshHandle.IsValid() || skin == nullptr || !skin->Valid)
+				{
+					if (!meshHandle.IsValid())
+						Log::CoreError("Native prefab {} is missing skinned mesh subasset {}", path.string(), skinnedKey);
+					else
+						Log::CoreError("Native prefab {} cannot bind skinned primitive {}:{} (missing skin)",
+							path.string(), primitive.MeshIndex, primitive.PrimitiveIndex);
+					// Fall back to the static mesh artifact when one exists.
+					meshHandle = FindSubasset(registry, rootHandle, "mesh:" + std::to_string(primitive.MeshIndex)
+						+ "_" + std::to_string(primitive.PrimitiveIndex));
+					skinned = false;
+				}
 			}
 			else
 			{
-				Log::CoreError("Native prefab {} is missing mesh subasset {}", path.string(), meshKey);
+				meshHandle = FindSubasset(registry, rootHandle, "mesh:" + std::to_string(primitive.MeshIndex)
+					+ "_" + std::to_string(primitive.PrimitiveIndex));
 			}
 
-			if (primitive.MaterialIndex >= 0)
+			if (skinned)
 			{
-				const std::string materialKey = "material:" + std::to_string(primitive.MaterialIndex);
-				primitiveEntity.StaticMaterialAsset = FindSubasset(registry, rootHandle, materialKey);
-				if (!primitiveEntity.StaticMaterialAsset.IsValid())
-					Log::CoreError("Native prefab {} is missing material subasset {}", path.string(), materialKey);
+				SkinnedMeshComponentTemplate skinnedTemplate;
+				skinnedTemplate.MeshAsset = meshHandle;
+				skinnedTemplate.SkeletonAsset = skin->SkeletonAsset;
+				skinnedTemplate.MaterialAsset = materialHandle;
+				skinnedTemplate.SkeletonEntityLocalIndex = skin->SkeletonLocalIndex;
+				primitiveEntity.SkinnedMesh = std::move(skinnedTemplate);
 			}
+			else
+			{
+				if (meshHandle.IsValid())
+				{
+					primitiveEntity.StaticMeshAsset = meshHandle;
+					primitiveEntity.StaticMaterialAsset = materialHandle;
+					primitiveEntity.HasStaticMesh = true;
+				}
+				else
+				{
+					Log::CoreError("Native prefab {} is missing mesh subasset {}", path.string(),
+						"mesh:" + std::to_string(primitive.MeshIndex) + "_" + std::to_string(primitive.PrimitiveIndex));
+				}
+			}
+
 			prefab->Entities.push_back(std::move(primitiveEntity));
 		}
 	}
@@ -350,6 +557,12 @@ Ref<Asset> RuntimeAssetLoader::Load(const AssetHandle handle,
 			return LoadMesh(handle, path);
 		case AssetType::ModelDEPRECATED:
 			return LoadSceneManifest(handle, path);
+	    case AssetType::Skeleton:
+            return LoadSkeleton(handle, path);
+        case AssetType::SkinnedMesh:
+            return LoadSkeletalMesh(handle, path);
+        case AssetType::Animation:
+            return LoadAnimation(handle, path);
 		case AssetType::Prefab:
 		{
 			NativeAssetRecord record;
