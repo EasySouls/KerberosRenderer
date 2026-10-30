@@ -23,14 +23,19 @@
 #include "Undo/InstantiatePrefabCommand.hpp"
 #include "Undo/SetComponentValueCommand.hpp"
 #include "Undo/UndoRedoManager.hpp"
+#include "Widgets/AssetPicker.hpp"
 
 #include <glm/gtc/type_ptr.hpp>
 #include <imgui/imgui.h>
 #include <imgui/imgui_internal.h>
 
+#include <algorithm>
 #include <filesystem>
+#include <format>
+#include <iterator>
 #include <memory>
 #include <optional>
+#include <ranges>
 #include <utility>
 
 
@@ -40,30 +45,6 @@ namespace Kerberos {
 
 namespace
 {
-    bool AcceptAnyAssetDragDrop(AssetHandle& outHandle)
-    {
-        constexpr const char* payloadTypes[] = {
-            assetBrowserTexture,
-            assetBrowserTextureCube,
-            assetBrowserMesh,
-            assetBrowserPrefab,
-            assetBrowserAudio,
-            assetBrowserMaterial,
-            assetBrowserItem
-        };
-
-        for (const char* payloadType : payloadTypes)
-        {
-            if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload(payloadType))
-            {
-                outHandle = ReadAssetDragPayload(payload->Data, payload->DataSize).Handle;
-                return true;
-            }
-        }
-
-        return false;
-    }
-
     void CreateProceduralSkinnedTest(const Ref<Scene>& scene)
     {
         if (!scene)
@@ -163,51 +144,40 @@ namespace
         return "None";
     }
 
+    std::string GetAssetStemLabel(const AssetHandle handle)
+    {
+        if (!handle.IsValid() || !AssetManager::IsAssetHandleValid(handle))
+            return "Missing asset";
+
+        const auto& metadata = Project::GetActive()->GetEditorAssetManager()->GetMetadata(handle);
+        std::string label = metadata.Filepath.stem().string();
+        if (label.empty())
+            label = metadata.SubAssetKey;
+        if (label.empty())
+            label = std::format("Asset {}", static_cast<uint64_t>(handle));
+        return label;
+    }
+
     std::optional<AssetHandle> DrawScriptAssetReferenceField(
         const char* label,
         const uint64_t currentHandle,
-        const char* payloadType,
-        const std::optional<AssetType> requiredType)
+        const AssetType type,
+        const char* hint = nullptr)
     {
-        ImGui::Text("%s: %s", label, GetAssetDisplayName(currentHandle).c_str());
-
-        std::optional<AssetHandle> newHandle;
-        if (ImGui::BeginDragDropTarget())
-        {
-            if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload(payloadType))
-            {
-                const AssetHandle handle = ReadAssetDragPayload(payload->Data, payload->DataSize).Handle;
-                if (!requiredType || AssetManager::GetAssetType(handle) == *requiredType)
-                {
-                    newHandle = handle;
-                }
-                else
-                {
-                    Log::EditorError("Asset type does not match the script field: {0}", handle);
-                }
-            }
-            ImGui::EndDragDropTarget();
-        }
-
-        return newHandle;
+        AssetHandle handle = AssetHandle(currentHandle);
+        if (AssetPicker::DrawAssetHandle(label, type, handle, hint))
+            return handle;
+        return std::nullopt;
     }
 
     std::optional<AssetHandle> DrawScriptAnyAssetReferenceField(
         const char* label,
         const uint64_t currentHandle)
     {
-        ImGui::Text("%s: %s", label, GetAssetDisplayName(currentHandle).c_str());
-
-        std::optional<AssetHandle> newHandle;
-        if (ImGui::BeginDragDropTarget())
-        {
-            AssetHandle handle;
-            if (AcceptAnyAssetDragDrop(handle))
-                newHandle = handle;
-            ImGui::EndDragDropTarget();
-        }
-
-        return newHandle;
+        AssetHandle handle = AssetHandle(currentHandle);
+        if (AssetPicker::DrawAnyAssetHandle(label, handle))
+            return handle;
+        return std::nullopt;
     }
 
     std::string GetEntityDisplayName(const Scene* scene, const uint64_t entityID)
@@ -260,6 +230,85 @@ namespace
         ImGui::PopID();
 
         return newEntityID;
+    }
+
+    template <typename TComponent>
+    std::optional<UUID> DrawComponentEntityReferenceField(
+        const char* label,
+        const Ref<Scene>& scene,
+        const UUID currentEntity)
+    {
+        std::optional<UUID> newEntity = std::nullopt;
+        if (!scene)
+            return newEntity;
+
+        std::vector<Entity> candidates;
+        for (const entt::entity root : scene->GetRootEntities())
+            candidates.emplace_back(root, scene.get());
+        for (size_t index = 0; index < candidates.size(); ++index)
+        {
+            for (const Entity child : scene->GetChildren(candidates[index]))
+                candidates.push_back(child);
+        }
+
+        candidates.erase(std::remove_if(candidates.begin(), candidates.end(), [](const Entity entity)
+        {
+            return !entity.HasComponent<TComponent>();
+        }), candidates.end());
+
+        std::string currentLabel = "None";
+        if (currentEntity.IsValid())
+        {
+            const Entity entity = scene->TryGetEntityByUUID(currentEntity);
+            currentLabel = entity && entity.HasComponent<TComponent>()
+                ? std::string(entity.GetName()) : "Missing Entity";
+        }
+
+        ImGui::PushID(label);
+        ImGui::TextUnformatted(label);
+        ImGui::SameLine();
+        ImGui::SetNextItemWidth(-1.0f);
+
+        if (ImGui::BeginCombo("##ComponentEntityPicker", currentLabel.c_str()))
+        {
+            if (ImGui::Selectable("None", !currentEntity.IsValid()))
+            {
+                newEntity = UUID::Invalid();
+                ImGui::CloseCurrentPopup();
+            }
+
+            for (const Entity entity : candidates)
+            {
+                ImGui::PushID(static_cast<int>(static_cast<uint64_t>(entity.GetUUID()) & 0x7fffffff));
+                const std::string entityName(entity.GetName());
+                if (ImGui::Selectable(entityName.c_str(), currentEntity == entity.GetUUID()))
+                {
+                    newEntity = entity.GetUUID();
+                    ImGui::CloseCurrentPopup();
+                }
+                ImGui::PopID();
+            }
+
+            ImGui::EndCombo();
+        }
+
+        if (ImGui::BeginDragDropTarget())
+        {
+            if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload(hierarchyEntity))
+            {
+                if (payload->DataSize == sizeof(uint64_t))
+                {
+                    const UUID dropped(*static_cast<const uint64_t*>(payload->Data));
+                    const Entity droppedEntity = scene->TryGetEntityByUUID(dropped);
+                    if (droppedEntity && droppedEntity.HasComponent<TComponent>())
+                        newEntity = dropped;
+                }
+            }
+            ImGui::EndDragDropTarget();
+        }
+
+        ImGui::PopID();
+        return newEntity;
     }
 }
 
@@ -539,6 +588,26 @@ void HierarchyPanel::AddComponentPopup(const Entity entity)
         if (ImGui::MenuItem("Static Mesh")) {
             AddComponentWithCheck<StaticMeshComponent>(entity);
             ImGui::CloseCurrentPopup();
+        }
+
+        if (ImGui::BeginMenu("Animation")) {
+            if (ImGui::MenuItem("Skeleton")) {
+                AddComponentWithCheck<SkeletonComponent>(entity);
+                ImGui::CloseCurrentPopup();
+            }
+            if (ImGui::MenuItem("Skinned Mesh")) {
+                AddComponentWithCheck<SkinnedMeshComponent>(entity);
+                ImGui::CloseCurrentPopup();
+            }
+            if (ImGui::MenuItem("Animator")) {
+                AddComponentWithCheck<AnimatorComponent>(entity);
+                ImGui::CloseCurrentPopup();
+            }
+            if (ImGui::MenuItem("Joint")) {
+                AddComponentWithCheck<JointComponent>(entity);
+                ImGui::CloseCurrentPopup();
+            }
+            ImGui::EndMenu();
         }
 
         if (ImGui::BeginMenu("Physics")) {
@@ -1118,94 +1187,25 @@ void HierarchyPanel::DrawComponents(const Entity entity)
                                 }
                             }
                             else if (scriptField.Type == ScriptFieldType::MaterialRef) {
-                                /*Ref<Material> value = scriptInstance->GetFieldValue<Ref<Material>>(name);
-                                if (ImGui::Button("Select Material"))
-                                {
-                                    ImGui::OpenPopup((name + "MaterialSelector").c_str());
-                                }
-                                if (ImGui::BeginPopup((name + "MaterialSelector").c_str()))
-                                {
-                                    const auto& materials = AssetManager::GetAssetsByType<Material>();
-                                    for (const auto& [id, material] : materials)
-                                    {
-                                        if (ImGui::Selectable(material->GetName().c_str()))
-                                        {
-                                            scriptInstance->SetFieldValue<Ref<Material>>(name, material);
-                                            ImGui::CloseCurrentPopup();
-                                        }
-                                    }
-                                    ImGui::EndPopup();
-                                }*/
                                 const uint64_t value = scriptInstance->GetFieldValue<uint64_t>(name);
-                                std::string materialLabel = "No material selected";
-                                if (value != UUID::Invalid()) {
-                                    const Ref<Material> material = AssetManager::GetAsset<Material>(UUID(value));
-                                    const auto& metadata =
-                                        Project::GetActive()->GetEditorAssetManager()->GetMetadata(material->GetHandle());
-                                    materialLabel = metadata.Filepath.filename().string();
-                                }
-                                ImGui::Text("%s: %s", name.c_str(), materialLabel.c_str());
-
-                                if (ImGui::BeginDragDropTarget()) {
-                                    if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload(assetBrowserMaterial)) {
-                                        const AssetHandle handle = ReadAssetDragPayload(payload->Data, payload->DataSize).Handle;
-                                        if (const AssetType assetType = AssetManager::GetAssetType(handle);
-                                            assetType != AssetType::Material) {
-                                            Log::EditorError("Asset is not a material: {0}", handle);
-                                            m_NotificationManager.AddNotification("Asset is not a material",
-                                                                                  Notification::Type::Error);
-                                            ImGui::EndDragDropTarget();
-
-                                            return;
-                                        }
-                                        const Ref<Material> newMaterial = AssetManager::GetAsset<Material>(handle);
-                                        scriptInstance->SetFieldValue<uint64_t>(name, newMaterial->GetHandle());
-                                    }
-                                    ImGui::EndDragDropTarget();
+                                if (const auto newHandle = DrawScriptAssetReferenceField(
+                                        name.c_str(), value, AssetType::Material, "Search materials...")) {
+                                    scriptInstance->SetFieldValue<uint64_t>(
+                                        name, static_cast<uint64_t>(*newHandle));
                                 }
                             }
                             else if (scriptField.Type == ScriptFieldType::MeshRef) {
                                 const uint64_t value = scriptInstance->GetFieldValue<uint64_t>(name);
-                                std::string meshLabel = "No mesh selected";
-                                if (value != UUID::Invalid()) {
-                                    const Ref<Mesh> mesh = AssetManager::ResolveMeshAsset(UUID(value));
-                                    if (mesh && AssetManager::IsAssetHandleValid(UUID(value))) {
-                                        const auto& metadata =
-                                            Project::GetActive()->GetEditorAssetManager()->GetMetadata(UUID(value));
-                                        meshLabel = metadata.Filepath.filename().string();
-                                    }
-                                }
-                                ImGui::Text("%s: %s", name.c_str(), meshLabel.c_str());
-
-                                if (ImGui::BeginDragDropTarget()) {
-                                    if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload(assetBrowserMesh)) {
-                                        const AssetHandle handle = ReadAssetDragPayload(payload->Data, payload->DataSize).Handle;
-                                        if (const AssetType assetType = AssetManager::GetAssetType(handle);
-                                            assetType != AssetType::Mesh) {
-                                            Log::EditorError("Asset is not a mesh or model: {0}", handle);
-                                            m_NotificationManager.AddNotification("Asset is not a mesh or model",
-                                                                                  Notification::Type::Error);
-                                            ImGui::EndDragDropTarget();
-
-                                            return;
-                                        }
-                                        const Ref<Mesh> newMesh = AssetManager::ResolveMeshAsset(handle);
-                                        if (!newMesh) {
-                                            Log::EditorError("Could not resolve mesh from asset: {0}", handle);
-                                            m_NotificationManager.AddNotification(
-                                                "Could not resolve mesh from selected asset", Notification::Type::Error);
-                                            ImGui::EndDragDropTarget();
-                                            return;
-                                        }
-                                        scriptInstance->SetFieldValue<uint64_t>(name, newMesh->GetHandle());
-                                    }
-                                    ImGui::EndDragDropTarget();
+                                if (const auto newHandle = DrawScriptAssetReferenceField(
+                                        name.c_str(), value, AssetType::Mesh, "Search meshes...")) {
+                                    scriptInstance->SetFieldValue<uint64_t>(
+                                        name, static_cast<uint64_t>(*newHandle));
                                 }
                             }
                         else if (scriptField.Type == ScriptFieldType::PrefabRef) {
                             const uint64_t value = scriptInstance->GetFieldValue<uint64_t>(name);
                             if (const auto newHandle = DrawScriptAssetReferenceField(
-                                    name.c_str(), value, assetBrowserPrefab, AssetType::Prefab)) {
+                                    name.c_str(), value, AssetType::Prefab)) {
                                 scriptInstance->SetFieldValue<uint64_t>(
                                     name, static_cast<uint64_t>(*newHandle));
                             }
@@ -1220,7 +1220,7 @@ void HierarchyPanel::DrawComponents(const Entity entity)
                         else if (scriptField.Type == ScriptFieldType::TextureRef) {
                             const uint64_t value = scriptInstance->GetFieldValue<uint64_t>(name);
                             if (const auto newHandle = DrawScriptAssetReferenceField(
-                                    name.c_str(), value, assetBrowserTexture, AssetType::Texture2D)) {
+                                    name.c_str(), value, AssetType::Texture2D)) {
                                 scriptInstance->SetFieldValue<uint64_t>(
                                     name, static_cast<uint64_t>(*newHandle));
                             }
@@ -1326,94 +1326,23 @@ void HierarchyPanel::DrawComponents(const Entity entity)
                                 }
                             }
                             else if (scriptField.Type == ScriptFieldType::MaterialRef) {
-                                /*Ref<Material> value = scriptInstance->GetFieldValue<Ref<Material>>(name);
-                                if (ImGui::Button("Select Material"))
-                                {
-                                    ImGui::OpenPopup((name + "MaterialSelector").c_str());
-                                }
-                                if (ImGui::BeginPopup((name + "MaterialSelector").c_str()))
-                                {
-                                    const auto& materials = AssetManager::GetAssetsByType<Material>();
-                                    for (const auto& [id, material] : materials)
-                                    {
-                                        if (ImGui::Selectable(material->GetName().c_str()))
-                                        {
-                                            scriptInstance->SetFieldValue<Ref<Material>>(name, material);
-                                            ImGui::CloseCurrentPopup();
-                                        }
-                                    }
-                                    ImGui::EndPopup();
-                                }*/
                                 const uint64_t value = fieldInitializer.GetValue<uint64_t>();
-                                std::string materialLabel = "No material selected";
-                                if (value != UUID::Invalid()) {
-                                    const Ref<Material> material = AssetManager::GetAsset<Material>(UUID(value));
-                                    const auto& metadata =
-                                        Project::GetActive()->GetEditorAssetManager()->GetMetadata(material->GetHandle());
-                                    materialLabel = metadata.Filepath.filename().string();
-                                }
-                                ImGui::Text("%s: %s", fieldName.c_str(), materialLabel.c_str());
-
-                                if (ImGui::BeginDragDropTarget()) {
-                                    if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload(assetBrowserMaterial)) {
-                                        const AssetHandle handle = ReadAssetDragPayload(payload->Data, payload->DataSize).Handle;
-                                        if (const AssetType assetType = AssetManager::GetAssetType(handle);
-                                            assetType != AssetType::Material) {
-                                            Log::EditorError("Asset is not a material: {0}", handle);
-                                            m_NotificationManager.AddNotification("Asset is not a material",
-                                                                                  Notification::Type::Error);
-                                            ImGui::EndDragDropTarget();
-
-                                            return;
-                                        }
-                                        const Ref<Material> newMaterial = AssetManager::GetAsset<Material>(handle);
-                                        fieldInitializer.SetValue(newMaterial->GetHandle());
-                                    }
-                                    ImGui::EndDragDropTarget();
+                                if (const auto newHandle = DrawScriptAssetReferenceField(
+                                        fieldName.c_str(), value, AssetType::Material, "Search materials...")) {
+                                    fieldInitializer.SetValue(static_cast<uint64_t>(*newHandle));
                                 }
                             }
                             else if (scriptField.Type == ScriptFieldType::MeshRef) {
                                 const uint64_t value = fieldInitializer.GetValue<uint64_t>();
-                                std::string meshLabel = "No mesh selected";
-                                if (value != UUID::Invalid()) {
-                                    const Ref<Mesh> mesh = AssetManager::ResolveMeshAsset(UUID(value));
-                                    if (mesh && AssetManager::IsAssetHandleValid(UUID(value))) {
-                                        const auto& metadata =
-                                            Project::GetActive()->GetEditorAssetManager()->GetMetadata(UUID(value));
-                                        meshLabel = metadata.Filepath.filename().string();
-                                    }
-                                }
-                                ImGui::Text("%s: %s", fieldName.c_str(), meshLabel.c_str());
-
-                                if (ImGui::BeginDragDropTarget()) {
-                                    if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload(assetBrowserMesh)) {
-                                        const AssetHandle handle = ReadAssetDragPayload(payload->Data, payload->DataSize).Handle;
-                                        if (const AssetType assetType = AssetManager::GetAssetType(handle);
-                                            assetType != AssetType::Mesh) {
-                                            Log::EditorError("Asset is not a mesh or model: {0}", handle);
-                                            m_NotificationManager.AddNotification("Asset is not a mesh or model",
-                                                                                  Notification::Type::Error);
-                                            ImGui::EndDragDropTarget();
-
-                                            return;
-                                        }
-                                        const Ref<Mesh> newMesh = AssetManager::ResolveMeshAsset(handle);
-                                        if (!newMesh) {
-                                            Log::EditorError("Could not resolve mesh from asset: {0}", handle);
-                                            m_NotificationManager.AddNotification(
-                                                "Could not resolve mesh from selected asset", Notification::Type::Error);
-                                            ImGui::EndDragDropTarget();
-                                            return;
-                                        }
-                                        fieldInitializer.SetValue(newMesh->GetHandle());
-                                    }
-                                    ImGui::EndDragDropTarget();
+                                if (const auto newHandle = DrawScriptAssetReferenceField(
+                                        fieldName.c_str(), value, AssetType::Mesh, "Search meshes...")) {
+                                    fieldInitializer.SetValue(static_cast<uint64_t>(*newHandle));
                                 }
                             }
                         else if (scriptField.Type == ScriptFieldType::PrefabRef) {
                             const uint64_t value = fieldInitializer.GetValue<uint64_t>();
                             if (const auto newHandle = DrawScriptAssetReferenceField(
-                                    fieldName.c_str(), value, assetBrowserPrefab, AssetType::Prefab)) {
+                                    fieldName.c_str(), value, AssetType::Prefab)) {
                                 fieldInitializer.SetValue(static_cast<uint64_t>(*newHandle));
                             }
                         }
@@ -1427,7 +1356,7 @@ void HierarchyPanel::DrawComponents(const Entity entity)
                         else if (scriptField.Type == ScriptFieldType::TextureRef) {
                             const uint64_t value = fieldInitializer.GetValue<uint64_t>();
                             if (const auto newHandle = DrawScriptAssetReferenceField(
-                                    fieldName.c_str(), value, assetBrowserTexture, AssetType::Texture2D)) {
+                                    fieldName.c_str(), value, AssetType::Texture2D)) {
                                 fieldInitializer.SetValue(static_cast<uint64_t>(*newHandle));
                             }
                         }
@@ -1632,73 +1561,8 @@ void HierarchyPanel::DrawComponents(const Entity entity)
             auto& staticMesh = entity.GetComponent<StaticMeshComponent>();
             ImGui::Checkbox("Visible", &staticMesh.Visible);
 
-            /// TODO: Visualize the static mesh in the editor
-            ImGui::Button("Static Mesh");
-
-            /// Handle drag and drop for meshes
-            if (ImGui::BeginDragDropTarget()) {
-                if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload(assetBrowserMesh)) {
-                    const AssetHandle handle = ReadAssetDragPayload(payload->Data, payload->DataSize).Handle;
-                    if (const AssetType assetType = AssetManager::GetAssetType(handle);
-                        assetType != AssetType::Mesh) {
-                        Log::EditorError("Asset is not a mesh: {0}", handle);
-                        m_NotificationManager.AddNotification("Asset is not a mesh", Notification::Type::Error);
-                        return;
-                    }
-                    const Ref<Mesh> mesh = AssetManager::ResolveMeshAsset(handle);
-                    if (!mesh) {
-                        Log::EditorError("Could not resolve mesh from asset: {0}", handle);
-                        m_NotificationManager.AddNotification("Could not resolve mesh from selected asset",
-                                                              Notification::Type::Error);
-                        return;
-                    }
-                    staticMesh.StaticMesh = mesh;
-                }
-                ImGui::EndDragDropTarget();
-            }
-
-            std::string meshLabel = "None";
-            if (staticMesh.StaticMesh) {
-                if (AssetManager::IsAssetHandleValid(staticMesh.StaticMesh->GetHandle())) {
-                    const auto& metadata =
-                        Project::GetActive()->GetEditorAssetManager()->GetMetadata(staticMesh.StaticMesh->GetHandle());
-                    meshLabel = metadata.Filepath.filename().string();
-                }
-                else {
-                    meshLabel = "Invalid Mesh";
-                }
-            }
-            ImGui::Text("%s", meshLabel.c_str());
-
-            ImGui::Button("Material");
-
-            /// Handle drag and drop for materials
-            if (ImGui::BeginDragDropTarget()) {
-                if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload(assetBrowserMaterial)) {
-                    const AssetHandle handle = ReadAssetDragPayload(payload->Data, payload->DataSize).Handle;
-                    if (const AssetType assetType = AssetManager::GetAssetType(handle);
-                        assetType != AssetType::Material) {
-                        Log::EditorError("Asset is not a material: {0}", handle);
-                        m_NotificationManager.AddNotification("Asset is not a material", Notification::Type::Error);
-                        return;
-                    }
-                    const Ref<Material> material = AssetManager::GetAsset<Material>(handle);
-                    staticMesh.MeshMaterial = material;
-                }
-                ImGui::EndDragDropTarget();
-            }
-
-            std::string materialLabel = "None";
-            if (staticMesh.MeshMaterial) {
-                if (AssetManager::IsAssetHandleValid(staticMesh.MeshMaterial->GetHandle())) {
-                    const auto& metadata = Project::GetActive()->GetEditorAssetManager()->GetMetadata(staticMesh.MeshMaterial->GetHandle());
-                    materialLabel = metadata.Filepath.filename().string();
-                }
-                else {
-                    materialLabel = "Invalid Material";
-                }
-            }
-            ImGui::Text("%s", materialLabel.c_str());
+            AssetPicker::DrawAsset("Static Mesh", AssetType::Mesh, staticMesh.StaticMesh, "Search meshes...");
+            AssetPicker::DrawAsset("Static Material", AssetType::Material, staticMesh.MeshMaterial, "Search materials...");
 
             ImGui::Separator();
 
@@ -1968,22 +1832,12 @@ void HierarchyPanel::DrawComponents(const Entity entity)
             /*const uint64_t textureID = m_CubemapFramebuffer->GetColorAttachmentRendererID();
             ImGui::Image(textureID, ImVec2{ 256, 256 }, ImVec2{ 0, 1 }, ImVec2{ 1, 0 });*/
 
-            /// Handle drag and drop for textures
-            if (ImGui::BeginDragDropTarget()) {
-                if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload(assetBrowserTextureCube)) {
-                    const AssetHandle handle = ReadAssetDragPayload(payload->Data, payload->DataSize).Handle;
-                    if (AssetManager::GetAssetType(handle) != AssetType::TextureCube) {
-                        Log::EditorError("Asset is not a texture: {0}", handle);
-                        m_NotificationManager.AddNotification("Asset is not a cubemap", Notification::Type::Error);
-                        return;
-                    }
-                    environment.SkyboxTexture = handle;
-
-                    /// render the changed cube into the environment
-                    /*m_CubemapFramebuffer->Bind();
-                    m_CubemapFramebuffer->Unbind();*/
-                }
-                ImGui::EndDragDropTarget();
+            if (AssetPicker::DrawAssetHandle("Cubemap", AssetType::TextureCube, environment.SkyboxTexture,
+                    "Search cubemaps..."))
+            {
+                /// render the changed cube into the environment
+                /*m_CubemapFramebuffer->Bind();
+                m_CubemapFramebuffer->Unbind();*/
             }
 
             ImGui::TreePop();
@@ -2078,22 +1932,7 @@ void HierarchyPanel::DrawComponents(const Entity entity)
         if (opened) {
             auto& audioComp = entity.GetComponent<AudioSource2DComponent>();
 
-            std::string soundName = audioComp.SoundAsset ? audioComp.SoundAsset->GetName() : "None";
-            ImGui::Text("Source: %s", soundName.c_str());
-
-            /// Handle drag and drop for the audio asset
-            if (ImGui::BeginDragDropTarget()) {
-                if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload(assetBrowserAudio)) {
-                    const AssetHandle handle = ReadAssetDragPayload(payload->Data, payload->DataSize).Handle;
-                    if (AssetManager::GetAssetType(handle) != AssetType::Sound) {
-                        Log::EditorError("Asset is not a sound: {0}", handle);
-                        m_NotificationManager.AddNotification("Asset is not a sound", Notification::Type::Error);
-                        return;
-                    }
-                    audioComp.SoundAsset = AssetManager::GetAsset<Sound>(handle);
-                }
-                ImGui::EndDragDropTarget();
-            }
+            AssetPicker::DrawAsset("Audio Clip 2D", AssetType::Sound, audioComp.SoundAsset, "Search audio...");
 
             ImGui::Separator();
 
@@ -2129,22 +1968,7 @@ void HierarchyPanel::DrawComponents(const Entity entity)
         if (opened) {
             auto& audioComp = entity.GetComponent<AudioSource3DComponent>();
 
-            std::string soundName = audioComp.SoundAsset ? audioComp.SoundAsset->GetName() : "None";
-            ImGui::Text("Source: %s", soundName.c_str());
-
-            /// Handle drag and drop for the audio asset
-            if (ImGui::BeginDragDropTarget()) {
-                if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload(assetBrowserAudio)) {
-                    const AssetHandle handle = ReadAssetDragPayload(payload->Data, payload->DataSize).Handle;
-                    if (AssetManager::GetAssetType(handle) != AssetType::Sound) {
-                        Log::EditorError("Asset is not a sound: {0}", handle);
-                        m_NotificationManager.AddNotification("Asset is not a sound", Notification::Type::Error);
-                        return;
-                    }
-                    audioComp.SoundAsset = AssetManager::GetAsset<Sound>(handle);
-                }
-                ImGui::EndDragDropTarget();
-            }
+            AssetPicker::DrawAsset("Audio Clip 3D", AssetType::Sound, audioComp.SoundAsset, "Search audio...");
 
             ImGui::Separator();
 
@@ -2231,38 +2055,8 @@ void HierarchyPanel::DrawComponents(const Entity entity)
 
             ImGui::DragFloat2("Sub UV Grid", glm::value_ptr(particleEmitter.SubUVGrid), 1, 1, 16, "%f");
 
-            ImGui::Button("Texture");
-
-            std::string textureLabel = "None";
-            if (AssetManager::IsAssetHandleValid(particleEmitter.ParticleTexture)) {
-                const auto& metadata = Project::GetActive()->GetEditorAssetManager()->GetMetadata(particleEmitter.ParticleTexture);
-                textureLabel = metadata.Filepath.filename().string();
-            }
-            else {
-                textureLabel = "Invalid Texture";
-            }
-            ImGui::Text("%s", textureLabel.c_str());
-
-            if (ImGui::BeginDragDropTarget()) {
-                if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload(assetBrowserTexture)) {
-                    const AssetHandle handle = ReadAssetDragPayload(payload->Data, payload->DataSize).Handle;
-                    if (const AssetType assetType = AssetManager::GetAssetType(handle);
-                        assetType != AssetType::Texture2D) {
-                        Log::EditorError("Asset is not a texture: {0}", handle);
-                        m_NotificationManager.AddNotification("Asset is not a texture", Notification::Type::Error);
-                        return;
-                    }
-                    const Ref<Texture2D> texture = AssetManager::GetAsset<Texture2D>(handle);
-                    if (!texture) {
-                        Log::EditorError("Could not resolve texture from asset: {0}", handle);
-                        m_NotificationManager.AddNotification("Could not resolve texture from selected asset",
-                                                              Notification::Type::Error);
-                        return;
-                    }
-                    particleEmitter.ParticleTexture = handle;
-                }
-                ImGui::EndDragDropTarget();
-            }
+            AssetPicker::DrawAssetHandle("Texture", AssetType::Texture2D, particleEmitter.ParticleTexture,
+                "Search textures...");
 
             ImGui::TreePop();
         }
@@ -2298,7 +2092,45 @@ void HierarchyPanel::DrawComponents(const Entity entity)
         {
             auto& skeletonComp = entity.GetComponent<SkeletonComponent>();
 
-            ImGui::Text("Skeleton Asset Handle: %d", skeletonComp.SkeletonAsset);
+            AssetHandle skeletonAsset = skeletonComp.SkeletonAsset;
+            if (AssetPicker::DrawAssetHandle("Skeleton Asset", AssetType::Skeleton, skeletonAsset,
+                    "Search skeletons..."))
+            {
+                skeletonComp.SkeletonAsset = skeletonAsset;
+                skeletonComp.Skeleton = skeletonAsset.IsValid()
+                    ? AssetManager::AsAsset<Skeleton>(skeletonAsset) : nullptr;
+            }
+
+            if (skeletonComp.Skeleton)
+            {
+                const auto& joints = skeletonComp.Skeleton->GetJoints();
+                ImGui::Text("Joints: %zu", joints.size());
+                if (ImGui::TreeNode("Joint List"))
+                {
+                    for (size_t i = 0; i < joints.size(); ++i)
+                        ImGui::Text("%zu: %s", i, joints[i].Name.c_str());
+                    ImGui::TreePop();
+                }
+            }
+            else if (skeletonComp.SkeletonAsset.IsValid())
+            {
+                ImGui::TextDisabled("Skeleton asset could not be loaded.");
+            }
+
+            if (!skeletonComp.JointEntities.empty())
+            {
+                if (ImGui::TreeNode("Joint Entities"))
+                {
+                    for (size_t i = 0; i < skeletonComp.JointEntities.size(); ++i)
+                    {
+                        const Entity jointEntity = m_Context
+                            ? m_Context->TryGetEntityByUUID(skeletonComp.JointEntities[i]) : Entity{};
+                        ImGui::Text("%zu: %s", i, jointEntity
+                            ? std::string(jointEntity.GetName()).c_str() : "Missing entity");
+                    }
+                    ImGui::TreePop();
+                }
+            }
 
             ImGui::TreePop();
         }
@@ -2334,7 +2166,51 @@ void HierarchyPanel::DrawComponents(const Entity entity)
         {
             auto& skinnedMeshComp = entity.GetComponent<SkinnedMeshComponent>();
 
-            ImGui::Text("Skinned Mesh Asset Handle: %d", skinnedMeshComp.MeshAsset);
+            AssetHandle meshAsset = skinnedMeshComp.MeshAsset;
+            if (AssetPicker::DrawAssetHandle("Skinned Mesh Asset", AssetType::SkinnedMesh, meshAsset,
+                    "Search skinned meshes..."))
+            {
+                skinnedMeshComp.MeshAsset = meshAsset;
+                skinnedMeshComp.Mesh = meshAsset.IsValid()
+                    ? AssetManager::AsAsset<SkeletalMesh>(meshAsset) : nullptr;
+            }
+
+            AssetHandle skeletonAsset = skinnedMeshComp.SkeletonAsset;
+            if (AssetPicker::DrawAssetHandle("Skinned Skeleton Asset", AssetType::Skeleton, skeletonAsset,
+                    "Search skeletons..."))
+            {
+                skinnedMeshComp.SkeletonAsset = skeletonAsset;
+            }
+
+            if (const auto newSkeletonEntity = DrawComponentEntityReferenceField<SkeletonComponent>(
+                    "Skinned Skeleton Entity", m_Context, skinnedMeshComp.SkeletonEntity))
+            {
+                skinnedMeshComp.SkeletonEntity = *newSkeletonEntity;
+                if (newSkeletonEntity->IsValid())
+                {
+                    const Entity skeletonEntity = m_Context->TryGetEntityByUUID(*newSkeletonEntity);
+                    if (skeletonEntity && skeletonEntity.HasComponent<SkeletonComponent>())
+                        skinnedMeshComp.SkeletonAsset =
+                            skeletonEntity.GetComponent<SkeletonComponent>().SkeletonAsset;
+                }
+            }
+
+            AssetHandle materialAsset = skinnedMeshComp.MaterialAsset;
+            if (AssetPicker::DrawAssetHandle("Skinned Material", AssetType::Material, materialAsset,
+                    "Search materials..."))
+            {
+                skinnedMeshComp.MaterialAsset = materialAsset;
+                skinnedMeshComp.Material = materialAsset.IsValid()
+                    ? AssetManager::AsAsset<Material>(materialAsset) : nullptr;
+            }
+
+            ImGui::Checkbox("Visible", &skinnedMeshComp.Visible);
+            ImGui::Checkbox("Cast Shadows", &skinnedMeshComp.CastShadows);
+
+            if (skinnedMeshComp.MeshAsset.IsValid() && !skinnedMeshComp.Mesh)
+                ImGui::TextDisabled("Skinned mesh artifact could not be loaded.");
+            if (skinnedMeshComp.MaterialAsset.IsValid() && !skinnedMeshComp.Material)
+                ImGui::TextDisabled("Material artifact could not be loaded.");
 
             ImGui::TreePop();
         }
@@ -2369,14 +2245,152 @@ void HierarchyPanel::DrawComponents(const Entity entity)
         if (opened)
         {
             auto& jointComp = entity.GetComponent<JointComponent>();
-
-            ImGui::Text("Joint Index: %d", jointComp.JointIndex);
-
+            ImGui::Text("Joint Index: %u", jointComp.JointIndex);
+            ImGui::TextDisabled("Joint indices are assigned by the imported skeleton.");
             ImGui::TreePop();
         }
         if (componentDeleted)
         {
             entity.RemoveComponent<JointComponent>();
+        }
+    }
+    if (entity.HasComponent<AnimatorComponent>())
+    {
+        ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(6, 6));
+        const bool opened = ImGui::TreeNodeEx(
+            reinterpret_cast<void*>(typeid(AnimatorComponent).hash_code()), treeNodeFlags, "Animator");
+        ImGui::SameLine(ImGui::GetContentRegionAvail().x - 20.f);
+        if (ImGui::Button("+", ImVec2{ 20, 20 }))
+        {
+            ImGui::OpenPopup("ComponentSettings");
+        }
+        ImGui::PopStyleVar();
+
+        bool componentDeleted = false;
+        if (ImGui::BeginPopup("ComponentSettings"))
+        {
+            ImGui::Text("Animator Settings");
+            ImGui::Separator();
+            if (ImGui::MenuItem("Remove Component"))
+            {
+                componentDeleted = true;
+                ImGui::CloseCurrentPopup();
+            }
+            ImGui::EndPopup();
+        }
+
+        if (opened)
+        {
+            auto& animator = entity.GetComponent<AnimatorComponent>();
+
+            if (const auto newSkeletonEntity = DrawComponentEntityReferenceField<SkeletonComponent>(
+                    "Animator Skeleton Entity", m_Context, animator.SkeletonEntity))
+            {
+                animator.SkeletonEntity = *newSkeletonEntity;
+            }
+
+            AssetHandle clipToAdd = AssetHandle::Invalid();
+            if (AssetPicker::DrawAssetHandle("Add Animation Clip", AssetType::Animation, clipToAdd,
+                    "Search animation clips...", false))
+            {
+                const bool alreadyPresent = std::ranges::find(animator.AnimationClips, clipToAdd)
+                    != animator.AnimationClips.end();
+                if (!alreadyPresent)
+                {
+                    animator.AnimationClips.push_back(clipToAdd);
+                    if (animator.ActiveClip < 0)
+                        animator.ActiveClip = static_cast<int32_t>(animator.AnimationClips.size() - 1);
+                }
+                else
+                {
+                    const auto it = std::ranges::find(animator.AnimationClips, clipToAdd);
+                    animator.ActiveClip = static_cast<int32_t>(std::distance(animator.AnimationClips.begin(), it));
+                }
+            }
+
+            ImGui::Text("Animation Clips (%zu)", animator.AnimationClips.size());
+            if (animator.AnimationClips.empty())
+            {
+                ImGui::TextDisabled("No clips assigned. Use Add Clip above.");
+            }
+
+            int32_t clipToRemove = -1;
+            for (int32_t i = 0; i < static_cast<int32_t>(animator.AnimationClips.size()); ++i)
+            {
+                ImGui::PushID(i);
+                const bool selected = animator.ActiveClip == i;
+                if (ImGui::Selectable(GetAssetStemLabel(animator.AnimationClips[i]).c_str(), selected))
+                    animator.ActiveClip = i;
+                ImGui::SameLine();
+                if (ImGui::SmallButton("Remove"))
+                {
+                    clipToRemove = i;
+                }
+                ImGui::PopID();
+            }
+
+            if (clipToRemove >= 0)
+            {
+                animator.AnimationClips.erase(animator.AnimationClips.begin() + clipToRemove);
+                if (animator.AnimationClips.empty())
+                    animator.ActiveClip = -1;
+                else if (animator.ActiveClip >= static_cast<int32_t>(animator.AnimationClips.size()))
+                    animator.ActiveClip = static_cast<int32_t>(animator.AnimationClips.size() - 1);
+            }
+
+            if (!animator.AnimationClips.empty())
+            {
+                std::string activeClipLabel = animator.ActiveClip >= 0
+                    && animator.ActiveClip < static_cast<int32_t>(animator.AnimationClips.size())
+                    ? GetAssetStemLabel(animator.AnimationClips[static_cast<size_t>(animator.ActiveClip)])
+                    : "None";
+                if (ImGui::BeginCombo("Active Clip", activeClipLabel.c_str()))
+                {
+                    for (int32_t i = 0; i < static_cast<int32_t>(animator.AnimationClips.size()); ++i)
+                    {
+                        ImGui::PushID(i);
+                        const bool selected = animator.ActiveClip == i;
+                        if (ImGui::Selectable(GetAssetStemLabel(animator.AnimationClips[i]).c_str(), selected))
+                            animator.ActiveClip = i;
+                        if (selected)
+                            ImGui::SetItemDefaultFocus();
+                        ImGui::PopID();
+                    }
+                    ImGui::EndCombo();
+                }
+            }
+
+            Ref<AnimationClip> activeClip = nullptr;
+            if (animator.ActiveClip >= 0
+                && animator.ActiveClip < static_cast<int32_t>(animator.AnimationClips.size()))
+            {
+                activeClip = AssetManager::AsAsset<AnimationClip>(
+                    animator.AnimationClips[static_cast<size_t>(animator.ActiveClip)]);
+            }
+
+            const float duration = activeClip ? activeClip->GetDuration() : 0.0f;
+            if (duration > 0.0f)
+                ImGui::SliderFloat("Time", &animator.CurrentTime, 0.0f, duration, "%.3f s");
+            else
+                ImGui::DragFloat("Time", &animator.CurrentTime, 0.01f, 0.0f, 1000.0f, "%.3f s");
+            ImGui::DragFloat("Playback Speed", &animator.PlaybackSpeed, 0.01f, 0.0f, 10.0f);
+            ImGui::Checkbox("Playing", &animator.IsPlaying);
+            ImGui::SameLine();
+            ImGui::Checkbox("Looping", &animator.IsLooping);
+            if (ImGui::Button("Reset Time"))
+                animator.CurrentTime = 0.0f;
+
+            if (activeClip)
+                ImGui::Text("Clip Duration: %.3f s", duration);
+            else if (!animator.AnimationClips.empty())
+                ImGui::TextDisabled("Active clip could not be loaded.");
+
+            ImGui::TreePop();
+        }
+
+        if (componentDeleted)
+        {
+            entity.RemoveComponent<AnimatorComponent>();
         }
     }
 }

@@ -9,6 +9,7 @@
 #include "Profiling/Profilers.hpp"
 #include "Project/Project.hpp"
 #include "Utils/SystemOperations.hpp"
+#include "Widgets/AssetPicker.hpp"
 
 #include <imgui/imgui.h>
 
@@ -78,26 +79,6 @@ std::string AssetDisplayName(const AssetMetadata& metadata, const AssetHandle ha
     if (!metadata.SubAssetKey.empty())
         return metadata.SubAssetKey;
     return std::format("Asset {}", static_cast<uint64_t>(handle));
-}
-
-std::string ToLowerCopy(const std::string_view text)
-{
-    std::string result(text);
-    std::ranges::transform(result, result.begin(), [](const unsigned char c) {
-        return static_cast<char>(std::tolower(c));
-    });
-    return result;
-}
-
-std::string TextureDisplayLabel(const AssetMetadata& metadata, const AssetHandle handle)
-{
-    if (!metadata.Filepath.empty())
-    {
-        if (!metadata.SubAssetKey.empty())
-            return metadata.Filepath.generic_string() + "  [" + metadata.SubAssetKey + "]";
-        return metadata.Filepath.generic_string();
-    }
-    return AssetDisplayName(metadata, handle);
 }
 
 std::string AssetStatusLabel(const AssetHandle handle,
@@ -638,7 +619,8 @@ std::string AssetStatusLabel(const AssetHandle handle,
         m_SubAssetsByRoot.clear();
         m_CachedArtifactExists.clear();
         m_MetadataByHandle.clear();
-        m_TexturePickerEntriesDirty = true;
+
+        AssetPicker::InvalidateCache();
 
         const auto editorAssetManager = Project::GetActive()->GetEditorAssetManager();
         const auto& registry = editorAssetManager->GetAssetRegistry();
@@ -805,151 +787,9 @@ std::string AssetStatusLabel(const AssetHandle handle,
         }
     }
 
-	void AssetsPanel::RebuildTexturePickerEntries()
-    {
-        m_TexturePickerEntries.clear();
-        m_TexturePickerEntriesDirty = false;
-
-        const Ref<AssetManagerBase> assetManager = Project::GetActive()->GetAssetManager();
-        if (!assetManager)
-            return;
-
-        const AssetRegistry& registry = assetManager->GetAssetRegistry();
-        const std::span<const AssetHandle> textureHandles = assetManager->GetAssetsOfType(AssetType::Texture2D);
-        m_TexturePickerEntries.reserve(textureHandles.size());
-
-        for (const AssetHandle handle : textureHandles)
-        {
-            if (!registry.Contains(handle))
-                continue;
-
-            const AssetMetadata& metadata = registry.Get(handle);
-            TexturePickerEntry entry{
-                .Handle = handle,
-                .Label = TextureDisplayLabel(metadata, handle),
-                .SearchKey = ToLowerCopy(std::format("{} {} {} {}",
-                    TextureDisplayLabel(metadata, handle),
-                    metadata.Filepath.generic_string(),
-                    metadata.LibraryPath.generic_string(),
-                    metadata.SubAssetKey))
-            };
-            m_TexturePickerEntries.emplace_back(std::move(entry));
-        }
-
-        std::ranges::sort(m_TexturePickerEntries, [](const TexturePickerEntry& left, const TexturePickerEntry& right) {
-            return ToLowerCopy(left.Label) < ToLowerCopy(right.Label);
-        });
-    }
-
 	void AssetsPanel::DrawMaterialTextureField(const char* label, Ref<Texture2D>& texture)
     {
-        if (m_TexturePickerEntriesDirty)
-            RebuildTexturePickerEntries();
-
-        const Ref<AssetManagerBase> assetManager = Project::GetActive()->GetAssetManager();
-        const AssetRegistry* registry = assetManager ? &assetManager->GetAssetRegistry() : nullptr;
-
-        std::string textureLabel = "None";
-        if (texture && texture->GetHandle().IsValid())
-        {
-            if (registry && registry->Contains(texture->GetHandle()))
-                textureLabel = TextureDisplayLabel(registry->Get(texture->GetHandle()), texture->GetHandle());
-            else
-                textureLabel = "Missing texture";
-        }
-
-        ImGui::PushID(label);
-        ImGui::TextUnformatted(label);
-        ImGui::SameLine();
-        ImGui::SetNextItemWidth(-1.0f);
-
-        if (ImGui::BeginCombo("##TexturePicker", textureLabel.c_str()))
-        {
-            ImGui::SetNextItemWidth(-1.0f);
-            ImGui::InputTextWithHint("##TextureSearch", "Search textures...", m_TexturePickerFilter, sizeof(m_TexturePickerFilter));
-
-            const std::string filter = ToLowerCopy(m_TexturePickerFilter);
-            std::vector<size_t> visibleEntries;
-            visibleEntries.reserve(m_TexturePickerEntries.size());
-            for (size_t i = 0; i < m_TexturePickerEntries.size(); ++i)
-            {
-                if (filter.empty() || m_TexturePickerEntries[i].SearchKey.find(filter) != std::string::npos)
-                    visibleEntries.push_back(i);
-            }
-
-            if (ImGui::BeginChild("##TextureList", ImVec2(0.0f, 300.0f), ImGuiChildFlags_Borders))
-            {
-                if (ImGui::Selectable("None", !texture))
-                {
-                    texture = nullptr;
-                    ImGui::CloseCurrentPopup();
-                }
-
-                if (visibleEntries.empty())
-                {
-                    ImGui::TextDisabled("No matching textures.");
-                }
-                else
-                {
-                    ImGuiListClipper clipper;
-                    clipper.Begin(static_cast<int>(visibleEntries.size()));
-                    while (clipper.Step())
-                    {
-                        for (int i = clipper.DisplayStart; i < clipper.DisplayEnd; ++i)
-                        {
-                            const TexturePickerEntry& entry = m_TexturePickerEntries[visibleEntries[static_cast<size_t>(i)]];
-                            const bool selected = texture && texture->GetHandle() == entry.Handle;
-                            ImGui::PushID(static_cast<int>(static_cast<uint64_t>(entry.Handle) & 0x7fffffff));
-                            if (ImGui::Selectable(entry.Label.c_str(), selected))
-                            {
-                                if (!assetManager)
-                                {
-                                    m_NotificationManager.AddNotification("No active asset manager",
-                                                                          Notification::Type::Error);
-                                }
-                                else if (!assetManager->IsAssetHandleValid(entry.Handle))
-                                {
-                                    m_NotificationManager.AddNotification(
-                                        "Texture has no imported artifact: " + entry.Label,
-                                        Notification::Type::Error);
-                                }
-                                else
-                                {
-                                    try
-                                    {
-                                        const Ref<Texture2D> selectedTexture =
-                                            std::dynamic_pointer_cast<Texture2D>(assetManager->GetAsset(entry.Handle));
-                                        if (selectedTexture)
-                                            texture = selectedTexture;
-                                        else
-                                            m_NotificationManager.AddNotification(
-                                                "Could not load texture: " + entry.Label,
-                                                Notification::Type::Error);
-                                    }
-                                    catch (const std::exception& exception)
-                                    {
-                                        m_NotificationManager.AddNotification(
-                                            "Could not load texture: " + entry.Label + "\n" + exception.what(),
-                                            Notification::Type::Error);
-                                    }
-                                }
-
-                                ImGui::CloseCurrentPopup();
-                            }
-                            ImGui::SetItemTooltip("%s", entry.Label.c_str());
-                            ImGui::PopID();
-                        }
-                    }
-                }
-            }
-            ImGui::EndChild();
-            ImGui::EndCombo();
-        }
-        else if (m_TexturePickerFilter[0] != '\0')
-        {
-            m_TexturePickerFilter[0] = '\0';
-        }
-        ImGui::PopID();
+        AssetPicker::DrawAsset(label, AssetType::Texture2D, texture, "Search textures...");
     }
 
 	std::filesystem::path AssetsPanel::GetRelativePath(const std::filesystem::path& path) const
@@ -1172,6 +1012,9 @@ std::string AssetStatusLabel(const AssetHandle handle,
             break;
         case AssetType::SkinnedMesh:
             payloadType = assetBrowserSkinnedMesh;
+            break;
+        case AssetType::Animation:
+            payloadType = assetBrowserAnimation;
             break;
         default:
             payloadType = assetBrowserItem;

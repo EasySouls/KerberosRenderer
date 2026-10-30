@@ -34,7 +34,10 @@ after the current ImGui loop and stack cleanup.
 
 Preserve ImGui Begin/End, popup, ID, style-color, columns/table, and drag/drop
 pairing rules. Give repeated controls stable `##` IDs and avoid duplicate
-labels across windows.
+labels across windows. Single-type asset fields should use
+`Widgets/AssetPicker` instead of custom button/drop-target pairs; it provides
+the searchable asset list and keeps the matching asset-browser payload as a
+drop target.
 
 ## Panels and integration
 
@@ -54,7 +57,11 @@ Editor windows live mainly under
   (skeletons, skinned meshes, joints, and animators). Its window context menu
   also has a debug "Create Skinned Test Mesh" action that builds a procedural
   two-bone strip for validating the bind-pose skinning path without imported
-  glTF data.
+  glTF data. Single-asset component fields use the shared
+  `KerberosEditor/Source/Widgets/AssetPicker` searchable dropdown, which keeps
+  the matching asset-browser drag/drop payload working. The Animator component
+  exposes skeleton-entity selection, clip add/remove/reorder-by-selection,
+  active-clip selection, time, speed, playing, and looping controls.
 - `InspectorPanel`: the unified right-side "Properties" window. It shows entity
   components when an entity is selected and asset import options when a source
   asset is selected in `AssetsPanel` (asset selection takes display precedence).
