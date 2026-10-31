@@ -4,14 +4,15 @@
 #include "Renderer/Animation/Skeleton.hpp"
 #include "Profiling/Profilers.hpp"
 #include "Scene/Components/AnimationComponents.hpp"
+#include "Scene/Entity.hpp"
 #include "VulkanContext.hpp"
+
+#include <glm/gtc/matrix_transform.hpp>
+#include <glm/gtx/quaternion.hpp>
 
 #include <cstring>
 #include <unordered_set>
-
-#include <glm/gtc/matrix_transform.hpp>
-#include <glm/gtc/quaternion.hpp>
-#include <glm/gtx/quaternion.hpp>
+#include <format>
 
 import Kerberos;
 
@@ -25,7 +26,7 @@ void AnimationSystem::Initialize(const Owner<DescriptorAllocator>& allocator)
 
     AllocateSkinMatricesBuffer();
 
-    m_Snapshot.SkinMatrixBuffer = m_SkinMatricesBuffer.Handle;
+    m_Snapshot.SkinMatrixBuffer = m_SkinMatricesBuffers[0].Handle;
 }
 
 void AnimationSystem::Shutdown()
@@ -33,7 +34,13 @@ void AnimationSystem::Shutdown()
     KBR_TRACY_FUNCTION();
 
     Reset();
-    m_SkinMatricesBuffer.Reset();
+
+    for (auto& buffer : m_SkinMatricesBuffers)
+    {
+        buffer.Reset();
+    }
+    m_SkinMatricesBuffers.clear();
+
     m_Snapshot = {};
 }
 
@@ -53,44 +60,46 @@ void AnimationSystem::AllocateSkinMatricesBuffer()
     VmaAllocationCreateInfo allocInfo{};
     allocInfo.usage = VMA_MEMORY_USAGE_CPU_TO_GPU;
 
-    VkBuffer buffer = nullptr;
-    if (vmaCreateBuffer(context.GetAllocator().get(),
-                        &bufferInfo,
-                        &allocInfo,
-                        &buffer,
-                        &m_SkinMatricesBuffer.Allocation,
-                        nullptr) != VK_SUCCESS)
+    for (int i = 0; i < VulkanContext::MaxFramesInFlight; ++i)
     {
-        KBRAssert(false, "Failed to create skin matrices buffer");
-        return;
+        m_SkinMatricesBuffers.emplace_back();
+
+        VkBuffer buffer = nullptr;
+        if (vmaCreateBuffer(context.GetAllocator().get(),
+                            &bufferInfo,
+                            &allocInfo,
+                            &buffer,
+                            &m_SkinMatricesBuffers[i].Allocation,
+                            nullptr) != VK_SUCCESS)
+        {
+            KBRAssert(false, "Failed to create skin matrices buffer");
+            return;
+        }
+
+        m_SkinMatricesBuffers[i].Handle = vk::Buffer(buffer);
+        vmaMapMemory(context.GetAllocator().get(), m_SkinMatricesBuffers[i].Allocation, &m_SkinMatricesBuffers[i].MappedData);
+        m_SkinMatricesBuffers[i].Size = bufferInfo.size;
+        m_SkinMatricesBuffers[i].DeviceAddress =
+            context.GetDevice().getBufferAddress({ .buffer = m_SkinMatricesBuffers[i].Handle });
+
+        context.SetObjectDebugName(reinterpret_cast<uint64_t>(static_cast<VkBuffer>(m_SkinMatricesBuffers[i].Handle)),
+                                   vk::ObjectType::eBuffer,
+                                   std::format("Animation Skin Matrices Buffer {}", i));
+        context.SetObjectDebugName(m_SkinMatricesBuffers[i].Allocation, std::format("Animation Skin Matrices Buffer Allocation {}", i));
+
+        std::memset(m_SkinMatricesBuffers[i].MappedData, 0, static_cast<size_t>(m_SkinMatricesBuffers[i].Size));
     }
-
-    m_SkinMatricesBuffer.Handle = vk::Buffer(buffer);
-    vmaMapMemory(context.GetAllocator().get(), m_SkinMatricesBuffer.Allocation, &m_SkinMatricesBuffer.MappedData);
-    m_SkinMatricesBuffer.Size = bufferInfo.size;
-    m_SkinMatricesBuffer.DeviceAddress =
-        context.GetDevice().getBufferAddress({ .buffer = m_SkinMatricesBuffer.Handle });
-
-    context.SetObjectDebugName(reinterpret_cast<uint64_t>(static_cast<VkBuffer>(m_SkinMatricesBuffer.Handle)),
-                               vk::ObjectType::eBuffer,
-                               "Animation Skin Matrices Buffer");
-    context.SetObjectDebugName(m_SkinMatricesBuffer.Allocation, "Animation Skin Matrices Buffer Allocation");
-
-    std::memset(m_SkinMatricesBuffer.MappedData, 0, static_cast<size_t>(m_SkinMatricesBuffer.Size));
 }
 
-void AnimationSystem::BeginFrame(const Ref<Scene>& scene, float dt, bool paused)
+void AnimationSystem::BeginFrame(const Ref<Scene>& scene, const uint32_t frameIndex, const float dt, const bool paused)
 {
     KBR_TRACY_FUNCTION();
-
-    (void)dt;
-    (void)paused;
 
     m_FrameSkeletons.clear();
 
     if (!scene)
     {
-        m_Snapshot.SkinMatrixBuffer = m_SkinMatricesBuffer.Handle;
+        m_Snapshot.SkinMatrixBuffer = m_SkinMatricesBuffers[frameIndex].Handle;
         m_Snapshot.Skeletons = std::span<const SkeletonFrame>{};
         return;
     }
@@ -132,7 +141,7 @@ void AnimationSystem::BeginFrame(const Ref<Scene>& scene, float dt, bool paused)
             }
 
             m_NextSkinMatrix += instance.JointCount;
-            WriteBindPose(instance);
+            WriteBindPose(instance, frameIndex);
             instance.SkinMatrixVersion = 1;
 
             it = m_Instances.emplace(entityUUID, instance).first;
@@ -167,19 +176,57 @@ void AnimationSystem::BeginFrame(const Ref<Scene>& scene, float dt, bool paused)
         }
     }
 
-    m_Snapshot.SkinMatrixBuffer = m_SkinMatricesBuffer.Handle;
+    m_Snapshot.SkinMatrixBuffer = m_SkinMatricesBuffers[frameIndex].Handle;
     m_Snapshot.Skeletons = std::span<const SkeletonFrame>(m_FrameSkeletons);
+
+    const auto animatorView = scene->m_Registry.view<AnimatorComponent>();
+    for (const auto entity : animatorView)
+    {
+        auto& animator = animatorView.get<AnimatorComponent>(entity);
+        
+        if (animator.IsPlaying && !paused)
+        {
+            animator.CurrentTime += dt * animator.PlaybackSpeed;
+        }
+
+        const Ref<AnimationClip> activeClip =
+            (animator.ActiveClip >= 0 && static_cast<size_t>(animator.ActiveClip) < animator.LoadedClips.size())
+                ? animator.LoadedClips[static_cast<size_t>(animator.ActiveClip)]
+                : nullptr;
+
+        const float duration = activeClip ? activeClip->GetDuration() : 0.0f;
+
+        if (duration >= 0.0f)
+        {
+            if (animator.IsLooping)
+            {
+                animator.CurrentTime = std::fmod(animator.CurrentTime, duration);
+                if (animator.CurrentTime < 0.0f)
+                {
+                    animator.CurrentTime += duration;
+                }
+            }
+            else
+            {
+                animator.CurrentTime = std::clamp(animator.CurrentTime, 0.0f, duration);
+                if (animator.CurrentTime >= duration)
+                {
+                    animator.IsPlaying = false;
+                }
+            }
+        }
+    }
 }
 
-void AnimationSystem::WriteBindPose(const SkeletonInstanceState& instance)
+void AnimationSystem::WriteBindPose(const SkeletonInstanceState& instance, const uint32_t frameIndex)
 {
     KBR_TRACY_FUNCTION();
 
-    if (!instance.Skeleton || m_SkinMatricesBuffer.MappedData == nullptr)
+    if (!instance.Skeleton || m_SkinMatricesBuffers[frameIndex].MappedData == nullptr)
         return;
 
     const auto& joints = instance.Skeleton->GetJoints();
-    auto* destination = static_cast<std::byte*>(m_SkinMatricesBuffer.MappedData) +
+    auto* destination = static_cast<std::byte*>(m_SkinMatricesBuffers[frameIndex].MappedData) +
         static_cast<size_t>(instance.FirstSkinMatrix) * sizeof(BoneMatrix);
 
     // Bind pose bone matrices are jointGlobal * inverseBind. With consistent glTF
@@ -205,9 +252,9 @@ void AnimationSystem::WriteBindPose(const SkeletonInstanceState& instance)
 
     const VkDeviceSize offset = static_cast<VkDeviceSize>(instance.FirstSkinMatrix) * sizeof(BoneMatrix);
     const VkDeviceSize size = static_cast<VkDeviceSize>(joints.size()) * sizeof(BoneMatrix);
-    vmaFlushAllocation(VulkanContext::Get().GetAllocator().get(), m_SkinMatricesBuffer.Allocation, offset, size);
+    vmaFlushAllocation(VulkanContext::Get().GetAllocator().get(), m_SkinMatricesBuffers[frameIndex].Allocation, offset, size);
 
-    m_Snapshot.SkinMatrixBuffer = m_SkinMatricesBuffer.Handle;
+    m_Snapshot.SkinMatrixBuffer = m_SkinMatricesBuffers[frameIndex].Handle;
 }
 
 void AnimationSystem::AddPasses(RenderGraph::Graph& graph, const uint32_t frameIndex)
@@ -223,6 +270,18 @@ const SkinningFrameSnapshot& AnimationSystem::GetSkinningSnapshot() const
     return m_Snapshot;
 }
 
+vk::Buffer AnimationSystem::GetSkinMatricesBuffer(const uint32_t frameIndex) const
+{
+    KBRAssert(frameIndex < m_SkinMatricesBuffers.size(),"Invalid frame index for skin matrices buffer");
+    return m_SkinMatricesBuffers[frameIndex].Handle;
+}
+
+vk::DeviceSize AnimationSystem::GetSkinMatricesBufferSize(const uint32_t frameIndex) const
+{
+    KBRAssert(frameIndex < m_SkinMatricesBuffers.size(), "Invalid frame index for skin matrices buffer");
+    return m_SkinMatricesBuffers[frameIndex].Size;
+}
+
 void AnimationSystem::RecompileShaders() const
 {
     // No animation pipelines exist in the bind-pose milestone.
@@ -235,7 +294,7 @@ void AnimationSystem::Reset()
     m_NextSkinMatrix = 0;
     m_NextInstanceId = 0;
 
-    m_Snapshot.SkinMatrixBuffer = m_SkinMatricesBuffer.Handle;
+    m_Snapshot.SkinMatrixBuffer = m_SkinMatricesBuffers[0].Handle;
     m_Snapshot.Skeletons = std::span<const SkeletonFrame>{};
 }
 

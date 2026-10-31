@@ -1399,7 +1399,7 @@ void Renderer::RecordQueuedSceneRender(const vk::raii::CommandBuffer& cmd)
         s_Data->LastRenderedScene = s_Data->PendingRender.Scene.get();
     }
 
-    s_Data->AnimationSystem.BeginFrame(s_Data->PendingRender.Scene, s_Data->PendingRender.DeltaTime, s_Data->PendingRender.Scene->IsPaused());
+    s_Data->AnimationSystem.BeginFrame(s_Data->PendingRender.Scene, frameIndex, s_Data->PendingRender.DeltaTime, s_Data->PendingRender.Scene->IsPaused());
     s_Data->SkinningSystem.BeginFrame(s_Data->PendingRender.Scene, s_Data->AnimationSystem.GetSkinningSnapshot());
 
     if (IsUsingAccelerationStructures()) {
@@ -2607,8 +2607,8 @@ void Renderer::CreateResources()
 
     s_Data->AnimationSystem.Initialize(s_Data->PersistentDescriptorAllocator);
     s_Data->SkinningSystem.Initialize(s_Data->PersistentDescriptorAllocator,
-                                      s_Data->AnimationSystem.GetSkinMatricesBuffer(),
-                                      s_Data->AnimationSystem.GetSkinMatricesBufferSize());
+                                      s_Data->AnimationSystem.GetSkinMatricesBuffer(0),
+                                      s_Data->AnimationSystem.GetSkinMatricesBufferSize(0));
 
     s_Data->ParticleSystem.Initialize(s_Data->ColorImage.Format,
                                       s_Data->DepthImage.Format,
