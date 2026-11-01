@@ -1364,7 +1364,9 @@ namespace PROJECT_NAME
 		ImGui::Checkbox("Display physics colliders", &Renderer::GetDisplayPhysicsColliders());
 
 		bool &useRayQueryBasedShadows = Renderer::GetUseRayQueryBasedShadows();
+		ImGui::BeginDisabled(!Renderer::IsRayTracingSupported());
 		ImGui::Checkbox("Ray query based shadows", &useRayQueryBasedShadows);
+		ImGui::EndDisabled();
 		if (useRayQueryBasedShadows)
 		{
 			ImGui::Indent();

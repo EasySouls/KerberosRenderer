@@ -24,11 +24,27 @@ namespace Kerberos
         Cleanup();
 	}
 
+	bool GrassSystem::IsSupportedByDevice()
+	{
+		const auto& context = VulkanContext::Get();
+
+		return context.SupportsMeshShaders() && context.SupportsShaderObjects() && context.UseDescriptorBuffers();
+	}
+
 	void GrassSystem::Init(const Owner<DescriptorAllocator>& allocator)
 	{
 		KBR_TRACY_FUNCTION();
 
         m_DescriptorAllocator = allocator.get();
+
+        if (!IsSupportedByDevice())
+        {
+            Log::CoreWarn("Grass rendering disabled: it requires mesh shaders, shader objects and descriptor buffers, "
+                          "which this device does not provide");
+            return;
+        }
+
+        m_Supported = true;
 
 		InitGrassDataBuffer();
 		InitDescriptorLayouts();
@@ -39,6 +55,9 @@ namespace Kerberos
 	void GrassSystem::RecordDraw(const vk::raii::CommandBuffer& cmd, uint32_t /*frameIndex*/, const GrassConstants& constants)
 	{
 		KBR_TRACY_FUNCTION();
+
+		if (!m_Supported)
+			return;
 
 		SetDefaultGraphicsState(cmd);
 
@@ -321,6 +340,9 @@ namespace Kerberos
 
     void GrassSystem::Cleanup() const
     {
+        if (m_ChunkBuffer.allocation == nullptr)
+            return; // Init() was skipped because the device does not support the required features.
+
         const auto allocator = VulkanContext::Get().GetAllocator().get();
 
         vmaUnmapMemory(allocator, m_ChunkBuffer.allocation);

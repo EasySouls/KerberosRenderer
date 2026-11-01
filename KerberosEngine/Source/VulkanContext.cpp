@@ -1173,6 +1173,29 @@ namespace Kerberos
 		return IsExtensionActive(vk::EXTDescriptorBufferExtensionName);
 	}
 
+	bool VulkanContext::SupportsMeshShaders() const
+	{
+		if (!IsExtensionActive(vk::EXTMeshShaderExtensionName))
+			return false;
+
+		const auto& features = m_SupportedFeatures.get<vk::PhysicalDeviceMeshShaderFeaturesEXT>();
+		return features.meshShader && features.taskShader;
+	}
+
+	bool VulkanContext::SupportsShaderObjects() const
+	{
+		return IsExtensionActive(vk::EXTShaderObjectExtensionName) &&
+			m_SupportedFeatures.get<vk::PhysicalDeviceShaderObjectFeaturesEXT>().shaderObject;
+	}
+
+	bool VulkanContext::SupportsRayTracing() const
+	{
+		return IsExtensionActive(vk::KHRAccelerationStructureExtensionName) &&
+			IsExtensionActive(vk::KHRRayQueryExtensionName) &&
+			m_SupportedFeatures.get<vk::PhysicalDeviceAccelerationStructureFeaturesKHR>().accelerationStructure &&
+			m_SupportedFeatures.get<vk::PhysicalDeviceRayQueryFeaturesKHR>().rayQuery;
+	}
+
 	VulkanContext::QueueFamilyInfo VulkanContext::FindQueueFamilies(const vk::raii::PhysicalDevice& physicalDevice, const vk::raii::SurfaceKHR& surface)
 	{
 		QueueFamilyInfo queueFamilyInfo{};

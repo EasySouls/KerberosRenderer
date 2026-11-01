@@ -152,6 +152,12 @@ namespace Kerberos
 		bool IsExtensionActive(const char* extensionName) const;
 		bool UseDescriptorBuffers() const;
 
+		// Optional-feature gates. Renderer subsystems that require an optional extension must ask these before
+		// creating layouts, pipelines or resources, because creating them without the extension is invalid Vulkan.
+		bool SupportsMeshShaders() const;
+		bool SupportsShaderObjects() const;
+		bool SupportsRayTracing() const;
+
 		static vk::DescriptorSet GenerateImGuiDescriptorSet(const vk::raii::Sampler& sampler,
 															const vk::raii::ImageView& imageView, 
 															vk::ImageLayout imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal);

@@ -1096,7 +1096,7 @@ void Renderer::RenderOpaque(const vk::raii::CommandBuffer& cmd,
     }
     
     {
-        if (s_Data->UseRayQueryBasedShadows) {
+        if (s_Data->UseRayQueryBasedShadows && s_Data->PBRRayQueryShadowsPipeline) {
             const auto& pipeline = GetUseRayQueryBasedSoftShadows() ? s_Data->PBRRayQuerySoftShadowsPipeline
                                        : s_Data->PBRRayQueryShadowsPipeline;
             pipeline->Bind(cmd);
@@ -1854,7 +1854,12 @@ void Renderer::CreateResources()
         };
 
         s_Data->MeshPipelineStatisticsQueryPools.clear();
-        s_Data->MeshPipelineStatisticsQueryPools.reserve(context.GetMaxFramesInFlight());
+        // Task/mesh statistics flags are only valid when the mesh shader extension and its query feature are
+        // enabled, so the pool is skipped on devices without mesh shaders (e.g. integrated GPUs).
+        const bool supportsMeshPipelineStatistics = context.SupportsMeshShaders();
+        if (supportsMeshPipelineStatistics) {
+            s_Data->MeshPipelineStatisticsQueryPools.reserve(context.GetMaxFramesInFlight());
+        }
 
         constexpr vk::QueryPoolCreateInfo meshQueryPoolInfo{
             .flags = {}, // vk::QueryPoolCreateFlagBits::eResetKHR,
@@ -1874,12 +1879,15 @@ void Renderer::CreateResources()
                 // first render to reset it
                 cmd.resetQueryPool(s_Data->PipelineStatisticsQueryPools.back(), 0, 2);
 
-                s_Data->MeshPipelineStatisticsQueryPools.emplace_back(device, meshQueryPoolInfo);
-                context.SetObjectDebugName(s_Data->MeshPipelineStatisticsQueryPools.back(),
-                                           "Renderer Mesh Pipeline Statistics Query Pool[" + std::to_string(i) + "]");
-                // Reset query pool at the beginning so that we can immediately start using it without waiting for the
-                // first render to reset it
-                cmd.resetQueryPool(s_Data->MeshPipelineStatisticsQueryPools.back(), 0, 1);
+                if (supportsMeshPipelineStatistics) {
+                    s_Data->MeshPipelineStatisticsQueryPools.emplace_back(device, meshQueryPoolInfo);
+                    context.SetObjectDebugName(
+                        s_Data->MeshPipelineStatisticsQueryPools.back(),
+                        "Renderer Mesh Pipeline Statistics Query Pool[" + std::to_string(i) + "]");
+                    // Reset query pool at the beginning so that we can immediately start using it without waiting for
+                    // the first render to reset it
+                    cmd.resetQueryPool(s_Data->MeshPipelineStatisticsQueryPools.back(), 0, 1);
+                }
             }
         });
     }
@@ -2529,27 +2537,38 @@ void Renderer::CreateResources()
         opaquePipelineSpec.Name = "PBR Opaque Pipeline with PCF Shadows";
         s_Data->PBROpaquePipelinePCF = CreateRef<GraphicsPipeline>(opaquePipelineSpec);
 
-        Ref<Shader> pbrRayQueryShadowsShader = CreateRef<Shader>("pbr_ray_query_shadows", "PBR Ray Query Shadows");
+        if (context.SupportsRayTracing()) {
+            Ref<Shader> pbrRayQueryShadowsShader =
+                CreateRef<Shader>("pbr_ray_query_shadows", "PBR Ray Query Shadows");
 
-        uint32_t enableRayQuerySoftShadows = 0;
-        vk::SpecializationMapEntry rayQuerySoftShadowsSpecializationMapEntry{ .constantID = 0,
-                                                                              .offset = 0,
-                                                                              .size = sizeof(uint32_t) };
-        vk::SpecializationInfo rayQuerySoftShadowsSpecializationInfo{ .mapEntryCount = 1,
-                                                                      .pMapEntries =
-                                                                          &rayQuerySoftShadowsSpecializationMapEntry,
-                                                                      .dataSize = sizeof(uint32_t),
-                                                                      .pData = &enableRayQuerySoftShadows };
+            uint32_t enableRayQuerySoftShadows = 0;
+            vk::SpecializationMapEntry rayQuerySoftShadowsSpecializationMapEntry{ .constantID = 0,
+                                                                                  .offset = 0,
+                                                                                  .size = sizeof(uint32_t) };
+            vk::SpecializationInfo rayQuerySoftShadowsSpecializationInfo{ .mapEntryCount = 1,
+                                                                          .pMapEntries =
+                                                                              &rayQuerySoftShadowsSpecializationMapEntry,
+                                                                          .dataSize = sizeof(uint32_t),
+                                                                          .pData = &enableRayQuerySoftShadows };
 
-        opaquePipelineSpec.Name = "PBR Ray Query Shadows Pipeline";
-        opaquePipelineSpec.Shader = pbrRayQueryShadowsShader;
-        opaquePipelineSpec.SpecializationMapEntries = { { vk::ShaderStageFlagBits::eFragment,
-                                                          rayQuerySoftShadowsSpecializationInfo } };
-        s_Data->PBRRayQueryShadowsPipeline = CreateRef<GraphicsPipeline>(opaquePipelineSpec);
+            opaquePipelineSpec.Name = "PBR Ray Query Shadows Pipeline";
+            opaquePipelineSpec.Shader = pbrRayQueryShadowsShader;
+            opaquePipelineSpec.SpecializationMapEntries = { { vk::ShaderStageFlagBits::eFragment,
+                                                              rayQuerySoftShadowsSpecializationInfo } };
+            s_Data->PBRRayQueryShadowsPipeline = CreateRef<GraphicsPipeline>(opaquePipelineSpec);
 
-        enableRayQuerySoftShadows = 1;
-        opaquePipelineSpec.Name = "PBR Ray Query Soft Shadows Pipeline";
-        s_Data->PBRRayQuerySoftShadowsPipeline = CreateRef<GraphicsPipeline>(opaquePipelineSpec);
+            enableRayQuerySoftShadows = 1;
+            opaquePipelineSpec.Name = "PBR Ray Query Soft Shadows Pipeline";
+            s_Data->PBRRayQuerySoftShadowsPipeline = CreateRef<GraphicsPipeline>(opaquePipelineSpec);
+        }
+        else {
+            Log::CoreWarn("Ray query based shadows disabled: the device does not provide acceleration structures "
+                          "and ray queries");
+            s_Data->PBRRayQueryShadowsPipeline = nullptr;
+            s_Data->PBRRayQuerySoftShadowsPipeline = nullptr;
+            s_Data->UseRayQueryBasedShadows = false;
+            s_Data->UseRayQueryBasedSoftShadows = false;
+        }
 
         Ref<Shader> normalDebugShader = CreateRef<Shader>("normaldebug", "NormalDebug");
 
@@ -4138,12 +4157,14 @@ void Renderer::ResetQueryPools(const vk::raii::CommandBuffer& cmd, const uint32_
 
         cmd.resetQueryPool(s_Data->PipelineStatisticsQueryPools[frameIndex], 0, 2);
 
-        KBRAssert(frameIndex < s_Data->MeshPipelineStatisticsQueryPools.size(),
-                        "Current frame index exceeds Mesh Pipeline Statistics Query Pools size!");
-        KBRAssert(s_Data->MeshPipelineStatisticsQueryPools[frameIndex] != nullptr,
-                        "Mesh Pipeline Statistics Query Pool for current frame is null!");
+        if (!s_Data->MeshPipelineStatisticsQueryPools.empty()) {
+            KBRAssert(frameIndex < s_Data->MeshPipelineStatisticsQueryPools.size(),
+                      "Current frame index exceeds Mesh Pipeline Statistics Query Pools size!");
+            KBRAssert(s_Data->MeshPipelineStatisticsQueryPools[frameIndex] != nullptr,
+                      "Mesh Pipeline Statistics Query Pool for current frame is null!");
 
-        cmd.resetQueryPool(s_Data->MeshPipelineStatisticsQueryPools[frameIndex], 0, 1);
+            cmd.resetQueryPool(s_Data->MeshPipelineStatisticsQueryPools[frameIndex], 0, 1);
+        }
     }
 }
 
@@ -4158,11 +4179,6 @@ void Renderer::ResolvePipelineStatistics(const uint32_t frameIndex)
                     "Current frame index exceeds Pipeline Statistics Query Pools size!");
     KBRAssert(s_Data->PipelineStatisticsQueryPools[frameIndex] != nullptr,
                     "Pipeline Statistics Query Pool for current frame is null!");
-
-    KBRAssert(frameIndex < s_Data->MeshPipelineStatisticsQueryPools.size(),
-                    "Current frame index exceeds Mesh Pipeline Statistics Query Pools size!");
-    KBRAssert(s_Data->MeshPipelineStatisticsQueryPools[frameIndex] != nullptr,
-                    "Mesh Pipeline Statistics Query Pool for current frame is null!");
 
     // Traditional pipeline statistics
 
@@ -4192,6 +4208,9 @@ void Renderer::ResolvePipelineStatistics(const uint32_t frameIndex)
     s_Data->LatestPipelineStatistics.FragmentShaderInvocations = results[3] + results[7];
 
     // Mesh pipeline statistics
+    if (s_Data->MeshPipelineStatisticsQueryPools.empty())
+        return;
+
     constexpr uint32_t statisticsPerMeshQuery = 3;
     constexpr uint32_t totalMeshStatisticsCount = statisticsPerMeshQuery * 1;
     std::array<uint64_t, totalMeshStatisticsCount> meshResults{};
@@ -4885,15 +4904,22 @@ void Renderer::CompileAndExecuteRenderGraph(const vk::raii::CommandBuffer& cmd,
                           vk::AccessFlagBits2::eDepthStencilAttachmentWrite |
                           vk::AccessFlagBits2::eDepthStencilAttachmentRead);
 
+            const bool grassSupported = s_Data->GrassSystem.IsSupported();
+
             return [=](const vk::raii::CommandBuffer& execCmd)
             {
                 execCmd.endQuery(s_Data->PipelineStatisticsQueryPools[frameIndex], 0);
 
-                execCmd.beginQuery(s_Data->MeshPipelineStatisticsQueryPools[frameIndex], 0, {});
+                // The mesh statistics pool only exists on devices with mesh shaders, and grass rendering also
+                // requires shader objects and descriptor buffers.
+                if (grassSupported)
+                {
+                    execCmd.beginQuery(s_Data->MeshPipelineStatisticsQueryPools[frameIndex], 0, {});
 
-                RenderGrass(execCmd, frameIndex);
+                    RenderGrass(execCmd, frameIndex);
 
-                execCmd.endQuery(s_Data->MeshPipelineStatisticsQueryPools[frameIndex], 0);
+                    execCmd.endQuery(s_Data->MeshPipelineStatisticsQueryPools[frameIndex], 0);
+                }
 
                 execCmd.beginQuery(s_Data->PipelineStatisticsQueryPools[frameIndex], 1, {});
             };
@@ -6373,7 +6399,15 @@ void Renderer::ApplyDeferredActions()
 
 bool Renderer::IsUsingAccelerationStructures()
 {
+    if (!VulkanContext::Get().SupportsRayTracing())
+        return false;
+
     return s_Data->UseRayQueryBasedShadows || s_Data->UseRayQueryBasedSoftShadows;
+}
+
+bool Renderer::IsRayTracingSupported()
+{
+    return VulkanContext::Get().SupportsRayTracing();
 }
 
 void Renderer::PrepareUniformBuffers()
@@ -6421,12 +6455,16 @@ void Renderer::SetupDescriptors()
         vk::DescriptorPoolSize{ .type = vk::DescriptorType::eUniformBuffer, .descriptorCount = 10 },
         vk::DescriptorPoolSize{ .type = vk::DescriptorType::eUniformBufferDynamic, .descriptorCount = 10 },
         vk::DescriptorPoolSize{ .type = vk::DescriptorType::eCombinedImageSampler, .descriptorCount = 100 },
-        vk::DescriptorPoolSize{ .type = vk::DescriptorType::eAccelerationStructureKHR, .descriptorCount = 2 },
         vk::DescriptorPoolSize{ .type = vk::DescriptorType::eStorageBuffer, .descriptorCount = 10 },
         vk::DescriptorPoolSize{ .type = vk::DescriptorType::eStorageImage, .descriptorCount = 20 },
         vk::DescriptorPoolSize{ .type = vk::DescriptorType::eSampledImage, .descriptorCount = 20 },
         vk::DescriptorPoolSize{ .type = vk::DescriptorType::eSampler, .descriptorCount = 10 },
     };
+
+    if (context.SupportsRayTracing()) {
+        poolSizes.push_back(
+            vk::DescriptorPoolSize{ .type = vk::DescriptorType::eAccelerationStructureKHR, .descriptorCount = 2 });
+    }
 
     vk::DescriptorPoolCreateInfo poolInfo{ .flags = vk::DescriptorPoolCreateFlagBits::eFreeDescriptorSet,
                                            .maxSets = 200,
@@ -6485,12 +6523,6 @@ void Renderer::SetupDescriptors()
             .descriptorCount = 1,
             .stageFlags = vk::ShaderStageFlagBits::eFragment,
             .pImmutableSamplers = nullptr },
-        vk::DescriptorSetLayoutBinding{ // TLAS
-            .binding = 7,
-            .descriptorType = vk::DescriptorType::eAccelerationStructureKHR,
-            .descriptorCount = 1,
-            .stageFlags = vk::ShaderStageFlagBits::eFragment,
-            .pImmutableSamplers = nullptr },
         vk::DescriptorSetLayoutBinding{ // Light storage buffer
             .binding = 8,
             .descriptorType = vk::DescriptorType::eStorageBuffer,
@@ -6504,6 +6536,17 @@ void Renderer::SetupDescriptors()
             .stageFlags = vk::ShaderStageFlagBits::eFragment,
             .pImmutableSamplers = nullptr },
     };
+
+    // The TLAS binding is only legal when the device enabled VK_KHR_acceleration_structure, so the ray query
+    // pipeline variants (which are the only consumers of binding 7) are created under the same condition.
+    if (context.SupportsRayTracing()) {
+        bindings.push_back(vk::DescriptorSetLayoutBinding{ // TLAS
+            .binding = 7,
+            .descriptorType = vk::DescriptorType::eAccelerationStructureKHR,
+            .descriptorCount = 1,
+            .stageFlags = vk::ShaderStageFlagBits::eFragment,
+            .pImmutableSamplers = nullptr });
+    }
 
     const vk::DescriptorSetLayoutCreateInfo layoutInfo{ .bindingCount = static_cast<uint32_t>(bindings.size()),
                                                         .pBindings = bindings.data() };

@@ -51,6 +51,29 @@ Dedicated compute/transfer queues may be selected, while optional descriptor
 buffer, mesh shader, shader object, ray query, and acceleration-structure
 features are enabled when available.
 
+Optional extensions are enabled whenever the physical device advertises them,
+so subsystems that need one must gate on capability, not on the extension
+being compiled in. `VulkanContext::IsExtensionActive`/`UseDescriptorBuffers`
+answers that for the active device, and `SupportsMeshShaders`,
+`SupportsShaderObjects`, and `SupportsRayTracing` also check the enabled
+features. Creating a layout, pipeline, query pool, or buffer usage that belongs
+to a disabled extension is invalid Vulkan (and aborts on drivers that lack the
+entry point), so:
+
+- grass (`GrassSystem::IsSupportedByDevice`) needs mesh shaders, shader objects,
+  and descriptor buffers; otherwise `Init` logs and skips and `RecordDraw` is a
+  no-op;
+- task/mesh pipeline-statistics query pools are only created with mesh shaders,
+  and the reset/resolve paths tolerate their absence;
+- the ray-query PBR pipelines, the scene set's TLAS binding (7), the
+  acceleration-structure pool entry, and the TLAS descriptor write only exist
+  when ray tracing is supported, and `Renderer::IsUsingAccelerationStructures`
+  reports false otherwise (the editor disables the toggle through
+  `Renderer::IsRayTracingSupported`);
+- vertex/index buffers only request
+  `ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_KHR` when the acceleration
+  structure extension is active.
+
 Swapchain format/present-mode selection and image-count rules live in
 `VulkanContext.cpp`. Swapchain recreation rebuilds swapchain-owned views,
 color, and depth resources, but does not recreate renderer-owned offscreen
@@ -97,6 +120,10 @@ skinning pass currently ends with an explicit compute-write to vertex-read
 barrier because the SVB is bound directly by raster passes and is not declared
 as a render-graph resource.
 
+The grass pass is always registered so the pipeline-statistics query split
+(`query 0` ends, `query 1` begins) stays balanced, but its mesh-statistics query
+and the grass draw only run when grass is supported on the device.
+
 When FSR3 is active, the spatial anti-aliasing pass is skipped and FSR3
 consumes the pre-AA HDR resolve so its internal temporal history receives the
 original jittered samples. Native presentation continues to use the
@@ -123,6 +150,18 @@ Renderer resources must remain alive until all submitted frames that use them
 complete. Deferred renderer actions currently use a device-wide wait to make
 resource mutation safe; preserve that guarantee unless introducing explicit
 per-resource synchronization.
+
+`DescriptorAllocator` (persistent and per-frame slots) owns every descriptor
+set it hands out: sets are allocated from its pool and ownership stays with
+that pool, so `ShaderResourceSet::DescriptorSet` is a non-owning handle. Do not
+wrap the result of `allocateDescriptorSets` in a temporary RAII handle that is
+destroyed at the end of the statement; the set would be freed immediately.
+`Reset()` destroys the pool contents, so a set from a frame slot is only valid
+for that frame slot. `DescriptorAllocator` has two backends: descriptor buffers
+(`VK_EXT_descriptor_buffer`, bump-allocated from a mapped buffer, `BufferAddress`
+/`BufferOffset`/`MappedData`) and traditional descriptor sets (`DescriptorSet`, a
+pool). GPUs without descriptor-buffer support take the traditional path, so both
+paths must stay exercised.
 
 Buffers use a mixture of device-local staging allocations and persistently
 mapped host-visible uniform/storage buffers. Images/textures own their Vulkan

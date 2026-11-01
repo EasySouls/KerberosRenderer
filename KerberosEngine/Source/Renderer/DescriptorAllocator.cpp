@@ -70,6 +70,9 @@ namespace Kerberos
 	{
 		KBR_TRACY_FUNCTION();
 
+		if (!m_UseDescriptorBuffers)
+			return; // The traditional path owns no VMA allocation.
+
 		const auto& allocator = VulkanContext::Get().GetAllocator().get();
 
 		vmaUnmapMemory(allocator, m_Allocation);
@@ -106,9 +109,9 @@ namespace Kerberos
 #ifdef KBR_DEBUG
 			if (!debugName.empty())
 			{
-				m_AllocationDebugNames[m_CurrentOffset] = debugName;
+				m_AllocationDebugNames[set.BufferOffset] = debugName;
 
-				Kerberos::Log::CoreTrace("Descriptor Allocator: Bound '{}' at offset {} (size {})", debugName, m_CurrentOffset, layoutSize);
+				Kerberos::Log::CoreTrace("Descriptor Allocator: Bound '{}' at offset {} (size {})", debugName, set.BufferOffset, layoutSize);
 			}
 #else
 			(void)debugName;
@@ -121,7 +124,13 @@ namespace Kerberos
 				.descriptorSetCount = 1,
 				.pSetLayouts = &(*layout)
 			};
-			set.DescriptorSet = std::move(device.allocateDescriptorSets(allocInfo).front());
+
+			// vk::raii::DescriptorSet frees itself in its destructor. Converting it to the raw
+			// handle (as this used to do) keeps only the handle and destroys the RAII owner at the
+			// end of the statement, which immediately frees the freshly allocated set back to the
+			// pool and leaves ShaderResourceSet pointing at an invalid handle. Release ownership to
+			// the pool instead: the set then stays valid until Reset() or the pool is destroyed.
+			set.DescriptorSet = device.allocateDescriptorSets(allocInfo).front().release();
 		}
 
 		return set;
