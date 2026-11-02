@@ -1,6 +1,7 @@
 include(GoogleTest)
 
 add_executable(KerberosEngineTests
+    AnimationEvaluatorTests.cpp
     GLTFImportTests.cpp
     ProjectLoadTests.cpp
 )

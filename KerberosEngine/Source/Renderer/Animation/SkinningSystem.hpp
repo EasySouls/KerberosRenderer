@@ -7,8 +7,9 @@
 #include "Renderer/Graph.hpp"
 #include "Renderer/VulkanBuffer.hpp"
 #include "Scene/Scene.hpp"
+#include "VulkanContext.hpp"
 
-#include <limits>
+#include <array>
 #include <optional>
 #include <unordered_map>
 #include <vector>
@@ -21,11 +22,11 @@ class SkinningSystem
 {
 public:
     void Initialize(const Owner<DescriptorAllocator>& allocator,
-                    vk::Buffer skinMatricesBuffer,
-                    vk::DeviceSize skinMatricesBufferSize);
+                    const std::vector<vk::Buffer>& skinMatricesBuffers,
+                    const std::vector<vk::DeviceSize>& skinMatricesBufferSizes);
     void Shutdown();
 
-    void BeginFrame(const Ref<Scene>& scene, const SkinningFrameSnapshot& snapshot);
+    void BeginFrame(const Ref<Scene>& scene, const SkinningFrameSnapshot& snapshot, uint32_t frameIndex);
     void AddPasses(RenderGraph::Graph& graph, uint32_t frameIndex) const;
 
     std::optional<SkinnedDrawView> FindMesh(UUID meshEntity) const;
@@ -50,7 +51,8 @@ private:
         MeshGpuSlice Slice{};
         uint32_t OutputFirstVertex = 0;
         uint32_t OutputVertexCount = 0;
-        uint64_t LastSkinnedVersion = std::numeric_limits<uint64_t>::max();
+        // Pose versions are >= 1, so zero means "never skinned on this frame slot".
+        std::array<uint64_t, VulkanContext::MaxFramesInFlight> LastSkinnedVersions{};
         bool Initialized = false;
         SkinnedDrawView View{};
     };
@@ -70,7 +72,7 @@ private:
 
     void AllocateBuffers();
     void SetupDescriptors();
-    void AllocateDescriptorSet();
+    void AllocateDescriptorSets();
     void SetupPipeline();
 
     void UploadMesh(AssetHandle handle, const Ref<SkeletalMesh>& mesh);
@@ -85,7 +87,7 @@ private:
     vk::raii::PipelineLayout m_SkinningPipelineLayout = nullptr;
 
     Ref<ComputePipeline> m_SkinningPipeline = nullptr;
-    ShaderResourceSet m_SkinningSet{};
+    std::vector<ShaderResourceSet> m_SkinningSets;
 
     VulkanBuffer m_InputVerticesBuffer{};
     VulkanBuffer m_OutputVerticesBuffer{};
@@ -93,9 +95,9 @@ private:
     VulkanBuffer m_JointWeightsBuffer{};
     VulkanBuffer m_SharedIndexBuffer{};
 
-    // Owned by AnimationSystem, referenced by the skinning descriptor set.
-    vk::Buffer m_SkinMatricesBuffer = nullptr;
-    vk::DeviceSize m_SkinMatricesBufferSize = 0;
+    // Owned by AnimationSystem, referenced by the per-frame skinning descriptor sets.
+    std::vector<vk::Buffer> m_SkinMatricesBuffers;
+    std::vector<vk::DeviceSize> m_SkinMatricesBufferSizes;
 
     uint32_t m_NextSourceVertex = 0;
     uint32_t m_NextIndex = 0;

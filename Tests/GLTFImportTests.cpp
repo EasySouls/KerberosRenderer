@@ -3,6 +3,9 @@
 #include "Assets/Formats/NativeAssetSerializer.hpp"
 #include "Assets/Formats/SkeletonFormat.hpp"
 #include "Assets/Importers/GLTFSceneImporter.hpp"
+#include "Renderer/Animation/AnimationClip.hpp"
+#include "Renderer/Animation/AnimationEvaluator.hpp"
+#include "Renderer/Animation/Skeleton.hpp"
 #include "Renderer/Animation/SkeletalMesh.hpp"
 
 #include <gtest/gtest.h>
@@ -11,7 +14,10 @@
 #include <glm/gtc/quaternion.hpp>
 #include <glm/gtx/quaternion.hpp>
 
+#include <algorithm>
+#include <cmath>
 #include <filesystem>
+#include <limits>
 #include <vector>
 
 import Kerberos;
@@ -130,4 +136,118 @@ TEST_F(GLTFImportTest, ImportsCesiumManSkeletonAnimationAndSkinnedMesh)
 	EXPECT_EQ(skinnedMesh.VertexStride, sizeof(Kerberos::SkinVertex));
 	EXPECT_GT(skinnedMesh.VertexData.size(), 0u);
 	EXPECT_FALSE(skinnedMesh.Indices.empty());
+}
+
+TEST_F(GLTFImportTest, EvaluatesImportedCesiumManAnimation)
+{
+	const std::filesystem::path source =
+		std::filesystem::path{ KBR_SOURCE_DIR } / "KerberosEditor" / "Assets" / "Models"
+		/ "CesiumMan" / "glTF" / "CesiumMan.gltf";
+	ASSERT_TRUE(std::filesystem::exists(source)) << source.string();
+
+	ASSERT_TRUE(Kerberos::GLTFSceneImporter::Import(source, m_Output, "CesiumMan", nullptr));
+
+	const auto skeletonPath = FindArtifact(m_Output, ".kbrskeleton");
+	const auto animationPath = FindArtifact(m_Output, ".kbranimation");
+	ASSERT_FALSE(skeletonPath.empty());
+	ASSERT_FALSE(animationPath.empty());
+
+	Kerberos::SkeletonFile skeletonFile;
+	ASSERT_TRUE(Kerberos::NativeAssetSerializer::DeserializeSkeleton(skeletonPath, skeletonFile));
+
+	Kerberos::AnimationClipFile animationFile;
+	ASSERT_TRUE(Kerberos::NativeAssetSerializer::DeserializeAnimationClip(animationPath, animationFile));
+
+	std::vector<Kerberos::SkeletonJoint> joints;
+	joints.reserve(skeletonFile.Joints.size());
+	for (const Kerberos::SkeletonJointFile& jointFile : skeletonFile.Joints)
+	{
+		Kerberos::SkeletonJoint joint{};
+		joint.Name = jointFile.Name;
+		joint.Parent = jointFile.ParentJoint;
+		joint.SourceNode = jointFile.SourceNode;
+		joint.RestTranslation = jointFile.RestTranslation;
+		joint.RestRotation = jointFile.RestRotation;
+		joint.RestScale = jointFile.RestScale;
+		joint.InverseBind = jointFile.InverseBind;
+		joints.push_back(std::move(joint));
+	}
+	const Kerberos::Skeleton skeleton(joints);
+
+	std::vector<Kerberos::AnimationTrack> tracks;
+	tracks.reserve(animationFile.Tracks.size());
+	for (const Kerberos::AnimationTrackFile& trackFile : animationFile.Tracks)
+	{
+		const auto path = [&trackFile]() -> Kerberos::AnimationPath
+		{
+			switch (trackFile.Path)
+			{
+			case Kerberos::AnimTrackPath::Translation: return Kerberos::AnimationPath::Translation;
+			case Kerberos::AnimTrackPath::Rotation: return Kerberos::AnimationPath::Rotation;
+			case Kerberos::AnimTrackPath::Scale: return Kerberos::AnimationPath::Scale;
+			}
+			return Kerberos::AnimationPath::Translation;
+		}();
+
+		const auto interpolation = [&trackFile]() -> Kerberos::AnimationInterpolation
+		{
+			switch (trackFile.Interpolation)
+			{
+			case Kerberos::AnimationClipInterpolation::Linear: return Kerberos::AnimationInterpolation::Linear;
+			case Kerberos::AnimationClipInterpolation::Step: return Kerberos::AnimationInterpolation::Step;
+			case Kerberos::AnimationClipInterpolation::CubicSpline: return Kerberos::AnimationInterpolation::CubicSpline;
+			}
+			return Kerberos::AnimationInterpolation::Linear;
+		}();
+
+		Kerberos::AnimationTrack track{};
+		track.Joint = static_cast<uint32_t>(trackFile.JointIndex);
+		track.Path = path;
+		track.Interpolation = interpolation;
+		track.Times = trackFile.Times;
+		track.Values = trackFile.Values;
+		track.InTangents = trackFile.InTangents;
+		track.OutTangents = trackFile.OutTangents;
+		tracks.push_back(std::move(track));
+	}
+
+	const Kerberos::AnimationClip clip(animationFile.Name, tracks, animationFile.DurationSeconds);
+	const Kerberos::ClipTrackCache cache = Kerberos::BuildClipTrackCache(skeleton, clip);
+	EXPECT_EQ(cache.IgnoredTrackCount, 0u);
+
+	const auto maxDifference = [](const Kerberos::SkeletonPose& a, const Kerberos::SkeletonPose& b)
+	{
+		float maxDifference = 0.0f;
+		if (a.SkinMatrices.size() != b.SkinMatrices.size())
+			return std::numeric_limits<float>::infinity();
+
+		for (size_t jointIndex = 0; jointIndex < a.SkinMatrices.size(); ++jointIndex)
+		{
+			for (int column = 0; column < 4; ++column)
+			{
+				for (int row = 0; row < 4; ++row)
+				{
+					maxDifference = std::max(maxDifference,
+					                         std::abs(a.SkinMatrices[jointIndex][column][row] -
+					                                  b.SkinMatrices[jointIndex][column][row]));
+				}
+			}
+		}
+		return maxDifference;
+	};
+
+	Kerberos::SkeletonPose firstPose;
+	Kerberos::EvaluatePose(skeleton, clip, cache, 0.0f, firstPose);
+
+	float largestChange = 0.0f;
+	for (int sampleIndex = 1; sampleIndex <= 4; ++sampleIndex)
+	{
+		const float time = animationFile.DurationSeconds * static_cast<float>(sampleIndex) / 5.0f;
+
+		Kerberos::SkeletonPose sampledPose;
+		Kerberos::EvaluatePose(skeleton, clip, cache, time, sampledPose);
+		largestChange = std::max(largestChange, maxDifference(firstPose, sampledPose));
+	}
+
+	EXPECT_GT(largestChange, 1.0e-3f);
 }

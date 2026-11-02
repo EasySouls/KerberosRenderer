@@ -98,27 +98,28 @@ the next frame.
 
 The active pass order is approximately:
 
-1. animation evaluation / skin-matrix precompute (when animation is implemented)
-2. skinning (skinned meshes)
-3. depth pre-pass
-4. shadows
-5. GTAO
-6. opaque
-7. particles
-8. grass
-9. transparent
-10. transparency resolve
-11. bloom
-12. anti-aliasing
-13. upscaling
-14. tonemapping
-15. presentation
-16. mouse picking
+1. skinning (skinned meshes; CPU animation evaluation happens earlier in
+   `AnimationSystem::BeginFrame`)
+2. depth pre-pass
+3. shadows
+4. GTAO
+5. opaque
+6. particles
+7. grass
+8. transparent
+9. transparency resolve
+10. bloom
+11. anti-aliasing
+12. upscaling
+13. tonemapping
+14. presentation
+15. mouse picking
 
-Animation and skinning passes are added before the depth pre-pass. The
-skinning pass currently ends with an explicit compute-write to vertex-read
-barrier because the SVB is bound directly by raster passes and is not declared
-as a render-graph resource.
+The skinning pass is added before the depth pre-pass; animation has no graph
+pass because pose evaluation and the skin-matrix upload happen on the CPU in
+`AnimationSystem::BeginFrame`. The skinning pass currently ends with an explicit
+compute-write to vertex-read barrier because the SVB is bound directly by raster
+passes and is not declared as a render-graph resource.
 
 The grass pass is always registered so the pipeline-statistics query split
 (`query 0` ends, `query 1` begins) stays balanced, but its mesh-statistics query
@@ -234,30 +235,57 @@ validation procedures change.
 ## Ownership
 
 `AnimationSystem` (`Renderer/Animation/AnimationSystem.*`) owns immutable
-skeleton/clip data and per-skeleton-instance pose/skin-matrix data. In the
-bind-pose milestone it owns one host-visible global skin-matrix buffer, filled
-from each skeleton's rest-pose globals multiplied by its inverse-bind matrices
-(which evaluates to identity for consistent bind data), and publishes a
-`SkinningFrameSnapshot` (buffer + per-instance `SkeletonFrame` records).
+skeleton/clip data and per-skeleton-instance pose/skin-matrix data. It keeps one
+host-visible skin-matrix buffer per frame in flight (selected by `frameIndex`)
+and publishes a `SkinningFrameSnapshot` (per-instance `SkeletonFrame` records).
+The snapshot buffer field mirrors the current frame's buffer but `SkinningSystem`
+binds its own per-frame descriptor set.
+
+`AnimationEvaluator` (`Renderer/Animation/AnimationEvaluator.*`) is the pure CPU
+pose layer: `BuildClipTrackCache` maps a clip to a skeleton, `SampleTrack`
+implements `STEP`/`LINEAR`/`CUBICSPLINE`, `EvaluatePose` produces local TRS,
+and `ComputeGlobalAndSkinMatrices` derives globals and skin matrices.
+`AdvancePlaybackTime` owns loop/clamp/stop semantics. Keep it Vulkan-free so it
+stays unit-testable.
 
 Entities use `SkeletonComponent` for the skeleton instance and joint list,
 `JointComponent` for joint ordering, `SkinnedMeshComponent` for the mesh /
 skeleton-entity link, and `AnimatorComponent` for the skeleton-entity reference,
 clip handles, and playback state. The animator replaces the old single-clip
 `AnimationComponent`; legacy serialized animation components are migrated on
-load.
+load. `AnimatorComponent::LoadedClips` is transient: `AnimationSystem` resolves
+`AnimationClips` through the active asset manager every frame when the handle
+list or cached handle changes.
+
+## Evaluation and versioning
+
+Per frame `AnimationSystem::BeginFrame` advances animator time, resolves the
+animator that drives each skeleton (same entity first, then `SkeletonEntity`,
+with a warning when several animators target one skeleton), evaluates the pose,
+uploads skin matrices, and publishes the snapshot. A skeleton with no animator
+or no resolvable active clip stays in its rest pose. Evaluation runs in the
+renderer frame, which is after scene transforms and physics; that ordering is
+fine for animation-only characters but must change before a ragdoll handoff.
+
+`SkinMatrixVersion` is bumped only when the evaluated pose changes (clip, time,
+animator, or first evaluation). Each instance also tracks the last version
+uploaded into each frame slot, so a paused instance still initializes a frame
+slot that has not seen the current pose. `SkinningSystem` tracks the same
+per-frame version and re-dispatches only when its slot is stale.
 
 `SkinningSystem` (`Renderer/Animation/SkinningSystem.*`) owns the global source
 vertex/joint/weight/index buffers, the shared vertex buffer (SVB), the SVB
-region allocator, the skinning descriptor set, and the skinning compute
-pipeline. It consumes the snapshot from `AnimationSystem`; it does not resolve
-or mutate skeleton assets.
+region allocator, one skinning descriptor set per frame in flight, and the
+skinning compute pipeline. It consumes the snapshot from `AnimationSystem`; it
+does not resolve or mutate skeleton assets.
 
 `Renderer` owns both systems as value members, calls `BeginFrame` in the order
-Animation → Skinning, adds their graph passes before the depth pre-pass, and
-resets both when the rendered scene pointer changes.
+Animation → Skinning with the current `frameIndex`, adds the skinning pass
+before the depth pre-pass, and resets both when the rendered scene pointer
+changes.
 
-`RayTracingSceneCache` and physics integration are not wired to the SVB yet.
+`RayTracingSceneCache` and physics integration are not wired to the SVB or the
+CPU pose yet.
 
 ## Buffers and shader contract
 
@@ -280,24 +308,26 @@ The SVB stores model-space vertices. Raster uses the existing per-object model
 matrix; RT and physics, when added, must apply the instance transform to the
 SVB rather than expecting world-space output.
 
-## Bind-pose milestone limitations
+## Current animation limitations
 
-- Skin matrices are filled on the CPU from each joint's rest-pose global
-  transform multiplied by its inverse-bind matrix; there is no animation
-  evaluation/precompute pass yet. `AnimatorComponent` already carries the
-  skeleton reference, clip handles, and playback state for that milestone.
-- Imported `AnimationClip` data includes all skeletal T/R/S keyframes,
-  interpolation modes, and cubic-spline tangents, so adding evaluation should
-  not require importer or loader changes.
+- Pose evaluation and skin-matrix generation are CPU-only. There is no
+  evaluation/precompute compute pass and no GPU pose path yet.
+- Clip cross-fades, pose blending, additive layers, root motion, animation
+  events, and sockets/attachments are not implemented.
+- Animation is evaluated inside the renderer frame, after scene transforms and
+  physics. Before adding ragdolls, split the update into a pre-physics pose pass
+  and a post-physics blend/finalize pass.
+- Physics/ragdoll integration and Jolt bone proxies are not implemented.
 - Only direct per-mesh dispatches are recorded; no indirect dispatch or
   per-frame job buffer exists.
-- SVB regions are bump-allocated and only returned by `Reset()`; there is no
-  per-entity free list yet.
+- Skeleton skin-matrix slices and SVB regions are bump-allocated and only
+  returned by `Reset()`; there is no per-entity free list yet.
 - The SVB and index buffer do not yet request
   `ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_KHR`; add it when skinned BLAS
   support is implemented.
-- Skinned meshes are not added to the TLAS.
-- Gameplay/physics should consume the pose/matrices, not the SVB.
+- Skinned meshes are not added to the TLAS, and acceleration structures are
+  still built before skinning.
+- Gameplay/physics should consume `SkeletonPose`/skin matrices, not the SVB.
 
 ## Validation
 
@@ -311,10 +341,17 @@ cd KerberosEditor\Assets\Shaders
 ```
 
 The editor hierarchy window context menu has "Create Skinned Test Mesh", which
-creates a procedural two-bone strip for validating the bind-pose path before
-glTF import exists. Validate that it appears in depth/shadow/opaque passes,
-that resize and scene switching do not leave stale instances, and that Vulkan
-validation reports no buffer synchronization errors.
+creates a procedural two-bone strip for validating the skinning path without
+glTF import. Validate that it appears in depth/shadow/opaque passes, that resize
+and scene switching do not leave stale instances, and that Vulkan validation
+reports no buffer synchronization errors.
+
+`Tests/AnimationEvaluatorTests.cpp` covers rest poses, step/linear/cubic
+sampling, shortest-path rotation slerp, out-of-range tracks, loop wrapping,
+reverse playback, and zero-duration playback. For the GPU path, validate
+CesiumMan in Edit/Simulate/Play: play, pause, scrub, loop, reverse, clip
+switching, two instances sharing one clip, scene switch, and two frames in
+flight under synchronization validation.
 
 # Particle system context
 

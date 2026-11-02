@@ -56,12 +56,14 @@ Editor windows live mainly under
   editing, including particle emitters and the animation components
   (skeletons, skinned meshes, joints, and animators). Its window context menu
   also has a debug "Create Skinned Test Mesh" action that builds a procedural
-  two-bone strip for validating the bind-pose skinning path without imported
-  glTF data. Single-asset component fields use the shared
+  two-bone strip for validating the skinning path without imported glTF data.
+  Single-asset component fields use the shared
   `KerberosEditor/Source/Widgets/AssetPicker` searchable dropdown, which keeps
   the matching asset-browser drag/drop payload working. The Animator component
   exposes skeleton-entity selection, clip add/remove/reorder-by-selection,
-  active-clip selection, time, speed, playing, and looping controls.
+  active-clip selection, time, speed, playing, and looping controls. Playback is
+  evaluated by the renderer in Edit, Simulate, and Play, so toggling Playing or
+  scrubbing Time previews the pose immediately unless the scene is paused.
 - `InspectorPanel`: the unified right-side "Properties" window. It shows entity
   components when an entity is selected and asset import options when a source
   asset is selected in `AssetsPanel` (asset selection takes display precedence).

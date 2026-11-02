@@ -13,6 +13,7 @@
 #include <algorithm>
 #include <array>
 #include <cstring>
+#include <format>
 #include <unordered_set>
 
 import Kerberos;
@@ -27,16 +28,22 @@ vk::BufferUsageFlags ToVkUsage(const VkBufferUsageFlags usage)
 }
 
 void SkinningSystem::Initialize(const Owner<DescriptorAllocator>& allocator,
-                                const vk::Buffer skinMatricesBuffer,
-                                const vk::DeviceSize skinMatricesBufferSize)
+                                const std::vector<vk::Buffer>& skinMatricesBuffers,
+                                const std::vector<vk::DeviceSize>& skinMatricesBufferSizes)
 {
+    KBRAssert(!skinMatricesBuffers.empty(), "Skinning requires at least one skin matrices buffer");
+    KBRAssert(skinMatricesBuffers.size() == skinMatricesBufferSizes.size(),
+              "Skin matrices buffer and size lists must match");
+    KBRAssert(skinMatricesBuffers.size() == VulkanContext::MaxFramesInFlight,
+              "Skinning requires one skin matrices buffer per frame in flight");
+
     m_DescriptorAllocator = allocator.get();
-    m_SkinMatricesBuffer = skinMatricesBuffer;
-    m_SkinMatricesBufferSize = skinMatricesBufferSize;
+    m_SkinMatricesBuffers = skinMatricesBuffers;
+    m_SkinMatricesBufferSizes = skinMatricesBufferSizes;
 
     AllocateBuffers();
     SetupDescriptors();
-    AllocateDescriptorSet();
+    AllocateDescriptorSets();
     SetupPipeline();
 }
 
@@ -48,14 +55,20 @@ void SkinningSystem::Shutdown()
     m_JointWeightsBuffer.Reset();
     m_SharedIndexBuffer.Reset();
 
+    m_SkinningSets.clear();
+    m_SkinMatricesBuffers.clear();
+    m_SkinMatricesBufferSizes.clear();
+
     m_MeshSlices.clear();
     m_Instances.clear();
     m_FrameJobs.clear();
 }
 
-void SkinningSystem::BeginFrame(const Ref<Scene>& scene, const SkinningFrameSnapshot& snapshot)
+void SkinningSystem::BeginFrame(const Ref<Scene>& scene, const SkinningFrameSnapshot& snapshot, const uint32_t frameIndex)
 {
     KBR_TRACY_FUNCTION();
+
+    KBRAssert(frameIndex < m_SkinMatricesBuffers.size(), "Invalid frame index for skinning");
 
     m_FrameJobs.clear();
 
@@ -165,7 +178,7 @@ void SkinningSystem::BeginFrame(const Ref<Scene>& scene, const SkinningFrameSnap
             .SkinVersion = skeletonFrame->SkinMatrixVersion,
         };
 
-        if (!instance.Initialized || instance.LastSkinnedVersion != skeletonFrame->SkinMatrixVersion)
+        if (!instance.Initialized || instance.LastSkinnedVersions[frameIndex] != skeletonFrame->SkinMatrixVersion)
         {
             m_FrameJobs.push_back({
                 .SourceFirst = instance.Slice.FirstVertex,
@@ -175,7 +188,7 @@ void SkinningSystem::BeginFrame(const Ref<Scene>& scene, const SkinningFrameSnap
                 .JointCount = skeletonFrame->JointCount,
             });
 
-            instance.LastSkinnedVersion = skeletonFrame->SkinMatrixVersion;
+            instance.LastSkinnedVersions[frameIndex] = skeletonFrame->SkinMatrixVersion;
             instance.Initialized = true;
         }
 
@@ -198,10 +211,11 @@ void SkinningSystem::BeginFrame(const Ref<Scene>& scene, const SkinningFrameSnap
 
 void SkinningSystem::AddPasses(RenderGraph::Graph& graph, const uint32_t frameIndex) const
 {
-    (void)frameIndex;
-
     if (m_FrameJobs.empty() || m_SkinningPipeline == nullptr)
         return;
+
+    KBRAssert(frameIndex < m_SkinMatricesBuffers.size() && frameIndex < m_SkinningSets.size(),
+              "Invalid frame index for skinning passes");
 
     constexpr RenderGraph::BufferState readState{
         .Stages = vk::PipelineStageFlagBits2::eComputeShader,
@@ -220,7 +234,7 @@ void SkinningSystem::AddPasses(RenderGraph::Graph& graph, const uint32_t frameIn
     const auto hOutput = graph.ImportBuffer(m_OutputVerticesBuffer.Handle, vertexReadState);
     const auto hJointIndices = graph.ImportBuffer(m_JointIndicesBuffer.Handle, readState);
     const auto hJointWeights = graph.ImportBuffer(m_JointWeightsBuffer.Handle, readState);
-    const auto hSkinMatrices = graph.ImportBuffer(m_SkinMatricesBuffer, readState);
+    const auto hSkinMatrices = graph.ImportBuffer(m_SkinMatricesBuffers[frameIndex], readState);
 
     graph.AddPass("Skinning", [&](RenderGraph::Graph::PassBuilder& builder) -> RenderGraph::PassExecuteFunction
     {
@@ -231,12 +245,13 @@ void SkinningSystem::AddPasses(RenderGraph::Graph& graph, const uint32_t frameIn
         builder.Write(hOutput, writeState.Stages, writeState.Access);
 
         const auto jobs = m_FrameJobs;
+        const ShaderResourceSet resourceSet = m_SkinningSets[frameIndex];
 
-        return [this, jobs](const vk::raii::CommandBuffer& cmd)
+        return [this, jobs, resourceSet](const vk::raii::CommandBuffer& cmd)
         {
             m_SkinningPipeline->Bind(cmd);
 
-            const std::vector<ShaderResourceSet> sets{ m_SkinningSet };
+            const std::vector<ShaderResourceSet> sets{ resourceSet };
             DescriptorManager::BindSets(cmd, vk::PipelineBindPoint::eCompute, m_SkinningPipelineLayout, 0, sets);
 
             for (const SkinJob& job : jobs)
@@ -385,22 +400,31 @@ void SkinningSystem::SetupDescriptors()
     context.SetObjectDebugName(m_SkinningPipelineLayout, "Skinning Pipeline Layout");
 }
 
-void SkinningSystem::AllocateDescriptorSet()
+void SkinningSystem::AllocateDescriptorSets()
 {
     KBRAssert(m_SkinningDescriptorSetLayout != nullptr,
-              "Descriptor set layout must be created before allocating the skinning descriptor set");
-    KBRAssert(m_SkinMatricesBuffer != nullptr,
-              "AnimationSystem must provide the skin matrices buffer before the skinning descriptor is created");
+              "Descriptor set layout must be created before allocating the skinning descriptor sets");
+    KBRAssert(!m_SkinMatricesBuffers.empty(),
+              "AnimationSystem must provide the skin matrices buffers before the skinning descriptors are created");
 
-    m_SkinningSet = m_DescriptorAllocator->Allocate(m_SkinningDescriptorSetLayout, "Skinning Descriptor Set");
+    m_SkinningSets.clear();
+    m_SkinningSets.reserve(m_SkinMatricesBuffers.size());
 
-    DescriptorWriter writer(m_SkinningDescriptorSetLayout, m_SkinningSet);
-    writer.WriteStorageBuffer(0, m_InputVerticesBuffer.Handle, m_InputVerticesBuffer.Size);
-    writer.WriteStorageBuffer(1, m_OutputVerticesBuffer.Handle, m_OutputVerticesBuffer.Size);
-    writer.WriteStorageBuffer(2, m_SkinMatricesBuffer, m_SkinMatricesBufferSize);
-    writer.WriteStorageBuffer(3, m_JointIndicesBuffer.Handle, m_JointIndicesBuffer.Size);
-    writer.WriteStorageBuffer(4, m_JointWeightsBuffer.Handle, m_JointWeightsBuffer.Size);
-    writer.Flush();
+    for (size_t frameIndex = 0; frameIndex < m_SkinMatricesBuffers.size(); ++frameIndex)
+    {
+        ShaderResourceSet set = m_DescriptorAllocator->Allocate(
+            m_SkinningDescriptorSetLayout, std::format("Skinning Descriptor Set {}", frameIndex));
+
+        DescriptorWriter writer(m_SkinningDescriptorSetLayout, set);
+        writer.WriteStorageBuffer(0, m_InputVerticesBuffer.Handle, m_InputVerticesBuffer.Size);
+        writer.WriteStorageBuffer(1, m_OutputVerticesBuffer.Handle, m_OutputVerticesBuffer.Size);
+        writer.WriteStorageBuffer(2, m_SkinMatricesBuffers[frameIndex], m_SkinMatricesBufferSizes[frameIndex]);
+        writer.WriteStorageBuffer(3, m_JointIndicesBuffer.Handle, m_JointIndicesBuffer.Size);
+        writer.WriteStorageBuffer(4, m_JointWeightsBuffer.Handle, m_JointWeightsBuffer.Size);
+        writer.Flush();
+
+        m_SkinningSets.push_back(set);
+    }
 }
 
 void SkinningSystem::SetupPipeline()

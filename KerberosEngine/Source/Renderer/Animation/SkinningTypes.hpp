@@ -161,14 +161,19 @@ struct SkeletonFrame
 {
     SkeletonInstanceId Id;
     UUID Entity = UUID::Invalid();
-    uint32_t FirstSkinMatrix; // in the skinMatrix buffer
+    // In the skinMatrix buffer
+    uint32_t FirstSkinMatrix; 
     uint32_t JointCount;
+    // Monotonic pose version. Starts at 1 after the first evaluation and only changes when the
+    // evaluated pose changes.
     uint64_t SkinMatrixVersion;
 };
 
 struct SkinningFrameSnapshot
 {
+    // Mirrors the current frame's skin-matrix buffer.
     vk::Buffer SkinMatrixBuffer;
+    // The skeleton instances that are currently skinned.
     std::span<const SkeletonFrame> Skeletons;
 };
 

@@ -796,6 +796,7 @@ Entity Scene::InstantiatePrefab(const AssetHandle prefabHandle, const std::strin
 			auto animator = sourceRegistry.get<AnimatorComponent>(sourceEntity);
 			animator.CurrentTime = 0.0f;
 			animator.IsPlaying = false;
+			animator.LoadedClips.clear();
 			newEntity.AddComponent<AnimatorComponent>(animator);
 		}
 		if (sourceRegistry.all_of<JointComponent>(sourceEntity))

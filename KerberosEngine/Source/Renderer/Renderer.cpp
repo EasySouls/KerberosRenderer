@@ -1400,7 +1400,7 @@ void Renderer::RecordQueuedSceneRender(const vk::raii::CommandBuffer& cmd)
     }
 
     s_Data->AnimationSystem.BeginFrame(s_Data->PendingRender.Scene, frameIndex, s_Data->PendingRender.DeltaTime, s_Data->PendingRender.Scene->IsPaused());
-    s_Data->SkinningSystem.BeginFrame(s_Data->PendingRender.Scene, s_Data->AnimationSystem.GetSkinningSnapshot());
+    s_Data->SkinningSystem.BeginFrame(s_Data->PendingRender.Scene, s_Data->AnimationSystem.GetSkinningSnapshot(), frameIndex);
 
     if (IsUsingAccelerationStructures()) {
         // TODO: This should happen after animation and skinning passes, so that the acceleration structures are built
@@ -2626,8 +2626,8 @@ void Renderer::CreateResources()
 
     s_Data->AnimationSystem.Initialize(s_Data->PersistentDescriptorAllocator);
     s_Data->SkinningSystem.Initialize(s_Data->PersistentDescriptorAllocator,
-                                      s_Data->AnimationSystem.GetSkinMatricesBuffer(0),
-                                      s_Data->AnimationSystem.GetSkinMatricesBufferSize(0));
+                                      s_Data->AnimationSystem.GetSkinMatricesBufferHandles(),
+                                      s_Data->AnimationSystem.GetSkinMatricesBufferSizes());
 
     s_Data->ParticleSystem.Initialize(s_Data->ColorImage.Format,
                                       s_Data->DepthImage.Format,
