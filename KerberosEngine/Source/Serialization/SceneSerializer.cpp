@@ -365,6 +365,7 @@ static void SerializeEntity(YAML::Emitter& out, const Entity entity)
         out << YAML::Key << "PlaybackSpeed" << YAML::Value << animation.PlaybackSpeed;
         out << YAML::Key << "IsPlaying" << YAML::Value << animation.IsPlaying;
         out << YAML::Key << "IsLooping" << YAML::Value << animation.IsLooping;
+        out << YAML::Key << "PlayOnStart" << YAML::Value << animation.PlayOnStart;
         out << YAML::EndMap;
     }
 
@@ -714,6 +715,7 @@ Entity SceneSerializer::DeserializeEntity(const Ref<Scene>& scene, const YAML::N
         animation.PlaybackSpeed = animationComponent["PlaybackSpeed"].as<float>(1.0f);
         animation.IsPlaying = animationComponent["IsPlaying"].as<bool>(false);
         animation.IsLooping = animationComponent["IsLooping"].as<bool>(true);
+        animation.PlayOnStart = animationComponent["PlayOnStart"].as<bool>(false);
     }
     else if (auto legacyAnimationComponent = node["AnimationComponent"]) {
         auto& animation = deserializedEntity.AddComponent<AnimatorComponent>();
@@ -724,6 +726,7 @@ Entity SceneSerializer::DeserializeEntity(const Ref<Scene>& scene, const YAML::N
         animation.PlaybackSpeed = legacyAnimationComponent["PlaybackSpeed"].as<float>(1.0f);
         animation.IsPlaying = legacyAnimationComponent["IsPlaying"].as<bool>(false);
         animation.IsLooping = legacyAnimationComponent["IsLooping"].as<bool>(true);
+        animation.PlayOnStart = legacyAnimationComponent["PlayOnStart"].as<bool>(false);
     }
 
     return deserializedEntity;

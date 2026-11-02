@@ -87,6 +87,21 @@ namespace Kerberos
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
         internal delegate byte PhysicsRaycastFn(ref Vector3 origin, ref Vector3 direction, float maxDistance, out Vector3 hitPoint, out Vector3 hitNormal, out ulong entityID);
 
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        internal delegate void AnimatorPlayFn(ulong entityID, int clipIndex);
+
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        internal delegate void AnimatorPlayByNameFn(ulong entityID, IntPtr clipName);
+
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        internal delegate int GetIntFn(ulong entityID);
+
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        internal delegate void SetIntFn(ulong entityID, int value);
+
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        internal delegate float AnimatorGetClipDurationFn(ulong entityID, int clipIndex);
+
         // ====================================================================
         // Stored delegate instances (prevent GC collection)
         // ====================================================================
@@ -141,6 +156,25 @@ namespace Kerberos
         private static GetBoolFn? s_AudioSource3DIsLooping;
 
         private static PhysicsRaycastFn? s_PhysicsRaycast;
+
+        private static AnimatorPlayFn? s_AnimatorPlay;
+        private static AnimatorPlayByNameFn? s_AnimatorPlayByName;
+        private static EntityActionFn? s_AnimatorStop;
+        private static EntityActionFn? s_AnimatorPause;
+        private static GetFloatFn? s_AnimatorGetTime;
+        private static SetFloatFn? s_AnimatorSetTime;
+        private static GetFloatFn? s_AnimatorGetSpeed;
+        private static SetFloatFn? s_AnimatorSetSpeed;
+        private static GetBoolFn? s_AnimatorIsPlaying;
+        private static SetBoolFn? s_AnimatorSetPlaying;
+        private static GetBoolFn? s_AnimatorIsLooping;
+        private static SetBoolFn? s_AnimatorSetLooping;
+        private static GetBoolFn? s_AnimatorGetPlayOnStart;
+        private static SetBoolFn? s_AnimatorSetPlayOnStart;
+        private static GetIntFn? s_AnimatorGetActiveClip;
+        private static SetIntFn? s_AnimatorSetActiveClip;
+        private static GetIntFn? s_AnimatorGetClipCount;
+        private static AnimatorGetClipDurationFn? s_AnimatorGetClipDuration;
 
         // ====================================================================
         // Initialization - called from C++ to provide function pointers
@@ -210,6 +244,25 @@ namespace Kerberos
 
             s_PhysicsRaycast = Marshal.GetDelegateForFunctionPointer<PhysicsRaycastFn>(ReadNext());
             s_EntityInstantiatePrefab = Marshal.GetDelegateForFunctionPointer<EntityInstantiatePrefabFn>(ReadNext());
+
+            s_AnimatorPlay = Marshal.GetDelegateForFunctionPointer<AnimatorPlayFn>(ReadNext());
+            s_AnimatorPlayByName = Marshal.GetDelegateForFunctionPointer<AnimatorPlayByNameFn>(ReadNext());
+            s_AnimatorStop = Marshal.GetDelegateForFunctionPointer<EntityActionFn>(ReadNext());
+            s_AnimatorPause = Marshal.GetDelegateForFunctionPointer<EntityActionFn>(ReadNext());
+            s_AnimatorGetTime = Marshal.GetDelegateForFunctionPointer<GetFloatFn>(ReadNext());
+            s_AnimatorSetTime = Marshal.GetDelegateForFunctionPointer<SetFloatFn>(ReadNext());
+            s_AnimatorGetSpeed = Marshal.GetDelegateForFunctionPointer<GetFloatFn>(ReadNext());
+            s_AnimatorSetSpeed = Marshal.GetDelegateForFunctionPointer<SetFloatFn>(ReadNext());
+            s_AnimatorIsPlaying = Marshal.GetDelegateForFunctionPointer<GetBoolFn>(ReadNext());
+            s_AnimatorSetPlaying = Marshal.GetDelegateForFunctionPointer<SetBoolFn>(ReadNext());
+            s_AnimatorIsLooping = Marshal.GetDelegateForFunctionPointer<GetBoolFn>(ReadNext());
+            s_AnimatorSetLooping = Marshal.GetDelegateForFunctionPointer<SetBoolFn>(ReadNext());
+            s_AnimatorGetPlayOnStart = Marshal.GetDelegateForFunctionPointer<GetBoolFn>(ReadNext());
+            s_AnimatorSetPlayOnStart = Marshal.GetDelegateForFunctionPointer<SetBoolFn>(ReadNext());
+            s_AnimatorGetActiveClip = Marshal.GetDelegateForFunctionPointer<GetIntFn>(ReadNext());
+            s_AnimatorSetActiveClip = Marshal.GetDelegateForFunctionPointer<SetIntFn>(ReadNext());
+            s_AnimatorGetClipCount = Marshal.GetDelegateForFunctionPointer<GetIntFn>(ReadNext());
+            s_AnimatorGetClipDuration = Marshal.GetDelegateForFunctionPointer<AnimatorGetClipDurationFn>(ReadNext());
         }
 
         // ====================================================================
@@ -464,6 +517,100 @@ namespace Kerberos
             entityID = 0;
 
             return s_PhysicsRaycast?.Invoke(ref origin, ref direction, maxDistance, out hitPoint, out hitNormal, out entityID) != 0;
+        }
+
+        // ----------------------------- AnimatorComponent -----------------------------
+
+        internal static void AnimatorComponent_Play(ulong entityID, int clipIndex)
+        {
+            s_AnimatorPlay?.Invoke(entityID, clipIndex);
+        }
+
+        internal static void AnimatorComponent_PlayByName(ulong entityID, string clipName)
+        {
+            IntPtr ptr = Marshal.StringToHGlobalAnsi(clipName);
+            try { s_AnimatorPlayByName?.Invoke(entityID, ptr); }
+            finally { Marshal.FreeHGlobal(ptr); }
+        }
+
+        internal static void AnimatorComponent_Stop(ulong entityID)
+        {
+            s_AnimatorStop?.Invoke(entityID);
+        }
+
+        internal static void AnimatorComponent_Pause(ulong entityID)
+        {
+            s_AnimatorPause?.Invoke(entityID);
+        }
+
+        internal static float AnimatorComponent_GetTime(ulong entityID)
+        {
+            return s_AnimatorGetTime?.Invoke(entityID) ?? 0.0f;
+        }
+
+        internal static void AnimatorComponent_SetTime(ulong entityID, float time)
+        {
+            s_AnimatorSetTime?.Invoke(entityID, time);
+        }
+
+        internal static float AnimatorComponent_GetSpeed(ulong entityID)
+        {
+            return s_AnimatorGetSpeed?.Invoke(entityID) ?? 1.0f;
+        }
+
+        internal static void AnimatorComponent_SetSpeed(ulong entityID, float speed)
+        {
+            s_AnimatorSetSpeed?.Invoke(entityID, speed);
+        }
+
+        internal static bool AnimatorComponent_IsPlaying(ulong entityID)
+        {
+            return s_AnimatorIsPlaying?.Invoke(entityID) != 0;
+        }
+
+        internal static void AnimatorComponent_SetPlaying(ulong entityID, bool playing)
+        {
+            s_AnimatorSetPlaying?.Invoke(entityID, playing ? (byte)1 : (byte)0);
+        }
+
+        internal static bool AnimatorComponent_IsLooping(ulong entityID)
+        {
+            return s_AnimatorIsLooping?.Invoke(entityID) != 0;
+        }
+
+        internal static void AnimatorComponent_SetLooping(ulong entityID, bool looping)
+        {
+            s_AnimatorSetLooping?.Invoke(entityID, looping ? (byte)1 : (byte)0);
+        }
+
+        internal static bool AnimatorComponent_GetPlayOnStart(ulong entityID)
+        {
+            return s_AnimatorGetPlayOnStart?.Invoke(entityID) != 0;
+        }
+
+        internal static void AnimatorComponent_SetPlayOnStart(ulong entityID, bool playOnStart)
+        {
+            s_AnimatorSetPlayOnStart?.Invoke(entityID, playOnStart ? (byte)1 : (byte)0);
+        }
+
+        internal static int AnimatorComponent_GetActiveClip(ulong entityID)
+        {
+            return s_AnimatorGetActiveClip?.Invoke(entityID) ?? -1;
+        }
+
+        internal static void AnimatorComponent_SetActiveClip(ulong entityID, int clipIndex)
+        {
+            s_AnimatorSetActiveClip?.Invoke(entityID, clipIndex);
+        }
+
+        internal static int AnimatorComponent_GetClipCount(ulong entityID)
+        {
+            return s_AnimatorGetClipCount?.Invoke(entityID) ?? 0;
+        }
+
+        internal static float AnimatorComponent_GetClipDuration(ulong entityID, int clipIndex)
+        {
+            return s_AnimatorGetClipDuration?.Invoke(entityID, clipIndex) ?? 0.0f;
         }
 
     }

@@ -2351,8 +2351,18 @@ void HierarchyPanel::DrawComponents(const Entity entity)
             if (animator.ActiveClip >= 0
                 && animator.ActiveClip < static_cast<int32_t>(animator.AnimationClips.size()))
             {
-                activeClip = AssetManager::AsAsset<AnimationClip>(
-                    animator.AnimationClips[static_cast<size_t>(animator.ActiveClip)]);
+                const size_t activeClipIndex = static_cast<size_t>(animator.ActiveClip);
+
+                // Prefer the clip the renderer already resolved so the inspector does not
+                // perform a second asset lookup every frame.
+                if (activeClipIndex < animator.LoadedClips.size())
+                    activeClip = animator.LoadedClips[activeClipIndex];
+
+                if (!activeClip)
+                {
+                    activeClip = AssetManager::AsAsset<AnimationClip>(
+                        animator.AnimationClips[activeClipIndex]);
+                }
             }
 
             const float duration = activeClip ? activeClip->GetDuration() : 0.0f;
@@ -2364,8 +2374,16 @@ void HierarchyPanel::DrawComponents(const Entity entity)
             ImGui::Checkbox("Playing", &animator.IsPlaying);
             ImGui::SameLine();
             ImGui::Checkbox("Looping", &animator.IsLooping);
+            ImGui::SameLine();
+            ImGui::Checkbox("Play On Start", &animator.PlayOnStart);
             if (ImGui::Button("Reset Time"))
                 animator.CurrentTime = 0.0f;
+            ImGui::SameLine();
+            if (ImGui::Button("Stop"))
+            {
+                animator.CurrentTime = 0.0f;
+                animator.IsPlaying = false;
+            }
 
             if (activeClip)
                 ImGui::Text("Clip Duration: %.3f s", duration);

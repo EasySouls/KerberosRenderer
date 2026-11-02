@@ -30,7 +30,7 @@ namespace Kerberos
 		void OnRuntimeStart();
 		void OnRuntimeStop();
 		void OnSimulationStart();
-		void OnSimulationStop() const;
+		void OnSimulationStop();
 		void SetScenePaused(bool isPaused);
 
 		bool IsPaused() const { return m_IsScenePaused; }
@@ -89,6 +89,11 @@ namespace Kerberos
 		const std::vector<entt::entity>& GetRootEntities() const { return m_RootEntities; }
 
 		void OnViewportResize(uint32_t width, uint32_t height);
+
+		/// Starts every animator according to its authored PlayOnStart flag and resets its time.
+		void StartAnimators();
+		/// Stops every animator and returns it to the beginning of its clip.
+		void StopAnimators();
 
 		void SetIs3D(const bool is3D) { m_Is3D = is3D; }
 		void SetEnableShadowMapping(const bool enable) { m_EnableShadowMapping = enable; }

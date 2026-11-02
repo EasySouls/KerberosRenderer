@@ -69,6 +69,77 @@ namespace Kerberos.Scene
         }
     }
 
+    public class AnimatorComponent : Component
+    {
+        public float CurrentTime
+        {
+            get => InternalCalls.AnimatorComponent_GetTime(Entity.GetID());
+            set => InternalCalls.AnimatorComponent_SetTime(Entity.GetID(), value);
+        }
+
+        public float PlaybackSpeed
+        {
+            get => InternalCalls.AnimatorComponent_GetSpeed(Entity.GetID());
+            set => InternalCalls.AnimatorComponent_SetSpeed(Entity.GetID(), value);
+        }
+
+        public bool IsPlaying
+        {
+            get => InternalCalls.AnimatorComponent_IsPlaying(Entity.GetID());
+            set => InternalCalls.AnimatorComponent_SetPlaying(Entity.GetID(), value);
+        }
+
+        public bool IsLooping
+        {
+            get => InternalCalls.AnimatorComponent_IsLooping(Entity.GetID());
+            set => InternalCalls.AnimatorComponent_SetLooping(Entity.GetID(), value);
+        }
+
+        public bool PlayOnStart
+        {
+            get => InternalCalls.AnimatorComponent_GetPlayOnStart(Entity.GetID());
+            set => InternalCalls.AnimatorComponent_SetPlayOnStart(Entity.GetID(), value);
+        }
+
+        public int ActiveClip
+        {
+            get => InternalCalls.AnimatorComponent_GetActiveClip(Entity.GetID());
+            set => InternalCalls.AnimatorComponent_SetActiveClip(Entity.GetID(), value);
+        }
+
+        public int ClipCount => InternalCalls.AnimatorComponent_GetClipCount(Entity.GetID());
+
+        /// <summary>
+        /// Resumes the current clip, or starts the first clip when none is selected.
+        /// </summary>
+        public void Play() => InternalCalls.AnimatorComponent_Play(Entity.GetID(), -1);
+
+        /// <summary>
+        /// Starts the clip at the given index from the beginning.
+        /// </summary>
+        public void Play(int clipIndex) => InternalCalls.AnimatorComponent_Play(Entity.GetID(), clipIndex);
+
+        /// <summary>
+        /// Starts the first clip whose asset name matches.
+        /// </summary>
+        public void Play(string clipName) => InternalCalls.AnimatorComponent_PlayByName(Entity.GetID(), clipName);
+
+        /// <summary>
+        /// Pauses playback and keeps the current time.
+        /// </summary>
+        public void Pause() => InternalCalls.AnimatorComponent_Pause(Entity.GetID());
+
+        /// <summary>
+        /// Stops playback and resets the current time to zero.
+        /// </summary>
+        public void Stop() => InternalCalls.AnimatorComponent_Stop(Entity.GetID());
+
+        /// <summary>
+        /// Returns the duration of the clip at the given index.
+        /// </summary>
+        public float GetClipDuration(int clipIndex) => InternalCalls.AnimatorComponent_GetClipDuration(Entity.GetID(), clipIndex);
+    }
+
     public class StaticMeshComponent : Component
     {
         public MeshRef Mesh

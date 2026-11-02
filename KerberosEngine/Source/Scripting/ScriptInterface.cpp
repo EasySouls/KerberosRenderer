@@ -8,9 +8,14 @@
 #include "Scripting/ScriptEngine.hpp"
 #include "Scripting/ScriptInstance.hpp"
 #include "Scene/Components.hpp"
+#include "Scene/Components/AnimationComponents.hpp"
 #include "Scene/Components/PhysicsComponents.hpp"
 #include "Scene/Components/AudioComponents.hpp"
+#include "Assets/AssetManager.hpp"
 #include "Profiling/Profilers.hpp"
+
+#include <algorithm>
+#include <cmath>
 
 #include <glm/glm.hpp>
 
@@ -77,6 +82,25 @@ namespace Kerberos
 
 		void* Physics_Raycast;
 		void* Entity_InstantiatePrefab;
+
+		void* AnimatorComponent_Play;
+		void* AnimatorComponent_PlayByName;
+		void* AnimatorComponent_Stop;
+		void* AnimatorComponent_Pause;
+		void* AnimatorComponent_GetTime;
+		void* AnimatorComponent_SetTime;
+		void* AnimatorComponent_GetSpeed;
+		void* AnimatorComponent_SetSpeed;
+		void* AnimatorComponent_IsPlaying;
+		void* AnimatorComponent_SetPlaying;
+		void* AnimatorComponent_IsLooping;
+		void* AnimatorComponent_SetLooping;
+		void* AnimatorComponent_GetPlayOnStart;
+		void* AnimatorComponent_SetPlayOnStart;
+		void* AnimatorComponent_GetActiveClip;
+		void* AnimatorComponent_SetActiveClip;
+		void* AnimatorComponent_GetClipCount;
+		void* AnimatorComponent_GetClipDuration;
 	};
 
 	/// Component type name to HasComponent check mapping
@@ -148,6 +172,8 @@ namespace Kerberos
 			return [](Entity entity) { return entity.AddComponent<AudioSource3DComponent>(); };
 		if (typeName == "AudioListenerComponent")
 			return [](Entity entity) { return entity.AddComponent<AudioListenerComponent>(); };
+		if (typeName == "AnimatorComponent")
+			return [](Entity entity) { return entity.AddComponent<AnimatorComponent>(); };
 
 		KBRAssert(false, "Unknown component type: {0}", typeName);
 		return nullptr;
@@ -452,6 +478,251 @@ namespace Kerberos
 		}
 	}
 
+	// ====================================================================
+	// Animation
+	// ====================================================================
+
+	static AnimatorComponent* GetAnimatorComponent(const uint64_t entityID)
+	{
+		const Ref<Scene> scene = ScriptEngine::GetSceneContext().lock();
+		if (!scene)
+			return nullptr;
+
+		const Entity entity = scene->TryGetEntityByUUID(UUID(entityID));
+		if (!entity || !entity.HasComponent<AnimatorComponent>())
+			return nullptr;
+
+		return &entity.GetComponent<AnimatorComponent>();
+	}
+
+	static Ref<AnimationClip> ResolveAnimatorClip(const AnimatorComponent& animator, const int32_t clipIndex)
+	{
+		if (clipIndex < 0 || static_cast<size_t>(clipIndex) >= animator.AnimationClips.size())
+			return nullptr;
+
+		const size_t index = static_cast<size_t>(clipIndex);
+		if (index < animator.LoadedClips.size() && animator.LoadedClips[index])
+			return animator.LoadedClips[index];
+
+		const AssetHandle handle = animator.AnimationClips[index];
+		return handle.IsValid() ? AssetManager::AsAsset<AnimationClip>(handle) : nullptr;
+	}
+
+	static void AnimatorComponent_Play(const uint64_t entityID, const int32_t clipIndex)
+	{
+		KBR_TRACY_FUNCTION();
+
+		AnimatorComponent* animator = GetAnimatorComponent(entityID);
+		if (!animator)
+		{
+			Log::CoreWarn("AnimatorComponent_Play: entity {} has no animator", entityID);
+			return;
+		}
+
+		if (clipIndex >= 0)
+		{
+			if (static_cast<size_t>(clipIndex) >= animator->AnimationClips.size())
+			{
+				Log::CoreWarn("AnimatorComponent_Play: clip index {} is out of range on entity {}",
+				              clipIndex, entityID);
+				return;
+			}
+
+			animator->ActiveClip = clipIndex;
+			animator->CurrentTime = 0.0f;
+		}
+		else if (animator->ActiveClip < 0 && !animator->AnimationClips.empty())
+		{
+			animator->ActiveClip = 0;
+			animator->CurrentTime = 0.0f;
+		}
+
+		animator->IsPlaying = true;
+	}
+
+	static void AnimatorComponent_PlayByName(const uint64_t entityID, const char* clipName)
+	{
+		KBR_TRACY_FUNCTION();
+
+		if (!clipName)
+			return;
+
+		const AnimatorComponent* animator = GetAnimatorComponent(entityID);
+		if (!animator)
+		{
+			Log::CoreWarn("AnimatorComponent_PlayByName: entity {} has no animator", entityID);
+			return;
+		}
+
+		for (size_t clipIndex = 0; clipIndex < animator->AnimationClips.size(); ++clipIndex)
+		{
+			const Ref<AnimationClip> clip = ResolveAnimatorClip(*animator, static_cast<int32_t>(clipIndex));
+			if (clip && clip->GetName() == clipName)
+			{
+				AnimatorComponent_Play(entityID, static_cast<int32_t>(clipIndex));
+				return;
+			}
+		}
+
+		Log::CoreWarn("AnimatorComponent_PlayByName: clip '{}' was not found on entity {}", clipName, entityID);
+	}
+
+	static void AnimatorComponent_Stop(const uint64_t entityID)
+	{
+		KBR_TRACY_FUNCTION();
+
+		if (AnimatorComponent* animator = GetAnimatorComponent(entityID))
+		{
+			animator->IsPlaying = false;
+			animator->CurrentTime = 0.0f;
+		}
+	}
+
+	static void AnimatorComponent_Pause(const uint64_t entityID)
+	{
+		KBR_TRACY_FUNCTION();
+
+		if (AnimatorComponent* animator = GetAnimatorComponent(entityID))
+			animator->IsPlaying = false;
+	}
+
+	static float AnimatorComponent_GetTime(const uint64_t entityID)
+	{
+        KBR_TRACY_FUNCTION();
+
+		const AnimatorComponent* animator = GetAnimatorComponent(entityID);
+		return animator ? animator->CurrentTime : 0.0f;
+	}
+
+	static void AnimatorComponent_SetTime(const uint64_t entityID, const float time)
+	{
+        KBR_TRACY_FUNCTION();
+
+		AnimatorComponent* animator = GetAnimatorComponent(entityID);
+		if (!animator || !std::isfinite(time))
+			return;
+
+		animator->CurrentTime = std::max(0.0f, time);
+
+		if (const Ref<AnimationClip> clip = ResolveAnimatorClip(*animator, animator->ActiveClip);
+			clip && clip->GetDuration() > 0.0f)
+		{
+			animator->CurrentTime = std::min(animator->CurrentTime, clip->GetDuration());
+		}
+	}
+
+	static float AnimatorComponent_GetSpeed(const uint64_t entityID)
+	{
+        KBR_TRACY_FUNCTION();
+
+		const AnimatorComponent* animator = GetAnimatorComponent(entityID);
+		return animator ? animator->PlaybackSpeed : 1.0f;
+	}
+
+	static void AnimatorComponent_SetSpeed(const uint64_t entityID, const float speed)
+	{
+        KBR_TRACY_FUNCTION();
+
+		AnimatorComponent* animator = GetAnimatorComponent(entityID);
+		if (animator && std::isfinite(speed))
+			animator->PlaybackSpeed = speed;
+	}
+
+	static uint8_t AnimatorComponent_IsPlaying(const uint64_t entityID)
+	{
+        KBR_TRACY_FUNCTION();
+
+		const AnimatorComponent* animator = GetAnimatorComponent(entityID);
+		return animator && animator->IsPlaying ? 1 : 0;
+	}
+
+	static void AnimatorComponent_SetPlaying(const uint64_t entityID, const uint8_t playing)
+	{
+        KBR_TRACY_FUNCTION();
+
+		if (AnimatorComponent* animator = GetAnimatorComponent(entityID))
+			animator->IsPlaying = playing != 0;
+	}
+
+	static uint8_t AnimatorComponent_IsLooping(const uint64_t entityID)
+	{
+        KBR_TRACY_FUNCTION();
+
+		const AnimatorComponent* animator = GetAnimatorComponent(entityID);
+		return animator && animator->IsLooping ? 1 : 0;
+	}
+
+	static void AnimatorComponent_SetLooping(const uint64_t entityID, const uint8_t looping)
+	{
+        KBR_TRACY_FUNCTION();
+
+		if (AnimatorComponent* animator = GetAnimatorComponent(entityID))
+			animator->IsLooping = looping != 0;
+	}
+
+	static uint8_t AnimatorComponent_GetPlayOnStart(const uint64_t entityID)
+	{
+        KBR_TRACY_FUNCTION();
+
+		const AnimatorComponent* animator = GetAnimatorComponent(entityID);
+		return animator && animator->PlayOnStart ? 1 : 0;
+	}
+
+	static void AnimatorComponent_SetPlayOnStart(const uint64_t entityID, const uint8_t playOnStart)
+	{
+        KBR_TRACY_FUNCTION();
+
+		if (AnimatorComponent* animator = GetAnimatorComponent(entityID))
+			animator->PlayOnStart = playOnStart != 0;
+	}
+
+	static int32_t AnimatorComponent_GetActiveClip(const uint64_t entityID)
+	{
+        KBR_TRACY_FUNCTION();
+
+		const AnimatorComponent* animator = GetAnimatorComponent(entityID);
+		return animator ? animator->ActiveClip : -1;
+	}
+
+	static void AnimatorComponent_SetActiveClip(const uint64_t entityID, const int32_t clipIndex)
+	{
+        KBR_TRACY_FUNCTION();
+
+		AnimatorComponent* animator = GetAnimatorComponent(entityID);
+		if (!animator)
+			return;
+
+		if (clipIndex < -1 || static_cast<size_t>(clipIndex) >= animator->AnimationClips.size())
+		{
+			Log::CoreWarn("AnimatorComponent_SetActiveClip: clip index {} is out of range on entity {}",
+			              clipIndex, entityID);
+			return;
+		}
+
+		animator->ActiveClip = clipIndex;
+		animator->CurrentTime = 0.0f;
+	}
+
+	static int32_t AnimatorComponent_GetClipCount(const uint64_t entityID)
+	{
+        KBR_TRACY_FUNCTION();
+
+		const AnimatorComponent* animator = GetAnimatorComponent(entityID);
+		return animator ? static_cast<int32_t>(animator->AnimationClips.size()) : 0;
+	}
+
+	static float AnimatorComponent_GetClipDuration(const uint64_t entityID, const int32_t clipIndex)
+	{
+        KBR_TRACY_FUNCTION();
+
+		const AnimatorComponent* animator = GetAnimatorComponent(entityID);
+		if (!animator)
+			return 0.0f;
+
+		const Ref<AnimationClip> clip = ResolveAnimatorClip(*animator, clipIndex);
+		return clip ? clip->GetDuration() : 0.0f;
+	}
+
 	/// String return buffer (managed side will read from this pointer)
 	static std::string s_StringReturnBuffer;
 
@@ -736,6 +1007,7 @@ namespace Kerberos
 		RegisterComponent<AudioSource2DComponent>("Kerberos.Scene.AudioSource2DComponent");
 		RegisterComponent<AudioSource3DComponent>("Kerberos.Scene.AudioSource3DComponent");
 		RegisterComponent<AudioListenerComponent>("Kerberos.Scene.AudioListenerComponent");
+		RegisterComponent<AnimatorComponent>("Kerberos.Scene.AnimatorComponent");
 
 		/// Build the native callback table and pass it to the managed side
 		static NativeCallbackTable callbackTable = {};
@@ -789,6 +1061,25 @@ namespace Kerberos
 
 		callbackTable.Physics_Raycast = reinterpret_cast<void*>(&Physics_Raycast);
 		callbackTable.Entity_InstantiatePrefab = reinterpret_cast<void*>(&Entity_InstantiatePrefab);
+
+		callbackTable.AnimatorComponent_Play = reinterpret_cast<void*>(&AnimatorComponent_Play);
+		callbackTable.AnimatorComponent_PlayByName = reinterpret_cast<void*>(&AnimatorComponent_PlayByName);
+		callbackTable.AnimatorComponent_Stop = reinterpret_cast<void*>(&AnimatorComponent_Stop);
+		callbackTable.AnimatorComponent_Pause = reinterpret_cast<void*>(&AnimatorComponent_Pause);
+		callbackTable.AnimatorComponent_GetTime = reinterpret_cast<void*>(&AnimatorComponent_GetTime);
+		callbackTable.AnimatorComponent_SetTime = reinterpret_cast<void*>(&AnimatorComponent_SetTime);
+		callbackTable.AnimatorComponent_GetSpeed = reinterpret_cast<void*>(&AnimatorComponent_GetSpeed);
+		callbackTable.AnimatorComponent_SetSpeed = reinterpret_cast<void*>(&AnimatorComponent_SetSpeed);
+		callbackTable.AnimatorComponent_IsPlaying = reinterpret_cast<void*>(&AnimatorComponent_IsPlaying);
+		callbackTable.AnimatorComponent_SetPlaying = reinterpret_cast<void*>(&AnimatorComponent_SetPlaying);
+		callbackTable.AnimatorComponent_IsLooping = reinterpret_cast<void*>(&AnimatorComponent_IsLooping);
+		callbackTable.AnimatorComponent_SetLooping = reinterpret_cast<void*>(&AnimatorComponent_SetLooping);
+		callbackTable.AnimatorComponent_GetPlayOnStart = reinterpret_cast<void*>(&AnimatorComponent_GetPlayOnStart);
+		callbackTable.AnimatorComponent_SetPlayOnStart = reinterpret_cast<void*>(&AnimatorComponent_SetPlayOnStart);
+		callbackTable.AnimatorComponent_GetActiveClip = reinterpret_cast<void*>(&AnimatorComponent_GetActiveClip);
+		callbackTable.AnimatorComponent_SetActiveClip = reinterpret_cast<void*>(&AnimatorComponent_SetActiveClip);
+		callbackTable.AnimatorComponent_GetClipCount = reinterpret_cast<void*>(&AnimatorComponent_GetClipCount);
+		callbackTable.AnimatorComponent_GetClipDuration = reinterpret_cast<void*>(&AnimatorComponent_GetClipDuration);
 
 		/// Pass the callback table to the managed side
 		ScriptEngine::SetManagedNativeCallbacks(&callbackTable);

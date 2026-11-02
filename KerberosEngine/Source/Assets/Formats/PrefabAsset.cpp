@@ -34,6 +34,7 @@ void PrefabEntityTemplate::ToEntity(Entity newEntity) const
         c.PlaybackSpeed = Animator->PlaybackSpeed;
         c.IsLooping = Animator->Loop;
         c.IsPlaying = Animator->AutoPlay;
+        c.PlayOnStart = Animator->AutoPlay;
         c.CurrentTime = 0.0f;
     }
     if (JointIndex)

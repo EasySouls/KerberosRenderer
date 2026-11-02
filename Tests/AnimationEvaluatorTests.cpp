@@ -1,4 +1,7 @@
 #include "Renderer/Animation/AnimationEvaluator.hpp"
+#include "Scene/Components/AnimationComponents.hpp"
+#include "Scene/Entity.hpp"
+#include "Scene/Scene.hpp"
 
 #include <gtest/gtest.h>
 
@@ -217,6 +220,54 @@ namespace
 		EXPECT_FLOAT_EQ(playback.Time, 0.0f);
 		EXPECT_FALSE(std::isnan(playback.Time));
 		EXPECT_TRUE(playback.IsPlaying);
+	}
+
+	TEST(AnimationSceneTest, CopyStartsAnimatorsAccordingToPlayOnStart)
+	{
+		const Kerberos::Ref<Kerberos::Scene> editorScene = Kerberos::CreateRef<Kerberos::Scene>();
+
+		Kerberos::Entity entity = editorScene->CreateEntity("Animated");
+		auto& animator = entity.AddComponent<Kerberos::AnimatorComponent>();
+		animator.PlayOnStart = true;
+		animator.IsPlaying = false;
+		animator.CurrentTime = 3.0f;
+		animator.ActiveClip = 0;
+		animator.AnimationClips.push_back(Kerberos::AssetHandle::Invalid());
+
+		const Kerberos::Ref<Kerberos::Scene> runtimeScene = Kerberos::Scene::Copy(editorScene);
+		const Kerberos::Entity copiedEntity = runtimeScene->GetEntityByUUID(entity.GetUUID());
+
+		ASSERT_TRUE(copiedEntity);
+		const auto& copiedAnimator = copiedEntity.GetComponent<Kerberos::AnimatorComponent>();
+		EXPECT_TRUE(copiedAnimator.PlayOnStart);
+		EXPECT_TRUE(copiedAnimator.IsPlaying);
+		EXPECT_FLOAT_EQ(copiedAnimator.CurrentTime, 0.0f);
+		EXPECT_TRUE(copiedAnimator.LoadedClips.empty());
+
+		runtimeScene->StopAnimators();
+		EXPECT_FALSE(copiedAnimator.IsPlaying);
+
+		runtimeScene->StartAnimators();
+		EXPECT_TRUE(copiedAnimator.IsPlaying);
+	}
+
+	TEST(AnimationSceneTest, CopyDoesNotStartAnimatorsWithoutPlayOnStart)
+	{
+		const Kerberos::Ref<Kerberos::Scene> editorScene = Kerberos::CreateRef<Kerberos::Scene>();
+
+		Kerberos::Entity entity = editorScene->CreateEntity("Animated");
+		auto& animator = entity.AddComponent<Kerberos::AnimatorComponent>();
+		animator.PlayOnStart = false;
+		animator.IsPlaying = true;
+		animator.CurrentTime = 2.0f;
+
+		const Kerberos::Ref<Kerberos::Scene> runtimeScene = Kerberos::Scene::Copy(editorScene);
+		const Kerberos::Entity copiedEntity = runtimeScene->GetEntityByUUID(entity.GetUUID());
+
+		ASSERT_TRUE(copiedEntity);
+		const auto& copiedAnimator = copiedEntity.GetComponent<Kerberos::AnimatorComponent>();
+		EXPECT_FALSE(copiedAnimator.IsPlaying);
+		EXPECT_FLOAT_EQ(copiedAnimator.CurrentTime, 0.0f);
 	}
 
 }

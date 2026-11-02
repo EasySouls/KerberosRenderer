@@ -100,9 +100,11 @@ field initializers, then reconciles them with the current script class so
 removed fields are dropped and new fields get defaults. Native glTF prefabs
 remain script-free. Authored prefab entity records also carry an optional joint
 index, an optional skinned-mesh record with a prefab-local skeleton-entity
-reference, and an `Animator` record (skeleton-entity reference plus clip
-handles). `Scene::InstantiatePrefab` remaps the skeleton-entity UUIDs and joint
-UUIDs after creating the entities. When a scene is
+reference, and an `Animator` record (skeleton-entity reference, clip handles,
+and an `AutoPlay` flag). `AnimatorComponentTemplate::AutoPlay` maps to
+`AnimatorComponent::PlayOnStart` and the initial `IsPlaying` state when the
+template is instantiated. `Scene::InstantiatePrefab` remaps the skeleton-entity
+UUIDs and joint UUIDs after creating the entities. When a scene is
 running, `Scene::InstantiatePrefab` creates script instances and runs
 `OnCreate` for scripted prefab entities immediately.
 The importer also emits one native material record per glTF material (named

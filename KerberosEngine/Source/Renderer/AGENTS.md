@@ -267,6 +267,12 @@ or no resolvable active clip stays in its rest pose. Evaluation runs in the
 renderer frame, which is after scene transforms and physics; that ordering is
 fine for animation-only characters but must change before a ragdoll handoff.
 
+Runtime playback state is authored through `AnimatorComponent::PlayOnStart`.
+`Scene::Copy` resets each animator's time, clears resolved clips, and sets
+`IsPlaying` from `PlayOnStart`; `Scene::StartAnimators` applies the same rule on
+`OnRuntimeStart`/`OnSimulationStart`, and `Scene::StopAnimators` resets playback
+on stop. Scripts can override the state after startup.
+
 `SkinMatrixVersion` is bumped only when the evaluated pose changes (clip, time,
 animator, or first evaluation). Each instance also tracks the last version
 uploaded into each frame slot, so a paused instance still initializes a frame

@@ -77,6 +77,7 @@ struct AnimatorComponent
     float PlaybackSpeed = 1.0f;
     bool IsPlaying = false;
     bool IsLooping = true;
+    bool PlayOnStart = false;
 
     AnimatorComponent() = default;
     explicit AnimatorComponent(const UUID& skeletonEntity) : SkeletonEntity(skeletonEntity) {}

@@ -47,6 +47,9 @@ namespace Kerberos
 		m_PhysicsSystem->Initialize(shared_from_this());
 		m_PhysicsSystem->Update(0.0f); // Sync physics bodies with transforms before scripts run for the first time
 
+		/// Start authored animation before scripts run so OnCreate can override it.
+		StartAnimators();
+
 		ScriptEngine::OnRuntimeStart(shared_from_this());
 
 		/// Instantiate all scripts. Snapshot the entities first because a
@@ -65,6 +68,7 @@ namespace Kerberos
 	{
 		m_IsRunning = false;
 
+		StopAnimators();
 		m_PhysicsSystem->Cleanup();
 
 		ScriptEngine::OnRuntimeStop();
@@ -73,11 +77,35 @@ namespace Kerberos
 	void Scene::OnSimulationStart()
 	{
 		m_PhysicsSystem->Initialize(shared_from_this());
+		StartAnimators();
 	}
 
-	void Scene::OnSimulationStop() const
+	void Scene::OnSimulationStop()
 	{
+		StopAnimators();
 		m_PhysicsSystem->Cleanup();
+	}
+
+	void Scene::StartAnimators()
+	{
+		const auto view = m_Registry.view<AnimatorComponent>();
+		for (const auto entity : view)
+		{
+			auto& animator = view.get<AnimatorComponent>(entity);
+			animator.CurrentTime = 0.0f;
+			animator.IsPlaying = animator.PlayOnStart;
+		}
+	}
+
+	void Scene::StopAnimators()
+	{
+		const auto view = m_Registry.view<AnimatorComponent>();
+		for (const auto entity : view)
+		{
+			auto& animator = view.get<AnimatorComponent>(entity);
+			animator.CurrentTime = 0.0f;
+			animator.IsPlaying = false;
+		}
 	}
 
 	void Scene::SetScenePaused(const bool isPaused)
@@ -795,7 +823,7 @@ Entity Scene::InstantiatePrefab(const AssetHandle prefabHandle, const std::strin
 		{
 			auto animator = sourceRegistry.get<AnimatorComponent>(sourceEntity);
 			animator.CurrentTime = 0.0f;
-			animator.IsPlaying = false;
+			animator.IsPlaying = animator.PlayOnStart;
 			animator.LoadedClips.clear();
 			newEntity.AddComponent<AnimatorComponent>(animator);
 		}
