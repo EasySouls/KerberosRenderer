@@ -17,7 +17,7 @@ import Kerberos;
 
 namespace
 {
-	Kerberos::Skeleton MakeTwoJointSkeleton()
+	std::vector<Kerberos::SkeletonJoint> MakeTwoJointJoints()
 	{
 		std::vector<Kerberos::SkeletonJoint> joints(2);
 
@@ -37,7 +37,12 @@ namespace
 		const glm::mat4 childGlobal = glm::translate(glm::mat4(1.0f), joints[1].RestTranslation);
 		joints[1].InverseBind = glm::inverse(childGlobal);
 
-		return Kerberos::Skeleton(joints);
+		return joints;
+	}
+
+	Kerberos::Skeleton MakeTwoJointSkeleton()
+	{
+		return Kerberos::Skeleton(MakeTwoJointJoints());
 	}
 
 	Kerberos::AnimationTrack MakeTrack(const uint32_t joint,
@@ -249,6 +254,43 @@ namespace
 
 		runtimeScene->StartAnimators();
 		EXPECT_TRUE(copiedAnimator.IsPlaying);
+	}
+
+	TEST(AnimationRuntimeTest, EvaluatesRestPoseAndTracksSkeletonInstances)
+	{
+		const Kerberos::Ref<Kerberos::Scene> scene = Kerberos::CreateRef<Kerberos::Scene>();
+		Kerberos::Entity entity = scene->CreateEntity("Skeleton");
+
+		auto& skeletonComponent = entity.AddComponent<Kerberos::SkeletonComponent>();
+		skeletonComponent.Skeleton = Kerberos::CreateRef<Kerberos::Skeleton>(MakeTwoJointJoints());
+
+		auto& runtime = scene->GetAnimationRuntime();
+		runtime.AdvanceClocks(0.0f, false);
+		runtime.EvaluatePose();
+
+		const Kerberos::SkeletonPose* pose = runtime.FindPose(entity.GetUUID());
+		ASSERT_NE(pose, nullptr);
+		ASSERT_EQ(pose->SkinMatrices.size(), 2u);
+
+		for (const glm::mat4& skinMatrix : pose->SkinMatrices)
+			ExpectMatrixNear(skinMatrix, glm::mat4(1.0f));
+
+		ASSERT_EQ(runtime.GetInstances().size(), 1u);
+		const uint64_t poseVersion = runtime.GetInstances().front().PoseVersion;
+		EXPECT_GE(poseVersion, 1u);
+
+		// A rest-pose skeleton does not need a new pose version when nothing changed.
+		runtime.AdvanceClocks(0.0f, false);
+		runtime.EvaluatePose();
+		EXPECT_EQ(runtime.GetInstances().front().PoseVersion, poseVersion);
+
+		glm::mat4 jointGlobal(1.0f);
+		ASSERT_TRUE(runtime.TryGetJointGlobalTransform(entity.GetUUID(), 1, jointGlobal));
+		EXPECT_NEAR(jointGlobal[3].x, 1.0f, 1.0e-5f);
+
+		scene->DestroyEntity(entity);
+		runtime.AdvanceClocks(0.0f, false);
+		EXPECT_TRUE(runtime.GetInstances().empty());
 	}
 
 	TEST(AnimationSceneTest, CopyDoesNotStartAnimatorsWithoutPlayOnStart)

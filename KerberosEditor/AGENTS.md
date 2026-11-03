@@ -62,9 +62,9 @@ Editor windows live mainly under
   the matching asset-browser drag/drop payload working. The Animator component
   exposes skeleton-entity selection, clip add/remove/reorder-by-selection,
   active-clip selection, time, speed, playing, looping, and Play On Start
-  controls plus a Stop button. Playback is evaluated by the renderer in Edit,
-  Simulate, and Play, so toggling Playing or scrubbing Time previews the pose
-  immediately unless the scene is paused. C# scripts control the same state
+  controls plus a Stop button. Playback is evaluated by the scene-owned
+  `AnimationRuntime` in Edit, Simulate, and Play, so toggling Playing or
+  scrubbing Time previews the pose immediately unless the scene is paused. C# scripts control the same state
   through `Kerberos.Scene.AnimatorComponent` (`Play`, `Play(string)`, `Pause`,
   `Stop`, `CurrentTime`, `PlaybackSpeed`, `IsPlaying`, `IsLooping`,
   `PlayOnStart`, `ActiveClip`, `ClipCount`, and `GetClipDuration`).
@@ -235,9 +235,13 @@ hidden-window Vulkan lifecycle tests. Those tests still use the real
 application, renderer, scripting, asset-manager, and scene-loading paths, but
 must close and release project resources before the application is destroyed.
 
-Scene updates drive editor/runtime simulation and then queue rendering. Edit and
-Simulate render through the editor camera; Play renders through the runtime
-scene's primary `CameraComponent`. The runtime view matrix is the inverse of the
+Scene updates drive editor/runtime simulation and then queue rendering. The
+scene update order is transforms → animation clocks/pose → scripts/physics →
+`AnimationRuntime::FinalizePose` → queue render; the renderer only uploads the
+already-final skin matrices. Play evaluates animation again after scripts when
+playback state changed so C# controls apply in the same frame. Edit and Simulate
+render through the editor camera; Play renders through the runtime scene's
+primary `CameraComponent`. The runtime view matrix is the inverse of the
 camera entity's world transform, and both editor/runtime scene projection
 matrices apply the Vulkan Y flip. The editor camera is neither updated nor given
 input while Play is active.

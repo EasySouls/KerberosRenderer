@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Components.hpp"
+#include "AnimationRuntime.hpp"
 #include "Camera/EditorCamera.hpp"
 #include "Camera/SceneCamera.hpp"
 #include "Core/UUID.hpp"
@@ -10,6 +11,7 @@
 #include <entt/single_include/entt/entt.hpp>
 #include <string_view>
 #include <memory>
+#include <utility>
 
 namespace Kerberos
 {
@@ -111,6 +113,9 @@ namespace Kerberos
 		const PhysicsSystem& GetPhysicsSystem() const;
 		PhysicsSystem& GetPhysicsSystem();
 
+		AnimationRuntime& GetAnimationRuntime();
+		const AnimationRuntime& GetAnimationRuntime() const;
+
 		void SetName(const std::string& name) { m_Name = name; }
 		const std::string& GetName() const { return m_Name; }
 
@@ -141,6 +146,8 @@ namespace Kerberos
 
 		static void CopyEntityRecursive(const Ref<Scene>& other, entt::entity sourceEntity, const Ref<Scene>& newScene, entt::entity parentNewEntity);
 
+		std::pair<const SceneCamera*, glm::mat4> FindPrimaryCamera();
+
 		template<typename Component>
 		static void CopyComponent(entt::registry& dst, entt::registry& src)
 		{
@@ -167,9 +174,11 @@ namespace Kerberos
 		std::vector<entt::entity> m_RootEntities;
 
 		JoltPhysicsSystem* m_PhysicsSystem;
+        AnimationRuntime m_AnimationRuntime;
 
 		friend class Entity;
 		friend class Renderer;
+		friend class AnimationRuntime;
 		friend class JoltPhysicsSystem;
 		friend class HierarchyPanel;
 		friend class SceneSerializer;

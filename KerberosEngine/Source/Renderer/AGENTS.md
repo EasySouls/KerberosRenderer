@@ -99,6 +99,7 @@ the next frame.
 The active pass order is approximately:
 
 1. skinning (skinned meshes; CPU animation evaluation happens earlier in
+   `Scene::AnimationRuntime` and the skin-matrix upload happens in
    `AnimationSystem::BeginFrame`)
 2. depth pre-pass
 3. shadows
@@ -116,8 +117,9 @@ The active pass order is approximately:
 15. mouse picking
 
 The skinning pass is added before the depth pre-pass; animation has no graph
-pass because pose evaluation and the skin-matrix upload happen on the CPU in
-`AnimationSystem::BeginFrame`. The skinning pass currently ends with an explicit
+pass because pose evaluation happens on the CPU in `Scene::AnimationRuntime` and
+the skin-matrix upload happens on the CPU in `AnimationSystem::BeginFrame`. The
+skinning pass currently ends with an explicit
 compute-write to vertex-read barrier because the SVB is bound directly by raster
 passes and is not declared as a render-graph resource.
 
@@ -234,12 +236,20 @@ validation procedures change.
 
 ## Ownership
 
-`AnimationSystem` (`Renderer/Animation/AnimationSystem.*`) owns immutable
-skeleton/clip data and per-skeleton-instance pose/skin-matrix data. It keeps one
-host-visible skin-matrix buffer per frame in flight (selected by `frameIndex`)
-and publishes a `SkinningFrameSnapshot` (per-instance `SkeletonFrame` records).
-The snapshot buffer field mirrors the current frame's buffer but `SkinningSystem`
-binds its own per-frame descriptor set.
+`Scene::AnimationRuntime` (`Scene/AnimationRuntime.*`) owns the authoritative CPU
+animation state: per-skeleton-instance pose data, resolved clips, playback
+clocks, pose versions, and the future marker/event/ragdoll/IK state. It is a
+value member of `Scene`, so every scene owns its own runtime and the renderer
+never drives playback.
+
+`AnimationSystem` (`Renderer/Animation/AnimationSystem.*`) is the GPU upload
+bridge. It owns one host-visible skin-matrix buffer per frame in flight, one GPU
+slice per skeleton instance, and publishes a `SkinningFrameSnapshot`
+(per-instance `SkeletonFrame` records). `BeginFrame(scene, frameIndex)` reads
+`scene->GetAnimationRuntime().GetInstances()`, uploads changed poses for that
+frame slot, and never advances time or evaluates animation. The snapshot buffer
+field mirrors the current frame's buffer, but `SkinningSystem` binds its own
+per-frame descriptor set.
 
 `AnimationEvaluator` (`Renderer/Animation/AnimationEvaluator.*`) is the pure CPU
 pose layer: `BuildClipTrackCache` maps a clip to a skeleton, `SampleTrack`
@@ -253,19 +263,24 @@ Entities use `SkeletonComponent` for the skeleton instance and joint list,
 skeleton-entity link, and `AnimatorComponent` for the skeleton-entity reference,
 clip handles, and playback state. The animator replaces the old single-clip
 `AnimationComponent`; legacy serialized animation components are migrated on
-load. `AnimatorComponent::LoadedClips` is transient: `AnimationSystem` resolves
-`AnimationClips` through the active asset manager every frame when the handle
-list or cached handle changes.
+load. `AnimatorComponent::LoadedClips` is transient: `AnimationRuntime` resolves
+`AnimationClips` through the active asset manager when the handle list changes
+or the cached artifact was evicted by a reimport.
 
 ## Evaluation and versioning
 
-Per frame `AnimationSystem::BeginFrame` advances animator time, resolves the
-animator that drives each skeleton (same entity first, then `SkeletonEntity`,
-with a warning when several animators target one skeleton), evaluates the pose,
-uploads skin matrices, and publishes the snapshot. A skeleton with no animator
-or no resolvable active clip stays in its rest pose. Evaluation runs in the
-renderer frame, which is after scene transforms and physics; that ordering is
-fine for animation-only characters but must change before a ragdoll handoff.
+`Scene::OnUpdateEditor`/`OnUpdateSimulation`/`OnUpdateRuntime` own the frame
+order. They calculate transforms, call `AnimationRuntime::AdvanceClocks`,
+`EvaluatePose`, run scripts/physics, then `FinalizePose`, and only then queue the
+render. The runtime resolves the animator that drives each skeleton (same entity
+first, then `SkeletonEntity`, with a warning when several animators target one
+skeleton). A skeleton with no animator or no resolvable active clip stays in its
+rest pose.
+
+`OnUpdateRuntime` evaluates once before scripts and again after scripts when
+playback state changed, so `Play`/`Stop`/`SetTime` from C# still applies before
+physics and rendering. `FinalizePose` is the post-physics hook reserved for
+ragdoll blending, IK, root motion, and sockets.
 
 Runtime playback state is authored through `AnimatorComponent::PlayOnStart`.
 `Scene::Copy` resets each animator's time, clears resolved clips, and sets
@@ -273,11 +288,12 @@ Runtime playback state is authored through `AnimatorComponent::PlayOnStart`.
 `OnRuntimeStart`/`OnSimulationStart`, and `Scene::StopAnimators` resets playback
 on stop. Scripts can override the state after startup.
 
-`SkinMatrixVersion` is bumped only when the evaluated pose changes (clip, time,
-animator, or first evaluation). Each instance also tracks the last version
-uploaded into each frame slot, so a paused instance still initializes a frame
-slot that has not seen the current pose. `SkinningSystem` tracks the same
-per-frame version and re-dispatches only when its slot is stale.
+`AnimationInstance::PoseVersion` is bumped only when the evaluated pose changes
+(clip, time, animator, or first evaluation). Each GPU instance tracks the last
+version uploaded into each frame slot, so a paused instance still initializes a
+frame slot that has not seen the current pose. `SkinningSystem` tracks the same
+per-frame version and re-dispatches only when its slot is stale. Renderer
+`BeginFrame` must run after `FinalizePose`, or skinning will use a stale pose.
 
 `SkinningSystem` (`Renderer/Animation/SkinningSystem.*`) owns the global source
 vertex/joint/weight/index buffers, the shared vertex buffer (SVB), the SVB
@@ -319,10 +335,11 @@ SVB rather than expecting world-space output.
 - Pose evaluation and skin-matrix generation are CPU-only. There is no
   evaluation/precompute compute pass and no GPU pose path yet.
 - Clip cross-fades, pose blending, additive layers, root motion, animation
-  events, and sockets/attachments are not implemented.
-- Animation is evaluated inside the renderer frame, after scene transforms and
-  physics. Before adding ragdolls, split the update into a pre-physics pose pass
-  and a post-physics blend/finalize pass.
+  events, event authoring, and sockets/attachments are not implemented.
+  `AnimationRuntime` already exposes marker query and pending-event surfaces for
+  the next milestone.
+- `FinalizePose` is an empty post-physics hook; ragdoll blending and IK still
+  need to fill it and bump `PoseVersion`.
 - Physics/ragdoll integration and Jolt bone proxies are not implemented.
 - Only direct per-mesh dispatches are recorded; no indirect dispatch or
   per-frame job buffer exists.

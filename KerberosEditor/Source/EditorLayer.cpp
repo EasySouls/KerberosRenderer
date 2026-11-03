@@ -231,8 +231,6 @@ namespace PROJECT_NAME
 		{
 			KBR_TRACY_SCOPE("Scene::OnUpdate");
 
-			m_ActiveScene->CalculateEntityTransforms();
-
 			switch (m_SceneState)
 			{
 			case SceneState::Edit:

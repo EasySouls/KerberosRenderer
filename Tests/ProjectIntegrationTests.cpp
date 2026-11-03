@@ -132,6 +132,15 @@ namespace
 		}
 		EXPECT_TRUE(skinnedLinkValid);
 		EXPECT_TRUE(animatorLinkValid);
+
+		auto& animationRuntime = scene->GetAnimationRuntime();
+		animationRuntime.AdvanceClocks(0.0f, false);
+		animationRuntime.EvaluatePose();
+
+		const Kerberos::SkeletonPose* pose = animationRuntime.FindPose(skeletonEntity);
+		ASSERT_NE(pose, nullptr);
+		EXPECT_EQ(pose->SkinMatrices.size(), 19u);
+
 		success = true;
 	}
 }

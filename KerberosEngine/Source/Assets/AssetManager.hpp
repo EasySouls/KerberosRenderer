@@ -64,6 +64,11 @@ public:
 		return Project::GetActive()->GetAssetManager()->IsAssetHandleValid(handle);
 	}
 
+	static bool IsAssetLoaded(const AssetHandle handle)
+	{
+		return Project::GetActive()->GetAssetManager()->IsAssetLoaded(handle);
+	}
+
 	static const AssetRegistry& GetAssetRegistry()
 	{
 		return Project::GetActive()->GetAssetManager()->GetAssetRegistry();

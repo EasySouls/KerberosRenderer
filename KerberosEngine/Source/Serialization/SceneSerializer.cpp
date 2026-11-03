@@ -748,6 +748,7 @@ bool SceneSerializer::Deserialize(const std::filesystem::path& filepath) const
 
     const std::string sceneName = data["Scene"].as<std::string>();
     m_Scene->SetName(sceneName);
+    m_Scene->GetAnimationRuntime().Reset();
 
     if (auto entities = data["Entities"]) {
         for (const auto& entity : entities) {

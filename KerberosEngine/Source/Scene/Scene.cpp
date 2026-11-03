@@ -26,8 +26,7 @@ import Kerberos;
 
 namespace Kerberos
 {
-	Scene::Scene()
-		: m_PhysicsSystem(new JoltPhysicsSystem())
+	Scene::Scene() : m_PhysicsSystem(new JoltPhysicsSystem()), m_AnimationRuntime(*this)
 	{
 		m_Registry = entt::basic_registry();
 	}
@@ -117,6 +116,12 @@ namespace Kerberos
 	{
 		KBR_TRACY_FUNCTION();
 
+	    CalculateEntityTransforms();
+
+		m_AnimationRuntime.AdvanceClocks(ts, m_IsScenePaused);
+        m_AnimationRuntime.EvaluatePose();
+        m_AnimationRuntime.FinalizePose(ts);
+
 		Render3DEditor(camera, ts);
 	}
 
@@ -124,11 +129,18 @@ namespace Kerberos
 	{
 		KBR_TRACY_FUNCTION();
 
+		CalculateEntityTransforms();
+
+		m_AnimationRuntime.AdvanceClocks(ts, m_IsScenePaused);
+        m_AnimationRuntime.EvaluatePose();
+
 		/// If the scene is paused, do not update the physics system, but still render the scene
 		if (!m_IsScenePaused)
 		{
 			m_PhysicsSystem->Update(ts);
 		}
+
+        m_AnimationRuntime.FinalizePose(ts);
 
 		Render3DEditor(camera, ts);
 	}
@@ -137,9 +149,19 @@ namespace Kerberos
 	{
 		KBR_TRACY_FUNCTION();
 
+		CalculateEntityTransforms();
+
+		m_AnimationRuntime.AdvanceClocks(ts, m_IsScenePaused);
+        m_AnimationRuntime.EvaluatePose();
+
 		if (!m_IsScenePaused)
 		{
 			UpdateScripts(ts);
+
+			// Scripts may have started, stopped, or seeked an animation. Evaluate again so the
+			// change is visible to physics and the renderer in this same frame. The runtime skips
+			// this when clip/time/state did not change.
+			m_AnimationRuntime.EvaluatePose();
 
 			m_PhysicsSystem->Update(ts);
 
@@ -156,36 +178,20 @@ namespace Kerberos
 			}
 		}
 
-		/// Render the scene from the primary camera in the scene. Runtime rendering
-		/// never uses the editor camera.
-		const SceneCamera* mainCamera = nullptr;
-		glm::mat4 mainCameraTransform(1.0f);
+        m_AnimationRuntime.FinalizePose(ts);
 
-		{
-			const auto view = m_Registry.view<CameraComponent, TransformComponent>();
-			for (const auto entity : view)
-			{
-				auto [cameraComp, transformComp] = view.get<CameraComponent, TransformComponent>(entity);
-				if (cameraComp.IsPrimary)
-				{
-					mainCameraTransform = transformComp.WorldTransform;
-					cameraComp.Camera.SetViewMatrix(glm::inverse(mainCameraTransform));
-					mainCamera = &cameraComp.Camera;
-					break;
-				}
-			}
-		}
+		const auto& [primaryCam, primaryCamTransform] = FindPrimaryCamera();
 
-		if (mainCamera == nullptr)
+		if (primaryCam == nullptr)
 		{
 			Log::CoreError("Cannot render the scene in play mode: no primary camera was found.");
 			return;
 		}
 
 		if (m_Is3D)
-			Render3DRuntime(mainCamera, mainCameraTransform, ts);
+			Render3DRuntime(primaryCam, primaryCamTransform, ts);
 		else
-			Render2DRuntime(mainCamera, mainCameraTransform, ts);
+			Render2DRuntime(primaryCam, primaryCamTransform, ts);
 	}
 
 	Entity Scene::CreateEntity(const std::string& name, const UUID parentId)
@@ -730,7 +736,17 @@ Entity Scene::InstantiatePrefab(const AssetHandle prefabHandle, const std::strin
 		return *m_PhysicsSystem;
 	}
 
-	void Scene::CopyEntityRecursive(const Ref<Scene>& other, const entt::entity sourceEntity, const Ref<Scene>& newScene, const entt::entity parentNewEntity)
+    AnimationRuntime& Scene::GetAnimationRuntime()
+    {
+        return m_AnimationRuntime;
+    }
+
+    const AnimationRuntime& Scene::GetAnimationRuntime() const
+    {
+        return m_AnimationRuntime;
+    }
+
+    void Scene::CopyEntityRecursive(const Ref<Scene>& other, const entt::entity sourceEntity, const Ref<Scene>& newScene, const entt::entity parentNewEntity)
 	{
 		KBR_TRACY_FUNCTION();
 
@@ -846,7 +862,25 @@ Entity Scene::InstantiatePrefab(const AssetHandle prefabHandle, const std::strin
 		}
 	}
 
-	Ref<Scene> Scene::Copy(const Ref<Scene>& other)
+    std::pair<const SceneCamera*, glm::mat4> Scene::FindPrimaryCamera()
+    {
+	    const auto view = m_Registry.view<CameraComponent, TransformComponent>();
+        for (const auto entity : view)
+        {
+            auto [cameraComp, transformComp] = view.get<CameraComponent, TransformComponent>(entity);
+            if (cameraComp.IsPrimary)
+            {
+                cameraComp.Camera.SetViewMatrix(glm::inverse(transformComp.WorldTransform));
+                const glm::mat4& cameraTransform = transformComp.WorldTransform;
+                const SceneCamera* primaryCamera = &cameraComp.Camera;
+                return { primaryCamera, cameraTransform };
+            }
+        }
+
+		return { nullptr, glm::mat4(1.0f) };
+    }
+
+    Ref<Scene> Scene::Copy(const Ref<Scene>& other)
 	{
 		Ref<Scene> newScene = CreateRef<Scene>();
 

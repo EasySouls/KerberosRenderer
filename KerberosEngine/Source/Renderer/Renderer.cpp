@@ -1399,7 +1399,7 @@ void Renderer::RecordQueuedSceneRender(const vk::raii::CommandBuffer& cmd)
         s_Data->LastRenderedScene = s_Data->PendingRender.Scene.get();
     }
 
-    s_Data->AnimationSystem.BeginFrame(s_Data->PendingRender.Scene, frameIndex, s_Data->PendingRender.DeltaTime, s_Data->PendingRender.Scene->IsPaused());
+    s_Data->AnimationSystem.BeginFrame(s_Data->PendingRender.Scene, frameIndex);
     s_Data->SkinningSystem.BeginFrame(s_Data->PendingRender.Scene, s_Data->AnimationSystem.GetSkinningSnapshot(), frameIndex);
 
     if (IsUsingAccelerationStructures()) {
