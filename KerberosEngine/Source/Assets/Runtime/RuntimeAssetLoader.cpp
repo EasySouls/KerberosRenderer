@@ -14,6 +14,7 @@
 #include "Profiling/Profilers.hpp"
 #include "Renderer/Animation/SkeletalMesh.hpp"
 
+#include <algorithm>
 #include <cstring>
 #include <fstream>
 #include <limits>
@@ -165,7 +166,36 @@ Ref<AnimationClip> LoadAnimation(const AssetHandle handle, const std::filesystem
         tracks.push_back(std::move(track));
     }
 
-    auto clip = CreateRef<AnimationClip>(native.Name, tracks, native.DurationSeconds);
+	std::vector<AnimationMarker> markers;
+    markers.reserve(native.Markers.size());
+    for (const auto& [Time, Name] : native.Markers)
+    {
+        markers.push_back({ .Time = Time, .Name = Name });
+    }
+    // Sort markers by time to ensure they are in chronological order
+    std::ranges::sort(markers, [](const AnimationMarker& a, const AnimationMarker& b) {
+        return a.Time < b.Time;
+    });
+
+    std::vector<AnimationEvent> events;
+    events.reserve(native.Events.size());
+    for (const AnimationEventFile& event : native.Events)
+    {
+        events.push_back({
+            .Time = event.Time,
+            .Duration = event.Duration,
+            .Name = event.Name,
+            .Payload = event.Payload,
+            .FireInEditor = event.FireInEditor,
+            .MinTriggerWeight = event.MinTriggerWeight,
+            .Flags = event.Flags,
+        });
+    }
+    // Sort events by time to ensure they are in chronological order
+    std::ranges::sort(events, [](const AnimationEvent& a, const AnimationEvent& b) { return a.Time < b.Time; });
+
+    auto clip = CreateRef<AnimationClip>(native.Name, tracks, native.DurationSeconds,
+                                         std::move(markers), std::move(events));
     clip->GetHandle() = handle;
     return clip;
 }

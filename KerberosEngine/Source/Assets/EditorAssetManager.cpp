@@ -495,6 +495,44 @@ namespace Kerberos
 		return ReimportAsset(sourcePath);
 	}
 
+	std::optional<std::map<std::string, AnimationClipMetaEntry>> EditorAssetManager::GetAnimationClipMeta(
+		const std::filesystem::path& sourcePath) const
+	{
+		if (!m_MetaService)
+			return std::nullopt;
+
+		const auto meta = m_MetaService->LoadMeta(sourcePath);
+		if (!meta.has_value())
+			return std::nullopt;
+
+		return meta->AnimationClips;
+	}
+
+	AssetHandle EditorAssetManager::SetAnimationClipMeta(const std::filesystem::path& sourcePath,
+		const std::map<std::string, AnimationClipMetaEntry>& animationClips)
+	{
+		KBR_TRACY_FUNCTION();
+
+		if (!m_MetaService)
+			return AssetHandle::Invalid();
+
+		auto meta = m_MetaService->LoadMeta(sourcePath);
+		if (!meta.has_value())
+		{
+			Log::CoreWarn("Cannot set animation metadata for a source with no metadata: {}", sourcePath.string());
+			return AssetHandle::Invalid();
+		}
+
+		meta->AnimationClips = animationClips;
+		if (!m_MetaService->SaveMeta(sourcePath, *meta))
+		{
+			Log::CoreError("Failed to persist animation metadata for {}", sourcePath.string());
+			return AssetHandle::Invalid();
+		}
+
+		return ReimportAsset(sourcePath);
+	}
+
 	AssetHandle EditorAssetManager::ReimportAsset(const std::filesystem::path& sourcePath)
 	{
 		KBR_TRACY_FUNCTION();

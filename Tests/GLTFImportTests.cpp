@@ -251,3 +251,68 @@ TEST_F(GLTFImportTest, EvaluatesImportedCesiumManAnimation)
 
 	EXPECT_GT(largestChange, 1.0e-3f);
 }
+
+TEST_F(GLTFImportTest, BakesAnimationMarkersAndEventsFromMetadata)
+{
+	const std::filesystem::path source =
+		std::filesystem::path{ KBR_SOURCE_DIR } / "KerberosEditor" / "Assets" / "Models"
+		/ "CesiumMan" / "glTF" / "CesiumMan.gltf";
+	ASSERT_TRUE(std::filesystem::exists(source)) << source.string();
+
+	std::map<std::string, Kerberos::AnimationClipMetaEntry> animationClips;
+	animationClips["animation:0"].Markers = {
+		{ .Time = 0.8f, .Name = "Late" },
+		{ .Time = 0.2f, .Name = "Early" },
+		{ .Time = 999.0f, .Name = "Clamped" },
+	};
+	animationClips["animation:0"].Events = {
+		{
+			.Time = 0.6f,
+			.Duration = 0.0f,
+			.Name = "Footstep",
+			.Payload = "left",
+			.FireInEditor = false,
+			.MinTriggerWeight = 0.0f,
+			.Flags = 0,
+		},
+		{
+			.Time = 0.3f,
+			.Duration = 0.2f,
+			.Name = "WeaponTrail",
+			.Payload = "right",
+			.FireInEditor = true,
+			.MinTriggerWeight = 0.25f,
+			.Flags = 2,
+		},
+	};
+
+	ASSERT_TRUE(Kerberos::GLTFSceneImporter::Import(source, m_Output, "CesiumMan", nullptr,
+	                                                nullptr, nullptr, &animationClips));
+
+	const auto animationPath = FindArtifact(m_Output, ".kbranimation");
+	ASSERT_FALSE(animationPath.empty());
+
+	Kerberos::AnimationClipFile animation;
+	ASSERT_TRUE(Kerberos::NativeAssetSerializer::DeserializeAnimationClip(animationPath, animation));
+	EXPECT_EQ(animation.Version, 2u);
+
+	ASSERT_EQ(animation.Markers.size(), 3u);
+	EXPECT_EQ(animation.Markers[0].Name, "Early");
+	EXPECT_FLOAT_EQ(animation.Markers[0].Time, 0.2f);
+	EXPECT_EQ(animation.Markers[1].Name, "Late");
+	EXPECT_FLOAT_EQ(animation.Markers[1].Time, 0.8f);
+	EXPECT_EQ(animation.Markers[2].Name, "Clamped");
+	EXPECT_LE(animation.Markers[2].Time, animation.DurationSeconds);
+
+	ASSERT_EQ(animation.Events.size(), 2u);
+	EXPECT_EQ(animation.Events[0].Name, "WeaponTrail");
+	EXPECT_FLOAT_EQ(animation.Events[0].Time, 0.3f);
+	EXPECT_EQ(animation.Events[0].Payload, "right");
+	EXPECT_TRUE(animation.Events[0].FireInEditor);
+	EXPECT_FLOAT_EQ(animation.Events[0].MinTriggerWeight, 0.25f);
+	EXPECT_EQ(animation.Events[0].Flags, 2u);
+
+	EXPECT_EQ(animation.Events[1].Name, "Footstep");
+	EXPECT_FLOAT_EQ(animation.Events[1].Time, 0.6f);
+	EXPECT_EQ(animation.Events[1].Payload, "left");
+}

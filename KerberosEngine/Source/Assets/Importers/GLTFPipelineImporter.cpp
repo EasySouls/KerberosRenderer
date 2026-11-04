@@ -88,7 +88,7 @@ ImportResult GLTFPipelineImporter::Import(const ImportContext &context)
     ImportResult result;
     GltfSceneManifest manifest;
     if (!GLTFSceneImporter::Import(context.SourceAbsolutePath, context.CacheRootAbsolutePath, namespacePath, &manifest,
-                                   &context.Meta.TextureSrgb, &result.TextureSrgb))
+                                   &context.Meta.TextureSrgb, &result.TextureSrgb, &context.Meta.AnimationClips))
         throw std::runtime_error("Failed to build glTF scene");
     result.SourceHandle = context.Meta.SourceHandle.IsValid() ? context.Meta.SourceHandle : AssetHandle();
     if (!result.SourceHandle.IsValid())

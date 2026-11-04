@@ -258,6 +258,12 @@ and `ComputeGlobalAndSkinMatrices` derives globals and skin matrices.
 `AdvancePlaybackTime` owns loop/clamp/stop semantics. Keep it Vulkan-free so it
 stays unit-testable.
 
+`AnimationClip` now carries sorted `AnimationMarker` and `AnimationEvent` data
+loaded from the native clip. The runtime exposes marker queries and the
+`PendingDispatch` surface, but crossing detection, duration windows, event
+dispatch, editor timeline authoring, and cross-fade weight filtering are not
+implemented yet.
+
 Entities use `SkeletonComponent` for the skeleton instance and joint list,
 `JointComponent` for joint ordering, `SkinnedMeshComponent` for the mesh /
 skeleton-entity link, and `AnimatorComponent` for the skeleton-entity reference,
@@ -334,10 +340,11 @@ SVB rather than expecting world-space output.
 
 - Pose evaluation and skin-matrix generation are CPU-only. There is no
   evaluation/precompute compute pass and no GPU pose path yet.
-- Clip cross-fades, pose blending, additive layers, root motion, animation
-  events, event authoring, and sockets/attachments are not implemented.
-  `AnimationRuntime` already exposes marker query and pending-event surfaces for
-  the next milestone.
+- Clip cross-fades, pose blending, additive layers, root motion, event
+  dispatch, event timeline authoring, and sockets/attachments are not
+  implemented. Marker/event data now round-trips from `.meta` through the
+  native clip into `AnimationClip`; `AnimationRuntime` exposes the query and
+  pending-dispatch surfaces for the next milestone.
 - `FinalizePose` is an empty post-physics hook; ragdoll blending and IK still
   need to fill it and bump `PoseVersion`.
 - Physics/ragdoll integration and Jolt bone proxies are not implemented.

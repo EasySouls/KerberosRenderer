@@ -238,7 +238,11 @@ must close and release project resources before the application is destroyed.
 Scene updates drive editor/runtime simulation and then queue rendering. The
 scene update order is transforms → animation clocks/pose → scripts/physics →
 `AnimationRuntime::FinalizePose` → queue render; the renderer only uploads the
-already-final skin matrices. Play evaluates animation again after scripts when
+already-final skin matrices. Animation markers/events are stored per source in
+the `.meta` (`AnimationClips`, schema 3); `EditorAssetManager` exposes
+`GetAnimationClipMeta`/`SetAnimationClipMeta`, and applying changes persists the
+metadata and force-reimports the source. There is no marker/event timeline UI
+yet. Play evaluates animation again after scripts when
 playback state changed so C# controls apply in the same frame. Edit and Simulate
 render through the editor camera; Play renders through the runtime scene's
 primary `CameraComponent`. The runtime view matrix is the inverse of the

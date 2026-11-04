@@ -19,6 +19,7 @@
 
 #include <algorithm>
 #include <array>
+#include <cmath>
 #include <cstring>
 #include <fstream>
 #include <map>
@@ -930,10 +931,11 @@ bool LoadImageDataWithKtxFallback(
 
     bool WriteAnimation(const std::filesystem::path& root, const size_t animationIndex,
         const tinygltf::Model& model, const SkeletonImportInfo& skeleton, AnimationClipFile& clip,
+        const std::map<std::string, AnimationClipMetaEntry>* animationClips,
         const std::string& filename)
     {
         const auto& animation = model.animations[animationIndex];
-        clip.Version = 1;
+        clip.Version = 2;
         clip.LocalKey = Key("animation", animationIndex);
         clip.SourceIndex = static_cast<uint32_t>(animationIndex);
         clip.Name = Name(animation.name, "Animation_", animationIndex);
@@ -951,6 +953,43 @@ bool LoadImageDataWithKtxFallback(
             clip.Tracks.push_back(std::move(track));
         }
 
+        if (animationClips)
+        {
+            const auto clipMetaIt = animationClips->find(clip.LocalKey);
+            if (clipMetaIt != animationClips->end())
+            {
+                clip.Markers = clipMetaIt->second.Markers;
+                clip.Events = clipMetaIt->second.Events;
+
+                std::erase_if(clip.Markers, [](const AnimationMarkerFile& marker)
+                {
+                    return !std::isfinite(marker.Time);
+                });
+                std::erase_if(clip.Events, [](const AnimationEventFile& event)
+                {
+                    return !std::isfinite(event.Time) || !std::isfinite(event.Duration) ||
+                        !std::isfinite(event.MinTriggerWeight);
+                });
+
+                const auto clampTime = [&clip](const float time)
+                {
+                    return clip.DurationSeconds > 0.0f ? std::clamp(time, 0.0f, clip.DurationSeconds) : 0.0f;
+                };
+
+                for (AnimationMarkerFile& marker : clip.Markers)
+                    marker.Time = clampTime(marker.Time);
+
+                for (AnimationEventFile& event : clip.Events)
+                {
+                    event.Time = clampTime(event.Time);
+                    event.Duration = std::max(0.0f, event.Duration);
+                }
+
+                std::ranges::stable_sort(clip.Markers, {}, &AnimationMarkerFile::Time);
+                std::ranges::stable_sort(clip.Events, {}, &AnimationEventFile::Time);
+            }
+        }
+
         std::error_code ec;
         const auto path = root / "Animations" / (filename + ".kbranimation");
         std::filesystem::create_directories(path.parent_path(), ec);
@@ -963,7 +1002,8 @@ bool LoadImageDataWithKtxFallback(
 bool GLTFSceneImporter::Import(const std::filesystem::path& source, const std::filesystem::path& outputDirectory,
                                const std::filesystem::path& namespacePath, GltfSceneManifest* output,
                                const std::map<std::string, bool>* textureSrgbOverrides,
-                               std::map<std::string, bool>* textureSrgbOut)
+                               std::map<std::string, bool>* textureSrgbOut,
+                               const std::map<std::string, AnimationClipMetaEntry>* animationClips)
 {
     KBR_TRACY_FUNCTION();
 
@@ -1219,7 +1259,7 @@ bool GLTFSceneImporter::Import(const std::filesystem::path& source, const std::f
         const std::string fileName = UniqueArtifactName(usedAnimationNames,
             SanitizeFileName(Name(a.name, "Animation_", i)), i);
         AnimationClipFile clip;
-        if (!WriteAnimation(artifactRoot, i, model, skeleton, clip, fileName))
+        if (!WriteAnimation(artifactRoot, i, model, skeleton, clip, animationClips, fileName))
             return false;
         if (skeleton.Valid && !clip.Tracks.empty())
             manifest.Skins[0].AnimationKeys.push_back(clip.LocalKey);

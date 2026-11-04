@@ -16,28 +16,6 @@ namespace Kerberos {
 class Scene;
 struct AnimatorComponent;
 
-struct AnimationMarker
-{
-    float Time = 0.0f;
-    std::string Name;
-};
-
-struct AnimationEvent
-{
-    float Time = 0.0f;
-    float Duration = 0.0f; // 0 means instant event, > 0 means a duration event
-    std::string Name;
-    std::string Payload;
-    bool FireInEditor = false;
-    float MinTriggerWeight = 0.0f;
-    uint32_t Flags = 0; // reserved for future use
-
-    bool IsPointEvent() const
-    {
-        return Duration <= 0.0f;
-    }
-};
-
 struct ActiveEventWindow
 {
     int32_t EventIndex = -1;

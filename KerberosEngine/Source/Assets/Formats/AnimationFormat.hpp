@@ -34,9 +34,26 @@ struct AnimationTrackFile
     std::vector<glm::vec4> OutTangents;         // empty unless CubicSpline
 };
 
+struct AnimationMarkerFile
+{
+    float Time = 0.0f;
+    std::string Name;
+};
+
+struct AnimationEventFile
+{
+    float Time = 0.0f;
+    float Duration = 0.0f; // 0 means instant event, > 0 means a duration event
+    std::string Name;
+    std::string Payload;
+    bool FireInEditor = false;
+    float MinTriggerWeight = 0.0f;
+    uint32_t Flags = 0; // reserved for future use
+};
+
 struct AnimationClipFile
 {
-    uint32_t Version = 1;
+    uint32_t Version = 2;
     std::string LocalKey;       // "animation:<i>"
     uint32_t SourceIndex = 0;
     std::string Name;
@@ -44,6 +61,8 @@ struct AnimationClipFile
     uint32_t JointCount = 0;
     float DurationSeconds = 0.0f;
     std::vector<AnimationTrackFile> Tracks;
+    std::vector<AnimationMarkerFile> Markers;
+    std::vector<AnimationEventFile> Events;
 };
 
 }

@@ -92,6 +92,18 @@ and stores per-joint rest TRS and inverse-bind matrices. Animation import
 preserves all skeletal T/R/S channels, interpolation modes, keyframe times,
 values, and cubic-spline tangents. Only the first skin in a glTF file is
 supported; additional skins are reported and ignored.
+
+Animation markers and events are authored in the source `.meta` (schema 3)
+under `AnimationClips`, keyed by the clip's stable `LocalKey`/`SubAssetKey`
+(`animation:<i>`). Each clip entry has `Markers` (`Time`, `Name`) and `Events`
+(`Time`, `Duration`, `Name`, `Payload`, `FireInEditor`, `MinTriggerWeight`,
+`Flags`). The glTF importer bakes them into `.kbranimation` version 2 after
+rejecting non-finite values, clamping times to the clip range, and sorting by
+time. Version 1 clips still load with empty marker/event lists. Editing this
+metadata must go through `EditorAssetManager::SetAnimationClipMeta`, which
+persists the `.meta` and force-reimports the source; the runtime re-resolves
+clips after the reimport. Reordering glTF animations remaps `animation:<i>`
+keys, so keep clip names visible when authoring events.
 Authored YAML prefabs may also carry per-entity script records
 (`PrefabScriptTemplate`: class name plus serialized field initializers).
 `PrefabSerializer` writes and reads those records, and

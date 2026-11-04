@@ -280,6 +280,34 @@ namespace Kerberos
                 || !WriteVector(stream, track.OutTangents))
                 return false;
         }
+
+        if (clip.Version >= 2)
+        {
+            if (!Write(stream, static_cast<uint32_t>(clip.Markers.size())))
+                return false;
+
+            for (const auto& marker : clip.Markers)
+            {
+                if (!Write(stream, marker.Time) || !WriteString(stream, marker.Name))
+                    return false;
+            }
+
+            if (!Write(stream, static_cast<uint32_t>(clip.Events.size())))
+                return false;
+
+            for (const auto& event : clip.Events)
+            {
+                if (!Write(stream, event.Time)
+                    || !Write(stream, event.Duration)
+                    || !WriteString(stream, event.Name)
+                    || !WriteString(stream, event.Payload)
+                    || !WriteBool(stream, event.FireInEditor)
+                    || !Write(stream, event.MinTriggerWeight)
+                    || !Write(stream, event.Flags))
+                    return false;
+            }
+        }
+
         return stream.good();
     }
 
@@ -288,6 +316,9 @@ namespace Kerberos
         std::ifstream stream(path, std::ios::binary);
         NativeAssetHeader header;
         uint32_t trackCount = 0;
+        uint32_t markerCount = 0;
+        uint32_t eventCount = 0;
+
         if (!stream || !Read(stream, header) || !ValidHeader(header, AnimationMagic, AnimationType)
             || !ReadString(stream, clip.LocalKey)
             || !Read(stream, clip.SourceIndex)
@@ -299,6 +330,7 @@ namespace Kerberos
             return false;
 
         clip.Version = header.Version;
+
         clip.Tracks.clear();
         clip.Tracks.resize(trackCount);
         for (auto& track : clip.Tracks)
@@ -320,6 +352,42 @@ namespace Kerberos
             track.Path = static_cast<AnimTrackPath>(pathValue);
             track.Interpolation = static_cast<AnimationClipInterpolation>(interpolation);
         }
+
+        // Version 1 clips end after the track array. Version 2 adds marker and event arrays.
+        if (header.Version >= 2)
+        {
+            if (!Read(stream, markerCount) || markerCount > MaxCollectionCount)
+                return false;
+        }
+
+        clip.Markers.clear();
+        clip.Markers.resize(markerCount);
+        for (auto& marker : clip.Markers)
+        {
+            if (!Read(stream, marker.Time) || !ReadString(stream, marker.Name))
+                return false;
+        }
+
+        if (header.Version >= 2)
+        {
+            if (!Read(stream, eventCount) || eventCount > MaxCollectionCount)
+                return false;
+        }
+
+        clip.Events.clear();
+        clip.Events.resize(eventCount);
+        for (auto& event : clip.Events)
+        {
+            if (!Read(stream, event.Time)
+                || !Read(stream, event.Duration)
+                || !ReadString(stream, event.Name)
+                || !ReadString(stream, event.Payload)
+                || !ReadBool(stream, event.FireInEditor)
+                || !Read(stream, event.MinTriggerWeight)
+                || !Read(stream, event.Flags))
+                return false;
+        }
+
         return stream.good();
     }
 
