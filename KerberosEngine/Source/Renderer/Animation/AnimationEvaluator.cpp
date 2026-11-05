@@ -279,6 +279,222 @@ void AdvancePlaybackTime(PlaybackTime& playback,
     }
 }
 
+std::vector<PlaybackSpan> BuildPlaybackSpans(const float fromTime,
+                                             const float toTime,
+                                             const float duration,
+                                             const bool looping)
+{
+    std::vector<PlaybackSpan> spans;
+
+    if (!std::isfinite(fromTime) || !std::isfinite(toTime) ||
+        !std::isfinite(duration) || duration <= 0.0f)
+    {
+        return spans;
+    }
+
+    if (toTime > fromTime)
+    {
+        spans.push_back({ .Start = fromTime, .End = toTime, .IncludeStart = false });
+        return spans;
+    }
+
+    if (!looping)
+        return spans;
+
+    if (toTime == fromTime)
+    {
+        // A full loop (or more) elapsed but the wrapped time is unchanged. Emit each event once.
+        spans.push_back({ .Start = 0.0f, .End = duration, .IncludeStart = true });
+        return spans;
+    }
+
+    float wrappedFrom = std::fmod(fromTime, duration);
+    if (wrappedFrom < 0.0f)
+        wrappedFrom += duration;
+
+    float wrappedTo = std::fmod(toTime, duration);
+    if (wrappedTo < 0.0f)
+        wrappedTo += duration;
+
+    spans.push_back({ .Start = wrappedFrom, .End = duration, .IncludeStart = false });
+    spans.push_back({ .Start = 0.0f, .End = wrappedTo, .IncludeStart = true });
+    return spans;
+}
+
+bool IsAnimationWindowActive(const AnimationEvent& event,
+                             const float time,
+                             const float clipDuration,
+                             const bool looping)
+{
+    if (event.Duration <= 0.0f || clipDuration <= 0.0f)
+        return false;
+
+    const float start = event.Time;
+    const float end = event.Time + event.Duration;
+
+    if (!looping || end <= clipDuration)
+        return time >= start && time <= end;
+
+    // The window crosses the loop boundary.
+    return time >= start || time <= (end - clipDuration);
+}
+
+void CollectPointEvents(const AnimationClip& clip,
+                        const float fromTime,
+                        const float toTime,
+                        const float duration,
+                        const bool looping,
+                        const float weight,
+                        std::vector<AnimationEventHit>& out)
+{
+    const std::vector<PlaybackSpan> spans = BuildPlaybackSpans(fromTime, toTime, duration, looping);
+    if (spans.empty())
+        return;
+
+    const std::vector<AnimationEvent>& events = clip.GetEvents();
+    for (size_t eventIndex = 0; eventIndex < events.size(); ++eventIndex)
+    {
+        const AnimationEvent& event = events[eventIndex];
+        if (event.Duration > 0.0f)
+            continue;
+
+        if (weight + 1.0e-5f < event.MinTriggerWeight)
+            continue;
+
+        for (const PlaybackSpan& span : spans)
+        {
+            const bool afterStart = span.IncludeStart
+                ? event.Time >= span.Start
+                : event.Time > span.Start;
+
+            if (afterStart && event.Time <= span.End)
+            {
+                out.push_back({
+                    .Event = &event,
+                    .EventIndex = static_cast<int32_t>(eventIndex),
+                    .Phase = AnimationEventPhase::Point,
+                    .Time = event.Time,
+                });
+                break;
+            }
+        }
+    }
+}
+
+void UpdateDurationEvents(const AnimationClip& clip,
+                          const float fromTime,
+                          const float toTime,
+                          const float duration,
+                          const bool looping,
+                          const float weight,
+                          std::vector<ActiveAnimationEvent>& active,
+                          std::vector<AnimationEventHit>& out)
+{
+    const std::vector<AnimationEvent>& events = clip.GetEvents();
+    const std::vector<PlaybackSpan> spans = BuildPlaybackSpans(fromTime, toTime, duration, looping);
+
+    // A clip reload or a malformed index must not leave stale windows behind.
+    std::erase_if(active, [&events](const ActiveAnimationEvent& window)
+    {
+        return window.EventIndex < 0 || static_cast<size_t>(window.EventIndex) >= events.size();
+    });
+
+    for (size_t eventIndex = 0; eventIndex < events.size(); ++eventIndex)
+    {
+        const AnimationEvent& event = events[eventIndex];
+        if (event.Duration <= 0.0f)
+            continue;
+
+        const auto stateIt = std::ranges::find_if(active, [eventIndex](const ActiveAnimationEvent& window)
+        {
+            return window.EventIndex == static_cast<int32_t>(eventIndex);
+        });
+
+        const bool weightOK = weight + 1.0e-5f >= event.MinTriggerWeight;
+        const bool activeNow = IsAnimationWindowActive(event, toTime, duration, looping);
+
+        if (!weightOK)
+        {
+            if (stateIt != active.end())
+            {
+                out.push_back({
+                    .Event = &event,
+                    .EventIndex = static_cast<int32_t>(eventIndex),
+                    .Phase = AnimationEventPhase::End,
+                    .Time = toTime,
+                });
+                active.erase(stateIt);
+            }
+            continue;
+        }
+
+        if (activeNow)
+        {
+            if (stateIt == active.end())
+            {
+                active.push_back({
+                    .EventIndex = static_cast<int32_t>(eventIndex),
+                    .Elapsed = 0.0f,
+                    .HasBegun = true,
+                });
+                out.push_back({
+                    .Event = &event,
+                    .EventIndex = static_cast<int32_t>(eventIndex),
+                    .Phase = AnimationEventPhase::Begin,
+                    .Time = event.Time,
+                });
+            }
+            else
+            {
+                stateIt->Elapsed += std::max(0.0f, toTime - fromTime);
+            }
+
+            out.push_back({
+                .Event = &event,
+                .EventIndex = static_cast<int32_t>(eventIndex),
+                .Phase = AnimationEventPhase::Tick,
+                .Time = toTime,
+            });
+            continue;
+        }
+
+        if (stateIt != active.end())
+        {
+            out.push_back({
+                .Event = &event,
+                .EventIndex = static_cast<int32_t>(eventIndex),
+                .Phase = AnimationEventPhase::End,
+                .Time = toTime,
+            });
+            active.erase(stateIt);
+            continue;
+        }
+
+        // The whole window was skipped by a large step. 
+        // Emit Begin and End so listeners can create and release their resources.
+        const float windowEnd = event.Time + event.Duration;
+        for (const PlaybackSpan& span : spans)
+        {
+            if (span.Start <= event.Time && span.End >= windowEnd)
+            {
+                out.push_back({
+                    .Event = &event,
+                    .EventIndex = static_cast<int32_t>(eventIndex),
+                    .Phase = AnimationEventPhase::Begin,
+                    .Time = event.Time,
+                });
+                out.push_back({
+                    .Event = &event,
+                    .EventIndex = static_cast<int32_t>(eventIndex),
+                    .Phase = AnimationEventPhase::End,
+                    .Time = windowEnd,
+                });
+                break;
+            }
+        }
+    }
+}
+
 void ComputeGlobalAndSkinMatrices(const Skeleton& skeleton, SkeletonPose& pose)
 {
     KBR_TRACY_FUNCTION();

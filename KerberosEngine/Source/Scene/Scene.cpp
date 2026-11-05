@@ -93,6 +93,7 @@ namespace Kerberos
 			auto& animator = view.get<AnimatorComponent>(entity);
 			animator.CurrentTime = 0.0f;
 			animator.IsPlaying = animator.PlayOnStart;
+			animator.PlaybackRevision++;
 		}
 	}
 
@@ -104,6 +105,7 @@ namespace Kerberos
 			auto& animator = view.get<AnimatorComponent>(entity);
 			animator.CurrentTime = 0.0f;
 			animator.IsPlaying = false;
+			animator.PlaybackRevision++;
 		}
 	}
 
@@ -120,6 +122,7 @@ namespace Kerberos
 
 		m_AnimationRuntime.AdvanceClocks(ts, m_IsScenePaused);
         m_AnimationRuntime.EvaluatePose();
+        DispatchAnimationEvents();
         m_AnimationRuntime.FinalizePose(ts);
 
 		Render3DEditor(camera, ts);
@@ -133,6 +136,7 @@ namespace Kerberos
 
 		m_AnimationRuntime.AdvanceClocks(ts, m_IsScenePaused);
         m_AnimationRuntime.EvaluatePose();
+        DispatchAnimationEvents();
 
 		/// If the scene is paused, do not update the physics system, but still render the scene
 		if (!m_IsScenePaused)
@@ -153,6 +157,7 @@ namespace Kerberos
 
 		m_AnimationRuntime.AdvanceClocks(ts, m_IsScenePaused);
         m_AnimationRuntime.EvaluatePose();
+        DispatchAnimationEvents();
 
 		if (!m_IsScenePaused)
 		{
@@ -162,6 +167,10 @@ namespace Kerberos
 			// change is visible to physics and the renderer in this same frame. The runtime skips
 			// this when clip/time/state did not change.
 			m_AnimationRuntime.EvaluatePose();
+
+			// A post-script clip/skeleton change can close an active duration window. Deliver the
+			// resulting End events before physics so gameplay resources are released this frame.
+			DispatchAnimationEvents();
 
 			m_PhysicsSystem->Update(ts);
 
@@ -746,6 +755,29 @@ Entity Scene::InstantiatePrefab(const AssetHandle prefabHandle, const std::strin
         return m_AnimationRuntime;
     }
 
+    void Scene::DispatchAnimationEvents()
+    {
+        if (!m_IsRunning)
+        {
+            m_AnimationRuntime.ClearPendingDispatches();
+            return;
+        }
+
+        for (const DispatchedAnimationEvent& event : m_AnimationRuntime.GetPendingDispatches())
+        {
+            if (!event.Clip || !event.Event)
+                continue;
+
+            const Entity entity = TryGetEntityByUUID(event.Entity);
+            if (!entity)
+                continue;
+
+            ScriptEngine::OnAnimationEvent(entity, event);
+        }
+
+        m_AnimationRuntime.ClearPendingDispatches();
+    }
+
     void Scene::CopyEntityRecursive(const Ref<Scene>& other, const entt::entity sourceEntity, const Ref<Scene>& newScene, const entt::entity parentNewEntity)
 	{
 		KBR_TRACY_FUNCTION();
@@ -840,6 +872,7 @@ Entity Scene::InstantiatePrefab(const AssetHandle prefabHandle, const std::strin
 			auto animator = sourceRegistry.get<AnimatorComponent>(sourceEntity);
 			animator.CurrentTime = 0.0f;
 			animator.IsPlaying = animator.PlayOnStart;
+			animator.PlaybackRevision = 0;
 			animator.LoadedClips.clear();
 			newEntity.AddComponent<AnimatorComponent>(animator);
 		}

@@ -2,6 +2,7 @@
 
 #include "Assets/Asset.hpp"
 #include "Renderer/Animation/AnimationEvaluator.hpp"
+#include "Renderer/Animation/AnimationEventTypes.hpp"
 #include "Renderer/Animation/Skeleton.hpp"
 
 #include <memory>
@@ -16,13 +17,6 @@ namespace Kerberos {
 class Scene;
 struct AnimatorComponent;
 
-struct ActiveEventWindow
-{
-    int32_t EventIndex = -1;
-    float Elapsed = 0.0f;
-    bool HasBegun = false;
-};
-
 struct AnimationInstance
 {
     UUID SkeletonEntity = UUID::Invalid();
@@ -35,18 +29,21 @@ struct AnimationInstance
     uint64_t PoseVersion = 0;
     bool HasPosed = false;
 
-    // playback state snapshot
+    // Playback state snapshot
+
     UUID LastEvaluatedAnimator = UUID::Invalid();
     int32_t LastClipIndex = -1;
     const AnimationClip* LastClip = nullptr;
-    float PreviousTime = 0.0f;
-    float LastEventTime = 0.0f;
+    float PreviousClockTime = 0.0f;             // Last sampled pose time, for pose invalidation
+    float LastEventTime = 0.0f;                 // Last time events were processed
+    // Keep a reference so an interrupted duration event can still be closed after a clip reload.
+    Ref<AnimationClip> LastEventClip = nullptr;
     uint32_t LastPlaybackRevision = 0;
 
-    // duration-event state
-    std::vector<ActiveEventWindow> ActiveEvents;
+    // Duration-event state
+    std::vector<ActiveAnimationEvent> ActiveEvents;
 
-    // future blending
+    // Future blending
     float ClipWeight = 1.0f;
 };
 
@@ -80,21 +77,7 @@ public:
     bool TryGetMarkerTime(UUID skeletonEntity, std::string_view name, float& outTime) const;
     bool GetNextMarker(UUID skeletonEntity, float afterTime, AnimationMarker& out) const;
 
-    struct PendingDispatch
-    {
-        UUID Entity;
-        const AnimationClip* Clip;
-        const AnimationEvent* Event;
-        enum class Phase : uint8_t
-        {
-            Point,
-            Begin,
-            Tick,
-            End
-        };
-        Phase Phase;
-        float Weight;
-    };
+    using PendingDispatch = DispatchedAnimationEvent;
 
     const std::vector<PendingDispatch>& GetPendingDispatches() const;
     void ClearPendingDispatches();
@@ -110,8 +93,10 @@ private:
 
     void SyncInstances();
     static void ResolveAnimatorClips(AnimatorComponent& animator);
+    void CloseActiveDurationEvents(AnimationInstance& instance, const Ref<AnimationClip>& clip, float time);
     const ClipTrackCache& GetClipTrackCache(const Ref<Skeleton>& skeleton, const Ref<AnimationClip>& clip);
 
+private:
     Scene* m_Scene = nullptr;
 
     std::vector<AnimationInstance> m_Instances;
@@ -126,4 +111,4 @@ private:
     uint64_t m_NextPoseVersion = 1;
 };
 
-} // namespace Kerberos
+}

@@ -51,6 +51,11 @@ namespace Kerberos
 		ScriptEngine::InvokeManagedOnCollisionExit(static_cast<uint64_t>(m_EntityID), m_ScriptClass->GetFullName(), event);
 	}
 
+	void ScriptInstance::InvokeOnAnimationEvent(const DispatchedAnimationEvent& event) const
+	{
+		ScriptEngine::InvokeManagedOnAnimationEvent(static_cast<uint64_t>(m_EntityID), m_ScriptClass->GetFullName(), event);
+	}
+
 	void ScriptInstance::IntializeFieldValues(
 		const std::unordered_map<std::string, ScriptFieldInitializer>& initialFieldValues) const
 	{

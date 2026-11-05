@@ -9,6 +9,7 @@
 namespace Kerberos
 {
 	class ScriptClass;
+	struct DispatchedAnimationEvent;
 
 	class ScriptInstance
 	{
@@ -20,6 +21,7 @@ namespace Kerberos
 		void InvokeOnCollisionEnter(const CollisionEvent& event) const;
 		void InvokeOnCollisionPersist(const CollisionEvent& event) const;
 		void InvokeOnCollisionExit(const CollisionEvent& event) const;
+		void InvokeOnAnimationEvent(const DispatchedAnimationEvent& event) const;
 
 		template<typename T>
 		T GetFieldValue(const std::string& name) const

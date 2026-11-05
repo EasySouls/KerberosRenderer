@@ -519,6 +519,8 @@ namespace Kerberos
 			return;
 		}
 
+		bool timeReset = false;
+
 		if (clipIndex >= 0)
 		{
 			if (static_cast<size_t>(clipIndex) >= animator->AnimationClips.size())
@@ -530,12 +532,17 @@ namespace Kerberos
 
 			animator->ActiveClip = clipIndex;
 			animator->CurrentTime = 0.0f;
+			timeReset = true;
 		}
 		else if (animator->ActiveClip < 0 && !animator->AnimationClips.empty())
 		{
 			animator->ActiveClip = 0;
 			animator->CurrentTime = 0.0f;
+			timeReset = true;
 		}
+
+		if (timeReset)
+			animator->PlaybackRevision++;
 
 		animator->IsPlaying = true;
 	}
@@ -575,6 +582,7 @@ namespace Kerberos
 		{
 			animator->IsPlaying = false;
 			animator->CurrentTime = 0.0f;
+            animator->PlaybackRevision++;
 		}
 	}
 
@@ -609,6 +617,8 @@ namespace Kerberos
 		{
 			animator->CurrentTime = std::min(animator->CurrentTime, clip->GetDuration());
 		}
+
+		animator->PlaybackRevision++;
 	}
 
 	static float AnimatorComponent_GetSpeed(const uint64_t entityID)
@@ -624,7 +634,7 @@ namespace Kerberos
         KBR_TRACY_FUNCTION();
 
 		AnimatorComponent* animator = GetAnimatorComponent(entityID);
-		if (animator && std::isfinite(speed))
+        if (animator && std::isfinite(speed))
 			animator->PlaybackSpeed = speed;
 	}
 
@@ -701,6 +711,7 @@ namespace Kerberos
 
 		animator->ActiveClip = clipIndex;
 		animator->CurrentTime = 0.0f;
+        animator->PlaybackRevision++;
 	}
 
 	static int32_t AnimatorComponent_GetClipCount(const uint64_t entityID)

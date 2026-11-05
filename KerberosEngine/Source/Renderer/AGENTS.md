@@ -258,11 +258,19 @@ and `ComputeGlobalAndSkinMatrices` derives globals and skin matrices.
 `AdvancePlaybackTime` owns loop/clamp/stop semantics. Keep it Vulkan-free so it
 stays unit-testable.
 
-`AnimationClip` now carries sorted `AnimationMarker` and `AnimationEvent` data
-loaded from the native clip. The runtime exposes marker queries and the
-`PendingDispatch` surface, but crossing detection, duration windows, event
-dispatch, editor timeline authoring, and cross-fade weight filtering are not
-implemented yet.
+`AnimationClip` carries sorted `AnimationMarker` and `AnimationEvent` data
+loaded from the native clip. `AnimationEvaluator` exposes pure helpers for
+playback spans, point-event crossing, wrapped duration windows, and
+`MinTriggerWeight` filtering. `AnimationRuntime::AdvanceClocks` collects
+`DispatchedAnimationEvent` records; `Scene::DispatchAnimationEvents` validates
+and dispatches them before scripts in Play mode. Duration events use
+`Begin`/`Tick`/`End`; point events use `Point`. Reverse playback suppresses
+events, and `AnimatorComponent::PlaybackRevision` suppresses point events across
+time jumps. Active duration windows are closed with `End` when playback is
+interrupted by a clip switch, revision jump, stop, skeleton replacement, reverse
+playback, or natural clip end; the runtime keeps a reference to the last event
+clip so the cleanup can still be delivered after a reload. Editor timeline
+authoring and cross-fade weight computation are not implemented yet.
 
 Entities use `SkeletonComponent` for the skeleton instance and joint list,
 `JointComponent` for joint ordering, `SkinnedMeshComponent` for the mesh /
@@ -283,10 +291,15 @@ first, then `SkeletonEntity`, with a warning when several animators target one
 skeleton). A skeleton with no animator or no resolvable active clip stays in its
 rest pose.
 
-`OnUpdateRuntime` evaluates once before scripts and again after scripts when
-playback state changed, so `Play`/`Stop`/`SetTime` from C# still applies before
-physics and rendering. `FinalizePose` is the post-physics hook reserved for
-ragdoll blending, IK, root motion, and sockets.
+`OnUpdateRuntime` advances clocks and collects events, evaluates a provisional
+pose, dispatches animation events, then runs scripts. It evaluates again after
+scripts when playback state changed, so `Play`/`Stop`/`SetTime` from C# applies
+before physics and rendering. `FinalizePose` is the post-physics hook reserved
+for ragdoll blending, IK, root motion, and sockets. Events are dispatched to
+scripts on the animator entity through `Entity.OnAnimationEvent`; Edit and
+Simulate clear pending events without invoking gameplay scripts. Runtime
+dispatch happens once before scripts and again after the post-script pose
+evaluation so interruption cleanup is not delayed.
 
 Runtime playback state is authored through `AnimatorComponent::PlayOnStart`.
 `Scene::Copy` resets each animator's time, clears resolved clips, and sets
@@ -340,11 +353,11 @@ SVB rather than expecting world-space output.
 
 - Pose evaluation and skin-matrix generation are CPU-only. There is no
   evaluation/precompute compute pass and no GPU pose path yet.
-- Clip cross-fades, pose blending, additive layers, root motion, event
-  dispatch, event timeline authoring, and sockets/attachments are not
-  implemented. Marker/event data now round-trips from `.meta` through the
-  native clip into `AnimationClip`; `AnimationRuntime` exposes the query and
-  pending-dispatch surfaces for the next milestone.
+- Clip cross-fades, pose blending, additive layers, root motion, editor
+  timeline authoring, and sockets/attachments are not implemented.
+  Marker/event data round-trips from `.meta` through the native clip into
+  `AnimationClip`, and point/duration events dispatch to scripts. Cross-fade
+  weight computation and `FireInEditor` preview dispatch remain future work.
 - `FinalizePose` is an empty post-physics hook; ragdoll blending and IK still
   need to fill it and bump `PoseVersion`.
 - Physics/ragdoll integration and Jolt bone proxies are not implemented.

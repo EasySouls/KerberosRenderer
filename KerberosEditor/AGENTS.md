@@ -67,7 +67,11 @@ Editor windows live mainly under
   scrubbing Time previews the pose immediately unless the scene is paused. C# scripts control the same state
   through `Kerberos.Scene.AnimatorComponent` (`Play`, `Play(string)`, `Pause`,
   `Stop`, `CurrentTime`, `PlaybackSpeed`, `IsPlaying`, `IsLooping`,
-  `PlayOnStart`, `ActiveClip`, `ClipCount`, and `GetClipDuration`).
+  `PlayOnStart`, `ActiveClip`, `ClipCount`, and `GetClipDuration`). Animation
+  events are delivered to scripts through
+  `Entity.OnAnimationEvent(AnimationEvent)` with Point/Begin/Tick/End phases;
+  events dispatch on the animator entity in Play mode only, while Edit and
+  Simulate clear pending events without invoking gameplay scripts.
 - `InspectorPanel`: the unified right-side "Properties" window. It shows entity
   components when an entity is selected and asset import options when a source
   asset is selected in `AssetsPanel` (asset selection takes display precedence).

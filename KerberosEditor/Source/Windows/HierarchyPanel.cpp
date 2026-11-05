@@ -2269,6 +2269,8 @@ void HierarchyPanel::DrawComponents(const Entity entity)
         if (opened)
         {
             auto& animator = entity.GetComponent<AnimatorComponent>();
+            const int32_t previousActiveClip = animator.ActiveClip;
+            const float previousTime = animator.CurrentTime;
 
             if (const auto newSkeletonEntity = DrawComponentEntityReferenceField<SkeletonComponent>(
                     "Animator Skeleton Entity", m_Context, animator.SkeletonEntity))
@@ -2389,6 +2391,9 @@ void HierarchyPanel::DrawComponents(const Entity entity)
                 ImGui::Text("Clip Duration: %.3f s", duration);
             else if (!animator.AnimationClips.empty())
                 ImGui::TextDisabled("Active clip could not be loaded.");
+
+            if (animator.ActiveClip != previousActiveClip || animator.CurrentTime != previousTime)
+                animator.PlaybackRevision++;
 
             ImGui::TreePop();
         }

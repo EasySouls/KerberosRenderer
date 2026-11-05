@@ -79,6 +79,11 @@ struct AnimatorComponent
     bool IsLooping = true;
     bool PlayOnStart = false;
 
+    // Incremented whenever the animator's playback state changes, so systems can
+    // detect changes without storing a copy of the previous state.
+    // Not serialized.
+    uint32_t PlaybackRevision = 0;
+
     AnimatorComponent() = default;
     explicit AnimatorComponent(const UUID& skeletonEntity) : SkeletonEntity(skeletonEntity) {}
 

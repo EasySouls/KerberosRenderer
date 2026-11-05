@@ -116,6 +116,9 @@ namespace Kerberos
 		AnimationRuntime& GetAnimationRuntime();
 		const AnimationRuntime& GetAnimationRuntime() const;
 
+		/// Dispatches events collected by the animation runtime. No-op outside Play mode.
+		void DispatchAnimationEvents();
+
 		void SetName(const std::string& name) { m_Name = name; }
 		const std::string& GetName() const { return m_Name; }
 

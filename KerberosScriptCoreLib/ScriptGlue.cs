@@ -28,6 +28,19 @@ namespace Kerberos
             public float PenetrationDepth;
         }
 
+        [StructLayout(LayoutKind.Sequential)]
+        private struct ScriptAnimationEventPayload
+        {
+            public IntPtr Name;
+            public IntPtr Payload;
+            public IntPtr ClipName;
+            public float Time;
+            public float Duration;
+            public float Weight;
+            public byte Phase;
+            public uint Flags;
+        }
+
         private static Assembly? s_CoreAssembly;
         private static Assembly? s_UserAssembly;
         private static AssemblyLoadContext? s_UserContext;
@@ -41,6 +54,7 @@ namespace Kerberos
         private static readonly Dictionary<Type, MethodInfo?> OnCollisionEnterMethods = new();
         private static readonly Dictionary<Type, MethodInfo?> OnCollisionPersistMethods = new();
         private static readonly Dictionary<Type, MethodInfo?> OnCollisionExitMethods = new();
+        private static readonly Dictionary<Type, MethodInfo?> OnAnimationEventMethods = new();
         private static readonly Dictionary<Type, ConstructorInfo?> UlongConstructors = new();
 
         // ====================================================================
@@ -85,6 +99,7 @@ namespace Kerberos
                 OnCollisionEnterMethods.Clear();
                 OnCollisionPersistMethods.Clear();
                 OnCollisionExitMethods.Clear();
+                OnAnimationEventMethods.Clear();
                 UlongConstructors.Clear();
                 EntityInstances.Clear();
 
@@ -150,6 +165,9 @@ namespace Kerberos
                 OnCollisionExitMethods[type] = type.GetMethod("OnCollisionExit",
                     BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public,
                     null, new[] { typeof(Collision) }, null);
+                OnAnimationEventMethods[type] = type.GetMethod("OnAnimationEvent",
+                    BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public,
+                    null, new[] { typeof(AnimationEvent) }, null);
                 UlongConstructors[type] = type.GetConstructor(
                     BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public,
                     null, new[] { typeof(ulong) }, null);
@@ -455,6 +473,42 @@ namespace Kerberos
             catch (Exception ex)
             {
                 Console.Error.WriteLine($"[ScriptGlue] InvokeOnCollisionExit failed for entity {entityID}: {ex}");
+                return 0;
+            }
+        }
+
+        [UnmanagedCallersOnly]
+        public static int InvokeOnAnimationEvent(ulong entityID, IntPtr classNamePtr, IntPtr payloadPtr)
+        {
+            try
+            {
+                if (!TryGetInstance(entityID, classNamePtr, out var instance) || instance == null)
+                    return 0;
+                if (payloadPtr == IntPtr.Zero)
+                    return 0;
+
+                ScriptAnimationEventPayload payload =
+                    Marshal.PtrToStructure<ScriptAnimationEventPayload>(payloadPtr);
+
+                var animationEvent = new AnimationEvent(
+                    Marshal.PtrToStringAnsi(payload.Name) ?? string.Empty,
+                    Marshal.PtrToStringAnsi(payload.Payload) ?? string.Empty,
+                    Marshal.PtrToStringAnsi(payload.ClipName) ?? string.Empty,
+                    payload.Time,
+                    payload.Duration,
+                    payload.Weight,
+                    (AnimationEventPhase)payload.Phase,
+                    payload.Flags);
+
+                var type = instance.GetType();
+                if (OnAnimationEventMethods.TryGetValue(type, out var method) && method != null)
+                    method.Invoke(instance, new object[] { animationEvent });
+
+                return 1;
+            }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine($"[ScriptGlue] InvokeOnAnimationEvent failed for entity {entityID}: {ex}");
                 return 0;
             }
         }

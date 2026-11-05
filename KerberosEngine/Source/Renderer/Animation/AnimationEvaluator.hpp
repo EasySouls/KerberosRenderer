@@ -1,6 +1,7 @@
 #pragma once
 
 #include "AnimationClip.hpp"
+#include "AnimationEventTypes.hpp"
 #include "Skeleton.hpp"
 
 #include <glm/glm.hpp>
@@ -82,4 +83,59 @@ void AdvancePlaybackTime(PlaybackTime& playback,
                          float dt,
                          bool canAdvance);
 
-} // namespace Kerberos
+/// A portion of the clip timeline crossed by one frame. 
+/// Wrapped spans are produced when playback loops. 
+/// IncludeStart is true for the post-wrap segment so 
+/// an event at time 0 can fire there.
+struct PlaybackSpan
+{
+    float Start = 0.0f;
+    float End = 0.0f;
+    bool IncludeStart = false;
+};
+
+/// One event produced by crossing evaluation, before it is attached to an entity.
+struct AnimationEventHit
+{
+    const AnimationEvent* Event = nullptr;
+    int32_t EventIndex = -1;
+    AnimationEventPhase Phase = AnimationEventPhase::Point;
+    float Time = 0.0f;
+};
+
+/// State for a duration event that is currently active.
+struct ActiveAnimationEvent
+{
+    int32_t EventIndex = -1;
+    float Elapsed = 0.0f;
+    bool HasBegun = false;
+};
+
+std::vector<PlaybackSpan> BuildPlaybackSpans(float fromTime,
+                                             float toTime,
+                                             float duration,
+                                             bool looping);
+
+bool IsAnimationWindowActive(const AnimationEvent& event,
+                             float time,
+                             float clipDuration,
+                             bool looping);
+
+void CollectPointEvents(const AnimationClip& clip,
+                        float fromTime,
+                        float toTime,
+                        float duration,
+                        bool looping,
+                        float weight,
+                        std::vector<AnimationEventHit>& out);
+
+void UpdateDurationEvents(const AnimationClip& clip,
+                          float fromTime,
+                          float toTime,
+                          float duration,
+                          bool looping,
+                          float weight,
+                          std::vector<ActiveAnimationEvent>& active,
+                          std::vector<AnimationEventHit>& out);
+
+}

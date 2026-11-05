@@ -24,6 +24,7 @@ namespace Kerberos.Scene
         protected virtual void OnCollisionEnter(Collision collision) { }
         protected virtual void OnCollisionPersist(Collision collision) { }
         protected virtual void OnCollisionExit(Collision collision) { }
+        protected virtual void OnAnimationEvent(AnimationEvent animationEvent) { }
 
         public Vector3 Translation
         {

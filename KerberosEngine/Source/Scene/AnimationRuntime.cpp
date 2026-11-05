@@ -7,7 +7,6 @@
 #include "Scene/Entity.hpp"
 
 #include <algorithm>
-#include <cmath>
 
 import Kerberos;
 
@@ -102,6 +101,9 @@ void AnimationRuntime::SyncInstances()
 
             if (skeletonChanged)
             {
+                // Close windows before dropping the old clip so gameplay resources release.
+                CloseActiveDurationEvents(existing, existing.LastEventClip, existing.LastEventTime);
+
                 // Reset the runtime state but keep the vector slot. The renderer will detect the
                 // skeleton change and rebuild its GPU slice.
                 existing = AnimationInstance{};
@@ -183,6 +185,9 @@ void AnimationRuntime::AdvanceClocks(const float dt, const bool paused)
     if (!m_Scene)
         return;
 
+    // Clear first so interruption End events emitted while syncing/advancing survive to dispatch.
+    m_PendingDispatches.clear();
+
     SyncInstances();
 
     const auto animatorView = m_Scene->m_Registry.view<AnimatorComponent>();
@@ -215,9 +220,149 @@ void AnimationRuntime::AdvanceClocks(const float dt, const bool paused)
         animator.IsPlaying = playback.IsPlaying;
     }
 
-    // Event crossing and marker collection are added in the event milestone. Keeping the
-    // pending list owned by the runtime now preserves the dispatch ownership boundary.
-    m_PendingDispatches.clear();
+    for (AnimationInstance& instance : m_Instances)
+    {
+        if (!instance.AnimatorEntity.IsValid())
+        {
+            CloseActiveDurationEvents(instance, instance.LastEventClip, instance.LastEventTime);
+            instance.LastEventClip = nullptr;
+            continue;
+        }
+
+        const Entity animatorEntity = m_Scene->TryGetEntityByUUID(instance.AnimatorEntity);
+        if (!animatorEntity || !animatorEntity.HasComponent<AnimatorComponent>())
+        {
+            CloseActiveDurationEvents(instance, instance.LastEventClip, instance.LastEventTime);
+            instance.LastEventClip = nullptr;
+            continue;
+        }
+
+        const AnimatorComponent& animator = animatorEntity.GetComponent<AnimatorComponent>();
+
+        Ref<AnimationClip> activeClip = nullptr;
+        if (animator.ActiveClip >= 0 &&
+            static_cast<size_t>(animator.ActiveClip) < animator.LoadedClips.size())
+        {
+            activeClip = animator.LoadedClips[static_cast<size_t>(animator.ActiveClip)];
+        }
+
+        const AnimationClip* activeClipPtr = activeClip.get();
+        const float currentTime = animator.CurrentTime;
+
+        if (instance.LastEventClip.get() != activeClipPtr)
+        {
+            // Do not replay events from the previous clip, but close its active windows so
+            // gameplay resources are released.
+            CloseActiveDurationEvents(instance, instance.LastEventClip, currentTime);
+            instance.LastEventClip = activeClip;
+            instance.LastEventTime = currentTime;
+            instance.LastPlaybackRevision = animator.PlaybackRevision;
+            continue;
+        }
+
+        if (instance.LastPlaybackRevision != animator.PlaybackRevision)
+        {
+            CloseActiveDurationEvents(instance, activeClip, currentTime);
+            instance.LastPlaybackRevision = animator.PlaybackRevision;
+            instance.LastEventTime = currentTime;
+            continue;
+        }
+
+        if (paused)
+        {
+            // Keep active windows across a pause. Resuming from the same time must not replay
+            // missed events.
+            instance.LastEventTime = currentTime;
+            continue;
+        }
+
+        if (!activeClip)
+        {
+            CloseActiveDurationEvents(instance, instance.LastEventClip, currentTime);
+            instance.LastEventClip = nullptr;
+            instance.LastEventTime = currentTime;
+            continue;
+        }
+
+        if (animator.PlaybackSpeed <= 0.0f)
+        {
+            // Reverse playback does not emit point events or reverse windows in this version.
+            CloseActiveDurationEvents(instance, instance.LastEventClip, currentTime);
+            instance.LastEventTime = currentTime;
+            continue;
+        }
+
+        if (!animator.IsPlaying)
+        {
+            const float duration = activeClip->GetDuration();
+
+            // Natural end of a non-looping clip: close windows so listeners can release effects.
+            if (!animator.IsLooping && !instance.ActiveEvents.empty() &&
+                (currentTime >= duration || currentTime <= 0.0f))
+            {
+                CloseActiveDurationEvents(instance, activeClip, currentTime);
+            }
+
+            instance.LastEventTime = currentTime;
+            continue;
+        }
+
+        const float fromTime = instance.LastEventTime;
+        const float toTime = currentTime;
+        if (fromTime == toTime)
+            continue;
+
+        std::vector<AnimationEventHit> hits;
+        CollectPointEvents(*activeClip, fromTime, toTime, activeClip->GetDuration(),
+                           animator.IsLooping, instance.ClipWeight, hits);
+        UpdateDurationEvents(*activeClip, fromTime, toTime, activeClip->GetDuration(),
+                             animator.IsLooping, instance.ClipWeight, instance.ActiveEvents, hits);
+
+        for (const AnimationEventHit& hit : hits)
+        {
+            m_PendingDispatches.push_back({
+                .Entity = instance.AnimatorEntity,
+                .Clip = activeClipPtr,
+                .Event = hit.Event,
+                .EventIndex = hit.EventIndex,
+                .Phase = hit.Phase,
+                .Weight = instance.ClipWeight,
+                .Time = hit.Time,
+            });
+        }
+
+        instance.LastEventClip = activeClip;
+        instance.LastEventTime = toTime;
+    }
+
+    static const auto phaseRank = [](const AnimationEventPhase phase)
+    {
+        switch (phase)
+        {
+        case AnimationEventPhase::End: return 0;
+        case AnimationEventPhase::Begin: return 1;
+        case AnimationEventPhase::Tick: return 2;
+        case AnimationEventPhase::Point: return 3;
+        }
+        return 4;
+    };
+
+    std::ranges::sort(m_PendingDispatches,
+                      [](const DispatchedAnimationEvent& a, const DispatchedAnimationEvent& b)
+                      {
+                          if (a.Time != b.Time)
+                              return a.Time < b.Time;
+
+                          const int aRank = phaseRank(a.Phase);
+                          const int bRank = phaseRank(b.Phase);
+                          if (aRank != bRank)
+                              return aRank < bRank;
+
+                          if (a.Entity != b.Entity)
+                              return static_cast<uint64_t>(a.Entity) < static_cast<uint64_t>(b.Entity);
+
+                          return a.EventIndex < b.EventIndex;
+                      });
 }
 
 void AnimationRuntime::EvaluatePose()
@@ -264,7 +409,7 @@ void AnimationRuntime::EvaluatePose()
                 animatorChanged ||
                 instance.LastClipIndex != activeClipIndex ||
                 instance.LastClip != activeClip.get() ||
-                instance.PreviousTime != sampledTime)
+                instance.PreviousClockTime != sampledTime)
             {
                 const ClipTrackCache& cache = GetClipTrackCache(instance.Skeleton, activeClip);
                 Kerberos::EvaluatePose(*instance.Skeleton, *activeClip, cache, sampledTime, instance.Pose);
@@ -272,7 +417,7 @@ void AnimationRuntime::EvaluatePose()
                 instance.LastEvaluatedAnimator = instance.AnimatorEntity;
                 instance.LastClipIndex = activeClipIndex;
                 instance.LastClip = activeClip.get();
-                instance.PreviousTime = sampledTime;
+                instance.PreviousClockTime = sampledTime;
                 instance.HasPosed = true;
                 instance.PoseVersion = m_NextPoseVersion++;
             }
@@ -285,7 +430,7 @@ void AnimationRuntime::EvaluatePose()
             instance.LastEvaluatedAnimator = instance.AnimatorEntity;
             instance.LastClipIndex = -1;
             instance.LastClip = nullptr;
-            instance.PreviousTime = sampledTime;
+            instance.PreviousClockTime = sampledTime;
             instance.HasPosed = true;
             instance.PoseVersion = m_NextPoseVersion++;
         }
@@ -381,6 +526,37 @@ const ClipTrackCache& AnimationRuntime::GetClipTrackCache(const Ref<Skeleton>& s
 
     auto [insertedIt, inserted] = m_ClipCaches.insert_or_assign(clip.get(), std::move(entry));
     return insertedIt->second.Cache;
+}
+
+void AnimationRuntime::CloseActiveDurationEvents(AnimationInstance& instance,
+                                                 const Ref<AnimationClip>& clip,
+                                                 const float time)
+{
+    if (!instance.ActiveEvents.empty() && clip)
+    {
+        const std::vector<AnimationEvent>& events = clip->GetEvents();
+        const UUID target = instance.AnimatorEntity.IsValid()
+            ? instance.AnimatorEntity
+            : instance.SkeletonEntity;
+
+        for (const ActiveAnimationEvent& window : instance.ActiveEvents)
+        {
+            if (window.EventIndex < 0 || static_cast<size_t>(window.EventIndex) >= events.size())
+                continue;
+
+            m_PendingDispatches.push_back({
+                .Entity = target,
+                .Clip = clip.get(),
+                .Event = &events[static_cast<size_t>(window.EventIndex)],
+                .EventIndex = window.EventIndex,
+                .Phase = AnimationEventPhase::End,
+                .Weight = instance.ClipWeight,
+                .Time = time,
+            });
+        }
+    }
+
+    instance.ActiveEvents.clear();
 }
 
 const std::vector<AnimationRuntime::PendingDispatch>& AnimationRuntime::GetPendingDispatches() const
