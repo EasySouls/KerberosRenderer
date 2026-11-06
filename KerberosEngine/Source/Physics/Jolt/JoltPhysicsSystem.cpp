@@ -129,7 +129,9 @@ namespace Kerberos
 
 		UpdateAndCreatePhysicsBodies();
 
-		constexpr int collisionSteps = 3;
+		SyncKinematicBodies(deltaTime);
+
+		constexpr int collisionSteps = 2;
 		m_JoltSystem->Update(deltaTime, collisionSteps, m_PhysicsTempAllocator, m_PhysicsJobSystem);
 
 		SyncTransforms();
@@ -214,7 +216,30 @@ namespace Kerberos
 		return false;
 	}
 
-	std::vector<CollisionEvent> JoltPhysicsSystem::GetCollisionEvents() const 
+    void JoltPhysicsSystem::SyncKinematicBodies(const float dt) const
+    {
+        const auto view = m_Scene.lock()->m_Registry.view<RigidBody3DComponent, TransformComponent>();
+		for (const auto e : view)
+		{
+			const auto& transform = view.get<TransformComponent>(e);
+			const auto& rigidBody = view.get<RigidBody3DComponent>(e);
+
+			if (rigidBody.Type != RigidBody3DComponent::BodyType::Kinematic || !rigidBody.RuntimeBody)
+				continue;
+
+			const glm::mat4& world = transform.WorldTransform;
+            const glm::vec3 position = world[3];
+            const glm::quat rotation = glm::normalize(glm::quat_cast(glm::mat3(world)));
+
+			const JPH::BodyID bodyId = static_cast<JPH::Body*>(rigidBody.RuntimeBody)->GetID();
+            const JPH::Vec3 joltPosition = JPH::Vec3(position.x, position.y, position.z);
+            const JPH::Quat joltRotation = JPH::Quat(rotation.w, rotation.x, rotation.y, rotation.z);
+
+            GetBodyInterface().MoveKinematic(bodyId, joltPosition, joltRotation, dt);
+		}
+    }
+
+    std::vector<CollisionEvent> JoltPhysicsSystem::GetCollisionEvents() const 
 	{
 		return static_cast<Physics::ContactListener*>(m_ContactListener)->GetCollisionEventsAndResetQueue();
 	}
@@ -289,7 +314,9 @@ namespace Kerberos
 			auto& transform = view.get<TransformComponent>(e);
 			auto& rigidBody = view.get<RigidBody3DComponent>(e);
 
-			if (rigidBody.Type == RigidBody3DComponent::BodyType::Static) 
+			// Only dinamyc bodies should be synced with the physics engine, static and kinematic bodies are controlled
+            // by the user
+			if (rigidBody.Type == RigidBody3DComponent::BodyType::Static || rigidBody.Type == RigidBody3DComponent::BodyType::Kinematic) 
 				continue;
 
 			if (rigidBody.RuntimeBody)
