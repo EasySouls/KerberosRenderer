@@ -102,6 +102,10 @@ namespace Kerberos
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
         internal delegate float AnimatorGetClipDurationFn(ulong entityID, int clipIndex);
 
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        internal delegate void SocketAttachFn(ulong entityID, ulong skeletonEntityID, IntPtr jointName,
+                                              ref Vector3 translation, ref Vector3 rotation, ref Vector3 scale);
+
         // ====================================================================
         // Stored delegate instances (prevent GC collection)
         // ====================================================================
@@ -175,6 +179,9 @@ namespace Kerberos
         private static SetIntFn? s_AnimatorSetActiveClip;
         private static GetIntFn? s_AnimatorGetClipCount;
         private static AnimatorGetClipDurationFn? s_AnimatorGetClipDuration;
+
+        private static SocketAttachFn? s_SocketAttach;
+        private static EntityActionFn? s_SocketDetach;
 
         // ====================================================================
         // Initialization - called from C++ to provide function pointers
@@ -263,6 +270,9 @@ namespace Kerberos
             s_AnimatorSetActiveClip = Marshal.GetDelegateForFunctionPointer<SetIntFn>(ReadNext());
             s_AnimatorGetClipCount = Marshal.GetDelegateForFunctionPointer<GetIntFn>(ReadNext());
             s_AnimatorGetClipDuration = Marshal.GetDelegateForFunctionPointer<AnimatorGetClipDurationFn>(ReadNext());
+
+            s_SocketAttach = Marshal.GetDelegateForFunctionPointer<SocketAttachFn>(ReadNext());
+            s_SocketDetach = Marshal.GetDelegateForFunctionPointer<EntityActionFn>(ReadNext());
         }
 
         // ====================================================================
@@ -611,6 +621,21 @@ namespace Kerberos
         internal static float AnimatorComponent_GetClipDuration(ulong entityID, int clipIndex)
         {
             return s_AnimatorGetClipDuration?.Invoke(entityID, clipIndex) ?? 0.0f;
+        }
+
+        // ----------------------------- SocketComponent -----------------------------
+
+        internal static void Socket_Attach(ulong entityID, ulong skeletonEntityID, string jointName,
+                                           ref Vector3 translation, ref Vector3 rotation, ref Vector3 scale)
+        {
+            IntPtr ptr = Marshal.StringToHGlobalAnsi(jointName);
+            try { s_SocketAttach?.Invoke(entityID, skeletonEntityID, ptr, ref translation, ref rotation, ref scale); }
+            finally { Marshal.FreeHGlobal(ptr); }
+        }
+
+        internal static void Socket_Detach(ulong entityID)
+        {
+            s_SocketDetach?.Invoke(entityID);
         }
 
     }

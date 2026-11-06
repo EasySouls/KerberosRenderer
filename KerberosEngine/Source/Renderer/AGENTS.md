@@ -274,8 +274,31 @@ authoring and cross-fade weight computation are not implemented yet.
 
 Entities use `SkeletonComponent` for the skeleton instance and joint list,
 `JointComponent` for joint ordering, `SkinnedMeshComponent` for the mesh /
-skeleton-entity link, and `AnimatorComponent` for the skeleton-entity reference,
-clip handles, and playback state. The animator replaces the old single-clip
+skeleton-entity link, `AnimatorComponent` for the skeleton-entity reference,
+clip handles, and playback state, and `SocketComponent` to attach an entity to
+a named joint.
+
+## Sockets and pose authority
+
+The CPU `SkeletonPose` is authoritative. A socket is a derived attachment, not
+a second animation source: `SocketComponent` stores the target skeleton entity,
+joint name, and local offset, while `AnimationRuntime::UpdateSockets` resolves
+the joint through `Skeleton::GetJointIndex` and writes the attached entity's
+`WorldTransform` from `skeletonWorld * pose.Global[joint] * localOffset`.
+Authored translation/rotation/scale are never overwritten; child transforms are
+recalculated from the socket world transform. Sockets update after each pose
+evaluation and again in `FinalizePose`, so event handlers and scripts see the
+current attachment before physics and the renderer sees the final post-physics
+pose. Socket-derived transforms currently update rendering and hierarchy only;
+moving a physics body with a socket-attached entity requires an explicit
+kinematic body update.
+
+For future ragdolling and animation blending, keep this same boundary: the
+skeleton pose remains the shared representation. Animation drives kinematic
+bone proxies while animated; at handoff copy pose and velocities into dynamic
+bodies; after physics read body transforms back into `SkeletonPose`, blend with
+animation, recompute globals/skin matrices, then update sockets. Do not make
+`JointComponent` entity transforms the authoritative pose. The animator replaces the old single-clip
 `AnimationComponent`; legacy serialized animation components are migrated on
 load. `AnimatorComponent::LoadedClips` is transient: `AnimationRuntime` resolves
 `AnimationClips` through the active asset manager when the handle list changes
@@ -354,10 +377,11 @@ SVB rather than expecting world-space output.
 - Pose evaluation and skin-matrix generation are CPU-only. There is no
   evaluation/precompute compute pass and no GPU pose path yet.
 - Clip cross-fades, pose blending, additive layers, root motion, editor
-  timeline authoring, and sockets/attachments are not implemented.
-  Marker/event data round-trips from `.meta` through the native clip into
-  `AnimationClip`, and point/duration events dispatch to scripts. Cross-fade
-  weight computation and `FireInEditor` preview dispatch remain future work.
+  timeline authoring, and ragdoll two-way pose synchronization are not
+  implemented. Marker/event data round-trips from `.meta` through the native
+  clip into `AnimationClip`, and point/duration events dispatch to scripts.
+  Cross-fade weight computation and `FireInEditor` preview dispatch remain
+  future work.
 - `FinalizePose` is an empty post-physics hook; ragdoll blending and IK still
   need to fill it and bump `PoseVersion`.
 - Physics/ragdoll integration and Jolt bone proxies are not implemented.

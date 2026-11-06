@@ -876,6 +876,8 @@ Entity Scene::InstantiatePrefab(const AssetHandle prefabHandle, const std::strin
 			animator.LoadedClips.clear();
 			newEntity.AddComponent<AnimatorComponent>(animator);
 		}
+		if (sourceRegistry.all_of<SocketComponent>(sourceEntity))
+			newEntity.AddComponent<SocketComponent>(sourceRegistry.get<SocketComponent>(sourceEntity));
 		if (sourceRegistry.all_of<JointComponent>(sourceEntity))
 			newEntity.AddComponent<JointComponent>(sourceRegistry.get<JointComponent>(sourceEntity));
 
@@ -1267,6 +1269,11 @@ Entity Scene::InstantiatePrefab(const AssetHandle prefabHandle, const std::strin
 
 	template <>
 	void Scene::OnComponentAdded<AnimatorComponent>(Entity, AnimatorComponent&)
+	{
+	}
+
+	template <>
+	void Scene::OnComponentAdded<SocketComponent>(Entity, SocketComponent&)
 	{
 	}
 

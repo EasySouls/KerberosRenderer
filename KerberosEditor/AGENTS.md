@@ -71,7 +71,14 @@ Editor windows live mainly under
   events are delivered to scripts through
   `Entity.OnAnimationEvent(AnimationEvent)` with Point/Begin/Tick/End phases;
   events dispatch on the animator entity in Play mode only, while Edit and
-  Simulate clear pending events without invoking gameplay scripts.
+  Simulate clear pending events without invoking gameplay scripts. The Socket
+  component attaches an entity to a named joint; its authored offset is edited
+  in the hierarchy and scripts can attach newly spawned entities at runtime
+  with `Entity.AttachToSocket(skeletonEntity, jointName, ...)` and detach with
+  `Entity.DetachFromSocket()`. Sockets are derived from the authoritative
+  skeleton pose; they do not animate joint entities. Socket components are
+  scene-serialized and copied with scenes; authored prefab templates do not
+  carry them yet, so runtime-spawned attachments use the scripting API.
 - `InspectorPanel`: the unified right-side "Properties" window. It shows entity
   components when an entity is selected and asset import options when a source
   asset is selected in `AssetsPanel` (asset selection takes display precedence).

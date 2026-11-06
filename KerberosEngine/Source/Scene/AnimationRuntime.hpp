@@ -66,7 +66,7 @@ public:
     void EvaluatePose();
 
     /// Post-physics hook for future ragdoll blending, IK, and socket/attachment updates.
-    void FinalizePose(float dt);
+    void FinalizePose(float dt) const;
 
     void Reset();
 
@@ -92,6 +92,7 @@ private:
     };
 
     void SyncInstances();
+    void UpdateSockets() const;
     static void ResolveAnimatorClips(AnimatorComponent& animator);
     void CloseActiveDurationEvents(AnimationInstance& instance, const Ref<AnimationClip>& clip, float time);
     const ClipTrackCache& GetClipTrackCache(const Ref<Skeleton>& skeleton, const Ref<AnimationClip>& clip);

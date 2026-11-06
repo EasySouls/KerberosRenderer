@@ -594,6 +594,10 @@ void HierarchyPanel::AddComponentPopup(const Entity entity)
                 AddComponentWithCheck<JointComponent>(entity);
                 ImGui::CloseCurrentPopup();
             }
+            if (ImGui::MenuItem("Socket")) {
+                AddComponentWithCheck<SocketComponent>(entity);
+                ImGui::CloseCurrentPopup();
+            }
             ImGui::EndMenu();
         }
 
@@ -2241,6 +2245,57 @@ void HierarchyPanel::DrawComponents(const Entity entity)
             entity.RemoveComponent<JointComponent>();
         }
     }
+    if (entity.HasComponent<SocketComponent>())
+    {
+        ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(6, 6));
+        const bool opened = ImGui::TreeNodeEx(
+            reinterpret_cast<void*>(typeid(SocketComponent).hash_code()), treeNodeFlags, "Socket");
+        ImGui::SameLine(ImGui::GetContentRegionAvail().x - 20.f);
+        if (ImGui::Button("+", ImVec2{ 20, 20 }))
+        {
+            ImGui::OpenPopup("SocketComponentSettings");
+        }
+
+        bool componentDeleted = false;
+        if (ImGui::BeginPopup("SocketComponentSettings"))
+        {
+            ImGui::Text("Socket Settings");
+            ImGui::Separator();
+            if (ImGui::MenuItem("Remove Component"))
+            {
+                componentDeleted = true;
+                ImGui::CloseCurrentPopup();
+            }
+            ImGui::EndPopup();
+        }
+        ImGui::PopStyleVar();
+
+        if (opened)
+        {
+            auto& socket = entity.GetComponent<SocketComponent>();
+
+            if (const auto newSkeletonEntity = DrawComponentEntityReferenceField<SkeletonComponent>(
+                    "Socket Skeleton Entity", m_Context, socket.SkeletonEntity))
+            {
+                socket.SkeletonEntity = *newSkeletonEntity;
+            }
+
+            char jointName[256]{};
+            std::snprintf(jointName, sizeof(jointName), "%s", socket.JointName.c_str());
+            if (ImGui::InputText("Joint Name", jointName, sizeof(jointName)))
+                socket.JointName = jointName;
+
+            ImGui::DragFloat3("Socket Translation", &socket.LocalTranslation.x, 0.01f);
+            ImGui::DragFloat3("Socket Rotation", &socket.LocalRotation.x, 0.01f);
+            ImGui::DragFloat3("Socket Scale", &socket.LocalScale.x, 0.01f);
+
+            ImGui::TreePop();
+        }
+
+        if (componentDeleted)
+            entity.RemoveComponent<SocketComponent>();
+    }
+
     if (entity.HasComponent<AnimatorComponent>())
     {
         ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(6, 6));

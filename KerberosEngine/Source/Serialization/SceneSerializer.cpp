@@ -369,6 +369,18 @@ static void SerializeEntity(YAML::Emitter& out, const Entity entity)
         out << YAML::EndMap;
     }
 
+    if (entity.HasComponent<SocketComponent>()) {
+        out << YAML::Key << "SocketComponent";
+        out << YAML::BeginMap;
+        const auto& socket = entity.GetComponent<SocketComponent>();
+        out << YAML::Key << "SkeletonEntity" << YAML::Value << socket.SkeletonEntity;
+        out << YAML::Key << "JointName" << YAML::Value << socket.JointName;
+        out << YAML::Key << "LocalTranslation" << YAML::Value << socket.LocalTranslation;
+        out << YAML::Key << "LocalRotation" << YAML::Value << socket.LocalRotation;
+        out << YAML::Key << "LocalScale" << YAML::Value << socket.LocalScale;
+        out << YAML::EndMap;
+    }
+
     out << YAML::EndMap;
 }
 
@@ -727,6 +739,15 @@ Entity SceneSerializer::DeserializeEntity(const Ref<Scene>& scene, const YAML::N
         animation.IsPlaying = legacyAnimationComponent["IsPlaying"].as<bool>(false);
         animation.IsLooping = legacyAnimationComponent["IsLooping"].as<bool>(true);
         animation.PlayOnStart = legacyAnimationComponent["PlayOnStart"].as<bool>(false);
+    }
+
+    if (auto socketComponent = node["SocketComponent"]) {
+        auto& socket = deserializedEntity.AddComponent<SocketComponent>();
+        socket.SkeletonEntity = UUID(socketComponent["SkeletonEntity"].as<uint64_t>(0));
+        socket.JointName = socketComponent["JointName"].as<std::string>("");
+        socket.LocalTranslation = socketComponent["LocalTranslation"].as<glm::vec3>(glm::vec3(0.0f));
+        socket.LocalRotation = socketComponent["LocalRotation"].as<glm::vec3>(glm::vec3(0.0f));
+        socket.LocalScale = socketComponent["LocalScale"].as<glm::vec3>(glm::vec3(1.0f));
     }
 
     return deserializedEntity;

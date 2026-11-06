@@ -293,6 +293,43 @@ namespace
 		EXPECT_TRUE(runtime.GetInstances().empty());
 	}
 
+	TEST(AnimationRuntimeTest, SocketFollowsJointAndChildTransforms)
+	{
+		const Kerberos::Ref<Kerberos::Scene> scene = Kerberos::CreateRef<Kerberos::Scene>();
+
+		Kerberos::Entity skeletonEntity = scene->CreateEntity("Skeleton");
+		skeletonEntity.GetComponent<Kerberos::TransformComponent>().Translation = glm::vec3(5.0f, 0.0f, 0.0f);
+		auto& skeletonComponent = skeletonEntity.AddComponent<Kerberos::SkeletonComponent>();
+		skeletonComponent.Skeleton = Kerberos::CreateRef<Kerberos::Skeleton>(MakeTwoJointJoints());
+
+		Kerberos::Entity swordEntity = scene->CreateEntity("Sword");
+		swordEntity.GetComponent<Kerberos::TransformComponent>().Translation = glm::vec3(100.0f);
+		auto& socket = swordEntity.AddComponent<Kerberos::SocketComponent>();
+		socket.SkeletonEntity = skeletonEntity.GetUUID();
+		socket.JointName = "Child";
+
+		const Kerberos::Entity socketChild = scene->CreateEntity("SocketChild");
+		socketChild.GetComponent<Kerberos::TransformComponent>().Translation = glm::vec3(0.0f, 0.0f, 1.0f);
+		scene->SetParent(socketChild, swordEntity, false);
+
+		scene->CalculateEntityTransforms();
+
+		auto& runtime = scene->GetAnimationRuntime();
+		runtime.AdvanceClocks(0.0f, false);
+		runtime.EvaluatePose();
+
+		const glm::mat4& socketWorld = swordEntity.GetComponent<Kerberos::TransformComponent>().WorldTransform;
+		EXPECT_NEAR(socketWorld[3].x, 6.0f, 1.0e-5f);
+		EXPECT_NEAR(socketWorld[3].z, 0.0f, 1.0e-5f);
+
+		// Authored local transform is not overwritten, only the derived world transform is.
+		EXPECT_NEAR(swordEntity.GetComponent<Kerberos::TransformComponent>().Translation.x, 100.0f, 1.0e-5f);
+
+		const glm::mat4& childWorld = socketChild.GetComponent<Kerberos::TransformComponent>().WorldTransform;
+		EXPECT_NEAR(childWorld[3].x, 6.0f, 1.0e-5f);
+		EXPECT_NEAR(childWorld[3].z, 1.0f, 1.0e-5f);
+	}
+
 	TEST(AnimationSceneTest, CopyDoesNotStartAnimatorsWithoutPlayOnStart)
 	{
 		const Kerberos::Ref<Kerberos::Scene> editorScene = Kerberos::CreateRef<Kerberos::Scene>();

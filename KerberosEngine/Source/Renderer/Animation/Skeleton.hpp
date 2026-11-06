@@ -6,6 +6,8 @@
 #include <glm/glm.hpp>
 #include <glm/gtc/quaternion.hpp>
 
+#include <string_view>
+#include <unordered_map>
 #include <vector>
 #include <string>
 
@@ -48,8 +50,12 @@ public:
 
     const SkeletonJoint& GetJointBySourceNode(int32_t sourceNode) const;
 
+    /// Returns the joint index for a joint name, or -1 when the name is not present.
+    int32_t GetJointIndex(std::string_view name) const;
+
 private:
     std::vector<SkeletonJoint> m_Joints;
+    std::unordered_map<std::string, int32_t> m_JointByName;
 };
 
 }

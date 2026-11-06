@@ -101,6 +101,9 @@ namespace Kerberos
 		void* AnimatorComponent_SetActiveClip;
 		void* AnimatorComponent_GetClipCount;
 		void* AnimatorComponent_GetClipDuration;
+
+		void* Socket_Attach;
+		void* Socket_Detach;
 	};
 
 	/// Component type name to HasComponent check mapping
@@ -174,6 +177,8 @@ namespace Kerberos
 			return [](Entity entity) { return entity.AddComponent<AudioListenerComponent>(); };
 		if (typeName == "AnimatorComponent")
 			return [](Entity entity) { return entity.AddComponent<AnimatorComponent>(); };
+		if (typeName == "SocketComponent")
+			return [](Entity entity) { return entity.AddComponent<SocketComponent>(); };
 
 		KBRAssert(false, "Unknown component type: {0}", typeName);
 		return nullptr;
@@ -734,6 +739,67 @@ namespace Kerberos
 		return clip ? clip->GetDuration() : 0.0f;
 	}
 
+	static void Socket_Attach(const uint64_t entityID, const uint64_t skeletonEntityID, const char* jointName,
+	                          const glm::vec3* localTranslation, const glm::vec3* localRotation,
+	                          const glm::vec3* localScale)
+	{
+		KBR_TRACY_FUNCTION();
+
+		if (!jointName || jointName[0] == '\0')
+		{
+			Log::CoreWarn("Socket_Attach: entity {} was given an empty joint name", entityID);
+			return;
+		}
+
+		const Ref<Scene> scene = ScriptEngine::GetSceneContext().lock();
+		if (!scene)
+			return;
+
+		Entity entity = scene->TryGetEntityByUUID(UUID(entityID));
+		const Entity skeletonEntity = scene->TryGetEntityByUUID(UUID(skeletonEntityID));
+		if (!entity || !skeletonEntity || !skeletonEntity.HasComponent<SkeletonComponent>())
+		{
+			Log::CoreWarn("Socket_Attach: entity {} or skeleton entity {} is invalid", entityID, skeletonEntityID);
+			return;
+		}
+
+		const SkeletonComponent& skeletonComponent = skeletonEntity.GetComponent<SkeletonComponent>();
+		if (skeletonComponent.Skeleton && skeletonComponent.Skeleton->GetJointIndex(jointName) < 0)
+		{
+			Log::CoreWarn("Socket_Attach: skeleton entity {} has no joint named '{}'", skeletonEntityID, jointName);
+			return;
+		}
+
+		SocketComponent& socket = entity.HasComponent<SocketComponent>()
+			? entity.GetComponent<SocketComponent>()
+			: entity.AddComponent<SocketComponent>();
+
+		socket.SkeletonEntity = UUID(skeletonEntityID);
+		socket.JointName = jointName;
+		socket.LocalTranslation = localTranslation ? *localTranslation : glm::vec3(0.0f);
+		socket.LocalRotation = localRotation ? *localRotation : glm::vec3(0.0f);
+		socket.LocalScale = localScale ? *localScale : glm::vec3(1.0f);
+	}
+
+	static void Socket_Detach(const uint64_t entityID)
+	{
+		KBR_TRACY_FUNCTION();
+
+		const Ref<Scene> scene = ScriptEngine::GetSceneContext().lock();
+		if (!scene)
+			return;
+
+		Entity entity = scene->TryGetEntityByUUID(UUID(entityID));
+		if (entity && entity.HasComponent<SocketComponent>())
+		{
+			entity.RemoveComponent<SocketComponent>();
+
+			// Restore the authored hierarchy transform instead of leaving the last socket world
+			// transform until the next frame's transform pass.
+			scene->CalculateEntityTransform(entity);
+		}
+	}
+
 	/// String return buffer (managed side will read from this pointer)
 	static std::string s_StringReturnBuffer;
 
@@ -1019,6 +1085,7 @@ namespace Kerberos
 		RegisterComponent<AudioSource3DComponent>("Kerberos.Scene.AudioSource3DComponent");
 		RegisterComponent<AudioListenerComponent>("Kerberos.Scene.AudioListenerComponent");
 		RegisterComponent<AnimatorComponent>("Kerberos.Scene.AnimatorComponent");
+		RegisterComponent<SocketComponent>("Kerberos.Scene.SocketComponent");
 
 		/// Build the native callback table and pass it to the managed side
 		static NativeCallbackTable callbackTable = {};
@@ -1091,6 +1158,9 @@ namespace Kerberos
 		callbackTable.AnimatorComponent_SetActiveClip = reinterpret_cast<void*>(&AnimatorComponent_SetActiveClip);
 		callbackTable.AnimatorComponent_GetClipCount = reinterpret_cast<void*>(&AnimatorComponent_GetClipCount);
 		callbackTable.AnimatorComponent_GetClipDuration = reinterpret_cast<void*>(&AnimatorComponent_GetClipDuration);
+
+		callbackTable.Socket_Attach = reinterpret_cast<void*>(&Socket_Attach);
+		callbackTable.Socket_Detach = reinterpret_cast<void*>(&Socket_Detach);
 
 		/// Pass the callback table to the managed side
 		ScriptEngine::SetManagedNativeCallbacks(&callbackTable);

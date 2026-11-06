@@ -69,6 +69,10 @@ namespace Kerberos.Scene
         }
     }
 
+    public class SocketComponent : Component
+    {
+    }
+
     public class AnimatorComponent : Component
     {
         public float CurrentTime

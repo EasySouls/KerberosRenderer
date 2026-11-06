@@ -38,6 +38,30 @@ namespace Kerberos.Scene
 
         public ulong GetID() => ID;
 
+        /// <summary>
+        /// Attaches this entity to a named joint of the skeleton entity. The skeleton pose drives
+        /// the entity's world transform; the authored local transform is not modified.
+        /// </summary>
+        public void AttachToSocket(Entity skeletonEntity, string jointName)
+            => AttachToSocket(skeletonEntity, jointName, new Vector3(0.0f), new Vector3(0.0f), new Vector3(1.0f));
+
+        public void AttachToSocket(Entity skeletonEntity, string jointName,
+                                   Vector3 localTranslation, Vector3 localRotation, Vector3 localScale)
+        {
+            if (skeletonEntity == null)
+                throw new ArgumentNullException(nameof(skeletonEntity));
+            if (string.IsNullOrWhiteSpace(jointName))
+                throw new ArgumentException("Joint name must not be empty.", nameof(jointName));
+
+            InternalCalls.Socket_Attach(ID, skeletonEntity.GetID(), jointName,
+                                        ref localTranslation, ref localRotation, ref localScale);
+        }
+
+        public void DetachFromSocket()
+        {
+            InternalCalls.Socket_Detach(ID);
+        }
+
         protected bool HasComponent<T>() where T : Component, new()
         {
             return InternalCalls.Entity_HasComponent(ID, typeof(T));

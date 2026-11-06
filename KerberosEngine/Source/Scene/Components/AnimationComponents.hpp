@@ -9,7 +9,9 @@
 #include "Scene/AABB.hpp"
 
 #include <glm/glm.hpp>
+#include <glm/gtc/quaternion.hpp>
 
+#include <string>
 #include <vector>
 
 namespace Kerberos {
@@ -17,6 +19,23 @@ namespace Kerberos {
 struct JointComponent
 {
     uint32_t JointIndex = 0;
+};
+
+/// Attaches this entity to a joint of a skeleton. The animation pose remains authoritative,
+/// the runtime writes only the entity's derived world transform, never its authored TRS.
+struct SocketComponent
+{
+    UUID SkeletonEntity = UUID::Invalid();
+    std::string JointName;
+    glm::vec3 LocalTranslation = glm::vec3(0.0f);
+    glm::vec3 LocalRotation = glm::vec3(0.0f);
+    glm::vec3 LocalScale = glm::vec3(1.0f);
+
+    SocketComponent() = default;
+    SocketComponent(const SocketComponent&) = default;
+    SocketComponent(SocketComponent&&) = default;
+    SocketComponent& operator=(const SocketComponent&) = default;
+    SocketComponent& operator=(SocketComponent&&) = default;
 };
 
 struct SkeletonComponent

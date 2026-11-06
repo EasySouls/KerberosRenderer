@@ -6,6 +6,9 @@
 #include "Scene/Components/AnimationComponents.hpp"
 #include "Scene/Entity.hpp"
 
+#include <glm/gtc/matrix_transform.hpp>
+#include <glm/gtx/quaternion.hpp>
+
 #include <algorithm>
 
 import Kerberos;
@@ -435,12 +438,73 @@ void AnimationRuntime::EvaluatePose()
             instance.PoseVersion = m_NextPoseVersion++;
         }
     }
+
+    UpdateSockets();
 }
 
-void AnimationRuntime::FinalizePose([[maybe_unused]] const float dt)
+void AnimationRuntime::UpdateSockets() const
 {
+    KBR_TRACY_FUNCTION();
+
+    if (!m_Scene)
+        return;
+
+    const auto view = m_Scene->m_Registry.view<SocketComponent, TransformComponent>();
+    for (const auto entity : view)
+    {
+        auto& socket = view.get<SocketComponent>(entity);
+        auto& transform = view.get<TransformComponent>(entity);
+
+        if (!socket.SkeletonEntity.IsValid() || socket.JointName.empty())
+            continue;
+
+        const SkeletonPose* pose = FindPose(socket.SkeletonEntity);
+        if (!pose)
+            continue;
+
+        const Entity skeletonEntity = m_Scene->TryGetEntityByUUID(socket.SkeletonEntity);
+        if (!skeletonEntity || !skeletonEntity.HasComponent<SkeletonComponent>() ||
+            !skeletonEntity.HasComponent<TransformComponent>())
+        {
+            continue;
+        }
+
+        const SkeletonComponent& skeletonComponent = skeletonEntity.GetComponent<SkeletonComponent>();
+        if (!skeletonComponent.Skeleton)
+            continue;
+
+        const int32_t jointIndex = skeletonComponent.Skeleton->GetJointIndex(socket.JointName);
+        if (jointIndex < 0 || static_cast<size_t>(jointIndex) >= pose->Global.size())
+            continue;
+
+        const glm::mat4 localOffset =
+            glm::translate(glm::mat4(1.0f), socket.LocalTranslation) *
+            glm::toMat4(glm::normalize(glm::quat(socket.LocalRotation))) *
+            glm::scale(glm::mat4(1.0f), socket.LocalScale);
+
+        const glm::mat4 socketWorld =
+            skeletonEntity.GetComponent<TransformComponent>().WorldTransform *
+            pose->Global[static_cast<size_t>(jointIndex)] *
+            localOffset;
+
+        // Socket entities are derived transforms: keep the authored local TRS untouched and
+        // update only the world transform plus descendants. 
+        // UpdateChildTransforms updates its
+        // own entity as well, so call it on children rather than on the socket entity.
+        transform.WorldTransform = socketWorld;
+        const Entity socketEntity{ entity, m_Scene };
+        for (const Entity child : m_Scene->GetChildren(socketEntity))
+            m_Scene->UpdateChildTransforms(child, socketWorld);
+    }
+}
+
+void AnimationRuntime::FinalizePose([[maybe_unused]] const float dt) const
+{
+    KBR_TRACY_FUNCTION();
+
     // Reserved for post-physics work: ragdoll blending, inverse kinematics, root motion, and
     // socket/attachment updates. The renderer uploads whatever pose is final after this call.
+    UpdateSockets();
 }
 
 void AnimationRuntime::Reset()
@@ -460,6 +524,8 @@ const std::vector<AnimationInstance>& AnimationRuntime::GetInstances() const
 
 const SkeletonPose* AnimationRuntime::FindPose(const UUID skeletonEntity) const
 {
+    KBR_TRACY_FUNCTION();
+
     const auto it = m_InstanceByEntity.find(skeletonEntity);
     if (it == m_InstanceByEntity.end())
         return nullptr;
@@ -499,6 +565,8 @@ bool AnimationRuntime::GetNextMarker(const UUID skeletonEntity, const float afte
 const ClipTrackCache& AnimationRuntime::GetClipTrackCache(const Ref<Skeleton>& skeleton,
                                                           const Ref<AnimationClip>& clip)
 {
+    KBR_TRACY_FUNCTION();
+
     const uint32_t jointCount = static_cast<uint32_t>(skeleton->GetJoints().size());
     const Skeleton* skeletonPtr = skeleton.get();
     const AssetHandle clipHandle = clip->GetHandle();
@@ -532,6 +600,8 @@ void AnimationRuntime::CloseActiveDurationEvents(AnimationInstance& instance,
                                                  const Ref<AnimationClip>& clip,
                                                  const float time)
 {
+    KBR_TRACY_FUNCTION();
+
     if (!instance.ActiveEvents.empty() && clip)
     {
         const std::vector<AnimationEvent>& events = clip->GetEvents();
