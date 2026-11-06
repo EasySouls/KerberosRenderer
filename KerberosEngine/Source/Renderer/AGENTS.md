@@ -291,7 +291,13 @@ evaluation and again in `FinalizePose`, so event handlers and scripts see the
 current attachment before physics and the renderer sees the final post-physics
 pose. Socket-derived transforms currently update rendering and hierarchy only;
 moving a physics body with a socket-attached entity requires an explicit
-kinematic body update.
+kinematic body update. Kinematic rigid bodies are moved from their
+`TransformComponent` world transform immediately before each Jolt step, while
+only dynamic bodies are read back into entity transforms. Collider components
+expose `IsTrigger` and `Enabled`, and the C# API supports body type, mass,
+gravity, friction, restitution, angular velocity, collider shape/offset, and
+trigger/enabled changes. Changing these marks the owning rigid body dirty; the
+physics system rebuilds the body on the next update.
 
 For future ragdolling and animation blending, keep this same boundary: the
 skeleton pose remains the shared representation. Animation drives kinematic

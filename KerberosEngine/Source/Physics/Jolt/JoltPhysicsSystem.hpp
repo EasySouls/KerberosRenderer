@@ -50,6 +50,7 @@ namespace Kerberos
 		void AddImpulse(uint32_t bodyId, const glm::vec3& impulse) const override;
 		void AddImpulse(uint32_t bodyId, const glm::vec3& impulse, const glm::vec3& point) const override;
 		void SetLinearVelocity(uint32_t bodyId, const glm::vec3& velocity) const override;
+		void SetAngularVelocity(uint32_t bodyId, const glm::vec3& velocity) const override;
 
 		bool Raycast(const glm::vec3& origin, const glm::vec3& direction, float maxDistance,
 			RaycastHit& outHit) const override;

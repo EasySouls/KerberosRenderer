@@ -4,6 +4,13 @@ using Kerberos.Scene;
 
 namespace Kerberos;
 
+public enum BodyType
+{
+    Static,
+    Dynamic,
+    Kinematic
+}
+
 public struct RaycastHit
 {
     public Vector3 Point;

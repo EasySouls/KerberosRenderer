@@ -1651,6 +1651,7 @@ void HierarchyPanel::DrawComponents(const Entity entity)
             colliderChanged |= ImGui::DragFloat3("Size", glm::value_ptr(collider.Size), 0.1f);
             colliderChanged |= ImGui::DragFloat3("Offset", glm::value_ptr(collider.Offset), 0.1f);
             colliderChanged |= ImGui::Checkbox("Is Trigger", &collider.IsTrigger);
+            colliderChanged |= ImGui::Checkbox("Enabled", &collider.Enabled);
             if (colliderChanged && entity.HasComponent<RigidBody3DComponent>()) {
                 entity.GetComponent<RigidBody3DComponent>().IsDirty = true;
             }
@@ -1690,6 +1691,7 @@ void HierarchyPanel::DrawComponents(const Entity entity)
             colliderChanged |= ImGui::DragFloat("Radius", &collider.Radius, 0.1f);
             colliderChanged |= ImGui::DragFloat3("Offset", glm::value_ptr(collider.Offset), 0.1f);
             colliderChanged |= ImGui::Checkbox("Is Trigger", &collider.IsTrigger);
+            colliderChanged |= ImGui::Checkbox("Enabled", &collider.Enabled);
             if (colliderChanged && entity.HasComponent<RigidBody3DComponent>()) {
                 entity.GetComponent<RigidBody3DComponent>().IsDirty = true;
             }
@@ -1729,6 +1731,7 @@ void HierarchyPanel::DrawComponents(const Entity entity)
             colliderChanged |= ImGui::DragFloat("Height", &collider.Height, 0.1f);
             colliderChanged |= ImGui::DragFloat3("Offset", glm::value_ptr(collider.Offset), 0.1f);
             colliderChanged |= ImGui::Checkbox("Is Trigger", &collider.IsTrigger);
+            colliderChanged |= ImGui::Checkbox("Enabled", &collider.Enabled);
             if (colliderChanged && entity.HasComponent<RigidBody3DComponent>()) {
                 entity.GetComponent<RigidBody3DComponent>().IsDirty = true;
             }
@@ -1765,6 +1768,7 @@ void HierarchyPanel::DrawComponents(const Entity entity)
             bool colliderChanged = false;
             colliderChanged |= ImGui::DragFloat3("Offset", glm::value_ptr(collider.Offset), 0.1f);
             colliderChanged |= ImGui::Checkbox("Is Trigger", &collider.IsTrigger);
+            colliderChanged |= ImGui::Checkbox("Enabled", &collider.Enabled);
             if (colliderChanged && entity.HasComponent<RigidBody3DComponent>()) {
                 entity.GetComponent<RigidBody3DComponent>().IsDirty = true;
             }

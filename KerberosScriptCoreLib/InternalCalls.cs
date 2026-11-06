@@ -183,6 +183,57 @@ namespace Kerberos
         private static SocketAttachFn? s_SocketAttach;
         private static EntityActionFn? s_SocketDetach;
 
+        private static GetIntFn? s_RigidbodyGetBodyType;
+        private static SetIntFn? s_RigidbodySetBodyType;
+        private static GetFloatFn? s_RigidbodyGetMass;
+        private static SetFloatFn? s_RigidbodySetMass;
+        private static GetVec3Fn? s_RigidbodyGetAngularVelocity;
+        private static SetVec3Fn? s_RigidbodySetAngularVelocity;
+        private static GetBoolFn? s_RigidbodyGetUseGravity;
+        private static SetBoolFn? s_RigidbodySetUseGravity;
+        private static GetFloatFn? s_RigidbodyGetFriction;
+        private static SetFloatFn? s_RigidbodySetFriction;
+        private static GetFloatFn? s_RigidbodyGetRestitution;
+        private static SetFloatFn? s_RigidbodySetRestitution;
+
+        private static GetVec3Fn? s_BoxColliderGetSize;
+        private static SetVec3Fn? s_BoxColliderSetSize;
+        private static GetVec3Fn? s_BoxColliderGetOffset;
+        private static SetVec3Fn? s_BoxColliderSetOffset;
+        private static GetBoolFn? s_BoxColliderGetIsTrigger;
+        private static SetBoolFn? s_BoxColliderSetIsTrigger;
+        private static GetBoolFn? s_BoxColliderGetEnabled;
+        private static SetBoolFn? s_BoxColliderSetEnabled;
+
+        private static GetFloatFn? s_SphereColliderGetRadius;
+        private static SetFloatFn? s_SphereColliderSetRadius;
+        private static GetVec3Fn? s_SphereColliderGetOffset;
+        private static SetVec3Fn? s_SphereColliderSetOffset;
+        private static GetBoolFn? s_SphereColliderGetIsTrigger;
+        private static SetBoolFn? s_SphereColliderSetIsTrigger;
+        private static GetBoolFn? s_SphereColliderGetEnabled;
+        private static SetBoolFn? s_SphereColliderSetEnabled;
+
+        private static GetFloatFn? s_CapsuleColliderGetRadius;
+        private static SetFloatFn? s_CapsuleColliderSetRadius;
+        private static GetFloatFn? s_CapsuleColliderGetHeight;
+        private static SetFloatFn? s_CapsuleColliderSetHeight;
+        private static GetVec3Fn? s_CapsuleColliderGetOffset;
+        private static SetVec3Fn? s_CapsuleColliderSetOffset;
+        private static GetBoolFn? s_CapsuleColliderGetIsTrigger;
+        private static SetBoolFn? s_CapsuleColliderSetIsTrigger;
+        private static GetBoolFn? s_CapsuleColliderGetEnabled;
+        private static SetBoolFn? s_CapsuleColliderSetEnabled;
+
+        private static StaticMeshGetMeshFn? s_MeshColliderGetMesh;
+        private static StaticMeshSetMeshFn? s_MeshColliderSetMesh;
+        private static GetVec3Fn? s_MeshColliderGetOffset;
+        private static SetVec3Fn? s_MeshColliderSetOffset;
+        private static GetBoolFn? s_MeshColliderGetIsTrigger;
+        private static SetBoolFn? s_MeshColliderSetIsTrigger;
+        private static GetBoolFn? s_MeshColliderGetEnabled;
+        private static SetBoolFn? s_MeshColliderSetEnabled;
+
         // ====================================================================
         // Initialization - called from C++ to provide function pointers
         // ====================================================================
@@ -273,6 +324,57 @@ namespace Kerberos
 
             s_SocketAttach = Marshal.GetDelegateForFunctionPointer<SocketAttachFn>(ReadNext());
             s_SocketDetach = Marshal.GetDelegateForFunctionPointer<EntityActionFn>(ReadNext());
+
+            s_RigidbodyGetBodyType = Marshal.GetDelegateForFunctionPointer<GetIntFn>(ReadNext());
+            s_RigidbodySetBodyType = Marshal.GetDelegateForFunctionPointer<SetIntFn>(ReadNext());
+            s_RigidbodyGetMass = Marshal.GetDelegateForFunctionPointer<GetFloatFn>(ReadNext());
+            s_RigidbodySetMass = Marshal.GetDelegateForFunctionPointer<SetFloatFn>(ReadNext());
+            s_RigidbodyGetAngularVelocity = Marshal.GetDelegateForFunctionPointer<GetVec3Fn>(ReadNext());
+            s_RigidbodySetAngularVelocity = Marshal.GetDelegateForFunctionPointer<SetVec3Fn>(ReadNext());
+            s_RigidbodyGetUseGravity = Marshal.GetDelegateForFunctionPointer<GetBoolFn>(ReadNext());
+            s_RigidbodySetUseGravity = Marshal.GetDelegateForFunctionPointer<SetBoolFn>(ReadNext());
+            s_RigidbodyGetFriction = Marshal.GetDelegateForFunctionPointer<GetFloatFn>(ReadNext());
+            s_RigidbodySetFriction = Marshal.GetDelegateForFunctionPointer<SetFloatFn>(ReadNext());
+            s_RigidbodyGetRestitution = Marshal.GetDelegateForFunctionPointer<GetFloatFn>(ReadNext());
+            s_RigidbodySetRestitution = Marshal.GetDelegateForFunctionPointer<SetFloatFn>(ReadNext());
+
+            s_BoxColliderGetSize = Marshal.GetDelegateForFunctionPointer<GetVec3Fn>(ReadNext());
+            s_BoxColliderSetSize = Marshal.GetDelegateForFunctionPointer<SetVec3Fn>(ReadNext());
+            s_BoxColliderGetOffset = Marshal.GetDelegateForFunctionPointer<GetVec3Fn>(ReadNext());
+            s_BoxColliderSetOffset = Marshal.GetDelegateForFunctionPointer<SetVec3Fn>(ReadNext());
+            s_BoxColliderGetIsTrigger = Marshal.GetDelegateForFunctionPointer<GetBoolFn>(ReadNext());
+            s_BoxColliderSetIsTrigger = Marshal.GetDelegateForFunctionPointer<SetBoolFn>(ReadNext());
+            s_BoxColliderGetEnabled = Marshal.GetDelegateForFunctionPointer<GetBoolFn>(ReadNext());
+            s_BoxColliderSetEnabled = Marshal.GetDelegateForFunctionPointer<SetBoolFn>(ReadNext());
+
+            s_SphereColliderGetRadius = Marshal.GetDelegateForFunctionPointer<GetFloatFn>(ReadNext());
+            s_SphereColliderSetRadius = Marshal.GetDelegateForFunctionPointer<SetFloatFn>(ReadNext());
+            s_SphereColliderGetOffset = Marshal.GetDelegateForFunctionPointer<GetVec3Fn>(ReadNext());
+            s_SphereColliderSetOffset = Marshal.GetDelegateForFunctionPointer<SetVec3Fn>(ReadNext());
+            s_SphereColliderGetIsTrigger = Marshal.GetDelegateForFunctionPointer<GetBoolFn>(ReadNext());
+            s_SphereColliderSetIsTrigger = Marshal.GetDelegateForFunctionPointer<SetBoolFn>(ReadNext());
+            s_SphereColliderGetEnabled = Marshal.GetDelegateForFunctionPointer<GetBoolFn>(ReadNext());
+            s_SphereColliderSetEnabled = Marshal.GetDelegateForFunctionPointer<SetBoolFn>(ReadNext());
+
+            s_CapsuleColliderGetRadius = Marshal.GetDelegateForFunctionPointer<GetFloatFn>(ReadNext());
+            s_CapsuleColliderSetRadius = Marshal.GetDelegateForFunctionPointer<SetFloatFn>(ReadNext());
+            s_CapsuleColliderGetHeight = Marshal.GetDelegateForFunctionPointer<GetFloatFn>(ReadNext());
+            s_CapsuleColliderSetHeight = Marshal.GetDelegateForFunctionPointer<SetFloatFn>(ReadNext());
+            s_CapsuleColliderGetOffset = Marshal.GetDelegateForFunctionPointer<GetVec3Fn>(ReadNext());
+            s_CapsuleColliderSetOffset = Marshal.GetDelegateForFunctionPointer<SetVec3Fn>(ReadNext());
+            s_CapsuleColliderGetIsTrigger = Marshal.GetDelegateForFunctionPointer<GetBoolFn>(ReadNext());
+            s_CapsuleColliderSetIsTrigger = Marshal.GetDelegateForFunctionPointer<SetBoolFn>(ReadNext());
+            s_CapsuleColliderGetEnabled = Marshal.GetDelegateForFunctionPointer<GetBoolFn>(ReadNext());
+            s_CapsuleColliderSetEnabled = Marshal.GetDelegateForFunctionPointer<SetBoolFn>(ReadNext());
+
+            s_MeshColliderGetMesh = Marshal.GetDelegateForFunctionPointer<StaticMeshGetMeshFn>(ReadNext());
+            s_MeshColliderSetMesh = Marshal.GetDelegateForFunctionPointer<StaticMeshSetMeshFn>(ReadNext());
+            s_MeshColliderGetOffset = Marshal.GetDelegateForFunctionPointer<GetVec3Fn>(ReadNext());
+            s_MeshColliderSetOffset = Marshal.GetDelegateForFunctionPointer<SetVec3Fn>(ReadNext());
+            s_MeshColliderGetIsTrigger = Marshal.GetDelegateForFunctionPointer<GetBoolFn>(ReadNext());
+            s_MeshColliderSetIsTrigger = Marshal.GetDelegateForFunctionPointer<SetBoolFn>(ReadNext());
+            s_MeshColliderGetEnabled = Marshal.GetDelegateForFunctionPointer<GetBoolFn>(ReadNext());
+            s_MeshColliderSetEnabled = Marshal.GetDelegateForFunctionPointer<SetBoolFn>(ReadNext());
         }
 
         // ====================================================================
@@ -637,6 +739,175 @@ namespace Kerberos
         {
             s_SocketDetach?.Invoke(entityID);
         }
+
+        // ----------------------------- RigidBody3DComponent -----------------------------
+
+        internal static int Rigidbody3DComponent_GetBodyType(ulong entityID)
+            => s_RigidbodyGetBodyType?.Invoke(entityID) ?? 0;
+
+        internal static void Rigidbody3DComponent_SetBodyType(ulong entityID, int bodyType)
+            => s_RigidbodySetBodyType?.Invoke(entityID, bodyType);
+
+        internal static float Rigidbody3DComponent_GetMass(ulong entityID)
+            => s_RigidbodyGetMass?.Invoke(entityID) ?? 0.0f;
+
+        internal static void Rigidbody3DComponent_SetMass(ulong entityID, float mass)
+            => s_RigidbodySetMass?.Invoke(entityID, mass);
+
+        internal static void Rigidbody3DComponent_GetAngularVelocity(ulong entityID, out Vector3 velocity)
+        {
+            velocity = default;
+            s_RigidbodyGetAngularVelocity?.Invoke(entityID, out velocity);
+        }
+
+        internal static void Rigidbody3DComponent_SetAngularVelocity(ulong entityID, ref Vector3 velocity)
+            => s_RigidbodySetAngularVelocity?.Invoke(entityID, ref velocity);
+
+        internal static bool Rigidbody3DComponent_GetUseGravity(ulong entityID)
+            => s_RigidbodyGetUseGravity?.Invoke(entityID) != 0;
+
+        internal static void Rigidbody3DComponent_SetUseGravity(ulong entityID, bool useGravity)
+            => s_RigidbodySetUseGravity?.Invoke(entityID, useGravity ? (byte)1 : (byte)0);
+
+        internal static float Rigidbody3DComponent_GetFriction(ulong entityID)
+            => s_RigidbodyGetFriction?.Invoke(entityID) ?? 0.0f;
+
+        internal static void Rigidbody3DComponent_SetFriction(ulong entityID, float friction)
+            => s_RigidbodySetFriction?.Invoke(entityID, friction);
+
+        internal static float Rigidbody3DComponent_GetRestitution(ulong entityID)
+            => s_RigidbodyGetRestitution?.Invoke(entityID) ?? 0.0f;
+
+        internal static void Rigidbody3DComponent_SetRestitution(ulong entityID, float restitution)
+            => s_RigidbodySetRestitution?.Invoke(entityID, restitution);
+
+        // ----------------------------- BoxCollider3DComponent -----------------------------
+
+        internal static void BoxCollider3DComponent_GetSize(ulong entityID, out Vector3 size)
+        {
+            size = default;
+            s_BoxColliderGetSize?.Invoke(entityID, out size);
+        }
+
+        internal static void BoxCollider3DComponent_SetSize(ulong entityID, ref Vector3 size)
+            => s_BoxColliderSetSize?.Invoke(entityID, ref size);
+
+        internal static void BoxCollider3DComponent_GetOffset(ulong entityID, out Vector3 offset)
+        {
+            offset = default;
+            s_BoxColliderGetOffset?.Invoke(entityID, out offset);
+        }
+
+        internal static void BoxCollider3DComponent_SetOffset(ulong entityID, ref Vector3 offset)
+            => s_BoxColliderSetOffset?.Invoke(entityID, ref offset);
+
+        internal static bool BoxCollider3DComponent_GetIsTrigger(ulong entityID)
+            => s_BoxColliderGetIsTrigger?.Invoke(entityID) != 0;
+
+        internal static void BoxCollider3DComponent_SetIsTrigger(ulong entityID, bool isTrigger)
+            => s_BoxColliderSetIsTrigger?.Invoke(entityID, isTrigger ? (byte)1 : (byte)0);
+
+        internal static bool BoxCollider3DComponent_GetEnabled(ulong entityID)
+            => s_BoxColliderGetEnabled?.Invoke(entityID) != 0;
+
+        internal static void BoxCollider3DComponent_SetEnabled(ulong entityID, bool enabled)
+            => s_BoxColliderSetEnabled?.Invoke(entityID, enabled ? (byte)1 : (byte)0);
+
+        // ----------------------------- SphereCollider3DComponent -----------------------------
+
+        internal static float SphereCollider3DComponent_GetRadius(ulong entityID)
+            => s_SphereColliderGetRadius?.Invoke(entityID) ?? 0.0f;
+
+        internal static void SphereCollider3DComponent_SetRadius(ulong entityID, float radius)
+            => s_SphereColliderSetRadius?.Invoke(entityID, radius);
+
+        internal static void SphereCollider3DComponent_GetOffset(ulong entityID, out Vector3 offset)
+        {
+            offset = default;
+            s_SphereColliderGetOffset?.Invoke(entityID, out offset);
+        }
+
+        internal static void SphereCollider3DComponent_SetOffset(ulong entityID, ref Vector3 offset)
+            => s_SphereColliderSetOffset?.Invoke(entityID, ref offset);
+
+        internal static bool SphereCollider3DComponent_GetIsTrigger(ulong entityID)
+            => s_SphereColliderGetIsTrigger?.Invoke(entityID) != 0;
+
+        internal static void SphereCollider3DComponent_SetIsTrigger(ulong entityID, bool isTrigger)
+            => s_SphereColliderSetIsTrigger?.Invoke(entityID, isTrigger ? (byte)1 : (byte)0);
+
+        internal static bool SphereCollider3DComponent_GetEnabled(ulong entityID)
+            => s_SphereColliderGetEnabled?.Invoke(entityID) != 0;
+
+        internal static void SphereCollider3DComponent_SetEnabled(ulong entityID, bool enabled)
+            => s_SphereColliderSetEnabled?.Invoke(entityID, enabled ? (byte)1 : (byte)0);
+
+        // ----------------------------- CapsuleCollider3DComponent -----------------------------
+
+        internal static float CapsuleCollider3DComponent_GetRadius(ulong entityID)
+            => s_CapsuleColliderGetRadius?.Invoke(entityID) ?? 0.0f;
+
+        internal static void CapsuleCollider3DComponent_SetRadius(ulong entityID, float radius)
+            => s_CapsuleColliderSetRadius?.Invoke(entityID, radius);
+
+        internal static float CapsuleCollider3DComponent_GetHeight(ulong entityID)
+            => s_CapsuleColliderGetHeight?.Invoke(entityID) ?? 0.0f;
+
+        internal static void CapsuleCollider3DComponent_SetHeight(ulong entityID, float height)
+            => s_CapsuleColliderSetHeight?.Invoke(entityID, height);
+
+        internal static void CapsuleCollider3DComponent_GetOffset(ulong entityID, out Vector3 offset)
+        {
+            offset = default;
+            s_CapsuleColliderGetOffset?.Invoke(entityID, out offset);
+        }
+
+        internal static void CapsuleCollider3DComponent_SetOffset(ulong entityID, ref Vector3 offset)
+            => s_CapsuleColliderSetOffset?.Invoke(entityID, ref offset);
+
+        internal static bool CapsuleCollider3DComponent_GetIsTrigger(ulong entityID)
+            => s_CapsuleColliderGetIsTrigger?.Invoke(entityID) != 0;
+
+        internal static void CapsuleCollider3DComponent_SetIsTrigger(ulong entityID, bool isTrigger)
+            => s_CapsuleColliderSetIsTrigger?.Invoke(entityID, isTrigger ? (byte)1 : (byte)0);
+
+        internal static bool CapsuleCollider3DComponent_GetEnabled(ulong entityID)
+            => s_CapsuleColliderGetEnabled?.Invoke(entityID) != 0;
+
+        internal static void CapsuleCollider3DComponent_SetEnabled(ulong entityID, bool enabled)
+            => s_CapsuleColliderSetEnabled?.Invoke(entityID, enabled ? (byte)1 : (byte)0);
+
+        // ----------------------------- MeshCollider3DComponent -----------------------------
+
+        internal static void MeshCollider3DComponent_GetMesh(ulong entityID, out MeshRef mesh)
+        {
+            mesh = default;
+            s_MeshColliderGetMesh?.Invoke(entityID, out mesh);
+        }
+
+        internal static void MeshCollider3DComponent_SetMesh(ulong entityID, MeshRef mesh)
+            => s_MeshColliderSetMesh?.Invoke(entityID, mesh);
+
+        internal static void MeshCollider3DComponent_GetOffset(ulong entityID, out Vector3 offset)
+        {
+            offset = default;
+            s_MeshColliderGetOffset?.Invoke(entityID, out offset);
+        }
+
+        internal static void MeshCollider3DComponent_SetOffset(ulong entityID, ref Vector3 offset)
+            => s_MeshColliderSetOffset?.Invoke(entityID, ref offset);
+
+        internal static bool MeshCollider3DComponent_GetIsTrigger(ulong entityID)
+            => s_MeshColliderGetIsTrigger?.Invoke(entityID) != 0;
+
+        internal static void MeshCollider3DComponent_SetIsTrigger(ulong entityID, bool isTrigger)
+            => s_MeshColliderSetIsTrigger?.Invoke(entityID, isTrigger ? (byte)1 : (byte)0);
+
+        internal static bool MeshCollider3DComponent_GetEnabled(ulong entityID)
+            => s_MeshColliderGetEnabled?.Invoke(entityID) != 0;
+
+        internal static void MeshCollider3DComponent_SetEnabled(ulong entityID, bool enabled)
+            => s_MeshColliderSetEnabled?.Invoke(entityID, enabled ? (byte)1 : (byte)0);
 
     }
 }

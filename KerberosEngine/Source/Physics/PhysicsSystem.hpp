@@ -62,6 +62,11 @@ namespace Kerberos
 		virtual void SetLinearVelocity(std::uint32_t bodyId, const glm::vec3& velocity) const = 0;
 
 		/**
+		 * Sets the angular velocity of the body, overwriting any existing angular velocity.
+		 */
+		virtual void SetAngularVelocity(std::uint32_t bodyId, const glm::vec3& velocity) const = 0;
+
+		/**
 		* Performs a raycast query from the given origin in the specified direction.
 		* @param origin The world-space starting point of the ray.
 		* @param direction The world-space direction of the ray.

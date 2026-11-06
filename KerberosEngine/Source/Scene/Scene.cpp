@@ -44,10 +44,18 @@ namespace Kerberos
 		m_IsRunning = true;
 
 		m_PhysicsSystem->Initialize(shared_from_this());
-		m_PhysicsSystem->Update(0.0f); // Sync physics bodies with transforms before scripts run for the first time
 
 		/// Start authored animation before scripts run so OnCreate can override it.
 		StartAnimators();
+
+		/// Resolve the initial animation pose and socket transforms before creating physics
+		/// bodies, so socket-attached kinematic bodies start at the hand rather than at their
+		/// authored local transform.
+		CalculateEntityTransforms();
+		m_AnimationRuntime.AdvanceClocks(0.0f, false);
+		m_AnimationRuntime.EvaluatePose();
+
+		m_PhysicsSystem->Update(0.0f); // Sync physics bodies with transforms before scripts run for the first time
 
 		ScriptEngine::OnRuntimeStart(shared_from_this());
 

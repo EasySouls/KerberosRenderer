@@ -186,6 +186,8 @@ static void SerializeEntity(YAML::Emitter& out, const Entity entity)
         const auto& boxCollider = entity.GetComponent<BoxCollider3DComponent>();
         out << YAML::Key << "Size" << YAML::Value << boxCollider.Size;
         out << YAML::Key << "Offset" << YAML::Value << boxCollider.Offset;
+        out << YAML::Key << "IsTrigger" << YAML::Value << boxCollider.IsTrigger;
+        out << YAML::Key << "Enabled" << YAML::Value << boxCollider.Enabled;
         out << YAML::EndMap;
     }
 
@@ -195,6 +197,8 @@ static void SerializeEntity(YAML::Emitter& out, const Entity entity)
         const auto& sphereCollider = entity.GetComponent<SphereCollider3DComponent>();
         out << YAML::Key << "Radius" << YAML::Value << sphereCollider.Radius;
         out << YAML::Key << "Offset" << YAML::Value << sphereCollider.Offset;
+        out << YAML::Key << "IsTrigger" << YAML::Value << sphereCollider.IsTrigger;
+        out << YAML::Key << "Enabled" << YAML::Value << sphereCollider.Enabled;
         out << YAML::EndMap;
     }
 
@@ -205,6 +209,8 @@ static void SerializeEntity(YAML::Emitter& out, const Entity entity)
         out << YAML::Key << "Radius" << YAML::Value << capsuleCollider.Radius;
         out << YAML::Key << "Height" << YAML::Value << capsuleCollider.Height;
         out << YAML::Key << "Offset" << YAML::Value << capsuleCollider.Offset;
+        out << YAML::Key << "IsTrigger" << YAML::Value << capsuleCollider.IsTrigger;
+        out << YAML::Key << "Enabled" << YAML::Value << capsuleCollider.Enabled;
         out << YAML::EndMap;
     }
 
@@ -215,6 +221,8 @@ static void SerializeEntity(YAML::Emitter& out, const Entity entity)
         out << YAML::Key << "Mesh" << YAML::Value
             << (meshCollider.Mesh ? meshCollider.Mesh->GetHandle() : UUID::Invalid());
         out << YAML::Key << "IsTrigger" << YAML::Value << meshCollider.IsTrigger;
+        out << YAML::Key << "Enabled" << YAML::Value << meshCollider.Enabled;
+        out << YAML::Key << "Offset" << YAML::Value << meshCollider.Offset;
         out << YAML::EndMap;
     }
 
@@ -578,12 +586,16 @@ Entity SceneSerializer::DeserializeEntity(const Ref<Scene>& scene, const YAML::N
         auto& boxCollider = deserializedEntity.AddComponent<BoxCollider3DComponent>();
         boxCollider.Size = boxColliderComponent["Size"].as<glm::vec3>();
         boxCollider.Offset = boxColliderComponent["Offset"].as<glm::vec3>();
+        boxCollider.IsTrigger = boxColliderComponent["IsTrigger"].as<bool>(false);
+        boxCollider.Enabled = boxColliderComponent["Enabled"].as<bool>(true);
     }
 
     if (auto sphereColliderComponent = node["SphereCollider3DComponent"]) {
         auto& sphereCollider = deserializedEntity.AddComponent<SphereCollider3DComponent>();
         sphereCollider.Radius = sphereColliderComponent["Radius"].as<float>();
         sphereCollider.Offset = sphereColliderComponent["Offset"].as<glm::vec3>();
+        sphereCollider.IsTrigger = sphereColliderComponent["IsTrigger"].as<bool>(false);
+        sphereCollider.Enabled = sphereColliderComponent["Enabled"].as<bool>(true);
     }
 
     if (auto capsuleColliderComponent = node["CapsuleCollider3DComponent"]) {
@@ -591,11 +603,15 @@ Entity SceneSerializer::DeserializeEntity(const Ref<Scene>& scene, const YAML::N
         capsuleCollider.Radius = capsuleColliderComponent["Radius"].as<float>();
         capsuleCollider.Height = capsuleColliderComponent["Height"].as<float>();
         capsuleCollider.Offset = capsuleColliderComponent["Offset"].as<glm::vec3>();
+        capsuleCollider.IsTrigger = capsuleColliderComponent["IsTrigger"].as<bool>(false);
+        capsuleCollider.Enabled = capsuleColliderComponent["Enabled"].as<bool>(true);
     }
 
     if (auto meshColliderComponent = node["MeshCollider3DComponent"]) {
         auto& meshCollider = deserializedEntity.AddComponent<MeshCollider3DComponent>();
-        meshCollider.IsTrigger = meshColliderComponent["IsTrigger"].as<bool>();
+        meshCollider.IsTrigger = meshColliderComponent["IsTrigger"].as<bool>(false);
+        meshCollider.Enabled = meshColliderComponent["Enabled"].as<bool>(true);
+        meshCollider.Offset = meshColliderComponent["Offset"].as<glm::vec3>(glm::vec3(0.0f));
         const AssetHandle meshHandle = AssetHandle(meshColliderComponent["Mesh"].as<uint64_t>());
         if (meshHandle.IsValid()) {
             meshCollider.Mesh = AssetManager::GetAsset<Mesh>(meshHandle);

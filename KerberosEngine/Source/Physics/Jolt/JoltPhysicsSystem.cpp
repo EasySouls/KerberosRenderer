@@ -162,6 +162,14 @@ namespace Kerberos
 		bodyInterface.SetLinearVelocity(id, joltVelocity);
 	}
 
+	void JoltPhysicsSystem::SetAngularVelocity(const uint32_t bodyId, const glm::vec3& velocity) const
+	{
+		const JPH::BodyID id{ bodyId };
+		JPH::BodyInterface& bodyInterface = GetBodyInterface();
+		const JPH::Vec3Arg joltVelocity(velocity.x, velocity.y, velocity.z);
+		bodyInterface.SetAngularVelocity(id, joltVelocity);
+	}
+
 	bool JoltPhysicsSystem::Raycast(const glm::vec3& origin, const glm::vec3& direction, const float maxDistance,
 		RaycastHit& outHit) const 
 	{
@@ -233,9 +241,19 @@ namespace Kerberos
 
 			const JPH::BodyID bodyId = static_cast<JPH::Body*>(rigidBody.RuntimeBody)->GetID();
             const JPH::Vec3 joltPosition = JPH::Vec3(position.x, position.y, position.z);
-            const JPH::Quat joltRotation = JPH::Quat(rotation.w, rotation.x, rotation.y, rotation.z);
+            const JPH::Quat joltRotation = JPH::Quat(rotation.x, rotation.y, rotation.z, rotation.w);
 
-            GetBodyInterface().MoveKinematic(bodyId, joltPosition, joltRotation, dt);
+            JPH::BodyInterface& bodyInterface = GetBodyInterface();
+            if (dt > 0.0f)
+            {
+                bodyInterface.MoveKinematic(bodyId, joltPosition, joltRotation, dt);
+                bodyInterface.ActivateBody(bodyId);
+            }
+            else
+            {
+                // Initial sync / teleport: no velocity integration is possible with dt == 0.
+                bodyInterface.SetPositionAndRotation(bodyId, joltPosition, joltRotation, JPH::EActivation::Activate);
+            }
 		}
     }
 
@@ -314,8 +332,8 @@ namespace Kerberos
 			auto& transform = view.get<TransformComponent>(e);
 			auto& rigidBody = view.get<RigidBody3DComponent>(e);
 
-			// Only dinamyc bodies should be synced with the physics engine, static and kinematic bodies are controlled
-            // by the user
+			// Only dynamic bodies are read back from the physics engine. Static and kinematic
+			// bodies are controlled by the user/scene.
 			if (rigidBody.Type == RigidBody3DComponent::BodyType::Static || rigidBody.Type == RigidBody3DComponent::BodyType::Kinematic) 
 				continue;
 
@@ -440,37 +458,50 @@ namespace Kerberos
 		if (entity.HasComponent<BoxCollider3DComponent>())
 		{
 			const auto& coll = entity.GetComponent<BoxCollider3DComponent>();
-			shapes.push_back({
-				.Offset = JPH::Vec3(coll.Offset.x, coll.Offset.y, coll.Offset.z),
-				.Shape = new JPH::BoxShape(JPH::Vec3(coll.Size.x, coll.Size.y, coll.Size.z))
-			});
+			if (coll.Enabled)
+			{
+				shapes.push_back({
+					.Offset = JPH::Vec3(coll.Offset.x, coll.Offset.y, coll.Offset.z),
+					.Shape = new JPH::BoxShape(JPH::Vec3(coll.Size.x, coll.Size.y, coll.Size.z))
+				});
+			}
 		}
 
 		if (entity.HasComponent<SphereCollider3DComponent>())
 		{
 			const auto& coll = entity.GetComponent<SphereCollider3DComponent>();
-			shapes.push_back({
-				.Offset = JPH::Vec3(coll.Offset.x, coll.Offset.y, coll.Offset.z),
-				.Shape = new JPH::SphereShape(coll.Radius)
-			});
+			if (coll.Enabled)
+			{
+				shapes.push_back({
+					.Offset = JPH::Vec3(coll.Offset.x, coll.Offset.y, coll.Offset.z),
+					.Shape = new JPH::SphereShape(coll.Radius)
+				});
+			}
 		}
 
 		if (entity.HasComponent<CapsuleCollider3DComponent>())
 		{
 			const auto& coll = entity.GetComponent<CapsuleCollider3DComponent>();
-			shapes.push_back({
-				.Offset = JPH::Vec3(coll.Offset.x, coll.Offset.y, coll.Offset.z),
-				.Shape = new JPH::CapsuleShape(coll.Height / 2, coll.Radius)
-			});
+			if (coll.Enabled)
+			{
+				shapes.push_back({
+					.Offset = JPH::Vec3(coll.Offset.x, coll.Offset.y, coll.Offset.z),
+					.Shape = new JPH::CapsuleShape(coll.Height / 2, coll.Radius)
+				});
+			}
 		}
 
 		if (entity.HasComponent<MeshCollider3DComponent>())
 		{
-			const StaticMeshComponent& mesh = entity.GetComponent<StaticMeshComponent>();
 			const auto& coll = entity.GetComponent<MeshCollider3DComponent>();
-			if (mesh.StaticMesh)
+			const Ref<Mesh> mesh = coll.Mesh
+				? coll.Mesh
+				: (entity.HasComponent<StaticMeshComponent>()
+					? entity.GetComponent<StaticMeshComponent>().StaticMesh
+					: nullptr);
+			if (coll.Enabled && mesh)
 			{
-				if (const JPH::RefConst<JPH::Shape> shape = Physics::Utils::CreateJoltMeshShape(mesh.StaticMesh, entity.GetName()))
+				if (const JPH::RefConst<JPH::Shape> shape = Physics::Utils::CreateJoltMeshShape(mesh, entity.GetName()))
 				{
 					shapes.push_back({
 						.Offset = JPH::Vec3(coll.Offset.x, coll.Offset.y, coll.Offset.z),
@@ -504,23 +535,30 @@ namespace Kerberos
 
 	bool JoltPhysicsSystem::IsColliderTrigger(const Entity& entity)
 	{
+		bool isTrigger = false;
+
 		if (entity.HasComponent<BoxCollider3DComponent>())
 		{
-			return entity.GetComponent<BoxCollider3DComponent>().IsTrigger;
+			const auto& collider = entity.GetComponent<BoxCollider3DComponent>();
+			isTrigger = isTrigger || (collider.Enabled && collider.IsTrigger);
 		}
 		if (entity.HasComponent<SphereCollider3DComponent>())
 		{
-			return entity.GetComponent<SphereCollider3DComponent>().IsTrigger;
+			const auto& collider = entity.GetComponent<SphereCollider3DComponent>();
+			isTrigger = isTrigger || (collider.Enabled && collider.IsTrigger);
 		}
 		if (entity.HasComponent<CapsuleCollider3DComponent>())
 		{
-			return entity.GetComponent<CapsuleCollider3DComponent>().IsTrigger;
+			const auto& collider = entity.GetComponent<CapsuleCollider3DComponent>();
+			isTrigger = isTrigger || (collider.Enabled && collider.IsTrigger);
 		}
 		if (entity.HasComponent<MeshCollider3DComponent>())
 		{
-			return entity.GetComponent<MeshCollider3DComponent>().IsTrigger;
+			const auto& collider = entity.GetComponent<MeshCollider3DComponent>();
+			isTrigger = isTrigger || (collider.Enabled && collider.IsTrigger);
 		}
-		return false;
+
+		return isTrigger;
 	}
 
 	void JoltPhysicsSystem::Cleanup()

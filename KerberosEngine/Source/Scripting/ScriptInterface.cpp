@@ -104,6 +104,57 @@ namespace Kerberos
 
 		void* Socket_Attach;
 		void* Socket_Detach;
+
+		void* Rigidbody3DComponent_GetBodyType;
+		void* Rigidbody3DComponent_SetBodyType;
+		void* Rigidbody3DComponent_GetMass;
+		void* Rigidbody3DComponent_SetMass;
+		void* Rigidbody3DComponent_GetAngularVelocity;
+		void* Rigidbody3DComponent_SetAngularVelocity;
+		void* Rigidbody3DComponent_GetUseGravity;
+		void* Rigidbody3DComponent_SetUseGravity;
+		void* Rigidbody3DComponent_GetFriction;
+		void* Rigidbody3DComponent_SetFriction;
+		void* Rigidbody3DComponent_GetRestitution;
+		void* Rigidbody3DComponent_SetRestitution;
+
+		void* BoxCollider3DComponent_GetSize;
+		void* BoxCollider3DComponent_SetSize;
+		void* BoxCollider3DComponent_GetOffset;
+		void* BoxCollider3DComponent_SetOffset;
+		void* BoxCollider3DComponent_GetIsTrigger;
+		void* BoxCollider3DComponent_SetIsTrigger;
+		void* BoxCollider3DComponent_GetEnabled;
+		void* BoxCollider3DComponent_SetEnabled;
+
+		void* SphereCollider3DComponent_GetRadius;
+		void* SphereCollider3DComponent_SetRadius;
+		void* SphereCollider3DComponent_GetOffset;
+		void* SphereCollider3DComponent_SetOffset;
+		void* SphereCollider3DComponent_GetIsTrigger;
+		void* SphereCollider3DComponent_SetIsTrigger;
+		void* SphereCollider3DComponent_GetEnabled;
+		void* SphereCollider3DComponent_SetEnabled;
+
+		void* CapsuleCollider3DComponent_GetRadius;
+		void* CapsuleCollider3DComponent_SetRadius;
+		void* CapsuleCollider3DComponent_GetHeight;
+		void* CapsuleCollider3DComponent_SetHeight;
+		void* CapsuleCollider3DComponent_GetOffset;
+		void* CapsuleCollider3DComponent_SetOffset;
+		void* CapsuleCollider3DComponent_GetIsTrigger;
+		void* CapsuleCollider3DComponent_SetIsTrigger;
+		void* CapsuleCollider3DComponent_GetEnabled;
+		void* CapsuleCollider3DComponent_SetEnabled;
+
+		void* MeshCollider3DComponent_GetMesh;
+		void* MeshCollider3DComponent_SetMesh;
+		void* MeshCollider3DComponent_GetOffset;
+		void* MeshCollider3DComponent_SetOffset;
+		void* MeshCollider3DComponent_GetIsTrigger;
+		void* MeshCollider3DComponent_SetIsTrigger;
+		void* MeshCollider3DComponent_GetEnabled;
+		void* MeshCollider3DComponent_SetEnabled;
 	};
 
 	/// Component type name to HasComponent check mapping
@@ -800,6 +851,401 @@ namespace Kerberos
 		}
 	}
 
+	template<typename T>
+	static T* GetPhysicsComponent(const uint64_t entityID)
+	{
+		const Ref<Scene> scene = ScriptEngine::GetSceneContext().lock();
+		if (!scene)
+			return nullptr;
+
+		const Entity entity = scene->TryGetEntityByUUID(UUID(entityID));
+		if (!entity || !entity.HasComponent<T>())
+			return nullptr;
+
+		return &entity.GetComponent<T>();
+	}
+
+	static void MarkPhysicsBodyDirty(const uint64_t entityID)
+	{
+		if (RigidBody3DComponent* rigidBody = GetPhysicsComponent<RigidBody3DComponent>(entityID))
+			rigidBody->IsDirty = true;
+	}
+
+	static void Rigidbody3DComponent_SetBodyType(const uint64_t entityID, const int32_t bodyType)
+	{
+		RigidBody3DComponent* rigidBody = GetPhysicsComponent<RigidBody3DComponent>(entityID);
+		if (!rigidBody || bodyType < 0 ||
+			bodyType > static_cast<int32_t>(RigidBody3DComponent::BodyType::Kinematic))
+		{
+			return;
+		}
+
+		rigidBody->Type = static_cast<RigidBody3DComponent::BodyType>(bodyType);
+		rigidBody->IsDirty = true;
+	}
+
+	static int32_t Rigidbody3DComponent_GetBodyType(const uint64_t entityID)
+	{
+		const RigidBody3DComponent* rigidBody = GetPhysicsComponent<RigidBody3DComponent>(entityID);
+		return rigidBody ? static_cast<int32_t>(rigidBody->Type) : 0;
+	}
+
+	static void Rigidbody3DComponent_SetMass(const uint64_t entityID, const float mass)
+	{
+		RigidBody3DComponent* rigidBody = GetPhysicsComponent<RigidBody3DComponent>(entityID);
+		if (!rigidBody || !std::isfinite(mass) || mass <= 0.0f)
+			return;
+
+		rigidBody->Mass = mass;
+		rigidBody->IsDirty = true;
+	}
+
+	static float Rigidbody3DComponent_GetMass(const uint64_t entityID)
+	{
+		const RigidBody3DComponent* rigidBody = GetPhysicsComponent<RigidBody3DComponent>(entityID);
+		return rigidBody ? rigidBody->Mass : 0.0f;
+	}
+
+	static void Rigidbody3DComponent_SetAngularVelocity(const uint64_t entityID, const glm::vec3* velocity)
+	{
+		if (!velocity)
+			return;
+
+		RigidBody3DComponent* rigidBody = GetPhysicsComponent<RigidBody3DComponent>(entityID);
+		if (!rigidBody)
+			return;
+
+		rigidBody->AngularVelocity = *velocity;
+
+		if (rigidBody->RuntimeBody)
+		{
+			if (const Ref<Scene> scene = ScriptEngine::GetSceneContext().lock())
+			{
+				const JPH::Body* body = static_cast<JPH::Body*>(rigidBody->RuntimeBody);
+				scene->GetPhysicsSystem().SetAngularVelocity(body->GetID().GetIndexAndSequenceNumber(), *velocity);
+			}
+		}
+	}
+
+	static void Rigidbody3DComponent_GetAngularVelocity(const uint64_t entityID, glm::vec3* outVelocity)
+	{
+		if (!outVelocity)
+			return;
+
+		const RigidBody3DComponent* rigidBody = GetPhysicsComponent<RigidBody3DComponent>(entityID);
+		*outVelocity = rigidBody ? rigidBody->AngularVelocity : glm::vec3(0.0f);
+	}
+
+	static void Rigidbody3DComponent_SetUseGravity(const uint64_t entityID, const uint8_t useGravity)
+	{
+		RigidBody3DComponent* rigidBody = GetPhysicsComponent<RigidBody3DComponent>(entityID);
+		if (!rigidBody)
+			return;
+
+		rigidBody->UseGravity = useGravity != 0;
+		rigidBody->IsDirty = true;
+	}
+
+	static uint8_t Rigidbody3DComponent_GetUseGravity(const uint64_t entityID)
+	{
+		const RigidBody3DComponent* rigidBody = GetPhysicsComponent<RigidBody3DComponent>(entityID);
+		return rigidBody && rigidBody->UseGravity ? 1 : 0;
+	}
+
+	static void Rigidbody3DComponent_SetFriction(const uint64_t entityID, const float friction)
+	{
+		RigidBody3DComponent* rigidBody = GetPhysicsComponent<RigidBody3DComponent>(entityID);
+		if (!rigidBody || !std::isfinite(friction))
+			return;
+
+		rigidBody->Friction = std::clamp(friction, 0.0f, 1.0f);
+		rigidBody->IsDirty = true;
+	}
+
+	static float Rigidbody3DComponent_GetFriction(const uint64_t entityID)
+	{
+		const RigidBody3DComponent* rigidBody = GetPhysicsComponent<RigidBody3DComponent>(entityID);
+		return rigidBody ? rigidBody->Friction : 0.0f;
+	}
+
+	static void Rigidbody3DComponent_SetRestitution(const uint64_t entityID, const float restitution)
+	{
+		RigidBody3DComponent* rigidBody = GetPhysicsComponent<RigidBody3DComponent>(entityID);
+		if (!rigidBody || !std::isfinite(restitution))
+			return;
+
+		rigidBody->Restitution = std::clamp(restitution, 0.0f, 1.0f);
+		rigidBody->IsDirty = true;
+	}
+
+	static float Rigidbody3DComponent_GetRestitution(const uint64_t entityID)
+	{
+		const RigidBody3DComponent* rigidBody = GetPhysicsComponent<RigidBody3DComponent>(entityID);
+		return rigidBody ? rigidBody->Restitution : 0.0f;
+	}
+
+	static void BoxCollider3DComponent_SetSize(const uint64_t entityID, const glm::vec3* size)
+	{
+		if (BoxCollider3DComponent* collider = GetPhysicsComponent<BoxCollider3DComponent>(entityID))
+		{
+			collider->Size = *size;
+			MarkPhysicsBodyDirty(entityID);
+		}
+	}
+
+	static void BoxCollider3DComponent_GetSize(const uint64_t entityID, glm::vec3* outSize)
+	{
+		if (!outSize) return;
+		const BoxCollider3DComponent* collider = GetPhysicsComponent<BoxCollider3DComponent>(entityID);
+		*outSize = collider ? collider->Size : glm::vec3(1.0f);
+	}
+
+	static void BoxCollider3DComponent_SetOffset(const uint64_t entityID, const glm::vec3* offset)
+	{
+		if (BoxCollider3DComponent* collider = GetPhysicsComponent<BoxCollider3DComponent>(entityID))
+		{
+			collider->Offset = *offset;
+			MarkPhysicsBodyDirty(entityID);
+		}
+	}
+
+	static void BoxCollider3DComponent_GetOffset(const uint64_t entityID, glm::vec3* outOffset)
+	{
+		if (!outOffset) return;
+		const BoxCollider3DComponent* collider = GetPhysicsComponent<BoxCollider3DComponent>(entityID);
+		*outOffset = collider ? collider->Offset : glm::vec3(0.0f);
+	}
+
+	static void BoxCollider3DComponent_SetIsTrigger(const uint64_t entityID, const uint8_t isTrigger)
+	{
+		if (BoxCollider3DComponent* collider = GetPhysicsComponent<BoxCollider3DComponent>(entityID))
+		{
+			collider->IsTrigger = isTrigger != 0;
+			MarkPhysicsBodyDirty(entityID);
+		}
+	}
+
+	static uint8_t BoxCollider3DComponent_GetIsTrigger(const uint64_t entityID)
+	{
+		const BoxCollider3DComponent* collider = GetPhysicsComponent<BoxCollider3DComponent>(entityID);
+		return collider && collider->IsTrigger ? 1 : 0;
+	}
+
+	static void BoxCollider3DComponent_SetEnabled(const uint64_t entityID, const uint8_t enabled)
+	{
+		if (BoxCollider3DComponent* collider = GetPhysicsComponent<BoxCollider3DComponent>(entityID))
+		{
+			collider->Enabled = enabled != 0;
+			MarkPhysicsBodyDirty(entityID);
+		}
+	}
+
+	static uint8_t BoxCollider3DComponent_GetEnabled(const uint64_t entityID)
+	{
+		const BoxCollider3DComponent* collider = GetPhysicsComponent<BoxCollider3DComponent>(entityID);
+		return collider && collider->Enabled ? 1 : 0;
+	}
+
+	static void SphereCollider3DComponent_SetRadius(const uint64_t entityID, const float radius)
+	{
+		if (SphereCollider3DComponent* collider = GetPhysicsComponent<SphereCollider3DComponent>(entityID))
+		{
+			collider->Radius = radius;
+			MarkPhysicsBodyDirty(entityID);
+		}
+	}
+
+	static float SphereCollider3DComponent_GetRadius(const uint64_t entityID)
+	{
+		const SphereCollider3DComponent* collider = GetPhysicsComponent<SphereCollider3DComponent>(entityID);
+		return collider ? collider->Radius : 0.0f;
+	}
+
+	static void SphereCollider3DComponent_SetOffset(const uint64_t entityID, const glm::vec3* offset)
+	{
+		if (SphereCollider3DComponent* collider = GetPhysicsComponent<SphereCollider3DComponent>(entityID))
+		{
+			collider->Offset = *offset;
+			MarkPhysicsBodyDirty(entityID);
+		}
+	}
+
+	static void SphereCollider3DComponent_GetOffset(const uint64_t entityID, glm::vec3* outOffset)
+	{
+		if (!outOffset) return;
+		const SphereCollider3DComponent* collider = GetPhysicsComponent<SphereCollider3DComponent>(entityID);
+		*outOffset = collider ? collider->Offset : glm::vec3(0.0f);
+	}
+
+	static void SphereCollider3DComponent_SetIsTrigger(const uint64_t entityID, const uint8_t isTrigger)
+	{
+		if (SphereCollider3DComponent* collider = GetPhysicsComponent<SphereCollider3DComponent>(entityID))
+		{
+			collider->IsTrigger = isTrigger != 0;
+			MarkPhysicsBodyDirty(entityID);
+		}
+	}
+
+	static uint8_t SphereCollider3DComponent_GetIsTrigger(const uint64_t entityID)
+	{
+		const SphereCollider3DComponent* collider = GetPhysicsComponent<SphereCollider3DComponent>(entityID);
+		return collider && collider->IsTrigger ? 1 : 0;
+	}
+
+	static void SphereCollider3DComponent_SetEnabled(const uint64_t entityID, const uint8_t enabled)
+	{
+		if (SphereCollider3DComponent* collider = GetPhysicsComponent<SphereCollider3DComponent>(entityID))
+		{
+			collider->Enabled = enabled != 0;
+			MarkPhysicsBodyDirty(entityID);
+		}
+	}
+
+	static uint8_t SphereCollider3DComponent_GetEnabled(const uint64_t entityID)
+	{
+		const SphereCollider3DComponent* collider = GetPhysicsComponent<SphereCollider3DComponent>(entityID);
+		return collider && collider->Enabled ? 1 : 0;
+	}
+
+	static void CapsuleCollider3DComponent_SetRadius(const uint64_t entityID, const float radius)
+	{
+		if (CapsuleCollider3DComponent* collider = GetPhysicsComponent<CapsuleCollider3DComponent>(entityID))
+		{
+			collider->Radius = radius;
+			MarkPhysicsBodyDirty(entityID);
+		}
+	}
+
+	static float CapsuleCollider3DComponent_GetRadius(const uint64_t entityID)
+	{
+		const CapsuleCollider3DComponent* collider = GetPhysicsComponent<CapsuleCollider3DComponent>(entityID);
+		return collider ? collider->Radius : 0.0f;
+	}
+
+	static void CapsuleCollider3DComponent_SetHeight(const uint64_t entityID, const float height)
+	{
+		if (CapsuleCollider3DComponent* collider = GetPhysicsComponent<CapsuleCollider3DComponent>(entityID))
+		{
+			collider->Height = height;
+			MarkPhysicsBodyDirty(entityID);
+		}
+	}
+
+	static float CapsuleCollider3DComponent_GetHeight(const uint64_t entityID)
+	{
+		const CapsuleCollider3DComponent* collider = GetPhysicsComponent<CapsuleCollider3DComponent>(entityID);
+		return collider ? collider->Height : 0.0f;
+	}
+
+	static void CapsuleCollider3DComponent_SetOffset(const uint64_t entityID, const glm::vec3* offset)
+	{
+		if (CapsuleCollider3DComponent* collider = GetPhysicsComponent<CapsuleCollider3DComponent>(entityID))
+		{
+			collider->Offset = *offset;
+			MarkPhysicsBodyDirty(entityID);
+		}
+	}
+
+	static void CapsuleCollider3DComponent_GetOffset(const uint64_t entityID, glm::vec3* outOffset)
+	{
+		if (!outOffset) return;
+		const CapsuleCollider3DComponent* collider = GetPhysicsComponent<CapsuleCollider3DComponent>(entityID);
+		*outOffset = collider ? collider->Offset : glm::vec3(0.0f);
+	}
+
+	static void CapsuleCollider3DComponent_SetIsTrigger(const uint64_t entityID, const uint8_t isTrigger)
+	{
+		if (CapsuleCollider3DComponent* collider = GetPhysicsComponent<CapsuleCollider3DComponent>(entityID))
+		{
+			collider->IsTrigger = isTrigger != 0;
+			MarkPhysicsBodyDirty(entityID);
+		}
+	}
+
+	static uint8_t CapsuleCollider3DComponent_GetIsTrigger(const uint64_t entityID)
+	{
+		const CapsuleCollider3DComponent* collider = GetPhysicsComponent<CapsuleCollider3DComponent>(entityID);
+		return collider && collider->IsTrigger ? 1 : 0;
+	}
+
+	static void CapsuleCollider3DComponent_SetEnabled(const uint64_t entityID, const uint8_t enabled)
+	{
+		if (CapsuleCollider3DComponent* collider = GetPhysicsComponent<CapsuleCollider3DComponent>(entityID))
+		{
+			collider->Enabled = enabled != 0;
+			MarkPhysicsBodyDirty(entityID);
+		}
+	}
+
+	static uint8_t CapsuleCollider3DComponent_GetEnabled(const uint64_t entityID)
+	{
+		const CapsuleCollider3DComponent* collider = GetPhysicsComponent<CapsuleCollider3DComponent>(entityID);
+		return collider && collider->Enabled ? 1 : 0;
+	}
+
+	static void MeshCollider3DComponent_SetMesh(const uint64_t entityID, const uint64_t meshHandle)
+	{
+		MeshCollider3DComponent* collider = GetPhysicsComponent<MeshCollider3DComponent>(entityID);
+		if (!collider)
+			return;
+
+		collider->Mesh = AssetManager::AsAsset<Mesh>(AssetHandle(meshHandle));
+		MarkPhysicsBodyDirty(entityID);
+	}
+
+	static void MeshCollider3DComponent_GetMesh(const uint64_t entityID, uint64_t* outMesh)
+	{
+		if (!outMesh) return;
+		const MeshCollider3DComponent* collider = GetPhysicsComponent<MeshCollider3DComponent>(entityID);
+		*outMesh = collider && collider->Mesh ? collider->Mesh->GetHandle() : AssetHandle::Invalid();
+	}
+
+	static void MeshCollider3DComponent_SetOffset(const uint64_t entityID, const glm::vec3* offset)
+	{
+		if (MeshCollider3DComponent* collider = GetPhysicsComponent<MeshCollider3DComponent>(entityID))
+		{
+			collider->Offset = *offset;
+			MarkPhysicsBodyDirty(entityID);
+		}
+	}
+
+	static void MeshCollider3DComponent_GetOffset(const uint64_t entityID, glm::vec3* outOffset)
+	{
+		if (!outOffset) return;
+		const MeshCollider3DComponent* collider = GetPhysicsComponent<MeshCollider3DComponent>(entityID);
+		*outOffset = collider ? collider->Offset : glm::vec3(0.0f);
+	}
+
+	static void MeshCollider3DComponent_SetIsTrigger(const uint64_t entityID, const uint8_t isTrigger)
+	{
+		if (MeshCollider3DComponent* collider = GetPhysicsComponent<MeshCollider3DComponent>(entityID))
+		{
+			collider->IsTrigger = isTrigger != 0;
+			MarkPhysicsBodyDirty(entityID);
+		}
+	}
+
+	static uint8_t MeshCollider3DComponent_GetIsTrigger(const uint64_t entityID)
+	{
+		const MeshCollider3DComponent* collider = GetPhysicsComponent<MeshCollider3DComponent>(entityID);
+		return collider && collider->IsTrigger ? 1 : 0;
+	}
+
+	static void MeshCollider3DComponent_SetEnabled(const uint64_t entityID, const uint8_t enabled)
+	{
+		if (MeshCollider3DComponent* collider = GetPhysicsComponent<MeshCollider3DComponent>(entityID))
+		{
+			collider->Enabled = enabled != 0;
+			MarkPhysicsBodyDirty(entityID);
+		}
+	}
+
+	static uint8_t MeshCollider3DComponent_GetEnabled(const uint64_t entityID)
+	{
+		const MeshCollider3DComponent* collider = GetPhysicsComponent<MeshCollider3DComponent>(entityID);
+		return collider && collider->Enabled ? 1 : 0;
+	}
+
 	/// String return buffer (managed side will read from this pointer)
 	static std::string s_StringReturnBuffer;
 
@@ -1080,6 +1526,10 @@ namespace Kerberos
 		RegisterComponent<TagComponent>("Kerberos.Scene.TagComponent");
 		RegisterComponent<StaticMeshComponent>("Kerberos.Scene.StaticMeshComponent");
 		RegisterComponent<RigidBody3DComponent>("Kerberos.Scene.RigidBody3DComponent");
+		RegisterComponent<BoxCollider3DComponent>("Kerberos.Scene.BoxCollider3DComponent");
+		RegisterComponent<SphereCollider3DComponent>("Kerberos.Scene.SphereCollider3DComponent");
+		RegisterComponent<CapsuleCollider3DComponent>("Kerberos.Scene.CapsuleCollider3DComponent");
+		RegisterComponent<MeshCollider3DComponent>("Kerberos.Scene.MeshCollider3DComponent");
 		RegisterComponent<TextComponent>("Kerberos.Scene.TextComponent");
 		RegisterComponent<AudioSource2DComponent>("Kerberos.Scene.AudioSource2DComponent");
 		RegisterComponent<AudioSource3DComponent>("Kerberos.Scene.AudioSource3DComponent");
@@ -1161,6 +1611,57 @@ namespace Kerberos
 
 		callbackTable.Socket_Attach = reinterpret_cast<void*>(&Socket_Attach);
 		callbackTable.Socket_Detach = reinterpret_cast<void*>(&Socket_Detach);
+
+		callbackTable.Rigidbody3DComponent_GetBodyType = reinterpret_cast<void*>(&Rigidbody3DComponent_GetBodyType);
+		callbackTable.Rigidbody3DComponent_SetBodyType = reinterpret_cast<void*>(&Rigidbody3DComponent_SetBodyType);
+		callbackTable.Rigidbody3DComponent_GetMass = reinterpret_cast<void*>(&Rigidbody3DComponent_GetMass);
+		callbackTable.Rigidbody3DComponent_SetMass = reinterpret_cast<void*>(&Rigidbody3DComponent_SetMass);
+		callbackTable.Rigidbody3DComponent_GetAngularVelocity = reinterpret_cast<void*>(&Rigidbody3DComponent_GetAngularVelocity);
+		callbackTable.Rigidbody3DComponent_SetAngularVelocity = reinterpret_cast<void*>(&Rigidbody3DComponent_SetAngularVelocity);
+		callbackTable.Rigidbody3DComponent_GetUseGravity = reinterpret_cast<void*>(&Rigidbody3DComponent_GetUseGravity);
+		callbackTable.Rigidbody3DComponent_SetUseGravity = reinterpret_cast<void*>(&Rigidbody3DComponent_SetUseGravity);
+		callbackTable.Rigidbody3DComponent_GetFriction = reinterpret_cast<void*>(&Rigidbody3DComponent_GetFriction);
+		callbackTable.Rigidbody3DComponent_SetFriction = reinterpret_cast<void*>(&Rigidbody3DComponent_SetFriction);
+		callbackTable.Rigidbody3DComponent_GetRestitution = reinterpret_cast<void*>(&Rigidbody3DComponent_GetRestitution);
+		callbackTable.Rigidbody3DComponent_SetRestitution = reinterpret_cast<void*>(&Rigidbody3DComponent_SetRestitution);
+
+		callbackTable.BoxCollider3DComponent_GetSize = reinterpret_cast<void*>(&BoxCollider3DComponent_GetSize);
+		callbackTable.BoxCollider3DComponent_SetSize = reinterpret_cast<void*>(&BoxCollider3DComponent_SetSize);
+		callbackTable.BoxCollider3DComponent_GetOffset = reinterpret_cast<void*>(&BoxCollider3DComponent_GetOffset);
+		callbackTable.BoxCollider3DComponent_SetOffset = reinterpret_cast<void*>(&BoxCollider3DComponent_SetOffset);
+		callbackTable.BoxCollider3DComponent_GetIsTrigger = reinterpret_cast<void*>(&BoxCollider3DComponent_GetIsTrigger);
+		callbackTable.BoxCollider3DComponent_SetIsTrigger = reinterpret_cast<void*>(&BoxCollider3DComponent_SetIsTrigger);
+		callbackTable.BoxCollider3DComponent_GetEnabled = reinterpret_cast<void*>(&BoxCollider3DComponent_GetEnabled);
+		callbackTable.BoxCollider3DComponent_SetEnabled = reinterpret_cast<void*>(&BoxCollider3DComponent_SetEnabled);
+
+		callbackTable.SphereCollider3DComponent_GetRadius = reinterpret_cast<void*>(&SphereCollider3DComponent_GetRadius);
+		callbackTable.SphereCollider3DComponent_SetRadius = reinterpret_cast<void*>(&SphereCollider3DComponent_SetRadius);
+		callbackTable.SphereCollider3DComponent_GetOffset = reinterpret_cast<void*>(&SphereCollider3DComponent_GetOffset);
+		callbackTable.SphereCollider3DComponent_SetOffset = reinterpret_cast<void*>(&SphereCollider3DComponent_SetOffset);
+		callbackTable.SphereCollider3DComponent_GetIsTrigger = reinterpret_cast<void*>(&SphereCollider3DComponent_GetIsTrigger);
+		callbackTable.SphereCollider3DComponent_SetIsTrigger = reinterpret_cast<void*>(&SphereCollider3DComponent_SetIsTrigger);
+		callbackTable.SphereCollider3DComponent_GetEnabled = reinterpret_cast<void*>(&SphereCollider3DComponent_GetEnabled);
+		callbackTable.SphereCollider3DComponent_SetEnabled = reinterpret_cast<void*>(&SphereCollider3DComponent_SetEnabled);
+
+		callbackTable.CapsuleCollider3DComponent_GetRadius = reinterpret_cast<void*>(&CapsuleCollider3DComponent_GetRadius);
+		callbackTable.CapsuleCollider3DComponent_SetRadius = reinterpret_cast<void*>(&CapsuleCollider3DComponent_SetRadius);
+		callbackTable.CapsuleCollider3DComponent_GetHeight = reinterpret_cast<void*>(&CapsuleCollider3DComponent_GetHeight);
+		callbackTable.CapsuleCollider3DComponent_SetHeight = reinterpret_cast<void*>(&CapsuleCollider3DComponent_SetHeight);
+		callbackTable.CapsuleCollider3DComponent_GetOffset = reinterpret_cast<void*>(&CapsuleCollider3DComponent_GetOffset);
+		callbackTable.CapsuleCollider3DComponent_SetOffset = reinterpret_cast<void*>(&CapsuleCollider3DComponent_SetOffset);
+		callbackTable.CapsuleCollider3DComponent_GetIsTrigger = reinterpret_cast<void*>(&CapsuleCollider3DComponent_GetIsTrigger);
+		callbackTable.CapsuleCollider3DComponent_SetIsTrigger = reinterpret_cast<void*>(&CapsuleCollider3DComponent_SetIsTrigger);
+		callbackTable.CapsuleCollider3DComponent_GetEnabled = reinterpret_cast<void*>(&CapsuleCollider3DComponent_GetEnabled);
+		callbackTable.CapsuleCollider3DComponent_SetEnabled = reinterpret_cast<void*>(&CapsuleCollider3DComponent_SetEnabled);
+
+		callbackTable.MeshCollider3DComponent_GetMesh = reinterpret_cast<void*>(&MeshCollider3DComponent_GetMesh);
+		callbackTable.MeshCollider3DComponent_SetMesh = reinterpret_cast<void*>(&MeshCollider3DComponent_SetMesh);
+		callbackTable.MeshCollider3DComponent_GetOffset = reinterpret_cast<void*>(&MeshCollider3DComponent_GetOffset);
+		callbackTable.MeshCollider3DComponent_SetOffset = reinterpret_cast<void*>(&MeshCollider3DComponent_SetOffset);
+		callbackTable.MeshCollider3DComponent_GetIsTrigger = reinterpret_cast<void*>(&MeshCollider3DComponent_GetIsTrigger);
+		callbackTable.MeshCollider3DComponent_SetIsTrigger = reinterpret_cast<void*>(&MeshCollider3DComponent_SetIsTrigger);
+		callbackTable.MeshCollider3DComponent_GetEnabled = reinterpret_cast<void*>(&MeshCollider3DComponent_GetEnabled);
+		callbackTable.MeshCollider3DComponent_SetEnabled = reinterpret_cast<void*>(&MeshCollider3DComponent_SetEnabled);
 
 		/// Pass the callback table to the managed side
 		ScriptEngine::SetManagedNativeCallbacks(&callbackTable);

@@ -1,5 +1,6 @@
 #include "Renderer/Animation/AnimationEvaluator.hpp"
 #include "Scene/Components/AnimationComponents.hpp"
+#include "Scene/Components/PhysicsComponents.hpp"
 #include "Scene/Entity.hpp"
 #include "Scene/Scene.hpp"
 
@@ -328,6 +329,41 @@ namespace
 		const glm::mat4& childWorld = socketChild.GetComponent<Kerberos::TransformComponent>().WorldTransform;
 		EXPECT_NEAR(childWorld[3].x, 6.0f, 1.0e-5f);
 		EXPECT_NEAR(childWorld[3].z, 1.0f, 1.0e-5f);
+	}
+
+	TEST(AnimationRuntimeTest, KinematicSocketBodyFollowsPoseBeforePhysicsStep)
+	{
+		const Kerberos::Ref<Kerberos::Scene> scene = Kerberos::CreateRef<Kerberos::Scene>();
+
+		Kerberos::Entity skeletonEntity = scene->CreateEntity("Skeleton");
+		skeletonEntity.GetComponent<Kerberos::TransformComponent>().Translation = glm::vec3(5.0f, 0.0f, 0.0f);
+		auto& skeletonComponent = skeletonEntity.AddComponent<Kerberos::SkeletonComponent>();
+		skeletonComponent.Skeleton = Kerberos::CreateRef<Kerberos::Skeleton>(MakeTwoJointJoints());
+
+		Kerberos::Entity swordEntity = scene->CreateEntity("Sword");
+		swordEntity.GetComponent<Kerberos::TransformComponent>().Translation = glm::vec3(100.0f);
+		auto& socket = swordEntity.AddComponent<Kerberos::SocketComponent>();
+		socket.SkeletonEntity = skeletonEntity.GetUUID();
+		socket.JointName = "Child";
+
+		auto& rigidBody = swordEntity.AddComponent<Kerberos::RigidBody3DComponent>();
+		rigidBody.Type = Kerberos::RigidBody3DComponent::BodyType::Kinematic;
+		swordEntity.AddComponent<Kerberos::BoxCollider3DComponent>();
+
+		scene->CalculateEntityTransforms();
+
+		auto& runtime = scene->GetAnimationRuntime();
+		runtime.AdvanceClocks(0.0f, false);
+		runtime.EvaluatePose();
+
+		scene->OnSimulationStart();
+		scene->GetPhysicsSystem().Update(1.0f / 60.0f);
+
+		// The socket world transform was computed before the physics update, so the kinematic
+		// body should have been created and moved from that transform.
+		EXPECT_NE(rigidBody.RuntimeBody, nullptr);
+
+		scene->OnSimulationStop();
 	}
 
 	TEST(AnimationSceneTest, CopyDoesNotStartAnimatorsWithoutPlayOnStart)
