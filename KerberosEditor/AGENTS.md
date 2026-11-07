@@ -84,7 +84,16 @@ Editor windows live mainly under
   transforms (never authored local TRS) so rigid attachments parented under
   joints follow the pose. Socket components are
   scene-serialized and copied with scenes; authored prefab templates do not
-  carry them yet, so runtime-spawned attachments use the scripting API.
+  carry them yet, so runtime-spawned attachments use the scripting API. The
+  Ragdoll component exposes skeleton-entity selection, blend duration, joint
+  radius scale, and Start In Ragdoll, shows the live state/physics weight in
+  Play/Simulate, and provides an Enable/Disable Ragdoll button there. C# scripts
+  use `Kerberos.Scene.RagdollComponent`
+  (`EnableRagdoll`, `DisableRagdoll`, `IsRagdoll`, `State`, `BlendWeight`,
+  `BlendDuration`, `StartInRagdoll`, and `JointRadiusScale`). The component is
+  authored setup only; `Scene::RagdollSystem` owns the runtime bodies,
+  constraints, offsets, and blend state. Authored prefab templates do not carry
+  the Ragdoll component yet, so add it after instantiation or from C#.
 - `InspectorPanel`: the unified right-side "Properties" window. It shows entity
   components when an entity is selected and asset import options when a source
   asset is selected in `AssetsPanel` (asset selection takes display precedence).
@@ -148,8 +157,11 @@ components, including prefab instances, particles, joints, skeletons, skinned
 meshes, animators, and script field initializers, resets transient runtime
 state, and intentionally does not copy `NativeScriptComponent` runtime
 instances. The scene serializer persists `JointComponent`, `SkeletonComponent`,
-`SkinnedMeshComponent`, and `AnimatorComponent`; legacy `AnimationComponent`
-records are migrated to a single-clip animator on load.
+`SkinnedMeshComponent`, `AnimatorComponent`, and `RagdollComponent`; legacy
+`AnimationComponent` records are migrated to a single-clip animator on load.
+`RagdollComponent` serializes only authored setup; runtime bodies and
+constraints belong to `Scene::RagdollSystem` and are recreated on simulation
+start.
 
 ## C# script components
 
@@ -253,9 +265,11 @@ application, renderer, scripting, asset-manager, and scene-loading paths, but
 must close and release project resources before the application is destroyed.
 
 Scene updates drive editor/runtime simulation and then queue rendering. The
-scene update order is transforms → animation clocks/pose → scripts/physics →
-`AnimationRuntime::FinalizePose` → queue render; the renderer only uploads the
-already-final skin matrices. Animation markers/events are stored per source in
+Play/Simulate update order is transforms → animation clocks/pose → events →
+scripts → `RagdollSystem::PreparePhysics` → `PhysicsSystem::Update` →
+`RagdollSystem::ReadPhysicsPose` → `AnimationRuntime::FinalizePose` → queue
+render; the renderer only uploads the already-final skin matrices and joint
+entities/sockets are published from the ragdoll-blended `FinalPose`. Animation markers/events are stored per source in
 the `.meta` (`AnimationClips`, schema 3); `EditorAssetManager` exposes
 `GetAnimationClipMeta`/`SetAnimationClipMeta`, and applying changes persists the
 metadata and force-reimports the source. There is no marker/event timeline UI

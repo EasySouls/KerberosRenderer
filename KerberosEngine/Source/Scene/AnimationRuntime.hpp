@@ -45,9 +45,12 @@ struct AnimationInstance
     SkeletonPose CurrentPose;
     // scratch: sampled outgoing clip or interrupted-pose snapshot
     SkeletonPose PreviousPose;
+    // scratch: previous physics-derived local pose, reused to avoid per-frame allocations
+    SkeletonPose PhysicsPose;
 
     uint64_t PoseVersion = 0;
     bool HasPosed = false;
+    float LastRagdollWeight = -1.0f;
 
     // Cross-fade state. Both clips own their clock and duration-event windows so an outgoing
     // clip keeps firing weighted events while it fades out.
@@ -98,6 +101,16 @@ public:
     const std::vector<AnimationInstance>& GetInstances() const;
     const SkeletonPose* FindPose(UUID skeletonEntity) const;
     bool TryGetJointGlobalTransform(UUID skeletonEntity, int32_t joint, glm::mat4& out) const;
+
+    /// Returns the model-to-world transform used to anchor the skeleton's pose globals. This is
+    /// the skinned mesh bound to the skeleton when one exists, otherwise the skeleton entity
+    /// (with its rest joint transform removed when the skeleton entity is itself a joint).
+    bool TryGetSkeletonWorldTransform(UUID skeletonEntityId, glm::mat4& out) const;
+
+    /// Blends a physics-derived local pose into FinalPose and recomputes globals/skin matrices.
+    /// weight is the physics contribution (0 = animation, 1 = physics). AnimationPose is left
+    /// untouched so the clip layer stays authoritative for cross-fades and recovery.
+    void ApplyRagdollPose(UUID skeletonEntity, const std::vector<JointPose>& physicsLocal, float weight);
 
     bool TryGetMarkerTime(UUID skeletonEntity, std::string_view name, float& outTime) const;
     bool GetNextMarker(UUID skeletonEntity, float afterTime, AnimationMarker& out) const;

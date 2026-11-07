@@ -598,6 +598,10 @@ void HierarchyPanel::AddComponentPopup(const Entity entity)
                 AddComponentWithCheck<SocketComponent>(entity);
                 ImGui::CloseCurrentPopup();
             }
+            if (ImGui::MenuItem("Ragdoll")) {
+                AddComponentWithCheck<RagdollComponent>(entity);
+                ImGui::CloseCurrentPopup();
+            }
             ImGui::EndMenu();
         }
 
@@ -2460,6 +2464,85 @@ void HierarchyPanel::DrawComponents(const Entity entity)
         if (componentDeleted)
         {
             entity.RemoveComponent<AnimatorComponent>();
+        }
+    }
+
+    if (entity.HasComponent<RagdollComponent>())
+    {
+        ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(6, 6));
+        const bool opened = ImGui::TreeNodeEx(
+            reinterpret_cast<void*>(typeid(RagdollComponent).hash_code()), treeNodeFlags, "Ragdoll");
+        ImGui::SameLine(ImGui::GetContentRegionAvail().x - 20.f);
+        if (ImGui::Button("+##Ragdoll", ImVec2{ 20, 20 }))
+        {
+            ImGui::OpenPopup("RagdollComponentSettings");
+        }
+        ImGui::PopStyleVar();
+
+        bool componentDeleted = false;
+        if (ImGui::BeginPopup("RagdollComponentSettings"))
+        {
+            ImGui::Text("Ragdoll Settings");
+            ImGui::Separator();
+            if (ImGui::MenuItem("Remove Component"))
+            {
+                componentDeleted = true;
+                ImGui::CloseCurrentPopup();
+            }
+            ImGui::EndPopup();
+        }
+
+        if (opened)
+        {
+            auto& ragdoll = entity.GetComponent<RagdollComponent>();
+
+            if (const auto newSkeletonEntity = DrawComponentEntityReferenceField<SkeletonComponent>(
+                    "Ragdoll Skeleton Entity", m_Context, ragdoll.SkeletonEntity))
+            {
+                ragdoll.SkeletonEntity = *newSkeletonEntity;
+            }
+            ImGui::TextDisabled("Empty skeleton uses this entity's SkeletonComponent.");
+
+            ImGui::DragFloat("Blend Duration", &ragdoll.BlendDuration, 0.01f, 0.0f, 10.0f, "%.3f s");
+            ImGui::DragFloat("Joint Radius Scale", &ragdoll.JointRadiusScale, 0.01f, 0.01f, 5.0f, "%.2f");
+            ImGui::Checkbox("Start In Ragdoll", &ragdoll.StartInRagdoll);
+
+            if (m_Context && m_Context->GetRagdollSystem().GetBodyCount(entity.GetUUID()) > 0)
+            {
+                RagdollSystem& ragdollSystem = m_Context->GetRagdollSystem();
+                const RagdollState state = ragdollSystem.GetState(entity.GetUUID());
+                const char* stateLabel = "Animated";
+                switch (state)
+                {
+                case RagdollState::BlendingToRagdoll: stateLabel = "Blending To Ragdoll"; break;
+                case RagdollState::Ragdoll: stateLabel = "Ragdoll"; break;
+                case RagdollState::BlendingToAnimation: stateLabel = "Blending To Animation"; break;
+                case RagdollState::Animated: break;
+                }
+
+                ImGui::Text("State: %s", stateLabel);
+                ImGui::ProgressBar(ragdollSystem.GetBlendWeight(entity.GetUUID()),
+                                   ImVec2(-1.0f, 0.0f), "Physics Weight");
+
+                if (ImGui::Button(state == RagdollState::Animated ? "Enable Ragdoll" : "Disable Ragdoll"))
+                {
+                    if (state == RagdollState::Animated)
+                        ragdollSystem.EnableRagdoll(entity.GetUUID());
+                    else
+                        ragdollSystem.DisableRagdoll(entity.GetUUID());
+                }
+            }
+            else
+            {
+                ImGui::TextDisabled("Enable/disable at runtime from C# with EnableRagdoll()/DisableRagdoll().");
+            }
+
+            ImGui::TreePop();
+        }
+
+        if (componentDeleted)
+        {
+            entity.RemoveComponent<RagdollComponent>();
         }
     }
 }

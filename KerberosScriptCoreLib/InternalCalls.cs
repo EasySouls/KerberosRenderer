@@ -191,6 +191,18 @@ namespace Kerberos
         private static SocketAttachFn? s_SocketAttach;
         private static EntityActionFn? s_SocketDetach;
 
+        private static EntityActionFn? s_RagdollEnable;
+        private static EntityActionFn? s_RagdollDisable;
+        private static GetBoolFn? s_RagdollIsRagdoll;
+        private static GetIntFn? s_RagdollGetState;
+        private static GetFloatFn? s_RagdollGetWeight;
+        private static GetFloatFn? s_RagdollGetBlendDuration;
+        private static SetFloatFn? s_RagdollSetBlendDuration;
+        private static GetBoolFn? s_RagdollGetStartInRagdoll;
+        private static SetBoolFn? s_RagdollSetStartInRagdoll;
+        private static GetFloatFn? s_RagdollGetJointRadiusScale;
+        private static SetFloatFn? s_RagdollSetJointRadiusScale;
+
         private static GetIntFn? s_RigidbodyGetBodyType;
         private static SetIntFn? s_RigidbodySetBodyType;
         private static GetFloatFn? s_RigidbodyGetMass;
@@ -334,6 +346,18 @@ namespace Kerberos
 
             s_SocketAttach = Marshal.GetDelegateForFunctionPointer<SocketAttachFn>(ReadNext());
             s_SocketDetach = Marshal.GetDelegateForFunctionPointer<EntityActionFn>(ReadNext());
+
+            s_RagdollEnable = Marshal.GetDelegateForFunctionPointer<EntityActionFn>(ReadNext());
+            s_RagdollDisable = Marshal.GetDelegateForFunctionPointer<EntityActionFn>(ReadNext());
+            s_RagdollIsRagdoll = Marshal.GetDelegateForFunctionPointer<GetBoolFn>(ReadNext());
+            s_RagdollGetState = Marshal.GetDelegateForFunctionPointer<GetIntFn>(ReadNext());
+            s_RagdollGetWeight = Marshal.GetDelegateForFunctionPointer<GetFloatFn>(ReadNext());
+            s_RagdollGetBlendDuration = Marshal.GetDelegateForFunctionPointer<GetFloatFn>(ReadNext());
+            s_RagdollSetBlendDuration = Marshal.GetDelegateForFunctionPointer<SetFloatFn>(ReadNext());
+            s_RagdollGetStartInRagdoll = Marshal.GetDelegateForFunctionPointer<GetBoolFn>(ReadNext());
+            s_RagdollSetStartInRagdoll = Marshal.GetDelegateForFunctionPointer<SetBoolFn>(ReadNext());
+            s_RagdollGetJointRadiusScale = Marshal.GetDelegateForFunctionPointer<GetFloatFn>(ReadNext());
+            s_RagdollSetJointRadiusScale = Marshal.GetDelegateForFunctionPointer<SetFloatFn>(ReadNext());
 
             s_RigidbodyGetBodyType = Marshal.GetDelegateForFunctionPointer<GetIntFn>(ReadNext());
             s_RigidbodySetBodyType = Marshal.GetDelegateForFunctionPointer<SetIntFn>(ReadNext());
@@ -761,6 +785,41 @@ namespace Kerberos
         {
             s_SocketDetach?.Invoke(entityID);
         }
+
+        // ----------------------------- RagdollComponent -----------------------------
+
+        internal static void RagdollComponent_EnableRagdoll(ulong entityID)
+            => s_RagdollEnable?.Invoke(entityID);
+
+        internal static void RagdollComponent_DisableRagdoll(ulong entityID)
+            => s_RagdollDisable?.Invoke(entityID);
+
+        internal static bool RagdollComponent_IsRagdoll(ulong entityID)
+            => s_RagdollIsRagdoll?.Invoke(entityID) != 0;
+
+        internal static int RagdollComponent_GetState(ulong entityID)
+            => s_RagdollGetState?.Invoke(entityID) ?? 0;
+
+        internal static float RagdollComponent_GetWeight(ulong entityID)
+            => s_RagdollGetWeight?.Invoke(entityID) ?? 0.0f;
+
+        internal static float RagdollComponent_GetBlendDuration(ulong entityID)
+            => s_RagdollGetBlendDuration?.Invoke(entityID) ?? 0.0f;
+
+        internal static void RagdollComponent_SetBlendDuration(ulong entityID, float duration)
+            => s_RagdollSetBlendDuration?.Invoke(entityID, duration);
+
+        internal static bool RagdollComponent_GetStartInRagdoll(ulong entityID)
+            => s_RagdollGetStartInRagdoll?.Invoke(entityID) != 0;
+
+        internal static void RagdollComponent_SetStartInRagdoll(ulong entityID, bool startInRagdoll)
+            => s_RagdollSetStartInRagdoll?.Invoke(entityID, startInRagdoll ? (byte)1 : (byte)0);
+
+        internal static float RagdollComponent_GetJointRadiusScale(ulong entityID)
+            => s_RagdollGetJointRadiusScale?.Invoke(entityID) ?? 1.0f;
+
+        internal static void RagdollComponent_SetJointRadiusScale(ulong entityID, float scale)
+            => s_RagdollSetJointRadiusScale?.Invoke(entityID, scale);
 
         // ----------------------------- RigidBody3DComponent -----------------------------
 

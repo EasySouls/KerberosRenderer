@@ -11,6 +11,7 @@
 #include <glm/glm.hpp>
 #include <glm/gtc/quaternion.hpp>
 
+#include <cstdint>
 #include <string>
 #include <vector>
 
@@ -122,6 +123,38 @@ struct AnimatorComponent
 
     Ref<Skeleton> Skeleton = nullptr;
     std::vector<Ref<AnimationClip>> LoadedClips;
+};
+
+enum class RagdollState : std::uint8_t
+{
+    Animated = 0,
+    BlendingToRagdoll,
+    Ragdoll,
+    BlendingToAnimation
+};
+
+/// Turns a skeleton entity into a physics-driven ragdoll. 
+/// The runtime bodies and constraints are owned by RagdollSystem.
+struct RagdollComponent
+{
+    /// Skeleton to simulate. When invalid, the component must live on the skeleton entity.
+    UUID SkeletonEntity = UUID::Invalid();
+
+    /// Seconds used to blend between the animation pose and the physics pose in both directions.
+    float BlendDuration = 0.25f;
+
+    /// Enter the ragdoll state as soon as the runtime starts.
+    bool StartInRagdoll = false;
+
+    /// Scales the generated capsule/sphere radii relative to the bone length.
+    float JointRadiusScale = 1.0f;
+
+    RagdollComponent() = default;
+    explicit RagdollComponent(const UUID& skeletonEntity) : SkeletonEntity(skeletonEntity) {}
+    RagdollComponent(const RagdollComponent&) = default;
+    RagdollComponent(RagdollComponent&&) = default;
+    RagdollComponent& operator=(const RagdollComponent&) = default;
+    RagdollComponent& operator=(RagdollComponent&&) = default;
 };
 
 }

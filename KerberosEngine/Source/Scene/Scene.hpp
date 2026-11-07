@@ -2,6 +2,7 @@
 
 #include "Components.hpp"
 #include "AnimationRuntime.hpp"
+#include "RagdollSystem.hpp"
 #include "Camera/EditorCamera.hpp"
 #include "Camera/SceneCamera.hpp"
 #include "Core/UUID.hpp"
@@ -116,6 +117,9 @@ namespace Kerberos
 		AnimationRuntime& GetAnimationRuntime();
 		const AnimationRuntime& GetAnimationRuntime() const;
 
+		RagdollSystem& GetRagdollSystem();
+		const RagdollSystem& GetRagdollSystem() const;
+
 		/// Dispatches events collected by the animation runtime. No-op outside Play mode.
 		void DispatchAnimationEvents();
 
@@ -178,10 +182,12 @@ namespace Kerberos
 
 		JoltPhysicsSystem* m_PhysicsSystem;
         AnimationRuntime m_AnimationRuntime;
+		RagdollSystem m_RagdollSystem;
 
 		friend class Entity;
 		friend class Renderer;
 		friend class AnimationRuntime;
+		friend class RagdollSystem;
 		friend class JoltPhysicsSystem;
 		friend class HierarchyPanel;
 		friend class SceneSerializer;

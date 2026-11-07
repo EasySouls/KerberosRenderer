@@ -26,7 +26,10 @@ import Kerberos;
 
 namespace Kerberos
 {
-	Scene::Scene() : m_PhysicsSystem(new JoltPhysicsSystem()), m_AnimationRuntime(*this)
+	Scene::Scene()
+		: m_PhysicsSystem(new JoltPhysicsSystem())
+		, m_AnimationRuntime(*this)
+		, m_RagdollSystem(*this)
 	{
 		m_Registry = entt::basic_registry();
 	}
@@ -44,6 +47,7 @@ namespace Kerberos
 		m_IsRunning = true;
 
 		m_PhysicsSystem->Initialize(shared_from_this());
+		m_RagdollSystem.Reset();
 
 		/// Start authored animation before scripts run so OnCreate can override it.
 		StartAnimators();
@@ -55,7 +59,12 @@ namespace Kerberos
 		m_AnimationRuntime.AdvanceClocks(0.0f, false);
 		m_AnimationRuntime.EvaluatePose();
 
+		/// Ragdoll proxies read the pose evaluated above, so they must be created before the
+		/// first physics step.
+		m_RagdollSystem.PreparePhysics(0.0f);
+
 		m_PhysicsSystem->Update(0.0f); // Sync physics bodies with transforms before scripts run for the first time
+		m_RagdollSystem.ReadPhysicsPose(0.0f);
 
 		ScriptEngine::OnRuntimeStart(shared_from_this());
 
@@ -76,6 +85,7 @@ namespace Kerberos
 		m_IsRunning = false;
 
 		StopAnimators();
+		m_RagdollSystem.Cleanup();
 		m_PhysicsSystem->Cleanup();
 
 		ScriptEngine::OnRuntimeStop();
@@ -84,12 +94,14 @@ namespace Kerberos
 	void Scene::OnSimulationStart()
 	{
 		m_PhysicsSystem->Initialize(shared_from_this());
+		m_RagdollSystem.Reset();
 		StartAnimators();
 	}
 
 	void Scene::OnSimulationStop()
 	{
 		StopAnimators();
+		m_RagdollSystem.Cleanup();
 		m_PhysicsSystem->Cleanup();
 	}
 
@@ -155,7 +167,9 @@ namespace Kerberos
 		/// If the scene is paused, do not update the physics system, but still render the scene
 		if (!m_IsScenePaused)
 		{
+			m_RagdollSystem.PreparePhysics(ts);
 			m_PhysicsSystem->Update(ts);
+			m_RagdollSystem.ReadPhysicsPose(ts);
 		}
 
         m_AnimationRuntime.FinalizePose(ts);
@@ -186,7 +200,11 @@ namespace Kerberos
 			// resulting End events before physics so gameplay resources are released this frame.
 			DispatchAnimationEvents();
 
+			// Ragdoll proxies follow the post-script animation pose, then physics runs, then the
+			// simulated pose is blended back into the authoritative FinalPose before finalization.
+			m_RagdollSystem.PreparePhysics(ts);
 			m_PhysicsSystem->Update(ts);
+			m_RagdollSystem.ReadPhysicsPose(ts);
 
 			Application::Get().GetAudioManager()->Update();
 
@@ -569,6 +587,10 @@ Entity Scene::InstantiatePrefab(const AssetHandle prefabHandle, const std::strin
 		{
 			newEntity.AddComponent<AnimatorComponent>(entity.GetComponent<AnimatorComponent>());
 		}
+		if (entity.HasComponent<RagdollComponent>())
+		{
+			newEntity.AddComponent<RagdollComponent>(entity.GetComponent<RagdollComponent>());
+		}
 
 		if (duplicateChildren)
 		{
@@ -769,6 +791,16 @@ Entity Scene::InstantiatePrefab(const AssetHandle prefabHandle, const std::strin
         return m_AnimationRuntime;
     }
 
+    RagdollSystem& Scene::GetRagdollSystem()
+    {
+        return m_RagdollSystem;
+    }
+
+    const RagdollSystem& Scene::GetRagdollSystem() const
+    {
+        return m_RagdollSystem;
+    }
+
     void Scene::DispatchAnimationEvents()
     {
         if (!m_IsRunning)
@@ -893,6 +925,8 @@ Entity Scene::InstantiatePrefab(const AssetHandle prefabHandle, const std::strin
 			animator.LoadedClips.clear();
 			newEntity.AddComponent<AnimatorComponent>(animator);
 		}
+		if (sourceRegistry.all_of<RagdollComponent>(sourceEntity))
+			newEntity.AddComponent<RagdollComponent>(sourceRegistry.get<RagdollComponent>(sourceEntity));
 		if (sourceRegistry.all_of<SocketComponent>(sourceEntity))
 			newEntity.AddComponent<SocketComponent>(sourceRegistry.get<SocketComponent>(sourceEntity));
 		if (sourceRegistry.all_of<JointComponent>(sourceEntity))
@@ -1291,6 +1325,11 @@ Entity Scene::InstantiatePrefab(const AssetHandle prefabHandle, const std::strin
 
 	template <>
 	void Scene::OnComponentAdded<SocketComponent>(Entity, SocketComponent&)
+	{
+	}
+
+	template <>
+	void Scene::OnComponentAdded<RagdollComponent>(Entity, RagdollComponent&)
 	{
 	}
 

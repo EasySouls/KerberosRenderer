@@ -158,6 +158,64 @@ namespace Kerberos.Scene
             => InternalCalls.AnimatorComponent_CrossFadeByName(Entity.GetID(), clipName, duration, restart);
     }
 
+    public enum RagdollState
+    {
+        Animated = 0,
+        BlendingToRagdoll,
+        Ragdoll,
+        BlendingToAnimation
+    }
+
+    public class RagdollComponent : Component
+    {
+        public float BlendDuration
+        {
+            get => InternalCalls.RagdollComponent_GetBlendDuration(Entity.GetID());
+            set
+            {
+                if (value < 0)
+                    throw new ArgumentOutOfRangeException(nameof(value), "Blend duration must not be negative.");
+                InternalCalls.RagdollComponent_SetBlendDuration(Entity.GetID(), value);
+            }
+        }
+
+        public bool StartInRagdoll
+        {
+            get => InternalCalls.RagdollComponent_GetStartInRagdoll(Entity.GetID());
+            set => InternalCalls.RagdollComponent_SetStartInRagdoll(Entity.GetID(), value);
+        }
+
+        public float JointRadiusScale
+        {
+            get => InternalCalls.RagdollComponent_GetJointRadiusScale(Entity.GetID());
+            set
+            {
+                if (value <= 0)
+                    throw new ArgumentOutOfRangeException(nameof(value), "Joint radius scale must be positive.");
+                InternalCalls.RagdollComponent_SetJointRadiusScale(Entity.GetID(), value);
+            }
+        }
+
+        public bool IsRagdoll => InternalCalls.RagdollComponent_IsRagdoll(Entity.GetID());
+
+        public RagdollState State => (RagdollState)InternalCalls.RagdollComponent_GetState(Entity.GetID());
+
+        /// <summary>
+        /// Physics contribution to the final pose. 0 is fully animated, 1 is fully simulated.
+        /// </summary>
+        public float BlendWeight => InternalCalls.RagdollComponent_GetWeight(Entity.GetID());
+
+        /// <summary>
+        /// Starts blending from the current animation pose into the simulated ragdoll.
+        /// </summary>
+        public void EnableRagdoll() => InternalCalls.RagdollComponent_EnableRagdoll(Entity.GetID());
+
+        /// <summary>
+        /// Blends from the simulated ragdoll back to the current animation pose.
+        /// </summary>
+        public void DisableRagdoll() => InternalCalls.RagdollComponent_DisableRagdoll(Entity.GetID());
+    }
+
     public class StaticMeshComponent : Component
     {
         public MeshRef Mesh

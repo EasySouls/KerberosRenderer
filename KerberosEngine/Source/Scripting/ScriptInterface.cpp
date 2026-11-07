@@ -107,6 +107,18 @@ namespace Kerberos
 		void* Socket_Attach;
 		void* Socket_Detach;
 
+		void* RagdollComponent_EnableRagdoll;
+		void* RagdollComponent_DisableRagdoll;
+		void* RagdollComponent_IsRagdoll;
+		void* RagdollComponent_GetState;
+		void* RagdollComponent_GetWeight;
+		void* RagdollComponent_GetBlendDuration;
+		void* RagdollComponent_SetBlendDuration;
+		void* RagdollComponent_GetStartInRagdoll;
+		void* RagdollComponent_SetStartInRagdoll;
+		void* RagdollComponent_GetJointRadiusScale;
+		void* RagdollComponent_SetJointRadiusScale;
+
 		void* Rigidbody3DComponent_GetBodyType;
 		void* Rigidbody3DComponent_SetBodyType;
 		void* Rigidbody3DComponent_GetMass;
@@ -232,6 +244,8 @@ namespace Kerberos
 			return [](Entity entity) { return entity.AddComponent<AnimatorComponent>(); };
 		if (typeName == "SocketComponent")
 			return [](Entity entity) { return entity.AddComponent<SocketComponent>(); };
+		if (typeName == "RagdollComponent")
+			return [](Entity entity) { return entity.AddComponent<RagdollComponent>(); };
 
 		KBRAssert(false, "Unknown component type: {0}", typeName);
 		return nullptr;
@@ -926,6 +940,95 @@ namespace Kerberos
 		}
 	}
 
+	static RagdollComponent* GetRagdollComponent(const uint64_t entityID)
+	{
+		const Ref<Scene> scene = ScriptEngine::GetSceneContext().lock();
+		if (!scene)
+			return nullptr;
+
+		const Entity entity = scene->TryGetEntityByUUID(UUID(entityID));
+		if (!entity || !entity.HasComponent<RagdollComponent>())
+			return nullptr;
+
+		return &entity.GetComponent<RagdollComponent>();
+	}
+
+	static RagdollSystem* GetRagdollSystem()
+	{
+		const Ref<Scene> scene = ScriptEngine::GetSceneContext().lock();
+		return scene ? &scene->GetRagdollSystem() : nullptr;
+	}
+
+	static void RagdollComponent_EnableRagdoll(const uint64_t entityID)
+	{
+		KBR_TRACY_FUNCTION();
+		if (RagdollSystem* ragdoll = GetRagdollSystem())
+			ragdoll->EnableRagdoll(UUID(entityID));
+	}
+
+	static void RagdollComponent_DisableRagdoll(const uint64_t entityID)
+	{
+		KBR_TRACY_FUNCTION();
+		if (RagdollSystem* ragdoll = GetRagdollSystem())
+			ragdoll->DisableRagdoll(UUID(entityID));
+	}
+
+	static uint8_t RagdollComponent_IsRagdoll(const uint64_t entityID)
+	{
+		const RagdollSystem* ragdoll = GetRagdollSystem();
+		return ragdoll && ragdoll->IsRagdoll(UUID(entityID)) ? 1 : 0;
+	}
+
+	static int32_t RagdollComponent_GetState(const uint64_t entityID)
+	{
+		const RagdollSystem* ragdoll = GetRagdollSystem();
+		return ragdoll ? static_cast<int32_t>(ragdoll->GetState(UUID(entityID))) : 0;
+	}
+
+	static float RagdollComponent_GetWeight(const uint64_t entityID)
+	{
+		const RagdollSystem* ragdoll = GetRagdollSystem();
+		return ragdoll ? ragdoll->GetBlendWeight(UUID(entityID)) : 0.0f;
+	}
+
+	static float RagdollComponent_GetBlendDuration(const uint64_t entityID)
+	{
+		const RagdollComponent* ragdoll = GetRagdollComponent(entityID);
+		return ragdoll ? ragdoll->BlendDuration : 0.0f;
+	}
+
+	static void RagdollComponent_SetBlendDuration(const uint64_t entityID, const float duration)
+	{
+		RagdollComponent* ragdoll = GetRagdollComponent(entityID);
+		if (ragdoll && std::isfinite(duration))
+			ragdoll->BlendDuration = std::max(0.0f, duration);
+	}
+
+	static uint8_t RagdollComponent_GetStartInRagdoll(const uint64_t entityID)
+	{
+		const RagdollComponent* ragdoll = GetRagdollComponent(entityID);
+		return ragdoll && ragdoll->StartInRagdoll ? 1 : 0;
+	}
+
+	static void RagdollComponent_SetStartInRagdoll(const uint64_t entityID, const uint8_t startInRagdoll)
+	{
+        if (RagdollComponent* ragdoll = GetRagdollComponent(entityID))
+			ragdoll->StartInRagdoll = startInRagdoll != 0;
+	}
+
+	static float RagdollComponent_GetJointRadiusScale(const uint64_t entityID)
+	{
+		const RagdollComponent* ragdoll = GetRagdollComponent(entityID);
+		return ragdoll ? ragdoll->JointRadiusScale : 1.0f;
+	}
+
+	static void RagdollComponent_SetJointRadiusScale(const uint64_t entityID, const float scale)
+	{
+		RagdollComponent* ragdoll = GetRagdollComponent(entityID);
+		if (ragdoll && std::isfinite(scale))
+			ragdoll->JointRadiusScale = std::max(0.01f, scale);
+	}
+
 	template<typename T>
 	static T* GetPhysicsComponent(const uint64_t entityID)
 	{
@@ -1611,6 +1714,7 @@ namespace Kerberos
 		RegisterComponent<AudioListenerComponent>("Kerberos.Scene.AudioListenerComponent");
 		RegisterComponent<AnimatorComponent>("Kerberos.Scene.AnimatorComponent");
 		RegisterComponent<SocketComponent>("Kerberos.Scene.SocketComponent");
+		RegisterComponent<RagdollComponent>("Kerberos.Scene.RagdollComponent");
 
 		/// Build the native callback table and pass it to the managed side
 		static NativeCallbackTable callbackTable = {};
@@ -1688,6 +1792,18 @@ namespace Kerberos
 
 		callbackTable.Socket_Attach = reinterpret_cast<void*>(&Socket_Attach);
 		callbackTable.Socket_Detach = reinterpret_cast<void*>(&Socket_Detach);
+
+		callbackTable.RagdollComponent_EnableRagdoll = reinterpret_cast<void*>(&RagdollComponent_EnableRagdoll);
+		callbackTable.RagdollComponent_DisableRagdoll = reinterpret_cast<void*>(&RagdollComponent_DisableRagdoll);
+		callbackTable.RagdollComponent_IsRagdoll = reinterpret_cast<void*>(&RagdollComponent_IsRagdoll);
+		callbackTable.RagdollComponent_GetState = reinterpret_cast<void*>(&RagdollComponent_GetState);
+		callbackTable.RagdollComponent_GetWeight = reinterpret_cast<void*>(&RagdollComponent_GetWeight);
+		callbackTable.RagdollComponent_GetBlendDuration = reinterpret_cast<void*>(&RagdollComponent_GetBlendDuration);
+		callbackTable.RagdollComponent_SetBlendDuration = reinterpret_cast<void*>(&RagdollComponent_SetBlendDuration);
+		callbackTable.RagdollComponent_GetStartInRagdoll = reinterpret_cast<void*>(&RagdollComponent_GetStartInRagdoll);
+		callbackTable.RagdollComponent_SetStartInRagdoll = reinterpret_cast<void*>(&RagdollComponent_SetStartInRagdoll);
+		callbackTable.RagdollComponent_GetJointRadiusScale = reinterpret_cast<void*>(&RagdollComponent_GetJointRadiusScale);
+		callbackTable.RagdollComponent_SetJointRadiusScale = reinterpret_cast<void*>(&RagdollComponent_SetJointRadiusScale);
 
 		callbackTable.Rigidbody3DComponent_GetBodyType = reinterpret_cast<void*>(&Rigidbody3DComponent_GetBodyType);
 		callbackTable.Rigidbody3DComponent_SetBodyType = reinterpret_cast<void*>(&Rigidbody3DComponent_SetBodyType);

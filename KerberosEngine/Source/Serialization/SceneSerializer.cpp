@@ -377,6 +377,17 @@ static void SerializeEntity(YAML::Emitter& out, const Entity entity)
         out << YAML::EndMap;
     }
 
+    if (entity.HasComponent<RagdollComponent>()) {
+        out << YAML::Key << "RagdollComponent";
+        out << YAML::BeginMap;
+        const auto& ragdoll = entity.GetComponent<RagdollComponent>();
+        out << YAML::Key << "SkeletonEntity" << YAML::Value << ragdoll.SkeletonEntity;
+        out << YAML::Key << "BlendDuration" << YAML::Value << ragdoll.BlendDuration;
+        out << YAML::Key << "StartInRagdoll" << YAML::Value << ragdoll.StartInRagdoll;
+        out << YAML::Key << "JointRadiusScale" << YAML::Value << ragdoll.JointRadiusScale;
+        out << YAML::EndMap;
+    }
+
     if (entity.HasComponent<SocketComponent>()) {
         out << YAML::Key << "SocketComponent";
         out << YAML::BeginMap;
@@ -755,6 +766,14 @@ Entity SceneSerializer::DeserializeEntity(const Ref<Scene>& scene, const YAML::N
         animation.IsPlaying = legacyAnimationComponent["IsPlaying"].as<bool>(false);
         animation.IsLooping = legacyAnimationComponent["IsLooping"].as<bool>(true);
         animation.PlayOnStart = legacyAnimationComponent["PlayOnStart"].as<bool>(false);
+    }
+
+    if (auto ragdollComponent = node["RagdollComponent"]) {
+        auto& ragdoll = deserializedEntity.AddComponent<RagdollComponent>();
+        ragdoll.SkeletonEntity = UUID(ragdollComponent["SkeletonEntity"].as<uint64_t>(0));
+        ragdoll.BlendDuration = std::max(0.0f, ragdollComponent["BlendDuration"].as<float>(0.25f));
+        ragdoll.StartInRagdoll = ragdollComponent["StartInRagdoll"].as<bool>(false);
+        ragdoll.JointRadiusScale = std::max(0.01f, ragdollComponent["JointRadiusScale"].as<float>(1.0f));
     }
 
     if (auto socketComponent = node["SocketComponent"]) {

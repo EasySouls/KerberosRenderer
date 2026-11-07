@@ -818,35 +818,9 @@ void AnimationRuntime::UpdateJointTransforms() const
         {
             baseWorld = it->second;
         }
-        else
+        else if (!TryGetSkeletonWorldTransform(instance.SkeletonEntity, baseWorld))
         {
-            baseWorld = skeletonEntity.GetComponent<TransformComponent>().WorldTransform;
-
-            int32_t skeletonJoint = -1;
-            for (size_t jointIndex = 0; jointIndex < skeletonComponent.JointEntities.size(); ++jointIndex)
-            {
-                if (skeletonComponent.JointEntities[jointIndex] == instance.SkeletonEntity)
-                {
-                    skeletonJoint = static_cast<int32_t>(jointIndex);
-                    break;
-                }
-            }
-
-            if (skeletonJoint >= 0)
-            {
-                // The skeleton entity is a joint, so its world includes that joint's rest
-                // transform. Remove it to recover the model space the pose is expressed in.
-                std::vector<glm::mat4> restGlobals(joints.size(), glm::mat4(1.0f));
-                for (size_t jointIndex = 0; jointIndex < joints.size(); ++jointIndex)
-                {
-                    const SkeletonJoint& joint = joints[jointIndex];
-                    const glm::mat4 local = JointRestLocal(joint);
-                    restGlobals[jointIndex] = joint.Parent >= 0
-                        ? restGlobals[static_cast<size_t>(joint.Parent)] * local
-                        : local;
-                }
-                baseWorld *= glm::inverse(restGlobals[static_cast<size_t>(skeletonJoint)]);
-            }
+            continue;
         }
 
         std::vector<glm::mat4> jointWorlds(joints.size(), glm::mat4(1.0f));
@@ -985,6 +959,123 @@ bool AnimationRuntime::TryGetJointGlobalTransform(const UUID skeletonEntity, con
 
     out = pose->Global[static_cast<size_t>(joint)];
     return true;
+}
+
+bool AnimationRuntime::TryGetSkeletonWorldTransform(const UUID skeletonEntityId, glm::mat4& out) const
+{
+    if (!m_Scene)
+        return false;
+
+    const Entity skeletonEntity = m_Scene->TryGetEntityByUUID(skeletonEntityId);
+    if (!skeletonEntity || !skeletonEntity.HasComponent<SkeletonComponent>() ||
+        !skeletonEntity.HasComponent<TransformComponent>())
+    {
+        return false;
+    }
+
+    const auto& skeletonComponent = skeletonEntity.GetComponent<SkeletonComponent>();
+    if (!skeletonComponent.Skeleton)
+        return false;
+
+    // Anchor to a skinned mesh bound to this skeleton when available.
+    const auto skinnedView = m_Scene->m_Registry.view<SkinnedMeshComponent, TransformComponent>();
+    for (const auto entity : skinnedView)
+    {
+        const auto& skinned = skinnedView.get<SkinnedMeshComponent>(entity);
+        if (skinned.SkeletonEntity == skeletonEntityId)
+        {
+            out = skinnedView.get<TransformComponent>(entity).WorldTransform;
+            return true;
+        }
+    }
+
+    out = skeletonEntity.GetComponent<TransformComponent>().WorldTransform;
+
+    // The skeleton entity may itself be a joint. It's world transform then includes that joint's
+    // rest transform. Remove it to recover the model space the pose globals are expressed in.
+    const auto& joints = skeletonComponent.Skeleton->GetJoints();
+    int32_t skeletonJoint = -1;
+    for (size_t jointIndex = 0; jointIndex < skeletonComponent.JointEntities.size(); ++jointIndex)
+    {
+        if (skeletonComponent.JointEntities[jointIndex] == skeletonEntityId)
+        {
+            skeletonJoint = static_cast<int32_t>(jointIndex);
+            break;
+        }
+    }
+
+    if (skeletonJoint >= 0)
+    {
+        std::vector<glm::mat4> restGlobals(joints.size(), glm::mat4(1.0f));
+        for (size_t jointIndex = 0; jointIndex < joints.size(); ++jointIndex)
+        {
+            const SkeletonJoint& joint = joints[jointIndex];
+            const glm::mat4 local = JointRestLocal(joint);
+            restGlobals[jointIndex] = joint.Parent >= 0
+                ? restGlobals[static_cast<size_t>(joint.Parent)] * local
+                : local;
+        }
+        out *= glm::inverse(restGlobals[static_cast<size_t>(skeletonJoint)]);
+    }
+
+    return true;
+}
+
+void AnimationRuntime::ApplyRagdollPose(const UUID skeletonEntity,
+                                        const std::vector<JointPose>& physicsLocal,
+                                        const float weight)
+{
+    KBR_TRACY_FUNCTION();
+
+    if (!m_Scene)
+        return;
+
+    const auto it = m_InstanceByEntity.find(skeletonEntity);
+    if (it == m_InstanceByEntity.end())
+        return;
+
+    AnimationInstance& instance = m_Instances[it->second];
+    if (!instance.Skeleton || !instance.HasPosed)
+        return;
+
+    const size_t jointCount = instance.Skeleton->GetJoints().size();
+    if (physicsLocal.size() != jointCount || instance.AnimationPose.Local.size() != jointCount)
+        return;
+
+    const float physicsWeight = std::clamp(weight, 0.0f, 1.0f);
+    if (physicsWeight <= 0.0f)
+        return;
+
+    if (instance.PhysicsPose.Local.size() != jointCount)
+        instance.PhysicsPose.Local.resize(jointCount);
+
+    // Only bump the pose version when the physics contribution actually changes. A sleeping
+    // ragdoll still blends every frame (EvaluatePose reset FinalPose to the animation layer),
+    // but the renderer skips the upload while the result is unchanged.
+    bool changed = instance.LastRagdollWeight != physicsWeight;
+    for (size_t jointIndex = 0; jointIndex < jointCount; ++jointIndex)
+    {
+        const JointPose& sampled = physicsLocal[jointIndex];
+        JointPose& cached = instance.PhysicsPose.Local[jointIndex];
+
+        if (!changed)
+        {
+            changed =
+                glm::distance2(cached.Translation, sampled.Translation) > 1.0e-8f ||
+                glm::distance2(cached.Scale, sampled.Scale) > 1.0e-8f ||
+                std::abs(glm::dot(cached.Rotation, sampled.Rotation)) < 1.0f - 1.0e-6f;
+        }
+
+        cached = sampled;
+    }
+
+    instance.LastRagdollWeight = physicsWeight;
+
+    BlendPose(instance.AnimationPose, instance.PhysicsPose, physicsWeight, instance.FinalPose);
+    ComputeGlobalAndSkinMatrices(*instance.Skeleton, instance.FinalPose);
+
+    if (changed)
+        instance.PoseVersion = m_NextPoseVersion++;
 }
 
 bool AnimationRuntime::TryGetMarkerTime(const UUID skeletonEntity, const std::string_view name, float& outTime) const

@@ -332,35 +332,94 @@ gravity, friction, restitution, angular velocity, collider shape/offset, and
 trigger/enabled changes. Changing these marks the owning rigid body dirty; the
 physics system rebuilds the body on the next update.
 
-For future ragdolling and ragdoll pose blending, keep this same boundary: the
-skeleton pose remains the shared representation. Animation drives kinematic
-bone proxies while animated; at handoff copy pose and velocities into dynamic
-bodies; after physics read body transforms back into `SkeletonPose`, blend with
-the `AnimationPose` layer using `BlendPose`, write the result into `FinalPose`,
-recompute globals/skin matrices, then update sockets. Do not make
-`JointComponent` entity transforms the authoritative pose. The animator replaces the old single-clip
-`AnimationComponent`; legacy serialized animation components are migrated on
-load. `AnimatorComponent::LoadedClips` is transient: `AnimationRuntime` resolves
-`AnimationClips` through the active asset manager when the handle list changes
-or the cached artifact was evicted by a reimport.
+## Ragdoll physics
+
+`Scene::RagdollSystem` (`Scene/RagdollSystem.*`) owns the runtime bodies and
+constraints for each `RagdollComponent`. The component stores only authored
+setup (skeleton entity, blend duration, start-in-ragdoll, joint radius scale);
+the system owns body/constraint handles, per-joint offsets, and blend state.
+
+Each joint gets one proxy body: a capsule spanning the parent-to-joint segment
+(or a sphere for a root or zero-length joint). The joint transform relative to
+its proxy body is captured at creation, so a rigid proxy does not stretch when
+the animation stretches a bone, but its joint end still tracks the pose. While
+`Animated`, the proxies are kinematic: `RagdollSystem::PreparePhysics` computes
+target body transforms from the authoritative `FinalPose`, moves the proxies,
+and records those transforms for velocity handoff.
+
+Enabling the ragdoll creates swing-twist constraints from the current pose,
+transfers linear/angular velocities from the previous animated frame, switches
+the proxies to dynamic, and ramps `BlendWeight` from 0 to 1.
+`ReadPhysicsPose` runs after `PhysicsSystem::Update`, reads the body
+transforms, converts them from world space into the skeleton's model space
+through `AnimationRuntime::TryGetSkeletonWorldTransform`, builds a local joint
+pose, and calls `AnimationRuntime::ApplyRagdollPose`. That blends the physics
+local pose with `AnimationPose` using `BlendPose` (the weight is the physics
+contribution), writes the result into `FinalPose`, recomputes globals/skin
+matrices, and bumps `PoseVersion` only when the physics pose or weight actually
+changed. Disabling the ragdoll ramps the weight back to 0 while physics still
+drives the pose, then destroys the constraints, returns the proxies to
+kinematic motion, and snaps them to the animation pose.
+
+`FinalizePose` runs after the ragdoll readback, so joint entities and sockets
+are published from the ragdoll-blended `FinalPose`. The skeleton pose therefore
+stays authoritative: physics bodies are proxies, and `JointComponent` entity
+transforms are never the source of truth.
+
+The Play/Simulate frame order is: calculate transforms -> animation
+clocks/pose -> events -> scripts -> post-script pose ->
+`RagdollSystem::PreparePhysics` -> `PhysicsSystem::Update` ->
+`RagdollSystem::ReadPhysicsPose` -> `AnimationRuntime::FinalizePose` -> queue
+render. Edit mode does not create or simulate ragdoll bodies.
+
+Ragdoll bodies use a shared Jolt `GroupFilterTable` with 256 subgroups and all
+intra-group pairs disabled. Each ragdoll uses a unique collision group, so its
+own bones do not collide but separate ragdolls still interact with each other
+and with ECS bodies. Ragdoll bodies carry the ragdoll entity UUID as Jolt user
+data, so raycasts and collision events attribute hits to the ragdoll entity.
+
+Animation clocks and events keep advancing while a ragdoll is active so the
+clip can resume during recovery. Gameplay scripts can inspect
+`RagdollComponent::IsRagdoll`/`State` or the blend weight to ignore events that
+should not fire while physics dominates; duration windows are not force-closed
+merely by entering the ragdoll state.
+
+Ragdoll constraints are swing-twist limits selected heuristically from joint
+names (neck/head, shoulder/hip, elbow/knee, otherwise a default). There are no
+authored per-joint limits yet, no world anchor for the root (a ragdoll falls
+freely), no contact-driven hit reactions, no joint motors/IK recovery, and no
+debug proxy drawing. Ragdoll bodies live in world space, so moving the skeleton
+entity while it is ragdolling shifts the simulated pose relative to the model.
+The runtime preallocates per-joint scratch buffers, avoids
+per-frame matrix inversions in readback, creates constraints only while the
+ragdoll is dynamic, and skips pose-version bumps when a sleeping ragdoll is
+unchanged.
+
+The animator replaces the old single-clip `AnimationComponent`; legacy serialized
+animation components are migrated on load. `AnimatorComponent::LoadedClips` is
+transient: `AnimationRuntime` resolves `AnimationClips` through the active asset
+manager when the handle list changes or the cached artifact was evicted by a
+reimport.
 
 ## Evaluation and versioning
 
 `Scene::OnUpdateEditor`/`OnUpdateSimulation`/`OnUpdateRuntime` own the frame
-order. They calculate transforms, call `AnimationRuntime::AdvanceClocks`,
-`EvaluatePose`, run scripts/physics, then `FinalizePose`, and only then queue the
-render. The runtime resolves the animator that drives each skeleton (same entity
-first, then `SkeletonEntity`, with a warning when several animators target one
-skeleton). A skeleton with no animator or no resolvable active clip stays in its
-rest pose.
+order. Play/Simulate evaluate animation, run scripts, prepare ragdoll proxies,
+step physics, read the ragdoll pose back, then call `FinalizePose`; only then is
+the render queued. The runtime resolves the animator that drives each skeleton
+(same entity first, then `SkeletonEntity`, with a warning when several animators
+target one skeleton). A skeleton with no animator or no resolvable active clip
+stays in its rest pose.
 
 `OnUpdateRuntime` advances clocks and collects events, evaluates a provisional
 pose, dispatches animation events, then runs scripts. It evaluates again after
 scripts when playback state changed, so `Play`/`Stop`/`SetTime`/`CrossFade` from
 C# applies before physics and rendering. A cross-fade request made by a script
 is applied by the post-script evaluation; its fade elapsed time starts advancing
-on the next clock update. `FinalizePose` is the post-physics hook reserved for
-ragdoll blending, IK, root motion, and sockets. Events are dispatched to
+on the next clock update. `FinalizePose` publishes the already-composed
+`FinalPose` to joint entities and sockets; ragdoll readback happens just before
+it, and future IK/root motion must write into `FinalPose` and bump
+`PoseVersion` before this call. Events are dispatched to
 scripts on the animator entity through `Entity.OnAnimationEvent`; Edit and
 Simulate clear pending events without invoking gameplay scripts. Runtime
 dispatch happens once before scripts and again after the post-script pose
@@ -420,15 +479,17 @@ SVB rather than expecting world-space output.
 
 - Pose evaluation and skin-matrix generation are CPU-only. There is no
   evaluation/precompute compute pass and no GPU pose path yet.
-- Two-clip cross-fades and local-pose composition are implemented. Additive
-  layers, root motion, editor timeline authoring, and ragdoll two-way pose
-  synchronization are not. Marker/event data round-trips from `.meta` through
-  the native clip into `AnimationClip`, and point/duration events dispatch to
-  scripts with per-clip fade weights. `FireInEditor` preview dispatch remains
-  future work.
-- `FinalizePose` is an empty post-physics hook; ragdoll blending and IK still
-  need to fill it, write into `FinalPose`, and bump `PoseVersion`.
-- Physics/ragdoll integration and Jolt bone proxies are not implemented.
+- Two-clip cross-fades, local-pose composition, and ragdoll two-way pose
+  synchronization are implemented. Additive layers, root motion, authored
+  per-joint ragdoll limits, joint motors, and editor timeline authoring are
+  not. Marker/event data round-trips from `.meta` through the native clip into
+  `AnimationClip`, and point/duration events dispatch to scripts with per-clip
+  fade weights. `FireInEditor` preview dispatch remains future work.
+- Ragdoll proxies are rigid capsules/spheres created from the pose at the time
+  the ragdoll is first initialized. They do not rescale with bone length, and
+  the root has no anchor, so an enabled ragdoll falls freely.
+- `FinalizePose` publishes `FinalPose` and does not itself modify it; future IK
+  and root motion must write into `FinalPose` and bump `PoseVersion` before it.
 - Only direct per-mesh dispatches are recorded; no indirect dispatch or
   per-frame job buffer exists.
 - Skeleton skin-matrix slices and SVB regions are bump-allocated and only

@@ -28,12 +28,57 @@
 #include "Jolt/Physics/Collision/Shape/RotatedTranslatedShape.h"
 #include "Jolt/Physics/Collision/RayCast.h"
 #include "Jolt/Physics/Collision/CastResult.h"
+#include <Jolt/Physics/Collision/GroupFilterTable.h>
+#include <Jolt/Physics/Constraints/SwingTwistConstraint.h>
 
 
 import Kerberos;
 
 namespace Kerberos
 {
+	namespace
+	{
+		JPH::EMotionType ToJoltMotionType(const PhysicsMotionType type)
+		{
+			switch (type)
+			{
+			case PhysicsMotionType::Static: return JPH::EMotionType::Static;
+			case PhysicsMotionType::Kinematic: return JPH::EMotionType::Kinematic;
+			case PhysicsMotionType::Dynamic: return JPH::EMotionType::Dynamic;
+			}
+
+			KBRAssert(false, "Unknown physics motion type!");
+			return JPH::EMotionType::Static;
+		}
+
+		JPH::Vec3 ToJoltVec3(const glm::vec3& value)
+		{
+			return { value.x, value.y, value.z };
+		}
+
+		JPH::RVec3 ToJoltRVec3(const glm::vec3& value)
+		{
+			return { value.x, value.y, value.z };
+		}
+
+		JPH::Quat ToJoltQuat(const glm::quat& value)
+		{
+			return { value.x, value.y, value.z, value.w };
+		}
+
+		glm::vec3 ToGlmVec3(const JPH::Vec3& value)
+		{
+			return { value.GetX(), value.GetY(), value.GetZ() };
+		}
+	}
+
+	struct JoltPhysicsSystem::Extras
+	{
+		JPH::Ref<JPH::GroupFilterTable> SelfCollisionFilter;
+		std::unordered_map<PhysicsConstraintHandle, JPH::Ref<JPH::Constraint>> Constraints;
+		PhysicsConstraintHandle NextConstraintHandle = 1;
+	};
+
 	JoltPhysicsSystem::~JoltPhysicsSystem()
 	{
 		JoltPhysicsSystem::Cleanup();
@@ -63,6 +108,20 @@ namespace Kerberos
 		/// else this function will create one for you.
 		JPH::RegisterTypes();
 
+		delete m_Extras;
+		m_Extras = new Extras();
+
+		// Shared self-collision filter for ragdoll bodies. 
+		// Every intra-group sub-group pair is disabled. 
+		// Different collision groups (separate ragdolls) still collide normally.
+		constexpr uint32_t cMaxRagdollSubGroups = 256;
+		m_Extras->SelfCollisionFilter = new JPH::GroupFilterTable(cMaxRagdollSubGroups);
+		for (uint32_t groupA = 0; groupA < cMaxRagdollSubGroups; ++groupA)
+		{
+			for (uint32_t groupB = groupA + 1; groupB < cMaxRagdollSubGroups; ++groupB)
+				m_Extras->SelfCollisionFilter->DisableCollision(groupA, groupB);
+		}
+
 		/// We need a temp allocator for temporary allocations during the physics update. We're
 		/// pre-allocating 10 MB to avoid having to do allocations during the physics update.
 		/// If you don't want to pre-allocate you can also use TempAllocatorMalloc to fall back to
@@ -75,9 +134,9 @@ namespace Kerberos
 		/// of your own job scheduler. JobSystemThreadPool is an example implementation.
 		m_PhysicsJobSystem = new JPH::JobSystemThreadPool(JPH::cMaxPhysicsJobs, JPH::cMaxPhysicsBarriers, static_cast<int>(std::thread::hardware_concurrency()) - 1);
 
-		/// This is the max amount of rigid bodies that you can add to the physics system. If you try to add more you'll get an error.
-		/// Note: This value is low because this is a simple test. For a real project use something in the order of 65536.
-		constexpr uint32_t cMaxBodies = 1024;
+		/// This is the max amount of rigid bodies that you can add to the physics system. Ragdolls
+		/// create one body per joint, so keep enough headroom for several characters.
+		constexpr uint32_t cMaxBodies = 4096;
 
 		/// This determines how many mutexes to allocate to protect rigid bodies from concurrent access. Set it to 0 for the default settings.
 		constexpr uint32_t cNumBodyMutexes = 0;
@@ -170,6 +229,236 @@ namespace Kerberos
 		bodyInterface.SetAngularVelocity(id, joltVelocity);
 	}
 
+	glm::vec3 JoltPhysicsSystem::GetLinearVelocity(const uint32_t bodyId) const
+	{
+		const JPH::Vec3 velocity = GetBodyInterface().GetLinearVelocity(JPH::BodyID{ bodyId });
+		return ToGlmVec3(velocity);
+	}
+
+	glm::vec3 JoltPhysicsSystem::GetAngularVelocity(const uint32_t bodyId) const
+	{
+		const JPH::Vec3 velocity = GetBodyInterface().GetAngularVelocity(JPH::BodyID{ bodyId });
+		return ToGlmVec3(velocity);
+	}
+
+	PhysicsBodyHandle JoltPhysicsSystem::CreateBody(const PhysicsBodyDesc& desc)
+	{
+		KBR_TRACY_FUNCTION();
+
+		if (!m_JoltSystem || !std::isfinite(desc.Mass) || desc.Mass <= 0.0f)
+			return 0;
+
+		JPH::RefConst<JPH::Shape> shape;
+		switch (desc.Shape.Type)
+		{
+		case PhysicsShapeType::Box:
+			shape = new JPH::BoxShape(ToJoltVec3(desc.Shape.HalfExtents));
+			break;
+		case PhysicsShapeType::Sphere:
+			shape = new JPH::SphereShape(desc.Shape.Radius);
+			break;
+		case PhysicsShapeType::Capsule:
+			shape = new JPH::CapsuleShape(desc.Shape.HalfHeight, desc.Shape.Radius);
+			break;
+		}
+
+		if (!shape)
+			return 0;
+
+		JPH::BodyCreationSettings settings(
+			shape.GetPtr(),
+			ToJoltRVec3(desc.Position),
+			ToJoltQuat(desc.Rotation),
+			ToJoltMotionType(desc.MotionType),
+			Physics::Layers::MOVING);
+
+		settings.mFriction = desc.Friction;
+		settings.mRestitution = desc.Restitution;
+		settings.mLinearDamping = desc.LinearDamping;
+		settings.mAngularDamping = desc.AngularDamping;
+		settings.mGravityFactor = desc.UseGravity ? 1.0f : 0.0f;
+		settings.mAllowSleeping = desc.AllowSleeping;
+		settings.mIsSensor = false;
+
+		settings.mOverrideMassProperties = JPH::EOverrideMassProperties::CalculateInertia;
+		settings.mMassPropertiesOverride.mMass = desc.Mass;
+
+		if (desc.CollisionGroup != 0xFFFFFFFFu && m_Extras && m_Extras->SelfCollisionFilter)
+		{
+			settings.mCollisionGroup = JPH::CollisionGroup(
+				m_Extras->SelfCollisionFilter.GetPtr(),
+				desc.CollisionGroup,
+				desc.CollisionSubGroup);
+		}
+
+		JPH::BodyInterface& bodyInterface = GetBodyInterface();
+		JPH::Body* body = bodyInterface.CreateBody(settings);
+		if (!body)
+			return 0;
+
+		const JPH::BodyID bodyId = body->GetID();
+		bodyInterface.AddBody(bodyId, JPH::EActivation::Activate);
+
+		if (desc.UserData.IsValid())
+		{
+			m_BodyIDToEntityID[bodyId.GetIndex()] = desc.UserData;
+			body->SetUserData(desc.UserData);
+		}
+
+		return bodyId.GetIndexAndSequenceNumber();
+	}
+
+	void JoltPhysicsSystem::DestroyBody(const PhysicsBodyHandle body)
+	{
+		if (!m_JoltSystem || body == 0)
+			return;
+
+		const JPH::BodyID id{ body };
+		m_BodyIDToEntityID.erase(id.GetIndex());
+
+		JPH::BodyInterface& bodyInterface = GetBodyInterface();
+		bodyInterface.RemoveBody(id);
+		bodyInterface.DestroyBody(id);
+	}
+
+	void JoltPhysicsSystem::SetBodyTransform(const PhysicsBodyHandle body,
+	                                         const glm::vec3& position,
+	                                         const glm::quat& rotation)
+	{
+		if (!m_JoltSystem || body == 0)
+			return;
+
+		GetBodyInterface().SetPositionAndRotation(
+			JPH::BodyID{ body },
+			ToJoltRVec3(position),
+			ToJoltQuat(rotation),
+			JPH::EActivation::Activate);
+	}
+
+	void JoltPhysicsSystem::MoveKinematicBody(const PhysicsBodyHandle body,
+	                                          const glm::vec3& position,
+	                                          const glm::quat& rotation,
+	                                          const float deltaTime)
+	{
+		if (!m_JoltSystem || body == 0)
+			return;
+
+		JPH::BodyInterface& bodyInterface = GetBodyInterface();
+		const JPH::BodyID id{ body };
+
+		if (deltaTime > 0.0f)
+		{
+			bodyInterface.MoveKinematic(id, ToJoltRVec3(position), ToJoltQuat(rotation), deltaTime);
+			bodyInterface.ActivateBody(id);
+		}
+		else
+		{
+			bodyInterface.SetPositionAndRotation(id, ToJoltRVec3(position), ToJoltQuat(rotation),
+			                                     JPH::EActivation::Activate);
+		}
+	}
+
+	void JoltPhysicsSystem::GetBodyTransform(const PhysicsBodyHandle body,
+	                                         glm::vec3& outPosition,
+	                                         glm::quat& outRotation) const
+	{
+		if (!m_JoltSystem || body == 0)
+		{
+			outPosition = glm::vec3(0.0f);
+			outRotation = glm::quat(1.0f, 0.0f, 0.0f, 0.0f);
+			return;
+		}
+
+		JPH::RVec3 position;
+		JPH::Quat rotation;
+		GetBodyInterface().GetPositionAndRotation(JPH::BodyID{ body }, position, rotation);
+
+		outPosition = Physics::Utils::ToGlmVec3(position);
+		outRotation = Physics::Utils::ToGlmQuat(rotation);
+	}
+
+	void JoltPhysicsSystem::SetBodyMotionType(const PhysicsBodyHandle body, const PhysicsMotionType type)
+	{
+		if (!m_JoltSystem || body == 0)
+			return;
+
+		GetBodyInterface().SetMotionType(
+			JPH::BodyID{ body },
+			ToJoltMotionType(type),
+			JPH::EActivation::Activate);
+	}
+
+	PhysicsConstraintHandle JoltPhysicsSystem::CreateConstraint(const PhysicsConstraintDesc& desc)
+	{
+		KBR_TRACY_FUNCTION();
+
+		if (!m_JoltSystem || desc.BodyA == 0 || desc.BodyB == 0)
+			return 0;
+
+		JPH::Body* bodyA = m_JoltSystem->GetBodyLockInterface().TryGetBody(JPH::BodyID{ desc.BodyA });
+		JPH::Body* bodyB = m_JoltSystem->GetBodyLockInterface().TryGetBody(JPH::BodyID{ desc.BodyB });
+		if (!bodyA || !bodyB)
+		{
+			Log::CoreWarn("Jolt: cannot create constraint without valid bodies");
+			return 0;
+		}
+
+		JPH::Vec3 twistAxis = ToJoltVec3(desc.TwistAxis);
+		if (twistAxis.LengthSq() < 1.0e-8f)
+			twistAxis = JPH::Vec3::sAxisY();
+		else
+			twistAxis = twistAxis.Normalized();
+
+		JPH::Vec3 planeAxis = ToJoltVec3(desc.PlaneAxis);
+		planeAxis -= twistAxis * planeAxis.Dot(twistAxis);
+		if (planeAxis.LengthSq() < 1.0e-8f)
+		{
+			const JPH::Vec3 fallback = std::abs(twistAxis.GetY()) < 0.9f
+				? JPH::Vec3::sAxisY()
+				: JPH::Vec3::sAxisX();
+			planeAxis = fallback - twistAxis * fallback.Dot(twistAxis);
+		}
+		planeAxis = planeAxis.Normalized();
+
+		JPH::SwingTwistConstraintSettings settings;
+		settings.mSpace = JPH::EConstraintSpace::WorldSpace;
+		settings.mPosition1 = ToJoltRVec3(desc.Position);
+		settings.mPosition2 = ToJoltRVec3(desc.Position);
+		settings.mTwistAxis1 = twistAxis;
+		settings.mTwistAxis2 = twistAxis;
+		settings.mPlaneAxis1 = planeAxis;
+		settings.mPlaneAxis2 = planeAxis;
+		settings.mNormalHalfConeAngle = desc.SwingLimit;
+		settings.mPlaneHalfConeAngle = desc.SwingLimit;
+		settings.mTwistMinAngle = desc.TwistMin;
+		settings.mTwistMaxAngle = desc.TwistMax;
+
+		JPH::TwoBodyConstraint* constraint = settings.Create(*bodyA, *bodyB);
+		if (!constraint)
+			return 0;
+
+		m_JoltSystem->AddConstraint(constraint);
+
+		const PhysicsConstraintHandle handle = m_Extras->NextConstraintHandle++;
+		m_Extras->Constraints.emplace(handle, JPH::Ref<JPH::Constraint>(constraint));
+		return handle;
+	}
+
+	void JoltPhysicsSystem::DestroyConstraint(const PhysicsConstraintHandle constraint)
+	{
+		if (!m_Extras)
+			return;
+
+		const auto it = m_Extras->Constraints.find(constraint);
+		if (it == m_Extras->Constraints.end())
+			return;
+
+		if (m_JoltSystem)
+			m_JoltSystem->RemoveConstraint(it->second.GetPtr());
+
+		m_Extras->Constraints.erase(it);
+	}
+
 	bool JoltPhysicsSystem::Raycast(const glm::vec3& origin, const glm::vec3& direction, const float maxDistance,
 		RaycastHit& outHit) const 
 	{
@@ -202,12 +491,11 @@ namespace Kerberos
 			const float dist = hit.mFraction * maxDistance;
 
 			const uint32_t bodyId = hit.mBodyID.GetIndex();
-			const UUID entityId = m_BodyIDToEntityID.at(bodyId);
-			if (!entityId.IsValid())
-			{
-				KBRAssert(false, "Invalid body ID in raycast hit!");
+			const auto entityIt = m_BodyIDToEntityID.find(bodyId);
+			if (entityIt == m_BodyIDToEntityID.end() || !entityIt->second.IsValid())
 				return false;
-			}
+
+			const UUID entityId = entityIt->second;
 
 			const JPH::BodyInterface& bodyInterface = GetBodyInterface();
 			const JPH::Vec3 joltNormal = bodyInterface.GetShape(hit.mBodyID)->GetSurfaceNormal(hit.mSubShapeID2, joltPoint);
@@ -574,6 +862,15 @@ namespace Kerberos
 
 		m_BodyIDToEntityID.clear();
 
+		// Constraints must be detached from the physics system before it is destroyed.
+		if (m_JoltSystem && m_Extras)
+		{
+			for (const auto& constraint : m_Extras->Constraints | std::views::values)
+				m_JoltSystem->RemoveConstraint(constraint.GetPtr());
+		}
+		if (m_Extras)
+			m_Extras->Constraints.clear();
+
 		delete m_ContactListener;
 		m_ContactListener = nullptr;
 
@@ -582,6 +879,9 @@ namespace Kerberos
 
 		delete m_JoltSystem;
 		m_JoltSystem = nullptr;
+
+		delete m_Extras;
+		m_Extras = nullptr;
 
 		delete m_ObjectVsObjectLayerFilter;
 		m_ObjectVsObjectLayerFilter = nullptr;
