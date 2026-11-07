@@ -27,6 +27,12 @@ namespace Kerberos
 	public:
 		~GrassSystem();
 
+		// Grass rendering needs mesh shaders, shader objects and descriptor buffers. When the device does not
+		// provide them, Init() logs and leaves the system uninitialised instead of creating invalid Vulkan
+		// objects, and RecordDraw() becomes a no-op.
+		static bool IsSupportedByDevice();
+		bool IsSupported() const { return m_Supported; }
+
 		void Init(const Owner<DescriptorAllocator>& allocator);
 		
 		void RecordDraw(const vk::raii::CommandBuffer& cmd, uint32_t frameIndex, const GrassConstants& constants);
@@ -43,6 +49,8 @@ namespace Kerberos
 
 	private:
 		DescriptorAllocator* m_DescriptorAllocator = nullptr;
+
+		bool m_Supported = false;
 
 		vk::raii::DescriptorSetLayout m_SetLayout = nullptr;
 		vk::raii::PipelineLayout m_PipelineLayout = nullptr;

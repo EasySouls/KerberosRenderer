@@ -6,6 +6,17 @@
 
 // TODO: Use VMA
 
+namespace {
+// VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR is only a legal usage flag when
+// VK_KHR_acceleration_structure is enabled, so devices without ray tracing must not request it.
+vk::BufferUsageFlags AccelerationStructureInputUsage()
+{
+	return Kerberos::VulkanContext::Get().IsExtensionActive(vk::KHRAccelerationStructureExtensionName)
+		? vk::BufferUsageFlags(vk::BufferUsageFlagBits::eAccelerationStructureBuildInputReadOnlyKHR)
+		: vk::BufferUsageFlags{};
+}
+}
+
 void CreateBuffer(
 	const vk::raii::Device& device,
 	const vk::DeviceSize size,
@@ -61,7 +72,7 @@ VertexBuffer::VertexBuffer(const std::vector<Vertex>& vertices)
 
 	const vk::BufferCreateInfo bufferInfo{
 		.size = bufferSize,
-		.usage = vk::BufferUsageFlagBits::eVertexBuffer | vk::BufferUsageFlagBits::eTransferDst | vk::BufferUsageFlagBits::eShaderDeviceAddress | vk::BufferUsageFlagBits::eAccelerationStructureBuildInputReadOnlyKHR,
+		.usage = vk::BufferUsageFlagBits::eVertexBuffer | vk::BufferUsageFlagBits::eTransferDst | vk::BufferUsageFlagBits::eShaderDeviceAddress | AccelerationStructureInputUsage(),
 		.sharingMode = vk::SharingMode::eExclusive
 	};
 	m_Buffer = vk::raii::Buffer(device, bufferInfo);
@@ -105,7 +116,7 @@ IndexBuffer::IndexBuffer(const std::vector<uint32_t>& indices)
 	stagingBufferMemory.unmapMemory();
 
 	CreateBuffer(device, bufferSize,
-				 vk::BufferUsageFlagBits::eTransferDst | vk::BufferUsageFlagBits::eIndexBuffer | vk::BufferUsageFlagBits::eShaderDeviceAddress | vk::BufferUsageFlagBits::eAccelerationStructureBuildInputReadOnlyKHR,
+				 vk::BufferUsageFlagBits::eTransferDst | vk::BufferUsageFlagBits::eIndexBuffer | vk::BufferUsageFlagBits::eShaderDeviceAddress | AccelerationStructureInputUsage(),
 				 vk::MemoryPropertyFlagBits::eDeviceLocal,
 				 m_Buffer, m_BufferMemory);
 

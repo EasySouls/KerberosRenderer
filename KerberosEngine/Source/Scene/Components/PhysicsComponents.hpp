@@ -56,6 +56,7 @@ namespace Kerberos
 		glm::vec3 Size = glm::vec3(1.0f);
 		glm::vec3 Offset = glm::vec3(0.0f);
 		bool IsTrigger = false;
+		bool Enabled = true;
 
 		// Pointer to the physics engine's runtime collider
 		void* RuntimeCollider = nullptr;
@@ -77,6 +78,7 @@ namespace Kerberos
 		float Radius = 1.0f;
 		glm::vec3 Offset = glm::vec3(0.0f);
 		bool IsTrigger = false;
+		bool Enabled = true;
 
 		// Pointer to the physics engine's runtime collider
 		void* RuntimeCollider = nullptr;
@@ -99,6 +101,7 @@ namespace Kerberos
 		float Height = 1.0f;
 		glm::vec3 Offset = glm::vec3(0.0f);
 		bool IsTrigger = false;
+		bool Enabled = true;
 
 		// Pointer to the physics engine's runtime collider
 		void* RuntimeCollider = nullptr;
@@ -120,6 +123,7 @@ namespace Kerberos
 		Ref<Mesh> Mesh = nullptr;
 		glm::vec3 Offset = glm::vec3(0.0f);
 		bool IsTrigger = false;
+		bool Enabled = true;
 		// Pointer to the physics engine's runtime collider
 		void* RuntimeCollider = nullptr;
 

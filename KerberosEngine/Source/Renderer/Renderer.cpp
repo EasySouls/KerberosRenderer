@@ -24,6 +24,9 @@
 #include "Profiling/Profilers.hpp"
 #include "Upscaling/FSR/FSR3Upscaler.hpp"
 #include "Upscaling/Native/NativeUpscaler.hpp"
+#include "Animation/AnimationSystem.hpp"
+#include "Animation/SkinningSystem.hpp"
+#include "Scene/Components/AnimationComponents.hpp"
 
 #include <glm/gtc/matrix_inverse.hpp>
 
@@ -498,6 +501,9 @@ struct RendererData
     RayTracingSceneCache RayTracingCache{};
     ParticleSystem ParticleSystem{};
     GrassSystem GrassSystem{};
+    AnimationSystem AnimationSystem{};
+    SkinningSystem SkinningSystem{};
+    const Scene* LastRenderedScene = nullptr;
 
     /**
      * Size of the viewport, and the final image presented to the swapchain
@@ -634,6 +640,8 @@ void Renderer::Shutdown()
     }
     
     s_Data->Upscaler->Release();
+    s_Data->SkinningSystem.Shutdown();
+    s_Data->AnimationSystem.Shutdown();
 
     s_Data.reset();
     s_Data = nullptr;
@@ -864,7 +872,7 @@ void Renderer::RenderPrePass(const vk::raii::CommandBuffer& cmd, const uint32_t 
             { s_Data->DescriptorSets[currentImage].scene, s_Data->TextureManager.GetGlobalDescriptorSet() },
             { dynamicOffset });
 
-        renderObject.Mesh->Draw(cmd);
+        RenderMesh(cmd, renderObject);
     }
 
     cmd.endRendering();
@@ -1088,7 +1096,7 @@ void Renderer::RenderOpaque(const vk::raii::CommandBuffer& cmd,
     }
     
     {
-        if (s_Data->UseRayQueryBasedShadows) {
+        if (s_Data->UseRayQueryBasedShadows && s_Data->PBRRayQueryShadowsPipeline) {
             const auto& pipeline = GetUseRayQueryBasedSoftShadows() ? s_Data->PBRRayQuerySoftShadowsPipeline
                                        : s_Data->PBRRayQueryShadowsPipeline;
             pipeline->Bind(cmd);
@@ -1112,7 +1120,7 @@ void Renderer::RenderOpaque(const vk::raii::CommandBuffer& cmd,
                 { s_Data->DescriptorSets[currentImage].scene, s_Data->TextureManager.GetGlobalDescriptorSet() },
                 { dynamicOffset });
     
-            renderObject.Mesh->Draw(cmd);
+            RenderMesh(cmd, renderObject);
         }
     }
     
@@ -1128,7 +1136,7 @@ void Renderer::RenderOpaque(const vk::raii::CommandBuffer& cmd,
                                    { s_Data->DescriptorSets[currentImage].scene },
                                    { dynamicOffset });
     
-            renderObject.Mesh->Draw(cmd);
+            RenderMesh(cmd, renderObject);
         }
     }
     
@@ -1216,7 +1224,7 @@ void Renderer::RenderTransparent(const vk::raii::CommandBuffer& cmd,
             { s_Data->DescriptorSets[currentImage].scene, s_Data->TextureManager.GetGlobalDescriptorSet() },
             { dynamicOffset });
 
-        renderObject.Mesh->Draw(cmd);
+        RenderMesh(cmd, renderObject);
     }
 
     cmd.endRendering();
@@ -1384,7 +1392,19 @@ void Renderer::RecordQueuedSceneRender(const vk::raii::CommandBuffer& cmd)
     std::array<std::byte, frameArenaSize> frameArenaBuffer;
     std::pmr::monotonic_buffer_resource frameArena(frameArenaBuffer.data(), frameArenaBuffer.size());
 
+    if (s_Data->LastRenderedScene != s_Data->PendingRender.Scene.get())
+    {
+        s_Data->AnimationSystem.Reset();
+        s_Data->SkinningSystem.Reset();
+        s_Data->LastRenderedScene = s_Data->PendingRender.Scene.get();
+    }
+
+    s_Data->AnimationSystem.BeginFrame(s_Data->PendingRender.Scene, frameIndex);
+    s_Data->SkinningSystem.BeginFrame(s_Data->PendingRender.Scene, s_Data->AnimationSystem.GetSkinningSnapshot(), frameIndex);
+
     if (IsUsingAccelerationStructures()) {
+        // TODO: This should happen after animation and skinning passes, so that the acceleration structures are built
+        // with the final vertex positions.
         s_Data->RayTracingCache.BuildAccelerationStructures(s_Data->PendingRender.Scene, cmd, frameIndex);
 
         const auto& tlas = s_Data->RayTracingCache.GetTLAS(frameIndex);
@@ -1409,7 +1429,7 @@ void Renderer::RecordQueuedSceneRender(const vk::raii::CommandBuffer& cmd)
 
     // Update all per-object uniform buffers once
     for (const auto& renderObject : allObjects) {
-        const auto& [Transform, Mesh, Material, EntityID, WorldAABB, UBOIndex, DebugName] = renderObject;
+        const auto& [Transform, Mesh, Material, EntityID, WorldAABB, UBOIndex, Skinned, DebugName] = renderObject;
 
         Ref<Kerberos::Material> material = Material;
         if (material == nullptr)
@@ -1769,7 +1789,7 @@ void Renderer::CreateResources()
 
     constexpr vk::DeviceSize colliderLineBufferSize = sizeof(LineVertex) * ColliderDebugHelpers::ColliderDebugMaxVertices;
     for (auto& [Buffer, Memory, MappedData] : s_Data->ColliderLineBuffers) {
-        CreateBuffer(device,
+        ::CreateBuffer(device,
                      colliderLineBufferSize,
                      vk::BufferUsageFlagBits::eVertexBuffer,
                      vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent,
@@ -1834,7 +1854,12 @@ void Renderer::CreateResources()
         };
 
         s_Data->MeshPipelineStatisticsQueryPools.clear();
-        s_Data->MeshPipelineStatisticsQueryPools.reserve(context.GetMaxFramesInFlight());
+        // Task/mesh statistics flags are only valid when the mesh shader extension and its query feature are
+        // enabled, so the pool is skipped on devices without mesh shaders (e.g. integrated GPUs).
+        const bool supportsMeshPipelineStatistics = context.SupportsMeshShaders();
+        if (supportsMeshPipelineStatistics) {
+            s_Data->MeshPipelineStatisticsQueryPools.reserve(context.GetMaxFramesInFlight());
+        }
 
         constexpr vk::QueryPoolCreateInfo meshQueryPoolInfo{
             .flags = {}, // vk::QueryPoolCreateFlagBits::eResetKHR,
@@ -1854,12 +1879,15 @@ void Renderer::CreateResources()
                 // first render to reset it
                 cmd.resetQueryPool(s_Data->PipelineStatisticsQueryPools.back(), 0, 2);
 
-                s_Data->MeshPipelineStatisticsQueryPools.emplace_back(device, meshQueryPoolInfo);
-                context.SetObjectDebugName(s_Data->MeshPipelineStatisticsQueryPools.back(),
-                                           "Renderer Mesh Pipeline Statistics Query Pool[" + std::to_string(i) + "]");
-                // Reset query pool at the beginning so that we can immediately start using it without waiting for the
-                // first render to reset it
-                cmd.resetQueryPool(s_Data->MeshPipelineStatisticsQueryPools.back(), 0, 1);
+                if (supportsMeshPipelineStatistics) {
+                    s_Data->MeshPipelineStatisticsQueryPools.emplace_back(device, meshQueryPoolInfo);
+                    context.SetObjectDebugName(
+                        s_Data->MeshPipelineStatisticsQueryPools.back(),
+                        "Renderer Mesh Pipeline Statistics Query Pool[" + std::to_string(i) + "]");
+                    // Reset query pool at the beginning so that we can immediately start using it without waiting for
+                    // the first render to reset it
+                    cmd.resetQueryPool(s_Data->MeshPipelineStatisticsQueryPools.back(), 0, 1);
+                }
             }
         });
     }
@@ -2509,27 +2537,38 @@ void Renderer::CreateResources()
         opaquePipelineSpec.Name = "PBR Opaque Pipeline with PCF Shadows";
         s_Data->PBROpaquePipelinePCF = CreateRef<GraphicsPipeline>(opaquePipelineSpec);
 
-        Ref<Shader> pbrRayQueryShadowsShader = CreateRef<Shader>("pbr_ray_query_shadows", "PBR Ray Query Shadows");
+        if (context.SupportsRayTracing()) {
+            Ref<Shader> pbrRayQueryShadowsShader =
+                CreateRef<Shader>("pbr_ray_query_shadows", "PBR Ray Query Shadows");
 
-        uint32_t enableRayQuerySoftShadows = 0;
-        vk::SpecializationMapEntry rayQuerySoftShadowsSpecializationMapEntry{ .constantID = 0,
-                                                                              .offset = 0,
-                                                                              .size = sizeof(uint32_t) };
-        vk::SpecializationInfo rayQuerySoftShadowsSpecializationInfo{ .mapEntryCount = 1,
-                                                                      .pMapEntries =
-                                                                          &rayQuerySoftShadowsSpecializationMapEntry,
-                                                                      .dataSize = sizeof(uint32_t),
-                                                                      .pData = &enableRayQuerySoftShadows };
+            uint32_t enableRayQuerySoftShadows = 0;
+            vk::SpecializationMapEntry rayQuerySoftShadowsSpecializationMapEntry{ .constantID = 0,
+                                                                                  .offset = 0,
+                                                                                  .size = sizeof(uint32_t) };
+            vk::SpecializationInfo rayQuerySoftShadowsSpecializationInfo{ .mapEntryCount = 1,
+                                                                          .pMapEntries =
+                                                                              &rayQuerySoftShadowsSpecializationMapEntry,
+                                                                          .dataSize = sizeof(uint32_t),
+                                                                          .pData = &enableRayQuerySoftShadows };
 
-        opaquePipelineSpec.Name = "PBR Ray Query Shadows Pipeline";
-        opaquePipelineSpec.Shader = pbrRayQueryShadowsShader;
-        opaquePipelineSpec.SpecializationMapEntries = { { vk::ShaderStageFlagBits::eFragment,
-                                                          rayQuerySoftShadowsSpecializationInfo } };
-        s_Data->PBRRayQueryShadowsPipeline = CreateRef<GraphicsPipeline>(opaquePipelineSpec);
+            opaquePipelineSpec.Name = "PBR Ray Query Shadows Pipeline";
+            opaquePipelineSpec.Shader = pbrRayQueryShadowsShader;
+            opaquePipelineSpec.SpecializationMapEntries = { { vk::ShaderStageFlagBits::eFragment,
+                                                              rayQuerySoftShadowsSpecializationInfo } };
+            s_Data->PBRRayQueryShadowsPipeline = CreateRef<GraphicsPipeline>(opaquePipelineSpec);
 
-        enableRayQuerySoftShadows = 1;
-        opaquePipelineSpec.Name = "PBR Ray Query Soft Shadows Pipeline";
-        s_Data->PBRRayQuerySoftShadowsPipeline = CreateRef<GraphicsPipeline>(opaquePipelineSpec);
+            enableRayQuerySoftShadows = 1;
+            opaquePipelineSpec.Name = "PBR Ray Query Soft Shadows Pipeline";
+            s_Data->PBRRayQuerySoftShadowsPipeline = CreateRef<GraphicsPipeline>(opaquePipelineSpec);
+        }
+        else {
+            Log::CoreWarn("Ray query based shadows disabled: the device does not provide acceleration structures "
+                          "and ray queries");
+            s_Data->PBRRayQueryShadowsPipeline = nullptr;
+            s_Data->PBRRayQuerySoftShadowsPipeline = nullptr;
+            s_Data->UseRayQueryBasedShadows = false;
+            s_Data->UseRayQueryBasedSoftShadows = false;
+        }
 
         Ref<Shader> normalDebugShader = CreateRef<Shader>("normaldebug", "NormalDebug");
 
@@ -2584,6 +2623,11 @@ void Renderer::CreateResources()
 
         s_Data->SkyboxPipeline = CreateRef<GraphicsPipeline>(skyboxPipelineSpec);
     }
+
+    s_Data->AnimationSystem.Initialize(s_Data->PersistentDescriptorAllocator);
+    s_Data->SkinningSystem.Initialize(s_Data->PersistentDescriptorAllocator,
+                                      s_Data->AnimationSystem.GetSkinMatricesBufferHandles(),
+                                      s_Data->AnimationSystem.GetSkinMatricesBufferSizes());
 
     s_Data->ParticleSystem.Initialize(s_Data->ColorImage.Format,
                                       s_Data->DepthImage.Format,
@@ -3082,7 +3126,7 @@ void Renderer::CreateResources()
 
     for (uint32_t i = 0; i < Renderer::MousePickingReadbackFrameLag; ++i) {
         auto& slot = s_Data->MousePickingReadback.Slots[i];
-        CreateBuffer(device,
+        ::CreateBuffer(device,
                      sizeof(uint32_t),
                      vk::BufferUsageFlagBits::eTransferDst,
                      vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent,
@@ -3714,6 +3758,10 @@ void Renderer::RecompileShaders()
         smaaBlendPipeline->Recompile();
     if (const auto& smaaNeighborhoodPipeline = s_Data->SMAAResources.NeighborhoodBlendingPipeline)
         smaaNeighborhoodPipeline->Recompile();
+
+    s_Data->AnimationSystem.RecompileShaders();
+    s_Data->ParticleSystem.RecompileShaders();
+    s_Data->SkinningSystem.RecompileShaders();
 }
 
 glm::vec3 Renderer::GetLightPositionForShadowMapCalculation()
@@ -4109,12 +4157,14 @@ void Renderer::ResetQueryPools(const vk::raii::CommandBuffer& cmd, const uint32_
 
         cmd.resetQueryPool(s_Data->PipelineStatisticsQueryPools[frameIndex], 0, 2);
 
-        KBRAssert(frameIndex < s_Data->MeshPipelineStatisticsQueryPools.size(),
-                        "Current frame index exceeds Mesh Pipeline Statistics Query Pools size!");
-        KBRAssert(s_Data->MeshPipelineStatisticsQueryPools[frameIndex] != nullptr,
-                        "Mesh Pipeline Statistics Query Pool for current frame is null!");
+        if (!s_Data->MeshPipelineStatisticsQueryPools.empty()) {
+            KBRAssert(frameIndex < s_Data->MeshPipelineStatisticsQueryPools.size(),
+                      "Current frame index exceeds Mesh Pipeline Statistics Query Pools size!");
+            KBRAssert(s_Data->MeshPipelineStatisticsQueryPools[frameIndex] != nullptr,
+                      "Mesh Pipeline Statistics Query Pool for current frame is null!");
 
-        cmd.resetQueryPool(s_Data->MeshPipelineStatisticsQueryPools[frameIndex], 0, 1);
+            cmd.resetQueryPool(s_Data->MeshPipelineStatisticsQueryPools[frameIndex], 0, 1);
+        }
     }
 }
 
@@ -4129,11 +4179,6 @@ void Renderer::ResolvePipelineStatistics(const uint32_t frameIndex)
                     "Current frame index exceeds Pipeline Statistics Query Pools size!");
     KBRAssert(s_Data->PipelineStatisticsQueryPools[frameIndex] != nullptr,
                     "Pipeline Statistics Query Pool for current frame is null!");
-
-    KBRAssert(frameIndex < s_Data->MeshPipelineStatisticsQueryPools.size(),
-                    "Current frame index exceeds Mesh Pipeline Statistics Query Pools size!");
-    KBRAssert(s_Data->MeshPipelineStatisticsQueryPools[frameIndex] != nullptr,
-                    "Mesh Pipeline Statistics Query Pool for current frame is null!");
 
     // Traditional pipeline statistics
 
@@ -4163,6 +4208,9 @@ void Renderer::ResolvePipelineStatistics(const uint32_t frameIndex)
     s_Data->LatestPipelineStatistics.FragmentShaderInvocations = results[3] + results[7];
 
     // Mesh pipeline statistics
+    if (s_Data->MeshPipelineStatisticsQueryPools.empty())
+        return;
+
     constexpr uint32_t statisticsPerMeshQuery = 3;
     constexpr uint32_t totalMeshStatisticsCount = statisticsPerMeshQuery * 1;
     std::array<uint64_t, totalMeshStatisticsCount> meshResults{};
@@ -4415,6 +4463,49 @@ std::pair<std::pmr::vector<RenderObject>, std::pmr::set<Ref<Material>>> Renderer
         renderObject.DebugName = meshView.get<TagComponent>(entity).Tag;
 
         renderObject.WorldAABB = CalculateWorldAABB(staticMesh.StaticMesh->GetBoundingBox(), renderObject.Transform);
+
+        renderObject.UBOIndex = entityCount++;
+
+        renderObjects.push_back(renderObject);
+        if (renderObject.Material)
+            uniqueMaterials.insert(renderObject.Material);
+    }
+
+    const auto skinnedView = scene.m_Registry.view<TransformComponent, SkinnedMeshComponent, TagComponent>();
+    for (const auto entity : skinnedView) {
+        auto& transform = skinnedView.get<TransformComponent>(entity);
+        auto& skinnedMesh = skinnedView.get<SkinnedMeshComponent>(entity);
+        if (!skinnedMesh.Visible || !skinnedMesh.Mesh)
+            continue;
+
+        RenderObject renderObject{};
+        renderObject.Transform = transform.WorldTransform;
+        renderObject.Material = skinnedMesh.Material;
+        renderObject.EntityID = static_cast<uint32_t>(entity);
+        renderObject.DebugName = skinnedView.get<TagComponent>(entity).Tag;
+
+        renderObject.WorldAABB = CalculateWorldAABB(skinnedMesh.Mesh->GetBoundingBox(), renderObject.Transform);
+
+        const UUID entityUUID = scene.m_Registry.get<IDComponent>(entity).ID;
+        const std::optional<SkinnedDrawView> skinnedMeshDataOpt = s_Data->SkinningSystem.FindMesh(entityUUID);
+        if (!skinnedMeshDataOpt.has_value())
+        {
+            Log::CoreWarn("Skipping skinned mesh render object for entity {}: no runtime skinning instance",
+                          static_cast<uint32_t>(entity));
+            continue;
+        }
+
+        const SkinnedDrawView skinnedMeshData = skinnedMeshDataOpt.value();
+
+        renderObject.Skinned = SkinnedDraw{
+            .VertexBuffer = skinnedMeshData.VertexBuffer,
+            .VertexOffset = skinnedMeshData.VertexOffsetBytes,
+            .VertexCount = skinnedMeshData.VertexCount,
+            .IndexBuffer = skinnedMeshData.IndexBuffer,
+            .IndexOffset = skinnedMeshData.IndexOffsetBytes,
+            .IndexCount = skinnedMeshData.IndexCount,
+            .SkinVersion = skinnedMeshData.SkinVersion
+        };
 
         renderObject.UBOIndex = entityCount++;
 
@@ -4691,6 +4782,9 @@ void Renderer::CompileAndExecuteRenderGraph(const vk::raii::CommandBuffer& cmd,
         const auto hOutput = s_Data->RenderGraph.ImportImage(*s_Data->OutputImage.Image, outputState, colorRange);
         const auto hFinal = s_Data->RenderGraph.ImportImage(*s_Data->FinalImage.Image, finalState, colorRange);
 
+        s_Data->AnimationSystem.AddPasses(s_Data->RenderGraph, frameIndex);
+        s_Data->SkinningSystem.AddPasses(s_Data->RenderGraph, frameIndex);
+
         s_Data->RenderGraph.AddPass("Depth Pre-Pass", [&](Graph::PassBuilder& builder) -> PassExecuteFunction {
             builder.Write(hDepth,
                           vk::ImageLayout::eDepthAttachmentOptimal,
@@ -4810,15 +4904,22 @@ void Renderer::CompileAndExecuteRenderGraph(const vk::raii::CommandBuffer& cmd,
                           vk::AccessFlagBits2::eDepthStencilAttachmentWrite |
                           vk::AccessFlagBits2::eDepthStencilAttachmentRead);
 
+            const bool grassSupported = s_Data->GrassSystem.IsSupported();
+
             return [=](const vk::raii::CommandBuffer& execCmd)
             {
                 execCmd.endQuery(s_Data->PipelineStatisticsQueryPools[frameIndex], 0);
 
-                execCmd.beginQuery(s_Data->MeshPipelineStatisticsQueryPools[frameIndex], 0, {});
+                // The mesh statistics pool only exists on devices with mesh shaders, and grass rendering also
+                // requires shader objects and descriptor buffers.
+                if (grassSupported)
+                {
+                    execCmd.beginQuery(s_Data->MeshPipelineStatisticsQueryPools[frameIndex], 0, {});
 
-                RenderGrass(execCmd, frameIndex);
+                    RenderGrass(execCmd, frameIndex);
 
-                execCmd.endQuery(s_Data->MeshPipelineStatisticsQueryPools[frameIndex], 0);
+                    execCmd.endQuery(s_Data->MeshPipelineStatisticsQueryPools[frameIndex], 0);
+                }
 
                 execCmd.beginQuery(s_Data->PipelineStatisticsQueryPools[frameIndex], 1, {});
             };
@@ -5135,7 +5236,7 @@ void Renderer::RenderShadowPass(const vk::raii::CommandBuffer& cmd,
                                    { s_Data->DescriptorSets[frameIndex].scene },
                                    { dynamicOffset });
 
-            renderObject.Mesh->Draw(cmd);
+            RenderMesh(cmd, renderObject);
         }
 
         cmd.endRendering();
@@ -6264,6 +6365,21 @@ void Renderer::HandleMousePickingReadback(const vk::raii::CommandBuffer& cmd)
     }
 }
 
+void Renderer::RenderMesh(const vk::raii::CommandBuffer& cmd, const Kerberos::RenderObject& renderObject)
+{
+    if (const auto skinnedMeshDataOpt = renderObject.Skinned)
+    {
+        const SkinnedDraw skinnedDraw = skinnedMeshDataOpt.value();
+        cmd.bindVertexBuffers(0, { skinnedDraw.VertexBuffer }, { skinnedDraw.VertexOffset });
+        cmd.bindIndexBuffer(skinnedDraw.IndexBuffer, skinnedDraw.IndexOffset, vk::IndexType::eUint32);
+        cmd.drawIndexed(skinnedDraw.IndexCount, 1, 0, 0, 0);
+    }
+    else
+    {
+        renderObject.Mesh->Draw(cmd);
+    }
+}
+
 void Renderer::EnqueueDeferredAction(DeferredAction&& action)
 {
     s_Data->DeferredActions.push_back(std::move(action));
@@ -6283,7 +6399,15 @@ void Renderer::ApplyDeferredActions()
 
 bool Renderer::IsUsingAccelerationStructures()
 {
+    if (!VulkanContext::Get().SupportsRayTracing())
+        return false;
+
     return s_Data->UseRayQueryBasedShadows || s_Data->UseRayQueryBasedSoftShadows;
+}
+
+bool Renderer::IsRayTracingSupported()
+{
+    return VulkanContext::Get().SupportsRayTracing();
 }
 
 void Renderer::PrepareUniformBuffers()
@@ -6331,12 +6455,16 @@ void Renderer::SetupDescriptors()
         vk::DescriptorPoolSize{ .type = vk::DescriptorType::eUniformBuffer, .descriptorCount = 10 },
         vk::DescriptorPoolSize{ .type = vk::DescriptorType::eUniformBufferDynamic, .descriptorCount = 10 },
         vk::DescriptorPoolSize{ .type = vk::DescriptorType::eCombinedImageSampler, .descriptorCount = 100 },
-        vk::DescriptorPoolSize{ .type = vk::DescriptorType::eAccelerationStructureKHR, .descriptorCount = 2 },
         vk::DescriptorPoolSize{ .type = vk::DescriptorType::eStorageBuffer, .descriptorCount = 10 },
         vk::DescriptorPoolSize{ .type = vk::DescriptorType::eStorageImage, .descriptorCount = 20 },
         vk::DescriptorPoolSize{ .type = vk::DescriptorType::eSampledImage, .descriptorCount = 20 },
         vk::DescriptorPoolSize{ .type = vk::DescriptorType::eSampler, .descriptorCount = 10 },
     };
+
+    if (context.SupportsRayTracing()) {
+        poolSizes.push_back(
+            vk::DescriptorPoolSize{ .type = vk::DescriptorType::eAccelerationStructureKHR, .descriptorCount = 2 });
+    }
 
     vk::DescriptorPoolCreateInfo poolInfo{ .flags = vk::DescriptorPoolCreateFlagBits::eFreeDescriptorSet,
                                            .maxSets = 200,
@@ -6395,12 +6523,6 @@ void Renderer::SetupDescriptors()
             .descriptorCount = 1,
             .stageFlags = vk::ShaderStageFlagBits::eFragment,
             .pImmutableSamplers = nullptr },
-        vk::DescriptorSetLayoutBinding{ // TLAS
-            .binding = 7,
-            .descriptorType = vk::DescriptorType::eAccelerationStructureKHR,
-            .descriptorCount = 1,
-            .stageFlags = vk::ShaderStageFlagBits::eFragment,
-            .pImmutableSamplers = nullptr },
         vk::DescriptorSetLayoutBinding{ // Light storage buffer
             .binding = 8,
             .descriptorType = vk::DescriptorType::eStorageBuffer,
@@ -6414,6 +6536,17 @@ void Renderer::SetupDescriptors()
             .stageFlags = vk::ShaderStageFlagBits::eFragment,
             .pImmutableSamplers = nullptr },
     };
+
+    // The TLAS binding is only legal when the device enabled VK_KHR_acceleration_structure, so the ray query
+    // pipeline variants (which are the only consumers of binding 7) are created under the same condition.
+    if (context.SupportsRayTracing()) {
+        bindings.push_back(vk::DescriptorSetLayoutBinding{ // TLAS
+            .binding = 7,
+            .descriptorType = vk::DescriptorType::eAccelerationStructureKHR,
+            .descriptorCount = 1,
+            .stageFlags = vk::ShaderStageFlagBits::eFragment,
+            .pImmutableSamplers = nullptr });
+    }
 
     const vk::DescriptorSetLayoutCreateInfo layoutInfo{ .bindingCount = static_cast<uint32_t>(bindings.size()),
                                                         .pBindings = bindings.data() };
@@ -7600,7 +7733,7 @@ void Renderer::CreateSMAATextures()
                          const std::string& debugName) {
         vk::raii::Buffer stagingBuffer = nullptr;
         vk::raii::DeviceMemory stagingMemory = nullptr;
-        CreateBuffer(device,
+        ::CreateBuffer(device,
                      size,
                      vk::BufferUsageFlagBits::eTransferSrc,
                      vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent,

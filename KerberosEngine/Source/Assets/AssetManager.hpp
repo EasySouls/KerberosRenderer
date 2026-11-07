@@ -64,6 +64,11 @@ public:
 		return Project::GetActive()->GetAssetManager()->IsAssetHandleValid(handle);
 	}
 
+	static bool IsAssetLoaded(const AssetHandle handle)
+	{
+		return Project::GetActive()->GetAssetManager()->IsAssetLoaded(handle);
+	}
+
 	static const AssetRegistry& GetAssetRegistry()
 	{
 		return Project::GetActive()->GetAssetManager()->GetAssetRegistry();
@@ -73,8 +78,6 @@ public:
 	{
 		return Project::GetActive()->GetAssetManager()->GetAssetsOfType(type);
 	}
-
-	static Ref<Mesh> ResolveMeshAsset(AssetHandle handle);
 
 	static Ref<Texture2D> GetDefaultTexture2D();
 	static Ref<Mesh> GetDefaultCubeMesh();

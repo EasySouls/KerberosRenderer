@@ -51,6 +51,29 @@ Dedicated compute/transfer queues may be selected, while optional descriptor
 buffer, mesh shader, shader object, ray query, and acceleration-structure
 features are enabled when available.
 
+Optional extensions are enabled whenever the physical device advertises them,
+so subsystems that need one must gate on capability, not on the extension
+being compiled in. `VulkanContext::IsExtensionActive`/`UseDescriptorBuffers`
+answers that for the active device, and `SupportsMeshShaders`,
+`SupportsShaderObjects`, and `SupportsRayTracing` also check the enabled
+features. Creating a layout, pipeline, query pool, or buffer usage that belongs
+to a disabled extension is invalid Vulkan (and aborts on drivers that lack the
+entry point), so:
+
+- grass (`GrassSystem::IsSupportedByDevice`) needs mesh shaders, shader objects,
+  and descriptor buffers; otherwise `Init` logs and skips and `RecordDraw` is a
+  no-op;
+- task/mesh pipeline-statistics query pools are only created with mesh shaders,
+  and the reset/resolve paths tolerate their absence;
+- the ray-query PBR pipelines, the scene set's TLAS binding (7), the
+  acceleration-structure pool entry, and the TLAS descriptor write only exist
+  when ray tracing is supported, and `Renderer::IsUsingAccelerationStructures`
+  reports false otherwise (the editor disables the toggle through
+  `Renderer::IsRayTracingSupported`);
+- vertex/index buffers only request
+  `ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_KHR` when the acceleration
+  structure extension is active.
+
 Swapchain format/present-mode selection and image-count rules live in
 `VulkanContext.cpp`. Swapchain recreation rebuilds swapchain-owned views,
 color, and depth resources, but does not recreate renderer-owned offscreen
@@ -75,20 +98,34 @@ the next frame.
 
 The active pass order is approximately:
 
-1. depth pre-pass
-2. shadows
-3. GTAO
-4. opaque
-5. particles
-6. grass
-7. transparent
-8. transparency resolve
-9. bloom
-10. anti-aliasing
-11. upscaling
-12. tonemapping
-13. presentation
-14. mouse picking
+1. skinning (skinned meshes; CPU animation evaluation happens earlier in
+   `Scene::AnimationRuntime` and the skin-matrix upload happens in
+   `AnimationSystem::BeginFrame`)
+2. depth pre-pass
+3. shadows
+4. GTAO
+5. opaque
+6. particles
+7. grass
+8. transparent
+9. transparency resolve
+10. bloom
+11. anti-aliasing
+12. upscaling
+13. tonemapping
+14. presentation
+15. mouse picking
+
+The skinning pass is added before the depth pre-pass; animation has no graph
+pass because pose evaluation happens on the CPU in `Scene::AnimationRuntime` and
+the skin-matrix upload happens on the CPU in `AnimationSystem::BeginFrame`. The
+skinning pass currently ends with an explicit
+compute-write to vertex-read barrier because the SVB is bound directly by raster
+passes and is not declared as a render-graph resource.
+
+The grass pass is always registered so the pipeline-statistics query split
+(`query 0` ends, `query 1` begins) stays balanced, but its mesh-statistics query
+and the grass draw only run when grass is supported on the device.
 
 When FSR3 is active, the spatial anti-aliasing pass is skipped and FSR3
 consumes the pre-AA HDR resolve so its internal temporal history receives the
@@ -116,6 +153,18 @@ Renderer resources must remain alive until all submitted frames that use them
 complete. Deferred renderer actions currently use a device-wide wait to make
 resource mutation safe; preserve that guarantee unless introducing explicit
 per-resource synchronization.
+
+`DescriptorAllocator` (persistent and per-frame slots) owns every descriptor
+set it hands out: sets are allocated from its pool and ownership stays with
+that pool, so `ShaderResourceSet::DescriptorSet` is a non-owning handle. Do not
+wrap the result of `allocateDescriptorSets` in a temporary RAII handle that is
+destroyed at the end of the statement; the set would be freed immediately.
+`Reset()` destroys the pool contents, so a set from a frame slot is only valid
+for that frame slot. `DescriptorAllocator` has two backends: descriptor buffers
+(`VK_EXT_descriptor_buffer`, bump-allocated from a mapped buffer, `BufferAddress`
+/`BufferOffset`/`MappedData`) and traditional descriptor sets (`DescriptorSet`, a
+pool). GPUs without descriptor-buffer support take the traditional path, so both
+paths must stay exercised.
 
 Buffers use a mixture of device-local staging allocations and persistently
 mapped host-visible uniform/storage buffers. Images/textures own their Vulkan
@@ -182,6 +231,313 @@ swapchain/viewport resize, frame synchronization, graph barriers/layouts,
 descriptor lifetime, and shader compilation. Keep this file updated whenever
 renderer ownership, pass order, synchronization, resource lifetime, or
 validation procedures change.
+
+# Animation and skinning context
+
+## Ownership
+
+`Scene::AnimationRuntime` (`Scene/AnimationRuntime.*`) owns the authoritative CPU
+animation state: per-skeleton-instance pose data, resolved clips, playback
+clocks, pose versions, and the future marker/event/ragdoll/IK state. It is a
+value member of `Scene`, so every scene owns its own runtime and the renderer
+never drives playback.
+
+`AnimationSystem` (`Renderer/Animation/AnimationSystem.*`) is the GPU upload
+bridge. It owns one host-visible skin-matrix buffer per frame in flight, one GPU
+slice per skeleton instance, and publishes a `SkinningFrameSnapshot`
+(per-instance `SkeletonFrame` records). `BeginFrame(scene, frameIndex)` reads
+`scene->GetAnimationRuntime().GetInstances()`, uploads changed poses for that
+frame slot, and never advances time or evaluates animation. The snapshot buffer
+field mirrors the current frame's buffer, but `SkinningSystem` binds its own
+per-frame descriptor set.
+
+`AnimationEvaluator` (`Renderer/Animation/AnimationEvaluator.*`) is the pure CPU
+pose layer: `BuildClipTrackCache` maps a clip to a skeleton, `SampleTrack`
+implements `STEP`/`LINEAR`/`CUBICSPLINE`, `EvaluatePose` produces local TRS,
+and `ComputeGlobalAndSkinMatrices` derives globals and skin matrices.
+`EvaluatePoseLocal`/`EvaluateRestPoseLocal` produce local-only poses for
+composition, `BlendPose` blends two local poses (translation/scale mix,
+shortest-path slerp, dominant-pose fallback on joint-count mismatch),
+`AccumulatePose` is the normalized weighted average used for layered
+composition, and `ComputeCrossFadeWeight` owns elapsed/duration clamping.
+`AdvancePlaybackTime` owns loop/clamp/stop semantics. Keep it Vulkan-free so it
+stays unit-testable.
+
+`AnimationClip` carries sorted `AnimationMarker` and `AnimationEvent` data
+loaded from the native clip. Events carry an optional list of named typed
+`AnimationEventParameter` values (`Bool`, `Int`, `Float`, `Vector3`, `String`,
+`Asset`); the engine does not interpret the names, games do. `AnimationEvaluator`
+exposes pure helpers for playback spans, point-event crossing, wrapped duration
+windows, and `MinTriggerWeight` filtering. `AnimationRuntime::AdvanceClocks`
+collects `DispatchedAnimationEvent` records; `Scene::DispatchAnimationEvents`
+validates and dispatches them before scripts in Play mode. The managed
+`AnimationEvent` exposes the parameter list plus `GetBool`/`GetInt`/`GetFloat`/
+`GetVector3`/`GetString`/`GetAsset` helpers. Duration events use
+`Begin`/`Tick`/`End`; point events use `Point`. Reverse playback suppresses
+events, and `AnimatorComponent::PlaybackRevision` suppresses point events across
+time jumps. Active duration windows are closed with `End` when playback is
+interrupted by a clip switch, revision jump, stop, skeleton replacement, reverse
+playback, or natural clip end; each clip playback state keeps its own clip
+reference so cleanup can still be delivered after a reload.
+
+Cross-fades keep a `Current` and `Previous` `ClipPlaybackState`, each with its
+own clock, weight, and duration-event windows. The incoming clip's weight rises
+from 0 to 1 while the outgoing clip's weight falls; point and duration events are
+filtered by that contributing weight, and the outgoing clip stops emitting once
+its weight reaches zero. The fade completes when the incoming weight reaches 1,
+which closes any remaining outgoing windows and drops the previous state.
+Interrupting an in-flight cross-fade snapshots the current composed pose and
+starts the new fade from that snapshot instead of the old raw clip. Direct
+`Play`/`SetActiveClip` changes snap; only `CrossFade` blends. Requests are
+delivered through the transient `AnimatorComponent::PendingCrossFadeClip`/
+`PendingCrossFadeDuration`/`PendingCrossFadeRestart` fields and consumed by the
+runtime. Timeline authoring lives in the editor's Animation Editor panel, which
+edits the source `.meta` markers/events/parameters and reimports the clip on
+save; the runtime itself never edits authored event data.
+
+Entities use `SkeletonComponent` for the skeleton instance and joint list,
+`JointComponent` for joint ordering, `SkinnedMeshComponent` for the mesh /
+skeleton-entity link, `AnimatorComponent` for the skeleton-entity reference,
+clip handles, and playback state, and `SocketComponent` to attach an entity to
+a named joint.
+
+## Sockets and pose authority
+
+Each `AnimationInstance` carries `AnimationPose.Local` (the composed clip layer)
+and `FinalPose` (the authoritative final pose after physics/IK). Consumers read
+`FinalPose`; `AnimationPose` is retained for cross-fade snapshots and future
+ragdoll blending. The CPU `SkeletonPose` remains authoritative. Pose publication
+writes derived entity transforms, never authored local TRS, so `JointComponent`
+entities stay rest-authored. `AnimationRuntime::UpdateJointTransforms` writes each joint
+entity's `WorldTransform` from the pose's global matrices and then propagates
+that world transform through non-skeletal descendants such as weapons, props, or
+garment pieces parented under a joint. The propagation skips nested joints,
+skinned meshes, and sockets because those have their own drivers. The pose's
+global space is anchored to a skinned mesh bound to the skeleton when one
+exists; otherwise the skeleton entity's world is used after removing its rest
+transform when the skeleton entity is itself a joint. This is what keeps rigid
+attachments in the hand of an animated character instead of leaving them at the
+bind-pose location.
+
+A socket is a derived attachment, not a second animation source:
+`SocketComponent` stores the target skeleton entity, joint name, and local
+offset, while `AnimationRuntime::UpdateSockets` resolves the joint through
+`Skeleton::GetJointIndex` and writes the attached entity's `WorldTransform`
+from the published joint world transform times `localOffset`. Authored
+translation/rotation/scale are never overwritten; child transforms are
+recalculated from the socket world transform. Joint and socket transforms update
+after each pose evaluation and again in `FinalizePose`, so event handlers and
+scripts see the current attachment before physics and the renderer sees the
+final post-physics pose. Socket-derived transforms currently update rendering
+and hierarchy only; moving a physics body with a socket-attached entity requires
+an explicit kinematic body update. Kinematic rigid bodies are moved from their
+`TransformComponent` world transform immediately before each Jolt step, while
+only dynamic bodies are read back into entity transforms. Collider components
+expose `IsTrigger` and `Enabled`, and the C# API supports body type, mass,
+gravity, friction, restitution, angular velocity, collider shape/offset, and
+trigger/enabled changes. Changing these marks the owning rigid body dirty; the
+physics system rebuilds the body on the next update. The physics facade also
+exposes standalone body creation, motion/transform/velocity access, swing-twist
+constraints (used by the ragdoll), and one-shot `OverlapBox`/`OverlapSphere`
+queries. Overlap queries return unique entities with contact point/normal, do
+not require a collider component, and are exposed to C# as
+`Physics.OverlapBox`/`Physics.OverlapSphere`; the entity-relative overloads use
+the entity's world transform, which makes them suitable for socket-driven
+weapon hitboxes.
+
+## Ragdoll physics
+
+`Scene::RagdollSystem` (`Scene/RagdollSystem.*`) owns the runtime bodies and
+constraints for each `RagdollComponent`. The component stores only authored
+setup (skeleton entity, blend duration, start-in-ragdoll, joint radius scale);
+the system owns body/constraint handles, per-joint offsets, and blend state.
+
+Each joint gets one proxy body: a capsule spanning the parent-to-joint segment
+(or a sphere for a root or zero-length joint). The joint transform relative to
+its proxy body is captured at creation, so a rigid proxy does not stretch when
+the animation stretches a bone, but its joint end still tracks the pose. While
+`Animated`, the proxies are kinematic: `RagdollSystem::PreparePhysics` computes
+target body transforms from the authoritative `FinalPose`, moves the proxies,
+and records those transforms for velocity handoff.
+
+Enabling the ragdoll creates swing-twist constraints from the current pose,
+transfers linear/angular velocities from the previous animated frame, switches
+the proxies to dynamic, and ramps `BlendWeight` from 0 to 1.
+`ReadPhysicsPose` runs after `PhysicsSystem::Update`, reads the body
+transforms, converts them from world space into the skeleton's model space
+through `AnimationRuntime::TryGetSkeletonWorldTransform`, builds a local joint
+pose, and calls `AnimationRuntime::ApplyRagdollPose`. That blends the physics
+local pose with `AnimationPose` using `BlendPose` (the weight is the physics
+contribution), writes the result into `FinalPose`, recomputes globals/skin
+matrices, and bumps `PoseVersion` only when the physics pose or weight actually
+changed. Disabling the ragdoll ramps the weight back to 0 while physics still
+drives the pose, then destroys the constraints, returns the proxies to
+kinematic motion, and snaps them to the animation pose.
+
+`FinalizePose` runs after the ragdoll readback, so joint entities and sockets
+are published from the ragdoll-blended `FinalPose`. The skeleton pose therefore
+stays authoritative: physics bodies are proxies, and `JointComponent` entity
+transforms are never the source of truth.
+
+The Play/Simulate frame order is: calculate transforms -> animation
+clocks/pose -> events -> scripts -> post-script pose ->
+`RagdollSystem::PreparePhysics` -> `PhysicsSystem::Update` ->
+`RagdollSystem::ReadPhysicsPose` -> `AnimationRuntime::FinalizePose` -> queue
+render. Edit mode does not create or simulate ragdoll bodies.
+
+Ragdoll bodies use a shared Jolt `GroupFilterTable` with 256 subgroups and all
+intra-group pairs disabled. Each ragdoll uses a unique collision group, so its
+own bones do not collide but separate ragdolls still interact with each other
+and with ECS bodies. Ragdoll bodies carry the ragdoll entity UUID as Jolt user
+data, so raycasts and collision events attribute hits to the ragdoll entity.
+
+Animation clocks and events keep advancing while a ragdoll is active so the
+clip can resume during recovery. Gameplay scripts can inspect
+`RagdollComponent::IsRagdoll`/`State` or the blend weight to ignore events that
+should not fire while physics dominates; duration windows are not force-closed
+merely by entering the ragdoll state.
+
+Ragdoll constraints are swing-twist limits selected heuristically from joint
+names (neck/head, shoulder/hip, elbow/knee, otherwise a default). There are no
+authored per-joint limits yet, no world anchor for the root (a ragdoll falls
+freely), no contact-driven hit reactions, no joint motors/IK recovery, and no
+debug proxy drawing. Ragdoll bodies live in world space, so moving the skeleton
+entity while it is ragdolling shifts the simulated pose relative to the model.
+The runtime preallocates per-joint scratch buffers, avoids
+per-frame matrix inversions in readback, creates constraints only while the
+ragdoll is dynamic, and skips pose-version bumps when a sleeping ragdoll is
+unchanged.
+
+The animator replaces the old single-clip `AnimationComponent`; legacy serialized
+animation components are migrated on load. `AnimatorComponent::LoadedClips` is
+transient: `AnimationRuntime` resolves `AnimationClips` through the active asset
+manager when the handle list changes or the cached artifact was evicted by a
+reimport.
+
+## Evaluation and versioning
+
+`Scene::OnUpdateEditor`/`OnUpdateSimulation`/`OnUpdateRuntime` own the frame
+order. Play/Simulate evaluate animation, run scripts, prepare ragdoll proxies,
+step physics, read the ragdoll pose back, then call `FinalizePose`; only then is
+the render queued. The runtime resolves the animator that drives each skeleton
+(same entity first, then `SkeletonEntity`, with a warning when several animators
+target one skeleton). A skeleton with no animator or no resolvable active clip
+stays in its rest pose.
+
+`OnUpdateRuntime` advances clocks and collects events, evaluates a provisional
+pose, dispatches animation events, then runs scripts. It evaluates again after
+scripts when playback state changed, so `Play`/`Stop`/`SetTime`/`CrossFade` from
+C# applies before physics and rendering. A cross-fade request made by a script
+is applied by the post-script evaluation; its fade elapsed time starts advancing
+on the next clock update. `FinalizePose` publishes the already-composed
+`FinalPose` to joint entities and sockets; ragdoll readback happens just before
+it, and future IK/root motion must write into `FinalPose` and bump
+`PoseVersion` before this call. Events are dispatched to
+scripts on the animator entity through `Entity.OnAnimationEvent`; Edit and
+Simulate clear pending events without invoking gameplay scripts. Runtime
+dispatch happens once before scripts and again after the post-script pose
+evaluation so interruption cleanup is not delayed.
+
+Runtime playback state is authored through `AnimatorComponent::PlayOnStart`.
+`Scene::Copy` resets each animator's time, clears resolved clips, and sets
+`IsPlaying` from `PlayOnStart`; `Scene::StartAnimators` applies the same rule on
+`OnRuntimeStart`/`OnSimulationStart`, and `Scene::StopAnimators` resets playback
+on stop. Scripts can override the state after startup.
+
+`AnimationInstance::PoseVersion` is bumped only when the final pose inputs
+change (current/previous clip, either clock, fade weight, animator, or first
+evaluation). Each GPU instance tracks the last version uploaded into each frame
+slot, so a paused instance still initializes a frame slot that has not seen the
+current pose. `SkinningSystem` tracks the same per-frame version and re-dispatches
+only when its slot is stale. Physics/IK changes made in `FinalizePose` must bump
+`PoseVersion`. Renderer `BeginFrame` must run after `FinalizePose`, or skinning
+will use a stale pose.
+
+`SkinningSystem` (`Renderer/Animation/SkinningSystem.*`) owns the global source
+vertex/joint/weight/index buffers, the shared vertex buffer (SVB), the SVB
+region allocator, one skinning descriptor set per frame in flight, and the
+skinning compute pipeline. It consumes the snapshot from `AnimationSystem`; it
+does not resolve or mutate skeleton assets.
+
+`Renderer` owns both systems as value members, calls `BeginFrame` in the order
+Animation → Skinning with the current `frameIndex`, adds the skinning pass
+before the depth pre-pass, and resets both when the rendered scene pointer
+changes.
+
+`RayTracingSceneCache` and physics integration are not wired to the SVB or the
+CPU pose yet.
+
+## Buffers and shader contract
+
+`skinning.slang` bindings:
+
+- 0: `StructuredBuffer<InputVertex>` source vertices (48 B: position, normal,
+  tangent, UV; same layout as `Renderer::Vertex`)
+- 1: `RWStructuredBuffer<OutputVertex>` shared vertex buffer (same 48 B layout)
+- 2: `StructuredBuffer<BoneMatrix>` skin matrices, owned by `AnimationSystem`
+- 3: `StructuredBuffer<uint4>` joint indices
+- 4: `StructuredBuffer<float4>` joint weights
+
+`BoneMatrix` is three explicit `float4` rows (48 B). `SkinningPushConstant`
+carries `sourceFirst`, `outputFirst`, `vertexCount`, `outputByteOffset`,
+`firstSkinMatrix`, and `jointCount`. The shader indexes source data and the
+skin matrix buffer with those offsets; do not bind per-mesh slices at offset 0.
+Weights are normalized defensively in the shader.
+
+The SVB stores model-space vertices. Raster uses the existing per-object model
+matrix; RT and physics, when added, must apply the instance transform to the
+SVB rather than expecting world-space output.
+
+## Current animation limitations
+
+- Pose evaluation and skin-matrix generation are CPU-only. There is no
+  evaluation/precompute compute pass and no GPU pose path yet.
+- Two-clip cross-fades, local-pose composition, ragdoll two-way pose
+  synchronization, event parameter authoring, and the editor event timeline are
+  implemented. Additive layers, root motion, authored per-joint ragdoll limits,
+  and joint motors are not. Marker/event data round-trips from `.meta` through
+  the native clip into `AnimationClip`, and point/duration events dispatch to
+  scripts with per-clip fade weights and typed parameters. `FireInEditor`
+  preview dispatch remains future work.
+- Ragdoll proxies are rigid capsules/spheres created from the pose at the time
+  the ragdoll is first initialized. They do not rescale with bone length, and
+  the root has no anchor, so an enabled ragdoll falls freely.
+- `FinalizePose` publishes `FinalPose` and does not itself modify it; future IK
+  and root motion must write into `FinalPose` and bump `PoseVersion` before it.
+- Only direct per-mesh dispatches are recorded; no indirect dispatch or
+  per-frame job buffer exists.
+- Skeleton skin-matrix slices and SVB regions are bump-allocated and only
+  returned by `Reset()`; there is no per-entity free list yet.
+- The SVB and index buffer do not yet request
+  `ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_KHR`; add it when skinned BLAS
+  support is implemented.
+- Skinned meshes are not added to the TLAS, and acceleration structures are
+  still built before skinning.
+- Gameplay/physics should consume `SkeletonPose`/skin matrices, not the SVB.
+
+## Validation
+
+Build and compile shaders:
+
+```powershell
+cmake --preset vs2026
+cmake --build --preset vs2026-debug
+cd KerberosEditor\Assets\Shaders
+.\compile_shaders.bat
+```
+
+The editor hierarchy window context menu has "Create Skinned Test Mesh", which
+creates a procedural two-bone strip for validating the skinning path without
+glTF import. Validate that it appears in depth/shadow/opaque passes, that resize
+and scene switching do not leave stale instances, and that Vulkan validation
+reports no buffer synchronization errors.
+
+`Tests/AnimationEvaluatorTests.cpp` covers rest poses, step/linear/cubic
+sampling, shortest-path rotation slerp, out-of-range tracks, loop wrapping,
+reverse playback, and zero-duration playback. For the GPU path, validate
+CesiumMan in Edit/Simulate/Play: play, pause, scrub, loop, reverse, clip
+switching, two instances sharing one clip, scene switch, and two frames in
+flight under synchronization validation.
 
 # Particle system context
 

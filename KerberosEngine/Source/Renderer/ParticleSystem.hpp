@@ -54,6 +54,8 @@ public:
 
     void OnResize(uint32_t width, uint32_t height, vk::ImageView depthImageView);
 
+    void RecompileShaders() const;
+
 private:
     void SetupDescriptors();
     void SetupPipelines(vk::Format colorFormat, vk::Format depthFormat, vk::Format reactiveFormat);

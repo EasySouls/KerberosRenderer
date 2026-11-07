@@ -16,7 +16,7 @@ namespace Kerberos
 	class AssetRegistry
 	{
 	public:
-		static constexpr size_t TypeCount = static_cast<size_t>(AssetType::Skin) + 1;
+		static constexpr size_t TypeCount = static_cast<size_t>(AssetType::Count);
 
 		AssetMetadata& Get(AssetHandle handle);
 		const AssetMetadata& Get(AssetHandle handle) const;

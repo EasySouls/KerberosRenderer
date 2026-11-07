@@ -11,15 +11,16 @@
 
 namespace Kerberos {
 
-		class GLTFPipelineImporter final : public IAssetImporter
-		{
-		public:
-			bool SupportsExtension(std::string_view extension) const override;
+	class GLTFPipelineImporter final : public IAssetImporter
+	{
+	public:
+		bool SupportsExtension(std::string_view extension) const override;
 
-			ImportResult Import(const ImportContext& context) override;
+		ImportResult Import(const ImportContext& context) override;
 
-			ImporterType Type() const override;
-			uint32_t Version() const override;
-			AssetType SourceAssetType() const override;
-		};
-	}
+		ImporterType Type() const override;
+		uint32_t Version() const override;
+		AssetType SourceAssetType() const override;
+	};
+
+}

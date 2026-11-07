@@ -14,7 +14,6 @@
 #include "Scripting/ScriptEngine.hpp"
 #include "Physics/Jolt/Utils.hpp"
 #include "Profiling/Profilers.hpp"
-#include "Assets/Model.hpp"
 
 #include <glm/gtx/matrix_decompose.hpp>
 
@@ -29,6 +28,8 @@ namespace Kerberos
 {
 	Scene::Scene()
 		: m_PhysicsSystem(new JoltPhysicsSystem())
+		, m_AnimationRuntime(*this)
+		, m_RagdollSystem(*this)
 	{
 		m_Registry = entt::basic_registry();
 	}
@@ -46,7 +47,24 @@ namespace Kerberos
 		m_IsRunning = true;
 
 		m_PhysicsSystem->Initialize(shared_from_this());
+		m_RagdollSystem.Reset();
+
+		/// Start authored animation before scripts run so OnCreate can override it.
+		StartAnimators();
+
+		/// Resolve the initial animation pose and socket transforms before creating physics
+		/// bodies, so socket-attached kinematic bodies start at the hand rather than at their
+		/// authored local transform.
+		CalculateEntityTransforms();
+		m_AnimationRuntime.AdvanceClocks(0.0f, false);
+		m_AnimationRuntime.EvaluatePose();
+
+		/// Ragdoll proxies read the pose evaluated above, so they must be created before the
+		/// first physics step.
+		m_RagdollSystem.PreparePhysics(0.0f);
+
 		m_PhysicsSystem->Update(0.0f); // Sync physics bodies with transforms before scripts run for the first time
+		m_RagdollSystem.ReadPhysicsPose(0.0f);
 
 		ScriptEngine::OnRuntimeStart(shared_from_this());
 
@@ -66,6 +84,8 @@ namespace Kerberos
 	{
 		m_IsRunning = false;
 
+		StopAnimators();
+		m_RagdollSystem.Cleanup();
 		m_PhysicsSystem->Cleanup();
 
 		ScriptEngine::OnRuntimeStop();
@@ -74,11 +94,45 @@ namespace Kerberos
 	void Scene::OnSimulationStart()
 	{
 		m_PhysicsSystem->Initialize(shared_from_this());
+		m_RagdollSystem.Reset();
+		StartAnimators();
 	}
 
-	void Scene::OnSimulationStop() const
+	void Scene::OnSimulationStop()
 	{
+		StopAnimators();
+		m_RagdollSystem.Cleanup();
 		m_PhysicsSystem->Cleanup();
+	}
+
+	void Scene::StartAnimators()
+	{
+		const auto view = m_Registry.view<AnimatorComponent>();
+		for (const auto entity : view)
+		{
+			auto& animator = view.get<AnimatorComponent>(entity);
+			animator.CurrentTime = 0.0f;
+			animator.IsPlaying = animator.PlayOnStart;
+			animator.PendingCrossFadeClip = -1;
+			animator.PendingCrossFadeDuration = 0.0f;
+			animator.PendingCrossFadeRestart = true;
+			animator.PlaybackRevision++;
+		}
+	}
+
+	void Scene::StopAnimators()
+	{
+		const auto view = m_Registry.view<AnimatorComponent>();
+		for (const auto entity : view)
+		{
+			auto& animator = view.get<AnimatorComponent>(entity);
+			animator.CurrentTime = 0.0f;
+			animator.IsPlaying = false;
+			animator.PendingCrossFadeClip = -1;
+			animator.PendingCrossFadeDuration = 0.0f;
+			animator.PendingCrossFadeRestart = true;
+			animator.PlaybackRevision++;
+		}
 	}
 
 	void Scene::SetScenePaused(const bool isPaused)
@@ -90,6 +144,13 @@ namespace Kerberos
 	{
 		KBR_TRACY_FUNCTION();
 
+	    CalculateEntityTransforms();
+
+		m_AnimationRuntime.AdvanceClocks(ts, m_IsScenePaused);
+        m_AnimationRuntime.EvaluatePose();
+        DispatchAnimationEvents();
+        m_AnimationRuntime.FinalizePose(ts);
+
 		Render3DEditor(camera, ts);
 	}
 
@@ -97,11 +158,21 @@ namespace Kerberos
 	{
 		KBR_TRACY_FUNCTION();
 
+		CalculateEntityTransforms();
+
+		m_AnimationRuntime.AdvanceClocks(ts, m_IsScenePaused);
+        m_AnimationRuntime.EvaluatePose();
+        DispatchAnimationEvents();
+
 		/// If the scene is paused, do not update the physics system, but still render the scene
 		if (!m_IsScenePaused)
 		{
+			m_RagdollSystem.PreparePhysics(ts);
 			m_PhysicsSystem->Update(ts);
+			m_RagdollSystem.ReadPhysicsPose(ts);
 		}
+
+        m_AnimationRuntime.FinalizePose(ts);
 
 		Render3DEditor(camera, ts);
 	}
@@ -110,11 +181,30 @@ namespace Kerberos
 	{
 		KBR_TRACY_FUNCTION();
 
+		CalculateEntityTransforms();
+
+		m_AnimationRuntime.AdvanceClocks(ts, m_IsScenePaused);
+        m_AnimationRuntime.EvaluatePose();
+        DispatchAnimationEvents();
+
 		if (!m_IsScenePaused)
 		{
 			UpdateScripts(ts);
 
+			// Scripts may have started, stopped, or seeked an animation. Evaluate again so the
+			// change is visible to physics and the renderer in this same frame. The runtime skips
+			// this when clip/time/state did not change.
+			m_AnimationRuntime.EvaluatePose();
+
+			// A post-script clip/skeleton change can close an active duration window. Deliver the
+			// resulting End events before physics so gameplay resources are released this frame.
+			DispatchAnimationEvents();
+
+			// Ragdoll proxies follow the post-script animation pose, then physics runs, then the
+			// simulated pose is blended back into the authoritative FinalPose before finalization.
+			m_RagdollSystem.PreparePhysics(ts);
 			m_PhysicsSystem->Update(ts);
+			m_RagdollSystem.ReadPhysicsPose(ts);
 
 			Application::Get().GetAudioManager()->Update();
 
@@ -129,36 +219,20 @@ namespace Kerberos
 			}
 		}
 
-		/// Render the scene from the primary camera in the scene. Runtime rendering
-		/// never uses the editor camera.
-		const SceneCamera* mainCamera = nullptr;
-		glm::mat4 mainCameraTransform(1.0f);
+        m_AnimationRuntime.FinalizePose(ts);
 
-		{
-			const auto view = m_Registry.view<CameraComponent, TransformComponent>();
-			for (const auto entity : view)
-			{
-				auto [cameraComp, transformComp] = view.get<CameraComponent, TransformComponent>(entity);
-				if (cameraComp.IsPrimary)
-				{
-					mainCameraTransform = transformComp.WorldTransform;
-					cameraComp.Camera.SetViewMatrix(glm::inverse(mainCameraTransform));
-					mainCamera = &cameraComp.Camera;
-					break;
-				}
-			}
-		}
+		const auto& [primaryCam, primaryCamTransform] = FindPrimaryCamera();
 
-		if (mainCamera == nullptr)
+		if (primaryCam == nullptr)
 		{
 			Log::CoreError("Cannot render the scene in play mode: no primary camera was found.");
 			return;
 		}
 
 		if (m_Is3D)
-			Render3DRuntime(mainCamera, mainCameraTransform, ts);
+			Render3DRuntime(primaryCam, primaryCamTransform, ts);
 		else
-			Render2DRuntime(mainCamera, mainCameraTransform, ts);
+			Render2DRuntime(primaryCam, primaryCamTransform, ts);
 	}
 
 	Entity Scene::CreateEntity(const std::string& name, const UUID parentId)
@@ -267,18 +341,36 @@ Entity Scene::InstantiatePrefab(const AssetHandle prefabHandle, const std::strin
 			SetParent(child, entityMapping[parentLocal], false);
 		}
 
-		if (child.HasComponent<SkinComponent>())
+		if (child.HasComponent<SkeletonComponent>() && prefabEntity.Skin.has_value())
 		{
 			for (auto joint : prefabEntity.Skin->JointEntityIndices)
 			{
 				if (entityMapping.contains(joint)) 
-				    child.GetComponent<SkinComponent>().JointEntities.push_back(entityMapping[joint].GetUUID());
+				    child.GetComponent<SkeletonComponent>().JointEntities.push_back(entityMapping[joint].GetUUID());
 			}
 			for (const auto& jointId : prefabEntity.Skin->JointEntityIDs)
 			{
 				if (legacyIndices.contains(jointId)) 
-				    child.GetComponent<SkinComponent>().JointEntities.push_back(entityMapping[legacyIndices[jointId]].GetUUID());
+				    child.GetComponent<SkeletonComponent>().JointEntities.push_back(entityMapping[legacyIndices[jointId]].GetUUID());
 			}
+		}
+		if (child.HasComponent<SkinnedMeshComponent>() && prefabEntity.SkinnedMesh.has_value())
+		{
+			auto& skinnedMesh = child.GetComponent<SkinnedMeshComponent>();
+			const auto localSkeleton = prefabEntity.SkinnedMesh->SkeletonEntityLocalIndex;
+			if (localSkeleton != InvalidPrefabLocalIndex && entityMapping.contains(localSkeleton))
+				skinnedMesh.SkeletonEntity = entityMapping[localSkeleton].GetUUID();
+			else if (prefabEntity.SkinnedMesh->SkeletonEntityID.IsValid() && legacyIndices.contains(prefabEntity.SkinnedMesh->SkeletonEntityID))
+				skinnedMesh.SkeletonEntity = entityMapping[legacyIndices[prefabEntity.SkinnedMesh->SkeletonEntityID]].GetUUID();
+		}
+		if (child.HasComponent<AnimatorComponent>() && prefabEntity.Animator.has_value())
+		{
+			auto& animator = child.GetComponent<AnimatorComponent>();
+			const auto localSkeleton = prefabEntity.Animator->SkeletonEntityLocalIndex;
+			if (localSkeleton != InvalidPrefabLocalIndex && entityMapping.contains(localSkeleton))
+				animator.SkeletonEntity = entityMapping[localSkeleton].GetUUID();
+			else if (prefabEntity.Animator->SkeletonEntityID.IsValid() && legacyIndices.contains(prefabEntity.Animator->SkeletonEntityID))
+				animator.SkeletonEntity = entityMapping[legacyIndices[prefabEntity.Animator->SkeletonEntityID]].GetUUID();
 		}
 		if (child.HasComponent<RigidBody3DComponent>()) child.GetComponent<RigidBody3DComponent>().RuntimeBody = nullptr;
 	}
@@ -479,6 +571,26 @@ Entity Scene::InstantiatePrefab(const AssetHandle prefabHandle, const std::strin
 		{
 			newEntity.AddComponent<AudioListenerComponent>(entity.GetComponent<AudioListenerComponent>());
 		}
+		if (entity.HasComponent<JointComponent>())
+		{
+			newEntity.AddComponent<JointComponent>(entity.GetComponent<JointComponent>());
+		}
+		if (entity.HasComponent<SkeletonComponent>())
+		{
+			newEntity.AddComponent<SkeletonComponent>(entity.GetComponent<SkeletonComponent>());
+		}
+		if (entity.HasComponent<SkinnedMeshComponent>())
+		{
+			newEntity.AddComponent<SkinnedMeshComponent>(entity.GetComponent<SkinnedMeshComponent>());
+		}
+		if (entity.HasComponent<AnimatorComponent>())
+		{
+			newEntity.AddComponent<AnimatorComponent>(entity.GetComponent<AnimatorComponent>());
+		}
+		if (entity.HasComponent<RagdollComponent>())
+		{
+			newEntity.AddComponent<RagdollComponent>(entity.GetComponent<RagdollComponent>());
+		}
 
 		if (duplicateChildren)
 		{
@@ -505,111 +617,6 @@ Entity Scene::InstantiatePrefab(const AssetHandle prefabHandle, const std::strin
 	{
 		const Entity child = CreateEntity("Unnamed");
 		SetParent(child, entity);
-	}
-
-	Entity Scene::InstantiateModelAsset(const AssetHandle modelHandle, const std::string& rootName)
-	{
-		KBR_TRACY_FUNCTION();
-
-		if (!modelHandle.IsValid())
-		{
-			Log::CoreError("Cannot instantiate model with invalid handle.");
-			return {};
-		}
-
-		if (AssetManager::GetAssetType(modelHandle) != AssetType::ModelDEPRECATED)
-		{
-			Log::CoreError("Asset {} is not a model asset.", modelHandle);
-			return {};
-		}
-
-		const Ref<Model> model = AssetManager::GetAsset<Model>(modelHandle);
-		if (!model)
-		{
-			Log::CoreError("Failed to load model asset: {}", modelHandle);
-			return {};
-		}
-
-		const std::string resolvedRootName = rootName.empty() ? model->GetName() : rootName;
-		Entity modelRoot = CreateEntity(resolvedRootName.empty() ? "Model" : resolvedRootName);
-		modelRoot.AddComponent<ModelComponent>(modelHandle);
-
-		const auto& modelNodes = model->GetNodes();
-		const auto& modelPrimitives = model->GetPrimitives();
-
-		if (modelNodes.empty())
-		{
-			for (size_t primitiveIndex = 0; primitiveIndex < modelPrimitives.size(); ++primitiveIndex)
-			{
-				const auto& primitive = modelPrimitives[primitiveIndex];
-				Entity primitiveEntity = CreateEntity(primitive.Name.empty()
-					? "Primitive_" + std::to_string(primitiveIndex)
-					: primitive.Name);
-				SetParent(primitiveEntity, modelRoot, false);
-
-				auto& smc = primitiveEntity.AddComponent<StaticMeshComponent>();
-				smc.StaticMesh = primitive.Mesh;
-				smc.MeshMaterial = primitive.Material;
-			}
-
-			return modelRoot;
-		}
-
-		std::vector<Entity> nodeEntities(modelNodes.size());
-
-		for (size_t nodeIndex = 0; nodeIndex < modelNodes.size(); ++nodeIndex)
-		{
-			const auto& node = modelNodes[nodeIndex];
-			Entity nodeEntity = CreateEntity(node.Name.empty() ? "Node_" + std::to_string(nodeIndex) : node.Name);
-			nodeEntities[nodeIndex] = nodeEntity;
-
-			auto& transform = nodeEntity.GetComponent<TransformComponent>();
-			transform.Translation = node.Translation;
-			transform.Rotation = glm::eulerAngles(node.Rotation);
-			transform.Scale = node.Scale;
-
-			bool assignedPrimaryPrimitive = false;
-			for (size_t primitiveSlot = 0; primitiveSlot < node.PrimitiveIndices.size(); ++primitiveSlot)
-			{
-				const uint32_t primitiveIndex = node.PrimitiveIndices[primitiveSlot];
-				if (primitiveIndex >= modelPrimitives.size())
-					continue;
-
-				const auto& primitive = modelPrimitives[primitiveIndex];
-				if (!assignedPrimaryPrimitive)
-				{
-					auto& smc = nodeEntity.AddComponent<StaticMeshComponent>();
-					smc.StaticMesh = primitive.Mesh;
-					smc.MeshMaterial = primitive.Material;
-					assignedPrimaryPrimitive = true;
-					continue;
-				}
-
-				Entity primitiveEntity = CreateEntity(primitive.Name.empty()
-					? nodeEntity.GetComponent<TagComponent>().Tag + "_Primitive_" + std::to_string(primitiveSlot)
-					: primitive.Name);
-				SetParent(primitiveEntity, nodeEntity, false);
-
-				auto& smc = primitiveEntity.AddComponent<StaticMeshComponent>();
-				smc.StaticMesh = primitive.Mesh;
-				smc.MeshMaterial = primitive.Material;
-			}
-		}
-
-		for (size_t nodeIndex = 0; nodeIndex < modelNodes.size(); ++nodeIndex)
-		{
-			const auto& node = modelNodes[nodeIndex];
-			const Entity nodeEntity = nodeEntities[nodeIndex];
-			if (!nodeEntity)
-				continue;
-
-			if (node.ParentIndex >= 0 && std::cmp_less(node.ParentIndex, nodeEntities.size()))
-				SetParent(nodeEntity, nodeEntities[node.ParentIndex], false);
-			else
-				SetParent(nodeEntity, modelRoot, false);
-		}
-
-		return modelRoot;
 	}
 
 	Entity Scene::GetEntityByUUID(const UUID uuid) const
@@ -774,7 +781,50 @@ Entity Scene::InstantiatePrefab(const AssetHandle prefabHandle, const std::strin
 		return *m_PhysicsSystem;
 	}
 
-	void Scene::CopyEntityRecursive(const Ref<Scene>& other, const entt::entity sourceEntity, const Ref<Scene>& newScene, const entt::entity parentNewEntity)
+    AnimationRuntime& Scene::GetAnimationRuntime()
+    {
+        return m_AnimationRuntime;
+    }
+
+    const AnimationRuntime& Scene::GetAnimationRuntime() const
+    {
+        return m_AnimationRuntime;
+    }
+
+    RagdollSystem& Scene::GetRagdollSystem()
+    {
+        return m_RagdollSystem;
+    }
+
+    const RagdollSystem& Scene::GetRagdollSystem() const
+    {
+        return m_RagdollSystem;
+    }
+
+    void Scene::DispatchAnimationEvents()
+    {
+        if (!m_IsRunning)
+        {
+            m_AnimationRuntime.ClearPendingDispatches();
+            return;
+        }
+
+        for (const DispatchedAnimationEvent& event : m_AnimationRuntime.GetPendingDispatches())
+        {
+            if (!event.Clip || !event.Event)
+                continue;
+
+            const Entity entity = TryGetEntityByUUID(event.Entity);
+            if (!entity)
+                continue;
+
+            ScriptEngine::OnAnimationEvent(entity, event);
+        }
+
+        m_AnimationRuntime.ClearPendingDispatches();
+    }
+
+    void Scene::CopyEntityRecursive(const Ref<Scene>& other, const entt::entity sourceEntity, const Ref<Scene>& newScene, const entt::entity parentNewEntity)
 	{
 		KBR_TRACY_FUNCTION();
 
@@ -859,17 +909,28 @@ Entity Scene::InstantiatePrefab(const AssetHandle prefabHandle, const std::strin
 			particleEmitter.spawnAccumulator = 0.0f;
 			newEntity.AddComponent<ParticleEmitterComponent>(particleEmitter);
 		}
-		if (sourceRegistry.all_of<SkinComponent>(sourceEntity))
-			newEntity.AddComponent<SkinComponent>(sourceRegistry.get<SkinComponent>(sourceEntity));
-		if (sourceRegistry.all_of<SkeletalMeshComponent>(sourceEntity))
-			newEntity.AddComponent<SkeletalMeshComponent>(sourceRegistry.get<SkeletalMeshComponent>(sourceEntity));
-		if (sourceRegistry.all_of<AnimationComponent>(sourceEntity))
+		if (sourceRegistry.all_of<SkeletonComponent>(sourceEntity))
+			newEntity.AddComponent<SkeletonComponent>(sourceRegistry.get<SkeletonComponent>(sourceEntity));
+		if (sourceRegistry.all_of<SkinnedMeshComponent>(sourceEntity))
+			newEntity.AddComponent<SkinnedMeshComponent>(sourceRegistry.get<SkinnedMeshComponent>(sourceEntity));
+		if (sourceRegistry.all_of<AnimatorComponent>(sourceEntity))
 		{
-			auto animation = sourceRegistry.get<AnimationComponent>(sourceEntity);
-			animation.CurrentTime = 0.0f;
-			animation.IsPlaying = false;
-			newEntity.AddComponent<AnimationComponent>(animation);
+			auto animator = sourceRegistry.get<AnimatorComponent>(sourceEntity);
+			animator.CurrentTime = 0.0f;
+			animator.IsPlaying = animator.PlayOnStart;
+			animator.PlaybackRevision = 0;
+			animator.PendingCrossFadeClip = -1;
+			animator.PendingCrossFadeDuration = 0.0f;
+			animator.PendingCrossFadeRestart = true;
+			animator.LoadedClips.clear();
+			newEntity.AddComponent<AnimatorComponent>(animator);
 		}
+		if (sourceRegistry.all_of<RagdollComponent>(sourceEntity))
+			newEntity.AddComponent<RagdollComponent>(sourceRegistry.get<RagdollComponent>(sourceEntity));
+		if (sourceRegistry.all_of<SocketComponent>(sourceEntity))
+			newEntity.AddComponent<SocketComponent>(sourceRegistry.get<SocketComponent>(sourceEntity));
+		if (sourceRegistry.all_of<JointComponent>(sourceEntity))
+			newEntity.AddComponent<JointComponent>(sourceRegistry.get<JointComponent>(sourceEntity));
 
 		/// Set parent if this is a child entity
 		if (parentNewEntity != entt::null)
@@ -887,7 +948,25 @@ Entity Scene::InstantiatePrefab(const AssetHandle prefabHandle, const std::strin
 		}
 	}
 
-	Ref<Scene> Scene::Copy(const Ref<Scene>& other)
+    std::pair<const SceneCamera*, glm::mat4> Scene::FindPrimaryCamera()
+    {
+	    const auto view = m_Registry.view<CameraComponent, TransformComponent>();
+        for (const auto entity : view)
+        {
+            auto [cameraComp, transformComp] = view.get<CameraComponent, TransformComponent>(entity);
+            if (cameraComp.IsPrimary)
+            {
+                cameraComp.Camera.SetViewMatrix(glm::inverse(transformComp.WorldTransform));
+                const glm::mat4& cameraTransform = transformComp.WorldTransform;
+                const SceneCamera* primaryCamera = &cameraComp.Camera;
+                return { primaryCamera, cameraTransform };
+            }
+        }
+
+		return { nullptr, glm::mat4(1.0f) };
+    }
+
+    Ref<Scene> Scene::Copy(const Ref<Scene>& other)
 	{
 		Ref<Scene> newScene = CreateRef<Scene>();
 
@@ -1200,6 +1279,25 @@ Entity Scene::InstantiatePrefab(const AssetHandle prefabHandle, const std::strin
 		return {};
 	}
 
+	Entity Scene::FindAnimatorEntityForSkeleton(const UUID skeletonEntity)
+	{
+		const auto view = m_Registry.view<AnimatorComponent>();
+		for (const auto entity : view)
+		{
+			const auto& animator = view.get<AnimatorComponent>(entity);
+			const UUID animatorUUID = m_Registry.get<IDComponent>(entity).ID;
+
+			UUID target = animator.SkeletonEntity;
+			if (!target.IsValid() && m_Registry.all_of<SkeletonComponent>(entity))
+				target = animatorUUID;
+
+			if (target == skeletonEntity)
+				return Entity{ entity, this };
+		}
+
+		return {};
+	}
+
 #pragma region ComponentAddedSpecializations
 
 	template <typename T>
@@ -1224,18 +1322,33 @@ Entity Scene::InstantiatePrefab(const AssetHandle prefabHandle, const std::strin
 	{
 	}
 
-	template <>
-	void Scene::OnComponentAdded<SkinComponent>(Entity, SkinComponent&)
+    template <>
+	void Scene::OnComponentAdded<JointComponent>(Entity, JointComponent&)
 	{
 	}
 
 	template <>
-	void Scene::OnComponentAdded<SkeletalMeshComponent>(Entity, SkeletalMeshComponent&)
+	void Scene::OnComponentAdded<SkeletonComponent>(Entity, SkeletonComponent&)
 	{
 	}
 
 	template <>
-	void Scene::OnComponentAdded<AnimationComponent>(Entity, AnimationComponent&)
+	void Scene::OnComponentAdded<SkinnedMeshComponent>(Entity, SkinnedMeshComponent&)
+	{
+	}
+
+	template <>
+	void Scene::OnComponentAdded<AnimatorComponent>(Entity, AnimatorComponent&)
+	{
+	}
+
+	template <>
+	void Scene::OnComponentAdded<SocketComponent>(Entity, SocketComponent&)
+	{
+	}
+
+	template <>
+	void Scene::OnComponentAdded<RagdollComponent>(Entity, RagdollComponent&)
 	{
 	}
 

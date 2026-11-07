@@ -13,34 +13,43 @@ void PrefabEntityTemplate::ToEntity(Entity newEntity) const
     transform.Rotation = Transform.Rotation;
     transform.Scale = Transform.Scale;
     transform.WorldTransform = glm::mat4(1.0f);
-    if (SkeletalMesh)
+    if (SkinnedMesh)
     {
-        auto& c = newEntity.AddComponent<SkeletalMeshComponent>();
-        c.MeshAsset = SkeletalMesh->MeshAsset;
-        c.SkeletonAsset = SkeletalMesh->SkeletonAsset;
-        c.MaterialAsset = SkeletalMesh->MaterialAsset;
-        c.Visible = SkeletalMesh->Visible;
-        c.CastShadows = SkeletalMesh->CastShadows;
+        auto& c = newEntity.AddComponent<SkinnedMeshComponent>();
+        c.MeshAsset = SkinnedMesh->MeshAsset;
+        c.SkeletonAsset = SkinnedMesh->SkeletonAsset;
+        c.MaterialAsset = SkinnedMesh->MaterialAsset;
+        c.SkeletonEntity = SkinnedMesh->SkeletonEntityID;
+        c.Visible = SkinnedMesh->Visible;
+        c.CastShadows = SkinnedMesh->CastShadows;
+        c.Mesh = AssetManager::AsAsset<SkeletalMesh>(c.MeshAsset);
+        c.Material = AssetManager::AsAsset<Material>(c.MaterialAsset);
     }
-    if (Animation)
+    if (Animator)
     {
-        auto& c = newEntity.AddComponent<AnimationComponent>();
-        c.AnimationAsset = Animation->AnimationAsset;
-        c.PlaybackSpeed = Animation->PlaybackSpeed;
-        c.IsLooping = Animation->Loop;
-        c.IsPlaying = Animation->AutoPlay;
+        auto& c = newEntity.AddComponent<AnimatorComponent>();
+        c.SkeletonEntity = Animator->SkeletonEntityID;
+        c.AnimationClips = Animator->Clips;
+        c.ActiveClip = Animator->ActiveClip;
+        c.PlaybackSpeed = Animator->PlaybackSpeed;
+        c.IsLooping = Animator->Loop;
+        c.IsPlaying = Animator->AutoPlay;
+        c.PlayOnStart = Animator->AutoPlay;
         c.CurrentTime = 0.0f;
+    }
+    if (JointIndex)
+    {
+        newEntity.AddComponent<JointComponent>(JointComponent{ .JointIndex = *JointIndex });
     }
     if (Skin)
     {
-        auto& c = newEntity.AddComponent<SkinComponent>();
+        auto& c = newEntity.AddComponent<SkeletonComponent>();
         c.SkeletonAsset = Skin->SkeletonAsset;
-        c.JointMatrices.clear();
     }
     if (HasStaticMesh && StaticMeshAsset.IsValid())
     {
         auto& c = newEntity.AddComponent<StaticMeshComponent>();
-        c.StaticMesh = AssetManager::ResolveMeshAsset(StaticMeshAsset);
+        c.StaticMesh = AssetManager::AsAsset<Mesh>(StaticMeshAsset);
         c.MeshMaterial = AssetManager::AsAsset<Material>(StaticMaterialAsset);
     }
     if (RigidBody)

@@ -55,6 +55,20 @@ namespace Kerberos
 			const std::map<std::string, bool>& textureSrgb);
 
 		/**
+		 * Loads the authored animation markers/events for a source file.
+		 * @return The clips map, or nullopt if the source has no metadata.
+		 */
+		std::optional<std::map<std::string, AnimationClipMetaEntry>> GetAnimationClipMeta(
+			const std::filesystem::path& sourcePath) const;
+
+		/**
+		 * Persists animation markers/events for a source and re-imports it.
+		 * @return The source's root handle on success, or AssetHandle::Invalid().
+		 */
+		AssetHandle SetAnimationClipMeta(const std::filesystem::path& sourcePath,
+			const std::map<std::string, AnimationClipMetaEntry>& animationClips);
+
+		/**
 		 * Force-rebuilds a single source and evicts cached loaded artifacts so
 		 * consumers reload the regenerated outputs.
 		 * @return The source's root handle on success, or AssetHandle::Invalid().
@@ -71,7 +85,7 @@ namespace Kerberos
 		void ConfigurePipeline(const std::filesystem::path& assetsRoot, const std::filesystem::path& cacheRoot = {});
 
 		void StartWatching();
-		void EnsureAssetMetas() const;
+		void EnsureAssetMetas();
 		std::vector<AssetBuildReport> BuildAssets(bool force = false);
 
 		ImporterRegistry& GetImporterRegistry() { return m_ImporterRegistry; }

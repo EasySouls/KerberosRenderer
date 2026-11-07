@@ -3,7 +3,6 @@
 #include "CubemapImporter.hpp"
 #include "TextureImporter.hpp"
 #include "AssimpModelImporter.hpp"
-#include "GLTFModelImporter.hpp"
 #include "MaterialImporter.hpp"
 #include "MeshImporter.hpp"
 #include "PrefabImporter.hpp"
@@ -32,33 +31,31 @@ namespace Kerberos
 				return CubemapImporter::ImportCubemap(handle, metadata);
 			case AssetType::Material:
 				return MaterialImporter::ImportMaterial(handle, metadata);
-			case AssetType::ModelDEPRECATED:
-			{
-				// Deprecated: model loading must move to imported engine artifacts.
-				const auto extension = metadata.Filepath.extension().string();
-				if (extension == ".gltf" || extension == ".glb")
-					return GLTFModelImporter::ImportModel(handle, metadata);
-				return AssimpModelImporter::ImportModel(metadata.Filepath);
-			}
 			case AssetType::Scene:
 				break;
 			case AssetType::Sound:
 				return SoundImporter::ImportSound(handle, metadata);
 			case AssetType::Mesh:
 				return MeshImporter::ImportMesh(handle, metadata);
-				break;
 			case AssetType::Prefab:
 				return PrefabImporter::ImportPrefab(handle, metadata);
-				break;
 			case AssetType::Animation:
 				// TODO: Implement AnimationImporter
 				Log::CoreWarn("Animation import not yet implemented");
 				break;
-            case AssetType::Skin:
+            case AssetType::Skeleton:
+                // TODO: Implement SkeletonImporter
+                Log::CoreWarn("Skeleton import not yet implemented");
+                break;
+            case AssetType::SkinnedMesh:
+                // TODO: Implement SkinnedMeshImporter
+                Log::CoreWarn("SkinnedMesh import not yet implemented");
+                break;
+            default:
                 break;
         }
 
-		KBRAssert(false, "Unsupported asset type by AssetImporter!");
+		KBRAssert("Unsupported asset type by AssetImporter!");
 		return nullptr;
 	}
 

@@ -90,6 +90,7 @@ namespace Kerberos
         ManagedInvokeOnCollisionEnterFn ManagedInvokeOnCollisionEnter = nullptr;
         ManagedInvokeOnCollisionPersistFn ManagedInvokeOnCollisionPersist = nullptr;
         ManagedInvokeOnCollisionExitFn ManagedInvokeOnCollisionExit = nullptr;
+        ManagedInvokeOnAnimationEventFn ManagedInvokeOnAnimationEvent = nullptr;
         ManagedGetFieldCountFn ManagedGetFieldCount = nullptr;
         ManagedGetFieldsFn ManagedGetFields = nullptr;
         ManagedGetFieldValueFn ManagedGetFieldValue = nullptr;
@@ -411,6 +412,28 @@ namespace Kerberos
 		}
 	}
 
+	void ScriptEngine::OnAnimationEvent(const Entity entity, const DispatchedAnimationEvent& event)
+	{
+		KBR_TRACY_FUNCTION();
+
+		if (!entity.HasComponent<ScriptComponent>())
+			return;
+
+		const UUID entityID = entity.GetUUID();
+		const auto instancesIt = s_ScriptData->EntityInstances.find(entityID);
+		if (instancesIt == s_ScriptData->EntityInstances.end())
+			return;
+
+		for (const std::string& className : entity.GetComponent<ScriptComponent>().ClassNames)
+		{
+			const auto instanceIt = instancesIt->second.find(className);
+			if (instanceIt == instancesIt->second.end() || !instanceIt->second)
+				continue;
+
+			instanceIt->second->InvokeOnAnimationEvent(event);
+		}
+	}
+
 	bool ScriptEngine::ClassExists(const std::string& className)
 	{
 		return s_ScriptData->EntityClasses.contains(className);
@@ -589,6 +612,51 @@ namespace Kerberos
 
 		const ScriptCollisionPayload payload = BuildScriptCollisionPayload(entityID, event);
 		return s_ScriptData->ManagedInvokeOnCollisionExit(entityID, className.c_str(), &payload) != 0;
+	}
+
+	bool ScriptEngine::InvokeManagedOnAnimationEvent(const uint64_t entityID, const std::string& className,
+	                                                 const DispatchedAnimationEvent& event)
+	{
+		KBRAssert(s_ScriptData->ManagedInvokeOnAnimationEvent != nullptr,
+		          "ManagedInvokeOnAnimationEvent function pointer is null!");
+
+		if (!event.Clip || !event.Event)
+			return false;
+
+		// The event and its parameters live in the clip for the duration of this synchronous call,
+		// so the raw pointers remain valid while the managed side marshals them.
+		std::vector<ScriptAnimationEventParameterPayload> parameterPayloads;
+		parameterPayloads.reserve(event.Event->Parameters.size());
+		for (const AnimationEventParameter& parameter : event.Event->Parameters)
+		{
+			parameterPayloads.push_back({
+				.Name = parameter.Name.c_str(),
+				.StringValue = parameter.StringValue.c_str(),
+				.AssetValue = parameter.AssetValue,
+				.VectorX = parameter.VectorValue.x,
+				.VectorY = parameter.VectorValue.y,
+				.VectorZ = parameter.VectorValue.z,
+				.FloatValue = parameter.FloatValue,
+				.IntValue = parameter.IntValue,
+				.Type = static_cast<uint8_t>(parameter.Type),
+				.BoolValue = parameter.BoolValue ? static_cast<uint8_t>(1) : static_cast<uint8_t>(0),
+			});
+		}
+
+		const ScriptAnimationEventPayload payload{
+			.Name = event.Event->Name.c_str(),
+			.Payload = event.Event->Payload.c_str(),
+			.ClipName = event.Clip->GetName().c_str(),
+			.Time = event.Time,
+			.Duration = event.Event->Duration,
+			.Weight = event.Weight,
+			.Phase = static_cast<uint8_t>(event.Phase),
+			.Flags = event.Event->Flags,
+			.Parameters = parameterPayloads.empty() ? nullptr : parameterPayloads.data(),
+			.ParameterCount = static_cast<uint32_t>(parameterPayloads.size()),
+		};
+
+		return s_ScriptData->ManagedInvokeOnAnimationEvent(entityID, className.c_str(), &payload) != 0;
 	}
 
 	bool ScriptEngine::GetManagedFieldValue(const uint64_t entityID, const std::string& className, const std::string& fieldName, void* outValue, const int bufferSize)
@@ -816,6 +884,7 @@ namespace Kerberos
 		s_ScriptData->ManagedInvokeOnCollisionEnter = LoadManagedFunction<ManagedInvokeOnCollisionEnterFn>(glueType, "InvokeOnCollisionEnter");
 		s_ScriptData->ManagedInvokeOnCollisionPersist = LoadManagedFunction<ManagedInvokeOnCollisionPersistFn>(glueType, "InvokeOnCollisionPersist");
 		s_ScriptData->ManagedInvokeOnCollisionExit = LoadManagedFunction<ManagedInvokeOnCollisionExitFn>(glueType, "InvokeOnCollisionExit");
+		s_ScriptData->ManagedInvokeOnAnimationEvent = LoadManagedFunction<ManagedInvokeOnAnimationEventFn>(glueType, "InvokeOnAnimationEvent");
 		s_ScriptData->ManagedGetFieldCount = LoadManagedFunction<ManagedGetFieldCountFn>(glueType, "GetClassFieldCount");
 		s_ScriptData->ManagedGetFields = LoadManagedFunction<ManagedGetFieldsFn>(glueType, "GetClassFields");
 		s_ScriptData->ManagedGetFieldValue = LoadManagedFunction<ManagedGetFieldValueFn>(glueType, "GetFieldValue");

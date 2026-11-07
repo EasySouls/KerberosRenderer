@@ -186,6 +186,8 @@ static void SerializeEntity(YAML::Emitter& out, const Entity entity)
         const auto& boxCollider = entity.GetComponent<BoxCollider3DComponent>();
         out << YAML::Key << "Size" << YAML::Value << boxCollider.Size;
         out << YAML::Key << "Offset" << YAML::Value << boxCollider.Offset;
+        out << YAML::Key << "IsTrigger" << YAML::Value << boxCollider.IsTrigger;
+        out << YAML::Key << "Enabled" << YAML::Value << boxCollider.Enabled;
         out << YAML::EndMap;
     }
 
@@ -195,6 +197,8 @@ static void SerializeEntity(YAML::Emitter& out, const Entity entity)
         const auto& sphereCollider = entity.GetComponent<SphereCollider3DComponent>();
         out << YAML::Key << "Radius" << YAML::Value << sphereCollider.Radius;
         out << YAML::Key << "Offset" << YAML::Value << sphereCollider.Offset;
+        out << YAML::Key << "IsTrigger" << YAML::Value << sphereCollider.IsTrigger;
+        out << YAML::Key << "Enabled" << YAML::Value << sphereCollider.Enabled;
         out << YAML::EndMap;
     }
 
@@ -205,6 +209,8 @@ static void SerializeEntity(YAML::Emitter& out, const Entity entity)
         out << YAML::Key << "Radius" << YAML::Value << capsuleCollider.Radius;
         out << YAML::Key << "Height" << YAML::Value << capsuleCollider.Height;
         out << YAML::Key << "Offset" << YAML::Value << capsuleCollider.Offset;
+        out << YAML::Key << "IsTrigger" << YAML::Value << capsuleCollider.IsTrigger;
+        out << YAML::Key << "Enabled" << YAML::Value << capsuleCollider.Enabled;
         out << YAML::EndMap;
     }
 
@@ -215,6 +221,8 @@ static void SerializeEntity(YAML::Emitter& out, const Entity entity)
         out << YAML::Key << "Mesh" << YAML::Value
             << (meshCollider.Mesh ? meshCollider.Mesh->GetHandle() : UUID::Invalid());
         out << YAML::Key << "IsTrigger" << YAML::Value << meshCollider.IsTrigger;
+        out << YAML::Key << "Enabled" << YAML::Value << meshCollider.Enabled;
+        out << YAML::Key << "Offset" << YAML::Value << meshCollider.Offset;
         out << YAML::EndMap;
     }
 
@@ -318,22 +326,30 @@ static void SerializeEntity(YAML::Emitter& out, const Entity entity)
         out << YAML::EndMap;
     }
 
-    if (entity.HasComponent<SkeletalMeshComponent>()) {
-        out << YAML::Key << "SkeletalMeshComponent";
+    if (entity.HasComponent<SkinnedMeshComponent>()) {
+        out << YAML::Key << "SkinnedMeshComponent";
         out << YAML::BeginMap;
-        const auto& skeletalMesh = entity.GetComponent<SkeletalMeshComponent>();
-        out << YAML::Key << "MeshAsset" << YAML::Value << skeletalMesh.MeshAsset;
-        out << YAML::Key << "SkeletonAsset" << YAML::Value << skeletalMesh.SkeletonAsset;
-        out << YAML::Key << "MaterialAsset" << YAML::Value << skeletalMesh.MaterialAsset;
-        out << YAML::Key << "Visible" << YAML::Value << skeletalMesh.Visible;
-        out << YAML::Key << "CastShadows" << YAML::Value << skeletalMesh.CastShadows;
+        const auto& skinnedMesh = entity.GetComponent<SkinnedMeshComponent>();
+        out << YAML::Key << "MeshAsset" << YAML::Value << skinnedMesh.MeshAsset;
+        out << YAML::Key << "SkeletonAsset" << YAML::Value << skinnedMesh.SkeletonAsset;
+        out << YAML::Key << "MaterialAsset" << YAML::Value << skinnedMesh.MaterialAsset;
+        out << YAML::Key << "SkeletonEntity" << YAML::Value << skinnedMesh.SkeletonEntity;
+        out << YAML::Key << "Visible" << YAML::Value << skinnedMesh.Visible;
+        out << YAML::Key << "CastShadows" << YAML::Value << skinnedMesh.CastShadows;
         out << YAML::EndMap;
     }
 
-    if (entity.HasComponent<SkinComponent>()) {
-        out << YAML::Key << "SkinComponent";
+    if (entity.HasComponent<JointComponent>()) {
+        out << YAML::Key << "JointComponent";
         out << YAML::BeginMap;
-        const auto& skin = entity.GetComponent<SkinComponent>();
+        out << YAML::Key << "JointIndex" << YAML::Value << entity.GetComponent<JointComponent>().JointIndex;
+        out << YAML::EndMap;
+    }
+
+    if (entity.HasComponent<SkeletonComponent>()) {
+        out << YAML::Key << "SkeletonComponent";
+        out << YAML::BeginMap;
+        const auto& skin = entity.GetComponent<SkeletonComponent>();
         out << YAML::Key << "SkeletonAsset" << YAML::Value << skin.SkeletonAsset;
         out << YAML::Key << "JointEntities" << YAML::Value << YAML::BeginSeq;
         for (const auto& jointEntity : skin.JointEntities) {
@@ -343,14 +359,44 @@ static void SerializeEntity(YAML::Emitter& out, const Entity entity)
         out << YAML::EndMap;
     }
 
-    if (entity.HasComponent<AnimationComponent>()) {
-        out << YAML::Key << "AnimationComponent";
+    if (entity.HasComponent<AnimatorComponent>()) {
+        out << YAML::Key << "AnimatorComponent";
         out << YAML::BeginMap;
-        const auto& animation = entity.GetComponent<AnimationComponent>();
-        out << YAML::Key << "AnimationAsset" << YAML::Value << animation.AnimationAsset;
+        const auto& animation = entity.GetComponent<AnimatorComponent>();
+        out << YAML::Key << "SkeletonEntity" << YAML::Value << animation.SkeletonEntity;
+        out << YAML::Key << "AnimationClips" << YAML::Value << YAML::BeginSeq;
+        for (const auto& clip : animation.AnimationClips) {
+            out << clip;
+        }
+        out << YAML::EndSeq;
+        out << YAML::Key << "ActiveClip" << YAML::Value << animation.ActiveClip;
         out << YAML::Key << "PlaybackSpeed" << YAML::Value << animation.PlaybackSpeed;
         out << YAML::Key << "IsPlaying" << YAML::Value << animation.IsPlaying;
         out << YAML::Key << "IsLooping" << YAML::Value << animation.IsLooping;
+        out << YAML::Key << "PlayOnStart" << YAML::Value << animation.PlayOnStart;
+        out << YAML::EndMap;
+    }
+
+    if (entity.HasComponent<RagdollComponent>()) {
+        out << YAML::Key << "RagdollComponent";
+        out << YAML::BeginMap;
+        const auto& ragdoll = entity.GetComponent<RagdollComponent>();
+        out << YAML::Key << "SkeletonEntity" << YAML::Value << ragdoll.SkeletonEntity;
+        out << YAML::Key << "BlendDuration" << YAML::Value << ragdoll.BlendDuration;
+        out << YAML::Key << "StartInRagdoll" << YAML::Value << ragdoll.StartInRagdoll;
+        out << YAML::Key << "JointRadiusScale" << YAML::Value << ragdoll.JointRadiusScale;
+        out << YAML::EndMap;
+    }
+
+    if (entity.HasComponent<SocketComponent>()) {
+        out << YAML::Key << "SocketComponent";
+        out << YAML::BeginMap;
+        const auto& socket = entity.GetComponent<SocketComponent>();
+        out << YAML::Key << "SkeletonEntity" << YAML::Value << socket.SkeletonEntity;
+        out << YAML::Key << "JointName" << YAML::Value << socket.JointName;
+        out << YAML::Key << "LocalTranslation" << YAML::Value << socket.LocalTranslation;
+        out << YAML::Key << "LocalRotation" << YAML::Value << socket.LocalRotation;
+        out << YAML::Key << "LocalScale" << YAML::Value << socket.LocalScale;
         out << YAML::EndMap;
     }
 
@@ -551,12 +597,16 @@ Entity SceneSerializer::DeserializeEntity(const Ref<Scene>& scene, const YAML::N
         auto& boxCollider = deserializedEntity.AddComponent<BoxCollider3DComponent>();
         boxCollider.Size = boxColliderComponent["Size"].as<glm::vec3>();
         boxCollider.Offset = boxColliderComponent["Offset"].as<glm::vec3>();
+        boxCollider.IsTrigger = boxColliderComponent["IsTrigger"].as<bool>(false);
+        boxCollider.Enabled = boxColliderComponent["Enabled"].as<bool>(true);
     }
 
     if (auto sphereColliderComponent = node["SphereCollider3DComponent"]) {
         auto& sphereCollider = deserializedEntity.AddComponent<SphereCollider3DComponent>();
         sphereCollider.Radius = sphereColliderComponent["Radius"].as<float>();
         sphereCollider.Offset = sphereColliderComponent["Offset"].as<glm::vec3>();
+        sphereCollider.IsTrigger = sphereColliderComponent["IsTrigger"].as<bool>(false);
+        sphereCollider.Enabled = sphereColliderComponent["Enabled"].as<bool>(true);
     }
 
     if (auto capsuleColliderComponent = node["CapsuleCollider3DComponent"]) {
@@ -564,11 +614,15 @@ Entity SceneSerializer::DeserializeEntity(const Ref<Scene>& scene, const YAML::N
         capsuleCollider.Radius = capsuleColliderComponent["Radius"].as<float>();
         capsuleCollider.Height = capsuleColliderComponent["Height"].as<float>();
         capsuleCollider.Offset = capsuleColliderComponent["Offset"].as<glm::vec3>();
+        capsuleCollider.IsTrigger = capsuleColliderComponent["IsTrigger"].as<bool>(false);
+        capsuleCollider.Enabled = capsuleColliderComponent["Enabled"].as<bool>(true);
     }
 
     if (auto meshColliderComponent = node["MeshCollider3DComponent"]) {
         auto& meshCollider = deserializedEntity.AddComponent<MeshCollider3DComponent>();
-        meshCollider.IsTrigger = meshColliderComponent["IsTrigger"].as<bool>();
+        meshCollider.IsTrigger = meshColliderComponent["IsTrigger"].as<bool>(false);
+        meshCollider.Enabled = meshColliderComponent["Enabled"].as<bool>(true);
+        meshCollider.Offset = meshColliderComponent["Offset"].as<glm::vec3>(glm::vec3(0.0f));
         const AssetHandle meshHandle = AssetHandle(meshColliderComponent["Mesh"].as<uint64_t>());
         if (meshHandle.IsValid()) {
             meshCollider.Mesh = AssetManager::GetAsset<Mesh>(meshHandle);
@@ -658,31 +712,77 @@ Entity SceneSerializer::DeserializeEntity(const Ref<Scene>& scene, const YAML::N
             prefabInstanceComponent["IsExpandedInHierarchy"].as<bool>(true);
     }
 
-    if (auto skeletalMeshComponent = node["SkeletalMeshComponent"]) {
-        auto& skeletalMesh = deserializedEntity.AddComponent<SkeletalMeshComponent>();
-        skeletalMesh.MeshAsset = AssetHandle(skeletalMeshComponent["MeshAsset"].as<uint64_t>());
-        skeletalMesh.SkeletonAsset = AssetHandle(skeletalMeshComponent["SkeletonAsset"].as<uint64_t>());
-        skeletalMesh.MaterialAsset = AssetHandle(skeletalMeshComponent["MaterialAsset"].as<uint64_t>());
-        skeletalMesh.Visible = skeletalMeshComponent["Visible"].as<bool>(true);
-        skeletalMesh.CastShadows = skeletalMeshComponent["CastShadows"].as<bool>(true);
+    if (auto skinnedMeshComponent = node["SkinnedMeshComponent"]) {
+        auto& skinnedMesh = deserializedEntity.AddComponent<SkinnedMeshComponent>();
+        skinnedMesh.MeshAsset = AssetHandle(skinnedMeshComponent["MeshAsset"].as<uint64_t>());
+        skinnedMesh.SkeletonAsset = AssetHandle(skinnedMeshComponent["SkeletonAsset"].as<uint64_t>());
+        skinnedMesh.MaterialAsset = AssetHandle(skinnedMeshComponent["MaterialAsset"].as<uint64_t>());
+        skinnedMesh.SkeletonEntity = UUID(skinnedMeshComponent["SkeletonEntity"].as<uint64_t>(0));
+        skinnedMesh.Visible = skinnedMeshComponent["Visible"].as<bool>(true);
+        skinnedMesh.CastShadows = skinnedMeshComponent["CastShadows"].as<bool>(true);
+        skinnedMesh.Mesh = AssetManager::AsAsset<SkeletalMesh>(skinnedMesh.MeshAsset);
+        skinnedMesh.Material = AssetManager::AsAsset<Material>(skinnedMesh.MaterialAsset);
     }
 
-    if (auto skinComponent = node["SkinComponent"]) {
-        auto& skin = deserializedEntity.AddComponent<SkinComponent>();
+    if (auto jointComponent = node["JointComponent"]) {
+        auto& joint = deserializedEntity.AddComponent<JointComponent>();
+        joint.JointIndex = jointComponent["JointIndex"].as<uint32_t>(0);
+    }
+
+    if (auto skinComponent = node["SkeletonComponent"]) {
+        auto& skin = deserializedEntity.AddComponent<SkeletonComponent>();
         skin.SkeletonAsset = AssetHandle(skinComponent["SkeletonAsset"].as<uint64_t>());
         if (auto jointEntities = skinComponent["JointEntities"]) {
             for (const auto& jointEntity : jointEntities) {
                 skin.JointEntities.emplace_back(jointEntity.as<uint64_t>());
             }
         }
+        skin.Skeleton = AssetManager::AsAsset<Skeleton>(skin.SkeletonAsset);
     }
 
-    if (auto animationComponent = node["AnimationComponent"]) {
-        auto& animation = deserializedEntity.AddComponent<AnimationComponent>();
-        animation.AnimationAsset = AssetHandle(animationComponent["AnimationAsset"].as<uint64_t>());
+    if (auto animationComponent = node["AnimatorComponent"]) {
+        auto& animation = deserializedEntity.AddComponent<AnimatorComponent>();
+        animation.SkeletonEntity = UUID(animationComponent["SkeletonEntity"].as<uint64_t>(0));
+        const YAML::Node clipsNode = animationComponent["AnimationClips"].IsDefined()
+            ? animationComponent["AnimationClips"] : animationComponent["Clips"];
+        if (clipsNode) {
+            for (const auto& clip : clipsNode) {
+                animation.AnimationClips.emplace_back(AssetHandle(clip.as<uint64_t>()));
+            }
+        }
+        animation.ActiveClip = animationComponent["ActiveClip"].as<int32_t>(-1);
         animation.PlaybackSpeed = animationComponent["PlaybackSpeed"].as<float>(1.0f);
         animation.IsPlaying = animationComponent["IsPlaying"].as<bool>(false);
         animation.IsLooping = animationComponent["IsLooping"].as<bool>(true);
+        animation.PlayOnStart = animationComponent["PlayOnStart"].as<bool>(false);
+    }
+    else if (auto legacyAnimationComponent = node["AnimationComponent"]) {
+        auto& animation = deserializedEntity.AddComponent<AnimatorComponent>();
+        const AssetHandle clip = AssetHandle(legacyAnimationComponent["AnimationAsset"].as<uint64_t>(0));
+        if (clip.IsValid())
+            animation.AnimationClips.push_back(clip);
+        animation.ActiveClip = animation.AnimationClips.empty() ? -1 : 0;
+        animation.PlaybackSpeed = legacyAnimationComponent["PlaybackSpeed"].as<float>(1.0f);
+        animation.IsPlaying = legacyAnimationComponent["IsPlaying"].as<bool>(false);
+        animation.IsLooping = legacyAnimationComponent["IsLooping"].as<bool>(true);
+        animation.PlayOnStart = legacyAnimationComponent["PlayOnStart"].as<bool>(false);
+    }
+
+    if (auto ragdollComponent = node["RagdollComponent"]) {
+        auto& ragdoll = deserializedEntity.AddComponent<RagdollComponent>();
+        ragdoll.SkeletonEntity = UUID(ragdollComponent["SkeletonEntity"].as<uint64_t>(0));
+        ragdoll.BlendDuration = std::max(0.0f, ragdollComponent["BlendDuration"].as<float>(0.25f));
+        ragdoll.StartInRagdoll = ragdollComponent["StartInRagdoll"].as<bool>(false);
+        ragdoll.JointRadiusScale = std::max(0.01f, ragdollComponent["JointRadiusScale"].as<float>(1.0f));
+    }
+
+    if (auto socketComponent = node["SocketComponent"]) {
+        auto& socket = deserializedEntity.AddComponent<SocketComponent>();
+        socket.SkeletonEntity = UUID(socketComponent["SkeletonEntity"].as<uint64_t>(0));
+        socket.JointName = socketComponent["JointName"].as<std::string>("");
+        socket.LocalTranslation = socketComponent["LocalTranslation"].as<glm::vec3>(glm::vec3(0.0f));
+        socket.LocalRotation = socketComponent["LocalRotation"].as<glm::vec3>(glm::vec3(0.0f));
+        socket.LocalScale = socketComponent["LocalScale"].as<glm::vec3>(glm::vec3(1.0f));
     }
 
     return deserializedEntity;
@@ -704,6 +804,7 @@ bool SceneSerializer::Deserialize(const std::filesystem::path& filepath) const
 
     const std::string sceneName = data["Scene"].as<std::string>();
     m_Scene->SetName(sceneName);
+    m_Scene->GetAnimationRuntime().Reset();
 
     if (auto entities = data["Entities"]) {
         for (const auto& entity : entities) {

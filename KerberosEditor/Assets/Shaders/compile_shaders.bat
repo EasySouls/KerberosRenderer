@@ -39,5 +39,6 @@ if not exist "%SLANGC%" (
 "%SLANGC%" particle_simulate.slang -target spirv -profile spirv_1_6 -emit-spirv-directly -fvk-use-entrypoint-name -entry computeMain -o ../Cache/Shaders/particle_simulate.spv
 "%SLANGC%" particle_finalize_simulation.slang -target spirv -profile spirv_1_6 -emit-spirv-directly -fvk-use-entrypoint-name -entry computeFinalizeSimulate -o ../Cache/Shaders/particle_finalize_simulation.spv
 "%SLANGC%" particle_draw.slang -target spirv -profile spirv_1_6 -emit-spirv-directly -fvk-use-entrypoint-name -entry vertexMain -entry fragmentMain -o ../Cache/Shaders/particle_draw.spv
+"%SLANGC%" skinning.slang -target spirv -profile spirv_1_6 -emit-spirv-directly -fvk-use-entrypoint-name -entry computeMain -o ../Cache/Shaders/skinning.spv
 
 PAUSE

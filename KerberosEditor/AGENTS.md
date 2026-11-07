@@ -34,7 +34,10 @@ after the current ImGui loop and stack cleanup.
 
 Preserve ImGui Begin/End, popup, ID, style-color, columns/table, and drag/drop
 pairing rules. Give repeated controls stable `##` IDs and avoid duplicate
-labels across windows.
+labels across windows. Single-type asset fields should use
+`Widgets/AssetPicker` instead of custom button/drop-target pairs; it provides
+the searchable asset list and keeps the matching asset-browser payload as a
+drop target.
 
 ## Panels and integration
 
@@ -50,7 +53,64 @@ Editor windows live mainly under
   loaded material instance, and force-reimports the source so the cache artifact
   and future loads stay in sync.
 - `HierarchyPanel`: entity selection, component add/remove, and component
-  editing, including particle emitters.
+  editing, including particle emitters and the animation components
+  (skeletons, skinned meshes, joints, and animators). Its window context menu
+  also has a debug "Create Skinned Test Mesh" action that builds a procedural
+  two-bone strip for validating the skinning path without imported glTF data.
+  Single-asset component fields use the shared
+  `KerberosEditor/Source/Widgets/AssetPicker` searchable dropdown, which keeps
+  the matching asset-browser drag/drop payload working. The Animator component
+  exposes skeleton-entity selection, clip add/remove/reorder-by-selection,
+  active-clip selection, time, speed, playing, looping, and Play On Start
+  controls plus a Stop button. Playback is evaluated by the scene-owned
+  `AnimationRuntime` in Edit, Simulate, and Play, so toggling Playing or
+  scrubbing Time previews the pose immediately unless the scene is paused. C# scripts control the same state
+  through `Kerberos.Scene.AnimatorComponent` (`Play`, `Play(string)`, `Pause`,
+  `Stop`, `CrossFade(int, float, bool)`, `CrossFade(string, float, bool)`,
+  `CurrentTime`, `PlaybackSpeed`, `IsPlaying`, `IsLooping`, `PlayOnStart`,
+  `ActiveClip`, `ClipCount`, and `GetClipDuration`). `Play`/`SetActiveClip` snap
+  to the requested clip; `CrossFade` blends from the current pose over the given
+  duration and can interrupt an in-flight fade from the current blended pose.
+  A zero or negative fade duration snaps. Animation
+  events are delivered to scripts through
+  `Entity.OnAnimationEvent(AnimationEvent)` with Point/Begin/Tick/End phases;
+  events dispatch on the animator entity in Play mode only, while Edit and
+  Simulate clear pending events without invoking gameplay scripts. The Socket
+  component attaches an entity to a named joint; its authored offset is edited
+  in the hierarchy and scripts can attach newly spawned entities at runtime
+  with `Entity.AttachToSocket(skeletonEntity, jointName, ...)` and detach with
+  `Entity.DetachFromSocket()`. Sockets are derived from the authoritative
+  skeleton pose. The runtime also publishes derived joint entity world
+  transforms (never authored local TRS) so rigid attachments parented under
+  joints follow the pose. Socket components are
+  scene-serialized and copied with scenes; authored prefab templates do not
+  carry them yet, so runtime-spawned attachments use the scripting API. The
+  Ragdoll component exposes skeleton-entity selection, blend duration, joint
+  radius scale, and Start In Ragdoll, shows the live state/physics weight in
+  Play/Simulate, and provides an Enable/Disable Ragdoll button there. C# scripts
+  use `Kerberos.Scene.RagdollComponent`
+  (`EnableRagdoll`, `DisableRagdoll`, `IsRagdoll`, `State`, `BlendWeight`,
+  `BlendDuration`, `StartInRagdoll`, and `JointRadiusScale`). The component is
+  authored setup only; `Scene::RagdollSystem` owns the runtime bodies,
+  constraints, offsets, and blend state. Authored prefab templates do not carry
+  the Ragdoll component yet, so add it after instantiation or from C#.
+- `AnimationEditorPanel`: opened from `View > Animation Editor`; it resolves the
+  animator from the selected entity, a parent, or the skeleton-linked animator.
+  Its timeline shows one lane per event name plus a marker lane, supports
+  scrubbing/zooming, point events as draggable diamonds, duration events as
+  draggable/resizable bars, and a marker lane. The event inspector edits the
+  generic name, time, duration, payload, trigger weight, flags, and a list of
+  named typed parameters (`Bool`, `Int`, `Float`, `Vector3`, `String`, `Asset`)
+  with an asset picker for asset values. Add/remove controls cover events and
+  markers. Save/Revert writes the source `.meta` through
+  `EditorAssetManager::SetAnimationClipMeta` and reimports; editing is disabled
+  outside Edit mode. There is no timeline undo yet, so Revert reloads the source.
+  Events are delivered to C# through `OnAnimationEvent`; the managed
+  `AnimationEvent` exposes typed parameter getters. Weapon-style hitboxes can be
+  queried from C# with `Physics.OverlapBox(Entity source, localCenter,
+  localHalfExtents, ignore)` or `Physics.OverlapSphere`; the entity-relative
+  overload uses the entity's world transform, so a socket-driven weapon is
+  enough and no dedicated hitbox component is required.
 - `InspectorPanel`: the unified right-side "Properties" window. It shows entity
   components when an entity is selected and asset import options when a source
   asset is selected in `AssetsPanel` (asset selection takes display precedence).
@@ -110,9 +170,15 @@ keyed by widget ID plus entity UUID so a selection change cannot mix them up.
 and shares per-entity deserialization with whole-scene loading. The whole-scene
 path still loads every entity in the file, while the subtree path restores only
 the entities present in the blob. `Scene::Copy` covers the serializer's authored
-components, including prefab instances, particles, skins, skeletal meshes,
-animations, and script field initializers, resets transient runtime state, and
-intentionally does not copy `NativeScriptComponent` runtime instances.
+components, including prefab instances, particles, joints, skeletons, skinned
+meshes, animators, and script field initializers, resets transient runtime
+state, and intentionally does not copy `NativeScriptComponent` runtime
+instances. The scene serializer persists `JointComponent`, `SkeletonComponent`,
+`SkinnedMeshComponent`, `AnimatorComponent`, and `RagdollComponent`; legacy
+`AnimationComponent` records are migrated to a single-clip animator on load.
+`RagdollComponent` serializes only authored setup; runtime bodies and
+constraints belong to `Scene::RagdollSystem` and are recreated on simulation
+start.
 
 ## C# script components
 
@@ -215,9 +281,21 @@ hidden-window Vulkan lifecycle tests. Those tests still use the real
 application, renderer, scripting, asset-manager, and scene-loading paths, but
 must close and release project resources before the application is destroyed.
 
-Scene updates drive editor/runtime simulation and then queue rendering. Edit and
-Simulate render through the editor camera; Play renders through the runtime
-scene's primary `CameraComponent`. The runtime view matrix is the inverse of the
+Scene updates drive editor/runtime simulation and then queue rendering. The
+Play/Simulate update order is transforms → animation clocks/pose → events →
+scripts → `RagdollSystem::PreparePhysics` → `PhysicsSystem::Update` →
+`RagdollSystem::ReadPhysicsPose` → `AnimationRuntime::FinalizePose` → queue
+render; the renderer only uploads the already-final skin matrices and joint
+entities/sockets are published from the ragdoll-blended `FinalPose`. Animation
+markers/events are stored per source in the `.meta` (`AnimationClips`, schema 3),
+including generic typed event parameters; `EditorAssetManager` exposes
+`GetAnimationClipMeta`/`SetAnimationClipMeta`, and applying changes persists the
+metadata and force-reimports the source. The `AnimationEditorPanel` is the
+timeline UI for this metadata. Play evaluates animation again after scripts when
+playback state changed so C# controls (including `CrossFade`) apply in the same
+frame; the fade clock advances on the following update. Edit and Simulate
+render through the editor camera; Play renders through the runtime scene's
+primary `CameraComponent`. The runtime view matrix is the inverse of the
 camera entity's world transform, and both editor/runtime scene projection
 matrices apply the Vulkan Y flip. The editor camera is neither updated nor given
 input while Play is active.

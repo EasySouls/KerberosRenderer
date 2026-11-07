@@ -36,7 +36,8 @@ Do not confuse a source asset with its generated library outputs.
 - Generated entries use a cache-relative `LibraryPath`, point to the root with
   `RootSourceHandle`/`ParentHandle`, and have a stable `SubAssetKey`.
 - glTF/GLB sources are imported as prefab root assets and can generate meshes,
-  materials, textures, skeletons, animations, and prefab subassets.
+  skinned meshes, materials, textures, skeletons, animations, and prefab
+  subassets.
 - Stable local keys are required to reuse sub-asset handles across rebuilds.
 - Generated cache/staging outputs must not recursively become watched sources.
 - Source files may live anywhere below the assets root; importers must not
@@ -75,19 +76,52 @@ while the imported binary `.kbrprefab` artifact plus its `.kbrscene` manifest
 are what runtime loading consumes. A scene must not resolve the glTF source
 directly, and native cache prefabs must not be sent through the legacy YAML
 `PrefabSerializer`.
-The `.kbrscene` manifest stores the imported node graph and one record for
-each mesh primitive, including its generated mesh and material indices. Native
-glTF loading preserves source parent relationships, creates primitive child
-entities, assigns `StaticMeshComponent::MeshMaterial`, and adds a synthetic
-instance root so files with multiple glTF roots remain grouped. Legacy YAML
-prefabs do not receive this wrapper behavior.
+The `.kbrscene` manifest stores the imported node graph (including node TRS),
+the ordered joint node list for each supported skeleton, and one record for
+each mesh primitive, including its generated mesh or skinned mesh index and
+material index. Native glTF loading preserves source parent relationships,
+applies node transforms, creates primitive child entities, assigns
+`StaticMeshComponent::MeshMaterial` for static primitives, and adds a synthetic
+instance root so files with multiple glTF roots remain grouped. For skinned
+primitives it creates `SkinnedMeshComponent`s linked to the skeleton entity,
+marks joint nodes with `JointComponent`, adds `SkeletonComponent` to the
+skeleton node, and adds an `AnimatorComponent` containing all clips imported
+for that skeleton. Legacy YAML prefabs do not receive this wrapper behavior.
+glTF skeleton import topologically sorts joints, remaps vertex joint indices,
+and stores per-joint rest TRS and inverse-bind matrices. Animation import
+preserves all skeletal T/R/S channels, interpolation modes, keyframe times,
+values, and cubic-spline tangents. Only the first skin in a glTF file is
+supported; additional skins are reported and ignored.
+
+Animation markers and events are authored in the source `.meta` (schema 3)
+under `AnimationClips`, keyed by the clip's stable `LocalKey`/`SubAssetKey`
+(`animation:<i>`). Each clip entry has `Markers` (`Time`, `Name`) and `Events`
+(`Time`, `Duration`, `Name`, `Payload`, `FireInEditor`, `MinTriggerWeight`,
+`Flags`, and optional `Parameters`). Event parameters are generic named typed
+values (`Bool`, `Int`, `Float`, `Vector3`, `String`, `Asset`); the engine does
+not assign gameplay meaning to names such as "Damage" or "Hitbox". The glTF
+importer bakes events and parameters into `.kbranimation` version 3 after
+rejecting non-finite values, clamping times to the clip range, and sorting by
+time. Version 1 clips still load with empty marker/event lists; version 2 clips
+load with events but no parameters. Editing this metadata must go through
+`EditorAssetManager::SetAnimationClipMeta`, which persists the `.meta` and
+force-reimports the source; the runtime re-resolves clips after the reimport.
+Reordering glTF animations remaps `animation:<i>` keys, so keep clip names
+visible when authoring events. The editor's Animation Editor panel is the
+authoring UI for this metadata.
 Authored YAML prefabs may also carry per-entity script records
 (`PrefabScriptTemplate`: class name plus serialized field initializers).
 `PrefabSerializer` writes and reads those records, and
 `PrefabEntityTemplate::ToEntity` recreates the entity's `ScriptComponent` and
 field initializers, then reconciles them with the current script class so
 removed fields are dropped and new fields get defaults. Native glTF prefabs
-remain script-free. When a scene is
+remain script-free. Authored prefab entity records also carry an optional joint
+index, an optional skinned-mesh record with a prefab-local skeleton-entity
+reference, and an `Animator` record (skeleton-entity reference, clip handles,
+and an `AutoPlay` flag). `AnimatorComponentTemplate::AutoPlay` maps to
+`AnimatorComponent::PlayOnStart` and the initial `IsPlaying` state when the
+template is instantiated. `Scene::InstantiatePrefab` remaps the skeleton-entity
+UUIDs and joint UUIDs after creating the entities. When a scene is
 running, `Scene::InstantiatePrefab` creates script instances and runs
 `OnCreate` for scripted prefab entities immediately.
 The importer also emits one native material record per glTF material (named
@@ -116,11 +150,15 @@ stripped), e.g. `Models/FlightHelmet/glTF/FlightHelmet/...`. This guarantees
 one source's cache entries never overwrite another source's, even when two
 glTF files share the same stem. Within that namespace, sub-asset file names
 are readable hints rather than bare indices: meshes use
-`mesh_<m>_<p>[_<meshName>]`, textures use `texture_<i>[_<imageName>]`, and
-materials/skeletons/animations use their glTF name with an index fallback.
+`mesh_<m>_<p>[_<meshName>]`, skinned meshes use
+`skinnedmesh_<m>_<p>[_<meshName>]`, textures use
+`texture_<i>[_<imageName>]`, and materials/skeletons/animations use their glTF
+name with an index fallback.
 The leading index tokens are the source of the stable `SubAssetKey`
-(`mesh:<m>_<p>`, `texture:<i>`, etc.), so the readable suffix never changes
-sub-asset identity.
+(`mesh:<m>_<p>`, `skinnedmesh:<m>_<p>`, `texture:<i>`, etc.), so the readable
+suffix never changes sub-asset identity. Skeleton, animation, and skinned-mesh
+artifacts also store their `LocalKey` and source index internally; the pipeline
+importer reads identity from those headers instead of relying on file names.
 
 `TexturePipelineImporter` converts texture sources into cached `.ktx2`
 artifacts so runtime loading only consumes KTX2. Raster images are decoded
@@ -164,6 +202,10 @@ Importer extension lookup normalizes the leading dot and case. Unknown file
 types must not silently become `Texture2D`; preserve explicit error/warning
 behavior when changing type classification.
 
+`AssetTypeFromString` accepts the legacy serialized names `Skin` and
+`AnimationClip` as aliases for `Skeleton` and `Animation` so projects written
+before the rename continue to load. New data should use the canonical names.
+
 ## Known glTF import limitations
 
 The glTF pipeline currently handles opaque, single-UV, unanimated
@@ -172,9 +214,9 @@ imported, or are imported lossily:
 
 - Per-texture `texCoord` indices beyond `TEXCOORD_0` (lightmaps, multi-UV).
 - `COLOR_0` vertex colors and `TEXCOORD_1+` attribute sets.
-- Morph targets, and `JOINTS_0`/`WEIGHTS_0` skinning weights (skeletons are
-  recorded but skinned meshes do not deform).
-- Animation keyframes (only channel/sampler counts are stored).
+- Morph targets and `weights` animation channels.
+- Multiple skins per glTF file; only the first skin is imported for now.
+- Non-joint node animation channels outside the supported skeleton are skipped.
 - `alphaMode`, `alphaCutoff`, and `doubleSided` material settings.
 - Texture sampler wrap/filter modes and `KHR_texture_transform`.
 - 16-bit per-channel source images.
@@ -207,7 +249,10 @@ registry completeness, and the build coordinator additionally verifies that
 artifact-producing importers have a root `LibraryPath` and an existing root
 artifact. Generated sub-asset output existence is not currently fully
 validated, so changes involving cache artifacts should address that gap
-deliberately.
+deliberately. `EditorAssetManager::EnsureAssetMetas` also removes stale root
+entries for a source path when a regenerated `.meta` uses a different source
+handle, including that stale root's generated subassets, so path lookup cannot
+keep resolving to an obsolete import.
 
 Import options also live in the `.meta` (`AssetMetaFile::TextureSrgb`), a map
 from a stable key to an sRGB boolean. glTF sources use `texture:<imageIndex>`
@@ -269,9 +314,10 @@ Both managers expose `GetAssetsOfType` (backed by the registry's dense type
 index) through `AssetManagerBase` and the `AssetManager` facade; UI code should
 use that query instead of scanning the registry or walking the filesystem when
 it needs assets of a particular type.
-The runtime loader still supports only part of the selected artifact set; add
-loaders explicitly and preserve unsupported-asset errors until they exist.
-glTF imports now emit native texture artifacts: each referenced image is
+The runtime loader supports textures, meshes, skinned meshes, materials,
+skeletons, animations, deprecated models, and prefabs. Add loaders explicitly
+and preserve unsupported-asset errors until they exist.
+glTF imports emit native texture artifacts: each referenced image is
 imported as a `.ktx2` file under `Textures/` (via `KTX2Encoder`/`KtxConversion`)
 and registered as a `Texture2D` sub-asset keyed `texture:<imageIndex>`. Native
 material records carry the base color, metallic, roughness, and emissive

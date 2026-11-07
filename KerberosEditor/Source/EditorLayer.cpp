@@ -231,8 +231,6 @@ namespace PROJECT_NAME
 		{
 			KBR_TRACY_SCOPE("Scene::OnUpdate");
 
-			m_ActiveScene->CalculateEntityTransforms();
-
 			switch (m_SceneState)
 			{
 			case SceneState::Edit:
@@ -324,6 +322,12 @@ namespace PROJECT_NAME
 
 		m_InspectorPanel.SetContext(&m_HierarchyPanel, m_AssetsPanel.get());
 		m_InspectorPanel.OnImGuiRender();
+
+		const Entity selectedEntity = m_HierarchyPanel.GetSelectedEntity();
+		const UUID selectedEntityUUID = selectedEntity ? selectedEntity.GetUUID() : UUID::Invalid();
+		m_AnimationEditorPanel.SetContext(m_ActiveScene, selectedEntityUUID,
+		                                  m_SceneState == SceneState::Edit);
+		m_AnimationEditorPanel.OnImGuiRender();
 
 		DrawViewport();
 
@@ -446,7 +450,7 @@ namespace PROJECT_NAME
 
 				Entity meshEntity = m_ActiveScene->CreateEntity("Mesh");
 				auto &smc = meshEntity.AddComponent<StaticMeshComponent>();
-				smc.StaticMesh = AssetManager::ResolveMeshAsset(handle);
+				smc.StaticMesh = AssetManager::AsAsset<Mesh>(handle);
 				m_HierarchyPanel.SetSelectedEntity(meshEntity);
 			}
 
@@ -1137,6 +1141,9 @@ namespace PROJECT_NAME
 
 			if (ImGui::BeginMenu("View"))
 			{
+				if (ImGui::MenuItem("Animation Editor", nullptr, m_AnimationEditorPanel.IsOpen()))
+					m_AnimationEditorPanel.SetOpen(!m_AnimationEditorPanel.IsOpen());
+
 				if (ImGui::MenuItem("Show Wireframe"))
 				{
 					/*m_ShowWireframe = !m_ShowWireframe;
@@ -1364,7 +1371,9 @@ namespace PROJECT_NAME
 		ImGui::Checkbox("Display physics colliders", &Renderer::GetDisplayPhysicsColliders());
 
 		bool &useRayQueryBasedShadows = Renderer::GetUseRayQueryBasedShadows();
+		ImGui::BeginDisabled(!Renderer::IsRayTracingSupported());
 		ImGui::Checkbox("Ray query based shadows", &useRayQueryBasedShadows);
+		ImGui::EndDisabled();
 		if (useRayQueryBasedShadows)
 		{
 			ImGui::Indent();

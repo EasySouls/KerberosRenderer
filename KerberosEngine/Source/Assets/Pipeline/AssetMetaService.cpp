@@ -3,6 +3,7 @@
 #include "Profiling/Profilers.hpp"
 
 #include <yaml-cpp/yaml.h>
+#include <algorithm>
 #include <fstream>
 #include <iomanip>
 #include <sstream>
@@ -10,6 +11,47 @@
 import Kerberos;
 
 namespace Kerberos {
+
+namespace {
+
+AnimationEventParameterTypeFile ParseAnimationEventParameterType(const std::string& value)
+{
+    if (value == "Bool") return AnimationEventParameterTypeFile::Bool;
+    if (value == "Int") return AnimationEventParameterTypeFile::Int;
+    if (value == "Float") return AnimationEventParameterTypeFile::Float;
+    if (value == "Vector3") return AnimationEventParameterTypeFile::Vector3;
+    if (value == "String") return AnimationEventParameterTypeFile::String;
+    if (value == "Asset") return AnimationEventParameterTypeFile::Asset;
+
+    // Accept legacy/numeric values as well.
+    try
+    {
+        const int type = std::stoi(value);
+        if (type >= 0 && type <= static_cast<int>(AnimationEventParameterTypeFile::Asset))
+            return static_cast<AnimationEventParameterTypeFile>(type);
+    }
+    catch (const std::exception&)
+    {
+    }
+
+    return AnimationEventParameterTypeFile::Float;
+}
+
+const char* AnimationEventParameterTypeToString(const AnimationEventParameterTypeFile type)
+{
+    switch (type)
+    {
+    case AnimationEventParameterTypeFile::Bool: return "Bool";
+    case AnimationEventParameterTypeFile::Int: return "Int";
+    case AnimationEventParameterTypeFile::Float: return "Float";
+    case AnimationEventParameterTypeFile::Vector3: return "Vector3";
+    case AnimationEventParameterTypeFile::String: return "String";
+    case AnimationEventParameterTypeFile::Asset: return "Asset";
+    }
+    return "Float";
+}
+
+}
 
 AssetMetaService::AssetMetaService(std::filesystem::path assetsRoot) 
 : m_AssetsRoot(std::move(assetsRoot)) 
@@ -93,6 +135,71 @@ std::optional<AssetMetaFile> AssetMetaService::LoadMeta(const std::filesystem::p
                 meta.TextureSrgb[entry.first.as<std::string>()] = entry.second.as<bool>();
             }
         }
+
+        if (config["AnimationClips"])
+        {
+            for (const auto& clipNode : config["AnimationClips"])
+            {
+                const std::string clipKey = clipNode.first.as<std::string>();
+                AnimationClipMetaEntry clipMeta{};
+
+                if (const YAML::Node markersNode = clipNode.second["Markers"])
+                {
+                    for (const auto& markerNode : markersNode)
+                    {
+                        AnimationMarkerFile marker{};
+                        marker.Time = markerNode["Time"].as<float>(0.0f);
+                        marker.Name = markerNode["Name"].as<std::string>("");
+                        clipMeta.Markers.push_back(std::move(marker));
+                    }
+                }
+
+                if (const YAML::Node eventsNode = clipNode.second["Events"])
+                {
+                    for (const auto& eventNode : eventsNode)
+                    {
+                        AnimationEventFile event{};
+                        event.Time = eventNode["Time"].as<float>(0.0f);
+                        event.Duration = eventNode["Duration"].as<float>(0.0f);
+                        event.Name = eventNode["Name"].as<std::string>("");
+                        event.Payload = eventNode["Payload"].as<std::string>("");
+                        event.FireInEditor = eventNode["FireInEditor"].as<bool>(false);
+                        event.MinTriggerWeight = eventNode["MinTriggerWeight"].as<float>(0.0f);
+                        event.Flags = eventNode["Flags"].as<uint32_t>(0);
+
+                        if (const YAML::Node parametersNode = eventNode["Parameters"])
+                        {
+                            for (const auto& parameterNode : parametersNode)
+                            {
+                                AnimationEventParameterFile parameter{};
+                                parameter.Name = parameterNode["Name"].as<std::string>("");
+                                parameter.Type = ParseAnimationEventParameterType(
+                                    parameterNode["Type"].as<std::string>("Float"));
+                                parameter.BoolValue = parameterNode["BoolValue"].as<bool>(false);
+                                parameter.IntValue = parameterNode["IntValue"].as<int32_t>(0);
+                                parameter.FloatValue = parameterNode["FloatValue"].as<float>(0.0f);
+                                if (const YAML::Node vectorNode = parameterNode["Vector3"];
+                                    vectorNode && vectorNode.IsSequence() && vectorNode.size() == 3)
+                                {
+                                    parameter.VectorValue = glm::vec3(
+                                        vectorNode[0].as<float>(0.0f),
+                                        vectorNode[1].as<float>(0.0f),
+                                        vectorNode[2].as<float>(0.0f));
+                                }
+                                parameter.StringValue = parameterNode["StringValue"].as<std::string>("");
+                                parameter.AssetValue = parameterNode["AssetValue"].as<uint64_t>(0);
+                                event.Parameters.push_back(std::move(parameter));
+                            }
+                        }
+
+                        clipMeta.Events.push_back(std::move(event));
+                    }
+                }
+
+                meta.AnimationClips[clipKey] = std::move(clipMeta);
+            }
+        }
+
         return meta;
     } 
     catch (const YAML::Exception& e) 
@@ -126,6 +233,89 @@ bool AssetMetaService::SaveMeta(const std::filesystem::path& sourcePath, const A
         out << YAML::Key << "TextureSrgb" << YAML::Value << YAML::BeginMap;
         for (const auto& [key, value] : meta.TextureSrgb)
             out << YAML::Key << key << YAML::Value << value;
+        out << YAML::EndMap;
+    }
+    if (!meta.AnimationClips.empty()) {
+        out << YAML::Key << "AnimationClips" << YAML::Value << YAML::BeginMap;
+        for (const auto& [clipKey, clipMeta] : meta.AnimationClips) {
+            out << YAML::Key << clipKey << YAML::Value << YAML::BeginMap;
+
+            auto markers = clipMeta.Markers;
+            std::ranges::stable_sort(markers, {}, &AnimationMarkerFile::Time);
+            if (!markers.empty()) {
+                out << YAML::Key << "Markers" << YAML::Value << YAML::BeginSeq;
+                for (const auto& marker : markers) {
+                    out << YAML::BeginMap
+                        << YAML::Key << "Time" << YAML::Value << marker.Time
+                        << YAML::Key << "Name" << YAML::Value << marker.Name
+                        << YAML::EndMap;
+                }
+                out << YAML::EndSeq;
+            }
+
+            auto events = clipMeta.Events;
+            std::ranges::stable_sort(events, {}, &AnimationEventFile::Time);
+            if (!events.empty()) {
+                out << YAML::Key << "Events" << YAML::Value << YAML::BeginSeq;
+                for (const auto& event : events) {
+                    out << YAML::BeginMap
+                        << YAML::Key << "Time" << YAML::Value << event.Time
+                        << YAML::Key << "Duration" << YAML::Value << event.Duration
+                        << YAML::Key << "Name" << YAML::Value << event.Name
+                        << YAML::Key << "Payload" << YAML::Value << event.Payload
+                        << YAML::Key << "FireInEditor" << YAML::Value << event.FireInEditor
+                        << YAML::Key << "MinTriggerWeight" << YAML::Value << event.MinTriggerWeight
+                        << YAML::Key << "Flags" << YAML::Value << event.Flags;
+
+                    if (!event.Parameters.empty())
+                    {
+                        out << YAML::Key << "Parameters" << YAML::Value << YAML::BeginSeq;
+                        for (const auto& parameter : event.Parameters)
+                        {
+                            out << YAML::BeginMap
+                                << YAML::Key << "Name" << YAML::Value << parameter.Name
+                                << YAML::Key << "Type" << YAML::Value
+                                << AnimationEventParameterTypeToString(parameter.Type);
+
+                            switch (parameter.Type)
+                            {
+                            case AnimationEventParameterTypeFile::Bool:
+                                out << YAML::Key << "BoolValue" << YAML::Value << parameter.BoolValue;
+                                break;
+                            case AnimationEventParameterTypeFile::Int:
+                                out << YAML::Key << "IntValue" << YAML::Value << parameter.IntValue;
+                                break;
+                            case AnimationEventParameterTypeFile::Float:
+                                out << YAML::Key << "FloatValue" << YAML::Value << parameter.FloatValue;
+                                break;
+                            case AnimationEventParameterTypeFile::Vector3:
+                                out << YAML::Key << "Vector3" << YAML::Value
+                                    << YAML::Flow << YAML::BeginSeq
+                                    << parameter.VectorValue.x
+                                    << parameter.VectorValue.y
+                                    << parameter.VectorValue.z
+                                    << YAML::EndSeq;
+                                break;
+                            case AnimationEventParameterTypeFile::String:
+                                out << YAML::Key << "StringValue" << YAML::Value << parameter.StringValue;
+                                break;
+                            case AnimationEventParameterTypeFile::Asset:
+                                out << YAML::Key << "AssetValue" << YAML::Value << parameter.AssetValue;
+                                break;
+                            }
+
+                            out << YAML::EndMap;
+                        }
+                        out << YAML::EndSeq;
+                    }
+
+                    out << YAML::EndMap;
+                }
+                out << YAML::EndSeq;
+            }
+
+            out << YAML::EndMap;
+        }
         out << YAML::EndMap;
     }
     out << YAML::EndMap;

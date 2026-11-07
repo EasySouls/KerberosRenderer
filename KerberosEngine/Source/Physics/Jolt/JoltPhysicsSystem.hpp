@@ -47,12 +47,36 @@ namespace Kerberos
 		void Initialize(const Ref<Scene>& scene) override;
 		void Update(float deltaTime) override;
 
+		PhysicsBodyHandle CreateBody(const PhysicsBodyDesc& desc) override;
+		void DestroyBody(PhysicsBodyHandle body) override;
+		void SetBodyTransform(PhysicsBodyHandle body, const glm::vec3& position,
+		                      const glm::quat& rotation) override;
+		void MoveKinematicBody(PhysicsBodyHandle body, const glm::vec3& position,
+		                       const glm::quat& rotation, float deltaTime) override;
+		void GetBodyTransform(PhysicsBodyHandle body, glm::vec3& outPosition,
+		                      glm::quat& outRotation) const override;
+		void SetBodyMotionType(PhysicsBodyHandle body, PhysicsMotionType type) override;
+
+		PhysicsConstraintHandle CreateConstraint(const PhysicsConstraintDesc& desc) override;
+		void DestroyConstraint(PhysicsConstraintHandle constraint) override;
+
+		glm::vec3 GetLinearVelocity(uint32_t bodyId) const override;
+		glm::vec3 GetAngularVelocity(uint32_t bodyId) const override;
+
 		void AddImpulse(uint32_t bodyId, const glm::vec3& impulse) const override;
 		void AddImpulse(uint32_t bodyId, const glm::vec3& impulse, const glm::vec3& point) const override;
 		void SetLinearVelocity(uint32_t bodyId, const glm::vec3& velocity) const override;
+		void SetAngularVelocity(uint32_t bodyId, const glm::vec3& velocity) const override;
 
 		bool Raycast(const glm::vec3& origin, const glm::vec3& direction, float maxDistance,
 			RaycastHit& outHit) const override;
+
+		std::vector<OverlapHit> OverlapBox(const glm::vec3& center,
+		                                   const glm::quat& rotation,
+		                                   const glm::vec3& halfExtents) const override;
+		std::vector<OverlapHit> OverlapSphere(const glm::vec3& center, float radius) const override;
+
+		void SyncKinematicBodies(float dt) const;
 
 		std::vector<CollisionEvent> GetCollisionEvents() const override;
 
@@ -92,6 +116,9 @@ namespace Kerberos
 		 * Shape cache to avoid creating the same shape multiple times.
 		 */
 		std::unordered_map<size_t, JPH::RefConst<JPH::Shape>> m_ShapeCache;
+
+		struct Extras;
+		Extras* m_Extras = nullptr;
 	};
 
 }

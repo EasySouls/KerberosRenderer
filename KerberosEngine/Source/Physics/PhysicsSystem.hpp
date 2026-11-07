@@ -5,6 +5,7 @@
 #include "CollisionEvent.hpp"
 
 #include <glm/glm.hpp>
+#include <glm/gtc/quaternion.hpp>
 
 #include <cstdint>
 #include <vector>
@@ -19,6 +20,78 @@ namespace Kerberos
 		glm::vec3 Normal;
 		float Distance;
 		UUID EntityID;
+	};
+
+	struct OverlapHit
+	{
+		UUID EntityID = UUID::Invalid();
+		glm::vec3 Point = glm::vec3(0.0f);
+		glm::vec3 Normal = glm::vec3(0.0f);
+	};
+
+	enum class PhysicsMotionType : std::uint8_t
+	{
+		Static,
+		Kinematic,
+		Dynamic
+	};
+
+	enum class PhysicsShapeType : std::uint8_t
+	{
+		Box,
+		Sphere,
+		Capsule
+	};
+
+	struct PhysicsShapeDesc
+	{
+		PhysicsShapeType Type = PhysicsShapeType::Capsule;
+		glm::vec3 HalfExtents = glm::vec3(0.5f);
+		float Radius = 0.1f;
+		/// Half height of the cylindrical section of a capsule (excludes the caps).
+		float HalfHeight = 0.5f;
+	};
+
+	/// Opaque runtime body handle. The value is the engine's stable body id and can be passed to
+	/// the existing velocity/impulse APIs.
+	using PhysicsBodyHandle = std::uint32_t;
+	using PhysicsConstraintHandle = std::uint64_t;
+
+	struct PhysicsBodyDesc
+	{
+		PhysicsShapeDesc Shape;
+		glm::vec3 Position = glm::vec3(0.0f);
+		glm::quat Rotation = glm::quat(1.0f, 0.0f, 0.0f, 0.0f);
+		PhysicsMotionType MotionType = PhysicsMotionType::Dynamic;
+		float Mass = 1.0f;
+		float Friction = 0.5f;
+		float Restitution = 0.0f;
+		float LinearDamping = 0.05f;
+		float AngularDamping = 0.1f;
+		bool UseGravity = true;
+		bool AllowSleeping = true;
+		/// Bodies in the same non-invalid group use the engine's self-collision filter. Different
+		/// groups collide normally, as do grouped bodies against ungrouped bodies.
+		std::uint32_t CollisionGroup = 0xFFFFFFFFu;
+		std::uint32_t CollisionSubGroup = 0;
+
+		/// Optional owning entity for raycast/collision attribution. Standalone bodies without an
+		/// owner are still created but are not returned by entity raycasts.
+		UUID UserData = UUID::Invalid();
+	};
+
+	/// Swing-twist constraint description. Positions and axes are in world space at creation time
+	/// and are converted to body-local space by the physics backend.
+	struct PhysicsConstraintDesc
+	{
+		PhysicsBodyHandle BodyA = 0;
+		PhysicsBodyHandle BodyB = 0;
+		glm::vec3 Position = glm::vec3(0.0f);
+		glm::vec3 TwistAxis = glm::vec3(0.0f, 1.0f, 0.0f);
+		glm::vec3 PlaneAxis = glm::vec3(1.0f, 0.0f, 0.0f);
+		float SwingLimit = 0.6f;
+		float TwistMin = -0.6f;
+		float TwistMax = 0.6f;
 	};
 
 	class PhysicsSystem
@@ -37,6 +110,41 @@ namespace Kerberos
 		virtual void Cleanup() = 0;
 
 		virtual void Update(float deltaTime) = 0;
+
+		/**
+		 * Creates a standalone body that is not owned by an ECS RigidBody3DComponent. Used by
+		 * systems such as the ragdoll, which manage their own body lifetime.
+		 * @return A handle that can be passed to DestroyBody and the transform/velocity APIs.
+		 */
+		virtual PhysicsBodyHandle CreateBody(const PhysicsBodyDesc& desc) = 0;
+
+		/// Removes and destroys a body created with CreateBody.
+		virtual void DestroyBody(PhysicsBodyHandle body) = 0;
+
+		/// Teleports a body to the given world transform.
+		virtual void SetBodyTransform(PhysicsBodyHandle body,
+		                              const glm::vec3& position,
+		                              const glm::quat& rotation) = 0;
+
+		/// Moves a kinematic body toward the target transform. A non-positive delta time
+		/// teleports instead, which is useful for spawning and large changes.
+		virtual void MoveKinematicBody(PhysicsBodyHandle body,
+		                               const glm::vec3& position,
+		                               const glm::quat& rotation,
+		                               float deltaTime) = 0;
+
+		virtual void GetBodyTransform(PhysicsBodyHandle body,
+		                              glm::vec3& outPosition,
+		                              glm::quat& outRotation) const = 0;
+
+		virtual void SetBodyMotionType(PhysicsBodyHandle body, PhysicsMotionType type) = 0;
+
+		/**
+		 * Creates a swing-twist constraint between two bodies. Returns an invalid handle on
+		 * failure. Constraints are owned by the physics system until DestroyConstraint.
+		 */
+		virtual PhysicsConstraintHandle CreateConstraint(const PhysicsConstraintDesc& desc) = 0;
+		virtual void DestroyConstraint(PhysicsConstraintHandle constraint) = 0;
 
 		/**
 		 * Applies an impulse to the center of mass of the body 
@@ -62,6 +170,14 @@ namespace Kerberos
 		virtual void SetLinearVelocity(std::uint32_t bodyId, const glm::vec3& velocity) const = 0;
 
 		/**
+		 * Sets the angular velocity of the body, overwriting any existing angular velocity.
+		 */
+		virtual void SetAngularVelocity(std::uint32_t bodyId, const glm::vec3& velocity) const = 0;
+
+		virtual glm::vec3 GetLinearVelocity(std::uint32_t bodyId) const = 0;
+		virtual glm::vec3 GetAngularVelocity(std::uint32_t bodyId) const = 0;
+
+		/**
 		* Performs a raycast query from the given origin in the specified direction.
 		* @param origin The world-space starting point of the ray.
 		* @param direction The world-space direction of the ray.
@@ -70,6 +186,18 @@ namespace Kerberos
 		* @return True if a collision was found, false otherwise.
 		*/
 		virtual bool Raycast(const glm::vec3& origin, const glm::vec3& direction, float maxDistance, RaycastHit& outHit) const = 0;
+
+		/**
+		 * Returns the entities overlapping an oriented box. The query is a one-shot shape query
+		 * against the current physics state and does not require a collider component. Results are
+		 * unique per entity and carry the contact point/normal for hit effects.
+		 */
+		virtual std::vector<OverlapHit> OverlapBox(const glm::vec3& center,
+		                                           const glm::quat& rotation,
+		                                           const glm::vec3& halfExtents) const = 0;
+
+		/// Returns the entities overlapping a sphere.
+		virtual std::vector<OverlapHit> OverlapSphere(const glm::vec3& center, float radius) const = 0;
 
 		/**
 		* Returns a list of collision events that occurred during the last physics update.

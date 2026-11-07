@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Core/UUID.hpp"
+#include "Renderer/Animation/AnimationEventTypes.hpp"
 #include "Scene/Entity.hpp"
 #include <filesystem>
 #include <unordered_map>
@@ -30,6 +31,34 @@ namespace Kerberos
 		float PenetrationDepth = 0.0f;
 	};
 
+	struct ScriptAnimationEventParameterPayload
+	{
+		const char* Name = nullptr;
+		const char* StringValue = nullptr;
+		uint64_t AssetValue = 0;
+		float VectorX = 0.0f;
+		float VectorY = 0.0f;
+		float VectorZ = 0.0f;
+		float FloatValue = 0.0f;
+		int32_t IntValue = 0;
+		uint8_t Type = 0;
+		uint8_t BoolValue = 0;
+	};
+
+	struct ScriptAnimationEventPayload
+	{
+		const char* Name = nullptr;
+		const char* Payload = nullptr;
+		const char* ClipName = nullptr;
+		float Time = 0.0f;
+		float Duration = 0.0f;
+		float Weight = 1.0f;
+		uint8_t Phase = 0;
+		uint32_t Flags = 0;
+		const ScriptAnimationEventParameterPayload* Parameters = nullptr;
+		uint32_t ParameterCount = 0;
+	};
+
 	/// Function pointer types for calls into the managed ScriptGlue bridge
 	using ManagedLoadAssemblyClassesFn = int(*)(const char* coreAssemblyPath, const char* userAssemblyPath);
 	using ManagedClassExistsFn = int(*)(const char* className);
@@ -41,6 +70,7 @@ namespace Kerberos
 	using ManagedInvokeOnCollisionEnterFn = int(*)(uint64_t entityID, const char* className, const ScriptCollisionPayload* payload);
 	using ManagedInvokeOnCollisionPersistFn = int(*)(uint64_t entityID, const char* className, const ScriptCollisionPayload* payload);
 	using ManagedInvokeOnCollisionExitFn = int(*)(uint64_t entityID, const char* className, const ScriptCollisionPayload* payload);
+	using ManagedInvokeOnAnimationEventFn = int(*)(uint64_t entityID, const char* className, const ScriptAnimationEventPayload* payload);
 	using ManagedGetFieldCountFn = int(*)(const char* className);
 	using ManagedGetFieldsFn = int(*)(const char* className, void** fieldNames, void** fieldTypeNames, int maxFields, int bufferSize);
 	using ManagedGetFieldValueFn = int(*)(uint64_t entityID, const char* className, const char* fieldName, void* outValue, int bufferSize);
@@ -68,6 +98,7 @@ namespace Kerberos
 		static void OnUpdateEntity(Entity entity, float deltaTime);
 
 		static void OnCollision(Entity entity, const CollisionEvent& event);
+		static void OnAnimationEvent(Entity entity, const DispatchedAnimationEvent& event);
 
 		static bool ClassExists(const std::string& className);
 		static void CreateScriptFieldInitializers(Entity entity, const std::string& className);
@@ -90,6 +121,7 @@ namespace Kerberos
 		static bool InvokeManagedOnCollisionEnter(uint64_t entityID, const std::string& className, const CollisionEvent& event);
 		static bool InvokeManagedOnCollisionPersist(uint64_t entityID, const std::string& className, const CollisionEvent& event);
 		static bool InvokeManagedOnCollisionExit(uint64_t entityID, const std::string& className, const CollisionEvent& event);
+		static bool InvokeManagedOnAnimationEvent(uint64_t entityID, const std::string& className, const DispatchedAnimationEvent& event);
 		static bool GetManagedFieldValue(uint64_t entityID, const std::string& className, const std::string& fieldName, void* outValue, int bufferSize);
 		static bool SetManagedFieldValue(uint64_t entityID, const std::string& className, const std::string& fieldName, void* value, int valueSize);
 

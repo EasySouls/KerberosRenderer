@@ -430,7 +430,7 @@ void ParticleSystem::RecordDraw(const vk::raii::CommandBuffer& cmd, const uint32
 
     const vk::DescriptorBufferBindingInfoEXT bindingInfo{ .address = m_DescriptorBuffers[frameIndex].DeviceAddress,
                                                           .usage =
-                                                              vk::BufferUsageFlagBits::eResourceDescriptorBufferEXT };
+                                                          vk::BufferUsageFlagBits::eResourceDescriptorBufferEXT };
     cmd.bindDescriptorBuffersEXT({ bindingInfo });
 
     constexpr uint32_t bufferIndices[3] = { 0, 0, 0 }; // Both sets live in buffer index 0
@@ -453,6 +453,15 @@ void ParticleSystem::OnResize(uint32_t /*width*/, uint32_t /*height*/, const vk:
 {
     DescriptorWriter writer(m_TextureLayout, m_TextureSet);
     writer.WriteSampledImage(2, depthImageView);
+}
+
+void ParticleSystem::RecompileShaders() const
+{
+    m_SpawnPipeline->Recompile();
+    m_PrepareSimulatePipeline->Recompile();
+    m_UpdatePipeline->Recompile();
+    m_FinalizeSimulatePipeline->Recompile();
+    m_RenderPipeline->Recompile();
 }
 
 void ParticleSystem::SetupDescriptors()
@@ -536,7 +545,7 @@ void ParticleSystem::SetupDescriptors()
                                                          .offset = 0,
                                                          .size = sizeof(uint32_t) };
     const vk::PipelineLayoutCreateInfo computePipelineLayoutInfo{ .setLayoutCount =
-                                                                      static_cast<uint32_t>(computeLayouts.size()),
+                                                                  static_cast<uint32_t>(computeLayouts.size()),
                                                                   .pSetLayouts = computeLayouts.data(),
                                                                   .pushConstantRangeCount = 1,
                                                                   .pPushConstantRanges = &computePushConstant };
@@ -548,7 +557,7 @@ void ParticleSystem::SetupDescriptors()
                                                                      *m_SpawnRequestsLayout,
                                                                      *m_TextureLayout };
     const vk::PipelineLayoutCreateInfo graphicsPipelineLayoutInfo{ .setLayoutCount =
-                                                                       static_cast<uint32_t>(graphicsLayouts.size()),
+                                                                   static_cast<uint32_t>(graphicsLayouts.size()),
                                                                    .pSetLayouts = graphicsLayouts.data(),
                                                                    .pushConstantRangeCount = 0,
                                                                    .pPushConstantRanges = nullptr };
@@ -688,10 +697,55 @@ void ParticleSystem::AllocateParticleFrameBuffers()
     }
 }
 
+void ParticleSystem::AllocateIndirectDrawBuffers()
+{
+    const auto& context = VulkanContext::Get();
+
+    for (uint32_t i = 0; i < context.GetMaxFramesInFlight(); ++i) {
+        VkBufferCreateInfo bufferInfo{};
+        bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+        bufferInfo.size = IndirectBufferSize;
+        bufferInfo.usage = VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
+                           VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT;
+        bufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+        VmaAllocationCreateInfo allocInfo{};
+        allocInfo.usage = VMA_MEMORY_USAGE_CPU_TO_GPU;
+
+        VkBuffer buffer = nullptr;
+        if (vmaCreateBuffer(VulkanContext::Get().GetAllocator().get(),
+                            &bufferInfo,
+                            &allocInfo,
+                            &buffer,
+                            &m_IndirectDrawBuffers[i].allocation,
+                            nullptr) != VK_SUCCESS)
+            KBRAssert(false, "Failed to create indirect draw buffer!");
+
+        m_IndirectDrawBuffers[i].Handle = vk::Buffer(buffer);
+        vmaMapMemory(VulkanContext::Get().GetAllocator().get(),
+                     m_IndirectDrawBuffers[i].allocation,
+                     &m_IndirectDrawBuffers[i].MappedData);
+
+        context.SetObjectDebugName(reinterpret_cast<uint64_t>(static_cast<VkBuffer>(m_IndirectDrawBuffers[i].Handle)),
+                                   vk::ObjectType::eBuffer,
+                                   std::format("Particle Indirect Draw Buffer {}", i));
+        context.SetObjectDebugName(m_IndirectDrawBuffers[i].allocation,
+                                   std::format("Particle Indirect Draw Buffer Allocation {}", i));
+
+        constexpr VkDispatchIndirectCommand dispatchCommand{ .x = 1, .y = 1, .z = 1 };
+        constexpr VkDrawIndirectCommand drawCommand{
+            .vertexCount = 6, .instanceCount = 0, .firstVertex = 0, .firstInstance = 0
+        };
+        std::memcpy(m_IndirectDrawBuffers[i].MappedData, &dispatchCommand, sizeof(dispatchCommand));
+        std::memcpy(static_cast<uint8_t*>(m_IndirectDrawBuffers[i].MappedData) + DrawIndirectOffset,
+                    &drawCommand,
+                    sizeof(drawCommand));
+    }
+}
+
 void ParticleSystem::AllocateDescriptorBuffers()
 {
     KBRAssert(*m_ParticleBuffersLayout != nullptr && *m_SpawnRequestsLayout != nullptr,
-                    "Descriptor Set Layouts must be created before allocating descriptor buffers!");
+              "Descriptor Set Layouts must be created before allocating descriptor buffers!");
 
     auto& context = VulkanContext::Get();
 
@@ -904,50 +958,5 @@ void ParticleSystem::CreateDefaultParticleTexture()
     const Buffer bufferStruct{ sizeof(uint8_t) * buffer.size() };
     std::memcpy(bufferStruct.Data, buffer.data(), bufferStruct.Size);
     m_DefaultParticleTexture = Texture2D::FromBuffer(spec, bufferStruct);
-}
-
-void ParticleSystem::AllocateIndirectDrawBuffers()
-{
-    const auto& context = VulkanContext::Get();
-
-    for (uint32_t i = 0; i < context.GetMaxFramesInFlight(); ++i) {
-        VkBufferCreateInfo bufferInfo{};
-        bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-        bufferInfo.size = IndirectBufferSize;
-        bufferInfo.usage = VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
-                           VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT;
-        bufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-        VmaAllocationCreateInfo allocInfo{};
-        allocInfo.usage = VMA_MEMORY_USAGE_CPU_TO_GPU;
-
-        VkBuffer buffer = nullptr;
-        if (vmaCreateBuffer(VulkanContext::Get().GetAllocator().get(),
-                            &bufferInfo,
-                            &allocInfo,
-                            &buffer,
-                            &m_IndirectDrawBuffers[i].allocation,
-                            nullptr) != VK_SUCCESS)
-            KBRAssert(false, "Failed to create indirect draw buffer!");
-
-        m_IndirectDrawBuffers[i].Handle = vk::Buffer(buffer);
-        vmaMapMemory(VulkanContext::Get().GetAllocator().get(),
-                     m_IndirectDrawBuffers[i].allocation,
-                     &m_IndirectDrawBuffers[i].MappedData);
-
-        context.SetObjectDebugName(reinterpret_cast<uint64_t>(static_cast<VkBuffer>(m_IndirectDrawBuffers[i].Handle)),
-                                   vk::ObjectType::eBuffer,
-                                   std::format("Particle Indirect Draw Buffer {}", i));
-        context.SetObjectDebugName(m_IndirectDrawBuffers[i].allocation,
-                                   std::format("Particle Indirect Draw Buffer Allocation {}", i));
-
-        constexpr VkDispatchIndirectCommand dispatchCommand{ .x = 1, .y = 1, .z = 1 };
-        constexpr VkDrawIndirectCommand drawCommand{
-            .vertexCount = 6, .instanceCount = 0, .firstVertex = 0, .firstInstance = 0
-        };
-        std::memcpy(m_IndirectDrawBuffers[i].MappedData, &dispatchCommand, sizeof(dispatchCommand));
-        std::memcpy(static_cast<uint8_t*>(m_IndirectDrawBuffers[i].MappedData) + DrawIndirectOffset,
-                    &drawCommand,
-                    sizeof(drawCommand));
-    }
 }
 } // namespace Kerberos

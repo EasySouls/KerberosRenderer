@@ -3,6 +3,7 @@
 #include "Layer.hpp"
 #include "Vulkan.hpp"
 
+#include "Windows/AnimationEditorPanel.hpp"
 #include "Windows/AssetsPanel.hpp"
 #include "Windows/HierarchyPanel.hpp"
 #include "Windows/ConsolePanel.hpp"
@@ -100,6 +101,7 @@ namespace Kerberos
 		Owner<AssetsPanel> m_AssetsPanel;
 		ConsolePanel m_ConsolePanel;
 		InspectorPanel m_InspectorPanel;
+		AnimationEditorPanel m_AnimationEditorPanel;
 
 		NotificationManager m_NotificationManager;
 

@@ -1,6 +1,8 @@
 #pragma once
 
 #include "Components.hpp"
+#include "AnimationRuntime.hpp"
+#include "RagdollSystem.hpp"
 #include "Camera/EditorCamera.hpp"
 #include "Camera/SceneCamera.hpp"
 #include "Core/UUID.hpp"
@@ -10,6 +12,7 @@
 #include <entt/single_include/entt/entt.hpp>
 #include <string_view>
 #include <memory>
+#include <utility>
 
 namespace Kerberos
 {
@@ -30,9 +33,10 @@ namespace Kerberos
 		void OnRuntimeStart();
 		void OnRuntimeStop();
 		void OnSimulationStart();
-		void OnSimulationStop() const;
+		void OnSimulationStop();
 		void SetScenePaused(bool isPaused);
 
+		bool IsPaused() const { return m_IsScenePaused; }
 		bool IsRunning() const { return m_IsRunning; }
 
 		void OnUpdateEditor(float ts, const Camera& camera);
@@ -67,8 +71,7 @@ namespace Kerberos
 		Entity DuplicateEntity(Entity entity, bool duplicateChildren);
 
 		void CreateChild(Entity entity);
-		[[deprecated("Import glTF as a prefab and call InstantiatePrefab")]]
-		Entity InstantiateModelAsset(AssetHandle modelHandle, const std::string& rootName = std::string());
+
 		Entity InstantiatePrefab(AssetHandle prefabHandle, const std::string& rootName = std::string());
 
 		Entity GetEntityByUUID(UUID uuid) const;
@@ -90,6 +93,11 @@ namespace Kerberos
 
 		void OnViewportResize(uint32_t width, uint32_t height);
 
+		/// Starts every animator according to its authored PlayOnStart flag and resets its time.
+		void StartAnimators();
+		/// Stops every animator and returns it to the beginning of its clip.
+		void StopAnimators();
+
 		void SetIs3D(const bool is3D) { m_Is3D = is3D; }
 		void SetEnableShadowMapping(const bool enable) { m_EnableShadowMapping = enable; }
 
@@ -101,10 +109,23 @@ namespace Kerberos
 
 		Entity FindEntityByName(std::string_view name);
 
+		/// Finds the animator that drives a skeleton entity. Checks the skeleton entity itself and
+		/// then animators that explicitly reference it through SkeletonEntity.
+		Entity FindAnimatorEntityForSkeleton(UUID skeletonEntity);
+
 		bool& GetOnlyRenderShadowMapIfLightHasChanged() { return m_OnlyRenderShadowMapIfLightHasChanged; }
 
 		const PhysicsSystem& GetPhysicsSystem() const;
 		PhysicsSystem& GetPhysicsSystem();
+
+		AnimationRuntime& GetAnimationRuntime();
+		const AnimationRuntime& GetAnimationRuntime() const;
+
+		RagdollSystem& GetRagdollSystem();
+		const RagdollSystem& GetRagdollSystem() const;
+
+		/// Dispatches events collected by the animation runtime. No-op outside Play mode.
+		void DispatchAnimationEvents();
 
 		void SetName(const std::string& name) { m_Name = name; }
 		const std::string& GetName() const { return m_Name; }
@@ -136,6 +157,8 @@ namespace Kerberos
 
 		static void CopyEntityRecursive(const Ref<Scene>& other, entt::entity sourceEntity, const Ref<Scene>& newScene, entt::entity parentNewEntity);
 
+		std::pair<const SceneCamera*, glm::mat4> FindPrimaryCamera();
+
 		template<typename Component>
 		static void CopyComponent(entt::registry& dst, entt::registry& src)
 		{
@@ -162,13 +185,19 @@ namespace Kerberos
 		std::vector<entt::entity> m_RootEntities;
 
 		JoltPhysicsSystem* m_PhysicsSystem;
+        AnimationRuntime m_AnimationRuntime;
+		RagdollSystem m_RagdollSystem;
 
 		friend class Entity;
 		friend class Renderer;
+		friend class AnimationRuntime;
+		friend class RagdollSystem;
 		friend class JoltPhysicsSystem;
 		friend class HierarchyPanel;
 		friend class SceneSerializer;
 		friend class RayTracingSceneCache;
 		friend class ParticleSystem;
+        friend class AnimationSystem;
+        friend class SkinningSystem;
 	};
 }

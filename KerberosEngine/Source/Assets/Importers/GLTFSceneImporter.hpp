@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Assets/Formats/NativeAssetFormat.hpp"
+#include "Assets/Pipeline/AssetMeta.hpp"
 
 #include <filesystem>
 #include <map>
@@ -22,11 +23,14 @@ namespace Kerberos
         ///     default.
         /// @param textureSrgbOut Optional output; receives the materialized per-texture
         ///     sRGB values (override or default) for every imported image.
+        /// @param animationClips Optional user-authored markers/events keyed by
+        ///     "animation:<index>". They are baked into the generated animation clips.
         static bool Import(const std::filesystem::path& source,
             const std::filesystem::path& outputDirectory,
             const std::filesystem::path& namespacePath,
             GltfSceneManifest* output = nullptr,
             const std::map<std::string, bool>* textureSrgbOverrides = nullptr,
-            std::map<std::string, bool>* textureSrgbOut = nullptr);
+            std::map<std::string, bool>* textureSrgbOut = nullptr,
+            const std::map<std::string, AnimationClipMetaEntry>* animationClips = nullptr);
     };
 }

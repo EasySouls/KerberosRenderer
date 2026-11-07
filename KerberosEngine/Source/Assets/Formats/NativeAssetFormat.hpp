@@ -1,5 +1,8 @@
 #pragma once
 
+#include <glm/glm.hpp>
+#include <glm/gtc/quaternion.hpp>
+
 #include <cstdint>
 #include <filesystem>
 #include <string>
@@ -7,7 +10,7 @@
 
 namespace Kerberos
 {
-    inline constexpr uint32_t NativeAssetFormatVersion = 3;
+    inline constexpr uint32_t NativeAssetFormatVersion = 4;
 
     struct NativeAssetHeader
     {
@@ -40,13 +43,25 @@ namespace Kerberos
         int32_t ParentIndex = -1;
         int32_t SkinIndex = -1;
 
+        glm::vec3 Translation = glm::vec3(0.0f);
+        glm::quat Rotation = glm::quat(1.0f, 0.0f, 0.0f, 0.0f);
+        glm::vec3 Scale = glm::vec3(1.0f);
+
         struct Primitive
         {
             uint32_t MeshIndex = 0;
             uint32_t PrimitiveIndex = 0;
             int32_t MaterialIndex = -1;
+            bool Skinned = false;
         };
         std::vector<Primitive> Primitives;
+    };
+
+    struct NativeSkin
+    {
+        int32_t SkeletonNode = -1;
+        std::vector<int32_t> JointNodes; // glTF node indices in final joint order
+        std::vector<std::string> AnimationKeys; // "animation:<i>" clips for this skeleton
     };
 
     struct GltfSceneManifest
@@ -55,6 +70,7 @@ namespace Kerberos
         std::string SourcePath;
         std::vector<NativeSubasset> Subassets;
         std::vector<NativeSceneNode> Nodes;
+        std::vector<NativeSkin> Skins;
     };
 
     struct NativeAssetRecord
