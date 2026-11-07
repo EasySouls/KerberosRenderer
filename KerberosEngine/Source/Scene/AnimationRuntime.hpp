@@ -92,6 +92,7 @@ private:
     };
 
     void SyncInstances();
+    void UpdateJointTransforms() const;
     void UpdateSockets() const;
     static void ResolveAnimatorClips(AnimatorComponent& animator);
     void CloseActiveDurationEvents(AnimationInstance& instance, const Ref<AnimationClip>& clip, float time);
@@ -105,6 +106,7 @@ private:
     std::unordered_map<const AnimationClip*, ClipCacheEntry> m_ClipCaches;
     std::unordered_set<UUID> m_WarnedAnimators;
     std::unordered_set<UUID> m_WarnedSkeletons;
+    mutable std::unordered_set<UUID> m_WarnedJointBindings;
     std::vector<PendingDispatch> m_PendingDispatches;
 
     // Monotonic across instance resets so the renderer never mistakes a rebuilt instance for an

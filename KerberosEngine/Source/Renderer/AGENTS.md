@@ -280,18 +280,31 @@ a named joint.
 
 ## Sockets and pose authority
 
-The CPU `SkeletonPose` is authoritative. A socket is a derived attachment, not
-a second animation source: `SocketComponent` stores the target skeleton entity,
-joint name, and local offset, while `AnimationRuntime::UpdateSockets` resolves
-the joint through `Skeleton::GetJointIndex` and writes the attached entity's
-`WorldTransform` from `skeletonWorld * pose.Global[joint] * localOffset`.
-Authored translation/rotation/scale are never overwritten; child transforms are
-recalculated from the socket world transform. Sockets update after each pose
-evaluation and again in `FinalizePose`, so event handlers and scripts see the
-current attachment before physics and the renderer sees the final post-physics
-pose. Socket-derived transforms currently update rendering and hierarchy only;
-moving a physics body with a socket-attached entity requires an explicit
-kinematic body update. Kinematic rigid bodies are moved from their
+The CPU `SkeletonPose` is authoritative. Pose publication writes derived entity
+transforms, never authored local TRS, so `JointComponent` entities stay
+rest-authored. `AnimationRuntime::UpdateJointTransforms` writes each joint
+entity's `WorldTransform` from the pose's global matrices and then propagates
+that world transform through non-skeletal descendants such as weapons, props, or
+garment pieces parented under a joint. The propagation skips nested joints,
+skinned meshes, and sockets because those have their own drivers. The pose's
+global space is anchored to a skinned mesh bound to the skeleton when one
+exists; otherwise the skeleton entity's world is used after removing its rest
+transform when the skeleton entity is itself a joint. This is what keeps rigid
+attachments in the hand of an animated character instead of leaving them at the
+bind-pose location.
+
+A socket is a derived attachment, not a second animation source:
+`SocketComponent` stores the target skeleton entity, joint name, and local
+offset, while `AnimationRuntime::UpdateSockets` resolves the joint through
+`Skeleton::GetJointIndex` and writes the attached entity's `WorldTransform`
+from the published joint world transform times `localOffset`. Authored
+translation/rotation/scale are never overwritten; child transforms are
+recalculated from the socket world transform. Joint and socket transforms update
+after each pose evaluation and again in `FinalizePose`, so event handlers and
+scripts see the current attachment before physics and the renderer sees the
+final post-physics pose. Socket-derived transforms currently update rendering
+and hierarchy only; moving a physics body with a socket-attached entity requires
+an explicit kinematic body update. Kinematic rigid bodies are moved from their
 `TransformComponent` world transform immediately before each Jolt step, while
 only dynamic bodies are read back into entity transforms. Collider components
 expose `IsTrigger` and `Enabled`, and the C# API supports body type, mass,

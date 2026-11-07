@@ -15,6 +15,36 @@ import Kerberos;
 
 namespace Kerberos {
 
+namespace
+{
+glm::mat4 JointRestLocal(const SkeletonJoint& joint)
+{
+    return glm::translate(glm::mat4(1.0f), joint.RestTranslation) *
+        glm::toMat4(glm::normalize(joint.RestRotation)) *
+        glm::scale(glm::mat4(1.0f), joint.RestScale);
+}
+
+// Propagates a joint's animated world transform through non-skeletal descendants. Joints,
+// skinned meshes, and sockets are already driven by their own animation paths.
+void UpdateAttachmentTransforms(Scene* scene, const Entity entity, const glm::mat4& parentWorld)
+{
+    if (!entity || !entity.HasComponent<TransformComponent>() ||
+        entity.HasComponent<JointComponent>() ||
+        entity.HasComponent<SkinnedMeshComponent>() ||
+        entity.HasComponent<SocketComponent>())
+    {
+        return;
+    }
+
+    auto& transform = entity.GetComponent<TransformComponent>();
+    transform.WorldTransform = parentWorld * transform.GetTransform();
+
+    for (const Entity child : scene->GetChildren(entity))
+        UpdateAttachmentTransforms(scene, child, transform.WorldTransform);
+}
+
+}
+
 AnimationRuntime::AnimationRuntime(Scene& scene)
     : m_Scene(&scene)
 {
@@ -439,7 +469,119 @@ void AnimationRuntime::EvaluatePose()
         }
     }
 
+    UpdateJointTransforms();
     UpdateSockets();
+}
+
+void AnimationRuntime::UpdateJointTransforms() const
+{
+    KBR_TRACY_FUNCTION();
+
+    if (!m_Scene)
+        return;
+
+    // The pose's Global matrices live in the skinned mesh's model space. A skinned mesh bound to
+    // the skeleton is the most reliable anchor for that space; scenes without one fall back to the
+    // skeleton entity, correcting for the case where the skeleton entity is itself a joint.
+    std::unordered_map<UUID, glm::mat4> baseWorldBySkeleton;
+    const auto skinnedView = m_Scene->m_Registry.view<SkinnedMeshComponent, TransformComponent>();
+    for (const auto entity : skinnedView)
+    {
+        const auto& skinned = skinnedView.get<SkinnedMeshComponent>(entity);
+        if (!skinned.SkeletonEntity.IsValid() || baseWorldBySkeleton.contains(skinned.SkeletonEntity))
+            continue;
+
+        baseWorldBySkeleton.emplace(skinned.SkeletonEntity,
+                                    skinnedView.get<TransformComponent>(entity).WorldTransform);
+    }
+
+    for (const AnimationInstance& instance : m_Instances)
+    {
+        if (!instance.HasPosed || !instance.Skeleton)
+            continue;
+
+        const Entity skeletonEntity = m_Scene->TryGetEntityByUUID(instance.SkeletonEntity);
+        if (!skeletonEntity || !skeletonEntity.HasComponent<SkeletonComponent>() ||
+            !skeletonEntity.HasComponent<TransformComponent>())
+        {
+            continue;
+        }
+
+        const auto& skeletonComponent = skeletonEntity.GetComponent<SkeletonComponent>();
+        const auto& joints = instance.Skeleton->GetJoints();
+        if (skeletonComponent.JointEntities.size() != joints.size() ||
+            instance.Pose.Global.size() != joints.size())
+        {
+            if (m_WarnedJointBindings.insert(instance.SkeletonEntity).second)
+            {
+                Log::CoreWarn("Skeleton entity {} cannot publish joint transforms: {} joint entities, "
+                              "{} bones, {} posed globals",
+                              instance.SkeletonEntity, skeletonComponent.JointEntities.size(),
+                              joints.size(), instance.Pose.Global.size());
+            }
+            continue;
+        }
+
+        glm::mat4 baseWorld;
+        if (const auto it = baseWorldBySkeleton.find(instance.SkeletonEntity);
+            it != baseWorldBySkeleton.end())
+        {
+            baseWorld = it->second;
+        }
+        else
+        {
+            baseWorld = skeletonEntity.GetComponent<TransformComponent>().WorldTransform;
+
+            int32_t skeletonJoint = -1;
+            for (size_t jointIndex = 0; jointIndex < skeletonComponent.JointEntities.size(); ++jointIndex)
+            {
+                if (skeletonComponent.JointEntities[jointIndex] == instance.SkeletonEntity)
+                {
+                    skeletonJoint = static_cast<int32_t>(jointIndex);
+                    break;
+                }
+            }
+
+            if (skeletonJoint >= 0)
+            {
+                // The skeleton entity is a joint, so its world includes that joint's rest
+                // transform. Remove it to recover the model space the pose is expressed in.
+                std::vector<glm::mat4> restGlobals(joints.size(), glm::mat4(1.0f));
+                for (size_t jointIndex = 0; jointIndex < joints.size(); ++jointIndex)
+                {
+                    const SkeletonJoint& joint = joints[jointIndex];
+                    const glm::mat4 local = JointRestLocal(joint);
+                    restGlobals[jointIndex] = joint.Parent >= 0
+                        ? restGlobals[static_cast<size_t>(joint.Parent)] * local
+                        : local;
+                }
+                baseWorld *= glm::inverse(restGlobals[static_cast<size_t>(skeletonJoint)]);
+            }
+        }
+
+        std::vector<glm::mat4> jointWorlds(joints.size(), glm::mat4(1.0f));
+        for (size_t jointIndex = 0; jointIndex < joints.size(); ++jointIndex)
+        {
+            jointWorlds[jointIndex] = baseWorld * instance.Pose.Global[jointIndex];
+
+            const Entity jointEntity = m_Scene->TryGetEntityByUUID(skeletonComponent.JointEntities[jointIndex]);
+            if (!jointEntity || !jointEntity.HasComponent<TransformComponent>())
+                continue;
+
+            jointEntity.GetComponent<TransformComponent>().WorldTransform = jointWorlds[jointIndex];
+        }
+
+        // Drive rigid attachments (weapons, props, garment pieces) parented under joint entities.
+        for (size_t jointIndex = 0; jointIndex < joints.size(); ++jointIndex)
+        {
+            const Entity jointEntity = m_Scene->TryGetEntityByUUID(skeletonComponent.JointEntities[jointIndex]);
+            if (!jointEntity)
+                continue;
+
+            for (const Entity child : m_Scene->GetChildren(jointEntity))
+                UpdateAttachmentTransforms(m_Scene, child, jointWorlds[jointIndex]);
+        }
+    }
 }
 
 void AnimationRuntime::UpdateSockets() const
@@ -482,10 +624,19 @@ void AnimationRuntime::UpdateSockets() const
             glm::toMat4(glm::normalize(glm::quat(socket.LocalRotation))) *
             glm::scale(glm::mat4(1.0f), socket.LocalScale);
 
-        const glm::mat4 socketWorld =
-            skeletonEntity.GetComponent<TransformComponent>().WorldTransform *
-            pose->Global[static_cast<size_t>(jointIndex)] *
-            localOffset;
+        // Joint transforms are published by UpdateJointTransforms, which also accounts for the
+        // skeleton entity itself being a joint (a common glTF layout).
+        glm::mat4 jointWorld = skeletonEntity.GetComponent<TransformComponent>().WorldTransform *
+            pose->Global[static_cast<size_t>(jointIndex)];
+        if (static_cast<size_t>(jointIndex) < skeletonComponent.JointEntities.size())
+        {
+            const Entity jointEntity =
+                m_Scene->TryGetEntityByUUID(skeletonComponent.JointEntities[static_cast<size_t>(jointIndex)]);
+            if (jointEntity && jointEntity.HasComponent<TransformComponent>())
+                jointWorld = jointEntity.GetComponent<TransformComponent>().WorldTransform;
+        }
+
+        const glm::mat4 socketWorld = jointWorld * localOffset;
 
         // Socket entities are derived transforms: keep the authored local TRS untouched and
         // update only the world transform plus descendants. 
@@ -504,6 +655,7 @@ void AnimationRuntime::FinalizePose([[maybe_unused]] const float dt) const
 
     // Reserved for post-physics work: ragdoll blending, inverse kinematics, root motion, and
     // socket/attachment updates. The renderer uploads whatever pose is final after this call.
+    UpdateJointTransforms();
     UpdateSockets();
 }
 
@@ -514,6 +666,7 @@ void AnimationRuntime::Reset()
     m_ClipCaches.clear();
     m_WarnedAnimators.clear();
     m_WarnedSkeletons.clear();
+    m_WarnedJointBindings.clear();
     m_PendingDispatches.clear();
 }
 

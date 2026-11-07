@@ -313,6 +313,7 @@ Entities:
       PlaybackSpeed: 1
       IsPlaying: false
       IsLooping: true
+      PlayOnStart: false
   - Entity: 14102483353540518461
     TagComponent:
       Tag: Cesium_Man
@@ -389,6 +390,8 @@ Entities:
       Radius: 16.4
       Height: 12.6
       Offset: [0, 0, 0]
+      IsTrigger: false
+      Enabled: true
   - Entity: 7236611495098439219
     TagComponent:
       Tag: Donut_Primitive_0
@@ -617,6 +620,8 @@ Entities:
     BoxCollider3DComponent:
       Size: [9, 13.7, 7.2]
       Offset: [0, 0.4, 0]
+      IsTrigger: false
+      Enabled: true
   - Entity: 12527572461200342431
     TagComponent:
       Tag: Mesh_0
@@ -850,6 +855,8 @@ Entities:
     BoxCollider3DComponent:
       Size: [255.9, 13.7, 270.5]
       Offset: [0, 0, 0]
+      IsTrigger: false
+      Enabled: true
     StaticMeshComponent:
       Mesh: 1673791072952261535
       Material: 12381593450151428241
@@ -1206,3 +1213,1048 @@ Entities:
             - Name: TargetPivotOffset
               Type: Vector3
               Data: [6.7e-44, 0, 0]
+  - Entity: 2032247052955899180
+    TagComponent:
+      Tag: Head
+    TransformComponent:
+      Translation: [-1.8930365e-15, 0.07835636, -1.4901161e-08]
+      Rotation: [-0.09116925, -1.2733017e-07, 1.8452376e-08]
+      Scale: [1, 1, 0.99999994]
+    HierarchyComponent:
+      Parent: 7986581454743282100
+      Children:
+        []
+    JointComponent:
+      JointIndex: 16
+  - Entity: 7986581454743282100
+    TagComponent:
+      Tag: Neck
+    TransformComponent:
+      Translation: [-3.0016146e-15, 0.2098392, 5.5879354e-09]
+      Rotation: [0.38128826, -1.7346336e-07, -2.7724827e-08]
+      Scale: [1, 1, 1]
+    HierarchyComponent:
+      Parent: 770388586213879229
+      Children:
+        - 2032247052955899180
+    JointComponent:
+      JointIndex: 11
+  - Entity: 17488881496638063911
+    TagComponent:
+      Tag: Fingers02.L
+    TransformComponent:
+      Translation: [-3.100325e-08, 0.058930013, -7.450581e-09]
+      Rotation: [0.12834278, -0.05324272, -0.13769263]
+      Scale: [0.99999994, 0.99999994, 0.99999994]
+    HierarchyComponent:
+      Parent: 15743499064050738019
+      Children:
+        []
+    JointComponent:
+      JointIndex: 31
+  - Entity: 15743499064050738019
+    TagComponent:
+      Tag: Fingers01.L
+    TransformComponent:
+      Translation: [-1.5139968e-08, 0.08712368, 1.4901161e-08]
+      Rotation: [0.25541708, -0.12708494, -0.8320029]
+      Scale: [0.99999994, 1, 0.9999999]
+    HierarchyComponent:
+      Parent: 4468162803398748487
+      Children:
+        - 17488881496638063911
+    JointComponent:
+      JointIndex: 25
+  - Entity: 8247941483405041509
+    TagComponent:
+      Tag: Shield
+    TransformComponent:
+      Translation: [4.1379714e-08, -1.4202669e-08, 1.6653212e-07]
+      Rotation: [1.5791887, 0.19709606, -1.5279654]
+      Scale: [1.0000007, 1.0000004, 1.0000002]
+    HierarchyComponent:
+      Parent: 5806688757773468697
+      Children:
+        - 1574705234237988885
+        - 1411413351454069636
+        - 9103625081294425721
+  - Entity: 5806688757773468697
+    TagComponent:
+      Tag: Hand Hold.L
+    TransformComponent:
+      Translation: [0.04797034, 0.078833245, -0.00038871728]
+      Rotation: [0.021733582, 1.4137203, -1.8138356]
+      Scale: [0.99999994, 1, 0.9999998]
+    HierarchyComponent:
+      Parent: 4468162803398748487
+      Children:
+        - 8247941483405041509
+    JointComponent:
+      JointIndex: 26
+  - Entity: 8363711945611723702
+    TagComponent:
+      Tag: Thumb02.L
+    TransformComponent:
+      Translation: [9.6254125e-09, 0.05333958, -4.0978193e-08]
+      Rotation: [-0.23530047, 0.00159724, 0.0024521928]
+      Scale: [0.99999994, 1, 1]
+    HierarchyComponent:
+      Parent: 12307492556202234951
+      Children:
+        []
+    JointComponent:
+      JointIndex: 32
+  - Entity: 12307492556202234951
+    TagComponent:
+      Tag: Thumb01.L
+    TransformComponent:
+      Translation: [0.015441459, 0.031059975, 0.028222296]
+      Rotation: [0.43101925, -0.08907781, -0.5430632]
+      Scale: [0.9999999, 1, 1]
+    HierarchyComponent:
+      Parent: 4468162803398748487
+      Children:
+        - 8363711945611723702
+    JointComponent:
+      JointIndex: 27
+  - Entity: 4468162803398748487
+    TagComponent:
+      Tag: Hand.L
+    TransformComponent:
+      Translation: [-1.2345493e-08, 0.2510338, 0]
+      Rotation: [-0.14350218, 0.055910327, 0.17004248]
+      Scale: [1.0000001, 1, 0.99999994]
+    HierarchyComponent:
+      Parent: 18106461531292033524
+      Children:
+        - 15743499064050738019
+        - 5806688757773468697
+        - 12307492556202234951
+    JointComponent:
+      JointIndex: 23
+  - Entity: 18106461531292033524
+    TagComponent:
+      Tag: Lower Arm.L
+    TransformComponent:
+      Translation: [-2.4221052e-08, 0.24690053, 5.122274e-09]
+      Rotation: [0.36779413, 0.0067325667, -0.13815825]
+      Scale: [1, 1, 1]
+    HierarchyComponent:
+      Parent: 4277319834201515741
+      Children:
+        - 4468162803398748487
+    JointComponent:
+      JointIndex: 21
+  - Entity: 4277319834201515741
+    TagComponent:
+      Tag: Upper Arm.L
+    TransformComponent:
+      Translation: [7.878407e-08, 0.1389238, 2.7939677e-09]
+      Rotation: [-0.16295192, -0.07251767, -0.39927018]
+      Scale: [1, 0.99999994, 1]
+    HierarchyComponent:
+      Parent: 12063243646846309799
+      Children:
+        - 18106461531292033524
+    JointComponent:
+      JointIndex: 17
+  - Entity: 12063243646846309799
+    TagComponent:
+      Tag: Shoulder.L
+    TransformComponent:
+      Translation: [0.079305634, 0.19316837, -0.0024079857]
+      Rotation: [0.035159297, 0.12697715, -2.3258052]
+      Scale: [0.9999995, 0.9999999, 1]
+    HierarchyComponent:
+      Parent: 770388586213879229
+      Children:
+        - 4277319834201515741
+    JointComponent:
+      JointIndex: 12
+  - Entity: 4876434539964278989
+    TagComponent:
+      Tag: Fingers02.R
+    TransformComponent:
+      Translation: [5.6072036e-09, 0.05893002, 3.7252903e-08]
+      Rotation: [0.12834273, 0.053242695, 0.13769238]
+      Scale: [1, 0.99999994, 0.99999994]
+    HierarchyComponent:
+      Parent: 11111006754309455001
+      Children:
+        []
+    JointComponent:
+      JointIndex: 33
+  - Entity: 11111006754309455001
+    TagComponent:
+      Tag: Fingers01.R
+    TransformComponent:
+      Translation: [-1.5706487e-08, 0.08712362, 2.2351742e-08]
+      Rotation: [0.2554171, 0.12708488, 0.8320028]
+      Scale: [1, 1, 1]
+    HierarchyComponent:
+      Parent: 13709477038425476007
+      Children:
+        - 4876434539964278989
+    JointComponent:
+      JointIndex: 28
+  - Entity: 326742142553545895
+    TagComponent:
+      Tag: Sword
+    TransformComponent:
+      Translation: [8.322036e-08, -7.706694e-08, 1.3585668e-07]
+      Rotation: [1.5791888, -0.19709618, 1.5279654]
+      Scale: [1.0000004, 1.0000002, 1.0000001]
+    HierarchyComponent:
+      Parent: 2180142960492639452
+      Children:
+        - 1310600031631022048
+        - 873435218840224975
+        - 10461845002276008656
+        - 11133947945557184377
+  - Entity: 2180142960492639452
+    TagComponent:
+      Tag: Hand Hold.R
+    TransformComponent:
+      Translation: [-0.04797037, 0.0788332, -0.00038870983]
+      Rotation: [0.021732422, -1.4137211, 1.8138367]
+      Scale: [1, 1, 0.9999998]
+    HierarchyComponent:
+      Parent: 13709477038425476007
+      Children:
+        - 326742142553545895
+    JointComponent:
+      JointIndex: 29
+  - Entity: 832497052344634417
+    TagComponent:
+      Tag: Thumb02.R
+    TransformComponent:
+      Translation: [1.4038885e-08, 0.053339586, 2.4214387e-08]
+      Rotation: [-0.23530072, -0.0015972513, -0.0024522457]
+      Scale: [0.9999999, 1, 0.9999999]
+    HierarchyComponent:
+      Parent: 16513651535925990275
+      Children:
+        []
+    JointComponent:
+      JointIndex: 34
+  - Entity: 16513651535925990275
+    TagComponent:
+      Tag: Thumb01.R
+    TransformComponent:
+      Translation: [-0.015441489, 0.031059932, 0.028222304]
+      Rotation: [0.43101948, 0.0890778, 0.5430634]
+      Scale: [0.99999994, 1.0000001, 1]
+    HierarchyComponent:
+      Parent: 13709477038425476007
+      Children:
+        - 832497052344634417
+    JointComponent:
+      JointIndex: 30
+  - Entity: 13709477038425476007
+    TagComponent:
+      Tag: Hand.R
+    TransformComponent:
+      Translation: [4.17363e-08, 0.2510336, -1.1175871e-08]
+      Rotation: [-0.14350219, -0.05591035, -0.17004257]
+      Scale: [1, 1, 1]
+    HierarchyComponent:
+      Parent: 15521193459890261360
+      Children:
+        - 11111006754309455001
+        - 2180142960492639452
+        - 16513651535925990275
+    JointComponent:
+      JointIndex: 24
+  - Entity: 15521193459890261360
+    TagComponent:
+      Tag: Lower Arm.R
+    TransformComponent:
+      Translation: [5.3583904e-08, 0.2469005, 2.3283064e-09]
+      Rotation: [0.36779413, -0.0067325556, 0.1381584]
+      Scale: [0.99999994, 1, 1]
+    HierarchyComponent:
+      Parent: 7932172657853612868
+      Children:
+        - 13709477038425476007
+    JointComponent:
+      JointIndex: 22
+  - Entity: 7932172657853612868
+    TagComponent:
+      Tag: Upper Arm.R
+    TransformComponent:
+      Translation: [7.75035e-08, 0.13892378, -1.8626451e-09]
+      Rotation: [-0.16295187, 0.07251766, 0.39927015]
+      Scale: [1, 1, 1]
+    HierarchyComponent:
+      Parent: 7265445654509564759
+      Children:
+        - 15521193459890261360
+    JointComponent:
+      JointIndex: 18
+  - Entity: 7265445654509564759
+    TagComponent:
+      Tag: Shoulder.R
+    TransformComponent:
+      Translation: [-0.079305634, 0.19316837, -0.0024080044]
+      Rotation: [0.035159137, -0.12697698, 2.3258054]
+      Scale: [0.99999934, 0.9999999, 0.99999994]
+    HierarchyComponent:
+      Parent: 770388586213879229
+      Children:
+        - 7932172657853612868
+    JointComponent:
+      JointIndex: 13
+  - Entity: 770388586213879229
+    TagComponent:
+      Tag: Chest
+    TransformComponent:
+      Translation: [0, 0.22672081, 0]
+      Rotation: [-0.07214489, -7.477706e-08, -7.518771e-09]
+      Scale: [1, 0.99999994, 1]
+    HierarchyComponent:
+      Parent: 15810586588873018309
+      Children:
+        - 7986581454743282100
+        - 12063243646846309799
+        - 7265445654509564759
+    JointComponent:
+      JointIndex: 8
+  - Entity: 15810586588873018309
+    TagComponent:
+      Tag: Spine
+    TransformComponent:
+      Translation: [-8.881784e-16, 0.17003354, 3.7252903e-09]
+      Rotation: [-0.16645093, 3.7902018e-07, -2.962648e-08]
+      Scale: [1, 1, 1]
+    HierarchyComponent:
+      Parent: 15650866791651612466
+      Children:
+        - 770388586213879229
+    JointComponent:
+      JointIndex: 5
+  - Entity: 5507993946380060814
+    TagComponent:
+      Tag: Toes.L
+    TransformComponent:
+      Translation: [-5.790273e-09, 0.11988467, 4.1909516e-09]
+      Rotation: [0.82745254, 0.8734014, 0.9428487]
+      Scale: [1, 1, 0.99999994]
+    HierarchyComponent:
+      Parent: 12349735628585166276
+      Children:
+        []
+    JointComponent:
+      JointIndex: 19
+  - Entity: 12349735628585166276
+    TagComponent:
+      Tag: Foot.L
+    TransformComponent:
+      Translation: [-3.6766004e-09, 0.4493735, -8.1490725e-10]
+      Rotation: [1.0569149, -0.027957393, 0.3281053]
+      Scale: [0.99999994, 0.99999994, 1]
+    HierarchyComponent:
+      Parent: 10548816444335459905
+      Children:
+        - 5507993946380060814
+    JointComponent:
+      JointIndex: 14
+  - Entity: 10548816444335459905
+    TagComponent:
+      Tag: Lower Leg.L
+    TransformComponent:
+      Translation: [8.104742e-09, 0.4180083, -1.033186e-09]
+      Rotation: [-0.11706108, 9.2401366e-05, 0.0033260596]
+      Scale: [1, 1, 1]
+    HierarchyComponent:
+      Parent: 2027795333043398713
+      Children:
+        - 12349735628585166276
+    JointComponent:
+      JointIndex: 9
+  - Entity: 2027795333043398713
+    TagComponent:
+      Tag: Upper Leg.L
+    TransformComponent:
+      Translation: [0.08768876, 0.05305442, -0.022884851]
+      Rotation: [0.12550193, -0.0051432587, -3.0875375]
+      Scale: [0.9999984, 0.9999997, 0.99999094]
+    HierarchyComponent:
+      Parent: 15650866791651612466
+      Children:
+        - 10548816444335459905
+    JointComponent:
+      JointIndex: 6
+  - Entity: 3065319400910015696
+    TagComponent:
+      Tag: Toes.R
+    TransformComponent:
+      Translation: [5.0550453e-09, 0.11988403, 7.916242e-09]
+      Rotation: [0.8274536, -0.87339795, -0.9428501]
+      Scale: [0.9999999, 1, 1]
+    HierarchyComponent:
+      Parent: 2267130950761639369
+      Children:
+        []
+    JointComponent:
+      JointIndex: 20
+  - Entity: 2267130950761639369
+    TagComponent:
+      Tag: Foot.R
+    TransformComponent:
+      Translation: [-1.1628959e-08, 0.44937333, 1.9790605e-09]
+      Rotation: [1.0569088, 0.027956685, -0.3281044]
+      Scale: [1, 1, 1.0000001]
+    HierarchyComponent:
+      Parent: 1598017008748086425
+      Children:
+        - 3065319400910015696
+    JointComponent:
+      JointIndex: 15
+  - Entity: 1598017008748086425
+    TagComponent:
+      Tag: Lower Leg.R
+    TransformComponent:
+      Translation: [3.384006e-09, 0.4180084, 3.3469405e-10]
+      Rotation: [-0.11705982, -9.2469825e-05, -0.0033260388]
+      Scale: [1, 1.0000001, 1.0000001]
+    HierarchyComponent:
+      Parent: 6035376032728024753
+      Children:
+        - 2267130950761639369
+    JointComponent:
+      JointIndex: 10
+  - Entity: 6035376032728024753
+    TagComponent:
+      Tag: Upper Leg.R
+    TransformComponent:
+      Translation: [-0.087688774, 0.05305442, -0.022884812]
+      Rotation: [0.1255027, 0.005147517, 3.0875387]
+      Scale: [1.0000004, 0.99999994, 1.000002]
+    HierarchyComponent:
+      Parent: 15650866791651612466
+      Children:
+        - 1598017008748086425
+    JointComponent:
+      JointIndex: 7
+  - Entity: 15650866791651612466
+    TagComponent:
+      Tag: Hips
+    TransformComponent:
+      Translation: [0, 0.8804884, 0]
+      Rotation: [0.095143564, -2.0176113e-07, -1.9254395e-08]
+      Scale: [1, 1, 1]
+    HierarchyComponent:
+      Parent: 9375796442227673625
+      Children:
+        - 15810586588873018309
+        - 2027795333043398713
+        - 6035376032728024753
+    JointComponent:
+      JointIndex: 0
+    SkeletonComponent:
+      SkeletonAsset: 13801415218288113534
+      JointEntities:
+        - 15650866791651612466
+        - 122722166161789383
+        - 17710563330691588813
+        - 1449003475076449479
+        - 9488572049520607969
+        - 15810586588873018309
+        - 2027795333043398713
+        - 6035376032728024753
+        - 770388586213879229
+        - 10548816444335459905
+        - 1598017008748086425
+        - 7986581454743282100
+        - 12063243646846309799
+        - 7265445654509564759
+        - 12349735628585166276
+        - 2267130950761639369
+        - 2032247052955899180
+        - 4277319834201515741
+        - 7932172657853612868
+        - 5507993946380060814
+        - 3065319400910015696
+        - 18106461531292033524
+        - 15521193459890261360
+        - 4468162803398748487
+        - 13709477038425476007
+        - 15743499064050738019
+        - 5806688757773468697
+        - 12307492556202234951
+        - 11111006754309455001
+        - 2180142960492639452
+        - 16513651535925990275
+        - 17488881496638063911
+        - 8363711945611723702
+        - 4876434539964278989
+        - 832497052344634417
+    AnimatorComponent:
+      SkeletonEntity: 15650866791651612466
+      AnimationClips:
+        - 3857756393375486187
+        - 8148199164905737752
+        - 4230540465934819545
+        - 6685553371363870004
+        - 2558929662716677076
+        - 17481697102713965332
+        - 14025324576564752096
+        - 8892580175433553909
+        - 18226696515324025708
+      ActiveClip: 8
+      PlaybackSpeed: 1
+      IsPlaying: false
+      IsLooping: true
+      PlayOnStart: false
+  - Entity: 122722166161789383
+    TagComponent:
+      Tag: Leg IK.L
+    TransformComponent:
+      Translation: [0.13614835, 0.07133101, -0.043844543]
+      Rotation: [-1.5541313, 3.1409968e-09, -1.884602e-07]
+      Scale: [1, 0.9999999, 0.99999994]
+    HierarchyComponent:
+      Parent: 9375796442227673625
+      Children:
+        []
+    JointComponent:
+      JointIndex: 1
+  - Entity: 17710563330691588813
+    TagComponent:
+      Tag: Leg IK.R
+    TransformComponent:
+      Translation: [-0.13614835, 0.07133101, -0.043844543]
+      Rotation: [-1.5541313, 3.1409968e-09, -1.884602e-07]
+      Scale: [1, 0.9999999, 0.99999994]
+    HierarchyComponent:
+      Parent: 9375796442227673625
+      Children:
+        []
+    JointComponent:
+      JointIndex: 2
+  - Entity: 1449003475076449479
+    TagComponent:
+      Tag: Pole Target.L
+    TransformComponent:
+      Translation: [0.11076476, 0.5193805, 0.51149]
+      Rotation: [1.5233883, -3.461082e-07, 3.1415854]
+      Scale: [1, 1.0000002, 1.0001093]
+    HierarchyComponent:
+      Parent: 9375796442227673625
+      Children:
+        []
+    JointComponent:
+      JointIndex: 3
+  - Entity: 9488572049520607969
+    TagComponent:
+      Tag: Pole Target.R
+    TransformComponent:
+      Translation: [-0.11076476, 0.5193805, 0.51149]
+      Rotation: [1.5233883, 3.461082e-07, -3.1415854]
+      Scale: [1, 1.0000002, 1.0001093]
+    HierarchyComponent:
+      Parent: 9375796442227673625
+      Children:
+        []
+    JointComponent:
+      JointIndex: 4
+  - Entity: 15487185519496094952
+    TagComponent:
+      Tag: Body
+    TransformComponent:
+      Translation: [0, 0, 0]
+      Rotation: [0, -0, 0]
+      Scale: [1, 1, 1]
+    HierarchyComponent:
+      Parent: 9375796442227673625
+      Children:
+        - 18054141944316629732
+  - Entity: 9375796442227673625
+    TagComponent:
+      Tag: Armature
+    TransformComponent:
+      Translation: [0, 0, 0]
+      Rotation: [0, -0, 0]
+      Scale: [1, 1, 1]
+    HierarchyComponent:
+      Parent: 3903272894817569788
+      Children:
+        - 15650866791651612466
+        - 122722166161789383
+        - 17710563330691588813
+        - 1449003475076449479
+        - 9488572049520607969
+        - 15487185519496094952
+  - Entity: 7222051414769560595
+    TagComponent:
+      Tag: Hair
+    TransformComponent:
+      Translation: [0, 0, 0]
+      Rotation: [0, -0, 0]
+      Scale: [1, 1, 1]
+    HierarchyComponent:
+      Parent: 3903272894817569788
+      Children:
+        - 12415415727634244881
+  - Entity: 5414930455166873675
+    TagComponent:
+      Tag: Helmet
+    TransformComponent:
+      Translation: [0, 0, 0]
+      Rotation: [0, -0, 0]
+      Scale: [1, 1, 1]
+    HierarchyComponent:
+      Parent: 3903272894817569788
+      Children:
+        - 10074285501861242131
+        - 4761131334796994865
+  - Entity: 4464103078219136674
+    TagComponent:
+      Tag: Pants
+    TransformComponent:
+      Translation: [0, 0, 0]
+      Rotation: [0, -0, 0]
+      Scale: [1, 1, 1]
+    HierarchyComponent:
+      Parent: 3903272894817569788
+      Children:
+        - 2903125664853208136
+  - Entity: 6984734256101995826
+    TagComponent:
+      Tag: Platebody
+    TransformComponent:
+      Translation: [0, 0, 0]
+      Rotation: [0, -0, 0]
+      Scale: [1, 1, 1]
+    HierarchyComponent:
+      Parent: 3903272894817569788
+      Children:
+        - 967065215983552471
+        - 12499339998417843074
+        - 1535756355975997002
+        - 16797600854041056050
+  - Entity: 2524017064198087961
+    TagComponent:
+      Tag: Platelegs
+    TransformComponent:
+      Translation: [0, 0, 0]
+      Rotation: [0, -0, 0]
+      Scale: [1, 1, 1]
+    HierarchyComponent:
+      Parent: 3903272894817569788
+      Children:
+        - 2252936398915522834
+        - 404933618089587104
+        - 248508369831692120
+        - 8227910215638376605
+  - Entity: 11591985143573518308
+    TagComponent:
+      Tag: Shirt
+    TransformComponent:
+      Translation: [0, 0, 0]
+      Rotation: [0, -0, 0]
+      Scale: [1, 1, 1]
+    HierarchyComponent:
+      Parent: 3903272894817569788
+      Children:
+        - 12768726586909691715
+  - Entity: 15051989946669777387
+    TagComponent:
+      Tag: Shoes
+    TransformComponent:
+      Translation: [0, 0, 0]
+      Rotation: [0, -0, 0]
+      Scale: [1, 1, 1]
+    HierarchyComponent:
+      Parent: 3903272894817569788
+      Children:
+        - 10498441085830345857
+  - Entity: 1574705234237988885
+    TagComponent:
+      Tag: Shield_Primitive_0
+    TransformComponent:
+      Translation: [0, 0, 0]
+      Rotation: [0, 0, 0]
+      Scale: [1, 1, 1]
+    HierarchyComponent:
+      Parent: 8247941483405041509
+      Children:
+        []
+    StaticMeshComponent:
+      Mesh: 729055640822441664
+      Material: 14663921740110325747
+  - Entity: 1411413351454069636
+    TagComponent:
+      Tag: Shield_Primitive_1
+    TransformComponent:
+      Translation: [0, 0, 0]
+      Rotation: [0, 0, 0]
+      Scale: [1, 1, 1]
+    HierarchyComponent:
+      Parent: 8247941483405041509
+      Children:
+        []
+    StaticMeshComponent:
+      Mesh: 2815510886732158274
+      Material: 3882844892062345756
+  - Entity: 9103625081294425721
+    TagComponent:
+      Tag: Shield_Primitive_2
+    TransformComponent:
+      Translation: [0, 0, 0]
+      Rotation: [0, 0, 0]
+      Scale: [1, 1, 1]
+    HierarchyComponent:
+      Parent: 8247941483405041509
+      Children:
+        []
+    StaticMeshComponent:
+      Mesh: 56309500359538563
+      Material: 6831886059678299664
+  - Entity: 1310600031631022048
+    TagComponent:
+      Tag: Sword_Primitive_0
+    TransformComponent:
+      Translation: [0, 0, 0]
+      Rotation: [0, 0, 0]
+      Scale: [1, 1, 1]
+    HierarchyComponent:
+      Parent: 326742142553545895
+      Children:
+        []
+    StaticMeshComponent:
+      Mesh: 15615477695215762967
+      Material: 14663921740110325747
+  - Entity: 873435218840224975
+    TagComponent:
+      Tag: Sword_Primitive_1
+    TransformComponent:
+      Translation: [0, 0, 0]
+      Rotation: [0, 0, 0]
+      Scale: [1, 1, 1]
+    HierarchyComponent:
+      Parent: 326742142553545895
+      Children:
+        []
+    StaticMeshComponent:
+      Mesh: 10251555215519292601
+      Material: 11105916490776446797
+  - Entity: 10461845002276008656
+    TagComponent:
+      Tag: Sword_Primitive_2
+    TransformComponent:
+      Translation: [0, 0, 0]
+      Rotation: [0, 0, 0]
+      Scale: [1, 1, 1]
+    HierarchyComponent:
+      Parent: 326742142553545895
+      Children:
+        []
+    StaticMeshComponent:
+      Mesh: 14835772593454769008
+      Material: 1299565518786054854
+  - Entity: 11133947945557184377
+    TagComponent:
+      Tag: Sword_Primitive_3
+    TransformComponent:
+      Translation: [0, 0, 0]
+      Rotation: [0, 0, 0]
+      Scale: [1, 1, 1]
+    HierarchyComponent:
+      Parent: 326742142553545895
+      Children:
+        []
+    StaticMeshComponent:
+      Mesh: 3956867381556159093
+      Material: 8120389647052500926
+  - Entity: 18054141944316629732
+    TagComponent:
+      Tag: Body_Primitive_0
+    TransformComponent:
+      Translation: [0, 0, 0]
+      Rotation: [0, 0, 0]
+      Scale: [1, 1, 1]
+    HierarchyComponent:
+      Parent: 15487185519496094952
+      Children:
+        []
+    SkinnedMeshComponent:
+      MeshAsset: 17406421384710706778
+      SkeletonAsset: 13801415218288113534
+      MaterialAsset: 6145915845945334296
+      SkeletonEntity: 15650866791651612466
+      Visible: true
+      CastShadows: true
+  - Entity: 12415415727634244881
+    TagComponent:
+      Tag: Hair_Primitive_0
+    TransformComponent:
+      Translation: [0, 0, 0]
+      Rotation: [0, 0, 0]
+      Scale: [1, 1, 1]
+    HierarchyComponent:
+      Parent: 7222051414769560595
+      Children:
+        []
+    SkinnedMeshComponent:
+      MeshAsset: 17802817333122630903
+      SkeletonAsset: 13801415218288113534
+      MaterialAsset: 11090215641611936526
+      SkeletonEntity: 15650866791651612466
+      Visible: true
+      CastShadows: true
+  - Entity: 10074285501861242131
+    TagComponent:
+      Tag: Helmet_Primitive_0
+    TransformComponent:
+      Translation: [0, 0, 0]
+      Rotation: [0, 0, 0]
+      Scale: [1, 1, 1]
+    HierarchyComponent:
+      Parent: 5414930455166873675
+      Children:
+        []
+    SkinnedMeshComponent:
+      MeshAsset: 16317846663073238075
+      SkeletonAsset: 13801415218288113534
+      MaterialAsset: 1382964809517397422
+      SkeletonEntity: 15650866791651612466
+      Visible: true
+      CastShadows: true
+  - Entity: 4761131334796994865
+    TagComponent:
+      Tag: Helmet_Primitive_1
+    TransformComponent:
+      Translation: [0, 0, 0]
+      Rotation: [0, 0, 0]
+      Scale: [1, 1, 1]
+    HierarchyComponent:
+      Parent: 5414930455166873675
+      Children:
+        []
+    SkinnedMeshComponent:
+      MeshAsset: 11036288656737039163
+      SkeletonAsset: 13801415218288113534
+      MaterialAsset: 7559657554540855939
+      SkeletonEntity: 15650866791651612466
+      Visible: true
+      CastShadows: true
+  - Entity: 2903125664853208136
+    TagComponent:
+      Tag: Pants_Primitive_0
+    TransformComponent:
+      Translation: [0, 0, 0]
+      Rotation: [0, 0, 0]
+      Scale: [1, 1, 1]
+    HierarchyComponent:
+      Parent: 4464103078219136674
+      Children:
+        []
+    SkinnedMeshComponent:
+      MeshAsset: 9161065078628216421
+      SkeletonAsset: 13801415218288113534
+      MaterialAsset: 15205186467829408047
+      SkeletonEntity: 15650866791651612466
+      Visible: true
+      CastShadows: true
+  - Entity: 967065215983552471
+    TagComponent:
+      Tag: Platebody_Primitive_0
+    TransformComponent:
+      Translation: [0, 0, 0]
+      Rotation: [0, 0, 0]
+      Scale: [1, 1, 1]
+    HierarchyComponent:
+      Parent: 6984734256101995826
+      Children:
+        []
+    SkinnedMeshComponent:
+      MeshAsset: 11518092268018965557
+      SkeletonAsset: 13801415218288113534
+      MaterialAsset: 1382964809517397422
+      SkeletonEntity: 15650866791651612466
+      Visible: true
+      CastShadows: true
+  - Entity: 12499339998417843074
+    TagComponent:
+      Tag: Platebody_Primitive_1
+    TransformComponent:
+      Translation: [0, 0, 0]
+      Rotation: [0, 0, 0]
+      Scale: [1, 1, 1]
+    HierarchyComponent:
+      Parent: 6984734256101995826
+      Children:
+        []
+    SkinnedMeshComponent:
+      MeshAsset: 14497402013867423964
+      SkeletonAsset: 13801415218288113534
+      MaterialAsset: 7559657554540855939
+      SkeletonEntity: 15650866791651612466
+      Visible: true
+      CastShadows: true
+  - Entity: 1535756355975997002
+    TagComponent:
+      Tag: Platebody_Primitive_2
+    TransformComponent:
+      Translation: [0, 0, 0]
+      Rotation: [0, 0, 0]
+      Scale: [1, 1, 1]
+    HierarchyComponent:
+      Parent: 6984734256101995826
+      Children:
+        []
+    SkinnedMeshComponent:
+      MeshAsset: 13194103632645582491
+      SkeletonAsset: 13801415218288113534
+      MaterialAsset: 5036353221110241332
+      SkeletonEntity: 15650866791651612466
+      Visible: true
+      CastShadows: true
+  - Entity: 16797600854041056050
+    TagComponent:
+      Tag: Platebody_Primitive_3
+    TransformComponent:
+      Translation: [0, 0, 0]
+      Rotation: [0, 0, 0]
+      Scale: [1, 1, 1]
+    HierarchyComponent:
+      Parent: 6984734256101995826
+      Children:
+        []
+    SkinnedMeshComponent:
+      MeshAsset: 13852188081096767353
+      SkeletonAsset: 13801415218288113534
+      MaterialAsset: 978516101842096683
+      SkeletonEntity: 15650866791651612466
+      Visible: true
+      CastShadows: true
+  - Entity: 2252936398915522834
+    TagComponent:
+      Tag: Platelegs_Primitive_0
+    TransformComponent:
+      Translation: [0, 0, 0]
+      Rotation: [0, 0, 0]
+      Scale: [1, 1, 1]
+    HierarchyComponent:
+      Parent: 2524017064198087961
+      Children:
+        []
+    SkinnedMeshComponent:
+      MeshAsset: 13949984607913109223
+      SkeletonAsset: 13801415218288113534
+      MaterialAsset: 1382964809517397422
+      SkeletonEntity: 15650866791651612466
+      Visible: true
+      CastShadows: true
+  - Entity: 404933618089587104
+    TagComponent:
+      Tag: Platelegs_Primitive_1
+    TransformComponent:
+      Translation: [0, 0, 0]
+      Rotation: [0, 0, 0]
+      Scale: [1, 1, 1]
+    HierarchyComponent:
+      Parent: 2524017064198087961
+      Children:
+        []
+    SkinnedMeshComponent:
+      MeshAsset: 10188161284715390614
+      SkeletonAsset: 13801415218288113534
+      MaterialAsset: 7559657554540855939
+      SkeletonEntity: 15650866791651612466
+      Visible: true
+      CastShadows: true
+  - Entity: 248508369831692120
+    TagComponent:
+      Tag: Platelegs_Primitive_2
+    TransformComponent:
+      Translation: [0, 0, 0]
+      Rotation: [0, 0, 0]
+      Scale: [1, 1, 1]
+    HierarchyComponent:
+      Parent: 2524017064198087961
+      Children:
+        []
+    SkinnedMeshComponent:
+      MeshAsset: 10079021829938676003
+      SkeletonAsset: 13801415218288113534
+      MaterialAsset: 5036353221110241332
+      SkeletonEntity: 15650866791651612466
+      Visible: true
+      CastShadows: true
+  - Entity: 8227910215638376605
+    TagComponent:
+      Tag: Platelegs_Primitive_3
+    TransformComponent:
+      Translation: [0, 0, 0]
+      Rotation: [0, 0, 0]
+      Scale: [1, 1, 1]
+    HierarchyComponent:
+      Parent: 2524017064198087961
+      Children:
+        []
+    SkinnedMeshComponent:
+      MeshAsset: 16610677648577568073
+      SkeletonAsset: 13801415218288113534
+      MaterialAsset: 978516101842096683
+      SkeletonEntity: 15650866791651612466
+      Visible: true
+      CastShadows: true
+  - Entity: 12768726586909691715
+    TagComponent:
+      Tag: Shirt_Primitive_0
+    TransformComponent:
+      Translation: [0, 0, 0]
+      Rotation: [0, 0, 0]
+      Scale: [1, 1, 1]
+    HierarchyComponent:
+      Parent: 11591985143573518308
+      Children:
+        []
+    SkinnedMeshComponent:
+      MeshAsset: 8962436261351536327
+      SkeletonAsset: 13801415218288113534
+      MaterialAsset: 15709678170736499354
+      SkeletonEntity: 15650866791651612466
+      Visible: true
+      CastShadows: true
+  - Entity: 10498441085830345857
+    TagComponent:
+      Tag: Shoes_Primitive_0
+    TransformComponent:
+      Translation: [0, 0, 0]
+      Rotation: [0, 0, 0]
+      Scale: [1, 1, 1]
+    HierarchyComponent:
+      Parent: 15051989946669777387
+      Children:
+        []
+    SkinnedMeshComponent:
+      MeshAsset: 11920345773493103870
+      SkeletonAsset: 13801415218288113534
+      MaterialAsset: 3353322660170857643
+      SkeletonEntity: 15650866791651612466
+      Visible: true
+      CastShadows: true
+  - Entity: 3903272894817569788
+    TagComponent:
+      Tag: E10 attack anims
+    TransformComponent:
+      Translation: [0, 0, 0]
+      Rotation: [0, 0, 0]
+      Scale: [10, 10, 10]
+    HierarchyComponent:
+      Parent: 0
+      Children:
+        - 9375796442227673625
+        - 7222051414769560595
+        - 5414930455166873675
+        - 4464103078219136674
+        - 6984734256101995826
+        - 2524017064198087961
+        - 11591985143573518308
+        - 15051989946669777387
+    PrefabInstanceComponent:
+      PrefabAsset: 3035278573088996826
+      IsExpandedInHierarchy: true

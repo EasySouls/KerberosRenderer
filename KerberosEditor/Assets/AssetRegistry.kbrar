@@ -54,6 +54,15 @@ AssetRegistry:
     ParentHandle: 0
     SubAssetKey: ""
     ImportVersion: 1
+  - Handle: 56309500359538563
+    Type: Mesh
+    Path: Models\rpg-character\E10 attack anims\Meshes\mesh_1_2_CUSurfPatch.kbrmesh
+    SourceRoot: 0
+    LibraryPath: Models\rpg-character\E10 attack anims\Meshes\mesh_1_2_CUSurfPatch.kbrmesh
+    RootSourceHandle: 3035278573088996826
+    ParentHandle: 3035278573088996826
+    SubAssetKey: mesh:1_2
+    ImportVersion: 1
   - Handle: 66019000018970975
     Type: Mesh
     Path: Models\retroufo\Meshes\mesh_62_0.kbrmesh
@@ -980,6 +989,15 @@ AssetRegistry:
     ParentHandle: 8858309372063028477
     SubAssetKey: mesh:16_0
     ImportVersion: 1
+  - Handle: 729055640822441664
+    Type: Mesh
+    Path: Models\rpg-character\E10 attack anims\Meshes\mesh_1_0_CUSurfPatch.kbrmesh
+    SourceRoot: 0
+    LibraryPath: Models\rpg-character\E10 attack anims\Meshes\mesh_1_0_CUSurfPatch.kbrmesh
+    RootSourceHandle: 3035278573088996826
+    ParentHandle: 3035278573088996826
+    SubAssetKey: mesh:1_0
+    ImportVersion: 1
   - Handle: 730799029749688558
     Type: Mesh
     Path: Models\retroufo\Meshes\mesh_71_0.kbrmesh
@@ -1347,6 +1365,15 @@ AssetRegistry:
     RootSourceHandle: 10152496132570147302
     ParentHandle: 10152496132570147302
     SubAssetKey: texture:0
+    ImportVersion: 1
+  - Handle: 978516101842096683
+    Type: Material
+    Path: Models\rpg-character\E10 attack anims\Materials\Black.kbrmaterial
+    SourceRoot: 0
+    LibraryPath: Models\rpg-character\E10 attack anims\Materials\Black.kbrmaterial
+    RootSourceHandle: 3035278573088996826
+    ParentHandle: 3035278573088996826
+    SubAssetKey: material:12
     ImportVersion: 1
   - Handle: 979274240438682711
     Type: Material
@@ -1793,6 +1820,15 @@ AssetRegistry:
     ParentHandle: 6148802185286014116
     SubAssetKey: mesh:2_0
     ImportVersion: 1
+  - Handle: 1299565518786054854
+    Type: Material
+    Path: Models\rpg-character\E10 attack anims\Materials\Blade.kbrmaterial
+    SourceRoot: 0
+    LibraryPath: Models\rpg-character\E10 attack anims\Materials\Blade.kbrmaterial
+    RootSourceHandle: 3035278573088996826
+    ParentHandle: 3035278573088996826
+    SubAssetKey: material:5
+    ImportVersion: 1
   - Handle: 1300517323055378517
     Type: Mesh
     Path: Models\retroufo_red_lowpoly\Meshes\mesh_27_0_Mesh_28.kbrmesh
@@ -1977,6 +2013,15 @@ AssetRegistry:
     RootSourceHandle: 11824251895976750977
     ParentHandle: 11824251895976750977
     SubAssetKey: material:4
+    ImportVersion: 1
+  - Handle: 1382964809517397422
+    Type: Material
+    Path: Models\rpg-character\E10 attack anims\Materials\Metal.002.kbrmaterial
+    SourceRoot: 0
+    LibraryPath: Models\rpg-character\E10 attack anims\Materials\Metal.002.kbrmaterial
+    RootSourceHandle: 3035278573088996826
+    ParentHandle: 3035278573088996826
+    SubAssetKey: material:8
     ImportVersion: 1
   - Handle: 1391136078095642632
     Type: Texture2D
@@ -4263,6 +4308,15 @@ AssetRegistry:
     ParentHandle: 0
     SubAssetKey: ""
     ImportVersion: 1
+  - Handle: 2558929662716677076
+    Type: Animation
+    Path: Models\rpg-character\E10 attack anims\Animations\Punch.kbranimation
+    SourceRoot: 0
+    LibraryPath: Models\rpg-character\E10 attack anims\Animations\Punch.kbranimation
+    RootSourceHandle: 3035278573088996826
+    ParentHandle: 3035278573088996826
+    SubAssetKey: animation:4
+    ImportVersion: 1
   - Handle: 2564933816490854695
     Type: Mesh
     Path: Models\retroufo\Meshes\mesh_17_0.kbrmesh
@@ -4616,6 +4670,15 @@ AssetRegistry:
       - 534126962233704142
       - 5734159455103572291
       - 4618149021998797964
+  - Handle: 2815510886732158274
+    Type: Mesh
+    Path: Models\rpg-character\E10 attack anims\Meshes\mesh_1_1_CUSurfPatch.kbrmesh
+    SourceRoot: 0
+    LibraryPath: Models\rpg-character\E10 attack anims\Meshes\mesh_1_1_CUSurfPatch.kbrmesh
+    RootSourceHandle: 3035278573088996826
+    ParentHandle: 3035278573088996826
+    SubAssetKey: mesh:1_1
+    ImportVersion: 1
   - Handle: 2820150906398696424
     Type: Prefab
     Path: Models\FlightHelmet\glTF\FlightHelmet\FlightHelmet.kbrprefab
@@ -5061,6 +5124,15 @@ AssetRegistry:
     RootSourceHandle: 3234291855590370197
     ParentHandle: 3234291855590370197
     SubAssetKey: mesh:38_0
+    ImportVersion: 1
+  - Handle: 3035278573088996826
+    Type: Prefab
+    Path: Models\rpg-character\E10 attack anims.gltf
+    SourceRoot: 0
+    LibraryPath: Models\rpg-character\E10 attack anims\E10 attack anims.kbrprefab
+    RootSourceHandle: 3035278573088996826
+    ParentHandle: 0
+    SubAssetKey: ""
     ImportVersion: 1
   - Handle: 3040574509941218920
     Type: Mesh
@@ -5667,6 +5739,15 @@ AssetRegistry:
     RootSourceHandle: 758760977254712444
     ParentHandle: 758760977254712444
     SubAssetKey: mesh:6_0
+    ImportVersion: 1
+  - Handle: 3353322660170857643
+    Type: Material
+    Path: Models\rpg-character\E10 attack anims\Materials\Shoe.kbrmaterial
+    SourceRoot: 0
+    LibraryPath: Models\rpg-character\E10 attack anims\Materials\Shoe.kbrmaterial
+    RootSourceHandle: 3035278573088996826
+    ParentHandle: 3035278573088996826
+    SubAssetKey: material:14
     ImportVersion: 1
   - Handle: 3355281046189804354
     Type: Mesh
@@ -6599,6 +6680,15 @@ AssetRegistry:
     ParentHandle: 9420112938983857962
     SubAssetKey: mesh:0_0
     ImportVersion: 1
+  - Handle: 3857756393375486187
+    Type: Animation
+    Path: Models\rpg-character\E10 attack anims\Animations\Combat_idle.kbranimation
+    SourceRoot: 0
+    LibraryPath: Models\rpg-character\E10 attack anims\Animations\Combat_idle.kbranimation
+    RootSourceHandle: 3035278573088996826
+    ParentHandle: 3035278573088996826
+    SubAssetKey: animation:0
+    ImportVersion: 1
   - Handle: 3861637059458129376
     Type: Texture2D
     Path: Models\viking_room\viking_room.png
@@ -6643,6 +6733,15 @@ AssetRegistry:
     RootSourceHandle: 3234291855590370197
     ParentHandle: 3234291855590370197
     SubAssetKey: mesh:9_1
+    ImportVersion: 1
+  - Handle: 3882844892062345756
+    Type: Material
+    Path: Models\rpg-character\E10 attack anims\Materials\Wood.kbrmaterial
+    SourceRoot: 0
+    LibraryPath: Models\rpg-character\E10 attack anims\Materials\Wood.kbrmaterial
+    RootSourceHandle: 3035278573088996826
+    ParentHandle: 3035278573088996826
+    SubAssetKey: material:2
     ImportVersion: 1
   - Handle: 3887326551226570579
     Type: Texture2D
@@ -6795,6 +6894,15 @@ AssetRegistry:
       - 13845182823292657758
       - 15462070879749610509
       - 16510599889426200558
+  - Handle: 3956867381556159093
+    Type: Mesh
+    Path: Models\rpg-character\E10 attack anims\Meshes\mesh_2_3_Cube.008.kbrmesh
+    SourceRoot: 0
+    LibraryPath: Models\rpg-character\E10 attack anims\Meshes\mesh_2_3_Cube.008.kbrmesh
+    RootSourceHandle: 3035278573088996826
+    ParentHandle: 3035278573088996826
+    SubAssetKey: mesh:2_3
+    ImportVersion: 1
   - Handle: 3959513460906552473
     Type: Material
     Path: Models\gltf\glTF-Embedded\Buggy\Materials\Material_22_4.kbrmaterial
@@ -7087,6 +7195,15 @@ AssetRegistry:
     RootSourceHandle: 5174649278247987669
     ParentHandle: 5174649278247987669
     SubAssetKey: mesh:12_0
+    ImportVersion: 1
+  - Handle: 4230540465934819545
+    Type: Animation
+    Path: Models\rpg-character\E10 attack anims\Animations\Grip right.kbranimation
+    SourceRoot: 0
+    LibraryPath: Models\rpg-character\E10 attack anims\Animations\Grip right.kbranimation
+    RootSourceHandle: 3035278573088996826
+    ParentHandle: 3035278573088996826
+    SubAssetKey: animation:2
     ImportVersion: 1
   - Handle: 4261590728470975030
     Type: Mesh
@@ -8832,6 +8949,15 @@ AssetRegistry:
     RootSourceHandle: 15982454909274218888
     ParentHandle: 15982454909274218888
     SubAssetKey: material:3
+    ImportVersion: 1
+  - Handle: 5036353221110241332
+    Type: Material
+    Path: Models\rpg-character\E10 attack anims\Materials\Underclothes.001.kbrmaterial
+    SourceRoot: 0
+    LibraryPath: Models\rpg-character\E10 attack anims\Materials\Underclothes.001.kbrmaterial
+    RootSourceHandle: 3035278573088996826
+    ParentHandle: 3035278573088996826
+    SubAssetKey: material:11
     ImportVersion: 1
   - Handle: 5037233660933876444
     Type: Mesh
@@ -10844,6 +10970,15 @@ AssetRegistry:
     ParentHandle: 6090326326702746238
     SubAssetKey: material:6
     ImportVersion: 1
+  - Handle: 6145915845945334296
+    Type: Material
+    Path: Models\rpg-character\E10 attack anims\Materials\Skin.kbrmaterial
+    SourceRoot: 0
+    LibraryPath: Models\rpg-character\E10 attack anims\Materials\Skin.kbrmaterial
+    RootSourceHandle: 3035278573088996826
+    ParentHandle: 3035278573088996826
+    SubAssetKey: material:0
+    ImportVersion: 1
   - Handle: 6147157259499426879
     Type: Mesh
     Path: Models\vulkanscene_shadow\Meshes\mesh_3_0_dragon.kbrmesh
@@ -11805,6 +11940,15 @@ AssetRegistry:
     ParentHandle: 13789860686184306386
     SubAssetKey: animation:0
     ImportVersion: 1
+  - Handle: 6685553371363870004
+    Type: Animation
+    Path: Models\rpg-character\E10 attack anims\Animations\Idle.kbranimation
+    SourceRoot: 0
+    LibraryPath: Models\rpg-character\E10 attack anims\Animations\Idle.kbranimation
+    RootSourceHandle: 3035278573088996826
+    ParentHandle: 3035278573088996826
+    SubAssetKey: animation:3
+    ImportVersion: 1
   - Handle: 6690872694731216128
     Type: Mesh
     Path: Models\lavaplanet\Meshes\mesh_0_0_Sphere.001.kbrmesh
@@ -11993,6 +12137,15 @@ AssetRegistry:
     RootSourceHandle: 2238632335295528690
     ParentHandle: 2238632335295528690
     SubAssetKey: mesh:80_0
+    ImportVersion: 1
+  - Handle: 6831886059678299664
+    Type: Material
+    Path: Models\rpg-character\E10 attack anims\Materials\Emblem.kbrmaterial
+    SourceRoot: 0
+    LibraryPath: Models\rpg-character\E10 attack anims\Materials\Emblem.kbrmaterial
+    RootSourceHandle: 3035278573088996826
+    ParentHandle: 3035278573088996826
+    SubAssetKey: material:3
     ImportVersion: 1
   - Handle: 6832303382400893764
     Type: Mesh
@@ -13204,6 +13357,15 @@ AssetRegistry:
     ParentHandle: 11130684027942237427
     SubAssetKey: mesh:2_0
     ImportVersion: 1
+  - Handle: 7559657554540855939
+    Type: Material
+    Path: Models\rpg-character\E10 attack anims\Materials\Metal_dark.kbrmaterial
+    SourceRoot: 0
+    LibraryPath: Models\rpg-character\E10 attack anims\Materials\Metal_dark.kbrmaterial
+    RootSourceHandle: 3035278573088996826
+    ParentHandle: 3035278573088996826
+    SubAssetKey: material:9
+    ImportVersion: 1
   - Handle: 7562076932231910568
     Type: Texture2D
     Path: Models\sponza\sponza\Textures\texture_3_14650633544276105767.ktx2
@@ -14384,6 +14546,15 @@ AssetRegistry:
     ParentHandle: 0
     SubAssetKey: ""
     ImportVersion: 1
+  - Handle: 8120389647052500926
+    Type: Material
+    Path: Models\rpg-character\E10 attack anims\Materials\Blade highlight.kbrmaterial
+    SourceRoot: 0
+    LibraryPath: Models\rpg-character\E10 attack anims\Materials\Blade highlight.kbrmaterial
+    RootSourceHandle: 3035278573088996826
+    ParentHandle: 3035278573088996826
+    SubAssetKey: material:6
+    ImportVersion: 1
   - Handle: 8125595408617232516
     Type: Mesh
     Path: Models\retroufo\Meshes\mesh_25_0_Mesh_25.kbrmesh
@@ -14401,6 +14572,15 @@ AssetRegistry:
     RootSourceHandle: 6090326326702746238
     ParentHandle: 6090326326702746238
     SubAssetKey: mesh:50_0
+    ImportVersion: 1
+  - Handle: 8148199164905737752
+    Type: Animation
+    Path: Models\rpg-character\E10 attack anims\Animations\Grip left.kbranimation
+    SourceRoot: 0
+    LibraryPath: Models\rpg-character\E10 attack anims\Animations\Grip left.kbranimation
+    RootSourceHandle: 3035278573088996826
+    ParentHandle: 3035278573088996826
+    SubAssetKey: animation:1
     ImportVersion: 1
   - Handle: 8151981278749144361
     Type: Mesh
@@ -15589,6 +15769,15 @@ AssetRegistry:
     ParentHandle: 7563732692318888728
     SubAssetKey: mesh:16_1
     ImportVersion: 1
+  - Handle: 8892580175433553909
+    Type: Animation
+    Path: Models\rpg-character\E10 attack anims\Animations\Sword_atk02.kbranimation
+    SourceRoot: 0
+    LibraryPath: Models\rpg-character\E10 attack anims\Animations\Sword_atk02.kbranimation
+    RootSourceHandle: 3035278573088996826
+    ParentHandle: 3035278573088996826
+    SubAssetKey: animation:7
+    ImportVersion: 1
   - Handle: 8916310257274511192
     Type: Mesh
     Path: Models\retroufo\Meshes\mesh_13_0.kbrmesh
@@ -15615,6 +15804,15 @@ AssetRegistry:
     RootSourceHandle: 14244998688843197978
     ParentHandle: 14244998688843197978
     SubAssetKey: mesh:64_0
+    ImportVersion: 1
+  - Handle: 8962436261351536327
+    Type: SkinnedMesh
+    Path: Models\rpg-character\E10 attack anims\Meshes\skinnedmesh_8_0_Cube.006.kbrskinnedmesh
+    SourceRoot: 0
+    LibraryPath: Models\rpg-character\E10 attack anims\Meshes\skinnedmesh_8_0_Cube.006.kbrskinnedmesh
+    RootSourceHandle: 3035278573088996826
+    ParentHandle: 3035278573088996826
+    SubAssetKey: skinnedmesh:8_0
     ImportVersion: 1
   - Handle: 8965494187379124236
     Type: Mesh
@@ -15891,6 +16089,15 @@ AssetRegistry:
     RootSourceHandle: 15982454909274218888
     ParentHandle: 15982454909274218888
     SubAssetKey: mesh:58_0
+    ImportVersion: 1
+  - Handle: 9161065078628216421
+    Type: SkinnedMesh
+    Path: Models\rpg-character\E10 attack anims\Meshes\skinnedmesh_5_0_Cube.003.kbrskinnedmesh
+    SourceRoot: 0
+    LibraryPath: Models\rpg-character\E10 attack anims\Meshes\skinnedmesh_5_0_Cube.003.kbrskinnedmesh
+    RootSourceHandle: 3035278573088996826
+    ParentHandle: 3035278573088996826
+    SubAssetKey: skinnedmesh:5_0
     ImportVersion: 1
   - Handle: 9164637741959227086
     Type: Mesh
@@ -17490,6 +17697,15 @@ AssetRegistry:
     ParentHandle: 7563732692318888728
     SubAssetKey: mesh:74_0
     ImportVersion: 1
+  - Handle: 10079021829938676003
+    Type: SkinnedMesh
+    Path: Models\rpg-character\E10 attack anims\Meshes\skinnedmesh_7_2_Cube.004.kbrskinnedmesh
+    SourceRoot: 0
+    LibraryPath: Models\rpg-character\E10 attack anims\Meshes\skinnedmesh_7_2_Cube.004.kbrskinnedmesh
+    RootSourceHandle: 3035278573088996826
+    ParentHandle: 3035278573088996826
+    SubAssetKey: skinnedmesh:7_2
+    ImportVersion: 1
   - Handle: 10091969707102326717
     Type: Prefab
     Path: Models\retroufo_glow\retroufo_glow.kbrprefab
@@ -17692,6 +17908,15 @@ AssetRegistry:
     ParentHandle: 8858309372063028477
     SubAssetKey: mesh:7_0
     ImportVersion: 1
+  - Handle: 10188161284715390614
+    Type: SkinnedMesh
+    Path: Models\rpg-character\E10 attack anims\Meshes\skinnedmesh_7_1_Cube.004.kbrskinnedmesh
+    SourceRoot: 0
+    LibraryPath: Models\rpg-character\E10 attack anims\Meshes\skinnedmesh_7_1_Cube.004.kbrskinnedmesh
+    RootSourceHandle: 3035278573088996826
+    ParentHandle: 3035278573088996826
+    SubAssetKey: skinnedmesh:7_1
+    ImportVersion: 1
   - Handle: 10191972420434094719
     Type: Mesh
     Path: Models\retroufo\Meshes\mesh_41_0_Mesh_41.kbrmesh
@@ -17851,6 +18076,15 @@ AssetRegistry:
     RootSourceHandle: 10242103575405872012
     ParentHandle: 0
     SubAssetKey: ""
+    ImportVersion: 1
+  - Handle: 10251555215519292601
+    Type: Mesh
+    Path: Models\rpg-character\E10 attack anims\Meshes\mesh_2_1_Cube.008.kbrmesh
+    SourceRoot: 0
+    LibraryPath: Models\rpg-character\E10 attack anims\Meshes\mesh_2_1_Cube.008.kbrmesh
+    RootSourceHandle: 3035278573088996826
+    ParentHandle: 3035278573088996826
+    SubAssetKey: mesh:2_1
     ImportVersion: 1
   - Handle: 10260356184428954740
     Type: Mesh
@@ -19321,6 +19555,15 @@ AssetRegistry:
       - 13097944894411498770
       - 14638711244906701180
       - 372695728083049570
+  - Handle: 11036288656737039163
+    Type: SkinnedMesh
+    Path: Models\rpg-character\E10 attack anims\Meshes\skinnedmesh_4_1_Cube.011.kbrskinnedmesh
+    SourceRoot: 0
+    LibraryPath: Models\rpg-character\E10 attack anims\Meshes\skinnedmesh_4_1_Cube.011.kbrskinnedmesh
+    RootSourceHandle: 3035278573088996826
+    ParentHandle: 3035278573088996826
+    SubAssetKey: skinnedmesh:4_1
+    ImportVersion: 1
   - Handle: 11042137105885818331
     Type: Mesh
     Path: Models\gltf\glTF-Embedded\Buggy\Meshes\mesh_62_0_body_64.kbrmesh
@@ -19441,6 +19684,15 @@ AssetRegistry:
     ParentHandle: 12460365323498653085
     SubAssetKey: texture:43
     ImportVersion: 1
+  - Handle: 11090215641611936526
+    Type: Material
+    Path: Models\rpg-character\E10 attack anims\Materials\Hair.kbrmaterial
+    SourceRoot: 0
+    LibraryPath: Models\rpg-character\E10 attack anims\Materials\Hair.kbrmaterial
+    RootSourceHandle: 3035278573088996826
+    ParentHandle: 3035278573088996826
+    SubAssetKey: material:7
+    ImportVersion: 1
   - Handle: 11098956974064799807
     Type: Material
     Path: Models\gltf\glTF-Embedded\Buggy\Materials\Material_20_69.kbrmaterial
@@ -19449,6 +19701,15 @@ AssetRegistry:
     RootSourceHandle: 2238632335295528690
     ParentHandle: 2238632335295528690
     SubAssetKey: material:69
+    ImportVersion: 1
+  - Handle: 11105916490776446797
+    Type: Material
+    Path: Models\rpg-character\E10 attack anims\Materials\Metal Dark.kbrmaterial
+    SourceRoot: 0
+    LibraryPath: Models\rpg-character\E10 attack anims\Materials\Metal Dark.kbrmaterial
+    RootSourceHandle: 3035278573088996826
+    ParentHandle: 3035278573088996826
+    SubAssetKey: material:4
     ImportVersion: 1
   - Handle: 11106689764875446416
     Type: Material
@@ -20185,6 +20446,15 @@ AssetRegistry:
     ParentHandle: 0
     SubAssetKey: ""
     ImportVersion: 1
+  - Handle: 11518092268018965557
+    Type: SkinnedMesh
+    Path: Models\rpg-character\E10 attack anims\Meshes\skinnedmesh_6_0_Cube.010.kbrskinnedmesh
+    SourceRoot: 0
+    LibraryPath: Models\rpg-character\E10 attack anims\Meshes\skinnedmesh_6_0_Cube.010.kbrskinnedmesh
+    RootSourceHandle: 3035278573088996826
+    ParentHandle: 3035278573088996826
+    SubAssetKey: skinnedmesh:6_0
+    ImportVersion: 1
   - Handle: 11519124924457443484
     Type: Material
     Path: Models\gltf\glTF-Embedded\Buggy\Materials\Material_26_119.kbrmaterial
@@ -20813,6 +21083,15 @@ AssetRegistry:
     RootSourceHandle: 9416030371750910923
     ParentHandle: 9416030371750910923
     SubAssetKey: mesh:50_0
+    ImportVersion: 1
+  - Handle: 11920345773493103870
+    Type: SkinnedMesh
+    Path: Models\rpg-character\E10 attack anims\Meshes\skinnedmesh_9_0_Cube.007.kbrskinnedmesh
+    SourceRoot: 0
+    LibraryPath: Models\rpg-character\E10 attack anims\Meshes\skinnedmesh_9_0_Cube.007.kbrskinnedmesh
+    RootSourceHandle: 3035278573088996826
+    ParentHandle: 3035278573088996826
+    SubAssetKey: skinnedmesh:9_0
     ImportVersion: 1
   - Handle: 11921785998395318344
     Type: Mesh
@@ -23040,6 +23319,15 @@ AssetRegistry:
     ParentHandle: 12460365323498653085
     SubAssetKey: texture:38
     ImportVersion: 1
+  - Handle: 13194103632645582491
+    Type: SkinnedMesh
+    Path: Models\rpg-character\E10 attack anims\Meshes\skinnedmesh_6_2_Cube.010.kbrskinnedmesh
+    SourceRoot: 0
+    LibraryPath: Models\rpg-character\E10 attack anims\Meshes\skinnedmesh_6_2_Cube.010.kbrskinnedmesh
+    RootSourceHandle: 3035278573088996826
+    ParentHandle: 3035278573088996826
+    SubAssetKey: skinnedmesh:6_2
+    ImportVersion: 1
   - Handle: 13201797956794002092
     Type: Mesh
     Path: Models\retroufo\Meshes\mesh_15_0_Mesh_15.kbrmesh
@@ -24117,6 +24405,15 @@ AssetRegistry:
     ParentHandle: 641661085910201849
     SubAssetKey: material:4
     ImportVersion: 1
+  - Handle: 13801415218288113534
+    Type: Skeleton
+    Path: Models\rpg-character\E10 attack anims\Skeletons\Armature.kbrskeleton
+    SourceRoot: 0
+    LibraryPath: Models\rpg-character\E10 attack anims\Skeletons\Armature.kbrskeleton
+    RootSourceHandle: 3035278573088996826
+    ParentHandle: 3035278573088996826
+    SubAssetKey: skeleton:0
+    ImportVersion: 1
   - Handle: 13803235061621961638
     Type: Material
     Path: Models\gltf\glTF-Embedded\Buggy\Materials\Material_24_73.kbrmaterial
@@ -24179,6 +24476,15 @@ AssetRegistry:
     RootSourceHandle: 583060611811443193
     ParentHandle: 583060611811443193
     SubAssetKey: mesh:7_0
+    ImportVersion: 1
+  - Handle: 13852188081096767353
+    Type: SkinnedMesh
+    Path: Models\rpg-character\E10 attack anims\Meshes\skinnedmesh_6_3_Cube.010.kbrskinnedmesh
+    SourceRoot: 0
+    LibraryPath: Models\rpg-character\E10 attack anims\Meshes\skinnedmesh_6_3_Cube.010.kbrskinnedmesh
+    RootSourceHandle: 3035278573088996826
+    ParentHandle: 3035278573088996826
+    SubAssetKey: skinnedmesh:6_3
     ImportVersion: 1
   - Handle: 13853720931391523692
     Type: Mesh
@@ -24315,6 +24621,15 @@ AssetRegistry:
     ParentHandle: 2238632335295528690
     SubAssetKey: mesh:101_0
     ImportVersion: 1
+  - Handle: 13949984607913109223
+    Type: SkinnedMesh
+    Path: Models\rpg-character\E10 attack anims\Meshes\skinnedmesh_7_0_Cube.004.kbrskinnedmesh
+    SourceRoot: 0
+    LibraryPath: Models\rpg-character\E10 attack anims\Meshes\skinnedmesh_7_0_Cube.004.kbrskinnedmesh
+    RootSourceHandle: 3035278573088996826
+    ParentHandle: 3035278573088996826
+    SubAssetKey: skinnedmesh:7_0
+    ImportVersion: 1
   - Handle: 13955877078585407757
     Type: Mesh
     Path: Models\treasure_smooth\Meshes\mesh_65_0_Cylinder.027.kbrmesh
@@ -24431,6 +24746,15 @@ AssetRegistry:
     RootSourceHandle: 12460365323498653085
     ParentHandle: 12460365323498653085
     SubAssetKey: texture:9
+    ImportVersion: 1
+  - Handle: 14025324576564752096
+    Type: Animation
+    Path: Models\rpg-character\E10 attack anims\Animations\Sword_atk01.kbranimation
+    SourceRoot: 0
+    LibraryPath: Models\rpg-character\E10 attack anims\Animations\Sword_atk01.kbranimation
+    RootSourceHandle: 3035278573088996826
+    ParentHandle: 3035278573088996826
+    SubAssetKey: animation:6
     ImportVersion: 1
   - Handle: 14040933173626480552
     Type: Texture2D
@@ -24976,6 +25300,63 @@ AssetRegistry:
     ParentHandle: 4418998681810053475
     SubAssetKey: material:4
     ImportVersion: 1
+  - Handle: 14373429708421540890
+    Type: Prefab
+    Path: Models\rpg-character\E10 attack anims\E10 attack anims.kbrprefab
+    SourceRoot: 0
+    LibraryPath: Models\rpg-character\E10 attack anims\E10 attack anims.kbrprefab
+    RootSourceHandle: 3035278573088996826
+    ParentHandle: 3035278573088996826
+    SubAssetKey: prefab:0
+    ImportVersion: 1
+    Dependencies:
+      - 3857756393375486187
+      - 8148199164905737752
+      - 4230540465934819545
+      - 6685553371363870004
+      - 2558929662716677076
+      - 17481697102713965332
+      - 14025324576564752096
+      - 8892580175433553909
+      - 18226696515324025708
+      - 978516101842096683
+      - 8120389647052500926
+      - 1299565518786054854
+      - 6831886059678299664
+      - 11090215641611936526
+      - 11105916490776446797
+      - 1382964809517397422
+      - 14663921740110325747
+      - 7559657554540855939
+      - 15205186467829408047
+      - 15709678170736499354
+      - 3353322660170857643
+      - 6145915845945334296
+      - 5036353221110241332
+      - 3882844892062345756
+      - 729055640822441664
+      - 2815510886732158274
+      - 56309500359538563
+      - 15615477695215762967
+      - 10251555215519292601
+      - 14835772593454769008
+      - 3956867381556159093
+      - 17406421384710706778
+      - 17802817333122630903
+      - 16317846663073238075
+      - 11036288656737039163
+      - 9161065078628216421
+      - 11518092268018965557
+      - 14497402013867423964
+      - 13194103632645582491
+      - 13852188081096767353
+      - 13949984607913109223
+      - 10188161284715390614
+      - 10079021829938676003
+      - 16610677648577568073
+      - 8962436261351536327
+      - 11920345773493103870
+      - 13801415218288113534
   - Handle: 14384674209446175846
     Type: Material
     Path: ImportedModels\armor\Material.001.kbrmat
@@ -25148,6 +25529,15 @@ AssetRegistry:
     RootSourceHandle: 7563732692318888728
     ParentHandle: 7563732692318888728
     SubAssetKey: mesh:91_0
+    ImportVersion: 1
+  - Handle: 14497402013867423964
+    Type: SkinnedMesh
+    Path: Models\rpg-character\E10 attack anims\Meshes\skinnedmesh_6_1_Cube.010.kbrskinnedmesh
+    SourceRoot: 0
+    LibraryPath: Models\rpg-character\E10 attack anims\Meshes\skinnedmesh_6_1_Cube.010.kbrskinnedmesh
+    RootSourceHandle: 3035278573088996826
+    ParentHandle: 3035278573088996826
+    SubAssetKey: skinnedmesh:6_1
     ImportVersion: 1
   - Handle: 14505095356925785064
     Type: Mesh
@@ -25466,6 +25856,15 @@ AssetRegistry:
     ParentHandle: 0
     SubAssetKey: ""
     ImportVersion: 1
+  - Handle: 14663921740110325747
+    Type: Material
+    Path: Models\rpg-character\E10 attack anims\Materials\Metal.kbrmaterial
+    SourceRoot: 0
+    LibraryPath: Models\rpg-character\E10 attack anims\Materials\Metal.kbrmaterial
+    RootSourceHandle: 3035278573088996826
+    ParentHandle: 3035278573088996826
+    SubAssetKey: material:1
+    ImportVersion: 1
   - Handle: 14664511261526991022
     Type: Mesh
     Path: Models\deferred_box\Meshes\mesh_0_0_Cube.001.kbrmesh
@@ -25688,6 +26087,15 @@ AssetRegistry:
     RootSourceHandle: 14831760407294300298
     ParentHandle: 0
     SubAssetKey: ""
+    ImportVersion: 1
+  - Handle: 14835772593454769008
+    Type: Mesh
+    Path: Models\rpg-character\E10 attack anims\Meshes\mesh_2_2_Cube.008.kbrmesh
+    SourceRoot: 0
+    LibraryPath: Models\rpg-character\E10 attack anims\Meshes\mesh_2_2_Cube.008.kbrmesh
+    RootSourceHandle: 3035278573088996826
+    ParentHandle: 3035278573088996826
+    SubAssetKey: mesh:2_2
     ImportVersion: 1
   - Handle: 14847304482140800016
     Type: Mesh
@@ -26190,6 +26598,15 @@ AssetRegistry:
     RootSourceHandle: 9659550559801413317
     ParentHandle: 9659550559801413317
     SubAssetKey: mesh:58_0
+    ImportVersion: 1
+  - Handle: 15205186467829408047
+    Type: Material
+    Path: Models\rpg-character\E10 attack anims\Materials\Pants.001.kbrmaterial
+    SourceRoot: 0
+    LibraryPath: Models\rpg-character\E10 attack anims\Materials\Pants.001.kbrmaterial
+    RootSourceHandle: 3035278573088996826
+    ParentHandle: 3035278573088996826
+    SubAssetKey: material:10
     ImportVersion: 1
   - Handle: 15208690320401851118
     Type: Mesh
@@ -27135,6 +27552,15 @@ AssetRegistry:
     ParentHandle: 7563732692318888728
     SubAssetKey: material:133
     ImportVersion: 1
+  - Handle: 15615477695215762967
+    Type: Mesh
+    Path: Models\rpg-character\E10 attack anims\Meshes\mesh_2_0_Cube.008.kbrmesh
+    SourceRoot: 0
+    LibraryPath: Models\rpg-character\E10 attack anims\Meshes\mesh_2_0_Cube.008.kbrmesh
+    RootSourceHandle: 3035278573088996826
+    ParentHandle: 3035278573088996826
+    SubAssetKey: mesh:2_0
+    ImportVersion: 1
   - Handle: 15615930773958427620
     Type: Texture2D
     Path: Textures\crate02_color_height_rgba.ktx
@@ -27269,6 +27695,15 @@ AssetRegistry:
     RootSourceHandle: 15702818114886942163
     ParentHandle: 0
     SubAssetKey: ""
+    ImportVersion: 1
+  - Handle: 15709678170736499354
+    Type: Material
+    Path: Models\rpg-character\E10 attack anims\Materials\Shirt.kbrmaterial
+    SourceRoot: 0
+    LibraryPath: Models\rpg-character\E10 attack anims\Materials\Shirt.kbrmaterial
+    RootSourceHandle: 3035278573088996826
+    ParentHandle: 3035278573088996826
+    SubAssetKey: material:13
     ImportVersion: 1
   - Handle: 15710540429513584018
     Type: Texture2D
@@ -28331,6 +28766,15 @@ AssetRegistry:
     ParentHandle: 2114448966674420345
     SubAssetKey: mesh:0_0
     ImportVersion: 1
+  - Handle: 16317846663073238075
+    Type: SkinnedMesh
+    Path: Models\rpg-character\E10 attack anims\Meshes\skinnedmesh_4_0_Cube.011.kbrskinnedmesh
+    SourceRoot: 0
+    LibraryPath: Models\rpg-character\E10 attack anims\Meshes\skinnedmesh_4_0_Cube.011.kbrskinnedmesh
+    RootSourceHandle: 3035278573088996826
+    ParentHandle: 3035278573088996826
+    SubAssetKey: skinnedmesh:4_0
+    ImportVersion: 1
   - Handle: 16318635891490433892
     Type: Texture2D
     Path: Models\sponza\4975155472559461469.ktx
@@ -28836,6 +29280,15 @@ AssetRegistry:
     RootSourceHandle: 14121002741739587132
     ParentHandle: 14121002741739587132
     SubAssetKey: mesh:7_0
+    ImportVersion: 1
+  - Handle: 16610677648577568073
+    Type: SkinnedMesh
+    Path: Models\rpg-character\E10 attack anims\Meshes\skinnedmesh_7_3_Cube.004.kbrskinnedmesh
+    SourceRoot: 0
+    LibraryPath: Models\rpg-character\E10 attack anims\Meshes\skinnedmesh_7_3_Cube.004.kbrskinnedmesh
+    RootSourceHandle: 3035278573088996826
+    ParentHandle: 3035278573088996826
+    SubAssetKey: skinnedmesh:7_3
     ImportVersion: 1
   - Handle: 16612539486805409438
     Type: Texture2D
@@ -30391,6 +30844,15 @@ AssetRegistry:
     ParentHandle: 9659550559801413317
     SubAssetKey: mesh:54_0
     ImportVersion: 1
+  - Handle: 17406421384710706778
+    Type: SkinnedMesh
+    Path: Models\rpg-character\E10 attack anims\Meshes\skinnedmesh_0_0_Cube.kbrskinnedmesh
+    SourceRoot: 0
+    LibraryPath: Models\rpg-character\E10 attack anims\Meshes\skinnedmesh_0_0_Cube.kbrskinnedmesh
+    RootSourceHandle: 3035278573088996826
+    ParentHandle: 3035278573088996826
+    SubAssetKey: skinnedmesh:0_0
+    ImportVersion: 1
   - Handle: 17414740149552203471
     Type: Mesh
     Path: Models\treasure_smooth\Meshes\mesh_12_0_Cylinder.013.kbrmesh
@@ -30498,6 +30960,15 @@ AssetRegistry:
     RootSourceHandle: 2238632335295528690
     ParentHandle: 2238632335295528690
     SubAssetKey: mesh:70_0
+    ImportVersion: 1
+  - Handle: 17481697102713965332
+    Type: Animation
+    Path: Models\rpg-character\E10 attack anims\Animations\Run.kbranimation
+    SourceRoot: 0
+    LibraryPath: Models\rpg-character\E10 attack anims\Animations\Run.kbranimation
+    RootSourceHandle: 3035278573088996826
+    ParentHandle: 3035278573088996826
+    SubAssetKey: animation:5
     ImportVersion: 1
   - Handle: 17490075670601151342
     Type: Mesh
@@ -30989,6 +31460,15 @@ AssetRegistry:
     RootSourceHandle: 7563732692318888728
     ParentHandle: 7563732692318888728
     SubAssetKey: mesh:24_0
+    ImportVersion: 1
+  - Handle: 17802817333122630903
+    Type: SkinnedMesh
+    Path: Models\rpg-character\E10 attack anims\Meshes\skinnedmesh_3_0_Cylinder.004.kbrskinnedmesh
+    SourceRoot: 0
+    LibraryPath: Models\rpg-character\E10 attack anims\Meshes\skinnedmesh_3_0_Cylinder.004.kbrskinnedmesh
+    RootSourceHandle: 3035278573088996826
+    ParentHandle: 3035278573088996826
+    SubAssetKey: skinnedmesh:3_0
     ImportVersion: 1
   - Handle: 17805388894558537713
     Type: Prefab
@@ -31741,6 +32221,15 @@ AssetRegistry:
     RootSourceHandle: 12460365323498653085
     ParentHandle: 12460365323498653085
     SubAssetKey: mesh:0_4
+    ImportVersion: 1
+  - Handle: 18226696515324025708
+    Type: Animation
+    Path: Models\rpg-character\E10 attack anims\Animations\Walk.kbranimation
+    SourceRoot: 0
+    LibraryPath: Models\rpg-character\E10 attack anims\Animations\Walk.kbranimation
+    RootSourceHandle: 3035278573088996826
+    ParentHandle: 3035278573088996826
+    SubAssetKey: animation:8
     ImportVersion: 1
   - Handle: 18228481697037579731
     Type: Mesh

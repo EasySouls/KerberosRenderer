@@ -76,7 +76,9 @@ Editor windows live mainly under
   in the hierarchy and scripts can attach newly spawned entities at runtime
   with `Entity.AttachToSocket(skeletonEntity, jointName, ...)` and detach with
   `Entity.DetachFromSocket()`. Sockets are derived from the authoritative
-  skeleton pose; they do not animate joint entities. Socket components are
+  skeleton pose. The runtime also publishes derived joint entity world
+  transforms (never authored local TRS) so rigid attachments parented under
+  joints follow the pose. Socket components are
   scene-serialized and copied with scenes; authored prefab templates do not
   carry them yet, so runtime-spawned attachments use the scripting API.
 - `InspectorPanel`: the unified right-side "Properties" window. It shows entity
