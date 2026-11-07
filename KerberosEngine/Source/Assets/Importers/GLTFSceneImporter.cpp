@@ -2,7 +2,6 @@
 #include "Assets/Formats/AnimationFormat.hpp"
 #include "Assets/Formats/NativeAssetSerializer.hpp"
 #include "Assets/Formats/SkeletonFormat.hpp"
-#include "Assets/Asset.hpp"
 #include "Assets/Pipeline/ImportPipeline.hpp"
 #include "Renderer/Animation/SkeletalMesh.hpp"
 #include "Renderer/Vertex.hpp"
@@ -19,8 +18,6 @@
 
 #include <algorithm>
 #include <array>
-#include <cmath>
-#include <cstring>
 #include <fstream>
 #include <map>
 #include <ranges>
@@ -346,8 +343,8 @@ std::vector<int32_t> BuildNodeParents(const tinygltf::Model& model)
 
 bool HasSkinAttribute(const tinygltf::Primitive& primitive)
 {
-    return primitive.attributes.find("JOINTS_0") != primitive.attributes.end()
-        && primitive.attributes.find("WEIGHTS_0") != primitive.attributes.end();
+    return primitive.attributes.contains("JOINTS_0")
+        && primitive.attributes.contains("WEIGHTS_0");
 }
 
 struct SkeletonImportInfo
@@ -997,6 +994,72 @@ bool LoadImageDataWithKtxFallback(
             return false;
         return NativeAssetSerializer::SerializeAnimationClip(clip, path);
     }
+
+    void InspectRootExtensions(const tinygltf::Model& model)
+    {
+        KBR_TRACY_FUNCTION();
+
+        Log::CoreInfo("--- Extensions Required ({}) ---", model.extensionsRequired.size());
+        for (const auto& ext : model.extensionsRequired)
+        {
+            Log::CoreInfo("  [REQUIRED] {}", ext);
+        }
+
+        Log::CoreInfo("--- Extensions Used ({}) ---", model.extensionsUsed.size());
+        for (const auto& ext : model.extensionsUsed)
+        {
+            Log::CoreInfo("  [USED]     {}", ext);
+        }
+    }
+
+    void InspectElementExtensions(const tinygltf::Model& model)
+    {
+        KBR_TRACY_FUNCTION();
+
+        for (size_t i = 0; i < model.materials.size(); ++i)
+        {
+            const auto& mat = model.materials[i];
+            for (const auto& extName : mat.extensions | std::views::keys)
+            {
+                Log::CoreInfo("[Material {} ({})] uses extension: {}", i, mat.name, extName);
+            }
+        }
+
+        for (size_t i = 0; i < model.meshes.size(); ++i)
+        {
+            const auto& mesh = model.meshes[i];
+            for (const auto& extName : mesh.extensions | std::views::keys)
+            {
+                Log::CoreInfo("[Mesh {} ({})] uses extension: {}", i, mesh.name, extName);
+            }
+
+            for (size_t p = 0; p < mesh.primitives.size(); ++p)
+            {
+                for (const auto& extName : mesh.primitives[p].extensions | std::views::keys)
+                {
+                    Log::CoreInfo("[Mesh {} Prim {}] uses extension: {}", i, p, extName);
+                }
+            }
+        }
+
+        for (size_t i = 0; i < model.nodes.size(); ++i)
+        {
+            const auto& node = model.nodes[i];
+            for (const auto& extName : node.extensions | std::views::keys)
+            {
+                Log::CoreInfo("[Node {} ({})] uses extension: {}", i, node.name, extName);
+            }
+        }
+
+        for (size_t i = 0; i < model.textures.size(); ++i)
+        {
+            const auto& tex = model.textures[i];
+            for (const auto& extName : tex.extensions | std::views::keys)
+            {
+                Log::CoreInfo("[Texture {}] uses extension: {}", i, extName);
+            }
+        }
+    }
 }
 
 bool GLTFSceneImporter::Import(const std::filesystem::path& source, const std::filesystem::path& outputDirectory,
@@ -1030,6 +1093,9 @@ bool GLTFSceneImporter::Import(const std::filesystem::path& source, const std::f
 
     if (model.skins.size() > 1)
         Log::CoreWarn("glTF '{}' has {} skins; only the first skeleton is supported", source.string(), model.skins.size());
+
+    InspectRootExtensions(model);
+    InspectElementExtensions(model);
 
     const std::vector<int32_t> nodeParents = BuildNodeParents(model);
     SkeletonImportInfo skeleton;
