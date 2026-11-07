@@ -134,8 +134,9 @@ void AnimationRuntime::SyncInstances()
 
             if (skeletonChanged)
             {
-                // Close windows before dropping the old clip so gameplay resources release.
-                CloseActiveDurationEvents(existing, existing.LastEventClip, existing.LastEventTime);
+                // Close windows before dropping the old clips so gameplay resources release.
+                CloseActiveDurationEvents(existing, existing.Current, existing.Current.Time);
+                CloseActiveDurationEvents(existing, existing.Previous, existing.Previous.Time);
 
                 // Reset the runtime state but keep the vector slot. The renderer will detect the
                 // skeleton change and rebuild its GPU slice.
@@ -200,7 +201,8 @@ void AnimationRuntime::ResolveAnimatorClips(AnimatorComponent& animator)
 
         if (!handle.IsValid())
         {
-            loadedClip = nullptr;
+            if (loadedClip && loadedClip->GetHandle().IsValid())
+                loadedClip = nullptr;
             continue;
         }
 
@@ -209,6 +211,19 @@ void AnimationRuntime::ResolveAnimatorClips(AnimatorComponent& animator)
         if (!loadedClip || loadedClip->GetHandle() != handle || !AssetManager::IsAssetLoaded(handle))
             loadedClip = AssetManager::AsAsset<AnimationClip>(handle);
     }
+}
+
+Ref<AnimationClip> AnimationRuntime::ResolveAnimatorClip(const AnimatorComponent& animator, const int32_t clipIndex)
+{
+    if (clipIndex < 0 || static_cast<size_t>(clipIndex) >= animator.AnimationClips.size())
+        return nullptr;
+
+    const size_t index = static_cast<size_t>(clipIndex);
+    if (index < animator.LoadedClips.size() && animator.LoadedClips[index])
+        return animator.LoadedClips[index];
+
+    const AssetHandle handle = animator.AnimationClips[index];
+    return handle.IsValid() ? AssetManager::AsAsset<AnimationClip>(handle) : nullptr;
 }
 
 void AnimationRuntime::AdvanceClocks(const float dt, const bool paused)
@@ -230,12 +245,7 @@ void AnimationRuntime::AdvanceClocks(const float dt, const bool paused)
 
         ResolveAnimatorClips(animator);
 
-        Ref<AnimationClip> activeClip = nullptr;
-        if (animator.ActiveClip >= 0 &&
-            static_cast<size_t>(animator.ActiveClip) < animator.LoadedClips.size())
-        {
-            activeClip = animator.LoadedClips[static_cast<size_t>(animator.ActiveClip)];
-        }
+        const Ref<AnimationClip> activeClip = ResolveAnimatorClip(animator, animator.ActiveClip);
 
         PlaybackTime playback{
             .Time = animator.CurrentTime,
@@ -257,115 +267,50 @@ void AnimationRuntime::AdvanceClocks(const float dt, const bool paused)
     {
         if (!instance.AnimatorEntity.IsValid())
         {
-            CloseActiveDurationEvents(instance, instance.LastEventClip, instance.LastEventTime);
-            instance.LastEventClip = nullptr;
+            CloseActiveDurationEvents(instance, instance.Current, instance.Current.Time);
+            CloseActiveDurationEvents(instance, instance.Previous, instance.Previous.Time);
+            instance.HasPrevious = false;
+            instance.PreviousIsSnapshot = false;
             continue;
         }
 
         const Entity animatorEntity = m_Scene->TryGetEntityByUUID(instance.AnimatorEntity);
         if (!animatorEntity || !animatorEntity.HasComponent<AnimatorComponent>())
         {
-            CloseActiveDurationEvents(instance, instance.LastEventClip, instance.LastEventTime);
-            instance.LastEventClip = nullptr;
+            CloseActiveDurationEvents(instance, instance.Current, instance.Current.Time);
+            CloseActiveDurationEvents(instance, instance.Previous, instance.Previous.Time);
+            instance.HasPrevious = false;
+            instance.PreviousIsSnapshot = false;
             continue;
         }
 
-        const AnimatorComponent& animator = animatorEntity.GetComponent<AnimatorComponent>();
+        AnimatorComponent& animator = animatorEntity.GetComponent<AnimatorComponent>();
 
-        Ref<AnimationClip> activeClip = nullptr;
-        if (animator.ActiveClip >= 0 &&
-            static_cast<size_t>(animator.ActiveClip) < animator.LoadedClips.size())
+        // Apply cross-fade requests and script-driven seeks before advancing the fade. 
+        // The authored clock was already advanced above for the animator's active clip.
+        SyncAnimatorState(instance, animator);
+
+        instance.Current.Time = animator.CurrentTime;
+
+        AdvanceCrossFade(instance, animator, dt, paused);
+
+        ProcessClipEvents(instance, instance.Current, animator, paused);
+        if (instance.HasPrevious && !instance.PreviousIsSnapshot)
+            ProcessClipEvents(instance, instance.Previous, animator, paused);
+
+        // The outgoing clip contributes nothing once the fade completes. Close any remaining
+        // duration windows so gameplay resources are released on the first completed frame.
+        if (instance.HasPrevious &&
+            ComputeCrossFadeWeight(instance.FadeElapsed, instance.FadeDuration) >= 1.0f)
         {
-            activeClip = animator.LoadedClips[static_cast<size_t>(animator.ActiveClip)];
+            CloseActiveDurationEvents(instance, instance.Previous, instance.Previous.Time);
+            instance.Previous = ClipPlaybackState{};
+            instance.HasPrevious = false;
+            instance.PreviousIsSnapshot = false;
+            instance.FadeElapsed = 0.0f;
+            instance.FadeDuration = 0.0f;
+            instance.Current.Weight = 1.0f;
         }
-
-        const AnimationClip* activeClipPtr = activeClip.get();
-        const float currentTime = animator.CurrentTime;
-
-        if (instance.LastEventClip.get() != activeClipPtr)
-        {
-            // Do not replay events from the previous clip, but close its active windows so
-            // gameplay resources are released.
-            CloseActiveDurationEvents(instance, instance.LastEventClip, currentTime);
-            instance.LastEventClip = activeClip;
-            instance.LastEventTime = currentTime;
-            instance.LastPlaybackRevision = animator.PlaybackRevision;
-            continue;
-        }
-
-        if (instance.LastPlaybackRevision != animator.PlaybackRevision)
-        {
-            CloseActiveDurationEvents(instance, activeClip, currentTime);
-            instance.LastPlaybackRevision = animator.PlaybackRevision;
-            instance.LastEventTime = currentTime;
-            continue;
-        }
-
-        if (paused)
-        {
-            // Keep active windows across a pause. Resuming from the same time must not replay
-            // missed events.
-            instance.LastEventTime = currentTime;
-            continue;
-        }
-
-        if (!activeClip)
-        {
-            CloseActiveDurationEvents(instance, instance.LastEventClip, currentTime);
-            instance.LastEventClip = nullptr;
-            instance.LastEventTime = currentTime;
-            continue;
-        }
-
-        if (animator.PlaybackSpeed <= 0.0f)
-        {
-            // Reverse playback does not emit point events or reverse windows in this version.
-            CloseActiveDurationEvents(instance, instance.LastEventClip, currentTime);
-            instance.LastEventTime = currentTime;
-            continue;
-        }
-
-        if (!animator.IsPlaying)
-        {
-            const float duration = activeClip->GetDuration();
-
-            // Natural end of a non-looping clip: close windows so listeners can release effects.
-            if (!animator.IsLooping && !instance.ActiveEvents.empty() &&
-                (currentTime >= duration || currentTime <= 0.0f))
-            {
-                CloseActiveDurationEvents(instance, activeClip, currentTime);
-            }
-
-            instance.LastEventTime = currentTime;
-            continue;
-        }
-
-        const float fromTime = instance.LastEventTime;
-        const float toTime = currentTime;
-        if (fromTime == toTime)
-            continue;
-
-        std::vector<AnimationEventHit> hits;
-        CollectPointEvents(*activeClip, fromTime, toTime, activeClip->GetDuration(),
-                           animator.IsLooping, instance.ClipWeight, hits);
-        UpdateDurationEvents(*activeClip, fromTime, toTime, activeClip->GetDuration(),
-                             animator.IsLooping, instance.ClipWeight, instance.ActiveEvents, hits);
-
-        for (const AnimationEventHit& hit : hits)
-        {
-            m_PendingDispatches.push_back({
-                .Entity = instance.AnimatorEntity,
-                .Clip = activeClipPtr,
-                .Event = hit.Event,
-                .EventIndex = hit.EventIndex,
-                .Phase = hit.Phase,
-                .Weight = instance.ClipWeight,
-                .Time = hit.Time,
-            });
-        }
-
-        instance.LastEventClip = activeClip;
-        instance.LastEventTime = toTime;
     }
 
     static const auto phaseRank = [](const AnimationEventPhase phase)
@@ -398,6 +343,297 @@ void AnimationRuntime::AdvanceClocks(const float dt, const bool paused)
                       });
 }
 
+void AnimationRuntime::SyncAnimatorState(AnimationInstance& instance, AnimatorComponent& animator)
+{
+    const Ref<AnimationClip> activeClip = ResolveAnimatorClip(animator, animator.ActiveClip);
+    const int32_t activeIndex = activeClip ? animator.ActiveClip : -1;
+
+    if (animator.PendingCrossFadeClip >= 0)
+    {
+        const int32_t requestedIndex = animator.PendingCrossFadeClip;
+        const float requestedDuration = animator.PendingCrossFadeDuration;
+        const bool requestedRestart = animator.PendingCrossFadeRestart;
+
+        animator.PendingCrossFadeClip = -1;
+        animator.PendingCrossFadeDuration = 0.0f;
+        animator.PendingCrossFadeRestart = true;
+
+        if (const Ref<AnimationClip> requestedClip = ResolveAnimatorClip(animator, requestedIndex))
+        {
+            ApplyPendingCrossFade(instance, animator, requestedClip, requestedIndex,
+                                  requestedDuration, requestedRestart);
+        }
+        else
+        {
+            Log::CoreWarn("AnimatorComponent on entity {} requested an unresolvable cross-fade clip {}",
+                          instance.AnimatorEntity, requestedIndex);
+            SnapToActiveClip(instance, animator, activeClip, activeIndex);
+        }
+
+        // The request already defines the new playback epoch, so the revision check must not
+        // close the outgoing clip's windows on the following clock advance.
+        instance.LastPlaybackRevision = animator.PlaybackRevision;
+        return;
+    }
+
+    const bool clipChanged = instance.Current.ClipIndex != activeIndex ||
+        instance.Current.Clip.get() != activeClip.get();
+
+    if (clipChanged)
+    {
+        // Direct Play/SetActiveClip changes snap instead of blending.
+        SnapToActiveClip(instance, animator, activeClip, activeIndex);
+        instance.LastPlaybackRevision = animator.PlaybackRevision;
+        return;
+    }
+
+    if (instance.LastPlaybackRevision != animator.PlaybackRevision)
+    {
+        // Seek/stop/reverse: suppress events across the jump and release active windows.
+        CloseActiveDurationEvents(instance, instance.Current, animator.CurrentTime);
+        CloseActiveDurationEvents(instance, instance.Previous, instance.Previous.Time);
+        instance.Current.LastEventTime = animator.CurrentTime;
+        instance.Previous.LastEventTime = instance.Previous.Time;
+        instance.LastPlaybackRevision = animator.PlaybackRevision;
+    }
+}
+
+void AnimationRuntime::ApplyPendingCrossFade(AnimationInstance& instance,
+                                             AnimatorComponent& animator,
+                                             const Ref<AnimationClip>& newClip,
+                                             const int32_t newClipIndex,
+                                             const float duration,
+                                             const bool restart)
+{
+    KBR_TRACY_FUNCTION();
+
+    const int32_t oldIndex = instance.Current.ClipIndex;
+    const Ref<AnimationClip> oldClip = instance.Current.Clip;
+    const float oldTime = instance.Current.Time;
+
+    const bool interrupting = instance.HasPrevious && instance.FadeDuration > 0.0f &&
+        instance.FadeElapsed < instance.FadeDuration;
+
+    if (interrupting)
+    {
+        // A second cross-fade during an in-flight one must start from the current blended pose,
+        // not from the old raw clip. Capture the composed local pose as the outgoing snapshot.
+        CloseActiveDurationEvents(instance, instance.Current, instance.Current.Time);
+        CloseActiveDurationEvents(instance, instance.Previous, instance.Previous.Time);
+
+        if (instance.Skeleton &&
+            instance.AnimationPose.Local.size() == instance.Skeleton->GetJoints().size())
+        {
+            instance.PreviousPose.Local = instance.AnimationPose.Local;
+        }
+        else if (instance.Skeleton)
+        {
+            EvaluateRestPoseLocal(*instance.Skeleton, instance.PreviousPose);
+        }
+        else
+        {
+            instance.PreviousPose.Local.clear();
+        }
+
+        instance.Previous = ClipPlaybackState{};
+        instance.PreviousIsSnapshot = true;
+        instance.HasPrevious = true;
+    }
+    else if (oldClip)
+    {
+        // The outgoing clip keeps its clock and duration-event windows so it can still emit
+        // weighted events while it fades out.
+        instance.Previous = std::move(instance.Current);
+        instance.PreviousIsSnapshot = false;
+        instance.HasPrevious = true;
+    }
+    else
+    {
+        if (instance.Skeleton)
+            EvaluateRestPoseLocal(*instance.Skeleton, instance.PreviousPose);
+        else
+            instance.PreviousPose.Local.clear();
+
+        instance.Previous = ClipPlaybackState{};
+        instance.PreviousIsSnapshot = true;
+        instance.HasPrevious = true;
+    }
+
+    // A restart always begins at zero. Re-requesting the same clip without restart preserves
+    // its current time so the fade is a no-op blend.
+    float startTime = 0.0f;
+    if (!restart && oldClip.get() == newClip.get() && oldIndex == newClipIndex)
+        startTime = oldTime;
+
+    instance.Current = ClipPlaybackState{};
+    instance.Current.ClipIndex = newClipIndex;
+    instance.Current.Clip = newClip;
+    instance.Current.Time = startTime;
+    instance.Current.LastEventTime = startTime;
+    instance.Current.Weight = 0.0f;
+
+    instance.FadeElapsed = 0.0f;
+    instance.FadeDuration = std::max(0.0f, duration);
+
+    animator.ActiveClip = newClipIndex;
+    animator.CurrentTime = startTime;
+    animator.PlaybackRevision++;
+
+    if (instance.FadeDuration <= 0.0f)
+    {
+        // Zero-duration cross-fade means snap to the new clip.
+        CloseActiveDurationEvents(instance, instance.Previous, instance.Previous.Time);
+        instance.Previous = ClipPlaybackState{};
+        instance.HasPrevious = false;
+        instance.PreviousIsSnapshot = false;
+        instance.Current.Weight = 1.0f;
+    }
+}
+
+void AnimationRuntime::SnapToActiveClip(AnimationInstance& instance,
+                                        const AnimatorComponent& animator,
+                                        const Ref<AnimationClip>& activeClip,
+                                        const int32_t activeClipIndex)
+{
+    CloseActiveDurationEvents(instance, instance.Current, animator.CurrentTime);
+    CloseActiveDurationEvents(instance, instance.Previous, instance.Previous.Time);
+
+    instance.Previous = ClipPlaybackState{};
+    instance.HasPrevious = false;
+    instance.PreviousIsSnapshot = false;
+    instance.FadeElapsed = 0.0f;
+    instance.FadeDuration = 0.0f;
+
+    instance.Current = ClipPlaybackState{};
+    instance.Current.ClipIndex = activeClipIndex;
+    instance.Current.Clip = activeClip;
+    instance.Current.Time = animator.CurrentTime;
+    instance.Current.LastEventTime = animator.CurrentTime;
+    instance.Current.Weight = 1.0f;
+}
+
+void AnimationRuntime::AdvanceCrossFade(AnimationInstance& instance,
+                                         const AnimatorComponent& animator,
+                                         const float dt,
+                                         const bool paused)
+{
+    if (!instance.HasPrevious)
+    {
+        instance.Current.Weight = 1.0f;
+        instance.FadeElapsed = 0.0f;
+        instance.FadeDuration = 0.0f;
+        return;
+    }
+
+    if (!instance.PreviousIsSnapshot && instance.Previous.Clip)
+    {
+        PlaybackTime previous{
+            .Time = instance.Previous.Time,
+            .IsPlaying = animator.IsPlaying,
+        };
+
+        AdvancePlaybackTime(previous,
+                            instance.Previous.Clip->GetDuration(),
+                            animator.IsLooping,
+                            animator.PlaybackSpeed,
+                            dt,
+                            animator.IsPlaying && !paused);
+
+        instance.Previous.Time = previous.Time;
+    }
+
+    // A scene pause freezes the blend. Pausing through the animator freezes the clip clocks but
+    // lets an in-flight fade finish so the pose settles on the incoming clip.
+    if (!paused && dt > 0.0f)
+        instance.FadeElapsed += dt;
+
+    const float weight = ComputeCrossFadeWeight(instance.FadeElapsed, instance.FadeDuration);
+    instance.Current.Weight = weight;
+    instance.Previous.Weight = 1.0f - weight;
+}
+
+void AnimationRuntime::ProcessClipEvents(AnimationInstance& instance,
+                                          ClipPlaybackState& state,
+                                          const AnimatorComponent& animator,
+                                          const bool paused)
+{
+    KBR_TRACY_FUNCTION();
+
+    if (!state.Clip)
+    {
+        CloseActiveDurationEvents(instance, state, state.Time);
+        state.LastEventTime = state.Time;
+        return;
+    }
+
+    const float currentTime = state.Time;
+
+    if (paused)
+    {
+        // Keep active windows across a pause. Resuming from the same time must not replay
+        // missed events.
+        state.LastEventTime = currentTime;
+        return;
+    }
+
+    if (state.Weight <= 1.0e-5f)
+    {
+        // A fully faded-out contributor must not keep firing point events or windows.
+        CloseActiveDurationEvents(instance, state, currentTime);
+        state.LastEventTime = currentTime;
+        return;
+    }
+
+    if (animator.PlaybackSpeed <= 0.0f)
+    {
+        // Reverse playback does not emit point events or reverse windows in this version.
+        CloseActiveDurationEvents(instance, state, currentTime);
+        state.LastEventTime = currentTime;
+        return;
+    }
+
+    if (!animator.IsPlaying)
+    {
+        const float duration = state.Clip->GetDuration();
+
+        // Natural end of a non-looping clip: close windows so listeners can release effects.
+        if (!animator.IsLooping && !state.ActiveEvents.empty() &&
+            (currentTime >= duration || currentTime <= 0.0f))
+        {
+            CloseActiveDurationEvents(instance, state, currentTime);
+        }
+
+        state.LastEventTime = currentTime;
+        return;
+    }
+
+    const float fromTime = state.LastEventTime;
+    const float toTime = currentTime;
+    if (fromTime == toTime)
+        return;
+
+    std::vector<AnimationEventHit> hits;
+    CollectPointEvents(*state.Clip, fromTime, toTime, state.Clip->GetDuration(),
+                       animator.IsLooping, state.Weight, hits);
+    UpdateDurationEvents(*state.Clip, fromTime, toTime, state.Clip->GetDuration(),
+                         animator.IsLooping, state.Weight, state.ActiveEvents, hits);
+
+    for (const AnimationEventHit& hit : hits)
+    {
+        m_PendingDispatches.push_back({
+            .Entity = instance.AnimatorEntity,
+            .Clip = state.Clip.get(),
+            .Event = hit.Event,
+            .EventIndex = hit.EventIndex,
+            .Phase = hit.Phase,
+            .Weight = state.Weight,
+            .Time = hit.Time,
+        });
+    }
+
+    state.LastEventTime = toTime;
+}
+
 void AnimationRuntime::EvaluatePose()
 {
     KBR_TRACY_FUNCTION();
@@ -414,7 +650,7 @@ void AnimationRuntime::EvaluatePose()
         if (!instance.Skeleton)
             continue;
 
-        const AnimatorComponent* animator = nullptr;
+        AnimatorComponent* animator = nullptr;
         if (instance.AnimatorEntity.IsValid())
         {
             const Entity animatorEntity = m_Scene->TryGetEntityByUUID(instance.AnimatorEntity);
@@ -422,51 +658,105 @@ void AnimationRuntime::EvaluatePose()
                 animator = &animatorEntity.GetComponent<AnimatorComponent>();
         }
 
-        Ref<AnimationClip> activeClip = nullptr;
-        int32_t activeClipIndex = -1;
-
-        if (animator && animator->ActiveClip >= 0 &&
-            static_cast<size_t>(animator->ActiveClip) < animator->LoadedClips.size())
+        if (animator)
         {
-            activeClip = animator->LoadedClips[static_cast<size_t>(animator->ActiveClip)];
-            if (activeClip)
-                activeClipIndex = animator->ActiveClip;
+            // Scripts may have requested a cross-fade or changed the active clip after the
+            // pre-script evaluation. Apply it now so this frame's pose, events, physics, and
+            // rendering all observe the same state.
+            SyncAnimatorState(instance, *animator);
+            instance.Current.Time = animator->CurrentTime;
+        }
+        else if (instance.Current.Clip || instance.Current.ClipIndex >= 0 || instance.HasPrevious)
+        {
+            CloseActiveDurationEvents(instance, instance.Current, instance.Current.Time);
+            CloseActiveDurationEvents(instance, instance.Previous, instance.Previous.Time);
+            instance.Current = ClipPlaybackState{};
+            instance.Previous = ClipPlaybackState{};
+            instance.HasPrevious = false;
+            instance.PreviousIsSnapshot = false;
+            instance.FadeElapsed = 0.0f;
+            instance.FadeDuration = 0.0f;
         }
 
-        const float sampledTime = animator ? animator->CurrentTime : 0.0f;
-        const bool animatorChanged = instance.LastEvaluatedAnimator != instance.AnimatorEntity;
+        const size_t jointCount = instance.Skeleton->GetJoints().size();
 
-        if (activeClip)
+        // Sample the incoming clip (or the rest pose) into local space.
+        if (instance.Current.Clip)
         {
-            if (!instance.HasPosed ||
-                animatorChanged ||
-                instance.LastClipIndex != activeClipIndex ||
-                instance.LastClip != activeClip.get() ||
-                instance.PreviousClockTime != sampledTime)
+            const ClipTrackCache& cache = GetClipTrackCache(instance.Skeleton, instance.Current.Clip);
+            EvaluatePoseLocal(*instance.Skeleton, *instance.Current.Clip, cache,
+                              instance.Current.Time, instance.CurrentPose);
+        }
+        else
+        {
+            EvaluateRestPoseLocal(*instance.Skeleton, instance.CurrentPose);
+        }
+
+        const bool hasPrevious = instance.HasPrevious;
+        const float fadeWeight = hasPrevious
+            ? ComputeCrossFadeWeight(instance.FadeElapsed, instance.FadeDuration)
+            : 1.0f;
+
+        if (hasPrevious && fadeWeight < 1.0f)
+        {
+            // Sample the outgoing clip, or reuse the interrupted-pose snapshot captured when a
+            // second cross-fade replaced an in-flight blend.
+            if (instance.PreviousIsSnapshot)
             {
-                const ClipTrackCache& cache = GetClipTrackCache(instance.Skeleton, activeClip);
-                Kerberos::EvaluatePose(*instance.Skeleton, *activeClip, cache, sampledTime, instance.Pose);
-
-                instance.LastEvaluatedAnimator = instance.AnimatorEntity;
-                instance.LastClipIndex = activeClipIndex;
-                instance.LastClip = activeClip.get();
-                instance.PreviousClockTime = sampledTime;
-                instance.HasPosed = true;
-                instance.PoseVersion = m_NextPoseVersion++;
+                if (instance.PreviousPose.Local.size() != jointCount)
+                    EvaluateRestPoseLocal(*instance.Skeleton, instance.PreviousPose);
             }
-        }
-        else if (!instance.HasPosed || instance.LastClipIndex >= 0 || animatorChanged)
-        {
-            // No animator or no resolvable active clip: keep the skeleton in its rest pose.
-            EvaluateRestPose(*instance.Skeleton, instance.Pose);
+            else if (instance.Previous.Clip)
+            {
+                const ClipTrackCache& cache = GetClipTrackCache(instance.Skeleton, instance.Previous.Clip);
+                EvaluatePoseLocal(*instance.Skeleton, *instance.Previous.Clip, cache,
+                                  instance.Previous.Time, instance.PreviousPose);
+            }
+            else
+            {
+                EvaluateRestPoseLocal(*instance.Skeleton, instance.PreviousPose);
+            }
 
-            instance.LastEvaluatedAnimator = instance.AnimatorEntity;
-            instance.LastClipIndex = -1;
-            instance.LastClip = nullptr;
-            instance.PreviousClockTime = sampledTime;
-            instance.HasPosed = true;
-            instance.PoseVersion = m_NextPoseVersion++;
+            // fadeWeight is the incoming clip's weight, so blend previous -> current.
+            BlendPose(instance.PreviousPose, instance.CurrentPose, fadeWeight, instance.AnimationPose);
         }
+        else
+        {
+            instance.AnimationPose.Local = instance.CurrentPose.Local;
+        }
+
+        // Derive globals and skin matrices exactly once from the composed local pose. 
+        // Physics and IK will later operate on FinalPose.
+        // AnimationPose remains the clip-only layer.
+        instance.FinalPose.Local = instance.AnimationPose.Local;
+        ComputeGlobalAndSkinMatrices(*instance.Skeleton, instance.FinalPose);
+
+        const AnimationClip* currentClip = instance.Current.Clip.get();
+        const AnimationClip* previousClip =
+            instance.PreviousIsSnapshot ? nullptr : instance.Previous.Clip.get();
+        const float effectiveFadeWeight = hasPrevious ? fadeWeight : 1.0f;
+
+        const bool changed =
+            !instance.HasPosed ||
+            instance.LastEvaluatedAnimator != instance.AnimatorEntity ||
+            instance.LastSampledClip != currentClip ||
+            instance.LastSampledPreviousClip != previousClip ||
+            instance.LastSampledHadPrevious != instance.HasPrevious ||
+            instance.LastSampledTime != instance.Current.Time ||
+            instance.LastSampledPreviousTime != instance.Previous.Time ||
+            instance.LastSampledFadeWeight != effectiveFadeWeight;
+
+        if (changed)
+            instance.PoseVersion = m_NextPoseVersion++;
+
+        instance.LastEvaluatedAnimator = instance.AnimatorEntity;
+        instance.LastSampledClip = currentClip;
+        instance.LastSampledPreviousClip = previousClip;
+        instance.LastSampledHadPrevious = instance.HasPrevious;
+        instance.LastSampledTime = instance.Current.Time;
+        instance.LastSampledPreviousTime = instance.Previous.Time;
+        instance.LastSampledFadeWeight = effectiveFadeWeight;
+        instance.HasPosed = true;
     }
 
     UpdateJointTransforms();
@@ -510,14 +800,14 @@ void AnimationRuntime::UpdateJointTransforms() const
         const auto& skeletonComponent = skeletonEntity.GetComponent<SkeletonComponent>();
         const auto& joints = instance.Skeleton->GetJoints();
         if (skeletonComponent.JointEntities.size() != joints.size() ||
-            instance.Pose.Global.size() != joints.size())
+            instance.FinalPose.Global.size() != joints.size())
         {
             if (m_WarnedJointBindings.insert(instance.SkeletonEntity).second)
             {
                 Log::CoreWarn("Skeleton entity {} cannot publish joint transforms: {} joint entities, "
                               "{} bones, {} posed globals",
                               instance.SkeletonEntity, skeletonComponent.JointEntities.size(),
-                              joints.size(), instance.Pose.Global.size());
+                              joints.size(), instance.FinalPose.Global.size());
             }
             continue;
         }
@@ -562,7 +852,7 @@ void AnimationRuntime::UpdateJointTransforms() const
         std::vector<glm::mat4> jointWorlds(joints.size(), glm::mat4(1.0f));
         for (size_t jointIndex = 0; jointIndex < joints.size(); ++jointIndex)
         {
-            jointWorlds[jointIndex] = baseWorld * instance.Pose.Global[jointIndex];
+            jointWorlds[jointIndex] = baseWorld * instance.FinalPose.Global[jointIndex];
 
             const Entity jointEntity = m_Scene->TryGetEntityByUUID(skeletonComponent.JointEntities[jointIndex]);
             if (!jointEntity || !jointEntity.HasComponent<TransformComponent>())
@@ -684,7 +974,7 @@ const SkeletonPose* AnimationRuntime::FindPose(const UUID skeletonEntity) const
         return nullptr;
 
     const AnimationInstance& instance = m_Instances[it->second];
-    return instance.HasPosed ? &instance.Pose : nullptr;
+    return instance.HasPosed ? &instance.FinalPose : nullptr;
 }
 
 bool AnimationRuntime::TryGetJointGlobalTransform(const UUID skeletonEntity, const int32_t joint, glm::mat4& out) const
@@ -749,37 +1039,37 @@ const ClipTrackCache& AnimationRuntime::GetClipTrackCache(const Ref<Skeleton>& s
     return insertedIt->second.Cache;
 }
 
-void AnimationRuntime::CloseActiveDurationEvents(AnimationInstance& instance,
-                                                 const Ref<AnimationClip>& clip,
+void AnimationRuntime::CloseActiveDurationEvents(const AnimationInstance& instance,
+                                                 ClipPlaybackState& state,
                                                  const float time)
 {
     KBR_TRACY_FUNCTION();
 
-    if (!instance.ActiveEvents.empty() && clip)
+    if (!state.ActiveEvents.empty() && state.Clip)
     {
-        const std::vector<AnimationEvent>& events = clip->GetEvents();
+        const std::vector<AnimationEvent>& events = state.Clip->GetEvents();
         const UUID target = instance.AnimatorEntity.IsValid()
             ? instance.AnimatorEntity
             : instance.SkeletonEntity;
 
-        for (const ActiveAnimationEvent& window : instance.ActiveEvents)
+        for (const ActiveAnimationEvent& window : state.ActiveEvents)
         {
             if (window.EventIndex < 0 || static_cast<size_t>(window.EventIndex) >= events.size())
                 continue;
 
             m_PendingDispatches.push_back({
                 .Entity = target,
-                .Clip = clip.get(),
+                .Clip = state.Clip.get(),
                 .Event = &events[static_cast<size_t>(window.EventIndex)],
                 .EventIndex = window.EventIndex,
                 .Phase = AnimationEventPhase::End,
-                .Weight = instance.ClipWeight,
+                .Weight = state.Weight,
                 .Time = time,
             });
         }
     }
 
-    instance.ActiveEvents.clear();
+    state.ActiveEvents.clear();
 }
 
 const std::vector<AnimationRuntime::PendingDispatch>& AnimationRuntime::GetPendingDispatches() const

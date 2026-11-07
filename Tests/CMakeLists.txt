@@ -2,6 +2,7 @@ include(GoogleTest)
 
 add_executable(KerberosEngineTests
     AnimationAssetTests.cpp
+    AnimationBlendTests.cpp
     AnimationEvaluatorTests.cpp
     AnimationEventTests.cpp
     GLTFImportTests.cpp

@@ -255,6 +255,11 @@ per-frame descriptor set.
 pose layer: `BuildClipTrackCache` maps a clip to a skeleton, `SampleTrack`
 implements `STEP`/`LINEAR`/`CUBICSPLINE`, `EvaluatePose` produces local TRS,
 and `ComputeGlobalAndSkinMatrices` derives globals and skin matrices.
+`EvaluatePoseLocal`/`EvaluateRestPoseLocal` produce local-only poses for
+composition, `BlendPose` blends two local poses (translation/scale mix,
+shortest-path slerp, dominant-pose fallback on joint-count mismatch),
+`AccumulatePose` is the normalized weighted average used for layered
+composition, and `ComputeCrossFadeWeight` owns elapsed/duration clamping.
 `AdvancePlaybackTime` owns loop/clamp/stop semantics. Keep it Vulkan-free so it
 stays unit-testable.
 
@@ -268,9 +273,21 @@ and dispatches them before scripts in Play mode. Duration events use
 events, and `AnimatorComponent::PlaybackRevision` suppresses point events across
 time jumps. Active duration windows are closed with `End` when playback is
 interrupted by a clip switch, revision jump, stop, skeleton replacement, reverse
-playback, or natural clip end; the runtime keeps a reference to the last event
-clip so the cleanup can still be delivered after a reload. Editor timeline
-authoring and cross-fade weight computation are not implemented yet.
+playback, or natural clip end; each clip playback state keeps its own clip
+reference so cleanup can still be delivered after a reload.
+
+Cross-fades keep a `Current` and `Previous` `ClipPlaybackState`, each with its
+own clock, weight, and duration-event windows. The incoming clip's weight rises
+from 0 to 1 while the outgoing clip's weight falls; point and duration events are
+filtered by that contributing weight, and the outgoing clip stops emitting once
+its weight reaches zero. The fade completes when the incoming weight reaches 1,
+which closes any remaining outgoing windows and drops the previous state.
+Interrupting an in-flight cross-fade snapshots the current composed pose and
+starts the new fade from that snapshot instead of the old raw clip. Direct
+`Play`/`SetActiveClip` changes snap; only `CrossFade` blends. Requests are
+delivered through the transient `AnimatorComponent::PendingCrossFadeClip`/
+`PendingCrossFadeDuration`/`PendingCrossFadeRestart` fields and consumed by the
+runtime. Editor timeline authoring is still not implemented.
 
 Entities use `SkeletonComponent` for the skeleton instance and joint list,
 `JointComponent` for joint ordering, `SkinnedMeshComponent` for the mesh /
@@ -280,9 +297,12 @@ a named joint.
 
 ## Sockets and pose authority
 
-The CPU `SkeletonPose` is authoritative. Pose publication writes derived entity
-transforms, never authored local TRS, so `JointComponent` entities stay
-rest-authored. `AnimationRuntime::UpdateJointTransforms` writes each joint
+Each `AnimationInstance` carries `AnimationPose.Local` (the composed clip layer)
+and `FinalPose` (the authoritative final pose after physics/IK). Consumers read
+`FinalPose`; `AnimationPose` is retained for cross-fade snapshots and future
+ragdoll blending. The CPU `SkeletonPose` remains authoritative. Pose publication
+writes derived entity transforms, never authored local TRS, so `JointComponent`
+entities stay rest-authored. `AnimationRuntime::UpdateJointTransforms` writes each joint
 entity's `WorldTransform` from the pose's global matrices and then propagates
 that world transform through non-skeletal descendants such as weapons, props, or
 garment pieces parented under a joint. The propagation skips nested joints,
@@ -312,11 +332,12 @@ gravity, friction, restitution, angular velocity, collider shape/offset, and
 trigger/enabled changes. Changing these marks the owning rigid body dirty; the
 physics system rebuilds the body on the next update.
 
-For future ragdolling and animation blending, keep this same boundary: the
+For future ragdolling and ragdoll pose blending, keep this same boundary: the
 skeleton pose remains the shared representation. Animation drives kinematic
 bone proxies while animated; at handoff copy pose and velocities into dynamic
 bodies; after physics read body transforms back into `SkeletonPose`, blend with
-animation, recompute globals/skin matrices, then update sockets. Do not make
+the `AnimationPose` layer using `BlendPose`, write the result into `FinalPose`,
+recompute globals/skin matrices, then update sockets. Do not make
 `JointComponent` entity transforms the authoritative pose. The animator replaces the old single-clip
 `AnimationComponent`; legacy serialized animation components are migrated on
 load. `AnimatorComponent::LoadedClips` is transient: `AnimationRuntime` resolves
@@ -335,9 +356,11 @@ rest pose.
 
 `OnUpdateRuntime` advances clocks and collects events, evaluates a provisional
 pose, dispatches animation events, then runs scripts. It evaluates again after
-scripts when playback state changed, so `Play`/`Stop`/`SetTime` from C# applies
-before physics and rendering. `FinalizePose` is the post-physics hook reserved
-for ragdoll blending, IK, root motion, and sockets. Events are dispatched to
+scripts when playback state changed, so `Play`/`Stop`/`SetTime`/`CrossFade` from
+C# applies before physics and rendering. A cross-fade request made by a script
+is applied by the post-script evaluation; its fade elapsed time starts advancing
+on the next clock update. `FinalizePose` is the post-physics hook reserved for
+ragdoll blending, IK, root motion, and sockets. Events are dispatched to
 scripts on the animator entity through `Entity.OnAnimationEvent`; Edit and
 Simulate clear pending events without invoking gameplay scripts. Runtime
 dispatch happens once before scripts and again after the post-script pose
@@ -349,12 +372,14 @@ Runtime playback state is authored through `AnimatorComponent::PlayOnStart`.
 `OnRuntimeStart`/`OnSimulationStart`, and `Scene::StopAnimators` resets playback
 on stop. Scripts can override the state after startup.
 
-`AnimationInstance::PoseVersion` is bumped only when the evaluated pose changes
-(clip, time, animator, or first evaluation). Each GPU instance tracks the last
-version uploaded into each frame slot, so a paused instance still initializes a
-frame slot that has not seen the current pose. `SkinningSystem` tracks the same
-per-frame version and re-dispatches only when its slot is stale. Renderer
-`BeginFrame` must run after `FinalizePose`, or skinning will use a stale pose.
+`AnimationInstance::PoseVersion` is bumped only when the final pose inputs
+change (current/previous clip, either clock, fade weight, animator, or first
+evaluation). Each GPU instance tracks the last version uploaded into each frame
+slot, so a paused instance still initializes a frame slot that has not seen the
+current pose. `SkinningSystem` tracks the same per-frame version and re-dispatches
+only when its slot is stale. Physics/IK changes made in `FinalizePose` must bump
+`PoseVersion`. Renderer `BeginFrame` must run after `FinalizePose`, or skinning
+will use a stale pose.
 
 `SkinningSystem` (`Renderer/Animation/SkinningSystem.*`) owns the global source
 vertex/joint/weight/index buffers, the shared vertex buffer (SVB), the SVB
@@ -395,14 +420,14 @@ SVB rather than expecting world-space output.
 
 - Pose evaluation and skin-matrix generation are CPU-only. There is no
   evaluation/precompute compute pass and no GPU pose path yet.
-- Clip cross-fades, pose blending, additive layers, root motion, editor
-  timeline authoring, and ragdoll two-way pose synchronization are not
-  implemented. Marker/event data round-trips from `.meta` through the native
-  clip into `AnimationClip`, and point/duration events dispatch to scripts.
-  Cross-fade weight computation and `FireInEditor` preview dispatch remain
+- Two-clip cross-fades and local-pose composition are implemented. Additive
+  layers, root motion, editor timeline authoring, and ragdoll two-way pose
+  synchronization are not. Marker/event data round-trips from `.meta` through
+  the native clip into `AnimationClip`, and point/duration events dispatch to
+  scripts with per-clip fade weights. `FireInEditor` preview dispatch remains
   future work.
 - `FinalizePose` is an empty post-physics hook; ragdoll blending and IK still
-  need to fill it and bump `PoseVersion`.
+  need to fill it, write into `FinalPose`, and bump `PoseVersion`.
 - Physics/ragdoll integration and Jolt bone proxies are not implemented.
 - Only direct per-mesh dispatches are recorded; no indirect dispatch or
   per-frame job buffer exists.

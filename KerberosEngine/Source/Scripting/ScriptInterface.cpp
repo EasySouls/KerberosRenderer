@@ -101,6 +101,8 @@ namespace Kerberos
 		void* AnimatorComponent_SetActiveClip;
 		void* AnimatorComponent_GetClipCount;
 		void* AnimatorComponent_GetClipDuration;
+		void* AnimatorComponent_CrossFade;
+		void* AnimatorComponent_CrossFadeByName;
 
 		void* Socket_Attach;
 		void* Socket_Detach;
@@ -564,6 +566,13 @@ namespace Kerberos
 		return handle.IsValid() ? AssetManager::AsAsset<AnimationClip>(handle) : nullptr;
 	}
 
+	static void ClearPendingCrossFade(AnimatorComponent& animator)
+	{
+		animator.PendingCrossFadeClip = -1;
+		animator.PendingCrossFadeDuration = 0.0f;
+		animator.PendingCrossFadeRestart = true;
+	}
+
 	static void AnimatorComponent_Play(const uint64_t entityID, const int32_t clipIndex)
 	{
 		KBR_TRACY_FUNCTION();
@@ -574,6 +583,8 @@ namespace Kerberos
 			Log::CoreWarn("AnimatorComponent_Play: entity {} has no animator", entityID);
 			return;
 		}
+
+		ClearPendingCrossFade(*animator);
 
 		bool timeReset = false;
 
@@ -636,6 +647,7 @@ namespace Kerberos
 
 		if (AnimatorComponent* animator = GetAnimatorComponent(entityID))
 		{
+			ClearPendingCrossFade(*animator);
 			animator->IsPlaying = false;
 			animator->CurrentTime = 0.0f;
             animator->PlaybackRevision++;
@@ -765,9 +777,72 @@ namespace Kerberos
 			return;
 		}
 
+		ClearPendingCrossFade(*animator);
 		animator->ActiveClip = clipIndex;
 		animator->CurrentTime = 0.0f;
         animator->PlaybackRevision++;
+	}
+
+	static void AnimatorComponent_CrossFade(const uint64_t entityID, const int32_t clipIndex,
+	                                         const float duration, const uint8_t restart)
+	{
+		KBR_TRACY_FUNCTION();
+
+		AnimatorComponent* animator = GetAnimatorComponent(entityID);
+		if (!animator)
+		{
+			Log::CoreWarn("AnimatorComponent_CrossFade: entity {} has no animator", entityID);
+			return;
+		}
+
+		if (clipIndex < 0 || static_cast<size_t>(clipIndex) >= animator->AnimationClips.size())
+		{
+			Log::CoreWarn("AnimatorComponent_CrossFade: clip index {} is out of range on entity {}",
+			              clipIndex, entityID);
+			return;
+		}
+
+		animator->PendingCrossFadeClip = clipIndex;
+		animator->PendingCrossFadeDuration =
+			std::isfinite(duration) ? std::max(0.0f, duration) : 0.0f;
+		animator->PendingCrossFadeRestart = restart != 0;
+
+		// Keep the authored playback state in sync with the request. The runtime consumes the
+		// pending fields on the next clock advance or pose evaluation.
+		animator->ActiveClip = clipIndex;
+		if (restart != 0)
+			animator->CurrentTime = 0.0f;
+		animator->IsPlaying = true;
+		animator->PlaybackRevision++;
+	}
+
+	static void AnimatorComponent_CrossFadeByName(const uint64_t entityID, const char* clipName,
+	                                               const float duration, const uint8_t restart)
+	{
+		KBR_TRACY_FUNCTION();
+
+		if (!clipName)
+			return;
+
+		const AnimatorComponent* animator = GetAnimatorComponent(entityID);
+		if (!animator)
+		{
+			Log::CoreWarn("AnimatorComponent_CrossFadeByName: entity {} has no animator", entityID);
+			return;
+		}
+
+		for (size_t clipIndex = 0; clipIndex < animator->AnimationClips.size(); ++clipIndex)
+		{
+			const Ref<AnimationClip> clip = ResolveAnimatorClip(*animator, static_cast<int32_t>(clipIndex));
+			if (clip && clip->GetName() == clipName)
+			{
+				AnimatorComponent_CrossFade(entityID, static_cast<int32_t>(clipIndex), duration, restart);
+				return;
+			}
+		}
+
+		Log::CoreWarn("AnimatorComponent_CrossFadeByName: clip '{}' was not found on entity {}",
+		              clipName, entityID);
 	}
 
 	static int32_t AnimatorComponent_GetClipCount(const uint64_t entityID)
@@ -1608,6 +1683,8 @@ namespace Kerberos
 		callbackTable.AnimatorComponent_SetActiveClip = reinterpret_cast<void*>(&AnimatorComponent_SetActiveClip);
 		callbackTable.AnimatorComponent_GetClipCount = reinterpret_cast<void*>(&AnimatorComponent_GetClipCount);
 		callbackTable.AnimatorComponent_GetClipDuration = reinterpret_cast<void*>(&AnimatorComponent_GetClipDuration);
+		callbackTable.AnimatorComponent_CrossFade = reinterpret_cast<void*>(&AnimatorComponent_CrossFade);
+		callbackTable.AnimatorComponent_CrossFadeByName = reinterpret_cast<void*>(&AnimatorComponent_CrossFadeByName);
 
 		callbackTable.Socket_Attach = reinterpret_cast<void*>(&Socket_Attach);
 		callbackTable.Socket_Detach = reinterpret_cast<void*>(&Socket_Detach);

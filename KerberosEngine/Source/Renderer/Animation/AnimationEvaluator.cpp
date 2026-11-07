@@ -181,6 +181,18 @@ void EvaluatePose(const Skeleton& skeleton,
 {
     KBR_TRACY_FUNCTION();
 
+    EvaluatePoseLocal(skeleton, clip, cache, time, pose);
+    ComputeGlobalAndSkinMatrices(skeleton, pose);
+}
+
+void EvaluatePoseLocal(const Skeleton& skeleton,
+                       const AnimationClip& clip,
+                       const ClipTrackCache& cache,
+                       const float time,
+                       SkeletonPose& pose)
+{
+    KBR_TRACY_FUNCTION();
+
     const auto& joints = skeleton.GetJoints();
     ResizePose(skeleton, pose);
 
@@ -213,11 +225,15 @@ void EvaluatePose(const Skeleton& skeleton,
                 pose.Local[jointIndex].Scale = glm::vec3(SampleTrack(tracks[scaleTrack], time));
         }
     }
-
-    ComputeGlobalAndSkinMatrices(skeleton, pose);
 }
 
 void EvaluateRestPose(const Skeleton& skeleton, SkeletonPose& pose)
+{
+    EvaluateRestPoseLocal(skeleton, pose);
+    ComputeGlobalAndSkinMatrices(skeleton, pose);
+}
+
+void EvaluateRestPoseLocal(const Skeleton& skeleton, SkeletonPose& pose)
 {
     const auto& joints = skeleton.GetJoints();
     ResizePose(skeleton, pose);
@@ -230,8 +246,6 @@ void EvaluateRestPose(const Skeleton& skeleton, SkeletonPose& pose)
             .Scale = joints[jointIndex].RestScale,
         };
     }
-
-    ComputeGlobalAndSkinMatrices(skeleton, pose);
 }
 
 void AdvancePlaybackTime(PlaybackTime& playback,
@@ -493,6 +507,78 @@ void UpdateDurationEvents(const AnimationClip& clip,
             }
         }
     }
+}
+
+void BlendPose(const SkeletonPose& a, const SkeletonPose& b, const float weight, SkeletonPose& out)
+{
+    const float blendWeight = std::clamp(weight, 0.0f, 1.0f);
+
+    // A mismatched joint count means the two poses cannot describe the same skeleton. Use the
+    // dominant side so a stale or rest-sized pose never corrupts the result.
+    if (a.Local.size() != b.Local.size())
+    {
+        const SkeletonPose& dominant = blendWeight < 0.5f ? a : b;
+        out.Local = dominant.Local;
+        return;
+    }
+
+    const size_t jointCount = a.Local.size();
+    out.Local.resize(jointCount);
+
+    for (size_t i = 0; i < jointCount; ++i)
+    {
+        out.Local[i].Translation = glm::mix(a.Local[i].Translation, b.Local[i].Translation, blendWeight);
+        out.Local[i].Rotation = NormalizeOrIdentity(
+            glm::slerp(NormalizeOrIdentity(a.Local[i].Rotation),
+                       NormalizeOrIdentity(b.Local[i].Rotation),
+                       blendWeight));
+        out.Local[i].Scale = glm::mix(a.Local[i].Scale, b.Local[i].Scale, blendWeight);
+    }
+}
+
+float ComputeCrossFadeWeight(const float elapsed, const float duration)
+{
+    if (!std::isfinite(duration) || duration <= 0.0f)
+        return 1.0f;
+
+    if (!std::isfinite(elapsed) || elapsed <= 0.0f)
+        return 0.0f;
+
+    return std::clamp(elapsed / duration, 0.0f, 1.0f);
+}
+
+void AccumulatePose(const SkeletonPose& source,
+                    const float weight,
+                    SkeletonPose& target,
+                    float& accumulatedWeight)
+{
+    if (!std::isfinite(weight) || weight <= 0.0f || source.Local.empty())
+        return;
+
+    if (target.Local.size() != source.Local.size())
+    {
+        target.Local = source.Local;
+        accumulatedWeight = weight;
+        return;
+    }
+
+    const float totalWeight = accumulatedWeight + weight;
+    if (!std::isfinite(totalWeight) || totalWeight <= 0.0f)
+        return;
+
+    const float blendWeight = weight / totalWeight;
+    for (size_t i = 0; i < source.Local.size(); ++i)
+    {
+        target.Local[i].Translation =
+            glm::mix(target.Local[i].Translation, source.Local[i].Translation, blendWeight);
+        target.Local[i].Rotation = NormalizeOrIdentity(
+            glm::slerp(NormalizeOrIdentity(target.Local[i].Rotation),
+                       NormalizeOrIdentity(source.Local[i].Rotation),
+                       blendWeight));
+        target.Local[i].Scale = glm::mix(target.Local[i].Scale, source.Local[i].Scale, blendWeight);
+    }
+
+    accumulatedWeight = totalWeight;
 }
 
 void ComputeGlobalAndSkinMatrices(const Skeleton& skeleton, SkeletonPose& pose)

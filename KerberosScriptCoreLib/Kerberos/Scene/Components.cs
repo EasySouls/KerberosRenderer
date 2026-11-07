@@ -142,6 +142,20 @@ namespace Kerberos.Scene
         /// Returns the duration of the clip at the given index.
         /// </summary>
         public float GetClipDuration(int clipIndex) => InternalCalls.AnimatorComponent_GetClipDuration(Entity.GetID(), clipIndex);
+
+        /// <summary>
+        /// Blends from the currently playing pose into the clip at the given index.
+        /// A non-positive duration snaps immediately. Interrupting an in-flight cross-fade
+        /// starts from the current blended pose.
+        /// </summary>
+        public void CrossFade(int clipIndex, float duration, bool restart = true)
+            => InternalCalls.AnimatorComponent_CrossFade(Entity.GetID(), clipIndex, duration, restart);
+
+        /// <summary>
+        /// Blends from the currently playing pose into the first clip whose asset name matches.
+        /// </summary>
+        public void CrossFade(string clipName, float duration, bool restart = true)
+            => InternalCalls.AnimatorComponent_CrossFadeByName(Entity.GetID(), clipName, duration, restart);
     }
 
     public class StaticMeshComponent : Component

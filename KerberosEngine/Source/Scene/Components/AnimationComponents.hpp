@@ -103,6 +103,12 @@ struct AnimatorComponent
     // Not serialized.
     uint32_t PlaybackRevision = 0;
 
+    // Transient cross-fade request consumed by AnimationRuntime on the next clock advance or
+    // pose evaluation. Negative means no request. Not serialized.
+    int32_t PendingCrossFadeClip = -1;
+    float PendingCrossFadeDuration = 0.0f;
+    bool PendingCrossFadeRestart = true;
+
     AnimatorComponent() = default;
     explicit AnimatorComponent(const UUID& skeletonEntity) : SkeletonEntity(skeletonEntity) {}
 

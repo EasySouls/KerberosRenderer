@@ -101,6 +101,9 @@ namespace Kerberos
 			auto& animator = view.get<AnimatorComponent>(entity);
 			animator.CurrentTime = 0.0f;
 			animator.IsPlaying = animator.PlayOnStart;
+			animator.PendingCrossFadeClip = -1;
+			animator.PendingCrossFadeDuration = 0.0f;
+			animator.PendingCrossFadeRestart = true;
 			animator.PlaybackRevision++;
 		}
 	}
@@ -113,6 +116,9 @@ namespace Kerberos
 			auto& animator = view.get<AnimatorComponent>(entity);
 			animator.CurrentTime = 0.0f;
 			animator.IsPlaying = false;
+			animator.PendingCrossFadeClip = -1;
+			animator.PendingCrossFadeDuration = 0.0f;
+			animator.PendingCrossFadeRestart = true;
 			animator.PlaybackRevision++;
 		}
 	}
@@ -881,6 +887,9 @@ Entity Scene::InstantiatePrefab(const AssetHandle prefabHandle, const std::strin
 			animator.CurrentTime = 0.0f;
 			animator.IsPlaying = animator.PlayOnStart;
 			animator.PlaybackRevision = 0;
+			animator.PendingCrossFadeClip = -1;
+			animator.PendingCrossFadeDuration = 0.0f;
+			animator.PendingCrossFadeRestart = true;
 			animator.LoadedClips.clear();
 			newEntity.AddComponent<AnimatorComponent>(animator);
 		}

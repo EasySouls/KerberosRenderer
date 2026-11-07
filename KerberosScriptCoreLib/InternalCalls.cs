@@ -103,6 +103,12 @@ namespace Kerberos
         internal delegate float AnimatorGetClipDurationFn(ulong entityID, int clipIndex);
 
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        internal delegate void AnimatorCrossFadeFn(ulong entityID, int clipIndex, float duration, byte restart);
+
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        internal delegate void AnimatorCrossFadeByNameFn(ulong entityID, IntPtr clipName, float duration, byte restart);
+
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
         internal delegate void SocketAttachFn(ulong entityID, ulong skeletonEntityID, IntPtr jointName,
                                               ref Vector3 translation, ref Vector3 rotation, ref Vector3 scale);
 
@@ -179,6 +185,8 @@ namespace Kerberos
         private static SetIntFn? s_AnimatorSetActiveClip;
         private static GetIntFn? s_AnimatorGetClipCount;
         private static AnimatorGetClipDurationFn? s_AnimatorGetClipDuration;
+        private static AnimatorCrossFadeFn? s_AnimatorCrossFade;
+        private static AnimatorCrossFadeByNameFn? s_AnimatorCrossFadeByName;
 
         private static SocketAttachFn? s_SocketAttach;
         private static EntityActionFn? s_SocketDetach;
@@ -321,6 +329,8 @@ namespace Kerberos
             s_AnimatorSetActiveClip = Marshal.GetDelegateForFunctionPointer<SetIntFn>(ReadNext());
             s_AnimatorGetClipCount = Marshal.GetDelegateForFunctionPointer<GetIntFn>(ReadNext());
             s_AnimatorGetClipDuration = Marshal.GetDelegateForFunctionPointer<AnimatorGetClipDurationFn>(ReadNext());
+            s_AnimatorCrossFade = Marshal.GetDelegateForFunctionPointer<AnimatorCrossFadeFn>(ReadNext());
+            s_AnimatorCrossFadeByName = Marshal.GetDelegateForFunctionPointer<AnimatorCrossFadeByNameFn>(ReadNext());
 
             s_SocketAttach = Marshal.GetDelegateForFunctionPointer<SocketAttachFn>(ReadNext());
             s_SocketDetach = Marshal.GetDelegateForFunctionPointer<EntityActionFn>(ReadNext());
@@ -723,6 +733,18 @@ namespace Kerberos
         internal static float AnimatorComponent_GetClipDuration(ulong entityID, int clipIndex)
         {
             return s_AnimatorGetClipDuration?.Invoke(entityID, clipIndex) ?? 0.0f;
+        }
+
+        internal static void AnimatorComponent_CrossFade(ulong entityID, int clipIndex, float duration, bool restart)
+        {
+            s_AnimatorCrossFade?.Invoke(entityID, clipIndex, duration, restart ? (byte)1 : (byte)0);
+        }
+
+        internal static void AnimatorComponent_CrossFadeByName(ulong entityID, string clipName, float duration, bool restart)
+        {
+            IntPtr ptr = Marshal.StringToHGlobalAnsi(clipName);
+            try { s_AnimatorCrossFadeByName?.Invoke(entityID, ptr, duration, restart ? (byte)1 : (byte)0); }
+            finally { Marshal.FreeHGlobal(ptr); }
         }
 
         // ----------------------------- SocketComponent -----------------------------

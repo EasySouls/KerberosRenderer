@@ -66,8 +66,12 @@ Editor windows live mainly under
   `AnimationRuntime` in Edit, Simulate, and Play, so toggling Playing or
   scrubbing Time previews the pose immediately unless the scene is paused. C# scripts control the same state
   through `Kerberos.Scene.AnimatorComponent` (`Play`, `Play(string)`, `Pause`,
-  `Stop`, `CurrentTime`, `PlaybackSpeed`, `IsPlaying`, `IsLooping`,
-  `PlayOnStart`, `ActiveClip`, `ClipCount`, and `GetClipDuration`). Animation
+  `Stop`, `CrossFade(int, float, bool)`, `CrossFade(string, float, bool)`,
+  `CurrentTime`, `PlaybackSpeed`, `IsPlaying`, `IsLooping`, `PlayOnStart`,
+  `ActiveClip`, `ClipCount`, and `GetClipDuration`). `Play`/`SetActiveClip` snap
+  to the requested clip; `CrossFade` blends from the current pose over the given
+  duration and can interrupt an in-flight fade from the current blended pose.
+  A zero or negative fade duration snaps. Animation
   events are delivered to scripts through
   `Entity.OnAnimationEvent(AnimationEvent)` with Point/Begin/Tick/End phases;
   events dispatch on the animator entity in Play mode only, while Edit and
@@ -256,7 +260,8 @@ the `.meta` (`AnimationClips`, schema 3); `EditorAssetManager` exposes
 `GetAnimationClipMeta`/`SetAnimationClipMeta`, and applying changes persists the
 metadata and force-reimports the source. There is no marker/event timeline UI
 yet. Play evaluates animation again after scripts when
-playback state changed so C# controls apply in the same frame. Edit and Simulate
+playback state changed so C# controls (including `CrossFade`) apply in the same
+frame; the fade clock advances on the following update. Edit and Simulate
 render through the editor camera; Play renders through the runtime scene's
 primary `CameraComponent`. The runtime view matrix is the inverse of the
 camera entity's world transform, and both editor/runtime scene projection

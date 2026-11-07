@@ -108,7 +108,7 @@ void AnimationSystem::BeginFrame(const Ref<Scene>& scene, const uint32_t frameIn
             continue;
 
         const uint32_t jointCount = animation.JointCount;
-        if (jointCount == 0 || animation.Pose.SkinMatrices.size() != jointCount)
+        if (jointCount == 0 || animation.FinalPose.SkinMatrices.size() != jointCount)
             continue;
 
         auto it = m_Instances.find(animation.SkeletonEntity);
@@ -183,20 +183,20 @@ void AnimationSystem::UploadSkinMatrices(SkeletonInstanceState& instance,
     KBR_TRACY_FUNCTION();
 
     const VulkanBuffer& buffer = m_SkinMatricesBuffers[frameIndex];
-    if (animation.Pose.SkinMatrices.size() != instance.JointCount || buffer.MappedData == nullptr)
+    if (animation.FinalPose.SkinMatrices.size() != instance.JointCount || buffer.MappedData == nullptr)
         return;
 
     auto* destination = static_cast<std::byte*>(buffer.MappedData) +
         static_cast<size_t>(instance.FirstSkinMatrix) * sizeof(BoneMatrix);
 
-    for (size_t jointIndex = 0; jointIndex < animation.Pose.SkinMatrices.size(); ++jointIndex)
+    for (size_t jointIndex = 0; jointIndex < animation.FinalPose.SkinMatrices.size(); ++jointIndex)
     {
-        const BoneMatrix bone = ToBoneMatrix(animation.Pose.SkinMatrices[jointIndex]);
+        const BoneMatrix bone = ToBoneMatrix(animation.FinalPose.SkinMatrices[jointIndex]);
         std::memcpy(destination + jointIndex * sizeof(BoneMatrix), &bone, sizeof(BoneMatrix));
     }
 
     const VkDeviceSize offset = static_cast<VkDeviceSize>(instance.FirstSkinMatrix) * sizeof(BoneMatrix);
-    const VkDeviceSize size = static_cast<VkDeviceSize>(animation.Pose.SkinMatrices.size()) * sizeof(BoneMatrix);
+    const VkDeviceSize size = static_cast<VkDeviceSize>(animation.FinalPose.SkinMatrices.size()) * sizeof(BoneMatrix);
     vmaFlushAllocation(VulkanContext::Get().GetAllocator().get(), buffer.Allocation, offset, size);
 
     instance.FrameVersions[frameIndex] = animation.PoseVersion;

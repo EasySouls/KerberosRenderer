@@ -58,8 +58,20 @@ void EvaluatePose(const Skeleton& skeleton,
                    float time,
                    SkeletonPose& pose);
 
+/// Fills only the local pose from the skeleton rest pose and compatible clip tracks.
+/// Use this when several clips are composed (cross-fades, ragdoll blending) and the
+/// Global/SkinMatrices can be derived once from the composed result.
+void EvaluatePoseLocal(const Skeleton& skeleton,
+                       const AnimationClip& clip,
+                       const ClipTrackCache& cache,
+                       float time,
+                       SkeletonPose& pose);
+
 /// Fills the local pose from the skeleton rest pose only.
 void EvaluateRestPose(const Skeleton& skeleton, SkeletonPose& pose);
+
+/// Fills only the local pose from the skeleton rest pose.
+void EvaluateRestPoseLocal(const Skeleton& skeleton, SkeletonPose& pose);
 
 /// Computes Global and SkinMatrices from Local. 
 /// Joints must be topologically sorted, which Skeleton enforces.
@@ -137,5 +149,26 @@ void UpdateDurationEvents(const AnimationClip& clip,
                           float weight,
                           std::vector<ActiveAnimationEvent>& active,
                           std::vector<AnimationEventHit>& out);
+
+/// Blends two local poses. 
+/// weight is the weight of b (0 = a, 1 = b). 
+/// Rotations use shortest-path slerp.
+/// Global/SkinMatrices are not recomputed. 
+/// Poses with different joint counts fall back to the dominant pose instead of producing an invalid result.
+void BlendPose(const SkeletonPose& a, const SkeletonPose& b, float weight, SkeletonPose& out);
+
+/// Normalized weight of the incoming pose for a cross-fade. 
+/// A non-positive or non-finite duration snaps to 1 so a 
+/// zero-length fade always completes immediately.
+float ComputeCrossFadeWeight(float elapsed, float duration);
+
+/// Incrementally accumulates source into a weighted average of local poses. 
+/// accumulatedWeight must start at 0 and is updated by this call. 
+/// This is the shared composition primitive for layered poses. 
+/// Two-pose cross-fades and ragdoll blending should use BlendPose.
+void AccumulatePose(const SkeletonPose& source,
+                    float weight,
+                    SkeletonPose& target,
+                    float& accumulatedWeight);
 
 }
