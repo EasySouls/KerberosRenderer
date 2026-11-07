@@ -932,7 +932,7 @@ bool LoadImageDataWithKtxFallback(
         const std::string& filename)
     {
         const auto& animation = model.animations[animationIndex];
-        clip.Version = 2;
+        clip.Version = 3;
         clip.LocalKey = Key("animation", animationIndex);
         clip.SourceIndex = static_cast<uint32_t>(animationIndex);
         clip.Name = Name(animation.name, "Animation_", animationIndex);
@@ -980,6 +980,18 @@ bool LoadImageDataWithKtxFallback(
                 {
                     event.Time = clampTime(event.Time);
                     event.Duration = std::max(0.0f, event.Duration);
+
+                    for (AnimationEventParameterFile& parameter : event.Parameters)
+                    {
+                        if (!std::isfinite(parameter.FloatValue))
+                            parameter.FloatValue = 0.0f;
+                        if (!std::isfinite(parameter.VectorValue.x) ||
+                            !std::isfinite(parameter.VectorValue.y) ||
+                            !std::isfinite(parameter.VectorValue.z))
+                        {
+                            parameter.VectorValue = glm::vec3(0.0f);
+                        }
+                    }
                 }
 
                 std::ranges::stable_sort(clip.Markers, {}, &AnimationMarkerFile::Time);

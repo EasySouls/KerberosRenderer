@@ -6,6 +6,7 @@ add_executable(KerberosEngineTests
     AnimationEvaluatorTests.cpp
     AnimationEventTests.cpp
     GLTFImportTests.cpp
+    PhysicsQueryTests.cpp
     ProjectLoadTests.cpp
     RagdollTests.cpp
 )

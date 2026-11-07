@@ -264,11 +264,15 @@ composition, and `ComputeCrossFadeWeight` owns elapsed/duration clamping.
 stays unit-testable.
 
 `AnimationClip` carries sorted `AnimationMarker` and `AnimationEvent` data
-loaded from the native clip. `AnimationEvaluator` exposes pure helpers for
-playback spans, point-event crossing, wrapped duration windows, and
-`MinTriggerWeight` filtering. `AnimationRuntime::AdvanceClocks` collects
-`DispatchedAnimationEvent` records; `Scene::DispatchAnimationEvents` validates
-and dispatches them before scripts in Play mode. Duration events use
+loaded from the native clip. Events carry an optional list of named typed
+`AnimationEventParameter` values (`Bool`, `Int`, `Float`, `Vector3`, `String`,
+`Asset`); the engine does not interpret the names, games do. `AnimationEvaluator`
+exposes pure helpers for playback spans, point-event crossing, wrapped duration
+windows, and `MinTriggerWeight` filtering. `AnimationRuntime::AdvanceClocks`
+collects `DispatchedAnimationEvent` records; `Scene::DispatchAnimationEvents`
+validates and dispatches them before scripts in Play mode. The managed
+`AnimationEvent` exposes the parameter list plus `GetBool`/`GetInt`/`GetFloat`/
+`GetVector3`/`GetString`/`GetAsset` helpers. Duration events use
 `Begin`/`Tick`/`End`; point events use `Point`. Reverse playback suppresses
 events, and `AnimatorComponent::PlaybackRevision` suppresses point events across
 time jumps. Active duration windows are closed with `End` when playback is
@@ -287,7 +291,9 @@ starts the new fade from that snapshot instead of the old raw clip. Direct
 `Play`/`SetActiveClip` changes snap; only `CrossFade` blends. Requests are
 delivered through the transient `AnimatorComponent::PendingCrossFadeClip`/
 `PendingCrossFadeDuration`/`PendingCrossFadeRestart` fields and consumed by the
-runtime. Editor timeline authoring is still not implemented.
+runtime. Timeline authoring lives in the editor's Animation Editor panel, which
+edits the source `.meta` markers/events/parameters and reimports the clip on
+save; the runtime itself never edits authored event data.
 
 Entities use `SkeletonComponent` for the skeleton instance and joint list,
 `JointComponent` for joint ordering, `SkinnedMeshComponent` for the mesh /
@@ -330,7 +336,14 @@ only dynamic bodies are read back into entity transforms. Collider components
 expose `IsTrigger` and `Enabled`, and the C# API supports body type, mass,
 gravity, friction, restitution, angular velocity, collider shape/offset, and
 trigger/enabled changes. Changing these marks the owning rigid body dirty; the
-physics system rebuilds the body on the next update.
+physics system rebuilds the body on the next update. The physics facade also
+exposes standalone body creation, motion/transform/velocity access, swing-twist
+constraints (used by the ragdoll), and one-shot `OverlapBox`/`OverlapSphere`
+queries. Overlap queries return unique entities with contact point/normal, do
+not require a collider component, and are exposed to C# as
+`Physics.OverlapBox`/`Physics.OverlapSphere`; the entity-relative overloads use
+the entity's world transform, which makes them suitable for socket-driven
+weapon hitboxes.
 
 ## Ragdoll physics
 
@@ -479,12 +492,13 @@ SVB rather than expecting world-space output.
 
 - Pose evaluation and skin-matrix generation are CPU-only. There is no
   evaluation/precompute compute pass and no GPU pose path yet.
-- Two-clip cross-fades, local-pose composition, and ragdoll two-way pose
-  synchronization are implemented. Additive layers, root motion, authored
-  per-joint ragdoll limits, joint motors, and editor timeline authoring are
-  not. Marker/event data round-trips from `.meta` through the native clip into
-  `AnimationClip`, and point/duration events dispatch to scripts with per-clip
-  fade weights. `FireInEditor` preview dispatch remains future work.
+- Two-clip cross-fades, local-pose composition, ragdoll two-way pose
+  synchronization, event parameter authoring, and the editor event timeline are
+  implemented. Additive layers, root motion, authored per-joint ragdoll limits,
+  and joint motors are not. Marker/event data round-trips from `.meta` through
+  the native clip into `AnimationClip`, and point/duration events dispatch to
+  scripts with per-clip fade weights and typed parameters. `FireInEditor`
+  preview dispatch remains future work.
 - Ragdoll proxies are rigid capsules/spheres created from the pose at the time
   the ragdoll is first initialized. They do not rescale with bone length, and
   the root has no anchor, so an enabled ragdoll falls freely.

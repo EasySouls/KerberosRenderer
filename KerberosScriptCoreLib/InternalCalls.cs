@@ -88,6 +88,18 @@ namespace Kerberos
         internal delegate byte PhysicsRaycastFn(ref Vector3 origin, ref Vector3 direction, float maxDistance, out Vector3 hitPoint, out Vector3 hitNormal, out ulong entityID);
 
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        internal delegate int PhysicsOverlapBoxFn(ref Vector3 center, ref Vector3 halfExtents, IntPtr outEntities, int maxEntities);
+
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        internal delegate int PhysicsOverlapBoxForEntityFn(ulong entityID, ref Vector3 localCenter, ref Vector3 localHalfExtents, ulong ignoreEntityID, IntPtr outEntities, int maxEntities);
+
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        internal delegate int PhysicsOverlapSphereFn(ref Vector3 center, float radius, IntPtr outEntities, int maxEntities);
+
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        internal delegate int PhysicsOverlapSphereForEntityFn(ulong entityID, ref Vector3 localCenter, float radius, ulong ignoreEntityID, IntPtr outEntities, int maxEntities);
+
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
         internal delegate void AnimatorPlayFn(ulong entityID, int clipIndex);
 
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
@@ -166,6 +178,10 @@ namespace Kerberos
         private static GetBoolFn? s_AudioSource3DIsLooping;
 
         private static PhysicsRaycastFn? s_PhysicsRaycast;
+        private static PhysicsOverlapBoxFn? s_PhysicsOverlapBox;
+        private static PhysicsOverlapBoxForEntityFn? s_PhysicsOverlapBoxForEntity;
+        private static PhysicsOverlapSphereFn? s_PhysicsOverlapSphere;
+        private static PhysicsOverlapSphereForEntityFn? s_PhysicsOverlapSphereForEntity;
 
         private static AnimatorPlayFn? s_AnimatorPlay;
         private static AnimatorPlayByNameFn? s_AnimatorPlayByName;
@@ -321,6 +337,10 @@ namespace Kerberos
             s_AudioSource3DIsLooping = Marshal.GetDelegateForFunctionPointer<GetBoolFn>(ReadNext());
 
             s_PhysicsRaycast = Marshal.GetDelegateForFunctionPointer<PhysicsRaycastFn>(ReadNext());
+            s_PhysicsOverlapBox = Marshal.GetDelegateForFunctionPointer<PhysicsOverlapBoxFn>(ReadNext());
+            s_PhysicsOverlapBoxForEntity = Marshal.GetDelegateForFunctionPointer<PhysicsOverlapBoxForEntityFn>(ReadNext());
+            s_PhysicsOverlapSphere = Marshal.GetDelegateForFunctionPointer<PhysicsOverlapSphereFn>(ReadNext());
+            s_PhysicsOverlapSphereForEntity = Marshal.GetDelegateForFunctionPointer<PhysicsOverlapSphereForEntityFn>(ReadNext());
             s_EntityInstantiatePrefab = Marshal.GetDelegateForFunctionPointer<EntityInstantiatePrefabFn>(ReadNext());
 
             s_AnimatorPlay = Marshal.GetDelegateForFunctionPointer<AnimatorPlayFn>(ReadNext());
@@ -664,6 +684,18 @@ namespace Kerberos
 
             return s_PhysicsRaycast?.Invoke(ref origin, ref direction, maxDistance, out hitPoint, out hitNormal, out entityID) != 0;
         }
+
+        internal static int Physics_OverlapBox(ref Vector3 center, ref Vector3 halfExtents, IntPtr outEntities, int maxEntities)
+            => s_PhysicsOverlapBox?.Invoke(ref center, ref halfExtents, outEntities, maxEntities) ?? 0;
+
+        internal static int Physics_OverlapBoxForEntity(ulong entityID, ref Vector3 localCenter, ref Vector3 localHalfExtents, ulong ignoreEntityID, IntPtr outEntities, int maxEntities)
+            => s_PhysicsOverlapBoxForEntity?.Invoke(entityID, ref localCenter, ref localHalfExtents, ignoreEntityID, outEntities, maxEntities) ?? 0;
+
+        internal static int Physics_OverlapSphere(ref Vector3 center, float radius, IntPtr outEntities, int maxEntities)
+            => s_PhysicsOverlapSphere?.Invoke(ref center, radius, outEntities, maxEntities) ?? 0;
+
+        internal static int Physics_OverlapSphereForEntity(ulong entityID, ref Vector3 localCenter, float radius, ulong ignoreEntityID, IntPtr outEntities, int maxEntities)
+            => s_PhysicsOverlapSphereForEntity?.Invoke(entityID, ref localCenter, radius, ignoreEntityID, outEntities, maxEntities) ?? 0;
 
         // ----------------------------- AnimatorComponent -----------------------------
 

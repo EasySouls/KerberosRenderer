@@ -305,6 +305,29 @@ namespace Kerberos
                     || !Write(stream, event.MinTriggerWeight)
                     || !Write(stream, event.Flags))
                     return false;
+
+                // Version 3 adds typed, named event parameters.
+                if (clip.Version >= 3)
+                {
+                    if (!Write(stream, static_cast<uint32_t>(event.Parameters.size())))
+                        return false;
+
+                    for (const auto& parameter : event.Parameters)
+                    {
+                        const uint8_t type = static_cast<uint8_t>(parameter.Type);
+                        if (!WriteString(stream, parameter.Name)
+                            || !Write(stream, type)
+                            || !WriteBool(stream, parameter.BoolValue)
+                            || !Write(stream, parameter.IntValue)
+                            || !Write(stream, parameter.FloatValue)
+                            || !Write(stream, parameter.VectorValue.x)
+                            || !Write(stream, parameter.VectorValue.y)
+                            || !Write(stream, parameter.VectorValue.z)
+                            || !WriteString(stream, parameter.StringValue)
+                            || !Write(stream, parameter.AssetValue))
+                            return false;
+                    }
+                }
             }
         }
 
@@ -386,6 +409,34 @@ namespace Kerberos
                 || !Read(stream, event.MinTriggerWeight)
                 || !Read(stream, event.Flags))
                 return false;
+
+            if (header.Version >= 3)
+            {
+                uint32_t parameterCount = 0;
+                if (!Read(stream, parameterCount) || parameterCount > MaxCollectionCount)
+                    return false;
+
+                event.Parameters.clear();
+                event.Parameters.resize(parameterCount);
+                for (auto& parameter : event.Parameters)
+                {
+                    uint8_t type = 0;
+                    if (!ReadString(stream, parameter.Name)
+                        || !Read(stream, type)
+                        || type > static_cast<uint8_t>(AnimationEventParameterTypeFile::Asset)
+                        || !ReadBool(stream, parameter.BoolValue)
+                        || !Read(stream, parameter.IntValue)
+                        || !Read(stream, parameter.FloatValue)
+                        || !Read(stream, parameter.VectorValue.x)
+                        || !Read(stream, parameter.VectorValue.y)
+                        || !Read(stream, parameter.VectorValue.z)
+                        || !ReadString(stream, parameter.StringValue)
+                        || !Read(stream, parameter.AssetValue))
+                        return false;
+
+                    parameter.Type = static_cast<AnimationEventParameterTypeFile>(type);
+                }
+            }
         }
 
         return stream.good();

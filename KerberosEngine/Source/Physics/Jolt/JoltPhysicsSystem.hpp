@@ -71,6 +71,11 @@ namespace Kerberos
 		bool Raycast(const glm::vec3& origin, const glm::vec3& direction, float maxDistance,
 			RaycastHit& outHit) const override;
 
+		std::vector<OverlapHit> OverlapBox(const glm::vec3& center,
+		                                   const glm::quat& rotation,
+		                                   const glm::vec3& halfExtents) const override;
+		std::vector<OverlapHit> OverlapSphere(const glm::vec3& center, float radius) const override;
+
 		void SyncKinematicBodies(float dt) const;
 
 		std::vector<CollisionEvent> GetCollisionEvents() const override;

@@ -1279,6 +1279,25 @@ Entity Scene::InstantiatePrefab(const AssetHandle prefabHandle, const std::strin
 		return {};
 	}
 
+	Entity Scene::FindAnimatorEntityForSkeleton(const UUID skeletonEntity)
+	{
+		const auto view = m_Registry.view<AnimatorComponent>();
+		for (const auto entity : view)
+		{
+			const auto& animator = view.get<AnimatorComponent>(entity);
+			const UUID animatorUUID = m_Registry.get<IDComponent>(entity).ID;
+
+			UUID target = animator.SkeletonEntity;
+			if (!target.IsValid() && m_Registry.all_of<SkeletonComponent>(entity))
+				target = animatorUUID;
+
+			if (target == skeletonEntity)
+				return Entity{ entity, this };
+		}
+
+		return {};
+	}
+
 #pragma region ComponentAddedSpecializations
 
 	template <typename T>

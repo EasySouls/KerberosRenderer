@@ -12,6 +12,47 @@ import Kerberos;
 
 namespace Kerberos {
 
+namespace {
+
+AnimationEventParameterTypeFile ParseAnimationEventParameterType(const std::string& value)
+{
+    if (value == "Bool") return AnimationEventParameterTypeFile::Bool;
+    if (value == "Int") return AnimationEventParameterTypeFile::Int;
+    if (value == "Float") return AnimationEventParameterTypeFile::Float;
+    if (value == "Vector3") return AnimationEventParameterTypeFile::Vector3;
+    if (value == "String") return AnimationEventParameterTypeFile::String;
+    if (value == "Asset") return AnimationEventParameterTypeFile::Asset;
+
+    // Accept legacy/numeric values as well.
+    try
+    {
+        const int type = std::stoi(value);
+        if (type >= 0 && type <= static_cast<int>(AnimationEventParameterTypeFile::Asset))
+            return static_cast<AnimationEventParameterTypeFile>(type);
+    }
+    catch (const std::exception&)
+    {
+    }
+
+    return AnimationEventParameterTypeFile::Float;
+}
+
+const char* AnimationEventParameterTypeToString(const AnimationEventParameterTypeFile type)
+{
+    switch (type)
+    {
+    case AnimationEventParameterTypeFile::Bool: return "Bool";
+    case AnimationEventParameterTypeFile::Int: return "Int";
+    case AnimationEventParameterTypeFile::Float: return "Float";
+    case AnimationEventParameterTypeFile::Vector3: return "Vector3";
+    case AnimationEventParameterTypeFile::String: return "String";
+    case AnimationEventParameterTypeFile::Asset: return "Asset";
+    }
+    return "Float";
+}
+
+}
+
 AssetMetaService::AssetMetaService(std::filesystem::path assetsRoot) 
 : m_AssetsRoot(std::move(assetsRoot)) 
 {}
@@ -125,6 +166,32 @@ std::optional<AssetMetaFile> AssetMetaService::LoadMeta(const std::filesystem::p
                         event.FireInEditor = eventNode["FireInEditor"].as<bool>(false);
                         event.MinTriggerWeight = eventNode["MinTriggerWeight"].as<float>(0.0f);
                         event.Flags = eventNode["Flags"].as<uint32_t>(0);
+
+                        if (const YAML::Node parametersNode = eventNode["Parameters"])
+                        {
+                            for (const auto& parameterNode : parametersNode)
+                            {
+                                AnimationEventParameterFile parameter{};
+                                parameter.Name = parameterNode["Name"].as<std::string>("");
+                                parameter.Type = ParseAnimationEventParameterType(
+                                    parameterNode["Type"].as<std::string>("Float"));
+                                parameter.BoolValue = parameterNode["BoolValue"].as<bool>(false);
+                                parameter.IntValue = parameterNode["IntValue"].as<int32_t>(0);
+                                parameter.FloatValue = parameterNode["FloatValue"].as<float>(0.0f);
+                                if (const YAML::Node vectorNode = parameterNode["Vector3"];
+                                    vectorNode && vectorNode.IsSequence() && vectorNode.size() == 3)
+                                {
+                                    parameter.VectorValue = glm::vec3(
+                                        vectorNode[0].as<float>(0.0f),
+                                        vectorNode[1].as<float>(0.0f),
+                                        vectorNode[2].as<float>(0.0f));
+                                }
+                                parameter.StringValue = parameterNode["StringValue"].as<std::string>("");
+                                parameter.AssetValue = parameterNode["AssetValue"].as<uint64_t>(0);
+                                event.Parameters.push_back(std::move(parameter));
+                            }
+                        }
+
                         clipMeta.Events.push_back(std::move(event));
                     }
                 }
@@ -198,8 +265,51 @@ bool AssetMetaService::SaveMeta(const std::filesystem::path& sourcePath, const A
                         << YAML::Key << "Payload" << YAML::Value << event.Payload
                         << YAML::Key << "FireInEditor" << YAML::Value << event.FireInEditor
                         << YAML::Key << "MinTriggerWeight" << YAML::Value << event.MinTriggerWeight
-                        << YAML::Key << "Flags" << YAML::Value << event.Flags
-                        << YAML::EndMap;
+                        << YAML::Key << "Flags" << YAML::Value << event.Flags;
+
+                    if (!event.Parameters.empty())
+                    {
+                        out << YAML::Key << "Parameters" << YAML::Value << YAML::BeginSeq;
+                        for (const auto& parameter : event.Parameters)
+                        {
+                            out << YAML::BeginMap
+                                << YAML::Key << "Name" << YAML::Value << parameter.Name
+                                << YAML::Key << "Type" << YAML::Value
+                                << AnimationEventParameterTypeToString(parameter.Type);
+
+                            switch (parameter.Type)
+                            {
+                            case AnimationEventParameterTypeFile::Bool:
+                                out << YAML::Key << "BoolValue" << YAML::Value << parameter.BoolValue;
+                                break;
+                            case AnimationEventParameterTypeFile::Int:
+                                out << YAML::Key << "IntValue" << YAML::Value << parameter.IntValue;
+                                break;
+                            case AnimationEventParameterTypeFile::Float:
+                                out << YAML::Key << "FloatValue" << YAML::Value << parameter.FloatValue;
+                                break;
+                            case AnimationEventParameterTypeFile::Vector3:
+                                out << YAML::Key << "Vector3" << YAML::Value
+                                    << YAML::Flow << YAML::BeginSeq
+                                    << parameter.VectorValue.x
+                                    << parameter.VectorValue.y
+                                    << parameter.VectorValue.z
+                                    << YAML::EndSeq;
+                                break;
+                            case AnimationEventParameterTypeFile::String:
+                                out << YAML::Key << "StringValue" << YAML::Value << parameter.StringValue;
+                                break;
+                            case AnimationEventParameterTypeFile::Asset:
+                                out << YAML::Key << "AssetValue" << YAML::Value << parameter.AssetValue;
+                                break;
+                            }
+
+                            out << YAML::EndMap;
+                        }
+                        out << YAML::EndSeq;
+                    }
+
+                    out << YAML::EndMap;
                 }
                 out << YAML::EndSeq;
             }

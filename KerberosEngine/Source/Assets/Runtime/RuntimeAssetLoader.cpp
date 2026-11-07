@@ -15,9 +15,7 @@
 #include "Renderer/Animation/SkeletalMesh.hpp"
 
 #include <algorithm>
-#include <cstring>
 #include <fstream>
-#include <limits>
 #include <sstream>
 #include <utility>
 
@@ -181,7 +179,7 @@ Ref<AnimationClip> LoadAnimation(const AssetHandle handle, const std::filesystem
     events.reserve(native.Events.size());
     for (const AnimationEventFile& event : native.Events)
     {
-        events.push_back({
+        AnimationEvent runtimeEvent{
             .Time = event.Time,
             .Duration = event.Duration,
             .Name = event.Name,
@@ -189,7 +187,24 @@ Ref<AnimationClip> LoadAnimation(const AssetHandle handle, const std::filesystem
             .FireInEditor = event.FireInEditor,
             .MinTriggerWeight = event.MinTriggerWeight,
             .Flags = event.Flags,
-        });
+        };
+
+        runtimeEvent.Parameters.reserve(event.Parameters.size());
+        for (const AnimationEventParameterFile& parameter : event.Parameters)
+        {
+            runtimeEvent.Parameters.push_back({
+                .Name = parameter.Name,
+                .Type = static_cast<AnimationEventParameterType>(parameter.Type),
+                .BoolValue = parameter.BoolValue,
+                .IntValue = parameter.IntValue,
+                .FloatValue = parameter.FloatValue,
+                .VectorValue = parameter.VectorValue,
+                .StringValue = parameter.StringValue,
+                .AssetValue = AssetHandle(parameter.AssetValue),
+            });
+        }
+
+        events.push_back(std::move(runtimeEvent));
     }
     // Sort events by time to ensure they are in chronological order
     std::ranges::sort(events, [](const AnimationEvent& a, const AnimationEvent& b) { return a.Time < b.Time; });

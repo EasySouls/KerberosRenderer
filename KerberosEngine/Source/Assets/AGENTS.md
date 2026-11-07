@@ -97,13 +97,18 @@ Animation markers and events are authored in the source `.meta` (schema 3)
 under `AnimationClips`, keyed by the clip's stable `LocalKey`/`SubAssetKey`
 (`animation:<i>`). Each clip entry has `Markers` (`Time`, `Name`) and `Events`
 (`Time`, `Duration`, `Name`, `Payload`, `FireInEditor`, `MinTriggerWeight`,
-`Flags`). The glTF importer bakes them into `.kbranimation` version 2 after
+`Flags`, and optional `Parameters`). Event parameters are generic named typed
+values (`Bool`, `Int`, `Float`, `Vector3`, `String`, `Asset`); the engine does
+not assign gameplay meaning to names such as "Damage" or "Hitbox". The glTF
+importer bakes events and parameters into `.kbranimation` version 3 after
 rejecting non-finite values, clamping times to the clip range, and sorting by
-time. Version 1 clips still load with empty marker/event lists. Editing this
-metadata must go through `EditorAssetManager::SetAnimationClipMeta`, which
-persists the `.meta` and force-reimports the source; the runtime re-resolves
-clips after the reimport. Reordering glTF animations remaps `animation:<i>`
-keys, so keep clip names visible when authoring events.
+time. Version 1 clips still load with empty marker/event lists; version 2 clips
+load with events but no parameters. Editing this metadata must go through
+`EditorAssetManager::SetAnimationClipMeta`, which persists the `.meta` and
+force-reimports the source; the runtime re-resolves clips after the reimport.
+Reordering glTF animations remaps `animation:<i>` keys, so keep clip names
+visible when authoring events. The editor's Animation Editor panel is the
+authoring UI for this metadata.
 Authored YAML prefabs may also carry per-entity script records
 (`PrefabScriptTemplate`: class name plus serialized field initializers).
 `PrefabSerializer` writes and reads those records, and

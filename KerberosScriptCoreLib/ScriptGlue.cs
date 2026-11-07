@@ -29,6 +29,21 @@ namespace Kerberos
         }
 
         [StructLayout(LayoutKind.Sequential)]
+        private struct ScriptAnimationEventParameterPayload
+        {
+            public IntPtr Name;
+            public IntPtr StringValue;
+            public ulong AssetValue;
+            public float VectorX;
+            public float VectorY;
+            public float VectorZ;
+            public float FloatValue;
+            public int IntValue;
+            public byte Type;
+            public byte BoolValue;
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
         private struct ScriptAnimationEventPayload
         {
             public IntPtr Name;
@@ -39,6 +54,8 @@ namespace Kerberos
             public float Weight;
             public byte Phase;
             public uint Flags;
+            public IntPtr Parameters;
+            public uint ParameterCount;
         }
 
         private static Assembly? s_CoreAssembly;
@@ -490,6 +507,29 @@ namespace Kerberos
                 ScriptAnimationEventPayload payload =
                     Marshal.PtrToStructure<ScriptAnimationEventPayload>(payloadPtr);
 
+                AnimationEventParameter[] parameters =
+                    new AnimationEventParameter[payload.ParameterCount];
+                if (payload.ParameterCount > 0 && payload.Parameters != IntPtr.Zero)
+                {
+                    int parameterSize = Marshal.SizeOf<ScriptAnimationEventParameterPayload>();
+                    for (int i = 0; i < payload.ParameterCount; i++)
+                    {
+                        ScriptAnimationEventParameterPayload parameter =
+                            Marshal.PtrToStructure<ScriptAnimationEventParameterPayload>(
+                                IntPtr.Add(payload.Parameters, i * parameterSize));
+
+                        parameters[i] = new AnimationEventParameter(
+                            Marshal.PtrToStringAnsi(parameter.Name) ?? string.Empty,
+                            (AnimationEventParameterType)parameter.Type,
+                            parameter.BoolValue != 0,
+                            parameter.IntValue,
+                            parameter.FloatValue,
+                            new Vector3(parameter.VectorX, parameter.VectorY, parameter.VectorZ),
+                            Marshal.PtrToStringAnsi(parameter.StringValue) ?? string.Empty,
+                            parameter.AssetValue);
+                    }
+                }
+
                 var animationEvent = new AnimationEvent(
                     Marshal.PtrToStringAnsi(payload.Name) ?? string.Empty,
                     Marshal.PtrToStringAnsi(payload.Payload) ?? string.Empty,
@@ -498,7 +538,8 @@ namespace Kerberos
                     payload.Duration,
                     payload.Weight,
                     (AnimationEventPhase)payload.Phase,
-                    payload.Flags);
+                    payload.Flags,
+                    parameters);
 
                 var type = instance.GetType();
                 if (OnAnimationEventMethods.TryGetValue(type, out var method) && method != null)

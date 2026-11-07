@@ -22,6 +22,13 @@ namespace Kerberos
 		UUID EntityID;
 	};
 
+	struct OverlapHit
+	{
+		UUID EntityID = UUID::Invalid();
+		glm::vec3 Point = glm::vec3(0.0f);
+		glm::vec3 Normal = glm::vec3(0.0f);
+	};
+
 	enum class PhysicsMotionType : std::uint8_t
 	{
 		Static,
@@ -179,6 +186,18 @@ namespace Kerberos
 		* @return True if a collision was found, false otherwise.
 		*/
 		virtual bool Raycast(const glm::vec3& origin, const glm::vec3& direction, float maxDistance, RaycastHit& outHit) const = 0;
+
+		/**
+		 * Returns the entities overlapping an oriented box. The query is a one-shot shape query
+		 * against the current physics state and does not require a collider component. Results are
+		 * unique per entity and carry the contact point/normal for hit effects.
+		 */
+		virtual std::vector<OverlapHit> OverlapBox(const glm::vec3& center,
+		                                           const glm::quat& rotation,
+		                                           const glm::vec3& halfExtents) const = 0;
+
+		/// Returns the entities overlapping a sphere.
+		virtual std::vector<OverlapHit> OverlapSphere(const glm::vec3& center, float radius) const = 0;
 
 		/**
 		* Returns a list of collision events that occurred during the last physics update.

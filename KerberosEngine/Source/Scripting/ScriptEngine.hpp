@@ -31,6 +31,20 @@ namespace Kerberos
 		float PenetrationDepth = 0.0f;
 	};
 
+	struct ScriptAnimationEventParameterPayload
+	{
+		const char* Name = nullptr;
+		const char* StringValue = nullptr;
+		uint64_t AssetValue = 0;
+		float VectorX = 0.0f;
+		float VectorY = 0.0f;
+		float VectorZ = 0.0f;
+		float FloatValue = 0.0f;
+		int32_t IntValue = 0;
+		uint8_t Type = 0;
+		uint8_t BoolValue = 0;
+	};
+
 	struct ScriptAnimationEventPayload
 	{
 		const char* Name = nullptr;
@@ -41,6 +55,8 @@ namespace Kerberos
 		float Weight = 1.0f;
 		uint8_t Phase = 0;
 		uint32_t Flags = 0;
+		const ScriptAnimationEventParameterPayload* Parameters = nullptr;
+		uint32_t ParameterCount = 0;
 	};
 
 	/// Function pointer types for calls into the managed ScriptGlue bridge

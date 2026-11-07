@@ -323,6 +323,12 @@ namespace PROJECT_NAME
 		m_InspectorPanel.SetContext(&m_HierarchyPanel, m_AssetsPanel.get());
 		m_InspectorPanel.OnImGuiRender();
 
+		const Entity selectedEntity = m_HierarchyPanel.GetSelectedEntity();
+		const UUID selectedEntityUUID = selectedEntity ? selectedEntity.GetUUID() : UUID::Invalid();
+		m_AnimationEditorPanel.SetContext(m_ActiveScene, selectedEntityUUID,
+		                                  m_SceneState == SceneState::Edit);
+		m_AnimationEditorPanel.OnImGuiRender();
+
 		DrawViewport();
 
 		DrawDebugWindow();
@@ -1135,6 +1141,9 @@ namespace PROJECT_NAME
 
 			if (ImGui::BeginMenu("View"))
 			{
+				if (ImGui::MenuItem("Animation Editor", nullptr, m_AnimationEditorPanel.IsOpen()))
+					m_AnimationEditorPanel.SetOpen(!m_AnimationEditorPanel.IsOpen());
+
 				if (ImGui::MenuItem("Show Wireframe"))
 				{
 					/*m_ShowWireframe = !m_ShowWireframe;

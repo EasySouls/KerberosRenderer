@@ -40,6 +40,28 @@ struct AnimationMarkerFile
     std::string Name;
 };
 
+enum class AnimationEventParameterTypeFile : uint8_t
+{
+    Bool = 0,
+    Int,
+    Float,
+    Vector3,
+    String,
+    Asset
+};
+
+struct AnimationEventParameterFile
+{
+    std::string Name;
+    AnimationEventParameterTypeFile Type = AnimationEventParameterTypeFile::Float;
+    bool BoolValue = false;
+    int32_t IntValue = 0;
+    float FloatValue = 0.0f;
+    glm::vec3 VectorValue = glm::vec3(0.0f);
+    std::string StringValue;
+    uint64_t AssetValue = 0;
+};
+
 struct AnimationEventFile
 {
     float Time = 0.0f;
@@ -49,11 +71,12 @@ struct AnimationEventFile
     bool FireInEditor = false;
     float MinTriggerWeight = 0.0f;
     uint32_t Flags = 0; // reserved for future use
+    std::vector<AnimationEventParameterFile> Parameters;
 };
 
 struct AnimationClipFile
 {
-    uint32_t Version = 2;
+    uint32_t Version = 3;
     std::string LocalKey;       // "animation:<i>"
     uint32_t SourceIndex = 0;
     std::string Name;

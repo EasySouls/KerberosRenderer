@@ -66,6 +66,33 @@ namespace
 			.FireInEditor = true,
 			.MinTriggerWeight = 0.01f,
 			.Flags = 7u,
+			.Parameters = {
+				{
+					.Name = "Damage",
+					.Type = Kerberos::AnimationEventParameterTypeFile::Float,
+					.FloatValue = 10.0f,
+				},
+				{
+					.Name = "Socket",
+					.Type = Kerberos::AnimationEventParameterTypeFile::String,
+					.StringValue = "Weapon",
+				},
+				{
+					.Name = "Offset",
+					.Type = Kerberos::AnimationEventParameterTypeFile::Vector3,
+					.VectorValue = glm::vec3(0.0f, 0.2f, 0.0f),
+				},
+				{
+					.Name = "HitOnce",
+					.Type = Kerberos::AnimationEventParameterTypeFile::Bool,
+					.BoolValue = true,
+				},
+				{
+					.Name = "Sound",
+					.Type = Kerberos::AnimationEventParameterTypeFile::Asset,
+					.AssetValue = 42,
+				},
+			},
 		});
 		meta.AnimationClips["animation:0"] = clipMeta;
 
@@ -89,6 +116,16 @@ namespace
 		EXPECT_TRUE(event.FireInEditor);
 		EXPECT_FLOAT_EQ(event.MinTriggerWeight, 0.01f);
 		EXPECT_EQ(event.Flags, 7u);
+
+		ASSERT_EQ(event.Parameters.size(), 5u);
+		EXPECT_EQ(event.Parameters[0].Name, "Damage");
+		EXPECT_EQ(event.Parameters[0].Type, Kerberos::AnimationEventParameterTypeFile::Float);
+		EXPECT_FLOAT_EQ(event.Parameters[0].FloatValue, 10.0f);
+		EXPECT_EQ(event.Parameters[1].StringValue, "Weapon");
+		EXPECT_EQ(event.Parameters[2].Type, Kerberos::AnimationEventParameterTypeFile::Vector3);
+		EXPECT_FLOAT_EQ(event.Parameters[2].VectorValue.y, 0.2f);
+		EXPECT_TRUE(event.Parameters[3].BoolValue);
+		EXPECT_EQ(event.Parameters[4].AssetValue, 42u);
 	}
 
 	TEST_F(AnimationAssetTest, OlderMetaWithoutAnimationClipsLoadsEmpty)
@@ -120,7 +157,7 @@ namespace
 	TEST_F(AnimationAssetTest, NativeClipRoundTripsMarkersAndEvents)
 	{
 		Kerberos::AnimationClipFile clip{};
-		clip.Version = 2;
+		clip.Version = 3;
 		clip.LocalKey = "animation:0";
 		clip.Name = "TestClip";
 		clip.DurationSeconds = 1.0f;
@@ -137,6 +174,33 @@ namespace
 				.FireInEditor = false,
 				.MinTriggerWeight = 0.0f,
 				.Flags = 0,
+				.Parameters = {
+					{
+						.Name = "Damage",
+						.Type = Kerberos::AnimationEventParameterTypeFile::Float,
+						.FloatValue = 20.0f,
+					},
+					{
+						.Name = "Socket",
+						.Type = Kerberos::AnimationEventParameterTypeFile::String,
+						.StringValue = "Weapon",
+					},
+					{
+						.Name = "Offset",
+						.Type = Kerberos::AnimationEventParameterTypeFile::Vector3,
+						.VectorValue = glm::vec3(0.0f, 1.0f, 0.0f),
+					},
+					{
+						.Name = "HitOnce",
+						.Type = Kerberos::AnimationEventParameterTypeFile::Bool,
+						.BoolValue = true,
+					},
+					{
+						.Name = "Sound",
+						.Type = Kerberos::AnimationEventParameterTypeFile::Asset,
+						.AssetValue = 12345,
+					},
+				},
 			},
 			{
 				.Time = 0.4f,
@@ -154,7 +218,7 @@ namespace
 
 		Kerberos::AnimationClipFile loaded{};
 		ASSERT_TRUE(Kerberos::NativeAssetSerializer::DeserializeAnimationClip(path, loaded));
-		EXPECT_EQ(loaded.Version, 2u);
+		EXPECT_EQ(loaded.Version, 3u);
 		ASSERT_EQ(loaded.Markers.size(), 2u);
 		ASSERT_EQ(loaded.Events.size(), 2u);
 
@@ -171,6 +235,17 @@ namespace
 		EXPECT_TRUE(loaded.Events[1].FireInEditor);
 		EXPECT_FLOAT_EQ(loaded.Events[1].MinTriggerWeight, 0.25f);
 		EXPECT_EQ(loaded.Events[1].Flags, 3u);
+
+		ASSERT_EQ(loaded.Events[0].Parameters.size(), 5u);
+		EXPECT_EQ(loaded.Events[0].Parameters[0].Name, "Damage");
+		EXPECT_EQ(loaded.Events[0].Parameters[0].Type, Kerberos::AnimationEventParameterTypeFile::Float);
+		EXPECT_FLOAT_EQ(loaded.Events[0].Parameters[0].FloatValue, 20.0f);
+		EXPECT_EQ(loaded.Events[0].Parameters[1].StringValue, "Weapon");
+		EXPECT_EQ(loaded.Events[0].Parameters[2].Type, Kerberos::AnimationEventParameterTypeFile::Vector3);
+		EXPECT_FLOAT_EQ(loaded.Events[0].Parameters[2].VectorValue.y, 1.0f);
+		EXPECT_TRUE(loaded.Events[0].Parameters[3].BoolValue);
+		EXPECT_EQ(loaded.Events[0].Parameters[4].AssetValue, 12345u);
+		EXPECT_TRUE(loaded.Events[1].Parameters.empty());
 	}
 
 	TEST_F(AnimationAssetTest, VersionOneClipStillLoads)
@@ -189,6 +264,32 @@ namespace
 		EXPECT_EQ(loaded.Version, 1u);
 		EXPECT_TRUE(loaded.Markers.empty());
 		EXPECT_TRUE(loaded.Events.empty());
+	}
+
+	TEST_F(AnimationAssetTest, VersionTwoClipStillLoadsWithoutParameters)
+	{
+		Kerberos::AnimationClipFile clip{};
+		clip.Version = 2;
+		clip.LocalKey = "animation:0";
+		clip.Name = "LegacyEvents";
+		clip.DurationSeconds = 1.0f;
+		clip.Events = {
+			{
+				.Time = 0.5f,
+				.Duration = 0.0f,
+				.Name = "Legacy",
+			},
+		};
+
+		const std::filesystem::path path = m_TempDir / "legacy_events.kbranimation";
+		ASSERT_TRUE(Kerberos::NativeAssetSerializer::SerializeAnimationClip(clip, path));
+
+		Kerberos::AnimationClipFile loaded{};
+		ASSERT_TRUE(Kerberos::NativeAssetSerializer::DeserializeAnimationClip(path, loaded));
+		EXPECT_EQ(loaded.Version, 2u);
+		ASSERT_EQ(loaded.Events.size(), 1u);
+		EXPECT_EQ(loaded.Events[0].Name, "Legacy");
+		EXPECT_TRUE(loaded.Events[0].Parameters.empty());
 	}
 
 	TEST_F(AnimationAssetTest, RuntimeClipSanitizesAndSortsMetadata)

@@ -2,10 +2,13 @@
 
 #include "Assets/Asset.hpp"
 
+#include <glm/vec3.hpp>
 #include <glm/vec4.hpp>
 
+#include <algorithm>
 #include <cstdint>
 #include <string>
+#include <string_view>
 #include <vector>
 
 namespace Kerberos {
@@ -44,6 +47,30 @@ struct AnimationMarker
     std::string Name;
 };
 
+enum class AnimationEventParameterType : uint8_t
+{
+    Bool = 0,
+    Int,
+    Float,
+    Vector3,
+    String,
+    Asset
+};
+
+/// One named, typed value attached to an animation event.
+/// The engine only stores and forwards the values to scripts.
+struct AnimationEventParameter
+{
+    std::string Name;
+    AnimationEventParameterType Type = AnimationEventParameterType::Float;
+    bool BoolValue = false;
+    int32_t IntValue = 0;
+    float FloatValue = 0.0f;
+    glm::vec3 VectorValue = glm::vec3(0.0f);
+    std::string StringValue;
+    AssetHandle AssetValue = AssetHandle::Invalid();
+};
+
 struct AnimationEvent
 {
     float Time = 0.0f;
@@ -53,10 +80,20 @@ struct AnimationEvent
     bool FireInEditor = false;
     float MinTriggerWeight = 0.0f;
     uint32_t Flags = 0; // reserved for future use
+    std::vector<AnimationEventParameter> Parameters;
 
     bool IsPointEvent() const
     {
         return Duration <= 0.0f;
+    }
+
+    const AnimationEventParameter* FindParameter(const std::string_view name) const
+    {
+        const auto it = std::ranges::find_if(Parameters, [name](const AnimationEventParameter& parameter)
+        {
+            return parameter.Name == name;
+        });
+        return it != Parameters.end() ? &*it : nullptr;
     }
 };
 

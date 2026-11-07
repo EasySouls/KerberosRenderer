@@ -294,6 +294,23 @@ namespace
 		EXPECT_TRUE(runtime.GetInstances().empty());
 	}
 
+	TEST(AnimationRuntimeTest, FindsAnimatorForSkeletonEntity)
+	{
+		const Kerberos::Ref<Kerberos::Scene> scene = Kerberos::CreateRef<Kerberos::Scene>();
+
+		Kerberos::Entity skeletonEntity = scene->CreateEntity("Skeleton");
+		skeletonEntity.AddComponent<Kerberos::SkeletonComponent>().Skeleton =
+			Kerberos::CreateRef<Kerberos::Skeleton>(MakeTwoJointJoints());
+
+		Kerberos::Entity animatorEntity = scene->CreateEntity("Animator");
+		auto& animator = animatorEntity.AddComponent<Kerberos::AnimatorComponent>();
+		animator.SkeletonEntity = skeletonEntity.GetUUID();
+
+		const Kerberos::Entity found = scene->FindAnimatorEntityForSkeleton(skeletonEntity.GetUUID());
+		ASSERT_TRUE(found);
+		EXPECT_EQ(found.GetUUID(), animatorEntity.GetUUID());
+	}
+
 	TEST(AnimationRuntimeTest, SocketFollowsJointAndChildTransforms)
 	{
 		const Kerberos::Ref<Kerberos::Scene> scene = Kerberos::CreateRef<Kerberos::Scene>();

@@ -4,7 +4,6 @@
 #include "Input/InputSystem.hpp"
 #include "Input/KeyCodes.hpp"
 #include "Scene/Scene.hpp"
-#include "Scripting/ScriptUtils.hpp"
 #include "Scripting/ScriptEngine.hpp"
 #include "Scripting/ScriptInstance.hpp"
 #include "Scene/Components.hpp"
@@ -15,7 +14,6 @@
 #include "Profiling/Profilers.hpp"
 
 #include <algorithm>
-#include <cmath>
 
 #include <glm/glm.hpp>
 
@@ -81,6 +79,11 @@ namespace Kerberos
 		void* AudioSource3DComponent_IsLooping;
 
 		void* Physics_Raycast;
+		void* Physics_OverlapBox;
+		void* Physics_OverlapBoxForEntity;
+		void* Physics_OverlapSphere;
+		void* Physics_OverlapSphereForEntity;
+
 		void* Entity_InstantiatePrefab;
 
 		void* AnimatorComponent_Play;
@@ -1675,6 +1678,140 @@ namespace Kerberos
 		return 0;
 	}
 
+	static int32_t WriteOverlapEntities(const std::vector<OverlapHit>& hits,
+	                                    uint64_t* outEntities,
+	                                    const int32_t maxEntities,
+	                                    const uint64_t ignoreEntityID)
+	{
+		if (!outEntities || maxEntities <= 0)
+			return 0;
+
+		int32_t count = 0;
+		for (const OverlapHit& hit : hits)
+		{
+			if (!hit.EntityID.IsValid())
+				continue;
+			if (ignoreEntityID != 0 && static_cast<uint64_t>(hit.EntityID) == ignoreEntityID)
+				continue;
+			if (count >= maxEntities)
+				break;
+
+			outEntities[count++] = static_cast<uint64_t>(hit.EntityID);
+		}
+
+		return count;
+	}
+
+	static int32_t Physics_OverlapBox(const glm::vec3* center,
+	                                  const glm::vec3* halfExtents,
+	                                  uint64_t* outEntities,
+	                                  const int32_t maxEntities)
+	{
+		KBR_TRACY_FUNCTION();
+
+		if (!center || !halfExtents)
+			return 0;
+
+		const Ref<Scene> scene = ScriptEngine::GetSceneContext().lock();
+		if (!scene)
+			return 0;
+
+		const std::vector<OverlapHit> hits = scene->GetPhysicsSystem().OverlapBox(
+			*center, glm::quat(1.0f, 0.0f, 0.0f, 0.0f), *halfExtents);
+		return WriteOverlapEntities(hits, outEntities, maxEntities, 0);
+	}
+
+	static int32_t Physics_OverlapBoxForEntity(const uint64_t entityID,
+	                                           const glm::vec3* localCenter,
+	                                           const glm::vec3* localHalfExtents,
+	                                           const uint64_t ignoreEntityID,
+	                                           uint64_t* outEntities,
+	                                           const int32_t maxEntities)
+	{
+		KBR_TRACY_FUNCTION();
+
+		if (!localCenter || !localHalfExtents)
+			return 0;
+
+		const Ref<Scene> scene = ScriptEngine::GetSceneContext().lock();
+		if (!scene)
+			return 0;
+
+		const Entity entity = scene->TryGetEntityByUUID(UUID(entityID));
+		if (!entity || !entity.HasComponent<TransformComponent>())
+			return 0;
+
+		const glm::mat4& world = entity.GetComponent<TransformComponent>().WorldTransform;
+		const glm::vec3 center = glm::vec3(world * glm::vec4(*localCenter, 1.0f));
+		glm::quat rotation = glm::quat_cast(glm::mat3(world));
+		const float rotationLength = glm::length(rotation);
+		rotation = rotationLength > 1.0e-6f
+			? rotation / rotationLength
+			: glm::quat(1.0f, 0.0f, 0.0f, 0.0f);
+		const glm::vec3 scale = {
+			glm::length(glm::vec3(world[0])),
+			glm::length(glm::vec3(world[1])),
+			glm::length(glm::vec3(world[2])),
+		};
+		const glm::vec3 halfExtents = glm::abs(*localHalfExtents * scale);
+
+		const std::vector<OverlapHit> hits =
+			scene->GetPhysicsSystem().OverlapBox(center, rotation, halfExtents);
+		return WriteOverlapEntities(hits, outEntities, maxEntities, ignoreEntityID);
+	}
+
+	static int32_t Physics_OverlapSphere(const glm::vec3* center,
+	                                     const float radius,
+	                                     uint64_t* outEntities,
+	                                     const int32_t maxEntities)
+	{
+		KBR_TRACY_FUNCTION();
+
+		if (!center)
+			return 0;
+
+		const Ref<Scene> scene = ScriptEngine::GetSceneContext().lock();
+		if (!scene)
+			return 0;
+
+		const std::vector<OverlapHit> hits = scene->GetPhysicsSystem().OverlapSphere(*center, radius);
+		return WriteOverlapEntities(hits, outEntities, maxEntities, 0);
+	}
+
+	static int32_t Physics_OverlapSphereForEntity(const uint64_t entityID,
+	                                              const glm::vec3* localCenter,
+	                                              const float radius,
+	                                              const uint64_t ignoreEntityID,
+	                                              uint64_t* outEntities,
+	                                              const int32_t maxEntities)
+	{
+		KBR_TRACY_FUNCTION();
+
+		if (!localCenter)
+			return 0;
+
+		const Ref<Scene> scene = ScriptEngine::GetSceneContext().lock();
+		if (!scene)
+			return 0;
+
+		const Entity entity = scene->TryGetEntityByUUID(UUID(entityID));
+		if (!entity || !entity.HasComponent<TransformComponent>())
+			return 0;
+
+		const glm::mat4& world = entity.GetComponent<TransformComponent>().WorldTransform;
+		const glm::vec3 center = glm::vec3(world * glm::vec4(*localCenter, 1.0f));
+		const glm::vec3 scale = {
+			glm::length(glm::vec3(world[0])),
+			glm::length(glm::vec3(world[1])),
+			glm::length(glm::vec3(world[2])),
+		};
+		const float scaledRadius = radius * glm::max(scale.x, glm::max(scale.y, scale.z));
+
+		const std::vector<OverlapHit> hits =
+			scene->GetPhysicsSystem().OverlapSphere(center, scaledRadius);
+		return WriteOverlapEntities(hits, outEntities, maxEntities, ignoreEntityID);
+	}
+
 	static uint8_t Input_IsKeyDown(const int key)
 	{
 		return Input::IsKeyPressed(static_cast<KeyCode>(key)) ? 1 : 0;
@@ -1767,6 +1904,11 @@ namespace Kerberos
 		callbackTable.AudioSource3DComponent_IsLooping = reinterpret_cast<void*>(&AudioSource3DComponent_IsLooping);
 
 		callbackTable.Physics_Raycast = reinterpret_cast<void*>(&Physics_Raycast);
+		callbackTable.Physics_OverlapBox = reinterpret_cast<void*>(&Physics_OverlapBox);
+		callbackTable.Physics_OverlapBoxForEntity = reinterpret_cast<void*>(&Physics_OverlapBoxForEntity);
+		callbackTable.Physics_OverlapSphere = reinterpret_cast<void*>(&Physics_OverlapSphere);
+		callbackTable.Physics_OverlapSphereForEntity = reinterpret_cast<void*>(&Physics_OverlapSphereForEntity);
+
 		callbackTable.Entity_InstantiatePrefab = reinterpret_cast<void*>(&Entity_InstantiatePrefab);
 
 		callbackTable.AnimatorComponent_Play = reinterpret_cast<void*>(&AnimatorComponent_Play);

@@ -109,6 +109,10 @@ namespace Kerberos
 
 		Entity FindEntityByName(std::string_view name);
 
+		/// Finds the animator that drives a skeleton entity. Checks the skeleton entity itself and
+		/// then animators that explicitly reference it through SkeletonEntity.
+		Entity FindAnimatorEntityForSkeleton(UUID skeletonEntity);
+
 		bool& GetOnlyRenderShadowMapIfLightHasChanged() { return m_OnlyRenderShadowMapIfLightHasChanged; }
 
 		const PhysicsSystem& GetPhysicsSystem() const;

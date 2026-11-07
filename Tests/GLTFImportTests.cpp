@@ -283,6 +283,18 @@ TEST_F(GLTFImportTest, BakesAnimationMarkersAndEventsFromMetadata)
 			.FireInEditor = true,
 			.MinTriggerWeight = 0.25f,
 			.Flags = 2,
+			.Parameters = {
+				{
+					.Name = "Damage",
+					.Type = Kerberos::AnimationEventParameterTypeFile::Float,
+					.FloatValue = 25.0f,
+				},
+				{
+					.Name = "Socket",
+					.Type = Kerberos::AnimationEventParameterTypeFile::String,
+					.StringValue = "Weapon",
+				},
+			},
 		},
 	};
 
@@ -294,7 +306,7 @@ TEST_F(GLTFImportTest, BakesAnimationMarkersAndEventsFromMetadata)
 
 	Kerberos::AnimationClipFile animation;
 	ASSERT_TRUE(Kerberos::NativeAssetSerializer::DeserializeAnimationClip(animationPath, animation));
-	EXPECT_EQ(animation.Version, 2u);
+	EXPECT_EQ(animation.Version, 3u);
 
 	ASSERT_EQ(animation.Markers.size(), 3u);
 	EXPECT_EQ(animation.Markers[0].Name, "Early");
@@ -311,6 +323,11 @@ TEST_F(GLTFImportTest, BakesAnimationMarkersAndEventsFromMetadata)
 	EXPECT_TRUE(animation.Events[0].FireInEditor);
 	EXPECT_FLOAT_EQ(animation.Events[0].MinTriggerWeight, 0.25f);
 	EXPECT_EQ(animation.Events[0].Flags, 2u);
+
+	ASSERT_EQ(animation.Events[0].Parameters.size(), 2u);
+	EXPECT_EQ(animation.Events[0].Parameters[0].Name, "Damage");
+	EXPECT_FLOAT_EQ(animation.Events[0].Parameters[0].FloatValue, 25.0f);
+	EXPECT_EQ(animation.Events[0].Parameters[1].StringValue, "Weapon");
 
 	EXPECT_EQ(animation.Events[1].Name, "Footstep");
 	EXPECT_FLOAT_EQ(animation.Events[1].Time, 0.6f);

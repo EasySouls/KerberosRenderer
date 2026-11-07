@@ -623,6 +623,26 @@ namespace Kerberos
 		if (!event.Clip || !event.Event)
 			return false;
 
+		// The event and its parameters live in the clip for the duration of this synchronous call,
+		// so the raw pointers remain valid while the managed side marshals them.
+		std::vector<ScriptAnimationEventParameterPayload> parameterPayloads;
+		parameterPayloads.reserve(event.Event->Parameters.size());
+		for (const AnimationEventParameter& parameter : event.Event->Parameters)
+		{
+			parameterPayloads.push_back({
+				.Name = parameter.Name.c_str(),
+				.StringValue = parameter.StringValue.c_str(),
+				.AssetValue = parameter.AssetValue,
+				.VectorX = parameter.VectorValue.x,
+				.VectorY = parameter.VectorValue.y,
+				.VectorZ = parameter.VectorValue.z,
+				.FloatValue = parameter.FloatValue,
+				.IntValue = parameter.IntValue,
+				.Type = static_cast<uint8_t>(parameter.Type),
+				.BoolValue = parameter.BoolValue ? static_cast<uint8_t>(1) : static_cast<uint8_t>(0),
+			});
+		}
+
 		const ScriptAnimationEventPayload payload{
 			.Name = event.Event->Name.c_str(),
 			.Payload = event.Event->Payload.c_str(),
@@ -632,6 +652,8 @@ namespace Kerberos
 			.Weight = event.Weight,
 			.Phase = static_cast<uint8_t>(event.Phase),
 			.Flags = event.Event->Flags,
+			.Parameters = parameterPayloads.empty() ? nullptr : parameterPayloads.data(),
+			.ParameterCount = static_cast<uint32_t>(parameterPayloads.size()),
 		};
 
 		return s_ScriptData->ManagedInvokeOnAnimationEvent(entityID, className.c_str(), &payload) != 0;

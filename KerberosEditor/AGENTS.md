@@ -94,6 +94,23 @@ Editor windows live mainly under
   authored setup only; `Scene::RagdollSystem` owns the runtime bodies,
   constraints, offsets, and blend state. Authored prefab templates do not carry
   the Ragdoll component yet, so add it after instantiation or from C#.
+- `AnimationEditorPanel`: opened from `View > Animation Editor`; it resolves the
+  animator from the selected entity, a parent, or the skeleton-linked animator.
+  Its timeline shows one lane per event name plus a marker lane, supports
+  scrubbing/zooming, point events as draggable diamonds, duration events as
+  draggable/resizable bars, and a marker lane. The event inspector edits the
+  generic name, time, duration, payload, trigger weight, flags, and a list of
+  named typed parameters (`Bool`, `Int`, `Float`, `Vector3`, `String`, `Asset`)
+  with an asset picker for asset values. Add/remove controls cover events and
+  markers. Save/Revert writes the source `.meta` through
+  `EditorAssetManager::SetAnimationClipMeta` and reimports; editing is disabled
+  outside Edit mode. There is no timeline undo yet, so Revert reloads the source.
+  Events are delivered to C# through `OnAnimationEvent`; the managed
+  `AnimationEvent` exposes typed parameter getters. Weapon-style hitboxes can be
+  queried from C# with `Physics.OverlapBox(Entity source, localCenter,
+  localHalfExtents, ignore)` or `Physics.OverlapSphere`; the entity-relative
+  overload uses the entity's world transform, so a socket-driven weapon is
+  enough and no dedicated hitbox component is required.
 - `InspectorPanel`: the unified right-side "Properties" window. It shows entity
   components when an entity is selected and asset import options when a source
   asset is selected in `AssetsPanel` (asset selection takes display precedence).
@@ -269,11 +286,12 @@ Play/Simulate update order is transforms → animation clocks/pose → events �
 scripts → `RagdollSystem::PreparePhysics` → `PhysicsSystem::Update` →
 `RagdollSystem::ReadPhysicsPose` → `AnimationRuntime::FinalizePose` → queue
 render; the renderer only uploads the already-final skin matrices and joint
-entities/sockets are published from the ragdoll-blended `FinalPose`. Animation markers/events are stored per source in
-the `.meta` (`AnimationClips`, schema 3); `EditorAssetManager` exposes
+entities/sockets are published from the ragdoll-blended `FinalPose`. Animation
+markers/events are stored per source in the `.meta` (`AnimationClips`, schema 3),
+including generic typed event parameters; `EditorAssetManager` exposes
 `GetAnimationClipMeta`/`SetAnimationClipMeta`, and applying changes persists the
-metadata and force-reimports the source. There is no marker/event timeline UI
-yet. Play evaluates animation again after scripts when
+metadata and force-reimports the source. The `AnimationEditorPanel` is the
+timeline UI for this metadata. Play evaluates animation again after scripts when
 playback state changed so C# controls (including `CrossFade`) apply in the same
 frame; the fade clock advances on the following update. Edit and Simulate
 render through the editor camera; Play renders through the runtime scene's

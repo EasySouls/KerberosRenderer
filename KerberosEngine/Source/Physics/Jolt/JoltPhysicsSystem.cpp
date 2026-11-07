@@ -28,8 +28,12 @@
 #include "Jolt/Physics/Collision/Shape/RotatedTranslatedShape.h"
 #include "Jolt/Physics/Collision/RayCast.h"
 #include "Jolt/Physics/Collision/CastResult.h"
+#include <Jolt/Physics/Collision/CollideShape.h>
+#include <Jolt/Physics/Collision/CollisionCollectorImpl.h>
 #include <Jolt/Physics/Collision/GroupFilterTable.h>
 #include <Jolt/Physics/Constraints/SwingTwistConstraint.h>
+
+#include <unordered_set>
 
 
 import Kerberos;
@@ -69,6 +73,50 @@ namespace Kerberos
 		glm::vec3 ToGlmVec3(const JPH::Vec3& value)
 		{
 			return { value.GetX(), value.GetY(), value.GetZ() };
+		}
+
+		std::vector<OverlapHit> CollectShapeOverlaps(
+			const JPH::PhysicsSystem& system,
+			const JPH::Shape& shape,
+			const JPH::RMat44& transform,
+			const std::unordered_map<uint32_t, UUID>& bodyToEntity)
+		{
+			JPH::CollideShapeSettings settings;
+			settings.mMaxSeparationDistance = 0.0f;
+
+			JPH::AllHitCollisionCollector<JPH::CollideShapeCollector> collector;
+			system.GetNarrowPhaseQuery().CollideShape(
+				&shape,
+				JPH::Vec3::sOne(),
+				transform,
+				settings,
+				JPH::RVec3::sZero(),
+				collector);
+			collector.Sort();
+
+			std::vector<OverlapHit> results;
+			std::unordered_set<UUID> seen;
+			results.reserve(collector.mHits.size());
+
+			for (const JPH::CollideShapeResult& hit : collector.mHits)
+			{
+				const auto entityIt = bodyToEntity.find(hit.mBodyID2.GetIndex());
+				if (entityIt == bodyToEntity.end() || !entityIt->second.IsValid())
+					continue;
+
+				if (!seen.insert(entityIt->second).second)
+					continue;
+
+				OverlapHit result;
+				result.EntityID = entityIt->second;
+				result.Point = ToGlmVec3(hit.mContactPointOn2);
+				result.Normal = hit.mPenetrationAxis.LengthSq() > 1.0e-8f
+					? ToGlmVec3(-hit.mPenetrationAxis.Normalized())
+					: glm::vec3(0.0f);
+				results.push_back(result);
+			}
+
+			return results;
 		}
 	}
 
@@ -510,6 +558,37 @@ namespace Kerberos
 		}
 
 		return false;
+	}
+
+	std::vector<OverlapHit> JoltPhysicsSystem::OverlapBox(const glm::vec3& center,
+	                                                      const glm::quat& rotation,
+	                                                      const glm::vec3& halfExtents) const
+	{
+		KBR_TRACY_FUNCTION();
+
+		if (!m_JoltSystem)
+			return {};
+
+		const glm::vec3 safeHalfExtents = glm::max(halfExtents, glm::vec3(1.0e-4f));
+		const JPH::BoxShape shape(ToJoltVec3(safeHalfExtents));
+		const JPH::RMat44 transform = JPH::RMat44::sRotationTranslation(
+			ToJoltQuat(rotation),
+			ToJoltRVec3(center));
+
+		return CollectShapeOverlaps(*m_JoltSystem, shape, transform, m_BodyIDToEntityID);
+	}
+
+	std::vector<OverlapHit> JoltPhysicsSystem::OverlapSphere(const glm::vec3& center, const float radius) const
+	{
+		KBR_TRACY_FUNCTION();
+
+		if (!m_JoltSystem || !std::isfinite(radius) || radius <= 0.0f)
+			return {};
+
+		const JPH::SphereShape shape(radius);
+		const JPH::RMat44 transform = JPH::RMat44::sTranslation(ToJoltRVec3(center));
+
+		return CollectShapeOverlaps(*m_JoltSystem, shape, transform, m_BodyIDToEntityID);
 	}
 
     void JoltPhysicsSystem::SyncKinematicBodies(const float dt) const
