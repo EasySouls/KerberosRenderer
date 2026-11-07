@@ -12224,64 +12224,199 @@
 	],
 	"materials":[
 		{
-			"doubleSided":true,
-			"name":"Skin"
+			"name":"Skin",
+			"pbrMetallicRoughness":{
+				"baseColorFactor":[
+					0.9403908252716064,
+					0.6221444606781006,
+					0.36940139532089233,
+					1
+				],
+				"metallicFactor":0,
+				"roughnessFactor":0.5
+			}
 		},
 		{
-			"doubleSided":true,
-			"name":"Metal"
+			"name":"Metal",
+			"pbrMetallicRoughness":{
+				"baseColorFactor":[
+					0.17848047614097595,
+					0.1498091071844101,
+					0.30319738388061523,
+					1
+				],
+				"metallicFactor":0,
+				"roughnessFactor":0.5
+			}
 		},
 		{
-			"doubleSided":true,
-			"name":"Wood"
+			"name":"Wood",
+			"pbrMetallicRoughness":{
+				"baseColorFactor":[
+					0.18446825444698334,
+					0.07190367579460144,
+					0.050608109682798386,
+					1
+				],
+				"metallicFactor":0,
+				"roughnessFactor":0.5
+			}
 		},
 		{
-			"doubleSided":true,
-			"name":"Emblem"
+			"name":"Emblem",
+			"pbrMetallicRoughness":{
+				"baseColorFactor":[
+					0.8000000715255737,
+					0.10603854805231094,
+					0.14509814977645874,
+					1
+				],
+				"metallicFactor":0,
+				"roughnessFactor":0.5
+			}
 		},
 		{
-			"doubleSided":true,
-			"name":"Metal Dark"
+			"name":"Metal Dark",
+			"pbrMetallicRoughness":{
+				"baseColorFactor":[
+					0.09694276750087738,
+					0.07576285302639008,
+					0.15232475101947784,
+					1
+				],
+				"metallicFactor":0,
+				"roughnessFactor":0.5
+			}
 		},
 		{
-			"doubleSided":true,
-			"name":"Blade"
+			"name":"Blade",
+			"pbrMetallicRoughness":{
+				"baseColorFactor":[
+					0.5704701542854309,
+					0.5704701542854309,
+					0.5704701542854309,
+					1
+				],
+				"metallicFactor":0,
+				"roughnessFactor":0.5
+			}
 		},
 		{
-			"doubleSided":true,
-			"name":"Blade highlight"
+			"name":"Blade highlight",
+			"pbrMetallicRoughness":{
+				"baseColorFactor":[
+					1,
+					1,
+					1,
+					1
+				],
+				"metallicFactor":0,
+				"roughnessFactor":0.5
+			}
 		},
 		{
-			"doubleSided":true,
-			"name":"Hair"
+			"name":"Hair",
+			"pbrMetallicRoughness":{
+				"baseColorFactor":[
+					0.07657985389232635,
+					0.02258014678955078,
+					0.014741677790880203,
+					1
+				],
+				"metallicFactor":0,
+				"roughnessFactor":0.5
+			}
 		},
 		{
-			"doubleSided":true,
-			"name":"Metal.002"
+			"name":"Metal.002",
+			"pbrMetallicRoughness":{
+				"baseColorFactor":[
+					0.14808420836925507,
+					0.11781950294971466,
+					0.28100818395614624,
+					1
+				],
+				"metallicFactor":0,
+				"roughnessFactor":0.5
+			}
 		},
 		{
-			"doubleSided":true,
-			"name":"Metal_dark"
+			"name":"Metal_dark",
+			"pbrMetallicRoughness":{
+				"baseColorFactor":[
+					0.09281142055988312,
+					0.07434140890836716,
+					0.17335422337055206,
+					1
+				],
+				"metallicFactor":0,
+				"roughnessFactor":0.5
+			}
 		},
 		{
-			"doubleSided":true,
-			"name":"Pants.001"
+			"name":"Pants.001",
+			"pbrMetallicRoughness":{
+				"baseColorFactor":[
+					0.13758356869220734,
+					0.09200114756822586,
+					0.041248589754104614,
+					1
+				],
+				"metallicFactor":0,
+				"roughnessFactor":0.5
+			}
 		},
 		{
-			"doubleSided":true,
-			"name":"Underclothes.001"
+			"name":"Underclothes.001",
+			"pbrMetallicRoughness":{
+				"baseColorFactor":[
+					0.05221749469637871,
+					0.05221749469637871,
+					0.05221749469637871,
+					1
+				],
+				"metallicFactor":0,
+				"roughnessFactor":0.5
+			}
 		},
 		{
-			"doubleSided":true,
-			"name":"Black"
+			"name":"Black",
+			"pbrMetallicRoughness":{
+				"baseColorFactor":[
+					0.01108737662434578,
+					0.01108737662434578,
+					0.01108737662434578,
+					1
+				],
+				"metallicFactor":0,
+				"roughnessFactor":0.5
+			}
 		},
 		{
-			"doubleSided":true,
-			"name":"Shirt"
+			"name":"Shirt",
+			"pbrMetallicRoughness":{
+				"baseColorFactor":[
+					0.3185385465621948,
+					0.1013839840888977,
+					0.09687062352895737,
+					1
+				],
+				"metallicFactor":0,
+				"roughnessFactor":0.5
+			}
 		},
 		{
-			"doubleSided":true,
-			"name":"Shoe"
+			"name":"Shoe",
+			"pbrMetallicRoughness":{
+				"baseColorFactor":[
+					0.06459086388349533,
+					0.047014184296131134,
+					0.06997798383235931,
+					1
+				],
+				"metallicFactor":0,
+				"roughnessFactor":0.5
+			}
 		}
 	],
 	"meshes":[
