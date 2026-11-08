@@ -30,6 +30,9 @@ enum class TaskStatus : std::uint8_t
 
 class IAICondition
 {
+protected:
+    IAICondition() = default;
+
 public:
     virtual ~IAICondition() = default;
 
@@ -38,7 +41,7 @@ public:
     IAICondition& operator=(const IAICondition& other) = default;
     IAICondition& operator=(IAICondition&& other) noexcept = default;
 
-    virtual bool Test(const AIContext& context) const = 0;
+    virtual bool TestCondition(const AIContext& context) const = 0;
 };
 
 class IAITask

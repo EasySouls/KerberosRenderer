@@ -55,7 +55,7 @@ void AISystem::Update(const float dt) const
                 bool conditionsMet = true;
                 for (const Ref<IAICondition>& condition : transition.Conditions)
                 {
-                    if (!condition->Test(ctx))
+                    if (!condition->TestCondition(ctx))
                     {
                         conditionsMet = false;
                         break;

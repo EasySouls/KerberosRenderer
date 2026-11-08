@@ -138,6 +138,8 @@ namespace Kerberos
 		/// while resetting transient runtime state.
 		static Ref<Scene> Copy(const Ref<Scene>& other);
 
+		const entt::registry& GetRegistry() const { return m_Registry; }
+
 		static constexpr AssetType Type = AssetType::Scene;
 
 		AssetType GetType() override
