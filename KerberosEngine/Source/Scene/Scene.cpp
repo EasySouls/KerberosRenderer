@@ -7,6 +7,7 @@
 #include "Components/AudioComponents.hpp"
 #include "Components/ParticleComponents.hpp"
 #include "Components/AnimationComponents.hpp"
+#include "Components/AIComponents.hpp"
 #include "Application.hpp"
 #include "Assets/AssetManager.hpp"
 #include "Assets/Prefab.hpp"
@@ -30,6 +31,7 @@ namespace Kerberos
 		: m_PhysicsSystem(new JoltPhysicsSystem())
 		, m_AnimationRuntime(*this)
 		, m_RagdollSystem(*this)
+		, m_AISystem(*this)
 	{
 		m_Registry = entt::basic_registry();
 	}
@@ -78,11 +80,15 @@ namespace Kerberos
 
 		for (const Entity entity : scriptEntities)
 			ScriptEngine::OnCreateEntity(entity);
+
+		m_AISystem.OnStart();
 	}
 
 	void Scene::OnRuntimeStop()
 	{
 		m_IsRunning = false;
+
+		m_AISystem.OnStop();
 
 		StopAnimators();
 		m_RagdollSystem.Cleanup();
@@ -199,6 +205,8 @@ namespace Kerberos
 			// A post-script clip/skeleton change can close an active duration window. Deliver the
 			// resulting End events before physics so gameplay resources are released this frame.
 			DispatchAnimationEvents();
+
+			m_AISystem.Update(ts);
 
 			// Ragdoll proxies follow the post-script animation pose, then physics runs, then the
 			// simulated pose is blended back into the authoritative FinalPose before finalization.
@@ -591,6 +599,26 @@ Entity Scene::InstantiatePrefab(const AssetHandle prefabHandle, const std::strin
 		{
 			newEntity.AddComponent<RagdollComponent>(entity.GetComponent<RagdollComponent>());
 		}
+        if (entity.HasComponent<AIBlackboardComponent>())
+        {
+            newEntity.AddComponent<AIBlackboardComponent>(entity.GetComponent<AIBlackboardComponent>());
+        }
+        if (entity.HasComponent<AIStateMachineComponent>())
+        {
+            newEntity.AddComponent<AIStateMachineComponent>(entity.GetComponent<AIStateMachineComponent>());
+        }
+        if (entity.HasComponent<AIControllerComponent>())
+        {
+            newEntity.AddComponent<AIControllerComponent>(entity.GetComponent<AIControllerComponent>());
+        }
+        if (entity.HasComponent<AIPerceptionComponent>())
+        {
+            newEntity.AddComponent<AIPerceptionComponent>(entity.GetComponent<AIPerceptionComponent>());
+        }
+        if (entity.HasComponent<AITargetableComponent>())
+        {
+            newEntity.AddComponent<AITargetableComponent>(entity.GetComponent<AITargetableComponent>());
+        }
 
 		if (duplicateChildren)
 		{
@@ -801,6 +829,16 @@ Entity Scene::InstantiatePrefab(const AssetHandle prefabHandle, const std::strin
         return m_RagdollSystem;
     }
 
+    AISystem& Scene::GetAISystem()
+    {
+        return m_AISystem;
+    }
+
+    const AISystem& Scene::GetAISystem() const
+    {
+        return m_AISystem;
+    }
+
     void Scene::DispatchAnimationEvents()
     {
         if (!m_IsRunning)
@@ -931,6 +969,17 @@ Entity Scene::InstantiatePrefab(const AssetHandle prefabHandle, const std::strin
 			newEntity.AddComponent<SocketComponent>(sourceRegistry.get<SocketComponent>(sourceEntity));
 		if (sourceRegistry.all_of<JointComponent>(sourceEntity))
 			newEntity.AddComponent<JointComponent>(sourceRegistry.get<JointComponent>(sourceEntity));
+
+		if (sourceRegistry.all_of<AIBlackboardComponent>(sourceEntity))
+            newEntity.AddComponent<AIBlackboardComponent>(sourceRegistry.get<AIBlackboardComponent>(sourceEntity));
+        if (sourceRegistry.all_of<AIStateMachineComponent>(sourceEntity))
+            newEntity.AddComponent<AIStateMachineComponent>(sourceRegistry.get<AIStateMachineComponent>(sourceEntity));
+        if (sourceRegistry.all_of<AIControllerComponent>(sourceEntity))
+            newEntity.AddComponent<AIControllerComponent>(sourceRegistry.get<AIControllerComponent>(sourceEntity));
+        if (sourceRegistry.all_of<AIPerceptionComponent>(sourceEntity))
+            newEntity.AddComponent<AIPerceptionComponent>(sourceRegistry.get<AIPerceptionComponent>(sourceEntity));
+        if (sourceRegistry.all_of<AITargetableComponent>(sourceEntity))
+            newEntity.AddComponent<AITargetableComponent>(sourceRegistry.get<AITargetableComponent>(sourceEntity));
 
 		/// Set parent if this is a child entity
 		if (parentNewEntity != entt::null)
@@ -1486,6 +1535,12 @@ Entity Scene::InstantiatePrefab(const AssetHandle prefabHandle, const std::strin
 	void Scene::OnComponentAdded<ParticleEmitterComponent>(Entity, ParticleEmitterComponent&)
 	{
 	}
+
+	template <> void Scene::OnComponentAdded<AIBlackboardComponent>(Entity, AIBlackboardComponent&) {}
+    template <> void Scene::OnComponentAdded<AIStateMachineComponent>(Entity, AIStateMachineComponent&) {}
+	template <> void Scene::OnComponentAdded<AIControllerComponent>(Entity, AIControllerComponent&) {}
+    template <> void Scene::OnComponentAdded<AIPerceptionComponent>(Entity, AIPerceptionComponent&) {}
+	template <> void Scene::OnComponentAdded<AITargetableComponent>(Entity, AITargetableComponent&) {}
 
 #pragma endregion
 }
