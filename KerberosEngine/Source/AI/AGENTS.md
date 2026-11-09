@@ -18,16 +18,33 @@ blackboard:
   transitions). Trees are immutable while entities are running.
 - `AIStateTreeRegistry` maps names to `Ref<AIStateTree>` with an origin
   (`BuiltIn`, `Script`, `Asset`). Registering an existing name replaces it.
-  Script-owned trees are cleared on project open and script-assembly reload.
+  Script-owned trees are cleared on project open and script-assembly reload;
+  asset-owned trees have their own `ClearAssetTrees` path. Entries registered
+  from a document also retain the authored `AIStateTreeDocument`, exposed via
+  `GetDocument`; `GetOrigin` reports the registration origin.
+- `AIStateTreeDocument` (`AIStateTreeDocument.hpp`) is the editable source
+  representation: named states with task descriptors, ordered transitions with
+  condition descriptors, entry state, and optional graph `EditorPosition`.
+  `AIStateTreeSerializer` parses/serializes it as YAML or JSON and preserves
+  parameter types against the registered node schema (for example an emitted
+  `12` is restored as a float for a `Float` parameter). Unknown keys are
+  ignored so older and C#-authored documents stay loadable.
+- `AIStateTreeRegistry::CompileDocument` turns a document into an `AIStateTree`;
+  `RegisterFromDocument` is the parse-compile-register path retained for C++/C#
+  callers. The registry key is authoritative and is written back into the
+  document name on registration.
 - `AINodeFactory` maps string type names to task/condition factories. This is
   the extension point for code-registered nodes. Standard types:
   `ChaseTarget`, `FaceTarget`, `Stop`, `Wait`, `SetBlackboardBool`,
   `AttackTarget`, `DistanceToTarget`, `BlackboardBool`, `TimeInState`,
-  `TargetVisible`, and `TargetExists`.
-- `AIStateTreeRegistry::RegisterFromDocument` parses JSON/YAML documents into
-  trees. State IDs are hashed from `Name`; transitions target names. The parser
-  rejects duplicate states, unknown entry states, dangling transitions,
-  unknown node types, and invalid parameters.
+  `TargetVisible`, and `TargetExists`. Each registration also carries optional
+  authoring metadata (`AINodeTypeInfo` + `AINodeParamDef`) that tools query with
+  `GetAINodeTypes`/`FindAINodeType`. `CreateTask`/`CreateCondition` stamp the
+  registered type name onto `IAITask::GetDebugType`/`IAICondition::GetDebugType`
+  for diagnostics.
+- `AIStateTreeRegistry::RegisterFromDocument` rejects duplicate states, unknown
+  entry states, dangling transitions, unknown node types, and invalid
+  parameters.
 
 `AISystem` is owned by `Scene`, is a `friend` of `Scene`, and runs
 
@@ -131,13 +148,16 @@ Build and run the AI tests:
 ```powershell
 cmake --preset vs2026
 cmake --build --preset vs2026-debug --target KerberosEngineTests
-.\out\build\vs2026-debug\Tests\Debug\KerberosEngineTests.exe --gtest_filter=AI*
+.\out\build\vs2026\Tests\Debug\KerberosEngineTests.exe --gtest_filter=AI*
 ```
 
-- Reconfigure CMake after adding new `.cpp` files; engine sources are globbed.
-- Tests cover hashing, typed blackboards, document parsing/rejection, entry and
-  transitions, per-entity task instances, movement/facing, perception
-  acquire/lose, and subtree serialization.
+- Reconfigure CMake after adding new `.cpp` files; engine sources are globbed,
+  but new test files must also be added to `Tests/CMakeLists.txt`.
+- Tests cover hashing, typed blackboards, document parse/serialize round-trips
+  (including typed parameters and editor positions), registry document/origin
+  retention, compile rejection, node schema metadata, task/condition debug type
+  stamps, entry and transitions, per-entity task instances, movement/facing,
+  perception acquire/lose, and subtree serialization.
 - Manual Play validation: add an AI Agent + Targetable target, assign a tree,
   verify transitions, movement, target loss, pause, save/load, duplicate, and a
   C#-registered tree after hot reload.

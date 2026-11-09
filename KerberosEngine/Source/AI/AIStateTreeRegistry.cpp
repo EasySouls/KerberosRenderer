@@ -1,17 +1,14 @@
 #include "AIStateTreeRegistry.hpp"
 
+#include "AIStateTreeSerializer.hpp"
 #include "AINodeFactory.hpp"
 
-#include <yaml-cpp/yaml.h>
-
 #include <algorithm>
-#include <cctype>
-#include <cerrno>
-#include <charconv>
-#include <cstdlib>
+#include <optional>
 #include <ranges>
 #include <string>
 #include <unordered_map>
+#include <utility>
 
 import Kerberos;
 
@@ -23,6 +20,7 @@ struct RegistryEntry
 {
     Ref<AIStateTree> Tree;
     AIStateTreeOrigin Origin = AIStateTreeOrigin::BuiltIn;
+    std::optional<AIStateTreeDocument> Document;
 };
 
 std::unordered_map<std::string, RegistryEntry>& Trees()
@@ -31,162 +29,16 @@ std::unordered_map<std::string, RegistryEntry>& Trees()
     return trees;
 }
 
-std::string ToLower(std::string value)
-{
-    std::ranges::transform(value, value.begin(), [](const unsigned char c) {
-        return static_cast<char>(std::tolower(c));
-    });
-    return value;
-}
-
-bool TryParseInt(const std::string& text, std::int64_t& out)
-{
-    if (text.empty())
-        return false;
-
-    const char* begin = text.data();
-    const char* end = begin + text.size();
-    const auto result = std::from_chars(begin, end, out);
-    return result.ec == std::errc() && result.ptr == end;
-}
-
-bool TryParseFloat(const std::string& text, double& out)
-{
-    if (text.empty())
-        return false;
-
-    errno = 0;
-    char* end = nullptr;
-    const double value = std::strtod(text.c_str(), &end);
-    if (end != text.c_str() + text.size() || errno == ERANGE)
-        return false;
-
-    out = value;
-    return true;
-}
-
-bool ParseParam(const YAML::Node& node, AINodeParam& out, std::string& error)
-{
-    if (node.IsSequence())
-    {
-        if (node.size() != 3)
-        {
-            error = "Vector parameters must contain exactly three numbers.";
-            return false;
-        }
-
-        glm::vec3 vector(0.0f);
-        float* components[3] = { &vector.x, &vector.y, &vector.z };
-        for (std::size_t i = 0; i < 3; ++i)
-        {
-            if (!node[i].IsScalar())
-            {
-                error = "Vector parameters must contain exactly three numbers.";
-                return false;
-            }
-
-            double value = 0.0;
-            if (!TryParseFloat(node[i].as<std::string>(), value))
-            {
-                error = "Vector parameters must contain exactly three numbers.";
-                return false;
-            }
-            *components[i] = static_cast<float>(value);
-        }
-
-        out = vector;
-        return true;
-    }
-
-    if (!node.IsScalar())
-    {
-        error = "Parameters must be scalars or three-component vectors.";
-        return false;
-    }
-
-    const std::string text = node.as<std::string>();
-    const std::string lower = ToLower(text);
-
-    if (lower == "true")
-    {
-        out = true;
-        return true;
-    }
-
-    if (lower == "false")
-    {
-        out = false;
-        return true;
-    }
-
-    std::int64_t intValue = 0;
-    if (TryParseInt(text, intValue))
-    {
-        out = intValue;
-        return true;
-    }
-
-    double floatValue = 0.0;
-    if (TryParseFloat(text, floatValue))
-    {
-        out = floatValue;
-        return true;
-    }
-
-    out = text;
-    return true;
-}
-
-bool ParseNode(const YAML::Node& node, AINodeDesc& out, std::string& error)
-{
-    if (!node.IsMap())
-    {
-        error = "Each task/condition must be a map with a 'Type' field.";
-        return false;
-    }
-
-    const YAML::Node typeNode = node["Type"];
-    if (!typeNode || !typeNode.IsScalar())
-    {
-        error = "Each task/condition must have a scalar 'Type' field.";
-        return false;
-    }
-
-    out.Type = typeNode.as<std::string>();
-    if (out.Type.empty())
-    {
-        error = "Task/condition 'Type' must not be empty.";
-        return false;
-    }
-
-    const YAML::Node paramsNode = node["Params"];
-    if (paramsNode && paramsNode.IsMap())
-    {
-        for (const auto& param : paramsNode)
-        {
-            const std::string key = param.first.as<std::string>();
-            AINodeParam value;
-            if (!ParseParam(param.second, value, error))
-            {
-                error = "Parameter '" + key + "': " + error;
-                return false;
-            }
-            out.Params.emplace(key, std::move(value));
-        }
-    }
-
-    return true;
-}
-
 void SetError(std::string* outError, const std::string& error)
 {
     if (outError)
         *outError = error;
 }
 
-}
-
-bool AIStateTreeRegistry::Register(std::string name, Ref<AIStateTree> tree, const AIStateTreeOrigin origin)
+bool Store(std::string name,
+           Ref<AIStateTree> tree,
+           const AIStateTreeOrigin origin,
+           std::optional<AIStateTreeDocument> document)
 {
     if (name.empty() || !tree)
     {
@@ -194,8 +46,30 @@ bool AIStateTreeRegistry::Register(std::string name, Ref<AIStateTree> tree, cons
         return false;
     }
 
-    Trees()[std::move(name)] = RegistryEntry{ .Tree = std::move(tree), .Origin = origin };
+    Trees()[std::move(name)] = RegistryEntry{
+        .Tree = std::move(tree),
+        .Origin = origin,
+        .Document = std::move(document)
+    };
     return true;
+}
+
+} // namespace
+
+bool AIStateTreeRegistry::Register(std::string name, Ref<AIStateTree> tree, const AIStateTreeOrigin origin)
+{
+    return Store(std::move(name), std::move(tree), origin, std::nullopt);
+}
+
+bool AIStateTreeRegistry::RegisterDocument(std::string name,
+                                           Ref<AIStateTree> tree,
+                                           const AIStateTreeOrigin origin,
+                                           AIStateTreeDocument document)
+{
+    // Keep the stored document's name aligned with its registry key so editing
+    // and saving it back cannot silently rename the tree.
+    document.Name = name;
+    return Store(std::move(name), std::move(tree), origin, std::move(document));
 }
 
 bool AIStateTreeRegistry::RegisterFromDocument(const std::string& name,
@@ -214,210 +88,148 @@ bool AIStateTreeRegistry::RegisterFromDocument(const std::string& name,
         return false;
     }
 
-    YAML::Node documentNode;
-    try
+    AIStateTreeDocument document;
+    if (!AIStateTreeSerializer::Parse(json, document, &error))
     {
-        documentNode = YAML::Load(std::string(json));
-    }
-    catch (const YAML::Exception& exception)
-    {
-        error = "Failed to parse state tree '" + name + "': " + exception.what();
-        SetError(outError, error);
-        Log::CoreError("{}", error);
-        return false;
-    }
-    catch (const std::exception& exception)
-    {
-        error = "Failed to parse state tree '" + name + "': " + exception.what();
+        error = "Failed to parse state tree '" + name + "': " + error;
         SetError(outError, error);
         Log::CoreError("{}", error);
         return false;
     }
 
-    try
+    // The registry key is authoritative for C++/C# registration. Keep the
+    // document name in sync so saving it back produces the same named tree.
+    document.Name = name;
+
+    Ref<AIStateTree> tree = CompileDocument(document, &error);
+    if (!tree)
     {
-        if (!documentNode.IsMap())
+        error = "Failed to compile state tree '" + name + "': " + error;
+        SetError(outError, error);
+        Log::CoreError("{}", error);
+        return false;
+    }
+
+    return RegisterDocument(name, std::move(tree), origin, std::move(document));
+}
+
+Ref<AIStateTree> AIStateTreeRegistry::CompileDocument(const AIStateTreeDocument& document,
+                                                      std::string* outError)
+{
+    std::string error;
+    if (document.Name.empty())
+    {
+        error = "State tree name must not be empty.";
+        SetError(outError, error);
+        return nullptr;
+    }
+
+    if (document.States.empty())
+    {
+        error = "State tree '" + document.Name + "' must contain at least one state.";
+        SetError(outError, error);
+        return nullptr;
+    }
+
+    if (document.EntryState.empty())
+    {
+        error = "State tree '" + document.Name + "' must have a non-empty entry state.";
+        SetError(outError, error);
+        return nullptr;
+    }
+
+    Ref<AIStateTree> tree = CreateRef<AIStateTree>(document.Name);
+    std::unordered_map<std::string, StateID> idsByName;
+    std::unordered_map<StateID, AIStateDefinition*> definitions;
+
+    for (const AIDocumentState& state : document.States)
+    {
+        if (state.Name.empty())
         {
-            error = "State tree '" + name + "' must be a map.";
+            error = "State tree '" + document.Name + "' contains a state with an empty name.";
             SetError(outError, error);
-            Log::CoreError("{}", error);
-            return false;
+            return nullptr;
         }
 
-        const YAML::Node entryNode = documentNode["Entry"];
-        const YAML::Node statesNode = documentNode["States"];
-
-        if (!entryNode || !entryNode.IsScalar())
+        if (idsByName.contains(state.Name))
         {
-            error = "State tree '" + name + "' must have a scalar 'Entry' field.";
+            error = "Duplicate state '" + state.Name + "'.";
             SetError(outError, error);
-            Log::CoreError("{}", error);
-            return false;
+            return nullptr;
         }
 
-        if (!statesNode || !statesNode.IsSequence() || statesNode.size() == 0)
+        const StateID id = HashState(state.Name);
+        if (tree->HasState(id))
         {
-            error = "State tree '" + name + "' must have a non-empty 'States' sequence.";
+            error = "State hash collision for '" + state.Name + "'.";
             SetError(outError, error);
-            Log::CoreError("{}", error);
-            return false;
+            return nullptr;
         }
 
-        Ref<AIStateTree> tree = CreateRef<AIStateTree>(name);
-        std::unordered_map<std::string, StateID> idsByName;
-        std::unordered_map<StateID, AIStateDefinition*> definitions;
+        AIStateDefinition& definition = tree->AddState(id, state.Name);
+        idsByName.emplace(state.Name, id);
+        definitions.emplace(id, &definition);
+    }
 
-        for (const auto& stateNode : statesNode)
+    for (const AIDocumentState& state : document.States)
+    {
+        const StateID stateID = idsByName.at(state.Name);
+        AIStateDefinition& definition = *definitions.at(stateID);
+
+        for (const AINodeDesc& desc : state.Tasks)
         {
-            if (!stateNode.IsMap())
+            Ref<IAITask> task = CreateTask(desc);
+            if (!task)
             {
-                error = "Every state must be a map.";
+                error = "State '" + state.Name + "': failed to create task '" + desc.Type + "'.";
                 SetError(outError, error);
-                Log::CoreError("State tree '{}': {}", name, error);
-                return false;
+                return nullptr;
             }
-
-            const std::string stateName = stateNode["Name"].as<std::string>("");
-            if (stateName.empty())
-            {
-                error = "Every state must have a non-empty 'Name'.";
-                SetError(outError, error);
-                Log::CoreError("State tree '{}': {}", name, error);
-                return false;
-            }
-
-            if (idsByName.contains(stateName))
-            {
-                error = "Duplicate state '" + stateName + "'.";
-                SetError(outError, error);
-                Log::CoreError("State tree '{}': {}", name, error);
-                return false;
-            }
-
-            const StateID id = HashState(stateName);
-            if (tree->HasState(id))
-            {
-                error = "State hash collision for '" + stateName + "'.";
-                SetError(outError, error);
-                Log::CoreError("State tree '{}': {}", name, error);
-                return false;
-            }
-
-            AIStateDefinition& definition = tree->AddState(id, stateName);
-            idsByName.emplace(stateName, id);
-            definitions.emplace(id, &definition);
+            definition.Tasks.push_back(std::move(task));
         }
 
-        for (const auto& stateNode : statesNode)
+        for (const AIDocumentTransition& docTransition : state.Transitions)
         {
-            const std::string stateName = stateNode["Name"].as<std::string>();
-            const StateID stateID = idsByName.at(stateName);
-            AIStateDefinition& definition = *definitions.at(stateID);
-
-            const YAML::Node tasksNode = stateNode["Tasks"];
-            if (tasksNode && tasksNode.IsSequence())
+            if (!idsByName.contains(docTransition.TargetState))
             {
-                for (const auto& taskNode : tasksNode)
+                error = "State '" + state.Name + "': transition target '" +
+                    docTransition.TargetState + "' does not exist.";
+                SetError(outError, error);
+                return nullptr;
+            }
+
+            AITransition transition;
+            transition.TargetState = idsByName.at(docTransition.TargetState);
+            transition.DebugName = docTransition.Name.empty()
+                ? state.Name + " -> " + docTransition.TargetState
+                : docTransition.Name;
+
+            for (const AINodeDesc& desc : docTransition.Conditions)
+            {
+                Ref<IAICondition> condition = CreateCondition(desc);
+                if (!condition)
                 {
-                    AINodeDesc desc;
-                    if (!ParseNode(taskNode, desc, error))
-                    {
-                        SetError(outError, error);
-                        Log::CoreError("State tree '{}', state '{}': {}", name, stateName, error);
-                        return false;
-                    }
-
-                    Ref<IAITask> task = CreateTask(desc);
-                    if (!task)
-                    {
-                        error = "Failed to create task '" + desc.Type + "'.";
-                        SetError(outError, error);
-                        Log::CoreError("State tree '{}', state '{}': {}", name, stateName, error);
-                        return false;
-                    }
-                    definition.Tasks.push_back(std::move(task));
+                    error = "State '" + state.Name + "': failed to create condition '" +
+                        desc.Type + "'.";
+                    SetError(outError, error);
+                    return nullptr;
                 }
+                transition.Conditions.push_back(std::move(condition));
             }
 
-            const YAML::Node transitionsNode = stateNode["Transitions"];
-            if (transitionsNode && transitionsNode.IsSequence())
-            {
-                for (const auto& transitionNode : transitionsNode)
-                {
-                    if (!transitionNode.IsMap())
-                    {
-                        error = "Every transition must be a map.";
-                        SetError(outError, error);
-                        Log::CoreError("State tree '{}', state '{}': {}", name, stateName, error);
-                        return false;
-                    }
-
-                    const std::string targetName = transitionNode["To"].as<std::string>("");
-                    if (targetName.empty() || !idsByName.contains(targetName))
-                    {
-                        error = "Transition target '" + targetName + "' does not exist.";
-                        SetError(outError, error);
-                        Log::CoreError("State tree '{}', state '{}': {}", name, stateName, error);
-                        return false;
-                    }
-
-                    AITransition transition;
-                    transition.TargetState = idsByName.at(targetName);
-
-                    const YAML::Node nameNode = transitionNode["Name"];
-                    transition.DebugName = nameNode && nameNode.IsScalar()
-                        ? nameNode.as<std::string>()
-                        : stateName + " -> " + targetName;
-
-                    const YAML::Node whenNode = transitionNode["When"];
-                    if (whenNode && whenNode.IsSequence())
-                    {
-                        for (const auto& conditionNode : whenNode)
-                        {
-                            AINodeDesc desc;
-                            if (!ParseNode(conditionNode, desc, error))
-                            {
-                                SetError(outError, error);
-                                Log::CoreError("State tree '{}', state '{}': {}", name, stateName, error);
-                                return false;
-                            }
-
-                            Ref<IAICondition> condition = CreateCondition(desc);
-                            if (!condition)
-                            {
-                                error = "Failed to create condition '" + desc.Type + "'.";
-                                SetError(outError, error);
-                                Log::CoreError("State tree '{}', state '{}': {}", name, stateName, error);
-                                return false;
-                            }
-                            transition.Conditions.push_back(std::move(condition));
-                        }
-                    }
-
-                    definition.Transitions.push_back(std::move(transition));
-                }
-            }
+            definition.Transitions.push_back(std::move(transition));
         }
-
-        const std::string entryName = entryNode.as<std::string>();
-        if (!idsByName.contains(entryName))
-        {
-            error = "Entry state '" + entryName + "' does not exist.";
-            SetError(outError, error);
-            Log::CoreError("State tree '{}': {}", name, error);
-            return false;
-        }
-
-        tree->SetEntryState(idsByName.at(entryName));
-        return Register(std::move(name), std::move(tree), origin);
     }
-    catch (const YAML::Exception& exception)
+
+    if (!idsByName.contains(document.EntryState))
     {
-        error = "Failed to parse state tree '" + name + "': " + exception.what();
+        error = "Entry state '" + document.EntryState + "' does not exist.";
         SetError(outError, error);
-        Log::CoreError("{}", error);
-        return false;
+        return nullptr;
     }
+
+    tree->SetEntryState(idsByName.at(document.EntryState));
+    return tree;
 }
 
 bool AIStateTreeRegistry::Unregister(const std::string_view name)
@@ -431,12 +243,29 @@ Ref<AIStateTree> AIStateTreeRegistry::Find(const std::string_view name)
     return it != Trees().end() ? it->second.Tree : nullptr;
 }
 
+const AIStateTreeDocument* AIStateTreeRegistry::GetDocument(const std::string_view name)
+{
+    const auto it = Trees().find(std::string(name));
+    if (it == Trees().end() || !it->second.Document)
+        return nullptr;
+    return &*it->second.Document;
+}
+
+std::optional<AIStateTreeOrigin> AIStateTreeRegistry::GetOrigin(const std::string_view name)
+{
+    const auto it = Trees().find(std::string(name));
+    if (it == Trees().end())
+        return std::nullopt;
+    return it->second.Origin;
+}
+
 std::vector<std::string> AIStateTreeRegistry::GetNames()
 {
     std::vector<std::string> names;
     names.reserve(Trees().size());
     for (const auto& name : Trees() | std::views::keys)
         names.push_back(name);
+
     std::ranges::sort(names);
     return names;
 }
@@ -445,6 +274,13 @@ void AIStateTreeRegistry::ClearScriptTrees()
 {
     std::erase_if(Trees(), [](const auto& entry) {
         return entry.second.Origin == AIStateTreeOrigin::Script;
+    });
+}
+
+void AIStateTreeRegistry::ClearAssetTrees()
+{
+    std::erase_if(Trees(), [](const auto& entry) {
+        return entry.second.Origin == AIStateTreeOrigin::Asset;
     });
 }
 

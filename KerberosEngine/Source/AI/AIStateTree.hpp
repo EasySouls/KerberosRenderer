@@ -5,6 +5,7 @@
 #include "Core/Core.hpp"
 
 #include <string>
+#include <utility>
 #include <vector>
 #include <unordered_map>
 
@@ -33,6 +34,10 @@ class IAICondition
 protected:
     IAICondition() = default;
 
+    /// Registered node type name, assigned by CreateCondition. 
+    /// Purely diagnostic, the compiled condition is still identified by its C++ type.
+    std::string m_DebugType;
+
 public:
     virtual ~IAICondition() = default;
 
@@ -40,6 +45,9 @@ public:
     IAICondition(IAICondition&& other) noexcept = default;
     IAICondition& operator=(const IAICondition& other) = default;
     IAICondition& operator=(IAICondition&& other) noexcept = default;
+
+    [[nodiscard]] const std::string& GetDebugType() const { return m_DebugType; }
+    void SetDebugType(std::string type) { m_DebugType = std::move(type); }
 
     virtual bool TestCondition(const AIContext& context) const = 0;
 };
@@ -49,6 +57,10 @@ class IAITask
 protected:
     IAITask() = default;
 
+    /// Registered node type name, assigned by CreateTask. 
+    /// Purely diagnostic; the compiled task is still identified by its C++ type.
+    std::string m_DebugType;
+
 public:
     virtual ~IAITask() = default;
 
@@ -56,6 +68,9 @@ public:
     IAITask(IAITask&& other) noexcept = default;
     IAITask& operator=(const IAITask& other) = default;
     IAITask& operator=(IAITask&& other) noexcept = default;
+
+    [[nodiscard]] const std::string& GetDebugType() const { return m_DebugType; }
+    void SetDebugType(std::string type) { m_DebugType = std::move(type); }
     
     virtual void OnEnter(AIContext& context);
     virtual TaskStatus OnTick(AIContext& context);
