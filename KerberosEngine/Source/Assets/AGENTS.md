@@ -328,6 +328,12 @@ are loaded from their cached copies through `MaterialImporter`; their texture
 slots are asset handles resolved through the active manager, so the material
 reader no longer depends on source paths or the legacy texture loader.
 
+Editor UI glyphs live under `KerberosEditor/Assets/Editor/Icons` and are loaded
+directly through `TextureImporter` by the editor's `EditorIcons` widget; they
+are not a user-facing project asset type. The editor asset manager may still
+create `.meta` files for them when the engine asset root is scanned, which is
+expected.
+
 The asset browser is `KerberosEditor/Source/Windows/AssetsPanel.cpp`. It
 enumerates the filesystem, looks up handles, previews textures, opens files,
 supports drag/drop payloads, and edits materials. Drag/drop payloads use

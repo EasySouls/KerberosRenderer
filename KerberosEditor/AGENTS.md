@@ -39,6 +39,18 @@ labels across windows. Single-type asset fields should use
 the searchable asset list and keeps the matching asset-browser payload as a
 drop target.
 
+## Icon assets and EditorIcons
+
+Editor-authored glyph icons live under `KerberosEditor/Assets/Editor/Icons` as
+white-on-transparent PNGs (with SVG sources and `icons.json` beside them).
+`KerberosEditor/Source/Widgets/EditorIcons` loads them through
+`EnginePaths::Assets()/Editor/Icons` during `EditorLayer::OnAttach`, converts
+them to ImGui texture IDs once, and releases them in `OnDetach`. Panels should
+use its `Draw`/`ImageButton`/`Selectable`/`MenuItem` helpers (tinted from the
+ImGui text color) instead of hard-coded placeholder text or per-panel texture
+loads. Use `ForAssetType` for asset rows and pickers. Add new glyphs to both the
+PNG/SVG set and the `KBR_EDITOR_ICON_LIST` macro.
+
 ## Panels and integration
 
 Editor windows live mainly under

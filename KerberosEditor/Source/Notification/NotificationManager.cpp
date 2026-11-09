@@ -1,5 +1,7 @@
 #include "NotificationManager.hpp"
 
+#include "Widgets/EditorIcons.hpp"
+
 #include "imgui/imgui_internal.h"
 
 namespace Kerberos
@@ -90,6 +92,17 @@ namespace Kerberos
 
             if (ImGui::Begin(windowName.c_str(), nullptr, windowFlags))
             {
+                EditorIcon icon = EditorIcon::NotificationInfo;
+                switch (notif.type)
+                {
+                case Notification::Type::Warning: icon = EditorIcon::NotificationWarning; break;
+                case Notification::Type::Error: icon = EditorIcon::NotificationError; break;
+                case Notification::Type::Info:
+                default: icon = EditorIcon::NotificationInfo; break;
+                }
+
+                EditorIcons::Draw(icon, 20.0f, &textColor);
+                ImGui::SameLine(0.0f, 6.0f);
                 ImGui::TextWrapped("%s", notif.message.c_str());
 
                 notif.isHovered = ImGui::IsWindowHovered(ImGuiHoveredFlags_AllowWhenBlockedByActiveItem);

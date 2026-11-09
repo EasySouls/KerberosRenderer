@@ -9,6 +9,7 @@
 #include "Renderer/Textures/Texture2D.hpp"
 #include "VulkanContext.hpp"
 #include "Profiling/Profilers.hpp"
+#include "Widgets/EditorIcons.hpp"
 
 #include <imgui/imgui.h>
 
@@ -72,6 +73,8 @@ namespace Kerberos
 		}
 
 		const std::string assetTypeStr = std::string(AssetTypeToString(type));
+		EditorIcons::Draw(EditorIcons::ForAssetType(type), 20.0f);
+		ImGui::SameLine(0.0f, 6.0f);
 		ImGui::TextUnformatted(sourcePath.filename().string().c_str());
 		ImGui::TextDisabled("Type: %s", assetTypeStr.data());
 		if (handle.IsValid())

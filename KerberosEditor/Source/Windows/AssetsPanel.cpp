@@ -4,12 +4,11 @@
 #include "Assets/Asset.hpp"
 #include "Assets/AssetManager.hpp"
 #include "Assets/Importers/MaterialImporter.hpp"
-#include "Assets/Importers/TextureImporter.hpp"
-#include "Core/EnginePaths.hpp"
 #include "Profiling/Profilers.hpp"
 #include "Project/Project.hpp"
 #include "Utils/SystemOperations.hpp"
 #include "Widgets/AssetPicker.hpp"
+#include "Widgets/EditorIcons.hpp"
 
 #include <imgui/imgui.h>
 
@@ -43,33 +42,57 @@ std::filesystem::path MakeLexicallyRelative(const std::filesystem::path& path, c
     return MakeAbsoluteLexical(path).lexically_relative(MakeAbsoluteLexical(root));
 }
 
-const char* AssetTypeIcon(const AssetType type)
+EditorIcon AssetIconFor(const AssetMetadata* metadata, const std::filesystem::path& path)
 {
-    switch (type)
-    {
-    case AssetType::Texture2D:
-        return "[IMG]";
-    case AssetType::TextureCube:
-        return "[CUBE]";
-    case AssetType::Material:
-        return "[MAT]";
-    case AssetType::Mesh:
-        return "[MESH]";
-    case AssetType::Prefab:
-        return "[MODEL]";
-    case AssetType::Scene:
-        return "[SCENE]";
-    case AssetType::Sound:
-        return "[AUDIO]";
-    case AssetType::Animation:
-        return "[ANIM]";
-    case AssetType::Skeleton:
-        return "[SKELETON]";
-    case AssetType::SkinnedMesh:
-        return "[SKINNED]";
-    default:
-        return "[ASSET]";
-    }
+    if (metadata != nullptr)
+        return EditorIcons::ForAssetType(metadata->Type);
+
+    std::string extension = path.extension().string();
+    std::ranges::transform(extension, extension.begin(),
+                           [](const unsigned char c) { return static_cast<char>(std::tolower(c)); });
+
+    if (extension == ".png" || extension == ".jpg" || extension == ".jpeg" ||
+        extension == ".ktx" || extension == ".ktx2")
+        return EditorIcon::AssetTexture2d;
+    if (extension == ".kbrcubemap")
+        return EditorIcon::AssetTexturecube;
+    if (extension == ".fbx" || extension == ".obj")
+        return EditorIcon::AssetMesh;
+    if (extension == ".gltf" || extension == ".glb" || extension == ".kbrprefab")
+        return EditorIcon::AssetPrefab;
+    if (extension == ".kerberos")
+        return EditorIcon::AssetScene;
+    if (extension == ".wav")
+        return EditorIcon::AssetSound;
+    if (extension == ".kbrmat" || extension == ".kbrmaterial")
+        return EditorIcon::AssetMaterial;
+    if (extension == ".kbranim" || extension == ".kbranimation")
+        return EditorIcon::AssetAnimation;
+    if (extension == ".cs")
+        return EditorIcon::Script;
+    if (extension == ".csproj")
+        return EditorIcon::Csproj;
+    if (extension == ".slang" || extension == ".spv")
+        return EditorIcon::Shader;
+    if (extension == ".ttf" || extension == ".otf")
+        return EditorIcon::Font;
+    if (extension == ".meta")
+        return EditorIcon::FileMeta;
+    if (extension == ".kbrscene")
+        return EditorIcon::SceneManifest;
+
+    return EditorIcon::File;
+}
+
+EditorIcon StatusIconFor(const std::string& status)
+{
+    if (status == "Ready")
+        return EditorIcon::StatusReady;
+    if (status == "Missing artifact")
+        return EditorIcon::StatusMissing;
+    if (status == "Not imported")
+        return EditorIcon::StatusNotImported;
+    return EditorIcon::StatusRegistered;
 }
 
 std::string AssetDisplayName(const AssetMetadata& metadata, const AssetHandle handle)
@@ -101,9 +124,6 @@ std::string AssetStatusLabel(const AssetHandle handle,
 		: m_AssetsDirectory(Project::GetAssetDirectory()), m_CurrentDirectory(m_AssetsDirectory), m_NotificationManager(
 			std::move(notificationManager))
 	{
-		m_FolderIcon = TextureImporter::ImportTexture(EnginePaths::Assets() / "Editor/directory_icon.png");
-		m_FileIcon = TextureImporter::ImportTexture(EnginePaths::Assets() / "Editor/file_icon.png");
-
 	    // Normalize once. The browser always holds absolute paths after this point,
         // so it can use lexical path operations instead of filesystem::relative(), which tanks the framerate.
         m_AssetsDirectory = MakeAbsoluteLexical(m_AssetsDirectory);
@@ -220,7 +240,9 @@ std::string AssetStatusLabel(const AssetHandle handle,
 
                     if (item.IsDirectory)
                     {
-                        if (ImGui::Selectable((std::string("[DIR]  ") + fileName).c_str(),
+                        EditorIcons::Draw(EditorIcon::Folder);
+                        ImGui::SameLine(0.0f, 4.0f);
+                        if (ImGui::Selectable(fileName.c_str(),
                                               false,
                                               ImGuiSelectableFlags_SpanAllColumns | ImGuiSelectableFlags_AllowDoubleClick))
                         {
@@ -238,11 +260,9 @@ std::string AssetStatusLabel(const AssetHandle handle,
                         constexpr ImGuiTreeNodeFlags flags = ImGuiTreeNodeFlags_SpanFullWidth |
                                                              ImGuiTreeNodeFlags_OpenOnArrow |
                                                              ImGuiTreeNodeFlags_FramePadding;
-                        childrenOpen = ImGui::TreeNodeEx("##AssetTreeNode",
-                                                         flags,
-                                                         "%s  %s",
-                                                         AssetTypeIcon(metadata ? metadata->Type : AssetType::Prefab),
-                                                         fileName.c_str());
+                        EditorIcons::Draw(AssetIconFor(metadata, item.Path));
+                        ImGui::SameLine(0.0f, 4.0f);
+                        childrenOpen = ImGui::TreeNodeEx("##AssetTreeNode", flags, "%s", fileName.c_str());
                         if (registered && metadata)
                         {
                             HandleAssetDragAndDrop(handle, item.Path.filename(), *metadata);
@@ -277,10 +297,10 @@ std::string AssetStatusLabel(const AssetHandle handle,
                     else
                     {
                         const bool selected = handle.IsValid() && handle == m_SelectedAsset.Handle;
+                        EditorIcons::Draw(AssetIconFor(metadata, item.Path));
+                        ImGui::SameLine(0.0f, 4.0f);
                         if (ImGui::Selectable(
-                            (std::string(AssetTypeIcon(metadata ? metadata->Type : AssetType::Texture2D)) + "  " +
-                             fileName)
-                                .c_str(),
+                            fileName.c_str(),
                             selected,
                             ImGuiSelectableFlags_SpanAllColumns | ImGuiSelectableFlags_AllowDoubleClick))
                         {
@@ -328,6 +348,8 @@ std::string AssetStatusLabel(const AssetHandle handle,
                     else
                     {
                         const auto status = AssetStatusLabel(handle, metadata, m_CachedArtifactExists);
+                        EditorIcons::Draw(StatusIconFor(status), 0.0f);
+                        ImGui::SameLine(0.0f, 4.0f);
                         if (status == "Ready")
                         {
                             ImGui::TextColored(ImVec4(0.35f, 0.82f, 0.45f, 1.0f), "%s", status.c_str());
@@ -370,11 +392,13 @@ std::string AssetStatusLabel(const AssetHandle handle,
                             ImGui::TableSetColumnIndex(0);
                             ImGui::PushID(static_cast<int>(static_cast<uint64_t>(childHandle) & 0x7fffffff));
 
-                            const std::string childLabel =
-                                std::string("    ") + AssetTypeIcon(childMetadata.Type) + "  " + childName;
-                            ImGui::Selectable(childLabel.c_str(),
+                            ImGui::Indent(16.0f);
+                            EditorIcons::Draw(EditorIcons::ForAssetType(childMetadata.Type));
+                            ImGui::SameLine(0.0f, 4.0f);
+                            ImGui::Selectable(childName.c_str(),
                                               false,
                                               ImGuiSelectableFlags_SpanAllColumns | ImGuiSelectableFlags_AllowDoubleClick);
+                            ImGui::Unindent(16.0f);
                             HandleAssetDragAndDrop(childHandle, childMetadata.LibraryPath.filename(), childMetadata);
                             if (ImGui::BeginPopupContextItem("GeneratedSubAssetContext"))
                             {
@@ -400,6 +424,8 @@ std::string AssetStatusLabel(const AssetHandle handle,
                             ImGui::Text("%.*s", static_cast<int>(childTypeName.size()), childTypeName.data());
                             ImGui::TableSetColumnIndex(2);
                             const auto status = AssetStatusLabel(childHandle, &childMetadata, m_CachedArtifactExists);
+                            EditorIcons::Draw(StatusIconFor(status), 0.0f);
+                            ImGui::SameLine(0.0f, 4.0f);
                             if (status == "Ready")
                                 ImGui::TextColored(ImVec4(0.35f, 0.82f, 0.45f, 1.0f), "%s", status.c_str());
                             else if (status == "Missing artifact")
@@ -789,6 +815,23 @@ std::string AssetStatusLabel(const AssetHandle handle,
 
 	void AssetsPanel::DrawMaterialTextureField(const char* label, Ref<Texture2D>& texture)
     {
+        const std::string_view name(label);
+        EditorIcon icon = EditorIcon::SlotUnset;
+        if (name.find("Albedo") != std::string_view::npos)
+            icon = EditorIcon::SlotAlbedo;
+        else if (name.find("Normal") != std::string_view::npos)
+            icon = EditorIcon::SlotNormal;
+        else if (name.find("Metallic") != std::string_view::npos)
+            icon = EditorIcon::SlotMetallic;
+        else if (name.find("Roughness") != std::string_view::npos)
+            icon = EditorIcon::SlotRoughness;
+        else if (name.find("AO") != std::string_view::npos)
+            icon = EditorIcon::SlotOcclusion;
+        else if (name.find("Emissive") != std::string_view::npos)
+            icon = EditorIcon::SlotEmissive;
+
+        EditorIcons::Draw(icon);
+        ImGui::SameLine(0.0f, 4.0f);
         AssetPicker::DrawAsset(label, AssetType::Texture2D, texture, "Search textures...");
     }
 

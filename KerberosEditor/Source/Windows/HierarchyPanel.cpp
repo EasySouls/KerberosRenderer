@@ -25,6 +25,7 @@
 #include "Undo/DuplicateEntityCommand.hpp"
 #include "Undo/InstantiatePrefabCommand.hpp"
 #include "Undo/SetComponentValueCommand.hpp"
+#include "Widgets/EditorIcons.hpp"
 #include "Undo/UndoRedoManager.hpp"
 #include "Widgets/AssetPicker.hpp"
 
@@ -391,6 +392,8 @@ void HierarchyPanel::OnImGuiRender()
         ImGuiTreeNodeFlags_OpenOnArrow | ImGuiTreeNodeFlags_SpanAvailWidth | ImGuiTreeNodeFlags_DefaultOpen;
 
     const char* sceneName = m_Context ? m_Context->GetName().c_str() : "No Scene Loaded";
+    EditorIcons::Draw(EditorIcon::AssetScene);
+    ImGui::SameLine(0.0f, 4.0f);
     if (ImGui::TreeNodeEx(reinterpret_cast<const void*>(sceneName), flags, "%s", sceneName)) {
         /// Only draw the root nodes
         for (const entt::entity& entityId : m_Context->GetRootEntities()) {
@@ -424,11 +427,11 @@ void HierarchyPanel::OnImGuiRender()
 
     /// If the right mouse button is clicked, show the context menu
     if (ImGui::BeginPopupContextWindow(nullptr, 1 | ImGuiPopupFlags_NoOpenOverItems)) {
-        if (ImGui::MenuItem("Create Empty Entity")) {
+        if (EditorIcons::MenuItem(EditorIcon::HierarchyEntity, "Create Empty Entity")) {
             ExecuteCreateEntity("Empty Entity");
         }
 
-        if (ImGui::MenuItem("Create Skinned Test Mesh")) {
+        if (EditorIcons::MenuItem(EditorIcon::ComponentSkinnedMesh, "Create Skinned Test Mesh")) {
             CreateProceduralSkinnedTest(m_Context);
         }
 
@@ -495,6 +498,29 @@ void HierarchyPanel::DrawEntityNode(const Entity& entity)
                                      ImGuiTreeNodeFlags_DefaultOpen |
                                      (entity == m_SelectedEntity ? ImGuiTreeNodeFlags_Selected : 0);
 
+    EditorIcon entityIcon = EditorIcon::HierarchyEntity;
+    if (entity.HasComponent<PrefabInstanceComponent>())
+        entityIcon = EditorIcon::ComponentPrefab;
+    else if (entity.HasComponent<CameraComponent>())
+        entityIcon = EditorIcon::ComponentCamera;
+    else if (entity.HasComponent<DirectionalLightComponent>())
+        entityIcon = EditorIcon::ComponentDirectionalLight;
+    else if (entity.HasComponent<SpotLightComponent>())
+        entityIcon = EditorIcon::ComponentSpotLight;
+    else if (entity.HasComponent<PointLightComponent>())
+        entityIcon = EditorIcon::ComponentPointLight;
+    else if (entity.HasComponent<SkinnedMeshComponent>())
+        entityIcon = EditorIcon::ComponentSkinnedMesh;
+    else if (entity.HasComponent<StaticMeshComponent>())
+        entityIcon = EditorIcon::ComponentStaticMesh;
+    else if (entity.HasComponent<ParticleEmitterComponent>())
+        entityIcon = EditorIcon::ComponentParticles;
+    else if (entity.HasComponent<AudioSource2DComponent>() || entity.HasComponent<AudioSource3DComponent>())
+        entityIcon = EditorIcon::ComponentAudio2d;
+
+    EditorIcons::Draw(entityIcon);
+    ImGui::SameLine(0.0f, 4.0f);
+
     /// The entity's identifier serves as the unique ID for the ImGui tree node
     const bool opened =
         ImGui::TreeNodeEx(reinterpret_cast<void*>(static_cast<uint64_t>(entity.GetUUID())), flags, "%s", tag.c_str());
@@ -531,12 +557,12 @@ void HierarchyPanel::DrawEntityNodeContextMenu(const Entity& entity, bool& entit
     if (!ImGui::BeginPopupContextItem())
         return;
 
-    if (ImGui::MenuItem("Delete Entity", "Delete")) 
+    if (EditorIcons::MenuItem(EditorIcon::ActionDelete, "Delete Entity", "Delete"))
     {
         /// Defer the deletion of the entity until the popup is closed to avoid invalidating the iterator
         entityDeleted = true;
     }
-    if (ImGui::MenuItem("Duplicate Entity", "Ctrl + D")) 
+    if (EditorIcons::MenuItem(EditorIcon::ActionDuplicate, "Duplicate Entity", "Ctrl + D"))
     {
         if (m_UndoRedo)
         {
@@ -547,7 +573,7 @@ void HierarchyPanel::DrawEntityNodeContextMenu(const Entity& entity, bool& entit
             m_Context->DuplicateEntity(entity, true);
         }
     }
-    if (ImGui::MenuItem("Create child")) 
+    if (EditorIcons::MenuItem(EditorIcon::HierarchyChild, "Create child"))
     {
         if (m_UndoRedo)
         {
@@ -592,87 +618,96 @@ void HierarchyPanel::AddComponentPopup(const Entity entity)
     }
 
     if (ImGui::BeginPopup("Add Component")) {
-        if (ImGui::MenuItem("Camera")) {
+        if (EditorIcons::MenuItem(EditorIcon::ComponentCamera, "Camera")) {
             AddComponentWithCheck<CameraComponent>(entity);
             ImGui::CloseCurrentPopup();
         }
 
-        if (ImGui::MenuItem("Script")) {
+        if (EditorIcons::MenuItem(EditorIcon::ComponentScript, "Script")) {
             AddComponentWithCheck<ScriptComponent>(entity);
             ImGui::CloseCurrentPopup();
         }
 
-        if (ImGui::MenuItem("Sprite Renderer")) {
+        if (EditorIcons::MenuItem(EditorIcon::ComponentSprite, "Sprite Renderer")) {
             AddComponentWithCheck<SpriteRendererComponent>(entity);
             ImGui::CloseCurrentPopup();
         }
 
-        if (ImGui::MenuItem("Directional Light")) {
+        if (EditorIcons::MenuItem(EditorIcon::ComponentDirectionalLight, "Directional Light")) {
             AddComponentWithCheck<DirectionalLightComponent>(entity);
             ImGui::CloseCurrentPopup();
         }
 
-        if (ImGui::MenuItem("Point Light")) {
+        if (EditorIcons::MenuItem(EditorIcon::ComponentPointLight, "Point Light")) {
             AddComponentWithCheck<PointLightComponent>(entity);
             ImGui::CloseCurrentPopup();
         }
 
-        if (ImGui::MenuItem("Static Mesh")) {
+        if (EditorIcons::MenuItem(EditorIcon::ComponentSpotLight, "Spot Light")) {
+            AddComponentWithCheck<SpotLightComponent>(entity);
+            ImGui::CloseCurrentPopup();
+        }
+
+        if (EditorIcons::MenuItem(EditorIcon::ComponentStaticMesh, "Static Mesh")) {
             AddComponentWithCheck<StaticMeshComponent>(entity);
             ImGui::CloseCurrentPopup();
         }
 
+        EditorIcons::Draw(EditorIcon::ComponentAnimator);
+        ImGui::SameLine(0.0f, 6.0f);
         if (ImGui::BeginMenu("Animation")) {
-            if (ImGui::MenuItem("Skeleton")) {
+            if (EditorIcons::MenuItem(EditorIcon::ComponentSkeleton, "Skeleton")) {
                 AddComponentWithCheck<SkeletonComponent>(entity);
                 ImGui::CloseCurrentPopup();
             }
-            if (ImGui::MenuItem("Skinned Mesh")) {
+            if (EditorIcons::MenuItem(EditorIcon::ComponentSkinnedMesh, "Skinned Mesh")) {
                 AddComponentWithCheck<SkinnedMeshComponent>(entity);
                 ImGui::CloseCurrentPopup();
             }
-            if (ImGui::MenuItem("Animator")) {
+            if (EditorIcons::MenuItem(EditorIcon::ComponentAnimator, "Animator")) {
                 AddComponentWithCheck<AnimatorComponent>(entity);
                 ImGui::CloseCurrentPopup();
             }
-            if (ImGui::MenuItem("Joint")) {
+            if (EditorIcons::MenuItem(EditorIcon::ComponentJoint, "Joint")) {
                 AddComponentWithCheck<JointComponent>(entity);
                 ImGui::CloseCurrentPopup();
             }
-            if (ImGui::MenuItem("Socket")) {
+            if (EditorIcons::MenuItem(EditorIcon::ComponentSocket, "Socket")) {
                 AddComponentWithCheck<SocketComponent>(entity);
                 ImGui::CloseCurrentPopup();
             }
-            if (ImGui::MenuItem("Ragdoll")) {
+            if (EditorIcons::MenuItem(EditorIcon::ComponentRagdoll, "Ragdoll")) {
                 AddComponentWithCheck<RagdollComponent>(entity);
                 ImGui::CloseCurrentPopup();
             }
             ImGui::EndMenu();
         }
 
+        EditorIcons::Draw(EditorIcon::ComponentRigidbody);
+        ImGui::SameLine(0.0f, 6.0f);
         if (ImGui::BeginMenu("Physics")) {
 
-            if (ImGui::MenuItem("Rigidbody3D")) {
+            if (EditorIcons::MenuItem(EditorIcon::ComponentRigidbody, "Rigidbody3D")) {
                 AddComponentWithCheck<RigidBody3DComponent>(entity);
                 ImGui::CloseCurrentPopup();
             }
 
-            if (ImGui::MenuItem("Box Collider 3D")) {
+            if (EditorIcons::MenuItem(EditorIcon::ComponentBoxCollider, "Box Collider 3D")) {
                 AddComponentWithCheck<BoxCollider3DComponent>(entity);
                 ImGui::CloseCurrentPopup();
             }
 
-            if (ImGui::MenuItem("Sphere Collider 3D")) {
+            if (EditorIcons::MenuItem(EditorIcon::ComponentSphereCollider, "Sphere Collider 3D")) {
                 AddComponentWithCheck<SphereCollider3DComponent>(entity);
                 ImGui::CloseCurrentPopup();
             }
 
-            if (ImGui::MenuItem("Capsule Collider 3D")) {
+            if (EditorIcons::MenuItem(EditorIcon::ComponentCapsuleCollider, "Capsule Collider 3D")) {
                 AddComponentWithCheck<CapsuleCollider3DComponent>(entity);
                 ImGui::CloseCurrentPopup();
             }
 
-            if (ImGui::MenuItem("Mesh Collider 3D")) {
+            if (EditorIcons::MenuItem(EditorIcon::ComponentMeshCollider, "Mesh Collider 3D")) {
                 AddComponentWithCheck<MeshCollider3DComponent>(entity);
                 ImGui::CloseCurrentPopup();
             }
@@ -680,28 +715,30 @@ void HierarchyPanel::AddComponentPopup(const Entity entity)
             ImGui::EndMenu();
         }
 
-        if (ImGui::MenuItem("Environment")) {
+        if (EditorIcons::MenuItem(EditorIcon::ComponentEnvironment, "Environment")) {
             AddComponentWithCheck<EnvironmentComponent>(entity);
             ImGui::CloseCurrentPopup();
         }
 
-        if (ImGui::MenuItem("Text")) {
+        if (EditorIcons::MenuItem(EditorIcon::ComponentText, "Text")) {
             AddComponentWithCheck<TextComponent>(entity);
             ImGui::CloseCurrentPopup();
         }
 
+        EditorIcons::Draw(EditorIcon::ComponentAudio2d);
+        ImGui::SameLine(0.0f, 6.0f);
         if (ImGui::BeginMenu("Audio")) {
-            if (ImGui::MenuItem("Audio Source 2D")) {
+            if (EditorIcons::MenuItem(EditorIcon::ComponentAudio2d, "Audio Source 2D")) {
                 AddComponentWithCheck<AudioSource2DComponent>(entity);
                 ImGui::CloseCurrentPopup();
             }
 
-            if (ImGui::MenuItem("Audio Source 3D")) {
+            if (EditorIcons::MenuItem(EditorIcon::ComponentAudio3d, "Audio Source 3D")) {
                 AddComponentWithCheck<AudioSource3DComponent>(entity);
                 ImGui::CloseCurrentPopup();
             }
 
-            if (ImGui::MenuItem("Audio Listener")) {
+            if (EditorIcons::MenuItem(EditorIcon::ComponentAudioListener, "Audio Listener")) {
                 AddComponentWithCheck<AudioListenerComponent>(entity);
                 ImGui::CloseCurrentPopup();
             }
@@ -709,33 +746,36 @@ void HierarchyPanel::AddComponentPopup(const Entity entity)
             ImGui::EndMenu();
         }
 
-        if (ImGui::MenuItem("Particle Emitter")) {
+        if (EditorIcons::MenuItem(EditorIcon::ComponentParticles, "Particle Emitter")) {
             AddComponentWithCheck<ParticleEmitterComponent>(entity);
             ImGui::CloseCurrentPopup();
         }
 
+        EditorIcons::Draw(EditorIcon::ComponentAiAgent);
+        ImGui::SameLine(0.0f, 6.0f);
         if (ImGui::BeginMenu("AI")) {
-            if (ImGui::MenuItem("AI Agent (Blackboard + State Machine + Controller + Perception)")) {
+            if (EditorIcons::MenuItem(EditorIcon::ComponentAiAgent,
+                                      "AI Agent (Blackboard + State Machine + Controller + Perception)")) {
                 AddAIAgentComponents(entity);
                 ImGui::CloseCurrentPopup();
             }
-            if (ImGui::MenuItem("Blackboard")) {
+            if (EditorIcons::MenuItem(EditorIcon::ComponentAiBlackboard, "Blackboard")) {
                 AddComponentWithCheck<AIBlackboardComponent>(entity);
                 ImGui::CloseCurrentPopup();
             }
-            if (ImGui::MenuItem("State Machine")) {
+            if (EditorIcons::MenuItem(EditorIcon::ComponentAiStateMachine, "State Machine")) {
                 AddComponentWithCheck<AIStateMachineComponent>(entity);
                 ImGui::CloseCurrentPopup();
             }
-            if (ImGui::MenuItem("Controller")) {
+            if (EditorIcons::MenuItem(EditorIcon::ComponentAiController, "Controller")) {
                 AddComponentWithCheck<AIControllerComponent>(entity);
                 ImGui::CloseCurrentPopup();
             }
-            if (ImGui::MenuItem("Perception")) {
+            if (EditorIcons::MenuItem(EditorIcon::ComponentAiPerception, "Perception")) {
                 AddComponentWithCheck<AIPerceptionComponent>(entity);
                 ImGui::CloseCurrentPopup();
             }
-            if (ImGui::MenuItem("Targetable")) {
+            if (EditorIcons::MenuItem(EditorIcon::ComponentAiTargetable, "Targetable")) {
                 AddComponentWithCheck<AITargetableComponent>(entity);
                 ImGui::CloseCurrentPopup();
             }
@@ -942,6 +982,8 @@ void HierarchyPanel::DrawVec3Control(const std::string& label,
 void HierarchyPanel::DrawComponents(const Entity entity)
 {
     if (entity.HasComponent<TagComponent>()) {
+        EditorIcons::Draw(EditorIcon::ComponentTag);
+        ImGui::SameLine(0.0f, 4.0f);
         if (ImGui::TreeNodeEx(
                 reinterpret_cast<void*>(typeid(TagComponent).hash_code()), ImGuiTreeNodeFlags_DefaultOpen, "Tag")) {
             auto& tag = entity.GetComponent<TagComponent>().Tag;
@@ -976,6 +1018,8 @@ void HierarchyPanel::DrawComponents(const Entity entity)
         }
     }
     if (entity.HasComponent<TransformComponent>()) {
+        EditorIcons::Draw(EditorIcon::ComponentTransform);
+        ImGui::SameLine(0.0f, 4.0f);
         if (ImGui::TreeNodeEx(reinterpret_cast<void*>(typeid(TransformComponent).hash_code()),
                               ImGuiTreeNodeFlags_DefaultOpen,
                               "Transform")) {
@@ -1021,6 +1065,8 @@ void HierarchyPanel::DrawComponents(const Entity entity)
 
     if (entity.HasComponent<CameraComponent>()) {
         ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(6, 6));
+        EditorIcons::Draw(EditorIcon::ComponentCamera);
+        ImGui::SameLine(0.0f, 4.0f);
         const bool opened =
             ImGui::TreeNodeEx(reinterpret_cast<void*>(typeid(CameraComponent).hash_code()), treeNodeFlags, "Camera");
         ImGui::SameLine(ImGui::GetContentRegionAvail().x - 20.0f);
@@ -1104,6 +1150,8 @@ void HierarchyPanel::DrawComponents(const Entity entity)
 
     if (entity.HasComponent<ScriptComponent>()) {
         ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(6, 6));
+        EditorIcons::Draw(EditorIcon::ComponentScript);
+        ImGui::SameLine(0.0f, 4.0f);
         const bool opened = ImGui::TreeNodeEx(
             reinterpret_cast<const void*>(typeid(ScriptComponent).hash_code()), treeNodeFlags, "Script");
         ImGui::SameLine(ImGui::GetContentRegionAvail().x - 20.f);
@@ -1464,6 +1512,8 @@ void HierarchyPanel::DrawComponents(const Entity entity)
 
     if (entity.HasComponent<SpriteRendererComponent>()) {
         ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(6, 6));
+        EditorIcons::Draw(EditorIcon::ComponentSprite);
+        ImGui::SameLine(0.0f, 4.0f);
         const bool opened = ImGui::TreeNodeEx(
             reinterpret_cast<void*>(typeid(SpriteRendererComponent).hash_code()), treeNodeFlags, "Sprite");
         ImGui::SameLine(ImGui::GetContentRegionAvail().x - 20.f);
@@ -1496,6 +1546,8 @@ void HierarchyPanel::DrawComponents(const Entity entity)
     }
     if (entity.HasComponent<DirectionalLightComponent>()) {
         ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(6, 6));
+        EditorIcons::Draw(EditorIcon::ComponentDirectionalLight);
+        ImGui::SameLine(0.0f, 4.0f);
         const bool opened = ImGui::TreeNodeEx(
             reinterpret_cast<void*>(typeid(DirectionalLightComponent).hash_code()), treeNodeFlags, "Directional Light");
         ImGui::SameLine(ImGui::GetContentRegionAvail().x - 20.f);
@@ -1535,6 +1587,8 @@ void HierarchyPanel::DrawComponents(const Entity entity)
     }
     if (entity.HasComponent<PointLightComponent>()) {
         ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(6, 6));
+        EditorIcons::Draw(EditorIcon::ComponentPointLight);
+        ImGui::SameLine(0.0f, 4.0f);
         const bool opened = ImGui::TreeNodeEx(
             reinterpret_cast<void*>(typeid(PointLightComponent).hash_code()), treeNodeFlags, "Point Light");
         ImGui::SameLine(ImGui::GetContentRegionAvail().x - 20.f);
@@ -1570,6 +1624,8 @@ void HierarchyPanel::DrawComponents(const Entity entity)
     }
     if (entity.HasComponent<SpotLightComponent>()) {
         ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(6, 6));
+        EditorIcons::Draw(EditorIcon::ComponentSpotLight);
+        ImGui::SameLine(0.0f, 4.0f);
         const bool opened = ImGui::TreeNodeEx(
             reinterpret_cast<void*>(typeid(SpotLightComponent).hash_code()), treeNodeFlags, "Spotlight");
         ImGui::SameLine(ImGui::GetContentRegionAvail().x - 20.f);
@@ -1606,6 +1662,8 @@ void HierarchyPanel::DrawComponents(const Entity entity)
     }
     if (entity.HasComponent<StaticMeshComponent>()) {
         ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(6, 6));
+        EditorIcons::Draw(EditorIcon::ComponentStaticMesh);
+        ImGui::SameLine(0.0f, 4.0f);
         const bool opened = ImGui::TreeNodeEx(
             reinterpret_cast<void*>(typeid(StaticMeshComponent).hash_code()), treeNodeFlags, "Static Mesh");
         ImGui::SameLine(ImGui::GetContentRegionAvail().x - 20.f);
@@ -1645,6 +1703,8 @@ void HierarchyPanel::DrawComponents(const Entity entity)
     }
     if (entity.HasComponent<RigidBody3DComponent>()) {
         ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(6, 6));
+        EditorIcons::Draw(EditorIcon::ComponentRigidbody);
+        ImGui::SameLine(0.0f, 4.0f);
         const bool opened = ImGui::TreeNodeEx(
             reinterpret_cast<void*>(typeid(RigidBody3DComponent).hash_code()), treeNodeFlags, "RigidBody3D");
         ImGui::SameLine(ImGui::GetContentRegionAvail().x - 20.f);
@@ -1703,6 +1763,8 @@ void HierarchyPanel::DrawComponents(const Entity entity)
     }
     if (entity.HasComponent<BoxCollider3DComponent>()) {
         ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(6, 6));
+        EditorIcons::Draw(EditorIcon::ComponentBoxCollider);
+        ImGui::SameLine(0.0f, 4.0f);
         const bool opened = ImGui::TreeNodeEx(
             reinterpret_cast<void*>(typeid(BoxCollider3DComponent).hash_code()), treeNodeFlags, "BoxCollider3D");
         ImGui::SameLine(ImGui::GetContentRegionAvail().x - 20.f);
@@ -1745,6 +1807,8 @@ void HierarchyPanel::DrawComponents(const Entity entity)
     }
     if (entity.HasComponent<SphereCollider3DComponent>()) {
         ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(6, 6));
+        EditorIcons::Draw(EditorIcon::ComponentSphereCollider);
+        ImGui::SameLine(0.0f, 4.0f);
         const bool opened = ImGui::TreeNodeEx(
             reinterpret_cast<void*>(typeid(SphereCollider3DComponent).hash_code()), treeNodeFlags, "SphereCollider3D");
         ImGui::SameLine(ImGui::GetContentRegionAvail().x - 20.f);
@@ -1783,6 +1847,8 @@ void HierarchyPanel::DrawComponents(const Entity entity)
     }
     if (entity.HasComponent<CapsuleCollider3DComponent>()) {
         ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(6, 6));
+        EditorIcons::Draw(EditorIcon::ComponentCapsuleCollider);
+        ImGui::SameLine(0.0f, 4.0f);
         const bool opened = ImGui::TreeNodeEx(reinterpret_cast<void*>(typeid(CapsuleCollider3DComponent).hash_code()),
                                               treeNodeFlags,
                                               "CapsuleCollider3D");
@@ -1823,6 +1889,8 @@ void HierarchyPanel::DrawComponents(const Entity entity)
     }
     if (entity.HasComponent<MeshCollider3DComponent>()) {
         ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(6, 6));
+        EditorIcons::Draw(EditorIcon::ComponentMeshCollider);
+        ImGui::SameLine(0.0f, 4.0f);
         const bool opened = ImGui::TreeNodeEx(
             reinterpret_cast<void*>(typeid(MeshCollider3DComponent).hash_code()), treeNodeFlags, "MeshCollider3D");
         ImGui::SameLine(ImGui::GetContentRegionAvail().x - 20.f);
@@ -1878,6 +1946,8 @@ void HierarchyPanel::DrawComponents(const Entity entity)
     }
     if (entity.HasComponent<EnvironmentComponent>()) {
         ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(6, 6));
+        EditorIcons::Draw(EditorIcon::ComponentEnvironment);
+        ImGui::SameLine(0.0f, 4.0f);
         const bool opened = ImGui::TreeNodeEx(
             reinterpret_cast<void*>(typeid(EnvironmentComponent).hash_code()), treeNodeFlags, "Environment");
         ImGui::SameLine(ImGui::GetContentRegionAvail().x - 20.f);
@@ -1920,6 +1990,8 @@ void HierarchyPanel::DrawComponents(const Entity entity)
     }
     if (entity.HasComponent<TextComponent>()) {
         ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(6, 6));
+        EditorIcons::Draw(EditorIcon::ComponentText);
+        ImGui::SameLine(0.0f, 4.0f);
         const bool opened =
             ImGui::TreeNodeEx(reinterpret_cast<void*>(typeid(TextComponent).hash_code()), treeNodeFlags, "Text");
         ImGui::SameLine(ImGui::GetContentRegionAvail().x - 20.f);
@@ -1984,6 +2056,8 @@ void HierarchyPanel::DrawComponents(const Entity entity)
     }
     if (entity.HasComponent<AudioSource2DComponent>()) {
         ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(6, 6));
+        EditorIcons::Draw(EditorIcon::ComponentAudio2d);
+        ImGui::SameLine(0.0f, 4.0f);
         const bool opened = ImGui::TreeNodeEx(
             reinterpret_cast<void*>(typeid(AudioSource2DComponent).hash_code()), treeNodeFlags, "Audio Source 2D");
         ImGui::SameLine(ImGui::GetContentRegionAvail().x - 20.f);
@@ -2020,6 +2094,8 @@ void HierarchyPanel::DrawComponents(const Entity entity)
     }
     if (entity.HasComponent<AudioSource3DComponent>()) {
         ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(6, 6));
+        EditorIcons::Draw(EditorIcon::ComponentAudio3d);
+        ImGui::SameLine(0.0f, 4.0f);
         const bool opened = ImGui::TreeNodeEx(
             reinterpret_cast<void*>(typeid(AudioSource3DComponent).hash_code()), treeNodeFlags, "Audio Source 3D");
         ImGui::SameLine(ImGui::GetContentRegionAvail().x - 20.f);
@@ -2056,6 +2132,8 @@ void HierarchyPanel::DrawComponents(const Entity entity)
     }
     if (entity.HasComponent<AudioListenerComponent>()) {
         ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(6, 6));
+        EditorIcons::Draw(EditorIcon::ComponentAudioListener);
+        ImGui::SameLine(0.0f, 4.0f);
         const bool opened = ImGui::TreeNodeEx(
             reinterpret_cast<void*>(typeid(AudioListenerComponent).hash_code()), treeNodeFlags, "Audio Listener");
         ImGui::SameLine(ImGui::GetContentRegionAvail().x - 20.f);
@@ -2086,6 +2164,8 @@ void HierarchyPanel::DrawComponents(const Entity entity)
     }
     if (entity.HasComponent<ParticleEmitterComponent>()) {
         ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(6, 6));
+        EditorIcons::Draw(EditorIcon::ComponentParticles);
+        ImGui::SameLine(0.0f, 4.0f);
         const bool opened = ImGui::TreeNodeEx(
             reinterpret_cast<void*>(typeid(ParticleEmitterComponent).hash_code()), treeNodeFlags, "Particle Emitter");
         ImGui::SameLine(ImGui::GetContentRegionAvail().x - 20.f);
@@ -2140,6 +2220,8 @@ void HierarchyPanel::DrawComponents(const Entity entity)
     if (entity.HasComponent<SkeletonComponent>())
     {
         ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(6, 6));
+        EditorIcons::Draw(EditorIcon::ComponentSkeleton);
+        ImGui::SameLine(0.0f, 4.0f);
         const bool opened = ImGui::TreeNodeEx(
             reinterpret_cast<void*>(typeid(SkeletonComponent).hash_code()), treeNodeFlags, "Skeleton");
         ImGui::SameLine(ImGui::GetContentRegionAvail().x - 20.f);
@@ -2214,6 +2296,8 @@ void HierarchyPanel::DrawComponents(const Entity entity)
     if (entity.HasComponent<SkinnedMeshComponent>())
     {
         ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(6, 6));
+        EditorIcons::Draw(EditorIcon::ComponentSkinnedMesh);
+        ImGui::SameLine(0.0f, 4.0f);
         const bool opened = ImGui::TreeNodeEx(
             reinterpret_cast<void*>(typeid(SkinnedMeshComponent).hash_code()), treeNodeFlags, "Skinned Mesh");
         ImGui::SameLine(ImGui::GetContentRegionAvail().x - 20.f);
@@ -2294,6 +2378,8 @@ void HierarchyPanel::DrawComponents(const Entity entity)
     if (entity.HasComponent<JointComponent>())
     {
         ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(6, 6));
+        EditorIcons::Draw(EditorIcon::ComponentJoint);
+        ImGui::SameLine(0.0f, 4.0f);
         const bool opened = ImGui::TreeNodeEx(
             reinterpret_cast<void*>(typeid(JointComponent).hash_code()), treeNodeFlags, "Joint");
         ImGui::SameLine(ImGui::GetContentRegionAvail().x - 20.f);
@@ -2329,6 +2415,8 @@ void HierarchyPanel::DrawComponents(const Entity entity)
     if (entity.HasComponent<SocketComponent>())
     {
         ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(6, 6));
+        EditorIcons::Draw(EditorIcon::ComponentSocket);
+        ImGui::SameLine(0.0f, 4.0f);
         const bool opened = ImGui::TreeNodeEx(
             reinterpret_cast<void*>(typeid(SocketComponent).hash_code()), treeNodeFlags, "Socket");
         ImGui::SameLine(ImGui::GetContentRegionAvail().x - 20.f);
@@ -2380,6 +2468,8 @@ void HierarchyPanel::DrawComponents(const Entity entity)
     if (entity.HasComponent<AnimatorComponent>())
     {
         ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(6, 6));
+        EditorIcons::Draw(EditorIcon::ComponentAnimator);
+        ImGui::SameLine(0.0f, 4.0f);
         const bool opened = ImGui::TreeNodeEx(
             reinterpret_cast<void*>(typeid(AnimatorComponent).hash_code()), treeNodeFlags, "Animator");
         ImGui::SameLine(ImGui::GetContentRegionAvail().x - 20.f);
@@ -2543,6 +2633,8 @@ void HierarchyPanel::DrawComponents(const Entity entity)
     if (entity.HasComponent<RagdollComponent>())
     {
         ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(6, 6));
+        EditorIcons::Draw(EditorIcon::ComponentRagdoll);
+        ImGui::SameLine(0.0f, 4.0f);
         const bool opened = ImGui::TreeNodeEx(
             reinterpret_cast<void*>(typeid(RagdollComponent).hash_code()), treeNodeFlags, "Ragdoll");
         ImGui::SameLine(ImGui::GetContentRegionAvail().x - 20.f);
@@ -2622,6 +2714,8 @@ void HierarchyPanel::DrawComponents(const Entity entity)
     if (entity.HasComponent<AIBlackboardComponent>())
     {
         ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(6, 6));
+        EditorIcons::Draw(EditorIcon::ComponentAiBlackboard);
+        ImGui::SameLine(0.0f, 4.0f);
         const bool opened = ImGui::TreeNodeEx(
             reinterpret_cast<void*>(typeid(AIBlackboardComponent).hash_code()), treeNodeFlags, "AI Blackboard");
         ImGui::SameLine(ImGui::GetContentRegionAvail().x - 20.f);
@@ -2747,6 +2841,8 @@ void HierarchyPanel::DrawComponents(const Entity entity)
     if (entity.HasComponent<AIStateMachineComponent>())
     {
         ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(6, 6));
+        EditorIcons::Draw(EditorIcon::ComponentAiStateMachine);
+        ImGui::SameLine(0.0f, 4.0f);
         const bool opened = ImGui::TreeNodeEx(
             reinterpret_cast<void*>(typeid(AIStateMachineComponent).hash_code()), treeNodeFlags, "AI State Machine");
         ImGui::SameLine(ImGui::GetContentRegionAvail().x - 20.f);
@@ -2828,6 +2924,8 @@ void HierarchyPanel::DrawComponents(const Entity entity)
     if (entity.HasComponent<AIPerceptionComponent>())
     {
         ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(6, 6));
+        EditorIcons::Draw(EditorIcon::ComponentAiPerception);
+        ImGui::SameLine(0.0f, 4.0f);
         const bool opened = ImGui::TreeNodeEx(
             reinterpret_cast<void*>(typeid(AIPerceptionComponent).hash_code()), treeNodeFlags, "AI Perception");
         ImGui::SameLine(ImGui::GetContentRegionAvail().x - 20.f);
@@ -2874,6 +2972,8 @@ void HierarchyPanel::DrawComponents(const Entity entity)
     if (entity.HasComponent<AIControllerComponent>())
     {
         ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(6, 6));
+        EditorIcons::Draw(EditorIcon::ComponentAiController);
+        ImGui::SameLine(0.0f, 4.0f);
         const bool opened = ImGui::TreeNodeEx(
             reinterpret_cast<void*>(typeid(AIControllerComponent).hash_code()), treeNodeFlags, "AI Controller");
         ImGui::SameLine(ImGui::GetContentRegionAvail().x - 20.f);
@@ -2914,6 +3014,8 @@ void HierarchyPanel::DrawComponents(const Entity entity)
     if (entity.HasComponent<AITargetableComponent>())
     {
         ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(6, 6));
+        EditorIcons::Draw(EditorIcon::ComponentAiTargetable);
+        ImGui::SameLine(0.0f, 4.0f);
         const bool opened = ImGui::TreeNodeEx(
             reinterpret_cast<void*>(typeid(AITargetableComponent).hash_code()), treeNodeFlags, "AI Targetable");
         ImGui::SameLine(ImGui::GetContentRegionAvail().x - 20.f);

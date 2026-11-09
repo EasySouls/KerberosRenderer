@@ -6,8 +6,6 @@
 #include "Application.hpp"
 #include "AssetConstants.hpp"
 #include "Assets/AssetManager.hpp"
-#include "Core/EnginePaths.hpp"
-#include "Assets/Importers/TextureImporter.hpp"
 #include "Profiling/Profilers.hpp"
 #include "Input/InputSystem.hpp"
 #include "Utils/SystemOperations.hpp"
@@ -17,6 +15,7 @@
 #include "Renderer/Upscaling/UpscalerTypes.hpp"
 #include "Scripting/ScriptEngine.hpp"
 #include "Undo/InstantiatePrefabCommand.hpp"
+#include "Widgets/EditorIcons.hpp"
 
 #include <glm/gtc/matrix_inverse.hpp>
 #include <glm/gtc/type_ptr.hpp>
@@ -186,16 +185,14 @@ namespace PROJECT_NAME
 
 		m_ViewportSize = {1280.0f, 720.0f};
 
-		m_AssetsPanel = CreateOwner<AssetsPanel>(m_NotificationManager);
+		EditorIcons::Initialize();
 
-		m_IconPlay = TextureImporter::ImportTexture(EnginePaths::Assets() / "Editor/play_button.png");
-		m_IconStop = TextureImporter::ImportTexture(EnginePaths::Assets() / "Editor/stop_button.png");
-		m_IconPause = TextureImporter::ImportTexture(EnginePaths::Assets() / "Editor/pause_button.png");
-		m_IconResume = TextureImporter::ImportTexture(EnginePaths::Assets() / "Editor/outlined_play_button.png");
+		m_AssetsPanel = CreateOwner<AssetsPanel>(m_NotificationManager);
 	}
 
 	void EditorLayer::OnDetach()
 	{
+		EditorIcons::Shutdown();
         Log::EditorInfo("EditorLayer detached!");
 	}
 
@@ -942,7 +939,6 @@ namespace PROJECT_NAME
 
 		constexpr ImGuiWindowFlags flags = ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse;
 
-		ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.0f, 0.0f, 0.0f, 0.0f));
 		const auto &colors = ImGui::GetStyle().Colors;
 		const auto &buttonHovered = colors[ImGuiCol_ButtonHovered];
 		ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(buttonHovered.x, buttonHovered.y, buttonHovered.z, 0.5f));
@@ -955,16 +951,31 @@ namespace PROJECT_NAME
 
 		if (m_SceneState == SceneState::Edit)
 		{
-			constexpr int columns = 2;
+			constexpr int columns = 6;
 			ImGui::PushStyleVar(ImGuiStyleVar_ItemInnerSpacing, ImVec2(2.0f, 2.0f));
 			ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.0f, 2.0f));
 			constexpr ImGuiTableFlags tableFlags = ImGuiTableFlags_SizingFixedFit | ImGuiTableFlags_Resizable;
 			ImGui::BeginTable("##ToolbarButtonTable", columns, tableFlags, ImVec2(ImGui::GetWindowWidth(), size));
 			ImGui::PopStyleVar(2);
 
+			const auto gizmoButton = [&](const char* id, const EditorIcon icon, const GizmoType type,
+			                             const char* tooltip)
+			{
+				ImGui::TableNextColumn();
+				if (EditorIcons::ImageButton(id, icon, size, m_GizmoType == type))
+					m_GizmoType = type;
+				if (ImGui::IsItemHovered())
+					ImGui::SetTooltip("%s", tooltip);
+			};
+
+			gizmoButton("SelectGizmoButton", EditorIcon::GizmoSelect, GizmoType::None, "Select (Q)");
+			gizmoButton("TranslateGizmoButton", EditorIcon::GizmoTranslate, GizmoType::Translate, "Translate (W)");
+			gizmoButton("ScaleGizmoButton", EditorIcon::GizmoScale, GizmoType::Scale, "Scale (E)");
+			gizmoButton("RotateGizmoButton", EditorIcon::GizmoRotate, GizmoType::Rotate, "Rotate (R)");
+
 			ImGui::TableNextColumn();
 
-			if (ImGui::ImageButton("PlayButton", VulkanContext::Get().GetImGuiRendererID(m_IconPlay), ImVec2(size, size), ImVec2(0, 0), ImVec2(1, 1)))
+			if (EditorIcons::ImageButton("PlayButton", EditorIcon::TransportPlay, size))
 			{
 				OnScenePlay();
 			}
@@ -975,7 +986,7 @@ namespace PROJECT_NAME
 
 			ImGui::TableNextColumn();
 
-			if (ImGui::ImageButton("SimulateButton", VulkanContext::Get().GetImGuiRendererID(m_IconPlay), ImVec2(size, size), ImVec2(0, 0), ImVec2(1, 1)))
+			if (EditorIcons::ImageButton("SimulateButton", EditorIcon::TransportSimulate, size))
 			{
 				OnSceneSimulate();
 			}
@@ -995,13 +1006,11 @@ namespace PROJECT_NAME
 			constexpr ImGuiTableFlags tableFlags = ImGuiTableFlags_None;
 			ImGui::BeginTable("##ToolbarButtonTable", columns, tableFlags);
 
-			// ImGui::SetCursorPosX((ImGui::GetWindowContentRegionMax().x * 0.5f) - (size * 0.5f));
-
 			ImGui::TableNextColumn();
 
 			if (m_IsScenePaused)
 			{
-				if (ImGui::ImageButton("ResumeButton", VulkanContext::Get().GetImGuiRendererID(m_IconResume), ImVec2(size, size), ImVec2(0, 0), ImVec2(1, 1)))
+				if (EditorIcons::ImageButton("ResumeButton", EditorIcon::TransportResume, size))
 				{
 					m_IsScenePaused = false;
 					m_ActiveScene->SetScenePaused(m_IsScenePaused);
@@ -1013,7 +1022,7 @@ namespace PROJECT_NAME
 			}
 			else
 			{
-				if (ImGui::ImageButton("PauseButton", VulkanContext::Get().GetImGuiRendererID(m_IconPause), ImVec2(size, size), ImVec2(0, 0), ImVec2(1, 1)))
+				if (EditorIcons::ImageButton("PauseButton", EditorIcon::TransportPause, size))
 				{
 					m_IsScenePaused = true;
 					m_ActiveScene->SetScenePaused(m_IsScenePaused);
@@ -1026,7 +1035,7 @@ namespace PROJECT_NAME
 
 			ImGui::TableNextColumn();
 
-			if (ImGui::ImageButton("StopButton", VulkanContext::Get().GetImGuiRendererID(m_IconStop), ImVec2(size, size), ImVec2(0, 0), ImVec2(1, 1)))
+			if (EditorIcons::ImageButton("StopButton", EditorIcon::TransportStop, size))
 			{
 				OnSceneStop();
 			}
@@ -1044,7 +1053,7 @@ namespace PROJECT_NAME
 			ImGui::PopStyleVar(2);
 		}
 
-		ImGui::PopStyleColor(3);
+		ImGui::PopStyleColor(2);
 
 		ImGui::End();
 	}
@@ -1057,40 +1066,42 @@ namespace PROJECT_NAME
 		{
 			if (ImGui::BeginMenu("File"))
 			{
-				if (ImGui::MenuItem("Exit"))
+				if (EditorIcons::MenuItem(EditorIcon::ActionExit, "Exit"))
 				{
 					/// TODO: Show a confirmation dialog and whether to save the scene if there are unsaved changes
 					Application::Get().Close();
 				}
 
+				EditorIcons::Draw(EditorIcon::ActionFullscreen);
+				ImGui::SameLine(0.0f, 6.0f);
 				ImGui::MenuItem("Fullscreen", nullptr, &m_IsFullScreenPersistent);
 
-				if (ImGui::MenuItem("Open Project...", "Ctrl+Shift+O"))
+				if (EditorIcons::MenuItem(EditorIcon::ActionOpen, "Open Project...", "Ctrl+Shift+O"))
                 {
                     RequestOpenProject();
                 }
 
-				if (ImGui::MenuItem("New Project...", "Ctrl+Shift+N"))
+				if (EditorIcons::MenuItem(EditorIcon::ActionNew, "New Project...", "Ctrl+Shift+N"))
                 {
                     NewProject();
                 }
 
-				if (ImGui::MenuItem("New Scene", "Ctrl+N"))
+				if (EditorIcons::MenuItem(EditorIcon::AssetScene, "New Scene", "Ctrl+N"))
 				{
 					NewScene();
 				}
 
-				if (ImGui::MenuItem("Save", "Ctrl+S"))
+				if (EditorIcons::MenuItem(EditorIcon::ActionSave, "Save", "Ctrl+S"))
 				{
 					SaveScene();
 				}
 
-				if (ImGui::MenuItem("Save As...", "Ctrl+Shift+S"))
+				if (EditorIcons::MenuItem(EditorIcon::ActionSaveAs, "Save As...", "Ctrl+Shift+S"))
 				{
 					SaveSceneAs();
 				}
 
-				if (ImGui::MenuItem("Load...", "Ctrl+O"))
+				if (EditorIcons::MenuItem(EditorIcon::ActionOpen, "Load...", "Ctrl+O"))
 				{
 					LoadScene();
 				}
@@ -1109,31 +1120,31 @@ namespace PROJECT_NAME
 				const std::string undoLabel = (undoName.empty() ? "Undo" : "Undo " + undoName) + "##Undo";
 				const std::string redoLabel = (redoName.empty() ? "Redo" : "Redo " + redoName) + "##Redo";
 
-				if (ImGui::MenuItem(undoLabel.c_str(), "Ctrl+Z", false, canUndo))
+				if (EditorIcons::MenuItem(EditorIcon::ActionUndo, undoLabel.c_str(), "Ctrl+Z", false, canUndo))
 				{
 					Undo();
 				}
-				if (ImGui::MenuItem(redoLabel.c_str(), "Ctrl+Y", false, canRedo))
+				if (EditorIcons::MenuItem(EditorIcon::ActionRedo, redoLabel.c_str(), "Ctrl+Y", false, canRedo))
 				{
 					Redo();
 				}
 
 				ImGui::Separator();
 
-				if (ImGui::MenuItem("Cut", "Ctrl+X", false, false))
+				if (EditorIcons::MenuItem(EditorIcon::ActionCut, "Cut", "Ctrl+X", false, false))
 				{
 				}
-				if (ImGui::MenuItem("Copy", "Ctrl+C", false, false))
+				if (EditorIcons::MenuItem(EditorIcon::ActionCopy, "Copy", "Ctrl+C", false, false))
 				{
 				}
-				if (ImGui::MenuItem("Paste", "Ctrl+V", false, false))
+				if (EditorIcons::MenuItem(EditorIcon::ActionPaste, "Paste", "Ctrl+V", false, false))
 				{
 				}
-				if (ImGui::MenuItem("Duplicate", "Ctrl+D", false, false))
+				if (EditorIcons::MenuItem(EditorIcon::ActionDuplicate, "Duplicate", "Ctrl+D", false, false))
 				{
 				}
 				ImGui::Separator();
-				if (ImGui::MenuItem("Delete", "Del", false, false))
+				if (EditorIcons::MenuItem(EditorIcon::ActionDelete, "Delete", "Del", false, false))
 				{
 				}
 				ImGui::EndMenu();
@@ -1141,10 +1152,11 @@ namespace PROJECT_NAME
 
 			if (ImGui::BeginMenu("View"))
 			{
-				if (ImGui::MenuItem("Animation Editor", nullptr, m_AnimationEditorPanel.IsOpen()))
+				if (EditorIcons::MenuItem(EditorIcon::PanelAnimationEditor, "Animation Editor", nullptr,
+				                          m_AnimationEditorPanel.IsOpen()))
 					m_AnimationEditorPanel.SetOpen(!m_AnimationEditorPanel.IsOpen());
 
-				if (ImGui::MenuItem("Show Wireframe"))
+				if (EditorIcons::MenuItem(EditorIcon::ActionWireframe, "Show Wireframe"))
 				{
 					/*m_ShowWireframe = !m_ShowWireframe;
 					Renderer3D::SetShowWireframe(m_ShowWireframe);*/
@@ -1154,12 +1166,14 @@ namespace PROJECT_NAME
 
 			if (ImGui::BeginMenu("Debug"))
 			{
-				if (ImGui::MenuItem("Reload C# assemblies", "", nullptr, m_SceneState == SceneState::Edit))
+				if (EditorIcons::MenuItem(EditorIcon::ActionReload, "Reload C# assemblies", "",
+				                          false, m_SceneState == SceneState::Edit))
 				{
 					ScriptEngine::ReloadAssembly();
 				}
 
-				if (ImGui::MenuItem("Recompile shaders", "", nullptr, m_SceneState == SceneState::Edit))
+				if (EditorIcons::MenuItem(EditorIcon::Shader, "Recompile shaders", "",
+				                          false, m_SceneState == SceneState::Edit))
 				{
 					Renderer::RecompileShaders();
 				}

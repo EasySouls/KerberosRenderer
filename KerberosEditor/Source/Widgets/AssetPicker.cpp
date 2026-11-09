@@ -3,6 +3,7 @@
 #include "AssetConstants.hpp"
 #include "Assets/AssetRegistry.hpp"
 #include "Project/Project.hpp"
+#include "Widgets/EditorIcons.hpp"
 
 #include <algorithm>
 #include <array>
@@ -20,6 +21,7 @@ namespace Kerberos
 		struct PickerEntry
 		{
 			AssetHandle Handle = AssetHandle::Invalid();
+			AssetType Type = AssetType::Texture2D;
 			std::string Label;
 			std::string SearchKey;
 		};
@@ -96,6 +98,7 @@ namespace Kerberos
 				const AssetMetadata& metadata = registry.Get(handle);
 				PickerEntry entry{
 					.Handle = handle,
+					.Type = metadata.Type,
 					.Label = AssetDisplayLabel(metadata, handle),
 					.SearchKey = ""
 				};
@@ -217,6 +220,8 @@ namespace Kerberos
 								const PickerEntry& entry = cache.Entries[visibleEntries[static_cast<size_t>(i)]];
 								const bool selected = handle.IsValid() && handle == entry.Handle;
 								ImGui::PushID(static_cast<int>(static_cast<uint64_t>(entry.Handle) & 0x7fffffff));
+								EditorIcons::Draw(EditorIcons::ForAssetType(entry.Type));
+								ImGui::SameLine(0.0f, 4.0f);
 								if (ImGui::Selectable(entry.Label.c_str(), selected))
 								{
 									if (manager->IsAssetHandleValid(entry.Handle))

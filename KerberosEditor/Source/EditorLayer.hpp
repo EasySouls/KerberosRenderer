@@ -145,11 +145,6 @@ namespace Kerberos
 		};
 		GizmoType m_GizmoType = GizmoType::None;
 
-		Ref<Texture2D> m_IconPlay;
-		Ref<Texture2D> m_IconStop;
-		Ref<Texture2D> m_IconPause;
-		Ref<Texture2D> m_IconResume;
-
 		bool m_IsFullScreenPersistent = true;
 
 		Owner<Camera> m_EditorCamera = nullptr;
