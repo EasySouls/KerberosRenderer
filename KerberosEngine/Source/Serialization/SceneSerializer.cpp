@@ -2,6 +2,8 @@
 
 #include "Assets/AssetManager.hpp"
 #include "Scene/Components.hpp"
+#include "Scene/Components/AIComponents.hpp"
+#include "AI/AIKeys.hpp"
 #include "Scene/Components/AnimationComponents.hpp"
 #include "Scene/Components/AudioComponents.hpp"
 #include "Scene/Components/ParticleComponents.hpp"
@@ -16,12 +18,81 @@
 
 #include <glm/glm.hpp>
 
+#include <algorithm>
 #include <fstream>
+#include <type_traits>
 #include <yaml-cpp/yaml.h>
 
 import Kerberos;
 
 namespace Kerberos {
+
+namespace {
+
+const char* BlackboardTypeName(const BlackboardValue& value)
+{
+    return std::visit([]<typename Type>([[maybe_unused]] const Type& typedValue) -> const char* {
+        using T = std::decay_t<Type>;
+        if constexpr (std::is_same_v<T, bool>) return "Bool";
+        else if constexpr (std::is_same_v<T, std::int64_t>) return "Int";
+        else if constexpr (std::is_same_v<T, float>) return "Float";
+        else if constexpr (std::is_same_v<T, glm::vec3>) return "Vec3";
+        else if constexpr (std::is_same_v<T, UUID>) return "Entity";
+        else return "String";
+    }, value);
+}
+
+void SerializeBlackboardValue(YAML::Emitter& out, const BlackboardValue& value)
+{
+    std::visit([&out]<typename Type>(const Type& typedValue) {
+        using T = std::decay_t<Type>;
+        if constexpr (std::is_same_v<T, UUID>)
+            out << static_cast<std::uint64_t>(typedValue);
+        else
+            out << typedValue;
+    }, value);
+}
+
+bool DeserializeBlackboardValue(const YAML::Node& node, BlackboardValue& out)
+{
+    const std::string type = node["Type"].as<std::string>("");
+    const YAML::Node valueNode = node["Value"];
+
+    if (type == "Bool")
+    {
+        out = valueNode.as<bool>(false);
+        return true;
+    }
+    if (type == "Int")
+    {
+        out = valueNode.as<std::int64_t>(0);
+        return true;
+    }
+    if (type == "Float")
+    {
+        out = valueNode.as<float>(0.0f);
+        return true;
+    }
+    if (type == "Vec3")
+    {
+        out = valueNode.as<glm::vec3>(glm::vec3(0.0f));
+        return true;
+    }
+    if (type == "Entity")
+    {
+        out = UUID(valueNode.as<std::uint64_t>(0));
+        return true;
+    }
+    if (type == "String")
+    {
+        out = valueNode.as<std::string>("");
+        return true;
+    }
+
+    return false;
+}
+
+} // namespace
 
 static void SerializeEntity(YAML::Emitter& out, const Entity entity)
 {
@@ -397,6 +468,65 @@ static void SerializeEntity(YAML::Emitter& out, const Entity entity)
         out << YAML::Key << "LocalTranslation" << YAML::Value << socket.LocalTranslation;
         out << YAML::Key << "LocalRotation" << YAML::Value << socket.LocalRotation;
         out << YAML::Key << "LocalScale" << YAML::Value << socket.LocalScale;
+        out << YAML::EndMap;
+    }
+
+    if (entity.HasComponent<AIBlackboardComponent>()) {
+        out << YAML::Key << "AIBlackboardComponent";
+        out << YAML::BeginMap;
+        const auto& blackboard = entity.GetComponent<AIBlackboardComponent>();
+        out << YAML::Key << "Values" << YAML::Value << YAML::BeginSeq;
+        for (const NamedBlackboardValue& entry : blackboard.AuthoredValues) {
+            if (entry.Key.empty())
+                continue;
+
+            out << YAML::BeginMap;
+            out << YAML::Key << "Key" << YAML::Value << entry.Key;
+            out << YAML::Key << "Type" << YAML::Value << BlackboardTypeName(entry.Value);
+            out << YAML::Key << "Value" << YAML::Value;
+            SerializeBlackboardValue(out, entry.Value);
+            out << YAML::EndMap;
+        }
+        out << YAML::EndSeq;
+        out << YAML::EndMap;
+    }
+
+    if (entity.HasComponent<AIStateMachineComponent>()) {
+        out << YAML::Key << "AIStateMachineComponent";
+        out << YAML::BeginMap;
+        out << YAML::Key << "TreeName" << YAML::Value
+            << entity.GetComponent<AIStateMachineComponent>().TreeName;
+        out << YAML::EndMap;
+    }
+
+    if (entity.HasComponent<AIPerceptionComponent>()) {
+        out << YAML::Key << "AIPerceptionComponent";
+        out << YAML::BeginMap;
+        const auto& perception = entity.GetComponent<AIPerceptionComponent>();
+        out << YAML::Key << "TargetKey" << YAML::Value << perception.TargetKey;
+        out << YAML::Key << "SightRadius" << YAML::Value << perception.SightRadius;
+        out << YAML::Key << "LoseRadius" << YAML::Value << perception.LoseRadius;
+        out << YAML::Key << "FieldOfViewDegrees" << YAML::Value << perception.FieldOfViewDegrees;
+        out << YAML::Key << "EyeHeight" << YAML::Value << perception.EyeHeight;
+        out << YAML::Key << "RequireLineOfSight" << YAML::Value << perception.RequireLineOfSight;
+        out << YAML::Key << "PerceptionInterval" << YAML::Value << perception.PerceptionInterval;
+        out << YAML::Key << "FactionId" << YAML::Value << perception.FactionId;
+        out << YAML::EndMap;
+    }
+
+    if (entity.HasComponent<AIControllerComponent>()) {
+        out << YAML::Key << "AIControllerComponent";
+        out << YAML::BeginMap;
+        out << YAML::Key << "Enabled" << YAML::Value
+            << entity.GetComponent<AIControllerComponent>().Enabled;
+        out << YAML::EndMap;
+    }
+
+    if (entity.HasComponent<AITargetableComponent>()) {
+        out << YAML::Key << "AITargetableComponent";
+        out << YAML::BeginMap;
+        out << YAML::Key << "FactionId" << YAML::Value
+            << entity.GetComponent<AITargetableComponent>().FactionId;
         out << YAML::EndMap;
     }
 
@@ -783,6 +913,70 @@ Entity SceneSerializer::DeserializeEntity(const Ref<Scene>& scene, const YAML::N
         socket.LocalTranslation = socketComponent["LocalTranslation"].as<glm::vec3>(glm::vec3(0.0f));
         socket.LocalRotation = socketComponent["LocalRotation"].as<glm::vec3>(glm::vec3(0.0f));
         socket.LocalScale = socketComponent["LocalScale"].as<glm::vec3>(glm::vec3(1.0f));
+    }
+
+    if (auto aiBlackboard = node["AIBlackboardComponent"]) {
+        auto& blackboard = deserializedEntity.AddComponent<AIBlackboardComponent>();
+        const YAML::Node values = aiBlackboard["Values"];
+        if (values && values.IsSequence()) {
+            for (const auto& valueNode : values) {
+                NamedBlackboardValue entry;
+                entry.Key = valueNode["Key"].as<std::string>("");
+                if (entry.Key.empty()) {
+                    Log::CoreWarn("Skipping AI blackboard entry with an empty key.");
+                    continue;
+                }
+
+                if (!DeserializeBlackboardValue(valueNode, entry.Value)) {
+                    Log::CoreWarn("Skipping AI blackboard entry '{}' with an unknown value type.", entry.Key);
+                    continue;
+                }
+
+                blackboard.AuthoredValues.push_back(std::move(entry));
+            }
+        }
+    }
+
+    if (auto aiStateMachine = node["AIStateMachineComponent"]) {
+        auto& stateMachine = deserializedEntity.AddComponent<AIStateMachineComponent>();
+        stateMachine.TreeName = aiStateMachine["TreeName"].as<std::string>("");
+        stateMachine.Tree = nullptr;
+        stateMachine.IsInitialized = false;
+        stateMachine.CurrentState = AI::InvalidState;
+        stateMachine.PreviousState = AI::InvalidState;
+        stateMachine.PendingState = AI::InvalidState;
+        stateMachine.TimeInState = 0.0f;
+        stateMachine.TaskInstances.clear();
+    }
+
+    if (auto aiPerception = node["AIPerceptionComponent"]) {
+        auto& perception = deserializedEntity.AddComponent<AIPerceptionComponent>();
+        perception.TargetKey = aiPerception["TargetKey"].as<std::uint64_t>(AI::TargetEntity);
+        perception.SightRadius = std::max(0.0f, aiPerception["SightRadius"].as<float>(15.0f));
+        perception.LoseRadius = std::max(perception.SightRadius,
+            aiPerception["LoseRadius"].as<float>(std::max(20.0f, perception.SightRadius)));
+        perception.FieldOfViewDegrees = std::clamp(
+            aiPerception["FieldOfViewDegrees"].as<float>(120.0f), 0.0f, 360.0f);
+        perception.EyeHeight = std::max(0.0f, aiPerception["EyeHeight"].as<float>(1.5f));
+        perception.RequireLineOfSight = aiPerception["RequireLineOfSight"].as<bool>(true);
+        perception.PerceptionInterval = std::max(0.0f, aiPerception["PerceptionInterval"].as<float>(0.2f));
+        perception.TimeSincePerception = 0.0f;
+        perception.FactionId = aiPerception["FactionId"].as<std::uint32_t>(0);
+    }
+
+    if (auto aiController = node["AIControllerComponent"]) {
+        auto& controller = deserializedEntity.AddComponent<AIControllerComponent>();
+        controller.Enabled = aiController["Enabled"].as<bool>(true);
+        controller.DesiredVelocity = glm::vec3(0.0f);
+        controller.LookAtTarget = glm::vec3(0.0f);
+        controller.HasLookAt = false;
+        controller.WantsToAttack = false;
+        controller.WarnedDynamicBody = false;
+    }
+
+    if (auto aiTargetable = node["AITargetableComponent"]) {
+        auto& targetable = deserializedEntity.AddComponent<AITargetableComponent>();
+        targetable.FactionId = aiTargetable["FactionId"].as<std::uint32_t>(1);
     }
 
     return deserializedEntity;
