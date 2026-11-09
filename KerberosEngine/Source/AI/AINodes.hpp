@@ -63,25 +63,26 @@ private:
 class TaskChaseTarget : public TAITask<TaskChaseTarget>
 {
 public:
-    explicit TaskChaseTarget(float speed);
+    TaskChaseTarget(BlackboardKey targetKey, float speed);
 
     TaskStatus OnTick(AIContext& ctx) override;
 
     void OnExit(AIContext& ctx) override;
 
 private:
+    BlackboardKey m_TargetKey;
     float m_Speed;
 };
 
 class TaskFaceTarget : public TAITask<TaskFaceTarget>
 {
 public:
-    explicit TaskFaceTarget(float rotationSpeed);
+    explicit TaskFaceTarget(BlackboardKey targetKey);
 
     TaskStatus OnTick(AIContext& ctx) override;
 
 private:
-    float m_RotationSpeed;
+    BlackboardKey m_TargetKey;
 };
 
 class TaskStop : public TAITask<TaskStop>

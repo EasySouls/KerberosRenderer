@@ -53,4 +53,24 @@ const AIStateDefinition* AIStateTree::FindState(const StateID id) const
     return state;
 }
 
+StateID AIStateTree::GetEntryState() const
+{
+    return m_EntryState;
+}
+
+const std::string& AIStateTree::GetName() const
+{
+    return m_Name;
+}
+
+bool AIStateTree::HasState(const StateID id) const
+{
+    return m_States.contains(id);
+}
+
+const std::unordered_map<StateID, AIStateDefinition>& AIStateTree::GetStates() const
+{
+    return m_States;
+}
+
 }

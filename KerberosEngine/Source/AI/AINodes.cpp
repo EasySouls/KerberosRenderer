@@ -11,16 +11,27 @@ ConditionDistanceToTarget::ConditionDistanceToTarget(const BlackboardKey targetK
     : m_TargetKey(targetKey), m_ThresholdSq(threshold * threshold), m_LessThan(lessThan)
 {}
 
-bool ConditionDistanceToTarget::TestCondition(const AIContext& ctx) const override
+bool ConditionDistanceToTarget::TestCondition(const AIContext& ctx) const
 {
-    const Entity entity = ctx.World->GetEntityByUUID(ctx.Entity);
-    const auto& bb = entity.GetComponent<AIBlackboardComponent>();
-    const auto* target = bb.Get<uint64_t>(m_TargetKey);
-    if (!target || *target == 0)
+    const Entity entity = ctx.World->TryGetEntityByUUID(ctx.Entity);
+    if (!entity || !entity.HasComponent<AIBlackboardComponent>())
         return false;
 
-    const auto& myPos = entity.GetComponent<TransformComponent>().WorldTransform[3];
-    const auto& targetPos = ctx.World->GetRegistry().get<TransformComponent>(static_cast<entt::entity>(*target)).WorldTransform[3];
+    const auto& bb = entity.GetComponent<AIBlackboardComponent>();
+    const UUID* target = bb.Get<UUID>(m_TargetKey);
+    if (!target || *target == UUID::Invalid())
+        return false;
+
+    const Entity targetEntity = ctx.World->TryGetEntityByUUID(*target);
+    if (!targetEntity ||
+        !entity.HasComponent<TransformComponent>() ||
+        !targetEntity.HasComponent<TransformComponent>())
+    {
+        return false;
+    }
+
+    const glm::vec3 myPos = glm::vec3(entity.GetComponent<TransformComponent>().WorldTransform[3]);
+    const glm::vec3 targetPos = glm::vec3(targetEntity.GetComponent<TransformComponent>().WorldTransform[3]);
 
     const float distSq = glm::distance2(myPos, targetPos);
     return m_LessThan ? (distSq <= m_ThresholdSq) : (distSq > m_ThresholdSq);
@@ -33,7 +44,10 @@ ConditionBlackboardBool::ConditionBlackboardBool(const BlackboardKey key, const 
 
 bool ConditionBlackboardBool::TestCondition(const AIContext& ctx) const
 {
-    const Entity entity = ctx.World->GetEntityByUUID(ctx.Entity);
+    const Entity entity = ctx.World->TryGetEntityByUUID(ctx.Entity);
+    if (!entity || !entity.HasComponent<AIBlackboardComponent>())
+        return false;
+
     const auto& bb = entity.GetComponent<AIBlackboardComponent>();
     const auto* value = bb.Get<bool>(m_Key);
     if (!value)
@@ -49,7 +63,10 @@ ConditionTimeInState::ConditionTimeInState(const float threshold, const bool les
 
 bool ConditionTimeInState::TestCondition(const AIContext& ctx) const
 {
-    const Entity entity = ctx.World->GetEntityByUUID(ctx.Entity);
+    const Entity entity = ctx.World->TryGetEntityByUUID(ctx.Entity);
+    if (!entity || !entity.HasComponent<AIBlackboardComponent>())
+        return false;
+
     const auto& bb = entity.GetComponent<AIBlackboardComponent>();
     const auto* timeInState = bb.Get<float>(StateTime);
     if (!timeInState)
@@ -60,10 +77,13 @@ bool ConditionTimeInState::TestCondition(const AIContext& ctx) const
 
 bool ConditionTargetVisible::TestCondition(const AIContext& ctx) const
 {
-    const Entity entity = ctx.World->GetEntityByUUID(ctx.Entity);
+    const Entity entity = ctx.World->TryGetEntityByUUID(ctx.Entity);
+    if (!entity || !entity.HasComponent<AIBlackboardComponent>())
+        return false;
+
     const auto& bb = entity.GetComponent<AIBlackboardComponent>();
-    const auto* target = bb.Get<uint64_t>(HasLineOfSight);
-    return target && *target != 0;
+    const auto* visible = bb.Get<bool>(HasLineOfSight);
+    return visible && *visible;
 }
 
 ConditionTargetExists::ConditionTargetExists(const BlackboardKey targetKey)
@@ -73,27 +93,41 @@ ConditionTargetExists::ConditionTargetExists(const BlackboardKey targetKey)
 
 bool ConditionTargetExists::TestCondition(const AIContext& ctx) const
 {
-    const Entity entity = ctx.World->GetEntityByUUID(ctx.Entity);
+    const Entity entity = ctx.World->TryGetEntityByUUID(ctx.Entity);
+    if (!entity || !entity.HasComponent<AIBlackboardComponent>())
+        return false;
+
     const auto& bb = entity.GetComponent<AIBlackboardComponent>();
-    const auto* target = bb.Get<uint64_t>(m_TargetKey);
-    return target && *target != 0;
+    const auto* target = bb.Get<UUID>(m_TargetKey);
+    return target && *target != UUID::Invalid();
 }
 
 
-TaskChaseTarget::TaskChaseTarget(const float speed) 
-    : TAITask<TaskChaseTarget>(), m_Speed(speed) 
-{}
+TaskChaseTarget::TaskChaseTarget(const BlackboardKey targetKey, const float speed)
+    : TAITask<TaskChaseTarget>(), m_TargetKey(targetKey), m_Speed(speed)
+{
+}
 
 TaskStatus TaskChaseTarget::OnTick(AIContext& ctx)
 {
-    const Entity entity = ctx.World->GetEntityByUUID(ctx.Entity);
-    const auto& bb = entity.GetComponent<AIBlackboardComponent>();
-    const auto* target = bb.Get<uint64_t>(TargetEntity);
-    if (!target || *target == 0)
+    const Entity entity = ctx.World->TryGetEntityByUUID(ctx.Entity);
+    if (!entity || !entity.HasComponent<AIBlackboardComponent>())
         return TaskStatus::Failed;
 
-    const auto& myPos = entity.GetComponent<TransformComponent>().Translation;
-    const auto& targetPos = ctx.World->GetRegistry().get<TransformComponent>(static_cast<entt::entity>(*target)).Translation;
+    if (!entity.HasComponent<AIControllerComponent>())
+        return TaskStatus::Failed;
+
+    const auto& bb = entity.GetComponent<AIBlackboardComponent>();
+    const auto* target = bb.Get<UUID>(m_TargetKey);
+    if (!target || *target == UUID::Invalid())
+        return TaskStatus::Failed;
+
+    const Entity targetEntity = ctx.World->TryGetEntityByUUID(*target);
+    if (!targetEntity || !targetEntity.HasComponent<TransformComponent>())
+        return TaskStatus::Failed;
+
+    const glm::vec3 myPos = glm::vec3(entity.GetComponent<TransformComponent>().WorldTransform[3]);
+    const glm::vec3 targetPos = glm::vec3(targetEntity.GetComponent<TransformComponent>().WorldTransform[3]);
 
     glm::vec3 toTarget = targetPos - myPos;
     toTarget.y = 0.0f; // Constrain to ground plane if walking
@@ -103,6 +137,7 @@ TaskStatus TaskChaseTarget::OnTick(AIContext& ctx)
         auto& controller = entity.GetComponent<AIControllerComponent>();
         controller.DesiredVelocity = glm::normalize(toTarget) * m_Speed;
         controller.LookAtTarget = targetPos;
+        controller.HasLookAt = true;
     }
 
     return TaskStatus::Running;
@@ -110,26 +145,40 @@ TaskStatus TaskChaseTarget::OnTick(AIContext& ctx)
 
 void TaskChaseTarget::OnExit(AIContext& ctx)
 {
-    const Entity entity = ctx.World->GetEntityByUUID(ctx.Entity);
+    const Entity entity = ctx.World->TryGetEntityByUUID(ctx.Entity);
+    if (!entity || !entity.HasComponent<AIControllerComponent>())
+        return;
+
     auto& controller = entity.GetComponent<AIControllerComponent>();
     controller.DesiredVelocity = glm::vec3(0.0f);
+    controller.HasLookAt = false;
 }
 
-TaskFaceTarget::TaskFaceTarget(const float rotationSpeed)
-    : TAITask<TaskFaceTarget>(), m_RotationSpeed(rotationSpeed)
+TaskFaceTarget::TaskFaceTarget(const BlackboardKey targetKey)
+    : TAITask<TaskFaceTarget>(), m_TargetKey(targetKey)
 {
 }
 
 TaskStatus TaskFaceTarget::OnTick(AIContext& ctx)
 {
-    const Entity entity = ctx.World->GetEntityByUUID(ctx.Entity);
-    const auto& bb = entity.GetComponent<AIBlackboardComponent>();
-    const auto* target = bb.Get<uint64_t>(TargetEntity);
-    if (!target || *target == 0)
+    const Entity entity = ctx.World->TryGetEntityByUUID(ctx.Entity);
+    if (!entity || !entity.HasComponent<AIBlackboardComponent>())
         return TaskStatus::Failed;
 
-    const auto& myPos = entity.GetComponent<TransformComponent>().WorldTransform[3];
-    const auto& targetPos = ctx.World->GetRegistry().get<TransformComponent>(static_cast<entt::entity>(*target)).WorldTransform[3];
+    if (!entity.HasComponent<AIControllerComponent>())
+        return TaskStatus::Failed;
+
+    const auto& bb = entity.GetComponent<AIBlackboardComponent>();
+    const auto* target = bb.Get<UUID>(m_TargetKey);
+    if (!target || *target == UUID::Invalid())
+        return TaskStatus::Failed;
+
+    const Entity targetEntity = ctx.World->TryGetEntityByUUID(*target);
+    if (!targetEntity || !targetEntity.HasComponent<TransformComponent>())
+        return TaskStatus::Failed;
+
+    const glm::vec3 myPos = glm::vec3(entity.GetComponent<TransformComponent>().WorldTransform[3]);
+    const glm::vec3 targetPos = glm::vec3(targetEntity.GetComponent<TransformComponent>().WorldTransform[3]);
 
     glm::vec3 toTarget = targetPos - myPos;
     toTarget.y = 0.0f; // Constrain to ground plane if walking
@@ -139,6 +188,7 @@ TaskStatus TaskFaceTarget::OnTick(AIContext& ctx)
     {
         auto& controller = entity.GetComponent<AIControllerComponent>();
         controller.LookAtTarget = targetPos;
+        controller.HasLookAt = true;
     }
 
     return TaskStatus::Running;
@@ -151,9 +201,14 @@ TaskStop::TaskStop()
 
 void TaskStop::OnEnter(AIContext& context)
 {
-    const Entity entity = context.World->GetEntityByUUID(context.Entity);
+    const Entity entity = context.World->TryGetEntityByUUID(context.Entity);
+    if (!entity || !entity.HasComponent<AIControllerComponent>())
+        return;
+
     auto& controller = entity.GetComponent<AIControllerComponent>();
     controller.DesiredVelocity = glm::vec3(0.0f);
+    controller.HasLookAt = false;
+    controller.WantsToAttack = false;
 }
 
 TaskWait::TaskWait(const float duration)
@@ -163,7 +218,10 @@ TaskWait::TaskWait(const float duration)
 
 TaskStatus TaskWait::OnTick(AIContext& ctx)
 {
-    const Entity entity = ctx.World->GetEntityByUUID(ctx.Entity);
+    const Entity entity = ctx.World->TryGetEntityByUUID(ctx.Entity);
+    if (!entity || !entity.HasComponent<AIBlackboardComponent>())
+        return TaskStatus::Failed;
+
     const auto& bb = entity.GetComponent<AIBlackboardComponent>();
     auto* timeInState = bb.Get<float>(StateTime);
 
@@ -183,7 +241,10 @@ TaskSetBlackboardBool::TaskSetBlackboardBool(const BlackboardKey key, const bool
 
 void TaskSetBlackboardBool::OnEnter(AIContext& context)
 {
-    const Entity entity = context.World->GetEntityByUUID(context.Entity);
+    const Entity entity = context.World->TryGetEntityByUUID(context.Entity);
+    if (!entity || !entity.HasComponent<AIBlackboardComponent>())
+        return;
+
     auto& bb = entity.GetComponent<AIBlackboardComponent>();
     bb.Set(m_Key, m_Value);
 }
@@ -195,7 +256,10 @@ TaskAttackTarget::TaskAttackTarget()
 
 TaskStatus TaskAttackTarget::OnTick(AIContext& ctx)
 {
-    const Entity entity = ctx.World->GetEntityByUUID(ctx.Entity);
+    const Entity entity = ctx.World->TryGetEntityByUUID(ctx.Entity);
+    if (!entity || !entity.HasComponent<AIControllerComponent>())
+        return TaskStatus::Failed;
+
     auto& controller = entity.GetComponent<AIControllerComponent>();
     controller.WantsToAttack = true;
 

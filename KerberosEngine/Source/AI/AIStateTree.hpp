@@ -46,6 +46,9 @@ public:
 
 class IAITask
 {
+protected:
+    IAITask() = default;
+
 public:
     virtual ~IAITask() = default;
 
@@ -100,6 +103,11 @@ public:
     void SetEntryState(StateID id);
 
     const AIStateDefinition* FindState(StateID id) const;
+
+    [[nodiscard]] StateID GetEntryState() const;
+    [[nodiscard]] const std::string& GetName() const;
+    [[nodiscard]] bool HasState(StateID id) const;
+    [[nodiscard]] const std::unordered_map<StateID, AIStateDefinition>& GetStates() const;
 
 private:
     std::string m_Name;

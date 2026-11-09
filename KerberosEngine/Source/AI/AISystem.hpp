@@ -1,4 +1,4 @@
-#pragma once 
+#pragma once
 
 #include "Scene/Components/AIComponents.hpp"
 
@@ -12,19 +12,46 @@ class AISystem
 public:
     explicit AISystem(Scene& scene);
 
-    //Clear runtime state, seed authored blackboards, build task instances.
-    void OnStart(); 
-    // Clear runtime instances and values
+    /// Resets transient state and seeds authored blackboard values.
+    void OnStart();
+
+    /// Clears runtime blackboard values and per-entity task instances.
     void OnStop();
 
-    void Update(float dt) const;
+    /// Perception -> state machine -> movement for every AI agent in the scene.
+    void Update(float dt);
+
     bool IsEnabled() const;
     void SetEnabled(bool enabled);
 
 private:
-    void UpdatePerception(Entity entity, AIBlackboardComponent&, AIPerceptionComponent&, float dt);
-    void UpdateStateMachine(Entity entity, AIBlackboardComponent&, AIStateMachineComponent&, float dt);
-    void UpdateMovement(Entity entity, AIStateMachineComponent&, AIControllerComponent&, float dt);
+    bool EnsureInitialized(Entity entity,
+                           AIBlackboardComponent& blackboard,
+                           AIStateMachineComponent& stateMachine);
+
+    void SeedAuthoredValues(AIBlackboardComponent& blackboard);
+    static void ResetRuntimeState(AIStateMachineComponent& stateMachine);
+
+    static void TransitionTo(Entity entity,
+                             AIBlackboardComponent& blackboard,
+                             AIStateMachineComponent& stateMachine,
+                             AI::StateID targetState,
+                             AI::AIContext& context);
+
+    void UpdatePerception(Entity entity,
+                          AIBlackboardComponent& blackboard,
+                          AIPerceptionComponent& perception,
+                          float dt) const;
+
+    void UpdateStateMachine(Entity entity,
+                            AIBlackboardComponent& blackboard,
+                            AIStateMachineComponent& stateMachine,
+                            float dt) const;
+
+    void UpdateMovement(Entity entity,
+                        AIStateMachineComponent& stateMachine,
+                        AIControllerComponent& controller,
+                        float dt) const;
 
     Scene* m_Scene = nullptr;
     bool m_Enabled = true;

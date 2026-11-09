@@ -102,10 +102,12 @@ namespace Kerberos
 		m_PhysicsSystem->Initialize(shared_from_this());
 		m_RagdollSystem.Reset();
 		StartAnimators();
+		m_AISystem.OnStart();
 	}
 
 	void Scene::OnSimulationStop()
 	{
+		m_AISystem.OnStop();
 		StopAnimators();
 		m_RagdollSystem.Cleanup();
 		m_PhysicsSystem->Cleanup();
@@ -173,6 +175,7 @@ namespace Kerberos
 		/// If the scene is paused, do not update the physics system, but still render the scene
 		if (!m_IsScenePaused)
 		{
+			m_AISystem.Update(ts);
 			m_RagdollSystem.PreparePhysics(ts);
 			m_PhysicsSystem->Update(ts);
 			m_RagdollSystem.ReadPhysicsPose(ts);
