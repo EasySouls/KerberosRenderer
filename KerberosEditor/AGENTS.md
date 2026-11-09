@@ -94,6 +94,13 @@ Editor windows live mainly under
   authored setup only; `Scene::RagdollSystem` owns the runtime bodies,
   constraints, offsets, and blend state. Authored prefab templates do not carry
   the Ragdoll component yet, so add it after instantiation or from C#.
+  The AI components are added through the `AI` component submenu; the
+  "AI Agent" entry creates the blackboard, state machine, controller, and
+  perception together. The inspector selects a registered state tree, shows
+  the live current/previous state and time in state during Play/Simulate, and
+  edits perception/controller fields plus the authored blackboard values.
+  Runtime blackboard values are shown read-only. Removing any AI component
+  uses the same component-popup pattern as the rest of the hierarchy.
 - `AnimationEditorPanel`: opened from `View > Animation Editor`; it resolves the
   animator from the selected entity, a parent, or the skeleton-linked animator.
   Its timeline shows one lane per event name plus a marker lane, supports
@@ -216,6 +223,17 @@ immediately. `Scene::UpdateScripts`/`OnRuntimeStart` snapshot the script entity
 list before invoking callbacks so scripts may spawn prefabs during lifecycle
 methods.
 
+AI state trees can be registered from C# with
+`Kerberos.AI.AI.RegisterStateTree(name, docOrJson)` before assigning
+`AIStateMachineComponent.TreeName`. Script-owned trees are cleared on project
+open and script-assembly reload, so register them in `OnCreate` (not a static
+constructor). Scripts are not instantiated in Simulate, so C#-registered trees
+are available in Play only; native trees work in both. The managed AI
+components expose blackboard typed get/set, state-machine tree/current state/
+`RequestState`, controller intent, perception fields, and targetable faction.
+Native callback-table additions must be appended at the end on both sides; the
+table is read positionally.
+
 Script classes use the `Kerberos.*` namespace (renamed from
 `Kerberos.Source.Kerberos.*`); `ScriptUtils::MigrateLegacyScriptClassName`
 rewrites the old prefix when scenes/prefabs are deserialized. The built-in
@@ -283,7 +301,8 @@ must close and release project resources before the application is destroyed.
 
 Scene updates drive editor/runtime simulation and then queue rendering. The
 Play/Simulate update order is transforms → animation clocks/pose → events →
-scripts → `RagdollSystem::PreparePhysics` → `PhysicsSystem::Update` →
+scripts → `AISystem::Update` (perception → state machine → movement) →
+`RagdollSystem::PreparePhysics` → `PhysicsSystem::Update` →
 `RagdollSystem::ReadPhysicsPose` → `AnimationRuntime::FinalizePose` → queue
 render; the renderer only uploads the already-final skin matrices and joint
 entities/sockets are published from the ragdoll-blended `FinalPose`. Animation

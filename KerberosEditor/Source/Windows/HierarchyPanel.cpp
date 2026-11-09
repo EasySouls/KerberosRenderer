@@ -9,7 +9,10 @@
 #include "Scene/Components/AudioComponents.hpp"
 #include "Scene/Components/ParticleComponents.hpp"
 #include "Scene/Components/PhysicsComponents.hpp"
+#include "Scene/Components/AIComponents.hpp"
 #include "Scene/Components/AnimationComponents.hpp"
+#include "AI/AIKeys.hpp"
+#include "AI/AIStateTreeRegistry.hpp"
 #include "Renderer/Animation/Skeleton.hpp"
 #include "Renderer/Animation/SkeletalMesh.hpp"
 #include "Scripting/ScriptClass.hpp"
@@ -35,6 +38,7 @@
 #include <iterator>
 #include <memory>
 #include <optional>
+#include <type_traits>
 #include <utility>
 
 
@@ -44,6 +48,47 @@ namespace Kerberos {
 
 namespace
 {
+    const char* AIBlackboardTypeName(const BlackboardValue& value)
+    {
+        return std::visit([]<typename Type>([[maybe_unused]] const Type& typedValue) -> const char* {
+            using T = std::decay_t<Type>;
+            if constexpr (std::is_same_v<T, bool>) return "Bool";
+            else if constexpr (std::is_same_v<T, std::int64_t>) return "Int";
+            else if constexpr (std::is_same_v<T, float>) return "Float";
+            else if constexpr (std::is_same_v<T, glm::vec3>) return "Vec3";
+            else if constexpr (std::is_same_v<T, UUID>) return "Entity";
+            else return "String";
+        }, value);
+    }
+
+    std::string AIBlackboardValueToString(const BlackboardValue& value)
+    {
+        return std::visit([]<typename Type>(const Type& typedValue) -> std::string {
+            using T = std::decay_t<Type>;
+            if constexpr (std::is_same_v<T, bool>) return typedValue ? "true" : "false";
+            else if constexpr (std::is_same_v<T, std::int64_t>) return std::to_string(typedValue);
+            else if constexpr (std::is_same_v<T, float>) return std::format("{:.3f}", typedValue);
+            else if constexpr (std::is_same_v<T, glm::vec3>)
+                return std::format("({:.2f}, {:.2f}, {:.2f})", typedValue.x, typedValue.y, typedValue.z);
+            else if constexpr (std::is_same_v<T, UUID>)
+                return std::format("{}", static_cast<std::uint64_t>(typedValue));
+            else return typedValue;
+        }, value);
+    }
+
+    void AddAIAgentComponents(Entity entity)
+    {
+        // These all work together, and should reside on the same entity.
+        if (!entity.HasComponent<AIBlackboardComponent>())
+            entity.AddComponent<AIBlackboardComponent>();
+        if (!entity.HasComponent<AIStateMachineComponent>())
+            entity.AddComponent<AIStateMachineComponent>();
+        if (!entity.HasComponent<AIControllerComponent>())
+            entity.AddComponent<AIControllerComponent>();
+        if (!entity.HasComponent<AIPerceptionComponent>())
+            entity.AddComponent<AIPerceptionComponent>();
+    }
+
     void CreateProceduralSkinnedTest(const Ref<Scene>& scene)
     {
         if (!scene)
@@ -667,6 +712,34 @@ void HierarchyPanel::AddComponentPopup(const Entity entity)
         if (ImGui::MenuItem("Particle Emitter")) {
             AddComponentWithCheck<ParticleEmitterComponent>(entity);
             ImGui::CloseCurrentPopup();
+        }
+
+        if (ImGui::BeginMenu("AI")) {
+            if (ImGui::MenuItem("AI Agent (Blackboard + State Machine + Controller + Perception)")) {
+                AddAIAgentComponents(entity);
+                ImGui::CloseCurrentPopup();
+            }
+            if (ImGui::MenuItem("Blackboard")) {
+                AddComponentWithCheck<AIBlackboardComponent>(entity);
+                ImGui::CloseCurrentPopup();
+            }
+            if (ImGui::MenuItem("State Machine")) {
+                AddComponentWithCheck<AIStateMachineComponent>(entity);
+                ImGui::CloseCurrentPopup();
+            }
+            if (ImGui::MenuItem("Controller")) {
+                AddComponentWithCheck<AIControllerComponent>(entity);
+                ImGui::CloseCurrentPopup();
+            }
+            if (ImGui::MenuItem("Perception")) {
+                AddComponentWithCheck<AIPerceptionComponent>(entity);
+                ImGui::CloseCurrentPopup();
+            }
+            if (ImGui::MenuItem("Targetable")) {
+                AddComponentWithCheck<AITargetableComponent>(entity);
+                ImGui::CloseCurrentPopup();
+            }
+            ImGui::EndMenu();
         }
 
         ImGui::EndPopup();
@@ -2544,6 +2617,332 @@ void HierarchyPanel::DrawComponents(const Entity entity)
         {
             entity.RemoveComponent<RagdollComponent>();
         }
+    }
+
+    if (entity.HasComponent<AIBlackboardComponent>())
+    {
+        ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(6, 6));
+        const bool opened = ImGui::TreeNodeEx(
+            reinterpret_cast<void*>(typeid(AIBlackboardComponent).hash_code()), treeNodeFlags, "AI Blackboard");
+        ImGui::SameLine(ImGui::GetContentRegionAvail().x - 20.f);
+        if (ImGui::Button("+##AIBlackboard", ImVec2{ 20, 20 }))
+            ImGui::OpenPopup("AIBlackboardSettings");
+        ImGui::PopStyleVar();
+
+        bool componentDeleted = false;
+        if (ImGui::BeginPopup("AIBlackboardSettings"))
+        {
+            ImGui::Text("AI Blackboard Settings");
+            ImGui::Separator();
+            if (ImGui::MenuItem("Remove Component"))
+            {
+                componentDeleted = true;
+                ImGui::CloseCurrentPopup();
+            }
+            ImGui::EndPopup();
+        }
+
+        if (opened)
+        {
+            auto& blackboard = entity.GetComponent<AIBlackboardComponent>();
+
+            ImGui::TextDisabled("Runtime Values");
+            if (blackboard.Values.empty())
+                ImGui::TextDisabled("(empty)");
+
+            for (const auto& [key, value] : blackboard.Values)
+            {
+                std::string displayName = std::to_string(key);
+                for (const NamedBlackboardValue& authored : blackboard.AuthoredValues)
+                {
+                    if (AI::HashKey(authored.Key) == key)
+                    {
+                        displayName = authored.Key;
+                        break;
+                    }
+                }
+                ImGui::Text("%s: %s (%s)", displayName.c_str(),
+                            AIBlackboardValueToString(value).c_str(),
+                            AIBlackboardTypeName(value));
+            }
+
+            ImGui::Separator();
+            ImGui::TextDisabled("Authored Values");
+
+            int removeIndex = -1;
+            for (int i = 0; i < static_cast<int>(blackboard.AuthoredValues.size()); ++i)
+            {
+                NamedBlackboardValue& entry = blackboard.AuthoredValues[i];
+                ImGui::PushID(i);
+
+                char keyBuffer[128];
+                strcpy_s(keyBuffer, sizeof(keyBuffer), entry.Key.c_str());
+                if (ImGui::InputText("Key", keyBuffer, sizeof(keyBuffer)))
+                    entry.Key = keyBuffer;
+
+                static const char* typeNames[] = { "Bool", "Int", "Float", "Vec3", "Entity", "String" };
+                const int typeIndex = static_cast<int>(entry.Value.index());
+                if (ImGui::BeginCombo("Type", typeNames[typeIndex]))
+                {
+                    for (int type = 0; type < 6; ++type)
+                    {
+                        if (ImGui::Selectable(typeNames[type], type == typeIndex))
+                        {
+                            switch (type)
+                            {
+                            case 0: entry.Value = false; break;
+                            case 1: entry.Value = std::int64_t{ 0 }; break;
+                            case 2: entry.Value = 0.0f; break;
+                            case 3: entry.Value = glm::vec3(0.0f); break;
+                            case 4: entry.Value = UUID::Invalid(); break;
+                            case 5: entry.Value = std::string(); break;
+                            default: break;
+                            }
+                        }
+                    }
+                    ImGui::EndCombo();
+                }
+
+                if (auto* boolValue = std::get_if<bool>(&entry.Value))
+                    ImGui::Checkbox("Value", boolValue);
+                else if (auto* intValue = std::get_if<std::int64_t>(&entry.Value))
+                    ImGui::InputScalar("Value", ImGuiDataType_S64, intValue);
+                else if (auto* floatValue = std::get_if<float>(&entry.Value))
+                    ImGui::DragFloat("Value", floatValue, 0.01f);
+                else if (auto* vectorValue = std::get_if<glm::vec3>(&entry.Value))
+                    ImGui::DragFloat3("Value", glm::value_ptr(*vectorValue), 0.01f);
+                else if (auto* entityValue = std::get_if<UUID>(&entry.Value))
+                {
+                    std::uint64_t id = static_cast<std::uint64_t>(*entityValue);
+                    if (ImGui::InputScalar("Value", ImGuiDataType_U64, &id))
+                        *entityValue = UUID(id);
+                }
+                else if (auto* stringValue = std::get_if<std::string>(&entry.Value))
+                {
+                    char valueBuffer[256];
+                    strcpy_s(valueBuffer, sizeof(valueBuffer), stringValue->c_str());
+                    if (ImGui::InputText("Value", valueBuffer, sizeof(valueBuffer)))
+                        *stringValue = valueBuffer;
+                }
+
+                if (ImGui::Button("Remove"))
+                    removeIndex = i;
+
+                ImGui::PopID();
+            }
+
+            if (removeIndex >= 0)
+                blackboard.AuthoredValues.erase(blackboard.AuthoredValues.begin() + removeIndex);
+
+            if (ImGui::Button("Add Value"))
+                blackboard.AuthoredValues.push_back(NamedBlackboardValue{ "NewKey", false });
+
+            ImGui::TreePop();
+        }
+
+        if (componentDeleted)
+            entity.RemoveComponent<AIBlackboardComponent>();
+    }
+
+    if (entity.HasComponent<AIStateMachineComponent>())
+    {
+        ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(6, 6));
+        const bool opened = ImGui::TreeNodeEx(
+            reinterpret_cast<void*>(typeid(AIStateMachineComponent).hash_code()), treeNodeFlags, "AI State Machine");
+        ImGui::SameLine(ImGui::GetContentRegionAvail().x - 20.f);
+        if (ImGui::Button("+##AIStateMachine", ImVec2{ 20, 20 }))
+            ImGui::OpenPopup("AIStateMachineSettings");
+        ImGui::PopStyleVar();
+
+        bool componentDeleted = false;
+        if (ImGui::BeginPopup("AIStateMachineSettings"))
+        {
+            ImGui::Text("AI State Machine Settings");
+            ImGui::Separator();
+            if (ImGui::MenuItem("Remove Component"))
+            {
+                componentDeleted = true;
+                ImGui::CloseCurrentPopup();
+            }
+            ImGui::EndPopup();
+        }
+
+        if (opened)
+        {
+            auto& stateMachine = entity.GetComponent<AIStateMachineComponent>();
+
+            const std::vector<std::string> treeNames = AI::AIStateTreeRegistry::GetNames();
+            const char* preview = stateMachine.TreeName.empty() ? "<none>" : stateMachine.TreeName.c_str();
+            if (ImGui::BeginCombo("State Tree", preview))
+            {
+                if (ImGui::Selectable("<none>", stateMachine.TreeName.empty()))
+                {
+                    stateMachine.TreeName.clear();
+                    stateMachine.Tree = nullptr;
+                    stateMachine.IsInitialized = false;
+                    stateMachine.TaskInstances.clear();
+                }
+
+                for (const std::string& name : treeNames)
+                {
+                    if (ImGui::Selectable(name.c_str(), name == stateMachine.TreeName))
+                    {
+                        stateMachine.TreeName = name;
+                        stateMachine.Tree = AI::AIStateTreeRegistry::Find(name);
+                        stateMachine.IsInitialized = false;
+                        stateMachine.TaskInstances.clear();
+                    }
+                }
+                ImGui::EndCombo();
+            }
+
+            const AI::AIStateDefinition* current = stateMachine.Tree
+                ? stateMachine.Tree->FindState(stateMachine.CurrentState)
+                : nullptr;
+            const AI::AIStateDefinition* previous = stateMachine.Tree
+                ? stateMachine.Tree->FindState(stateMachine.PreviousState)
+                : nullptr;
+
+            ImGui::Text("Initialized: %s", stateMachine.IsInitialized ? "Yes" : "No");
+            ImGui::Text("Current State: %s", current ? current->Name.c_str() : "<none>");
+            ImGui::Text("Previous State: %s", previous ? previous->Name.c_str() : "<none>");
+            ImGui::Text("Time In State: %.3f s", stateMachine.TimeInState);
+
+            if (ImGui::Button("Reset Runtime State"))
+            {
+                stateMachine.IsInitialized = false;
+                stateMachine.CurrentState = AI::InvalidState;
+                stateMachine.PreviousState = AI::InvalidState;
+                stateMachine.PendingState = AI::InvalidState;
+                stateMachine.TimeInState = 0.0f;
+                stateMachine.TaskInstances.clear();
+            }
+
+            ImGui::TreePop();
+        }
+
+        if (componentDeleted)
+            entity.RemoveComponent<AIStateMachineComponent>();
+    }
+
+    if (entity.HasComponent<AIPerceptionComponent>())
+    {
+        ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(6, 6));
+        const bool opened = ImGui::TreeNodeEx(
+            reinterpret_cast<void*>(typeid(AIPerceptionComponent).hash_code()), treeNodeFlags, "AI Perception");
+        ImGui::SameLine(ImGui::GetContentRegionAvail().x - 20.f);
+        if (ImGui::Button("+##AIPerception", ImVec2{ 20, 20 }))
+            ImGui::OpenPopup("AIPerceptionSettings");
+        ImGui::PopStyleVar();
+
+        bool componentDeleted = false;
+        if (ImGui::BeginPopup("AIPerceptionSettings"))
+        {
+            ImGui::Text("AI Perception Settings");
+            ImGui::Separator();
+            if (ImGui::MenuItem("Remove Component"))
+            {
+                componentDeleted = true;
+                ImGui::CloseCurrentPopup();
+            }
+            ImGui::EndPopup();
+        }
+
+        if (opened)
+        {
+            auto& perception = entity.GetComponent<AIPerceptionComponent>();
+            ImGui::DragFloat("Sight Radius", &perception.SightRadius, 0.1f, 0.0f, 100.0f, "%.2f m");
+            ImGui::DragFloat("Lose Radius", &perception.LoseRadius, 0.1f, 0.0f, 100.0f, "%.2f m");
+            if (perception.LoseRadius < perception.SightRadius)
+            {
+                ImGui::SameLine();
+                ImGui::TextDisabled("(should be >= Sight Radius)");
+            }
+            ImGui::DragFloat("Field Of View", &perception.FieldOfViewDegrees, 0.5f, 0.0f, 360.0f, "%.1f deg");
+            ImGui::DragFloat("Eye Height", &perception.EyeHeight, 0.01f, 0.0f, 10.0f, "%.2f m");
+            ImGui::DragFloat("Perception Interval", &perception.PerceptionInterval, 0.01f, 0.0f, 5.0f, "%.2f s");
+            ImGui::Checkbox("Require Line Of Sight", &perception.RequireLineOfSight);
+            ImGui::InputScalar("Faction Id", ImGuiDataType_U32, &perception.FactionId);
+
+            ImGui::TreePop();
+        }
+
+        if (componentDeleted)
+            entity.RemoveComponent<AIPerceptionComponent>();
+    }
+
+    if (entity.HasComponent<AIControllerComponent>())
+    {
+        ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(6, 6));
+        const bool opened = ImGui::TreeNodeEx(
+            reinterpret_cast<void*>(typeid(AIControllerComponent).hash_code()), treeNodeFlags, "AI Controller");
+        ImGui::SameLine(ImGui::GetContentRegionAvail().x - 20.f);
+        if (ImGui::Button("+##AIController", ImVec2{ 20, 20 }))
+            ImGui::OpenPopup("AIControllerSettings");
+        ImGui::PopStyleVar();
+
+        bool componentDeleted = false;
+        if (ImGui::BeginPopup("AIControllerSettings"))
+        {
+            ImGui::Text("AI Controller Settings");
+            ImGui::Separator();
+            if (ImGui::MenuItem("Remove Component"))
+            {
+                componentDeleted = true;
+                ImGui::CloseCurrentPopup();
+            }
+            ImGui::EndPopup();
+        }
+
+        if (opened)
+        {
+            auto& controller = entity.GetComponent<AIControllerComponent>();
+            ImGui::Checkbox("Enabled", &controller.Enabled);
+            ImGui::Text("Desired Velocity: %.2f, %.2f, %.2f",
+                        controller.DesiredVelocity.x, controller.DesiredVelocity.y, controller.DesiredVelocity.z);
+            ImGui::Text("Look At: %.2f, %.2f, %.2f",
+                        controller.LookAtTarget.x, controller.LookAtTarget.y, controller.LookAtTarget.z);
+            ImGui::Text("Has Look At: %s", controller.HasLookAt ? "Yes" : "No");
+            ImGui::Text("Wants To Attack: %s", controller.WantsToAttack ? "Yes" : "No");
+            ImGui::TreePop();
+        }
+
+        if (componentDeleted)
+            entity.RemoveComponent<AIControllerComponent>();
+    }
+
+    if (entity.HasComponent<AITargetableComponent>())
+    {
+        ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(6, 6));
+        const bool opened = ImGui::TreeNodeEx(
+            reinterpret_cast<void*>(typeid(AITargetableComponent).hash_code()), treeNodeFlags, "AI Targetable");
+        ImGui::SameLine(ImGui::GetContentRegionAvail().x - 20.f);
+        if (ImGui::Button("+##AITargetable", ImVec2{ 20, 20 }))
+            ImGui::OpenPopup("AITargetableSettings");
+        ImGui::PopStyleVar();
+
+        bool componentDeleted = false;
+        if (ImGui::BeginPopup("AITargetableSettings"))
+        {
+            ImGui::Text("AI Targetable Settings");
+            ImGui::Separator();
+            if (ImGui::MenuItem("Remove Component"))
+            {
+                componentDeleted = true;
+                ImGui::CloseCurrentPopup();
+            }
+            ImGui::EndPopup();
+        }
+
+        if (opened)
+        {
+            auto& targetable = entity.GetComponent<AITargetableComponent>();
+            ImGui::InputScalar("Faction Id", ImGuiDataType_U32, &targetable.FactionId);
+            ImGui::TreePop();
+        }
+
+        if (componentDeleted)
+            entity.RemoveComponent<AITargetableComponent>();
     }
 }
 
