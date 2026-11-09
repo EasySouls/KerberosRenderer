@@ -124,6 +124,63 @@ namespace Kerberos
         internal delegate void SocketAttachFn(ulong entityID, ulong skeletonEntityID, IntPtr jointName,
                                               ref Vector3 translation, ref Vector3 rotation, ref Vector3 scale);
 
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        internal delegate byte AINameAndJsonFn(IntPtr name, IntPtr json);
+
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        internal delegate byte AINameFn(IntPtr name);
+
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        internal delegate byte AIEntityKeyBoolFn(ulong entityID, IntPtr key);
+
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        internal delegate void AIEntityKeyActionFn(ulong entityID, IntPtr key);
+
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        internal delegate float AIEntityKeyFloatFn(ulong entityID, IntPtr key);
+
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        internal delegate void AIEntityKeySetFloatFn(ulong entityID, IntPtr key, float value);
+
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        internal delegate long AIEntityKeyLongFn(ulong entityID, IntPtr key);
+
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        internal delegate void AIEntityKeySetLongFn(ulong entityID, IntPtr key, long value);
+
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        internal delegate byte AIEntityKeyByteFn(ulong entityID, IntPtr key);
+
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        internal delegate void AIEntityKeySetByteFn(ulong entityID, IntPtr key, byte value);
+
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        internal delegate void AIEntityKeyVec3Fn(ulong entityID, IntPtr key, out Vector3 value);
+
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        internal delegate void AIEntityKeySetVec3Fn(ulong entityID, IntPtr key, ref Vector3 value);
+
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        internal delegate ulong AIEntityKeyEntityFn(ulong entityID, IntPtr key);
+
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        internal delegate void AIEntityKeySetEntityFn(ulong entityID, IntPtr key, ulong value);
+
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        internal delegate IntPtr AIEntityKeyStringFn(ulong entityID, IntPtr key);
+
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        internal delegate void AIEntityKeySetStringFn(ulong entityID, IntPtr key, IntPtr value);
+
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        internal delegate IntPtr AIEntityStringFn(ulong entityID);
+
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        internal delegate void AISetEntityStringFn(ulong entityID, IntPtr value);
+
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        internal delegate byte AIEntityNameFn(ulong entityID, IntPtr name);
+
         // ====================================================================
         // Stored delegate instances (prevent GC collection)
         // ====================================================================
@@ -269,6 +326,61 @@ namespace Kerberos
         private static SetBoolFn? s_MeshColliderSetIsTrigger;
         private static GetBoolFn? s_MeshColliderGetEnabled;
         private static SetBoolFn? s_MeshColliderSetEnabled;
+
+        private static AINameAndJsonFn? s_AI_RegisterStateTree;
+        private static AINameFn? s_AI_UnregisterStateTree;
+        private static AINameFn? s_AI_StateTreeExists;
+
+        private static AIEntityKeyBoolFn? s_AIBlackboardHasKey;
+        private static AIEntityKeyActionFn? s_AIBlackboardRemoveKey;
+        private static EntityActionFn? s_AIBlackboardClear;
+        private static AIEntityKeyFloatFn? s_AIBlackboardGetFloat;
+        private static AIEntityKeySetFloatFn? s_AIBlackboardSetFloat;
+        private static AIEntityKeyLongFn? s_AIBlackboardGetInt;
+        private static AIEntityKeySetLongFn? s_AIBlackboardSetInt;
+        private static AIEntityKeyByteFn? s_AIBlackboardGetBool;
+        private static AIEntityKeySetByteFn? s_AIBlackboardSetBool;
+        private static AIEntityKeyVec3Fn? s_AIBlackboardGetVec3;
+        private static AIEntityKeySetVec3Fn? s_AIBlackboardSetVec3;
+        private static AIEntityKeyEntityFn? s_AIBlackboardGetEntity;
+        private static AIEntityKeySetEntityFn? s_AIBlackboardSetEntity;
+        private static AIEntityKeyStringFn? s_AIBlackboardGetString;
+        private static AIEntityKeySetStringFn? s_AIBlackboardSetString;
+
+        private static AIEntityStringFn? s_AIStateMachineGetTreeName;
+        private static AISetEntityStringFn? s_AIStateMachineSetTreeName;
+        private static AIEntityStringFn? s_AIStateMachineGetCurrentState;
+        private static AIEntityStringFn? s_AIStateMachineGetPreviousState;
+        private static GetFloatFn? s_AIStateMachineGetTimeInState;
+        private static AIEntityNameFn? s_AIStateMachineRequestState;
+        private static EntityActionFn? s_AIStateMachineResetRuntime;
+
+        private static GetVec3Fn? s_AIControllerGetDesiredVelocity;
+        private static SetVec3Fn? s_AIControllerSetDesiredVelocity;
+        private static GetVec3Fn? s_AIControllerGetLookAtTarget;
+        private static SetVec3Fn? s_AIControllerSetLookAtTarget;
+        private static GetBoolFn? s_AIControllerGetWantsToAttack;
+        private static SetBoolFn? s_AIControllerSetWantsToAttack;
+        private static GetBoolFn? s_AIControllerGetEnabled;
+        private static SetBoolFn? s_AIControllerSetEnabled;
+
+        private static GetFloatFn? s_AIPerceptionGetSightRadius;
+        private static SetFloatFn? s_AIPerceptionSetSightRadius;
+        private static GetFloatFn? s_AIPerceptionGetLoseRadius;
+        private static SetFloatFn? s_AIPerceptionSetLoseRadius;
+        private static GetFloatFn? s_AIPerceptionGetFieldOfView;
+        private static SetFloatFn? s_AIPerceptionSetFieldOfView;
+        private static GetFloatFn? s_AIPerceptionGetEyeHeight;
+        private static SetFloatFn? s_AIPerceptionSetEyeHeight;
+        private static GetFloatFn? s_AIPerceptionGetInterval;
+        private static SetFloatFn? s_AIPerceptionSetInterval;
+        private static GetBoolFn? s_AIPerceptionGetRequireLineOfSight;
+        private static SetBoolFn? s_AIPerceptionSetRequireLineOfSight;
+        private static GetIntFn? s_AIPerceptionGetFactionId;
+        private static SetIntFn? s_AIPerceptionSetFactionId;
+
+        private static GetIntFn? s_AITargetableGetFactionId;
+        private static SetIntFn? s_AITargetableSetFactionId;
 
         // ====================================================================
         // Initialization - called from C++ to provide function pointers
@@ -429,6 +541,61 @@ namespace Kerberos
             s_MeshColliderSetIsTrigger = Marshal.GetDelegateForFunctionPointer<SetBoolFn>(ReadNext());
             s_MeshColliderGetEnabled = Marshal.GetDelegateForFunctionPointer<GetBoolFn>(ReadNext());
             s_MeshColliderSetEnabled = Marshal.GetDelegateForFunctionPointer<SetBoolFn>(ReadNext());
+
+            s_AI_RegisterStateTree = Marshal.GetDelegateForFunctionPointer<AINameAndJsonFn>(ReadNext());
+            s_AI_UnregisterStateTree = Marshal.GetDelegateForFunctionPointer<AINameFn>(ReadNext());
+            s_AI_StateTreeExists = Marshal.GetDelegateForFunctionPointer<AINameFn>(ReadNext());
+
+            s_AIBlackboardHasKey = Marshal.GetDelegateForFunctionPointer<AIEntityKeyBoolFn>(ReadNext());
+            s_AIBlackboardRemoveKey = Marshal.GetDelegateForFunctionPointer<AIEntityKeyActionFn>(ReadNext());
+            s_AIBlackboardClear = Marshal.GetDelegateForFunctionPointer<EntityActionFn>(ReadNext());
+            s_AIBlackboardGetFloat = Marshal.GetDelegateForFunctionPointer<AIEntityKeyFloatFn>(ReadNext());
+            s_AIBlackboardSetFloat = Marshal.GetDelegateForFunctionPointer<AIEntityKeySetFloatFn>(ReadNext());
+            s_AIBlackboardGetInt = Marshal.GetDelegateForFunctionPointer<AIEntityKeyLongFn>(ReadNext());
+            s_AIBlackboardSetInt = Marshal.GetDelegateForFunctionPointer<AIEntityKeySetLongFn>(ReadNext());
+            s_AIBlackboardGetBool = Marshal.GetDelegateForFunctionPointer<AIEntityKeyByteFn>(ReadNext());
+            s_AIBlackboardSetBool = Marshal.GetDelegateForFunctionPointer<AIEntityKeySetByteFn>(ReadNext());
+            s_AIBlackboardGetVec3 = Marshal.GetDelegateForFunctionPointer<AIEntityKeyVec3Fn>(ReadNext());
+            s_AIBlackboardSetVec3 = Marshal.GetDelegateForFunctionPointer<AIEntityKeySetVec3Fn>(ReadNext());
+            s_AIBlackboardGetEntity = Marshal.GetDelegateForFunctionPointer<AIEntityKeyEntityFn>(ReadNext());
+            s_AIBlackboardSetEntity = Marshal.GetDelegateForFunctionPointer<AIEntityKeySetEntityFn>(ReadNext());
+            s_AIBlackboardGetString = Marshal.GetDelegateForFunctionPointer<AIEntityKeyStringFn>(ReadNext());
+            s_AIBlackboardSetString = Marshal.GetDelegateForFunctionPointer<AIEntityKeySetStringFn>(ReadNext());
+
+            s_AIStateMachineGetTreeName = Marshal.GetDelegateForFunctionPointer<AIEntityStringFn>(ReadNext());
+            s_AIStateMachineSetTreeName = Marshal.GetDelegateForFunctionPointer<AISetEntityStringFn>(ReadNext());
+            s_AIStateMachineGetCurrentState = Marshal.GetDelegateForFunctionPointer<AIEntityStringFn>(ReadNext());
+            s_AIStateMachineGetPreviousState = Marshal.GetDelegateForFunctionPointer<AIEntityStringFn>(ReadNext());
+            s_AIStateMachineGetTimeInState = Marshal.GetDelegateForFunctionPointer<GetFloatFn>(ReadNext());
+            s_AIStateMachineRequestState = Marshal.GetDelegateForFunctionPointer<AIEntityNameFn>(ReadNext());
+            s_AIStateMachineResetRuntime = Marshal.GetDelegateForFunctionPointer<EntityActionFn>(ReadNext());
+
+            s_AIControllerGetDesiredVelocity = Marshal.GetDelegateForFunctionPointer<GetVec3Fn>(ReadNext());
+            s_AIControllerSetDesiredVelocity = Marshal.GetDelegateForFunctionPointer<SetVec3Fn>(ReadNext());
+            s_AIControllerGetLookAtTarget = Marshal.GetDelegateForFunctionPointer<GetVec3Fn>(ReadNext());
+            s_AIControllerSetLookAtTarget = Marshal.GetDelegateForFunctionPointer<SetVec3Fn>(ReadNext());
+            s_AIControllerGetWantsToAttack = Marshal.GetDelegateForFunctionPointer<GetBoolFn>(ReadNext());
+            s_AIControllerSetWantsToAttack = Marshal.GetDelegateForFunctionPointer<SetBoolFn>(ReadNext());
+            s_AIControllerGetEnabled = Marshal.GetDelegateForFunctionPointer<GetBoolFn>(ReadNext());
+            s_AIControllerSetEnabled = Marshal.GetDelegateForFunctionPointer<SetBoolFn>(ReadNext());
+
+            s_AIPerceptionGetSightRadius = Marshal.GetDelegateForFunctionPointer<GetFloatFn>(ReadNext());
+            s_AIPerceptionSetSightRadius = Marshal.GetDelegateForFunctionPointer<SetFloatFn>(ReadNext());
+            s_AIPerceptionGetLoseRadius = Marshal.GetDelegateForFunctionPointer<GetFloatFn>(ReadNext());
+            s_AIPerceptionSetLoseRadius = Marshal.GetDelegateForFunctionPointer<SetFloatFn>(ReadNext());
+            s_AIPerceptionGetFieldOfView = Marshal.GetDelegateForFunctionPointer<GetFloatFn>(ReadNext());
+            s_AIPerceptionSetFieldOfView = Marshal.GetDelegateForFunctionPointer<SetFloatFn>(ReadNext());
+            s_AIPerceptionGetEyeHeight = Marshal.GetDelegateForFunctionPointer<GetFloatFn>(ReadNext());
+            s_AIPerceptionSetEyeHeight = Marshal.GetDelegateForFunctionPointer<SetFloatFn>(ReadNext());
+            s_AIPerceptionGetInterval = Marshal.GetDelegateForFunctionPointer<GetFloatFn>(ReadNext());
+            s_AIPerceptionSetInterval = Marshal.GetDelegateForFunctionPointer<SetFloatFn>(ReadNext());
+            s_AIPerceptionGetRequireLineOfSight = Marshal.GetDelegateForFunctionPointer<GetBoolFn>(ReadNext());
+            s_AIPerceptionSetRequireLineOfSight = Marshal.GetDelegateForFunctionPointer<SetBoolFn>(ReadNext());
+            s_AIPerceptionGetFactionId = Marshal.GetDelegateForFunctionPointer<GetIntFn>(ReadNext());
+            s_AIPerceptionSetFactionId = Marshal.GetDelegateForFunctionPointer<SetIntFn>(ReadNext());
+
+            s_AITargetableGetFactionId = Marshal.GetDelegateForFunctionPointer<GetIntFn>(ReadNext());
+            s_AITargetableSetFactionId = Marshal.GetDelegateForFunctionPointer<SetIntFn>(ReadNext());
         }
 
         // ====================================================================
@@ -1021,6 +1188,261 @@ namespace Kerberos
 
         internal static void MeshCollider3DComponent_SetEnabled(ulong entityID, bool enabled)
             => s_MeshColliderSetEnabled?.Invoke(entityID, enabled ? (byte)1 : (byte)0);
+
+        // ----------------------------- AI -----------------------------
+
+        internal static bool AI_RegisterStateTree(string name, string json)
+        {
+            IntPtr namePtr = Marshal.StringToHGlobalAnsi(name);
+            IntPtr jsonPtr = Marshal.StringToHGlobalAnsi(json);
+            try { return s_AI_RegisterStateTree?.Invoke(namePtr, jsonPtr) != 0; }
+            finally
+            {
+                Marshal.FreeHGlobal(namePtr);
+                Marshal.FreeHGlobal(jsonPtr);
+            }
+        }
+
+        internal static bool AI_UnregisterStateTree(string name)
+        {
+            IntPtr ptr = Marshal.StringToHGlobalAnsi(name);
+            try { return s_AI_UnregisterStateTree?.Invoke(ptr) != 0; }
+            finally { Marshal.FreeHGlobal(ptr); }
+        }
+
+        internal static bool AI_StateTreeExists(string name)
+        {
+            IntPtr ptr = Marshal.StringToHGlobalAnsi(name);
+            try { return s_AI_StateTreeExists?.Invoke(ptr) != 0; }
+            finally { Marshal.FreeHGlobal(ptr); }
+        }
+
+        internal static bool AIBlackboard_HasKey(ulong entityID, string key)
+        {
+            IntPtr ptr = Marshal.StringToHGlobalAnsi(key);
+            try { return s_AIBlackboardHasKey?.Invoke(entityID, ptr) != 0; }
+            finally { Marshal.FreeHGlobal(ptr); }
+        }
+
+        internal static void AIBlackboard_RemoveKey(ulong entityID, string key)
+        {
+            IntPtr ptr = Marshal.StringToHGlobalAnsi(key);
+            try { s_AIBlackboardRemoveKey?.Invoke(entityID, ptr); }
+            finally { Marshal.FreeHGlobal(ptr); }
+        }
+
+        internal static void AIBlackboard_Clear(ulong entityID)
+            => s_AIBlackboardClear?.Invoke(entityID);
+
+        internal static float AIBlackboard_GetFloat(ulong entityID, string key)
+        {
+            IntPtr ptr = Marshal.StringToHGlobalAnsi(key);
+            try { return s_AIBlackboardGetFloat?.Invoke(entityID, ptr) ?? 0.0f; }
+            finally { Marshal.FreeHGlobal(ptr); }
+        }
+
+        internal static void AIBlackboard_SetFloat(ulong entityID, string key, float value)
+        {
+            IntPtr ptr = Marshal.StringToHGlobalAnsi(key);
+            try { s_AIBlackboardSetFloat?.Invoke(entityID, ptr, value); }
+            finally { Marshal.FreeHGlobal(ptr); }
+        }
+
+        internal static long AIBlackboard_GetInt(ulong entityID, string key)
+        {
+            IntPtr ptr = Marshal.StringToHGlobalAnsi(key);
+            try { return s_AIBlackboardGetInt?.Invoke(entityID, ptr) ?? 0L; }
+            finally { Marshal.FreeHGlobal(ptr); }
+        }
+
+        internal static void AIBlackboard_SetInt(ulong entityID, string key, long value)
+        {
+            IntPtr ptr = Marshal.StringToHGlobalAnsi(key);
+            try { s_AIBlackboardSetInt?.Invoke(entityID, ptr, value); }
+            finally { Marshal.FreeHGlobal(ptr); }
+        }
+
+        internal static bool AIBlackboard_GetBool(ulong entityID, string key)
+        {
+            IntPtr ptr = Marshal.StringToHGlobalAnsi(key);
+            try { return s_AIBlackboardGetBool?.Invoke(entityID, ptr) != 0; }
+            finally { Marshal.FreeHGlobal(ptr); }
+        }
+
+        internal static void AIBlackboard_SetBool(ulong entityID, string key, bool value)
+        {
+            IntPtr ptr = Marshal.StringToHGlobalAnsi(key);
+            try { s_AIBlackboardSetBool?.Invoke(entityID, ptr, value ? (byte)1 : (byte)0); }
+            finally { Marshal.FreeHGlobal(ptr); }
+        }
+
+        internal static void AIBlackboard_GetVec3(ulong entityID, string key, out Vector3 value)
+        {
+            value = default;
+            IntPtr ptr = Marshal.StringToHGlobalAnsi(key);
+            try { s_AIBlackboardGetVec3?.Invoke(entityID, ptr, out value); }
+            finally { Marshal.FreeHGlobal(ptr); }
+        }
+
+        internal static void AIBlackboard_SetVec3(ulong entityID, string key, ref Vector3 value)
+        {
+            IntPtr ptr = Marshal.StringToHGlobalAnsi(key);
+            try { s_AIBlackboardSetVec3?.Invoke(entityID, ptr, ref value); }
+            finally { Marshal.FreeHGlobal(ptr); }
+        }
+
+        internal static ulong AIBlackboard_GetEntity(ulong entityID, string key)
+        {
+            IntPtr ptr = Marshal.StringToHGlobalAnsi(key);
+            try { return s_AIBlackboardGetEntity?.Invoke(entityID, ptr) ?? 0UL; }
+            finally { Marshal.FreeHGlobal(ptr); }
+        }
+
+        internal static void AIBlackboard_SetEntity(ulong entityID, string key, ulong value)
+        {
+            IntPtr ptr = Marshal.StringToHGlobalAnsi(key);
+            try { s_AIBlackboardSetEntity?.Invoke(entityID, ptr, value); }
+            finally { Marshal.FreeHGlobal(ptr); }
+        }
+
+        internal static string AIBlackboard_GetString(ulong entityID, string key)
+        {
+            IntPtr ptr = Marshal.StringToHGlobalAnsi(key);
+            try
+            {
+                IntPtr result = s_AIBlackboardGetString?.Invoke(entityID, ptr) ?? IntPtr.Zero;
+                return result != IntPtr.Zero ? Marshal.PtrToStringAnsi(result) ?? string.Empty : string.Empty;
+            }
+            finally { Marshal.FreeHGlobal(ptr); }
+        }
+
+        internal static void AIBlackboard_SetString(ulong entityID, string key, string value)
+        {
+            IntPtr keyPtr = Marshal.StringToHGlobalAnsi(key);
+            IntPtr valuePtr = Marshal.StringToHGlobalAnsi(value);
+            try { s_AIBlackboardSetString?.Invoke(entityID, keyPtr, valuePtr); }
+            finally
+            {
+                Marshal.FreeHGlobal(keyPtr);
+                Marshal.FreeHGlobal(valuePtr);
+            }
+        }
+
+        internal static string AIStateMachine_GetTreeName(ulong entityID)
+        {
+            IntPtr ptr = s_AIStateMachineGetTreeName?.Invoke(entityID) ?? IntPtr.Zero;
+            return ptr != IntPtr.Zero ? Marshal.PtrToStringAnsi(ptr) ?? string.Empty : string.Empty;
+        }
+
+        internal static void AIStateMachine_SetTreeName(ulong entityID, string name)
+        {
+            IntPtr ptr = Marshal.StringToHGlobalAnsi(name);
+            try { s_AIStateMachineSetTreeName?.Invoke(entityID, ptr); }
+            finally { Marshal.FreeHGlobal(ptr); }
+        }
+
+        internal static string AIStateMachine_GetCurrentState(ulong entityID)
+        {
+            IntPtr ptr = s_AIStateMachineGetCurrentState?.Invoke(entityID) ?? IntPtr.Zero;
+            return ptr != IntPtr.Zero ? Marshal.PtrToStringAnsi(ptr) ?? string.Empty : string.Empty;
+        }
+
+        internal static string AIStateMachine_GetPreviousState(ulong entityID)
+        {
+            IntPtr ptr = s_AIStateMachineGetPreviousState?.Invoke(entityID) ?? IntPtr.Zero;
+            return ptr != IntPtr.Zero ? Marshal.PtrToStringAnsi(ptr) ?? string.Empty : string.Empty;
+        }
+
+        internal static float AIStateMachine_GetTimeInState(ulong entityID)
+            => s_AIStateMachineGetTimeInState?.Invoke(entityID) ?? 0.0f;
+
+        internal static bool AIStateMachine_RequestState(ulong entityID, string stateName)
+        {
+            IntPtr ptr = Marshal.StringToHGlobalAnsi(stateName);
+            try { return s_AIStateMachineRequestState?.Invoke(entityID, ptr) != 0; }
+            finally { Marshal.FreeHGlobal(ptr); }
+        }
+
+        internal static void AIStateMachine_ResetRuntime(ulong entityID)
+            => s_AIStateMachineResetRuntime?.Invoke(entityID);
+
+        internal static void AIController_GetDesiredVelocity(ulong entityID, out Vector3 value)
+        {
+            value = default;
+            s_AIControllerGetDesiredVelocity?.Invoke(entityID, out value);
+        }
+
+        internal static void AIController_SetDesiredVelocity(ulong entityID, ref Vector3 value)
+            => s_AIControllerSetDesiredVelocity?.Invoke(entityID, ref value);
+
+        internal static void AIController_GetLookAtTarget(ulong entityID, out Vector3 value)
+        {
+            value = default;
+            s_AIControllerGetLookAtTarget?.Invoke(entityID, out value);
+        }
+
+        internal static void AIController_SetLookAtTarget(ulong entityID, ref Vector3 value)
+            => s_AIControllerSetLookAtTarget?.Invoke(entityID, ref value);
+
+        internal static bool AIController_GetWantsToAttack(ulong entityID)
+            => s_AIControllerGetWantsToAttack?.Invoke(entityID) != 0;
+
+        internal static void AIController_SetWantsToAttack(ulong entityID, bool value)
+            => s_AIControllerSetWantsToAttack?.Invoke(entityID, value ? (byte)1 : (byte)0);
+
+        internal static bool AIController_GetEnabled(ulong entityID)
+            => s_AIControllerGetEnabled?.Invoke(entityID) != 0;
+
+        internal static void AIController_SetEnabled(ulong entityID, bool value)
+            => s_AIControllerSetEnabled?.Invoke(entityID, value ? (byte)1 : (byte)0);
+
+        internal static float AIPerception_GetSightRadius(ulong entityID)
+            => s_AIPerceptionGetSightRadius?.Invoke(entityID) ?? 0.0f;
+
+        internal static void AIPerception_SetSightRadius(ulong entityID, float value)
+            => s_AIPerceptionSetSightRadius?.Invoke(entityID, value);
+
+        internal static float AIPerception_GetLoseRadius(ulong entityID)
+            => s_AIPerceptionGetLoseRadius?.Invoke(entityID) ?? 0.0f;
+
+        internal static void AIPerception_SetLoseRadius(ulong entityID, float value)
+            => s_AIPerceptionSetLoseRadius?.Invoke(entityID, value);
+
+        internal static float AIPerception_GetFieldOfView(ulong entityID)
+            => s_AIPerceptionGetFieldOfView?.Invoke(entityID) ?? 0.0f;
+
+        internal static void AIPerception_SetFieldOfView(ulong entityID, float value)
+            => s_AIPerceptionSetFieldOfView?.Invoke(entityID, value);
+
+        internal static float AIPerception_GetEyeHeight(ulong entityID)
+            => s_AIPerceptionGetEyeHeight?.Invoke(entityID) ?? 0.0f;
+
+        internal static void AIPerception_SetEyeHeight(ulong entityID, float value)
+            => s_AIPerceptionSetEyeHeight?.Invoke(entityID, value);
+
+        internal static float AIPerception_GetInterval(ulong entityID)
+            => s_AIPerceptionGetInterval?.Invoke(entityID) ?? 0.0f;
+
+        internal static void AIPerception_SetInterval(ulong entityID, float value)
+            => s_AIPerceptionSetInterval?.Invoke(entityID, value);
+
+        internal static bool AIPerception_GetRequireLineOfSight(ulong entityID)
+            => s_AIPerceptionGetRequireLineOfSight?.Invoke(entityID) != 0;
+
+        internal static void AIPerception_SetRequireLineOfSight(ulong entityID, bool value)
+            => s_AIPerceptionSetRequireLineOfSight?.Invoke(entityID, value ? (byte)1 : (byte)0);
+
+        internal static int AIPerception_GetFactionId(ulong entityID)
+            => s_AIPerceptionGetFactionId?.Invoke(entityID) ?? 0;
+
+        internal static void AIPerception_SetFactionId(ulong entityID, int value)
+            => s_AIPerceptionSetFactionId?.Invoke(entityID, value);
+
+        internal static int AITargetable_GetFactionId(ulong entityID)
+            => s_AITargetableGetFactionId?.Invoke(entityID) ?? 0;
+
+        internal static void AITargetable_SetFactionId(ulong entityID, int value)
+            => s_AITargetableSetFactionId?.Invoke(entityID, value);
 
     }
 }

@@ -9,6 +9,7 @@
 //#include "Core/Filesystem.hpp"
 #include "Scene/Scene.hpp"
 #include "Scene/Entity.hpp"
+#include "AI/AIStateTreeRegistry.hpp"
 #include "Application.hpp"
 #include "Project/Project.hpp"
 #include "Core/Timer.hpp"
@@ -245,6 +246,9 @@ namespace Kerberos
 			Log::CoreInfo("Reloading C# assemblies took {:.2f} ms", data.DurationMs);
 		});
 
+		// Script-owned trees are re-registered by scripts on the next runtime start.
+		AI::AIStateTreeRegistry::ClearScriptTrees();
+
 		LoadAssembly(s_ScriptData->CoreAssemblyPath);
 		LoadAssemblyClasses();
 	}
@@ -252,6 +256,8 @@ namespace Kerberos
 	void ScriptEngine::OnProjectOpened(const std::filesystem::path& projectDirectory, const std::string& assemblyName)
 	{
 		KBR_TRACY_FUNCTION();
+
+		AI::AIStateTreeRegistry::ClearScriptTrees();
 
 		if (assemblyName.empty())
 		{

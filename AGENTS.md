@@ -13,6 +13,8 @@ Use the subsystem context files when working in their scopes:
   loading, and the asset browser.
 - `KerberosEngine/Source/Renderer/AGENTS.md` — renderer, Vulkan context and
   resources, the render graph, shaders, and the particle system.
+- `KerberosEngine/Source/AI/AGENTS.md` — AI identifiers, blackboards, state
+  trees, node factory/registry, perception, movement, and C# authoring.
 - `KerberosEditor/AGENTS.md` — editor lifecycle, panels, and project/scene
   flow.
 
@@ -50,6 +52,7 @@ systems, update the corresponding context file in the same change:
 
 - assets: `KerberosEngine/Source/Assets/AGENTS.md`
 - renderer and particles: `KerberosEngine/Source/Renderer/AGENTS.md`
+- AI: `KerberosEngine/Source/AI/AGENTS.md`
 - editor: `KerberosEditor/AGENTS.md`
 
 Keep cross-system references synchronized as well, do not allow these files to
