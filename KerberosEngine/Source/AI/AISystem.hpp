@@ -1,6 +1,9 @@
 #pragma once
 
+#include "AIDebug.hpp"
 #include "Scene/Components/AIComponents.hpp"
+
+#include <deque>
 
 namespace Kerberos {
 
@@ -23,6 +26,12 @@ public:
 
     bool IsEnabled() const;
     void SetEnabled(bool enabled);
+    
+    void SetDebugCaptureEnabled(bool enabled);
+    [[nodiscard]] bool IsDebugCaptureEnabled() const;
+
+    [[nodiscard]] const std::vector<AI::AITransitionEvent>& GetTransitionEvents() const;
+    [[nodiscard]] const AI::AIAgentDebugSnapshot* GetDebugSnapshot(Entity entity) const;
 
 private:
     bool EnsureInitialized(Entity entity,
@@ -52,9 +61,25 @@ private:
                         AIStateMachineComponent& stateMachine,
                         AIControllerComponent& controller,
                         float dt) const;
+    
+    void RecordTransition(const AIStateMachineComponent& stateMachine,
+                          UUID entity,
+                          AI::StateID from,
+                          AI::StateID to,
+                          std::string_view transitionName,
+                          AI::AITransitionReason reason,
+                          float timeInPreviousState);
+
+    void ClearDebugCapture();
 
     Scene* m_Scene = nullptr;
     bool m_Enabled = true;
+    
+    bool m_DebugCaptureEnabled = false;
+    double m_DebugTime = 0.0;
+    std::deque<AI::AITransitionEvent> m_TransitionEvents;
+    std::unordered_map<UUID, AI::AIAgentDebugSnapshot> m_DebugSnapshots;
+    static constexpr std::size_t MaxTransitionEvents = 256;
 };
 
 }

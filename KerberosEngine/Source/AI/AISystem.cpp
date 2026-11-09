@@ -105,7 +105,33 @@ void AISystem::SetEnabled(const bool enabled)
     m_Enabled = enabled;
 }
 
-bool AISystem::EnsureInitialized(Entity entity,
+void AISystem::SetDebugCaptureEnabled(bool enabled)
+{
+    if (m_DebugCaptureEnabled == enabled)
+        return;
+
+    m_DebugCaptureEnabled = enabled;
+    ClearDebugCapture();
+}
+
+bool AISystem::IsDebugCaptureEnabled() const
+{
+    return m_DebugCaptureEnabled;
+}
+
+const std::vector<AI::AITransitionEvent>& AISystem::GetTransitionEvents() const
+{
+    return std::vector(m_TransitionEvents.begin(), m_TransitionEvents.end());
+}
+
+const AI::AIAgentDebugSnapshot* AISystem::GetDebugSnapshot(const Entity entity) const
+{
+    return m_DebugSnapshots.contains(entity.GetUUID())
+        ? &m_DebugSnapshots.at(entity.GetUUID())
+        : nullptr;
+}
+
+bool AISystem::EnsureInitialized(const Entity entity,
                                  AIBlackboardComponent& blackboard,
                                  AIStateMachineComponent& stateMachine)
 {
@@ -449,6 +475,22 @@ void AISystem::UpdateMovement(const Entity entity,
     }
 
     controller.DesiredVelocity = glm::vec3(0.0f);
+}
+
+void AISystem::RecordTransition(const AIStateMachineComponent& stateMachine,
+    UUID entity,
+    AI::StateID from,
+    AI::StateID to,
+    std::string_view transitionName,
+    AI::AITransitionReason reason,
+    float timeInPreviousState)
+{
+    throw std::logic_error("Not implemented");
+}
+
+void AISystem::ClearDebugCapture()
+{
+    
 }
 
 }
