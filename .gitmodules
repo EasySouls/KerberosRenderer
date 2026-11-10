@@ -35,3 +35,6 @@
 [submodule "KerberosEngine/ThirdParty/googletest"]
 	path = KerberosEngine/ThirdParty/googletest
 	url = https://github.com/google/googletest.git
+[submodule "KerberosEngine/ThirdParty/imgui-node-editor"]
+	path = KerberosEngine/ThirdParty/imgui-node-editor
+	url = https://github.com/thedmd/imgui-node-editor.git

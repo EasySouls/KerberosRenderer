@@ -24,6 +24,7 @@ target_include_directories(KerberosEditor PRIVATE
 target_link_libraries(KerberosEditor PRIVATE
     KerberosEngine
     KerberosBuildSettings
+    imgui_node_editor
 )
 add_dependencies(KerberosEditor KerberosScriptCoreLibBuild)
 
