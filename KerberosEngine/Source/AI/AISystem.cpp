@@ -15,11 +15,14 @@
 
 #include <cmath>
 #include <limits>
+#include <utility>
 #include <vector>
 
 import Kerberos;
 
 namespace Kerberos {
+
+using namespace AI;
 
 AISystem::AISystem(Scene& scene)
     : m_Scene(&scene)
@@ -28,7 +31,9 @@ AISystem::AISystem(Scene& scene)
 
 void AISystem::OnStart()
 {
-    AI::RegisterStandardAINodes();
+    RegisterStandardAINodes();
+    
+    ClearDebugCapture();
 
     auto stateMachines = m_Scene->m_Registry.view<AIStateMachineComponent>();
     for (const entt::entity handle : stateMachines)
@@ -45,7 +50,7 @@ void AISystem::OnStart()
 
 void AISystem::OnStop()
 {
-    auto blackboards = m_Scene->m_Registry.view<AIBlackboardComponent>();
+    const auto blackboards = m_Scene->m_Registry.view<AIBlackboardComponent>();
     for (const entt::entity handle : blackboards)
     {
         auto& blackboard = blackboards.get<AIBlackboardComponent>(handle);
@@ -53,9 +58,13 @@ void AISystem::OnStop()
         blackboard.AuthoredValuesSeeded = false;
     }
 
-    auto stateMachines = m_Scene->m_Registry.view<AIStateMachineComponent>();
+    const auto stateMachines = m_Scene->m_Registry.view<AIStateMachineComponent>();
     for (const entt::entity handle : stateMachines)
+    {
         ResetRuntimeState(stateMachines.get<AIStateMachineComponent>(handle));
+    }
+    
+    ClearDebugCapture();
 }
 
 void AISystem::Update(const float dt)
@@ -64,6 +73,12 @@ void AISystem::Update(const float dt)
 
     if (!m_Enabled || dt < 0.0f)
         return;
+    
+    if (m_DebugCaptureEnabled)
+    {
+        m_DebugTime += dt;
+        m_DebugSnapshots.clear();
+    }
 
     // Tasks and scripts may spawn or destroy entities. Snapshot the handles before ticking.
     std::vector<entt::entity> entities;
@@ -119,26 +134,35 @@ bool AISystem::IsDebugCaptureEnabled() const
     return m_DebugCaptureEnabled;
 }
 
-const std::vector<AI::AITransitionEvent>& AISystem::GetTransitionEvents() const
+const std::vector<AITransitionEvent>& AISystem::GetTransitionEvents() const
 {
-    return std::vector(m_TransitionEvents.begin(), m_TransitionEvents.end());
+    return m_TransitionEvents;
 }
 
-const AI::AIAgentDebugSnapshot* AISystem::GetDebugSnapshot(const Entity entity) const
+const AIAgentDebugSnapshot* AISystem::GetDebugSnapshot(const Entity entity) const
 {
-    return m_DebugSnapshots.contains(entity.GetUUID())
-        ? &m_DebugSnapshots.at(entity.GetUUID())
-        : nullptr;
+    if (!entity || !m_Scene || !m_Scene->IsEntityValid(entity))
+        return nullptr;
+
+    return GetDebugSnapshot(entity.GetUUID());
+}
+
+const AIAgentDebugSnapshot* AISystem::GetDebugSnapshot(const UUID entityID) const
+{
+    const auto it = m_DebugSnapshots.find(entityID);
+    return it != m_DebugSnapshots.end() ? &it->second : nullptr;
 }
 
 bool AISystem::EnsureInitialized(const Entity entity,
                                  AIBlackboardComponent& blackboard,
                                  AIStateMachineComponent& stateMachine)
 {
+    KBR_TRACY_FUNCTION();
+    
     SeedAuthoredValues(blackboard);
 
     if (!stateMachine.Tree && !stateMachine.TreeName.empty())
-        stateMachine.Tree = AI::AIStateTreeRegistry::Find(stateMachine.TreeName);
+        stateMachine.Tree = AIStateTreeRegistry::Find(stateMachine.TreeName);
 
     if (!stateMachine.Tree)
     {
@@ -157,8 +181,8 @@ bool AISystem::EnsureInitialized(const Entity entity,
     if (stateMachine.IsInitialized)
         return true;
 
-    const AI::StateID entryState = stateMachine.Tree->GetEntryState();
-    if (entryState == AI::InvalidState)
+    const StateID entryState = stateMachine.Tree->GetEntryState();
+    if (entryState == InvalidState)
     {
         Log::CoreError("AI state tree '{}' has no entry state.", stateMachine.TreeName);
         return false;
@@ -170,7 +194,7 @@ bool AISystem::EnsureInitialized(const Entity entity,
     {
         auto& instances = stateMachine.TaskInstances[stateID];
         instances.reserve(definition.Tasks.size());
-        for (const Ref<AI::IAITask>& prototype : definition.Tasks)
+        for (const Ref<IAITask>& prototype : definition.Tasks)
         {
             if (prototype)
                 instances.push_back(prototype->Clone());
@@ -178,16 +202,24 @@ bool AISystem::EnsureInitialized(const Entity entity,
     }
 
     stateMachine.CurrentState = entryState;
-    stateMachine.PreviousState = AI::InvalidState;
+    stateMachine.PreviousState = InvalidState;
     stateMachine.TimeInState = 0.0f;
     stateMachine.IsInitialized = true;
 
-    AI::AIContext context{ m_Scene, entity.GetUUID(), 0.0f };
+    AIContext context{ .World = m_Scene, .Entity = entity.GetUUID(), .DeltaTime = 0.0f };
     if (const auto it = stateMachine.TaskInstances.find(entryState); it != stateMachine.TaskInstances.end())
     {
-        for (const Owner<AI::IAITask>& task : it->second)
+        for (const Owner<IAITask>& task : it->second)
             task->OnEnter(context);
     }
+
+    RecordTransition(stateMachine,
+                     entity.GetUUID(),
+                     InvalidState,
+                     entryState,
+                     "Entry",
+                     AITransitionReason::Initialize,
+                     0.0f);
 
     return true;
 }
@@ -203,7 +235,7 @@ void AISystem::SeedAuthoredValues(AIBlackboardComponent& blackboard)
             continue;
 
         // Runtime and script writes win over authored defaults.
-        blackboard.Values.try_emplace(AI::HashKey(entry.Key), entry.Value);
+        blackboard.Values.try_emplace(HashKey(entry.Key), entry.Value);
     }
 
     blackboard.AuthoredValuesSeeded = true;
@@ -211,20 +243,22 @@ void AISystem::SeedAuthoredValues(AIBlackboardComponent& blackboard)
 
 void AISystem::ResetRuntimeState(AIStateMachineComponent& stateMachine)
 {
-    stateMachine.CurrentState = AI::InvalidState;
-    stateMachine.PreviousState = AI::InvalidState;
-    stateMachine.PendingState = AI::InvalidState;
+    stateMachine.CurrentState = InvalidState;
+    stateMachine.PreviousState = InvalidState;
+    stateMachine.PendingState = InvalidState;
     stateMachine.TimeInState = 0.0f;
     stateMachine.IsInitialized = false;
-    stateMachine.LastTaskStatus = AI::TaskStatus::Running;
+    stateMachine.LastTaskStatus = TaskStatus::Running;
     stateMachine.TaskInstances.clear();
 }
 
 void AISystem::TransitionTo(const Entity entity,
                             AIBlackboardComponent& blackboard,
                             AIStateMachineComponent& stateMachine,
-                            const AI::StateID targetState,
-                            AI::AIContext& context)
+                            const StateID targetState,
+                            AIContext& context,
+                            const std::string_view transitionName,
+                            const AITransitionReason reason)
 {
     if (!stateMachine.Tree || !stateMachine.Tree->HasState(targetState))
     {
@@ -232,24 +266,34 @@ void AISystem::TransitionTo(const Entity entity,
         return;
     }
 
+    const float previousTime = stateMachine.TimeInState;
+
     if (const auto oldIt = stateMachine.TaskInstances.find(stateMachine.CurrentState);
         oldIt != stateMachine.TaskInstances.end())
     {
-        for (const Owner<AI::IAITask>& task : oldIt->second)
+        for (const Owner<IAITask>& task : oldIt->second)
             task->OnExit(context);
     }
 
     stateMachine.PreviousState = stateMachine.CurrentState;
     stateMachine.CurrentState = targetState;
     stateMachine.TimeInState = 0.0f;
-    blackboard.Set(AI::StateTime, 0.0f);
+    blackboard.Set(StateTime, 0.0f);
 
     if (const auto newIt = stateMachine.TaskInstances.find(targetState);
         newIt != stateMachine.TaskInstances.end())
     {
-        for (const Owner<AI::IAITask>& task : newIt->second)
+        for (const Owner<IAITask>& task : newIt->second)
             task->OnEnter(context);
     }
+
+    RecordTransition(stateMachine,
+                     entity.GetUUID(),
+                     stateMachine.PreviousState,
+                     targetState,
+                     transitionName,
+                     reason,
+                     previousTime);
 }
 
 void AISystem::UpdatePerception(Entity entity,
@@ -347,84 +391,173 @@ void AISystem::UpdatePerception(Entity entity,
     if (bestTarget.IsValid())
     {
         blackboard.Set(perception.TargetKey, bestTarget);
-        blackboard.Set(AI::HasLineOfSight, true);
-        blackboard.Set(AI::LastKnownPosition, bestPosition);
+        blackboard.Set(HasLineOfSight, true);
+        blackboard.Set(LastKnownPosition, bestPosition);
     }
     else
     {
         blackboard.Remove(perception.TargetKey);
-        blackboard.Set(AI::HasLineOfSight, false);
+        blackboard.Set(HasLineOfSight, false);
     }
 }
 
 void AISystem::UpdateStateMachine(const Entity entity,
                                   AIBlackboardComponent& blackboard,
                                   AIStateMachineComponent& stateMachine,
-                                  const float dt) const
+                                  const float dt)
 {
     if (!stateMachine.Tree)
         return;
 
     stateMachine.TimeInState += dt;
-    blackboard.Set(AI::StateTime, stateMachine.TimeInState);
+    blackboard.Set(StateTime, stateMachine.TimeInState);
 
-    AI::AIContext context{ .World = m_Scene, .Entity = entity.GetUUID(), .DeltaTime = dt };
+    const UUID entityID = entity.GetUUID();
+    AIContext context{ .World = m_Scene, .Entity = entityID, .DeltaTime = dt };
 
-    if (stateMachine.PendingState != AI::InvalidState)
+    AIAgentDebugSnapshot snapshot;
+    if (m_DebugCaptureEnabled)
     {
-        const AI::StateID requestedState = stateMachine.PendingState;
-        stateMachine.PendingState = AI::InvalidState;
-
-        if (requestedState != stateMachine.CurrentState && stateMachine.Tree->HasState(requestedState))
-            TransitionTo(entity, blackboard, stateMachine, requestedState, context);
+        snapshot.Entity = entityID;
+        snapshot.TreeName = stateMachine.TreeName.empty()
+            ? stateMachine.Tree->GetName()
+            : stateMachine.TreeName;
+        snapshot.TimeInState = stateMachine.TimeInState;
+        snapshot.CurrentState = stateMachine.CurrentState;
+        snapshot.PreviousState = stateMachine.PreviousState;
+        snapshot.PendingState = stateMachine.PendingState;
+        snapshot.LastTaskStatus = stateMachine.LastTaskStatus;
     }
 
-    const AI::AIStateDefinition* currentDefinition =
+    const auto storeSnapshot = [&]() {
+        if (!m_DebugCaptureEnabled)
+            return;
+
+        snapshot.CurrentState = stateMachine.CurrentState;
+        snapshot.PreviousState = stateMachine.PreviousState;
+        snapshot.PendingState = stateMachine.PendingState;
+        snapshot.LastTaskStatus = stateMachine.LastTaskStatus;
+        snapshot.Valid = true;
+        m_DebugSnapshots[entityID] = std::move(snapshot);
+    };
+
+    if (stateMachine.PendingState != InvalidState)
+    {
+        const StateID requestedState = stateMachine.PendingState;
+        stateMachine.PendingState = InvalidState;
+
+        if (requestedState != stateMachine.CurrentState && stateMachine.Tree->HasState(requestedState))
+        {
+            TransitionTo(entity,
+                         blackboard,
+                         stateMachine,
+                         requestedState,
+                         context,
+                         "PendingState",
+                         AITransitionReason::ScriptRequest);
+        }
+    }
+
+    if (m_DebugCaptureEnabled)
+        snapshot.EvaluatedState = stateMachine.CurrentState;
+
+    const AIStateDefinition* currentDefinition =
         stateMachine.Tree->FindState(stateMachine.CurrentState);
 
     if (!currentDefinition)
-        return;
-
-    AI::StateID nextState = AI::InvalidState;
-    for (const AI::AITransition& transition : currentDefinition->Transitions)
     {
-        bool conditionsMet = true;
-        for (const Ref<AI::IAICondition>& condition : transition.Conditions)
+        storeSnapshot();
+        return;
+    }
+
+    StateID nextState = InvalidState;
+    const AITransition* winningTransition = nullptr;
+
+    for (const AITransition& transition : currentDefinition->Transitions)
+    {
+        AITransitionDebugTrace* trace = nullptr;
+        if (m_DebugCaptureEnabled)
         {
-            if (!condition || !condition->TestCondition(context))
+            snapshot.Candidates.emplace_back();
+            trace = &snapshot.Candidates.back();
+            trace->Name = transition.DebugName;
+            trace->TargetState = transition.TargetState;
+            if (const AIStateDefinition* target = stateMachine.Tree->FindState(transition.TargetState))
+                trace->TargetStateName = target->Name;
+        }
+
+        bool conditionsMet = true;
+        for (const Ref<IAICondition>& condition : transition.Conditions)
+        {
+            const bool result = condition && condition->TestCondition(context);
+
+            if (trace)
+            {
+                trace->Conditions.push_back({
+                    .Type = condition ? condition->GetDebugType() : std::string("<null>"),
+                    .Result = result
+                });
+            }
+
+            if (!result)
             {
                 conditionsMet = false;
                 break;
             }
         }
 
+        if (trace)
+            trace->Satisfied = conditionsMet;
+
         if (conditionsMet)
         {
             nextState = transition.TargetState;
+            winningTransition = &transition;
             break;
         }
     }
 
-    if (nextState != AI::InvalidState && nextState != stateMachine.CurrentState)
+    if (nextState != InvalidState && nextState != stateMachine.CurrentState)
     {
-        TransitionTo(entity, blackboard, stateMachine, nextState, context);
+        const std::string_view transitionName =
+            winningTransition && !winningTransition->DebugName.empty()
+                ? std::string_view(winningTransition->DebugName)
+                : std::string_view("Condition");
+
+        TransitionTo(entity,
+                     blackboard,
+                     stateMachine,
+                     nextState,
+                     context,
+                     transitionName,
+                     AITransitionReason::Condition);
+
         currentDefinition = stateMachine.Tree->FindState(stateMachine.CurrentState);
     }
 
     if (!currentDefinition)
+    {
+        storeSnapshot();
         return;
+    }
 
     if (const auto it = stateMachine.TaskInstances.find(stateMachine.CurrentState);
         it != stateMachine.TaskInstances.end())
     {
-        for (const Owner<AI::IAITask>& task : it->second)
+        for (const Owner<IAITask>& task : it->second)
         {
-            const AI::TaskStatus status = task->OnTick(context);
+            const TaskStatus status = task->OnTick(context);
             stateMachine.LastTaskStatus = status;
-            if (status == AI::TaskStatus::Failed)
+
+            if (m_DebugCaptureEnabled)
+                snapshot.Tasks.push_back({ .Type = task->GetDebugType(), .Status = status });
+
+            if (status == TaskStatus::Failed)
                 break;
         }
     }
+
+    storeSnapshot();
 }
 
 void AISystem::UpdateMovement(const Entity entity,
@@ -463,7 +596,7 @@ void AISystem::UpdateMovement(const Entity entity,
             if (rigidBody.Type == RigidBody3DComponent::BodyType::Dynamic &&
                 !controller.WarnedDynamicBody)
             {
-                Log::CoreWarn("AI entity {} is a dynamic body; AI movement will fight Jolt. "
+                Log::CoreWarn("AI entity {} is a dynamic body, AI movement will fight Jolt. "
                               "Use a Kinematic body for TransformComponent-driven movement.",
                               entity.GetUUID());
                 controller.WarnedDynamicBody = true;
@@ -478,19 +611,52 @@ void AISystem::UpdateMovement(const Entity entity,
 }
 
 void AISystem::RecordTransition(const AIStateMachineComponent& stateMachine,
-    UUID entity,
-    AI::StateID from,
-    AI::StateID to,
-    std::string_view transitionName,
-    AI::AITransitionReason reason,
-    float timeInPreviousState)
+                                const UUID entity,
+                                const StateID from,
+                                const StateID to,
+                                const std::string_view transitionName,
+                                const AITransitionReason reason,
+                                const float timeInPreviousState)
 {
-    throw std::logic_error("Not implemented");
+    if (!m_DebugCaptureEnabled)
+        return;
+
+    AITransitionEvent event;
+    event.Time = m_DebugTime;
+    event.Entity = entity;
+    event.FromState = from;
+    event.ToState = to;
+
+    if (stateMachine.Tree)
+    {
+        if (from != InvalidState)
+        {
+            if (const AIStateDefinition* definition = stateMachine.Tree->FindState(from))
+                event.FromStateName = definition->Name;
+        }
+
+        if (to != InvalidState)
+        {
+            if (const AIStateDefinition* definition = stateMachine.Tree->FindState(to))
+                event.ToStateName = definition->Name;
+        }
+    }
+
+    event.TransitionName = std::string(transitionName);
+    event.Reason = reason;
+    event.TimeInPreviousState = timeInPreviousState;
+
+    m_TransitionEvents.push_back(std::move(event));
+
+    if (m_TransitionEvents.size() > MaxTransitionEvents)
+        m_TransitionEvents.erase(m_TransitionEvents.begin());
 }
 
 void AISystem::ClearDebugCapture()
 {
-    
+    m_TransitionEvents.clear();
+    m_DebugSnapshots.clear();
+    m_DebugTime = 0.0;
 }
 
 }

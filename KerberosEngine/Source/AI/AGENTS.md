@@ -141,6 +141,40 @@ The managed callback table in `ScriptInterface.cpp` is positional. Append new
 callbacks at the end of both `NativeCallbackTable` and the C# `SetNativeCallbacks`
 read sequence; never insert in the middle.
 
+## Runtime debug capture
+
+`AIDebug.hpp` defines the observation-only runtime data the AI Editor uses.
+Capture is opt-in through `AISystem::SetDebugCaptureEnabled` and must stay
+disabled outside the editor window. When disabled, `AISystem` adds no debug
+allocations and does not change transition or task evaluation.
+
+Each update while enabled produces one `AIAgentDebugSnapshot` per agent, keyed
+by entity UUID, containing:
+
+- the tree name and current/previous/pending state
+- `TimeInState` and `LastTaskStatus`
+- every task that ticked, its registered debug type, and result
+- every transition candidate evaluated this tick, with per-condition results
+
+`EvaluatedState` is the state whose transitions were evaluated this tick;
+`CurrentState` is the state after any transition and is the state whose tasks
+ticked. They differ when a transition happened in the same tick. Candidates
+describe `EvaluatedState`, tasks describe `CurrentState`.
+
+Transitions are recorded in a bounded 256-entry ring buffer with capture-relative
+timestamps and a reason: `Initialize`, `Condition`, or `ScriptRequest`.
+Initialization records `InvalidState -> Entry`; script requests record
+`PendingState`; condition transitions use the transition's `DebugName`.
+Only conditions and tasks that were actually evaluated are traced, because
+evaluation stops on the first failing condition/task.
+
+Enable/disable and `OnStart`/`OnStop` clear events, snapshots, and the capture
+clock. Snapshots are cleared at the start of each captured update, so a paused
+scene keeps its last snapshot. Snapshot pointers and event references are valid
+until the next `AISystem::Update`; the panel must consume them in the same frame.
+Blackboard values are not copied into snapshots; the panel reads
+`AIBlackboardComponent` directly.
+
 ## Validation
 
 Build and run the AI tests:

@@ -3,7 +3,9 @@
 #include "AIDebug.hpp"
 #include "Scene/Components/AIComponents.hpp"
 
-#include <deque>
+#include <string_view>
+#include <unordered_map>
+#include <vector>
 
 namespace Kerberos {
 
@@ -32,6 +34,7 @@ public:
 
     [[nodiscard]] const std::vector<AI::AITransitionEvent>& GetTransitionEvents() const;
     [[nodiscard]] const AI::AIAgentDebugSnapshot* GetDebugSnapshot(Entity entity) const;
+    [[nodiscard]] const AI::AIAgentDebugSnapshot* GetDebugSnapshot(UUID entityID) const;
 
 private:
     bool EnsureInitialized(Entity entity,
@@ -41,11 +44,13 @@ private:
     void SeedAuthoredValues(AIBlackboardComponent& blackboard);
     static void ResetRuntimeState(AIStateMachineComponent& stateMachine);
 
-    static void TransitionTo(Entity entity,
-                             AIBlackboardComponent& blackboard,
-                             AIStateMachineComponent& stateMachine,
-                             AI::StateID targetState,
-                             AI::AIContext& context);
+    void TransitionTo(Entity entity,
+                      AIBlackboardComponent& blackboard,
+                      AIStateMachineComponent& stateMachine,
+                      AI::StateID targetState,
+                      AI::AIContext& context,
+                      std::string_view transitionName,
+                      AI::AITransitionReason reason);
 
     void UpdatePerception(Entity entity,
                           AIBlackboardComponent& blackboard,
@@ -55,7 +60,7 @@ private:
     void UpdateStateMachine(Entity entity,
                             AIBlackboardComponent& blackboard,
                             AIStateMachineComponent& stateMachine,
-                            float dt) const;
+                            float dt);
 
     void UpdateMovement(Entity entity,
                         AIStateMachineComponent& stateMachine,
@@ -71,13 +76,14 @@ private:
                           float timeInPreviousState);
 
     void ClearDebugCapture();
-
+    
+private:
     Scene* m_Scene = nullptr;
     bool m_Enabled = true;
     
     bool m_DebugCaptureEnabled = false;
     double m_DebugTime = 0.0;
-    std::deque<AI::AITransitionEvent> m_TransitionEvents;
+    std::vector<AI::AITransitionEvent> m_TransitionEvents;
     std::unordered_map<UUID, AI::AIAgentDebugSnapshot> m_DebugSnapshots;
     static constexpr std::size_t MaxTransitionEvents = 256;
 };
