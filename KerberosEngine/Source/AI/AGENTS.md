@@ -191,7 +191,9 @@ cmake --build --preset vs2026-debug --target KerberosEngineTests
   (including typed parameters and editor positions), registry document/origin
   retention, compile rejection, node schema metadata, task/condition debug type
   stamps, entry and transitions, per-entity task instances, movement/facing,
-  perception acquire/lose, and subtree serialization.
+  perception acquire/lose, subtree serialization, and debug capture
+  (initialization, condition/script transitions, task failure, no-transition
+  candidates, ring-buffer bounds, and capture clearing).
 - Manual Play validation: add an AI Agent + Targetable target, assign a tree,
   verify transitions, movement, target loss, pause, save/load, duplicate, and a
   C#-registered tree after hot reload.
