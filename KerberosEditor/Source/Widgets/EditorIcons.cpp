@@ -138,6 +138,7 @@ namespace Kerberos
             case AssetType::Skeleton: return EditorIcon::AssetSkeleton;
             case AssetType::SkinnedMesh: return EditorIcon::AssetSkinnedmesh;
             case AssetType::Animation: return EditorIcon::AssetAnimation;
+            case AssetType::AIStateTree: return EditorIcon::ComponentAiStateMachine;
             default: return EditorIcon::File;
             }
         }

@@ -64,10 +64,12 @@ receive the updated `TransformComponent` through
   authored `AuthoredValues` (name + `variant<bool, int64_t, float, vec3, UUID,
   string>`). Authored values are seeded with `try_emplace`, so script/runtime
   values win.
-- `AIStateMachineComponent`: authored `TreeName` plus transient `Tree`,
+- `AIStateMachineComponent`: authored `TreeAsset` (a `.kbrai` asset handle) or
+  `TreeName` (registry-only native/script tree), plus transient `Tree`,
   `CurrentState`, `PreviousState`, `PendingState`, `TimeInState`,
-  `IsInitialized`, `LastTaskStatus`, and per-entity `TaskInstances`. Copying or
-  duplicating an entity preserves `TreeName` but resets runtime state.
+  `IsInitialized`, `LastTaskStatus`, and per-entity `TaskInstances`. `TreeAsset`
+  takes precedence when valid. Copying or duplicating an entity preserves the
+  authored binding but resets runtime state.
 - `AIControllerComponent`: `Enabled`, `DesiredVelocity`, `LookAtTarget`,
   `HasLookAt`, `WantsToAttack`, and the transient `WarnedDynamicBody` flag.
   Tasks write intent; `AISystem::UpdateMovement` consumes and clears velocity.
@@ -108,12 +110,25 @@ before Jolt. Facing writes `Rotation.y = atan2(dir.x, dir.z)` in radians
 bodies are warned about because Jolt overwrites their transform. Parented
 agents currently assume root-level local movement.
 
+## State tree assets
+
+`.kbrai` sources are imported by `AIStateTreePipelineImporter` and loaded by
+`RuntimeAssetLoader` into `AIStateTreeAsset`. The asset owns an editable
+`AIStateTreeDocument` and its compiled `Ref<AIStateTree>`; `Recompile` rebuilds
+the runtime tree after editor edits and `SaveSource` writes the document back to
+the source path.
+
+Asset trees are the editable form used by the dedicated AI editor window.
+Native C++/C# registrations remain first-class and are view-only in the editor.
+Registering an asset tree with the same document name as a native/script tree is
+allowed but warned about; the asset remains usable through its handle.
+
 ## Serialization
 
 `SceneSerializer` persists only authored data:
 
 - `AIBlackboardComponent`: `Values` list with `Key`, `Type`, `Value`.
-- `AIStateMachineComponent`: `TreeName` only.
+- `AIStateMachineComponent`: `TreeAsset` handle and `TreeName`.
 - `AIPerceptionComponent`: authored perception fields.
 - `AIControllerComponent`: `Enabled` only.
 - `AITargetableComponent`: `FactionId`.

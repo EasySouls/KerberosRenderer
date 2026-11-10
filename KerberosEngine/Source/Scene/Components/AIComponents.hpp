@@ -2,6 +2,7 @@
 
 #include "AI/AIStateTree.hpp"
 #include "AI/AIKeys.hpp"
+#include "Assets/Asset.hpp"
 
 #include <glm/glm.hpp>
 
@@ -77,6 +78,9 @@ struct AIBlackboardComponent
 
 struct AIStateMachineComponent
 {
+    /// Persistent .kbrai asset binding. Takes precedence over TreeName when valid.
+    AssetHandle TreeAsset = AssetHandle::Invalid();
+    /// Registry-only (native C++/C#) tree name. View-only in the AI editor.
     std::string TreeName;
     // Shared tree across entities
     Ref<AI::AIStateTree> Tree = nullptr;
@@ -99,12 +103,13 @@ struct AIStateMachineComponent
 
     // Shares tree, drops instances
     AIStateMachineComponent(const AIStateMachineComponent& other)
-        : TreeName(other.TreeName), Tree(other.Tree)
+        : TreeAsset(other.TreeAsset), TreeName(other.TreeName), Tree(other.Tree)
     {
     }
 
     AIStateMachineComponent(AIStateMachineComponent&& other) noexcept
     {
+        TreeAsset = other.TreeAsset;
         TreeName = std::move(other.TreeName);
         Tree = std::move(other.Tree);
         TaskInstances = std::move(other.TaskInstances);
@@ -124,6 +129,7 @@ struct AIStateMachineComponent
     {
         if (this != &other)
         {
+            TreeAsset = other.TreeAsset;
             TreeName = other.TreeName;
             Tree = other.Tree;
             CurrentState = AI::InvalidState;
@@ -142,6 +148,7 @@ struct AIStateMachineComponent
     {
         if (this != &other)
         {
+            TreeAsset = other.TreeAsset;
             TreeName = std::move(other.TreeName);
             Tree = std::move(other.Tree);
             TaskInstances = std::move(other.TaskInstances);

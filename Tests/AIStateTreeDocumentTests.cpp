@@ -1,4 +1,5 @@
 #include "AI/AINodeFactory.hpp"
+#include "AI/AIStateTreeAsset.hpp"
 #include "AI/AIStateTreeDocument.hpp"
 #include "AI/AIStateTreeRegistry.hpp"
 #include "AI/AIStateTreeSerializer.hpp"
@@ -6,8 +7,10 @@
 #include <gtest/gtest.h>
 
 #include <algorithm>
+#include <filesystem>
 #include <string>
 #include <string_view>
+#include <system_error>
 #include <utility>
 #include <vector>
 
@@ -255,6 +258,61 @@ TEST_F(AIStateTreeDocumentTest, ClearAssetTreesPreservesOtherOrigins)
     AIStateTreeRegistry::ClearScriptTrees();
     EXPECT_NE(AIStateTreeRegistry::Find("BuiltInTree"), nullptr);
     EXPECT_EQ(AIStateTreeRegistry::Find("ScriptTree"), nullptr);
+}
+
+TEST_F(AIStateTreeDocumentTest, StateTreeAssetLoadsCompilesAndRegisters)
+{
+    const std::filesystem::path source =
+        std::filesystem::temp_directory_path() / "kerberos_ai_asset_load.kbrai";
+
+    std::string error;
+    ASSERT_TRUE(AIStateTreeSerializer::SaveFile(source, MakeChaseDocument(), &error)) << error;
+
+    const Ref<AIStateTreeAsset> asset = AIStateTreeAsset::Load(AssetHandle(123), source, &error);
+    ASSERT_NE(asset, nullptr) << error;
+    EXPECT_EQ(asset->GetHandle(), AssetHandle(123));
+    EXPECT_EQ(asset->Document.Name, "Enemy");
+    ASSERT_NE(asset->Compiled, nullptr);
+    EXPECT_EQ(asset->Compiled->GetEntryState(), "Idle"_id);
+
+    const Ref<AIStateTree> registered = AIStateTreeRegistry::Find("Enemy");
+    ASSERT_NE(registered, nullptr);
+    EXPECT_EQ(registered.get(), asset->Compiled.get());
+
+    const auto origin = AIStateTreeRegistry::GetOrigin("Enemy");
+    ASSERT_TRUE(origin.has_value());
+    EXPECT_TRUE(*origin == AIStateTreeOrigin::Asset);
+
+    std::error_code ec;
+    std::filesystem::remove(source, ec);
+}
+
+TEST_F(AIStateTreeDocumentTest, StateTreeAssetSavesEditedSource)
+{
+    const std::filesystem::path source =
+        std::filesystem::temp_directory_path() / "kerberos_ai_asset_save_source.kbrai";
+    const std::filesystem::path saved =
+        std::filesystem::temp_directory_path() / "kerberos_ai_asset_save_target.kbrai";
+
+    std::string error;
+    ASSERT_TRUE(AIStateTreeSerializer::SaveFile(source, MakeChaseDocument(), &error)) << error;
+
+    const Ref<AIStateTreeAsset> asset = AIStateTreeAsset::Load(AssetHandle(124), source, &error);
+    ASSERT_NE(asset, nullptr) << error;
+
+    asset->Document.EntryState = "Chase";
+    ASSERT_TRUE(asset->Recompile(&error)) << error;
+    EXPECT_EQ(asset->Compiled->GetEntryState(), "Chase"_id);
+    ASSERT_TRUE(asset->SaveSource(saved, &error)) << error;
+
+    AIStateTreeDocument reloaded;
+    ASSERT_TRUE(AIStateTreeSerializer::LoadFile(saved, reloaded, &error)) << error;
+    EXPECT_EQ(reloaded.EntryState, "Chase");
+    ASSERT_NE(reloaded.FindState("Chase"), nullptr);
+
+    std::error_code ec;
+    std::filesystem::remove(source, ec);
+    std::filesystem::remove(saved, ec);
 }
 
 TEST_F(AIStateTreeDocumentTest, CompileDocumentRejectsInvalidDocuments)

@@ -5,6 +5,7 @@
 #include "Assets/Formats/SkeletonFormat.hpp"
 #include "Assets/Importers/MaterialImporter.hpp"
 #include "Assets/Prefab.hpp"
+#include "AI/AIStateTreeAsset.hpp"
 #include "Serialization/PrefabSerializer.hpp"
 #include "Renderer/Mesh.hpp"
 #include "Renderer/Animation/AnimationClip.hpp"
@@ -582,6 +583,14 @@ Ref<Asset> RuntimeAssetLoader::Load(const AssetHandle handle,
             return LoadSkeletalMesh(handle, path);
         case AssetType::Animation:
             return LoadAnimation(handle, path);
+		case AssetType::AIStateTree:
+		{
+			std::string error;
+			Ref<AI::AIStateTreeAsset> asset = AI::AIStateTreeAsset::Load(handle, path, &error);
+			if (!asset)
+				Log::CoreError("Failed to load AI state tree asset '{}': {}", path.string(), error);
+			return asset;
+		}
 		case AssetType::Prefab:
 		{
 			NativeAssetRecord record;

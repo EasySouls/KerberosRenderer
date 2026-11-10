@@ -7,6 +7,7 @@
 #include "MeshImporter.hpp"
 #include "PrefabImporter.hpp"
 #include "SoundImporter.hpp"
+#include "AI/AIStateTreeAsset.hpp"
 #include "Assets/Asset.hpp"
 #include "Profiling/Profilers.hpp"
 
@@ -51,6 +52,8 @@ namespace Kerberos
                 // TODO: Implement SkinnedMeshImporter
                 Log::CoreWarn("SkinnedMesh import not yet implemented");
                 break;
+            case AssetType::AIStateTree:
+                return AI::AIStateTreeAsset::Load(handle, metadata.Filepath);
             default:
                 break;
         }

@@ -2867,29 +2867,64 @@ void HierarchyPanel::DrawComponents(const Entity entity)
         {
             auto& stateMachine = entity.GetComponent<AIStateMachineComponent>();
 
+            if (AssetPicker::DrawAssetHandle("State Tree Asset", AssetType::AIStateTree,
+                    stateMachine.TreeAsset, "Search AI state trees..."))
+            {
+                stateMachine.TreeName.clear();
+                stateMachine.Tree = nullptr;
+                stateMachine.ResolutionFailed = false;
+                stateMachine.IsInitialized = false;
+                stateMachine.TaskInstances.clear();
+            }
+
+            ImGui::TextDisabled("Asset trees are editable in the AI editor. C++/C# trees are view-only.");
+
             const std::vector<std::string> treeNames = AI::AIStateTreeRegistry::GetNames();
             const char* preview = stateMachine.TreeName.empty() ? "<none>" : stateMachine.TreeName.c_str();
-            if (ImGui::BeginCombo("State Tree", preview))
+            if (ImGui::BeginCombo("Registered Tree", preview))
             {
                 if (ImGui::Selectable("<none>", stateMachine.TreeName.empty()))
                 {
+                    stateMachine.TreeAsset = AssetHandle::Invalid();
                     stateMachine.TreeName.clear();
                     stateMachine.Tree = nullptr;
+                    stateMachine.ResolutionFailed = false;
                     stateMachine.IsInitialized = false;
                     stateMachine.TaskInstances.clear();
                 }
 
                 for (const std::string& name : treeNames)
                 {
+                    const std::optional<AI::AIStateTreeOrigin> origin =
+                        AI::AIStateTreeRegistry::GetOrigin(name);
+                    if (origin && *origin == AI::AIStateTreeOrigin::Asset)
+                        continue; // Asset trees are bound by handle above.
+
                     if (ImGui::Selectable(name.c_str(), name == stateMachine.TreeName))
                     {
+                        stateMachine.TreeAsset = AssetHandle::Invalid();
                         stateMachine.TreeName = name;
                         stateMachine.Tree = AI::AIStateTreeRegistry::Find(name);
+                        stateMachine.ResolutionFailed = false;
                         stateMachine.IsInitialized = false;
                         stateMachine.TaskInstances.clear();
                     }
                 }
                 ImGui::EndCombo();
+            }
+
+            if (!stateMachine.TreeName.empty())
+            {
+                if (const std::optional<AI::AIStateTreeOrigin> origin =
+                        AI::AIStateTreeRegistry::GetOrigin(stateMachine.TreeName))
+                {
+                    const char* originLabel = *origin == AI::AIStateTreeOrigin::Asset
+                        ? "Asset"
+                        : *origin == AI::AIStateTreeOrigin::Script
+                        ? "C# (view-only)"
+                        : "C++ (view-only)";
+                    ImGui::Text("Tree Origin: %s", originLabel);
+                }
             }
 
             const AI::AIStateDefinition* current = stateMachine.Tree

@@ -494,8 +494,10 @@ static void SerializeEntity(YAML::Emitter& out, const Entity entity)
     if (entity.HasComponent<AIStateMachineComponent>()) {
         out << YAML::Key << "AIStateMachineComponent";
         out << YAML::BeginMap;
-        out << YAML::Key << "TreeName" << YAML::Value
-            << entity.GetComponent<AIStateMachineComponent>().TreeName;
+        const auto& stateMachine = entity.GetComponent<AIStateMachineComponent>();
+        out << YAML::Key << "TreeAsset" << YAML::Value
+            << static_cast<std::uint64_t>(stateMachine.TreeAsset);
+        out << YAML::Key << "TreeName" << YAML::Value << stateMachine.TreeName;
         out << YAML::EndMap;
     }
 
@@ -939,8 +941,10 @@ Entity SceneSerializer::DeserializeEntity(const Ref<Scene>& scene, const YAML::N
 
     if (auto aiStateMachine = node["AIStateMachineComponent"]) {
         auto& stateMachine = deserializedEntity.AddComponent<AIStateMachineComponent>();
+        stateMachine.TreeAsset = AssetHandle(aiStateMachine["TreeAsset"].as<std::uint64_t>(0));
         stateMachine.TreeName = aiStateMachine["TreeName"].as<std::string>("");
         stateMachine.Tree = nullptr;
+        stateMachine.ResolutionFailed = false;
         stateMachine.IsInitialized = false;
         stateMachine.CurrentState = AI::InvalidState;
         stateMachine.PreviousState = AI::InvalidState;

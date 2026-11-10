@@ -108,11 +108,13 @@ Editor windows live mainly under
   the Ragdoll component yet, so add it after instantiation or from C#.
   The AI components are added through the `AI` component submenu; the
   "AI Agent" entry creates the blackboard, state machine, controller, and
-  perception together. The inspector selects a registered state tree, shows
-  the live current/previous state and time in state during Play/Simulate, and
-  edits perception/controller fields plus the authored blackboard values.
-  Runtime blackboard values are shown read-only. Removing any AI component
-  uses the same component-popup pattern as the rest of the hierarchy.
+  perception together. The inspector binds a persistent `.kbrai` state tree
+  asset through `AssetPicker` (editable in the AI editor) or selects a
+  registered native/C# tree (view-only). It shows the live current/previous
+  state and time in state during Play/Simulate, and edits perception/controller
+  fields plus the authored blackboard values. Runtime blackboard values are
+  shown read-only. Removing any AI component uses the same component-popup
+  pattern as the rest of the hierarchy.
 - `AnimationEditorPanel`: opened from `View > Animation Editor`; it resolves the
   animator from the selected entity, a parent, or the skeleton-linked animator.
   Its timeline shows one lane per event name plus a marker lane, supports
@@ -235,9 +237,12 @@ immediately. `Scene::UpdateScripts`/`OnRuntimeStart` snapshot the script entity
 list before invoking callbacks so scripts may spawn prefabs during lifecycle
 methods.
 
-AI state trees can be registered from C# with
-`Kerberos.AI.AI.RegisterStateTree(name, docOrJson)` before assigning
-`AIStateMachineComponent.TreeName`. Script-owned trees are cleared on project
+Persistent AI trees are `.kbrai` assets bound with
+`AIStateMachineComponent.TreeAsset`; the dedicated AI editor window loads the
+`AIStateTreeAsset` document, edits it, recompiles the runtime tree, and saves it
+through `SaveSource`/the asset manager. Native C++/C# trees are registered with
+`Kerberos.AI.AI.RegisterStateTree(name, docOrJson)` or the C++ registry and
+remain view-only in the editor. Script-owned trees are cleared on project
 open and script-assembly reload, so register them in `OnCreate` (not a static
 constructor). Scripts are not instantiated in Simulate, so C#-registered trees
 are available in Play only; native trees work in both. The managed AI

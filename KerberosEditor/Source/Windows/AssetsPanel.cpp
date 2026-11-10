@@ -1059,6 +1059,9 @@ std::string AssetStatusLabel(const AssetHandle handle,
         case AssetType::Animation:
             payloadType = assetBrowserAnimation;
             break;
+        case AssetType::AIStateTree:
+            payloadType = assetBrowserAIStateTree;
+            break;
         default:
             payloadType = assetBrowserItem;
             break;

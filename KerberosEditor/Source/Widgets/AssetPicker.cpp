@@ -269,6 +269,7 @@ namespace Kerberos
 		case AssetType::Skeleton: return assetBrowserSkeleton;
 		case AssetType::SkinnedMesh: return assetBrowserSkinnedMesh;
 		case AssetType::Animation: return assetBrowserAnimation;
+		case AssetType::AIStateTree: return assetBrowserAIStateTree;
 		default: return assetBrowserItem;
 		}
 	}
@@ -308,6 +309,7 @@ namespace Kerberos
 			assetBrowserSkeleton,
 			assetBrowserSkinnedMesh,
 			assetBrowserAnimation,
+			assetBrowserAIStateTree,
 			assetBrowserItem,
 		};
 

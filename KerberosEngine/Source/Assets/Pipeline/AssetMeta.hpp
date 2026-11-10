@@ -17,6 +17,7 @@ enum class ImporterType : uint8_t
     GLTFScene,
     Standalone,
     Material,
+    AIStateTree,
 };
 
 enum class SubAssetKind : uint8_t

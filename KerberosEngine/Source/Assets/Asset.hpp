@@ -21,6 +21,7 @@ enum class AssetType : uint8_t
 	Skeleton,
 	SkinnedMesh,
 	Animation,
+	AIStateTree,
 
 	Count
 };

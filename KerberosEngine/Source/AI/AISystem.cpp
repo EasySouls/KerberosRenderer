@@ -1,9 +1,12 @@
 #include "AISystem.hpp"
 
+#include "AIStateTreeAsset.hpp"
 #include "AIStateTreeRegistry.hpp"
 #include "AIKeys.hpp"
 #include "AINodeFactory.hpp"
 
+#include "Assets/AssetManager.hpp"
+#include "Project/Project.hpp"
 #include "Scene/Scene.hpp"
 #include "Scene/Entity.hpp"
 #include "Scene/Components.hpp"
@@ -161,16 +164,44 @@ bool AISystem::EnsureInitialized(const Entity entity,
     
     SeedAuthoredValues(blackboard);
 
+    // Asset-bound trees take precedence over registry-only native/script trees.
+    if (!stateMachine.Tree && stateMachine.TreeAsset.IsValid())
+    {
+        if (const Ref<Project> project = Project::GetActive(); project && project->GetAssetManager())
+        {
+            if (const Ref<AIStateTreeAsset> asset = AssetManager::AsAsset<AIStateTreeAsset>(stateMachine.TreeAsset))
+            {
+                if (!asset->Compiled)
+                {
+                    std::string error;
+                    if (!asset->Recompile(&error))
+                        Log::CoreError("AI state tree asset '{}' failed to compile: {}", stateMachine.TreeAsset, error);
+                }
+
+                stateMachine.Tree = asset->Compiled;
+            }
+        }
+    }
+
     if (!stateMachine.Tree && !stateMachine.TreeName.empty())
         stateMachine.Tree = AIStateTreeRegistry::Find(stateMachine.TreeName);
 
     if (!stateMachine.Tree)
     {
-        if (!stateMachine.TreeName.empty() && !stateMachine.ResolutionFailed)
+        if (!stateMachine.ResolutionFailed && (stateMachine.TreeAsset.IsValid() || !stateMachine.TreeName.empty()))
         {
-            Log::CoreError("AI entity {} references unknown state tree '{}'.",
-                           entity.GetUUID(),
-                           stateMachine.TreeName);
+            if (stateMachine.TreeAsset.IsValid())
+            {
+                Log::CoreError("AI entity {} references unresolvable state tree asset {}.",
+                               entity.GetUUID(),
+                               stateMachine.TreeAsset);
+            }
+            else
+            {
+                Log::CoreError("AI entity {} references unknown state tree '{}'.",
+                               entity.GetUUID(),
+                               stateMachine.TreeName);
+            }
             stateMachine.ResolutionFailed = true;
         }
         return false;

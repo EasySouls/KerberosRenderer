@@ -19,6 +19,10 @@ namespace {
 using namespace Kerberos;
 using namespace Kerberos::AI;
 
+/// Arbitrary non-zero asset handle used to verify TreeAsset serialization. It
+/// does not need to resolve to a real imported asset in this headless test.
+constexpr uint64_t kSerializedTreeAssetId = 77;
+
 constexpr const char* kChaseTreeDocument = R"json(
 {
   "Entry": "Idle",
@@ -293,6 +297,7 @@ TEST_F(AITest, SceneSubtreeSerializationRoundTripsAuthoredAI)
     blackboard.AuthoredValues.push_back(NamedBlackboardValue{ "Home", glm::vec3(1.0f, 2.0f, 3.0f) });
 
     auto& stateMachine = entity.GetComponent<AIStateMachineComponent>();
+    stateMachine.TreeAsset = AssetHandle(kSerializedTreeAssetId);
     stateMachine.TreeName = "Enemy";
 
     auto& perception = entity.GetComponent<AIPerceptionComponent>();
@@ -320,6 +325,7 @@ TEST_F(AITest, SceneSubtreeSerializationRoundTripsAuthoredAI)
     EXPECT_FLOAT_EQ(*std::get_if<float>(&restoredBlackboard.AuthoredValues[2].Value), 3.5f);
 
     const auto& restoredStateMachine = restored.GetComponent<AIStateMachineComponent>();
+    EXPECT_EQ(restoredStateMachine.TreeAsset, AssetHandle(kSerializedTreeAssetId));
     EXPECT_EQ(restoredStateMachine.TreeName, "Enemy");
     EXPECT_FALSE(restoredStateMachine.IsInitialized);
 
