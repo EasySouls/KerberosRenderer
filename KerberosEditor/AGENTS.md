@@ -300,8 +300,12 @@ table is read positionally.
 Script classes use the `Kerberos.*` namespace (renamed from
 `Kerberos.Source.Kerberos.*`); `ScriptUtils::MigrateLegacyScriptClassName`
 rewrites the old prefix when scenes/prefabs are deserialized. The built-in
-sample scripts (`Player`, `Camera`, `CameraFollow`) live in `KerberosScriptCoreLib`
-under `Kerberos`; user scripts live in their own per-project assembly.
+sample scripts (`Player`, `Camera`, `CameraFollow`, `CSharpDemoTree`) live in
+`KerberosScriptCoreLib` under `Kerberos`; user scripts live in their own
+per-project assembly. `CSharpDemoTree` registers the view-only `CSharpDemo`
+state tree from `OnCreate`, so attaching it to an entity and entering Play makes
+the tree available in the AI Editor's registered-tree picker. It is the sample
+used to exercise C# trees in the AI Editor and AI runtime inspector.
 
 Each project owns a C# project at `<project>/Assets/Scripts/<PascalName>.csproj`
 (referencing `KerberosScriptCoreLib` through `$(KerberosEnginePath)`, with

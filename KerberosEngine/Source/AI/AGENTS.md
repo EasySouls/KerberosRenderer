@@ -151,6 +151,10 @@ C# uses `Kerberos.AI.AI.RegisterStateTree(name, docOrJson)` and the
 `AIPerceptionComponent`, and `AITargetableComponent` proxies. Register script
 trees in `OnCreate`; scripts are not instantiated in Simulate, so script-owned
 trees are available in Play only. Native `BuiltIn` trees work in both.
+`KerberosScriptCoreLib/Kerberos/AI/CSharpDemoTree.cs` is the reference example:
+attach it to an entity and enter Play to register the view-only `CSharpDemo`
+tree for AI Editor and runtime-inspector testing. It covers every standard
+task/condition type.
 
 The managed callback table in `ScriptInterface.cpp` is positional. Append new
 callbacks at the end of both `NativeCallbackTable` and the C# `SetNativeCallbacks`
