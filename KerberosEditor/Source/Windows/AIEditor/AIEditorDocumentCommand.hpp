@@ -18,6 +18,16 @@ struct AIEditorDocumentSnapshot
     uint64_t NextEditorID = 1;
 };
 
+[[nodiscard]] inline AIEditorDocumentSnapshot CaptureSnapshot(const AIEditorDocument& document)
+{
+    return AIEditorDocumentSnapshot{
+        .Document = document.Document,
+        .States = document.States,
+        .Transitions = document.Transitions,
+        .NextEditorID = document.NextEditorID
+    };
+}
+
 class AIEditorDocumentCommand final : public ICommand
 {
 public:

@@ -1573,7 +1573,10 @@ namespace PROJECT_NAME
 			}
 			else if (ctrl)
 			{
-				SaveScene();
+				if (m_AIEditorPanel.IsFocused())
+					m_AIEditorPanel.SaveActiveTab();
+				else
+					SaveScene();
 			}
 			break;
 		case Key::N:
@@ -1597,15 +1600,28 @@ namespace PROJECT_NAME
 			}
 			break;
 		case Key::Z:
-			if (ctrl && isInEditMode && !ImGui::GetIO().WantTextInput && !ImGui::IsAnyItemActive())
+			if (ctrl && isInEditMode && !isInputCaptured)
 			{
-				Undo();
+				if (m_AIEditorPanel.IsFocused())
+				{
+					if (shift)
+						m_AIEditorPanel.RedoActiveTab();
+					else
+						m_AIEditorPanel.UndoActiveTab();
+				}
+				else
+				{
+					Undo();
+				}
 			}
 			break;
 		case Key::Y:
-			if (ctrl && isInEditMode && !ImGui::GetIO().WantTextInput && !ImGui::IsAnyItemActive())
+			if (ctrl && isInEditMode && !isInputCaptured)
 			{
-				Redo();
+				if (m_AIEditorPanel.IsFocused())
+					m_AIEditorPanel.RedoActiveTab();
+				else
+					Redo();
 			}
 			break;
 

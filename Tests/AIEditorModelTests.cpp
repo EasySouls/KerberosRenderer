@@ -13,6 +13,7 @@
 #include <filesystem>
 #include <sstream>
 #include <string>
+#include <utility>
 #include <vector>
 
 import Kerberos;
@@ -21,16 +22,6 @@ namespace {
 
 using namespace Kerberos;
 using namespace Kerberos::AI;
-
-AIEditorDocumentSnapshot CaptureSnapshot(const AIEditorDocument& document)
-{
-    return AIEditorDocumentSnapshot{
-        .Document = document.Document,
-        .States = document.States,
-        .Transitions = document.Transitions,
-        .NextEditorID = document.NextEditorID
-    };
-}
 
 AIEditorDocument MakeDocument()
 {
@@ -187,7 +178,7 @@ TEST(AIEditorModelTest, SampleEnemyChaseAssetIsValid)
 
 TEST(AIEditorModelTest, GraphIDsAreUniqueAcrossKinds)
 {
-    using namespace AIEditorGraphIds;
+    using namespace AIEditorGraphId;
 
     EXPECT_NE(MakeStateNodeId(7), MakeStateInputPinId(7));
     EXPECT_NE(MakeStateNodeId(7), MakeTransitionOutputPinId(7));
@@ -208,4 +199,88 @@ TEST(AIEditorModelTest, NextGraphReferencesResetForReload)
     EXPECT_EQ(document.States[0].EditorID, 1u);
     EXPECT_EQ(document.States[1].EditorID, 2u);
     EXPECT_EQ(document.Transitions[0].EditorID, 3u);
+}
+
+TEST(AIEditorModelTest, RemoveStatesByDocumentIndexIsBatchSafe)
+{
+    AIEditorDocument document = MakeDocument();
+    const uint64_t idleID = document.AddState("Idle");
+    const uint64_t chaseID = document.AddState("Chase");
+    document.AddState("Attack");
+    document.AddTransition(0, "Chase", "Spotted");
+    document.AddTransition(1, "Attack", "InRange");
+
+    ASSERT_EQ(document.States.size(), 3u);
+    const size_t idleIndex = document.FindState(idleID)->DocumentStateIndex;
+    const size_t chaseIndex = document.FindState(chaseID)->DocumentStateIndex;
+
+    // Deliberately unsorted: the batch must resolve every index against the
+    // pre-removal document instead of the rebuilt session IDs.
+    const size_t indices[] = { chaseIndex, idleIndex };
+    document.RemoveStates(indices);
+
+    ASSERT_EQ(document.Document.States.size(), 1u);
+    EXPECT_EQ(document.Document.States[0].Name, "Attack");
+    EXPECT_TRUE(document.Document.States[0].Transitions.empty());
+    EXPECT_TRUE(document.Transitions.empty());
+}
+
+TEST(AIEditorModelTest, RemoveStatesRepairsEntryState)
+{
+    AIEditorDocument document = MakeDocument();
+    const uint64_t idleID = document.AddState("Idle");
+    const uint64_t chaseID = document.AddState("Chase");
+    document.AddState("Attack");
+
+    document.RemoveState(chaseID);
+    EXPECT_EQ(document.Document.EntryState, "Idle");
+
+    document.RemoveState(idleID);
+    EXPECT_EQ(document.Document.EntryState, "Attack");
+
+    const size_t remainingCount = document.Document.States.size();
+    std::vector<size_t> allIndices;
+    for (size_t i = 0; i < remainingCount; ++i)
+        allIndices.push_back(i);
+
+    document.RemoveStates(allIndices);
+    EXPECT_TRUE(document.Document.States.empty());
+    EXPECT_TRUE(document.Document.EntryState.empty());
+}
+
+TEST(AIEditorModelTest, RemoveTransitionsByIndexIsBatchSafe)
+{
+    AIEditorDocument document = MakeDocument();
+    document.AddState("Idle");
+    document.AddState("Chase");
+    document.AddState("Attack");
+    document.AddTransition(0, "Chase", "A");
+    document.AddTransition(0, "Attack", "B");
+    document.AddTransition(1, "Idle", "C");
+
+    const std::pair<size_t, size_t> items[] = { { 0, 1 }, { 0, 0 } };
+    document.RemoveTransitions(items);
+
+    ASSERT_EQ(document.Document.States.size(), 3u);
+    EXPECT_TRUE(document.Document.States[0].Transitions.empty());
+    ASSERT_EQ(document.Document.States[1].Transitions.size(), 1u);
+    EXPECT_EQ(document.Document.States[1].Transitions[0].Name, "C");
+    EXPECT_EQ(document.Transitions.size(), 1u);
+}
+
+TEST(AIEditorModelTest, UniqueNamesAvoidExistingEntries)
+{
+    AIEditorDocument document = MakeDocument();
+    document.AddState("Idle");
+    document.AddState("New State");
+    document.AddTransition(0, "New State", "Transition");
+
+    EXPECT_EQ(document.GenerateUniqueStateName(), "New State 2");
+    EXPECT_EQ(document.GenerateUniqueStateName("Chase"), "Chase");
+
+    const AIEditorStateRef* idleRef = document.FindState(document.States.front().EditorID);
+    ASSERT_NE(idleRef, nullptr);
+    const AI::AIDocumentState* idle = document.ResolveState(*idleRef);
+    ASSERT_NE(idle, nullptr);
+    EXPECT_EQ(document.GenerateUniqueTransitionName(*idle), "Transition 2");
 }

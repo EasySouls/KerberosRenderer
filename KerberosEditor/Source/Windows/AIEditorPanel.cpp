@@ -30,6 +30,7 @@ bool IsEditMode(const bool isPlaying, const bool isSimulating)
 
 void AIEditorPanel::OnImGuiRender()
 {
+    m_Focused = false;
     if (!m_Open)
         return;
 
@@ -39,6 +40,8 @@ void AIEditorPanel::OnImGuiRender()
         ImGui::End();
         return;
     }
+
+    m_Focused = ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows);
 
     DrawToolbar();
     ImGui::Separator();
@@ -468,11 +471,34 @@ void AIEditorPanel::DrawTabContent(AIEditorTab& tab)
     DrawGraph(tab, canEdit);
     DrawValidation(tab);
 
-    if (ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows) &&
-        ImGui::GetIO().KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_S, false))
+}
+
+bool AIEditorPanel::UndoActiveTab()
+{
+    AIEditorTab* tab = GetActiveTab();
+    if (!tab || tab->Document.ViewOnly || !IsEditMode(m_IsPlaying, m_IsSimulating) ||
+        !tab->UndoRedo.CanUndo())
     {
-        SaveActiveTab();
+        return false;
     }
+
+    tab->UndoRedo.Undo();
+    tab->ResetGraphSession();
+    return true;
+}
+
+bool AIEditorPanel::RedoActiveTab()
+{
+    AIEditorTab* tab = GetActiveTab();
+    if (!tab || tab->Document.ViewOnly || !IsEditMode(m_IsPlaying, m_IsSimulating) ||
+        !tab->UndoRedo.CanRedo())
+    {
+        return false;
+    }
+
+    tab->UndoRedo.Redo();
+    tab->ResetGraphSession();
+    return true;
 }
 
 void AIEditorPanel::DrawGraph(AIEditorTab& tab, const bool canEdit)
@@ -485,7 +511,7 @@ void AIEditorPanel::DrawGraph(AIEditorTab& tab, const bool canEdit)
 void AIEditorPanel::DrawDocumentPreview(const AIEditorTab& tab)
 {
     ImGui::Separator();
-    ImGui::TextDisabled("Node graph editor arrives in Phase 3. Current authored layout:");
+    ImGui::TextDisabled("Authored layout (debug list):");
     ImGui::BeginChild("##AIDocumentPreview", ImVec2(0.0f, 300.0f), true,
                       ImGuiWindowFlags_HorizontalScrollbar);
 
@@ -592,9 +618,8 @@ bool AIEditorPanel::RevertActiveTab()
         return false;
     }
 
-    tab->ValidationDirty = true;
-    tab->SelectedStateID = 0;
-    tab->SelectedTransitionID = 0;
+    tab->UndoRedo.Clear();
+    tab->ResetGraphSession();
     SetStatus("Reverted AI state tree to the saved source.", false);
     return true;
 }

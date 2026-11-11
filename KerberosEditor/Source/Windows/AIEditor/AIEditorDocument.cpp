@@ -1,6 +1,7 @@
 #include "AIEditorDocument.hpp"
 
 #include <algorithm>
+#include <functional>
 #include <utility>
 
 namespace Kerberos {
@@ -146,20 +147,46 @@ void AIEditorDocument::RemoveState(const uint64_t editorID)
     if (!stateRef || stateRef->DocumentStateIndex >= Document.States.size())
         return;
 
-    const size_t removedIndex = stateRef->DocumentStateIndex;
-    const std::string removedName = Document.States[removedIndex].Name;
+    const size_t index = stateRef->DocumentStateIndex;
+    RemoveStates(std::span<const size_t>(&index, 1));
+}
 
-    Document.States.erase(Document.States.begin() + static_cast<std::ptrdiff_t>(removedIndex));
+void AIEditorDocument::RemoveStates(const std::span<const size_t> documentStateIndices)
+{
+    if (documentStateIndices.empty())
+        return;
+
+    std::vector<size_t> indices(documentStateIndices.begin(), documentStateIndices.end());
+    std::ranges::sort(indices, std::greater<>());
+    indices.erase(std::ranges::unique(indices).begin(), indices.end());
+
+    std::vector<std::string> removedNames;
+    removedNames.reserve(indices.size());
+    for (const size_t index : indices)
+    {
+        if (index >= Document.States.size())
+            continue;
+
+        removedNames.push_back(Document.States[index].Name);
+        Document.States.erase(Document.States.begin() + static_cast<std::ptrdiff_t>(index));
+    }
+
+    if (removedNames.empty())
+        return;
 
     // Remove incoming transitions from every remaining state.
-    if (!removedName.empty())
+    for (AI::AIDocumentState& state : Document.States)
     {
-        for (AI::AIDocumentState& state : Document.States)
-        {
-            std::erase_if(state.Transitions, [&removedName](const AI::AIDocumentTransition& transition) {
-                return transition.TargetState == removedName;
-            });
-        }
+        std::erase_if(state.Transitions, [&removedNames](const AI::AIDocumentTransition& transition) {
+            return std::ranges::find(removedNames, transition.TargetState) != removedNames.end();
+        });
+    }
+
+    if (std::ranges::find(removedNames, Document.EntryState) != removedNames.end())
+    {
+        Document.EntryState = Document.States.empty()
+            ? std::string{}
+            : Document.States.front().Name;
     }
 
     RebuildGraphReferences();
@@ -171,13 +198,37 @@ void AIEditorDocument::RemoveTransition(const uint64_t editorID)
     if (!transitionRef || transitionRef->SourceStateIndex >= Document.States.size())
         return;
 
-    AI::AIDocumentState& state = Document.States[transitionRef->SourceStateIndex];
-    if (transitionRef->TransitionIndex >= state.Transitions.size())
+    const std::pair indices{ transitionRef->SourceStateIndex, transitionRef->TransitionIndex };
+    RemoveTransitions(std::span<const std::pair<size_t, size_t>>(&indices, 1));
+}
+
+void AIEditorDocument::RemoveTransitions(
+    const std::span<const std::pair<size_t, size_t>> transitions)
+{
+    if (transitions.empty())
         return;
 
-    state.Transitions.erase(state.Transitions.begin() +
-                            static_cast<std::ptrdiff_t>(transitionRef->TransitionIndex));
-    RebuildGraphReferences();
+    std::vector<std::pair<size_t, size_t>> items(transitions.begin(), transitions.end());
+    std::ranges::sort(items, std::greater<>());
+    items.erase(std::ranges::unique(items).begin(), items.end());
+
+    bool removed = false;
+    for (const auto& [stateIndex, transitionIndex] : items)
+    {
+        if (stateIndex >= Document.States.size())
+            continue;
+
+        AI::AIDocumentState& state = Document.States[stateIndex];
+        if (transitionIndex >= state.Transitions.size())
+            continue;
+
+        state.Transitions.erase(state.Transitions.begin() +
+                                static_cast<std::ptrdiff_t>(transitionIndex));
+        removed = true;
+    }
+
+    if (removed)
+        RebuildGraphReferences();
 }
 
 void AIEditorDocument::MoveTransition(const uint64_t editorID, size_t newIndex)
@@ -237,6 +288,42 @@ size_t AIEditorDocument::FindStateIndexByName(const std::string_view name) const
     return it != Document.States.end()
         ? static_cast<size_t>(std::distance(Document.States.begin(), it))
         : Document.States.size();
+}
+
+std::string AIEditorDocument::GenerateUniqueStateName(const std::string_view base) const
+{
+    const std::string prefix = base.empty() ? "New State" : std::string(base);
+    if (FindStateIndexByName(prefix) == Document.States.size())
+        return prefix;
+
+    for (size_t suffix = 2;; ++suffix)
+    {
+        std::string candidate = prefix + " " + std::to_string(suffix);
+        if (FindStateIndexByName(candidate) == Document.States.size())
+            return candidate;
+    }
+}
+
+std::string AIEditorDocument::GenerateUniqueTransitionName(
+    const AI::AIDocumentState& state, const std::string_view base) const
+{
+    const std::string prefix = base.empty() ? "Transition" : std::string(base);
+    const auto isUsed = [&state](const std::string& name) {
+        return std::ranges::any_of(state.Transitions,
+            [&name](const AI::AIDocumentTransition& transition) {
+                return transition.Name == name;
+            });
+    };
+
+    if (!isUsed(prefix))
+        return prefix;
+
+    for (size_t suffix = 2;; ++suffix)
+    {
+        std::string candidate = prefix + " " + std::to_string(suffix);
+        if (!isUsed(candidate))
+            return candidate;
+    }
 }
 
 bool AIEditorDocument::IsValid() const

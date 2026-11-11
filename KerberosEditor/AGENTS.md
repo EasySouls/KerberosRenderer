@@ -133,19 +133,37 @@ Editor windows live mainly under
   overload uses the entity's world transform, so a socket-driven weapon is
   enough and no dedicated hitbox component is required.
 - `AIEditorPanel`: opened from `View > AI Editor`; also opened by double-clicking
-  a `.kbrai` asset in `AssetsPanel`. Phase 2 provides a tabbed document workspace,
+  a `.kbrai` asset in `AssetsPanel`. It provides a tabbed document workspace,
   an AI state-tree asset picker, a registered-tree picker, New/Save/Revert/
-  Validate actions, a read-only state/transition preview, and a validation issue
-  list. Editable `.kbrai` documents save through `AIEditorAssetSession`, which
-  recompiles the asset and force-reimports the source; registered C++/C# trees
-  open read-only. Editing is disabled while Play/Simulate is active; the panel
-  still receives scene/runtime context for the later debug phases. The node
-  canvas, schema-driven inspector, and runtime overlays are Phases 3–5.
+  Validate actions, a validation issue list, a debug layout list, and an
+  `imgui-node-editor` canvas. The canvas draws one node per state (entry badge,
+  task list, one output pin per transition, and a trailing `+ Transition` pin)
+  and one link per transition. Dragging `+ Transition` onto a state input
+  creates a transition, dragging an existing transition pin retargets it, and
+  node/link deletion, entry-state selection, and state creation are available
+  through the canvas context menus. Node drags persist through
+  `AIDocumentState::EditorPosition`; structural edits, entry changes, and drags
+  mark the document dirty. Editable `.kbrai` documents save through
+  `AIEditorAssetSession`, which recompiles the asset and force-reimports the
+  source; registered C++/C# trees open read-only. Editing is disabled while
+  Play/Simulate is active; the panel still receives scene/runtime context for
+  the later debug phases.
+  Structural edits (create/retarget/delete transitions, delete states, set
+  entry, add state) are undoable per tab via snapshot commands. While the AI
+  Editor window is focused, `EditorLayer` routes Ctrl+Z/Ctrl+Shift+Z/Ctrl+Y and
+  Ctrl+S to the active tab instead of the scene history or scene save;
+  node-position drags are not undoable yet, and Revert clears the history.
+  Multi-selection deletes resolve every document
+  index before mutating so session-ID renumbering cannot remove the wrong
+  item. Deleting the entry state promotes the first remaining state (or clears
+  the entry when none remain), and new states/transitions receive unique names.
+  The schema-driven inspector and runtime overlays remain Phases 4–5.
   The editor-only model lives in `KerberosEditor/Source/Windows/AIEditor/**`;
   graph IDs, validation, tabs, and undo are editor-local and do not modify
   `AIStateTreeDocument` or `AIStateTreeSerializer`. `AIEditorDocument` stays
   free of ImGui/node-editor dependencies; `AIEditorTab` owns the node-editor
-  context and per-tab undo history.
+  context, per-tab undo history, node-position cache, refit request, and
+  selection.
 - `InspectorPanel`: the unified right-side "Properties" window. It shows entity
   components when an entity is selected and asset import options when a source
   asset is selected in `AssetsPanel` (asset selection takes display precedence).
@@ -405,7 +423,10 @@ For AI editor changes, run
 `.\out\build\vs2026\Tests\Debug\KerberosEditorModelTests.exe` and manually validate:
 opening a `.kbrai` through `View > AI Editor` and the asset browser, opening a
 registered tree in read-only mode, creating a new tree, save/revert/reimport,
-validation errors blocking save, tab close/discard behavior, and project
+validation errors blocking save, graph link create/retarget/delete, node deletion,
+multi-selection deletion, entry-state reassignment after deleting the entry,
+unique naming for new states/transitions, structural undo/redo and
+history clearing on revert, tab close/discard behavior, and project
 switching clearing AI tabs. For
 undo changes, validate create/delete round-trips (including entity subtrees),
 component field edits, history clearing on new/open scene, and that history is

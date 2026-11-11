@@ -1,15 +1,32 @@
 #include "AIEditorGraph.hpp"
+#include "AIEditorDocumentCommand.hpp"
 #include "AIEditorGraphIds.hpp"
 
 #include <glm/gtc/epsilon.hpp>
 #include <imgui/imgui.h>
 #include <imgui_node_editor.h>
 
+#include <memory>
+#include <span>
+#include <string>
 #include <utility>
+#include <vector>
 
 namespace ed = ax::NodeEditor;
 
 namespace Kerberos {
+
+namespace {
+
+void RecordEdit(AIEditorTab& tab, AIEditorDocumentSnapshot before, std::string name)
+{
+    tab.UndoRedo.Record(std::make_unique<AIEditorDocumentCommand>(
+        &tab.Document, std::move(before), CaptureSnapshot(tab.Document), std::move(name)));
+    tab.Document.Dirty = true;
+    tab.ValidationDirty = true;
+}
+
+} // namespace
 
 void AIEditorGraph::Draw(AIEditorTab& tab, const bool canEdit)
 {
@@ -30,6 +47,12 @@ void AIEditorGraph::Draw(AIEditorTab& tab, const bool canEdit)
     ed::PushStyleColor(ed::StyleColor_Bg, ImVec4(0.08f, 0.08f, 0.09f, 1.0f));
     
     ed::Begin("AI State Tree", ImVec2(0.0f, 0.0f));
+
+    if (tab.GraphNeedsSelectionClear)
+    {
+        ed::ClearSelection();
+        tab.GraphNeedsSelectionClear = false;
+    }
     
     for (AIEditorStateRef& stateRef : document.States)
     {
@@ -251,7 +274,10 @@ void AIEditorGraph::HandleNewLink(AIEditorTab& tab, AIEditorDocument& document, 
     if (source->Kind == PinRoleKind::NewTransition)
     {
         const AIEditorStateRef* sourceStateRef = document.FindState(source->StateEditorID);
-        if (!sourceStateRef)
+        AI::AIDocumentState* sourceState = sourceStateRef
+            ? document.ResolveState(*sourceStateRef)
+            : nullptr;
+        if (!sourceStateRef || !sourceState)
         {
             ed::RejectNewItem();
             return;
@@ -259,10 +285,12 @@ void AIEditorGraph::HandleNewLink(AIEditorTab& tab, AIEditorDocument& document, 
         
         if (ed::AcceptNewItem())
         {
+            const AIEditorDocumentSnapshot before = CaptureSnapshot(document);
+            const std::string transitionName =
+                document.GenerateUniqueTransitionName(*sourceState);
             const uint64_t newTransitionId = document.AddTransition(
-                sourceStateRef->DocumentStateIndex, targetState->Name, "Transition");
-            tab.Document.Dirty = true;
-            tab.ValidationDirty = true;
+                sourceStateRef->DocumentStateIndex, targetState->Name, transitionName);
+            RecordEdit(tab, before, "Add Transition");
             tab.SelectedTransitionID = newTransitionId;
         }
         
@@ -281,9 +309,13 @@ void AIEditorGraph::HandleNewLink(AIEditorTab& tab, AIEditorDocument& document, 
     
     if (ed::AcceptNewItem())
     {
-        transition->TargetState = targetState->Name;
-        tab.Document.Dirty = true;
-        tab.ValidationDirty = true;
+        if (transition->TargetState != targetState->Name)
+        {
+            const AIEditorDocumentSnapshot before = CaptureSnapshot(document);
+            transition->TargetState = targetState->Name;
+            RecordEdit(tab, before, "Retarget Transition");
+        }
+
         tab.SelectedTransitionID = transitionRef->EditorID;
     }
 }
@@ -292,52 +324,71 @@ void AIEditorGraph::HandleDelete(AIEditorTab& tab, AIEditorDocument& document, c
 {
     if (!ed::BeginDelete())
         return;
-    
+
+    // Capture document indices before mutating. Removing one item rebuilds the
+    // session references, so a second editor ID from this batch would resolve
+    // to a different state or transition and delete the wrong item.
+    std::vector<std::pair<size_t, size_t>> deletedTransitions;
+    std::vector<size_t> deletedStates;
+
     ed::LinkId linkId;
     while (ed::QueryDeletedLink(&linkId))
     {
         const auto it = m_LinkToTransition.find(linkId.Get());
-        if (!canEdit || it == m_LinkToTransition.end())
+        const AIEditorTransitionRef* transitionRef = it != m_LinkToTransition.end()
+            ? document.FindTransition(it->second)
+            : nullptr;
+
+        if (!canEdit || !transitionRef)
         {
             ed::RejectDeletedItem();
             continue;
         }
-        
-        const uint64_t transitionId = it->second;
+
         if (ed::AcceptDeletedItem())
         {
-            document.RemoveTransition(transitionId);
-            tab.Document.Dirty = true;
-            tab.ValidationDirty = true;
-            tab.SelectedTransitionID = 0;
-            tab.PositionedStateIDs.clear();
+            deletedTransitions.emplace_back(transitionRef->SourceStateIndex,
+                                            transitionRef->TransitionIndex);
         }
     }
-    
+
     ed::NodeId nodeId;
     while (ed::QueryDeletedNode(&nodeId))
     {
         const auto it = m_NodeToState.find(nodeId.Get());
-        if (!canEdit || it == m_NodeToState.end())
+        const AIEditorStateRef* stateRef = it != m_NodeToState.end()
+            ? document.FindState(it->second)
+            : nullptr;
+
+        if (!canEdit || !stateRef)
         {
             ed::RejectDeletedItem();
             continue;
         }
 
-        const uint64_t stateID = it->second;
         if (ed::AcceptDeletedItem())
-        {
-            document.RemoveState(stateID);
-            tab.Document.Dirty = true;
-            tab.ValidationDirty = true;
-            tab.SelectedStateID = 0;
-            tab.SelectedTransitionID = 0;
-            tab.PositionedStateIDs.clear();
-            tab.GraphNeedsRefit = true;
-        }
+            deletedStates.push_back(stateRef->DocumentStateIndex);
     }
 
     ed::EndDelete();
+
+    if (deletedTransitions.empty() && deletedStates.empty())
+        return;
+
+    const AIEditorDocumentSnapshot before = CaptureSnapshot(document);
+    document.RemoveTransitions(deletedTransitions);
+    document.RemoveStates(deletedStates);
+
+    std::string name;
+    if (!deletedStates.empty() && !deletedTransitions.empty())
+        name = "Delete Selection";
+    else if (!deletedStates.empty())
+        name = deletedStates.size() == 1 ? "Delete State" : "Delete States";
+    else
+        name = deletedTransitions.size() == 1 ? "Delete Transition" : "Delete Transitions";
+
+    RecordEdit(tab, before, std::move(name));
+    tab.ResetGraphSession();
 }
 
 void AIEditorGraph::HandleSelection(AIEditorTab& tab)
@@ -421,20 +472,24 @@ void AIEditorGraph::HandleContextMenus(AIEditorTab& tab,
                     ImGui::TextDisabled("%s", state->Name.c_str());
                     ImGui::Separator();
 
-                    if (canEdit && ImGui::MenuItem("Set as Entry State"))
+                    if (canEdit && ImGui::MenuItem("Set as Entry State", nullptr,
+                                                   document.Document.EntryState == state->Name))
                     {
-                        document.Document.EntryState = state->Name;
-                        tab.Document.Dirty = true;
-                        tab.ValidationDirty = true;
+                        if (document.Document.EntryState != state->Name)
+                        {
+                            const AIEditorDocumentSnapshot before = CaptureSnapshot(document);
+                            document.Document.EntryState = state->Name;
+                            RecordEdit(tab, before, "Set Entry State");
+                        }
                     }
 
                     if (canEdit && ImGui::MenuItem("Delete State"))
                     {
-                        // TODO: Snapshot + undo integration.
-                        document.RemoveState(it->second);
-                        tab.Document.Dirty = true;
-                        tab.ValidationDirty = true;
-                        tab.PositionedStateIDs.clear();
+                        const size_t stateIndex = stateRef->DocumentStateIndex;
+                        const AIEditorDocumentSnapshot before = CaptureSnapshot(document);
+                        document.RemoveStates(std::span<const size_t>(&stateIndex, 1));
+                        RecordEdit(tab, before, "Delete State");
+                        tab.ResetGraphSession();
                     }
                 }
             }
@@ -449,11 +504,18 @@ void AIEditorGraph::HandleContextMenus(AIEditorTab& tab,
         {
             if (ImGui::MenuItem("Delete Transition"))
             {
-                // TODO: Snapshot + undo integration.
-                document.RemoveTransition(it->second);
-                tab.Document.Dirty = true;
-                tab.ValidationDirty = true;
-                tab.PositionedStateIDs.clear();
+                const AIEditorTransitionRef* transitionRef = document.FindTransition(it->second);
+                if (transitionRef)
+                {
+                    const std::pair indices{
+                        transitionRef->SourceStateIndex, transitionRef->TransitionIndex
+                    };
+                    const AIEditorDocumentSnapshot before = CaptureSnapshot(document);
+                    document.RemoveTransitions(
+                        std::span<const std::pair<size_t, size_t>>(&indices, 1));
+                    RecordEdit(tab, before, "Delete Transition");
+                    tab.ResetGraphSession();
+                }
             }
         }
         ImGui::EndPopup();
@@ -463,11 +525,11 @@ void AIEditorGraph::HandleContextMenus(AIEditorTab& tab,
     {
         if (ImGui::MenuItem("Add State"))
         {
-            // TODO: Generate unique name, validator catches collisions
-            // TODO: Snapshot + undo integration
-            const uint64_t id = document.AddState("New State", glm::vec2(m_ContextCanvasPosition.x, m_ContextCanvasPosition.y));
-            tab.Document.Dirty = true;
-            tab.ValidationDirty = true;
+            const AIEditorDocumentSnapshot before = CaptureSnapshot(document);
+            const uint64_t id = document.AddState(
+                document.GenerateUniqueStateName("New State"),
+                glm::vec2(m_ContextCanvasPosition.x, m_ContextCanvasPosition.y));
+            RecordEdit(tab, before, "Add State");
             tab.SelectedStateID = id;
             tab.SelectedTransitionID = 0;
         }

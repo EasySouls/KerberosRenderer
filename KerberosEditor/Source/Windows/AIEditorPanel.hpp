@@ -31,6 +31,17 @@ public:
     void SetContext(const Ref<Scene>& activeScene, bool isPlaying, bool isSimulating, bool isPaused);
     void SetOpen(bool open);
     [[nodiscard]] bool IsOpen() const { return m_Open; }
+    [[nodiscard]] bool IsFocused() const { return m_Open && m_Focused; }
+
+    /// Applies the active tab's document history. 
+    /// Returns true when a command was applied.
+    /// View-only tabs and Play/Simulate are ignored.
+    bool UndoActiveTab();
+    bool RedoActiveTab();
+
+    /// Saves and reimports the active tab. 
+    /// Returns false for view-only tabs, validation errors, and failed saves.
+    bool SaveActiveTab();
 
     bool OpenAsset(AssetHandle handle);
     bool OpenRegisteredTree(const std::string& name);
@@ -49,7 +60,6 @@ private:
     static void DrawValidation(const AIEditorTab& tab);
     static void DrawDocumentPreview(const AIEditorTab& tab);
 
-    bool SaveActiveTab();
     bool RevertActiveTab();
     void ValidateActiveTab();
 
@@ -69,6 +79,7 @@ private:
 
 private:
     bool m_Open = false;
+    bool m_Focused = false;
     Ref<Scene> m_ActiveScene;
     bool m_IsPlaying = false;
     bool m_IsSimulating = false;

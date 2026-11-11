@@ -7,8 +7,10 @@
 
 #include <cstdint>
 #include <filesystem>
+#include <span>
 #include <string>
 #include <string_view>
+#include <utility>
 
 namespace Kerberos {
 
@@ -78,11 +80,27 @@ struct AIEditorDocument
     void RemoveTransition(uint64_t editorID);
     void MoveTransition(uint64_t editorID, size_t newIndex);
 
+    /// Removes states by document index. Indices refer to the document before
+    /// the call, so a multi-selection batch can be captured up front. Incoming
+    /// transitions are removed, and a removed entry state is replaced by the
+    /// first remaining state (or cleared when none remain).
+    void RemoveStates(std::span<const size_t> documentStateIndices);
+
+    /// Removes transitions by (source state index, transition index) pairs
+    /// captured before the call.
+    void RemoveTransitions(std::span<const std::pair<size_t, size_t>> transitions);
+
     /// Renames a state and rewrites incoming transition targets. The state keeps
     /// its EditorID.
     void RenameState(uint64_t editorID, std::string newName);
 
     [[nodiscard]] size_t FindStateIndexByName(std::string_view name) const;
+
+    /// Returns base, or the first "base N" that is not already used.
+    [[nodiscard]] std::string GenerateUniqueStateName(std::string_view base = "New State") const;
+    [[nodiscard]] std::string GenerateUniqueTransitionName(
+        const AI::AIDocumentState& state, std::string_view base = "Transition") const;
+
     [[nodiscard]] bool IsValid() const;
 };
 

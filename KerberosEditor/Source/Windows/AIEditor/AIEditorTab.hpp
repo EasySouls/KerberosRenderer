@@ -36,7 +36,22 @@ struct AIEditorTab
     // Prevents SetNodePosition from resetting nodes every frame.
     std::unordered_set<uint64_t> PositionedStateIDs;
     // Triggers NavigateToContent once after opening or a structural rebuild.
-    bool GraphNeedsRefit = false;
+    bool GraphNeedsRefit = true;
+    // Clears node-editor selection inside the next Begin/End canvas frame.
+    bool GraphNeedsSelectionClear = false;
+
+    /// Clears session-only graph state after the document identity changes
+    /// (undo/redo, revert, or a structural delete). Editor IDs may have been
+    /// renumbered, so nodes are repositioned and the view is refit.
+    void ResetGraphSession()
+    {
+        PositionedStateIDs.clear();
+        GraphNeedsRefit = true;
+        GraphNeedsSelectionClear = true;
+        SelectedStateID = 0;
+        SelectedTransitionID = 0;
+        ValidationDirty = true;
+    }
 };
 
 } // namespace Kerberos
