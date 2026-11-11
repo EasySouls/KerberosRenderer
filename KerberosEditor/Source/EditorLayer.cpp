@@ -1308,7 +1308,7 @@ namespace PROJECT_NAME
 			ImGui::Text("Vertices: %u", renderStatistics.VertexCount);
 			ImGui::Text("Indices: %u", renderStatistics.IndexCount);
 			ImGui::Text("Faces: %u", renderStatistics.FaceCount);
-			ImGui::Text("Collider line vertices: %u", renderStatistics.ColliderLineVertexCount);
+			ImGui::Text("Debug line vertices: %u", renderStatistics.ColliderLineVertexCount);
 		}
 		else
 		{
@@ -1438,6 +1438,7 @@ namespace PROJECT_NAME
 		ImGui::Checkbox("Display Skybox", &Renderer::GetDisplaySkybox());
 		ImGui::Checkbox("Display normals", &Renderer::GetDisplayDebugNormals());
 		ImGui::Checkbox("Display physics colliders", &Renderer::GetDisplayPhysicsColliders());
+		ImGui::Checkbox("Display AI perception", &Renderer::GetDisplayAIPerception());
 
 		bool &useRayQueryBasedShadows = Renderer::GetUseRayQueryBasedShadows();
 		ImGui::BeginDisabled(!Renderer::IsRayTracingSupported());

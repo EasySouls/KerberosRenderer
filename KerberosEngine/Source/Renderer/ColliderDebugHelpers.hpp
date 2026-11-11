@@ -16,10 +16,22 @@ namespace Kerberos
 			return { .Position = position, .Color = ColliderDebugColor };
 		}
 
+		static LineVertex MakeLineVertex(const glm::vec3& position, const glm::vec3& color)
+		{
+			return { .Position = position, .Color = color };
+		}
+
 		static void AddLine(std::vector<LineVertex>& vertices, const glm::vec3& a, const glm::vec3& b)
 		{
 			vertices.push_back(MakeLineVertex(a));
 			vertices.push_back(MakeLineVertex(b));
+		}
+
+		static void AddLine(std::vector<LineVertex>& vertices, const glm::vec3& a,
+		                    const glm::vec3& b, const glm::vec3& color)
+		{
+			vertices.push_back(MakeLineVertex(a, color));
+			vertices.push_back(MakeLineVertex(b, color));
 		}
 
 		static void AddBoxLines(std::vector<LineVertex>& vertices, const glm::mat4& transform, const glm::vec3& halfExtents)

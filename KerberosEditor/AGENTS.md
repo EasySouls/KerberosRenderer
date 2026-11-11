@@ -203,7 +203,10 @@ Editor windows live mainly under
   staged locally and applied with Apply/Revert, which persists the `.meta` and
   re-imports the source.
 - `ViewportPanel`: rendered image display, viewport resize, camera input, and
-  GPU mouse picking.
+  GPU mouse picking. The `View` menu can overlay physics colliders and AI
+  perception cones; the AI Editor runtime bar also exposes the perception
+  toggle. Perception cones show sight/retain sectors, FOV direction, eye height,
+  and the current target or last-known-position line.
 - project/scene panels: project settings, serialization, scene lifecycle, and
   runtime/editor mode transitions.
 

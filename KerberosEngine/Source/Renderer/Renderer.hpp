@@ -169,6 +169,7 @@ public:
     static bool& GetIsPCFEnabledForShadowMap();
     static bool& GetDisplayDebugNormals();
     static bool& GetDisplayPhysicsColliders();
+    static bool& GetDisplayAIPerception();
     static bool& GetDisplaySkybox();
     static bool& GetUseRayQueryBasedShadows();
     static bool& GetUseRayQueryBasedSoftShadows();
@@ -248,6 +249,7 @@ private:
     static std::pair<RenderObjectContainer, std::pmr::set<Ref<Material>>>
     GetRenderObjectsAndUniqueMaterialsFromScene(const Scene& scene, std::pmr::memory_resource* arena);
     static std::vector<LineVertex> GetColliderLineVerticesFromScene(const Scene& scene);
+    static std::vector<LineVertex> GetAIPerceptionLineVerticesFromScene(const Scene& scene);
 
     static RenderObjectContainer FrustumCullRenderObjects(const RenderObjectContainer& renderObjects,
                                                           const Frustum& frustum,
@@ -259,7 +261,7 @@ private:
                                              const RenderObjectContainer& allObjects,
                                              const RenderObjectContainer& renderObjects,
                                              std::pmr::memory_resource* frameArena,
-                                             const std::vector<LineVertex>& colliderLineVertices);
+                                             const std::vector<LineVertex>& debugLineVertices);
 
     static void RenderShadowPass(const vk::raii::CommandBuffer& cmd,
                                  uint32_t frameIndex,
@@ -293,11 +295,11 @@ private:
                                   const vk::Viewport& viewport,
                                   vk::Rect2D renderArea);
 
-    static void RenderPhysicsColliders(const vk::raii::CommandBuffer& cmd,
-                                       const std::vector<LineVertex>& colliderLineVertices,
-                                       uint32_t currentImage,
-                                       const vk::Viewport& viewport,
-                                       vk::Rect2D renderArea);
+    static void RenderDebugLines(const vk::raii::CommandBuffer& cmd,
+                                 const std::vector<LineVertex>& debugLineVertices,
+                                 uint32_t currentImage,
+                                 const vk::Viewport& viewport,
+                                 vk::Rect2D renderArea);
 
     static void ResolveTransparencyPass(const vk::raii::CommandBuffer& cmd,
                                         uint32_t frameIndex,

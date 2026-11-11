@@ -167,6 +167,12 @@ Capture is opt-in through `AISystem::SetDebugCaptureEnabled` and must stay
 disabled outside the editor window. When disabled, `AISystem` adds no debug
 allocations and does not change transition or task evaluation.
 
+Perception also has a renderer-side viewport overlay, independent of debug
+capture: `View > Display AI perception` draws each agent's sight/retain cones,
+eye height, current target line, and last-known-position memory line. It reads
+`AIPerceptionComponent`, transforms, and the blackboard only; it works in Edit,
+Simulate, and Play, and never drives perception.
+
 Each update while enabled produces one `AIAgentDebugSnapshot` per agent, keyed
 by entity UUID, containing:
 

@@ -5,6 +5,7 @@
 #include "Windows/AIEditor/AIEditorDebugView.hpp"
 #include "Assets/EditorAssetManager.hpp"
 #include "Profiling/TracyInstrumentation.hpp"
+#include "Renderer/Renderer.hpp"
 #include "Scene/Scene.hpp"
 #include "Utils/SystemOperations.hpp"
 #include "Widgets/AssetPicker.hpp"
@@ -591,6 +592,9 @@ void AIEditorPanel::DrawGraph(AIEditorTab& tab, const bool canEdit)
         ImGui::TextDisabled("Debug Agent");
         ImGui::SameLine();
         DrawAIAgentPicker(tab, tab.Document, m_ActiveScene);
+
+        ImGui::SameLine();
+        ImGui::Checkbox("Perception cones", &Renderer::GetDisplayAIPerception());
 
         if (tab.RuntimeAgent.IsValid())
             runtimeSnapshot = m_ActiveScene->GetAISystem().GetDebugSnapshot(tab.RuntimeAgent);
