@@ -2,7 +2,7 @@
 
 #include <cstdint>
 
-namespace Kerberos::AIEditorGraph {
+namespace Kerberos::AIEditorGraphId {
 
 /// Session editor IDs are packed with a small kind tag so node, pin, and link
 /// ID spaces cannot collide in imgui-node-editor.

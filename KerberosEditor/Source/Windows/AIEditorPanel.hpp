@@ -6,6 +6,7 @@
 #include "AI/AIStateTreeDocument.hpp"
 #include "Windows/AIEditor/AIEditorAssetSession.hpp"
 #include "Windows/AIEditor/AIEditorTab.hpp"
+#include "Windows/AIEditor/AIEditorGraph.hpp"
 
 #include <cstdint>
 #include <filesystem>
@@ -44,8 +45,9 @@ private:
     void DrawToolbar();
     void DrawTabs();
     void DrawTabContent(AIEditorTab& tab);
+    void DrawGraph(AIEditorTab& tab, bool canEdit);
     static void DrawValidation(const AIEditorTab& tab);
-    void DrawDocumentPreview(const AIEditorTab& tab);
+    static void DrawDocumentPreview(const AIEditorTab& tab);
 
     bool SaveActiveTab();
     bool RevertActiveTab();
@@ -84,6 +86,8 @@ private:
     bool m_RequestDiscardPopup = false;
 
     std::function<void()> m_OnAssetSaved;
+    
+    AIEditorGraph m_Graph;
 };
 
 } // namespace Kerberos

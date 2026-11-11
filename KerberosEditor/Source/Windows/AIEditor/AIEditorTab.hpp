@@ -6,6 +6,8 @@
 
 #include "imgui_node_editor.h"
 
+#include <unordered_set>
+
 namespace Kerberos {
 
 /// UI/session state for one open AI document. The document model itself stays
@@ -30,6 +32,11 @@ struct AIEditorTab
 
     uint64_t SelectedStateID = 0;
     uint64_t SelectedTransitionID = 0;
+    
+    // Prevents SetNodePosition from resetting nodes every frame.
+    std::unordered_set<uint64_t> PositionedStateIDs;
+    // Triggers NavigateToContent once after opening or a structural rebuild.
+    bool GraphNeedsRefit = false;
 };
 
 } // namespace Kerberos

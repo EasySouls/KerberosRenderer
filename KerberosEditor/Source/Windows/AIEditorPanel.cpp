@@ -465,6 +465,7 @@ void AIEditorPanel::DrawTabContent(AIEditorTab& tab)
         ImGui::TextColored(ImVec4(0.45f, 0.85f, 0.45f, 1.0f), "Validation passed.");
 
     DrawDocumentPreview(tab);
+    DrawGraph(tab, canEdit);
     DrawValidation(tab);
 
     if (ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows) &&
@@ -472,6 +473,13 @@ void AIEditorPanel::DrawTabContent(AIEditorTab& tab)
     {
         SaveActiveTab();
     }
+}
+
+void AIEditorPanel::DrawGraph(AIEditorTab& tab, const bool canEdit)
+{
+    ImGui::BeginChild("##AIGraphHost", ImVec2(0.0f, 480.0f), true);
+    m_Graph.Draw(tab, canEdit);
+    ImGui::EndChild();
 }
 
 void AIEditorPanel::DrawDocumentPreview(const AIEditorTab& tab)
