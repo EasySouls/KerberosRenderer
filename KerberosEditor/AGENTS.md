@@ -175,8 +175,11 @@ Editor windows live mainly under
   Validation failures color error nodes/links red and warnings amber, and link
   hover tooltips show the transition target and condition count. The toolbar
   provides `Auto Layout` (BFS from the entry state) and `Frame All`. The asset
-  browser file context menu has `Open in AI Editor`, and an AI state machine
-  bound to a `.kbrai` asset shows an `Open in AI Editor` button in the inspector.
+  browser file context menu has `Open in AI Editor`, the folder context menu has
+  `Create AI State Tree...` (prompts for a file name, creates the default
+  document through `AIEditorPanel::CreateAssetAtPath`, imports it, and opens
+  it), and an AI state machine bound to a `.kbrai` asset shows an
+  `Open in AI Editor` button in the inspector.
   Multi-selection deletes resolve every document
   index before mutating so session-ID renumbering cannot remove the wrong
   item. Deleting the entry state promotes the first remaining state (or clears
@@ -461,7 +464,8 @@ state, auto layout, frame-all, validation node/link colors and link tooltips,
 runtime overlays and transition history in Play, history-row selection,
 debug capture disabled outside Play/Simulate, structural undo/redo and
 history clearing on revert, the asset-browser and inspector `Open in AI Editor`
-paths, tab close/discard behavior, and project switching clearing AI tabs. For
+paths, the folder `Create AI State Tree...` flow (including duplicate-name
+rejection), tab close/discard behavior, and project switching clearing AI tabs. For
 undo changes, validate create/delete round-trips (including entity subtrees),
 component field edits, history clearing on new/open scene, and that history is
 inert during Play/Simulate.

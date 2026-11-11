@@ -63,6 +63,14 @@ namespace Kerberos
 			m_OnAIStateTreeActivated = std::move(callback);
 		}
 
+		/// Called when the folder context menu creates a new AI state tree.
+		/// The path is the requested source file inside the clicked folder.
+		void SetOnCreateAIStateTree(
+			std::function<void(const std::filesystem::path&)> callback)
+		{
+			m_OnCreateAIStateTree = std::move(callback);
+		}
+
 		/**
 		* Requests an asset-tree refresh on the next render.
 		*/
@@ -151,6 +159,10 @@ namespace Kerberos
 		std::unordered_map<std::string, MaterialEditorState> m_OpenMaterialEditors;
 
 		std::function<void(AssetHandle, const std::filesystem::path&)> m_OnAIStateTreeActivated;
+		std::function<void(const std::filesystem::path&)> m_OnCreateAIStateTree;
+		std::filesystem::path m_PendingCreateAITreeFolder;
+		char m_NewAITreeFileName[128]{};
+		bool m_OpenCreateAITreePopup = false;
 
 		NotificationManager m_NotificationManager;
 	};

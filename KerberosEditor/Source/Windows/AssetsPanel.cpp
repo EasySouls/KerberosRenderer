@@ -13,6 +13,7 @@
 #include <imgui/imgui.h>
 
 #include <algorithm>
+#include <cstdio>
 #include <string_view>
 
 #include "VulkanContext.hpp"
@@ -458,6 +459,46 @@ std::string AssetStatusLabel(const AssetHandle handle,
             {
                 ClearSelection();
             }
+
+            if (m_OpenCreateAITreePopup)
+            {
+                ImGui::OpenPopup("Create AI State Tree");
+                m_OpenCreateAITreePopup = false;
+            }
+
+            if (ImGui::BeginPopup("Create AI State Tree"))
+            {
+                ImGui::TextUnformatted("Create AI State Tree");
+                ImGui::TextDisabled("%s", m_PendingCreateAITreeFolder.string().c_str());
+                ImGui::Separator();
+
+                ImGui::SetNextItemWidth(280.0f);
+                ImGui::InputText("##AITreeFileName", m_NewAITreeFileName,
+                                 sizeof(m_NewAITreeFileName));
+
+                const std::string fileName = m_NewAITreeFileName;
+                const bool validName = !fileName.empty() &&
+                    fileName != "." && fileName != ".." &&
+                    std::filesystem::path(fileName).filename().string() == fileName;
+
+                ImGui::BeginDisabled(!validName);
+                if (ImGui::Button("Create") && m_OnCreateAIStateTree)
+                {
+                    std::filesystem::path path = fileName;
+                    if (path.extension() != ".kbrai")
+                        path.replace_extension(".kbrai");
+
+                    m_OnCreateAIStateTree(m_PendingCreateAITreeFolder / path.filename());
+                    ImGui::CloseCurrentPopup();
+                }
+                ImGui::EndDisabled();
+
+                ImGui::SameLine();
+                if (ImGui::Button("Cancel"))
+                    ImGui::CloseCurrentPopup();
+
+                ImGui::EndPopup();
+            }
         }
         ImGui::End();
 
@@ -575,6 +616,16 @@ std::string AssetStatusLabel(const AssetHandle handle,
                 }
                 ImGui::CloseCurrentPopup();
             }
+
+            if (ImGui::MenuItem("Create AI State Tree...") && m_OnCreateAIStateTree)
+            {
+                m_PendingCreateAITreeFolder = path;
+                std::snprintf(m_NewAITreeFileName, sizeof(m_NewAITreeFileName),
+                              "NewAIStateTree.kbrai");
+                m_OpenCreateAITreePopup = true;
+                ImGui::CloseCurrentPopup();
+            }
+
             constexpr const char* deleteFolderPopup = "DeleteFolderPopup";
             if (ImGui::MenuItem("Delete Folder"))
             {

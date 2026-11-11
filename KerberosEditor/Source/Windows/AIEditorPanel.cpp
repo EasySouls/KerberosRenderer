@@ -315,9 +315,24 @@ bool AIEditorPanel::NewAsset()
     if (selected.empty())
         return false;
 
-    std::filesystem::path path = std::filesystem::absolute(selected);
+    return CreateAssetAtPath(selected, true);
+}
+
+bool AIEditorPanel::CreateAssetAtPath(std::filesystem::path path,
+                                      const bool overwriteExisting)
+{
+    if (path.empty())
+        return false;
+
+    path = std::filesystem::absolute(path);
     if (path.extension() != ".kbrai")
         path.replace_extension(".kbrai");
+
+    if (!overwriteExisting && std::filesystem::exists(path))
+    {
+        SetStatus("An AI state tree already exists at " + path.filename().string() + ".", true);
+        return false;
+    }
 
     const AI::AIStateTreeDocument initial = MakeDefaultDocument(path.stem().string());
     AssetHandle handle = AssetHandle::Invalid();

@@ -215,6 +215,20 @@ namespace PROJECT_NAME
 			m_AIEditorPanel.SetOpen(true);
 			m_AIEditorPanel.OpenAsset(handle);
 		});
+
+		m_AssetsPanel->SetOnCreateAIStateTree([this](const std::filesystem::path& path)
+		{
+			if (m_AIEditorPanel.CreateAssetAtPath(path))
+			{
+				m_AIEditorPanel.SetOpen(true);
+			}
+			else
+			{
+				m_NotificationManager.AddNotification(
+					"Failed to create AI state tree asset: " + path.filename().string(),
+					Notification::Type::Error);
+			}
+		});
 	}
 
 	void EditorLayer::OnDetach()

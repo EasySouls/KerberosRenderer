@@ -48,6 +48,11 @@ public:
     bool OpenAsset(AssetHandle handle);
     bool OpenRegisteredTree(const std::string& name);
     bool NewAsset();
+
+    /// Creates and opens an AI state tree asset at the given source path.
+    /// When overwriteExisting is false, an existing source file is rejected.
+    bool CreateAssetAtPath(std::filesystem::path path, bool overwriteExisting = false);
+
     void CloseAllTabs();
 
     [[nodiscard]] bool HasUnsavedChanges() const;
