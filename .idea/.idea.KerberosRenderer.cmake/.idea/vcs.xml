@@ -11,6 +11,7 @@
     <mapping directory="$PROJECT_DIR$/KerberosEngine/ThirdParty/freetype/subprojects/dlg" vcs="Git" />
     <mapping directory="$PROJECT_DIR$/KerberosEngine/ThirdParty/googletest" vcs="Git" />
     <mapping directory="$PROJECT_DIR$/KerberosEngine/ThirdParty/imgui" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/KerberosEngine/ThirdParty/imgui-node-editor" vcs="Git" />
     <mapping directory="$PROJECT_DIR$/KerberosEngine/ThirdParty/ktx" vcs="Git" />
     <mapping directory="$PROJECT_DIR$/KerberosEngine/ThirdParty/ktx/tests/cts" vcs="Git" />
     <mapping directory="$PROJECT_DIR$/KerberosEngine/ThirdParty/msdf-atlas-gen" vcs="Git" />

@@ -286,7 +286,10 @@ std::string AssetStatusLabel(const AssetHandle handle,
                             {
                                 OpenMaterialEditor(item.Path);
                             }
-
+                            else if (extension == ".kbrai" && m_OnAIStateTreeActivated)
+                            {
+                                m_OnAIStateTreeActivated(handle, item.Path);
+                            }
                             else if (!FileOperations::OpenFile(item.Path.string().c_str()))
                             {
                                 m_NotificationManager.AddNotification("Could not open file: " + item.Path.string(),
@@ -320,6 +323,10 @@ std::string AssetStatusLabel(const AssetHandle handle,
                             if (extension == ".kbrmat" || extension == ".kbrmaterial")
                             {
                                 OpenMaterialEditor(item.Path);
+                            }
+                            else if (extension == ".kbrai" && m_OnAIStateTreeActivated)
+                            {
+                                m_OnAIStateTreeActivated(handle, item.Path);
                             }
                             else if (!FileOperations::OpenFile(item.Path.string().c_str()))
                             {

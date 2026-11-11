@@ -132,6 +132,20 @@ Editor windows live mainly under
   localHalfExtents, ignore)` or `Physics.OverlapSphere`; the entity-relative
   overload uses the entity's world transform, so a socket-driven weapon is
   enough and no dedicated hitbox component is required.
+- `AIEditorPanel`: opened from `View > AI Editor`; also opened by double-clicking
+  a `.kbrai` asset in `AssetsPanel`. Phase 2 provides a tabbed document workspace,
+  an AI state-tree asset picker, a registered-tree picker, New/Save/Revert/
+  Validate actions, a read-only state/transition preview, and a validation issue
+  list. Editable `.kbrai` documents save through `AIEditorAssetSession`, which
+  recompiles the asset and force-reimports the source; registered C++/C# trees
+  open read-only. Editing is disabled while Play/Simulate is active; the panel
+  still receives scene/runtime context for the later debug phases. The node
+  canvas, schema-driven inspector, and runtime overlays are Phases 3–5.
+  The editor-only model lives in `KerberosEditor/Source/Windows/AIEditor/**`;
+  graph IDs, validation, tabs, and undo are editor-local and do not modify
+  `AIStateTreeDocument` or `AIStateTreeSerializer`. `AIEditorDocument` stays
+  free of ImGui/node-editor dependencies; `AIEditorTab` owns the node-editor
+  context and per-tab undo history.
 - `InspectorPanel`: the unified right-side "Properties" window. It shows entity
   components when an entity is selected and asset import options when a source
   asset is selected in `AssetsPanel` (asset selection takes display precedence).
@@ -386,7 +400,13 @@ cmake --build --preset vs2026-debug
 
 For editor changes, validate startup/project load, scene open/save, panel
 navigation, selection/entity deletion, viewport resize, ImGui stack balance,
-drag/drop payloads, asset watcher updates, and runtime/editor transitions. For
+drag/drop payloads, asset watcher updates, and runtime/editor transitions.
+For AI editor changes, run
+`.\out\build\vs2026\Tests\Debug\KerberosEditorModelTests.exe` and manually validate:
+opening a `.kbrai` through `View > AI Editor` and the asset browser, opening a
+registered tree in read-only mode, creating a new tree, save/revert/reimport,
+validation errors blocking save, tab close/discard behavior, and project
+switching clearing AI tabs. For
 undo changes, validate create/delete round-trips (including entity subtrees),
 component field edits, history clearing on new/open scene, and that history is
 inert during Play/Simulate.

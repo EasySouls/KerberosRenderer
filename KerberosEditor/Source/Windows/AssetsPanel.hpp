@@ -10,6 +10,8 @@
 #include <imgui/imgui.h>
 
 #include <filesystem>
+#include <functional>
+#include <utility>
 #include <vector>
 #include <map>
 #include <unordered_map>
@@ -53,6 +55,13 @@ namespace Kerberos
         bool HasAssetSelection() const { return !m_SelectedAsset.Path.empty(); }
 
 		void ClearSelection();
+
+		/// Called when an AI state tree asset is opened from the asset browser.
+		void SetOnAIStateTreeActivated(
+			std::function<void(AssetHandle, const std::filesystem::path&)> callback)
+		{
+			m_OnAIStateTreeActivated = std::move(callback);
+		}
 
 		/**
 		* Requests an asset-tree refresh on the next render.
@@ -140,6 +149,8 @@ namespace Kerberos
         char m_SearchFilter[256]{};
 
 		std::unordered_map<std::string, MaterialEditorState> m_OpenMaterialEditors;
+
+		std::function<void(AssetHandle, const std::filesystem::path&)> m_OnAIStateTreeActivated;
 
 		NotificationManager m_NotificationManager;
 	};

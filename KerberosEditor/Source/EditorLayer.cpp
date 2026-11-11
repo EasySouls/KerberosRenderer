@@ -188,6 +188,24 @@ namespace PROJECT_NAME
 		EditorIcons::Initialize();
 
 		m_AssetsPanel = CreateOwner<AssetsPanel>(m_NotificationManager);
+		WireAssetsPanel();
+		m_AIEditorPanel.SetOnAssetSaved([this]()
+		{
+			if (m_AssetsPanel)
+				m_AssetsPanel->RequestRefresh();
+		});
+	}
+
+	void EditorLayer::WireAssetsPanel()
+	{
+		if (!m_AssetsPanel)
+			return;
+
+		m_AssetsPanel->SetOnAIStateTreeActivated([this](const AssetHandle handle, const std::filesystem::path&)
+		{
+			m_AIEditorPanel.SetOpen(true);
+			m_AIEditorPanel.OpenAsset(handle);
+		});
 	}
 
 	void EditorLayer::OnDetach()
@@ -325,6 +343,12 @@ namespace PROJECT_NAME
 		m_AnimationEditorPanel.SetContext(m_ActiveScene, selectedEntityUUID,
 		                                  m_SceneState == SceneState::Edit);
 		m_AnimationEditorPanel.OnImGuiRender();
+
+		m_AIEditorPanel.SetContext(m_ActiveScene,
+		                           m_SceneState == SceneState::Play,
+		                           m_SceneState == SceneState::Simulate,
+		                           m_IsScenePaused);
+		m_AIEditorPanel.OnImGuiRender();
 
 		DrawViewport();
 
@@ -647,7 +671,9 @@ namespace PROJECT_NAME
 		m_ActiveScenePath = scenePath;
 		m_HierarchyPanel.SetContext(m_ActiveScene);
 
+		m_AIEditorPanel.CloseAllTabs();
 		m_AssetsPanel = CreateOwner<AssetsPanel>(m_NotificationManager);
+		WireAssetsPanel();
 
 		ResetHoveredEntity();
 		m_UndoRedo.Clear();
@@ -679,7 +705,9 @@ namespace PROJECT_NAME
 			const auto startScenePath = Project::GetAssetDirectory() / project->GetInfo().StartScenePath;
 			OpenScene(startScenePath);
 
+			m_AIEditorPanel.CloseAllTabs();
 			m_AssetsPanel = CreateOwner<AssetsPanel>(m_NotificationManager);
+			WireAssetsPanel();
 		}
 		else
 		{
@@ -1155,6 +1183,10 @@ namespace PROJECT_NAME
 				if (EditorIcons::MenuItem(EditorIcon::PanelAnimationEditor, "Animation Editor", nullptr,
 				                          m_AnimationEditorPanel.IsOpen()))
 					m_AnimationEditorPanel.SetOpen(!m_AnimationEditorPanel.IsOpen());
+
+				if (EditorIcons::MenuItem(EditorIcon::ComponentAiStateMachine, "AI Editor", nullptr,
+				                          m_AIEditorPanel.IsOpen()))
+					m_AIEditorPanel.SetOpen(!m_AIEditorPanel.IsOpen());
 
 				if (EditorIcons::MenuItem(EditorIcon::ActionWireframe, "Show Wireframe"))
 				{

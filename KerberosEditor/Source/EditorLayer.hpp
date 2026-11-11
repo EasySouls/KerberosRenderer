@@ -3,6 +3,7 @@
 #include "Layer.hpp"
 #include "Vulkan.hpp"
 
+#include "Windows/AIEditorPanel.hpp"
 #include "Windows/AnimationEditorPanel.hpp"
 #include "Windows/AssetsPanel.hpp"
 #include "Windows/HierarchyPanel.hpp"
@@ -93,6 +94,8 @@ namespace Kerberos
 
 		void ResetHoveredEntity();
 
+		void WireAssetsPanel();
+
 	private:
 		float m_Time = 0.0f;
 		float m_Fps = 0.0f;
@@ -102,6 +105,7 @@ namespace Kerberos
 		ConsolePanel m_ConsolePanel;
 		InspectorPanel m_InspectorPanel;
 		AnimationEditorPanel m_AnimationEditorPanel;
+		AIEditorPanel m_AIEditorPanel;
 
 		NotificationManager m_NotificationManager;
 

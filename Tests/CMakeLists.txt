@@ -14,6 +14,22 @@ add_executable(KerberosEngineTests
     RagdollTests.cpp
 )
 
+add_executable(KerberosEditorModelTests
+    AIEditorModelTests.cpp
+    ../KerberosEditor/Source/Windows/AIEditor/AIEditorDocument.cpp
+    ../KerberosEditor/Source/Windows/AIEditor/AIEditorConversions.cpp
+    ../KerberosEditor/Source/Windows/AIEditor/AIEditorValidator.cpp
+    ../KerberosEditor/Source/Windows/AIEditor/AIEditorDocumentCommand.cpp
+)
+
+target_include_directories(KerberosEditorModelTests PRIVATE
+    ${CMAKE_SOURCE_DIR}/KerberosEditor/Source
+)
+
+target_compile_definitions(KerberosEditorModelTests PRIVATE
+    KBR_SOURCE_DIR="${CMAKE_SOURCE_DIR}"
+)
+
 add_executable(KerberosIntegrationTests
     TestApplication.cpp
     ProjectIntegrationTests.cpp
@@ -31,10 +47,12 @@ target_compile_definitions(KerberosEngineTests PRIVATE
 
 set(KBR_TEST_TARGETS
     KerberosEngineTests
+    KerberosEditorModelTests
     KerberosIntegrationTests
     KerberosEditorE2ETests
 )
 
+target_compile_features(KerberosEditorModelTests PRIVATE cxx_std_23)
 target_compile_features(KerberosIntegrationTests PRIVATE cxx_std_23)
 target_compile_features(KerberosEditorE2ETests PRIVATE cxx_std_23)
 
@@ -47,6 +65,11 @@ target_compile_definitions(KerberosEditorE2ETests PRIVATE
 )
 
 target_link_libraries(KerberosEngineTests PRIVATE
+    KerberosEngine
+    GTest::gtest_main
+)
+
+target_link_libraries(KerberosEditorModelTests PRIVATE
     KerberosEngine
     GTest::gtest_main
 )
@@ -77,6 +100,11 @@ foreach(test_target IN LISTS KBR_TEST_TARGETS)
 endforeach()
 
 gtest_discover_tests(KerberosEngineTests
+    WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}"
+    DISCOVERY_MODE PRE_TEST
+)
+
+gtest_discover_tests(KerberosEditorModelTests
     WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}"
     DISCOVERY_MODE PRE_TEST
 )
