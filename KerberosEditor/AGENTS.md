@@ -156,18 +156,27 @@ Editor windows live mainly under
   Selecting a validation issue or a transition row requests graph selection
   through the tab's pending-selection fields, which `AIEditorGraph` consumes
   inside the canvas frame.
-  In Play/Simulate the inspector enables `AISystem` debug capture while the
-  window is open, picks among agents bound to the open tree, and shows the
-  current/previous/evaluated/pending state, time in state, task results, and
-  per-condition transition results. Capture is disabled when the window closes
-  or the editor returns to Edit. Canvas runtime overlays remain Phase 5.
+  In Play/Simulate the panel enables `AISystem` debug capture while the window
+  is open. The inspector picks among agents bound to the open tree, and the
+  canvas overlays the selected agent's snapshot: current/previous/pending/
+  evaluated node markers and borders, task result rows, candidate link colors
+  (satisfied/unsatisfied), and the winning transition. Capture is disabled when
+  the window closes or the editor returns to Edit; paused scenes keep the last
+  snapshot. A transition history table below the workspace shows capture-relative
+  time, agent, reason, transition name, from/to states, and time in the previous
+  state; clicking a row selects the matching link (or state) and agent.
   Graph and inspector edits (create/retarget/delete transitions, delete states,
-  set entry, add state, add/remove/reorder tasks and conditions, retarget and
-  reorder transitions, rename, parameters) are undoable per tab via snapshot
-  commands. While the AI Editor window is focused, `EditorLayer` routes
-  Ctrl+Z/Ctrl+Shift+Z/Ctrl+Y and Ctrl+S to the active tab instead of the scene
-  history or scene save; node-position drags are not undoable yet, and Revert
+  set entry, add/duplicate/rename state, add state, add/remove/reorder tasks and
+  conditions, retarget and reorder transitions, rename, parameters, node moves,
+  and auto layout) are undoable per tab via snapshot commands. While the AI
+  Editor window is focused, `EditorLayer` routes Ctrl+Z/Ctrl+Shift+Z/Ctrl+Y and
+  Ctrl+S to the active tab instead of the scene history or scene save; Revert
   clears the history.
+  Validation failures color error nodes/links red and warnings amber, and link
+  hover tooltips show the transition target and condition count. The toolbar
+  provides `Auto Layout` (BFS from the entry state) and `Frame All`. The asset
+  browser file context menu has `Open in AI Editor`, and an AI state machine
+  bound to a `.kbrai` asset shows an `Open in AI Editor` button in the inspector.
   Multi-selection deletes resolve every document
   index before mutating so session-ID renumbering cannot remove the wrong
   item. Deleting the entry state promotes the first remaining state (or clears
@@ -176,8 +185,10 @@ Editor windows live mainly under
   graph IDs, validation, tabs, and undo are editor-local and do not modify
   `AIStateTreeDocument` or `AIStateTreeSerializer`. `AIEditorDocument` stays
   free of ImGui/node-editor dependencies; `AIEditorTab` owns the node-editor
-  context, per-tab undo history, node-position cache, refit request, and
-  selection.
+  context, per-tab undo history, node-position cache, refit request, selection,
+  and runtime agent. UI-free runtime resolution (state/link highlights and
+  history rows) lives in `AIEditorRuntimeView.*`; the shared agent picker and
+  transition-history table live in `AIEditorDebugView.*`.
 - `InspectorPanel`: the unified right-side "Properties" window. It shows entity
   components when an entity is selected and asset import options when a source
   asset is selected in `AssetsPanel` (asset selection takes display precedence).
@@ -445,10 +456,12 @@ validation errors blocking save, graph link create/retarget/delete, node deletio
 multi-selection deletion, entry-state reassignment after deleting the entry,
 unique naming for new states/transitions, inspector state/transition editing,
 every parameter type, task/condition/transition add-remove-reorder with undo,
-transition retarget/reorder after ID rebuilds, runtime inspector rows in Play,
+transition retarget/reorder after ID rebuilds, node-move undo, rename/duplicate
+state, auto layout, frame-all, validation node/link colors and link tooltips,
+runtime overlays and transition history in Play, history-row selection,
 debug capture disabled outside Play/Simulate, structural undo/redo and
-history clearing on revert, tab close/discard behavior, and project
-switching clearing AI tabs. For
+history clearing on revert, the asset-browser and inspector `Open in AI Editor`
+paths, tab close/discard behavior, and project switching clearing AI tabs. For
 undo changes, validate create/delete round-trips (including entity subtrees),
 component field edits, history clearing on new/open scene, and that history is
 inert during Play/Simulate.

@@ -3,6 +3,7 @@
 #include "Windows/AIEditor/AIEditorDocumentCommand.hpp"
 #include "Windows/AIEditor/AIEditorGraphIds.hpp"
 #include "Windows/AIEditor/AIEditorNodeSchema.hpp"
+#include "Windows/AIEditor/AIEditorRuntimeView.hpp"
 #include "Windows/AIEditor/AIEditorValidator.hpp"
 
 #include "AI/AINodes.hpp"
@@ -261,7 +262,7 @@ TEST(AIEditorModelTest, RemoveTransitionsByIndexIsBatchSafe)
     document.AddTransition(0, "Attack", "B");
     document.AddTransition(1, "Idle", "C");
 
-    const std::pair<size_t, size_t> items[] = { { 0, 1 }, { 0, 0 } };
+    constexpr std::pair<size_t, size_t> items[] = { { 0, 1 }, { 0, 0 } };
     document.RemoveTransitions(items);
 
     ASSERT_EQ(document.Document.States.size(), 3u);
@@ -296,6 +297,157 @@ TEST(AIEditorModelTest, MoveTransitionByIndexReordersAndReturnsEditorID)
     EXPECT_EQ(transitions[0].Name, "B");
     EXPECT_EQ(transitions[1].Name, "C");
     EXPECT_EQ(transitions[2].Name, "A");
+}
+
+TEST(AIEditorModelTest, DuplicateStateCopiesContentAndPreservesIDs)
+{
+    AIEditorDocument document = MakeDocument();
+    document.AddState("Idle");
+    const uint64_t chaseID = document.AddState("Chase");
+    document.AddTransition(1, "Idle", "Back");
+
+    const uint64_t copyID = document.DuplicateState(chaseID);
+    ASSERT_NE(copyID, 0u);
+    ASSERT_EQ(document.Document.States.size(), 3u);
+
+    const AIEditorStateRef* original = document.FindState(chaseID);
+    const AIEditorStateRef* copy = document.FindState(copyID);
+    ASSERT_NE(original, nullptr);
+    ASSERT_NE(copy, nullptr);
+
+    const AI::AIDocumentState& copied = document.Document.States[copy->DocumentStateIndex];
+    EXPECT_EQ(copied.Name, "Chase Copy");
+    ASSERT_EQ(copied.Transitions.size(), 1u);
+    EXPECT_EQ(copied.Transitions[0].TargetState, "Idle");
+    EXPECT_EQ(document.Transitions.size(), 2u);
+
+    const uint64_t secondCopyID = document.DuplicateState(chaseID);
+    ASSERT_NE(secondCopyID, 0u);
+    const AIEditorStateRef* secondCopy = document.FindState(secondCopyID);
+    ASSERT_NE(secondCopy, nullptr);
+    EXPECT_EQ(document.Document.States[secondCopy->DocumentStateIndex].Name, "Chase Copy 2");
+}
+
+TEST(AIEditorModelTest, AutoLayoutPlacesStatesByBfsDepth)
+{
+    AIEditorDocument document = MakeDocument();
+    document.AddState("Idle");
+    document.AddState("Chase");
+    document.AddState("Attack");
+    document.AddState("Orphan");
+    document.AddTransition(0, "Chase", "Go");
+    document.AddTransition(1, "Attack", "Hit");
+
+    document.AutoLayoutStates(glm::vec2(10.0f, 20.0f), 300.0f, 150.0f);
+
+    EXPECT_FLOAT_EQ(document.Document.States[0].EditorPosition.x, 10.0f);
+    EXPECT_FLOAT_EQ(document.Document.States[0].EditorPosition.y, 20.0f);
+    EXPECT_FLOAT_EQ(document.Document.States[1].EditorPosition.x, 310.0f);
+    EXPECT_FLOAT_EQ(document.Document.States[2].EditorPosition.x, 610.0f);
+    EXPECT_FLOAT_EQ(document.Document.States[3].EditorPosition.x, 910.0f);
+}
+
+TEST(AIEditorModelTest, RuntimeViewResolvesHighlightsAndHistory)
+{
+    AIEditorDocument document = MakeDocument();
+    document.AddState("Idle");
+    document.AddState("Chase");
+    document.AddState("Attack");
+    document.AddTransition(0, "Chase", "Spotted");
+    document.AddTransition(0, "Attack", "Timeout");
+
+    const auto editorIDFor = [&document](const std::string_view name) {
+        const size_t index = document.FindStateIndexByName(name);
+        for (const AIEditorStateRef& ref : document.States)
+        {
+            if (ref.DocumentStateIndex == index)
+                return ref.EditorID;
+        }
+        return uint64_t{ 0 };
+    };
+
+    const uint64_t idleID = editorIDFor("Idle");
+    const uint64_t chaseID = editorIDFor("Chase");
+    const uint64_t attackID = editorIDFor("Attack");
+    ASSERT_NE(idleID, 0u);
+
+    AI::AIAgentDebugSnapshot snapshot;
+    snapshot.Valid = true;
+    snapshot.CurrentState = AI::HashState("Chase");
+    snapshot.PreviousState = AI::HashState("Idle");
+    snapshot.PendingState = AI::HashState("Attack");
+    snapshot.EvaluatedState = AI::HashState("Idle");
+    snapshot.Candidates.push_back(AI::AITransitionDebugTrace{
+        .Name = "Spotted",
+        .TargetState = AI::HashState("Chase"),
+        .TargetStateName = "Chase",
+        .Satisfied = false,
+        .Conditions = {}
+    });
+    snapshot.Candidates.push_back(AI::AITransitionDebugTrace{
+        .Name = "Timeout",
+        .TargetState = AI::HashState("Attack"),
+        .TargetStateName = "Attack",
+        .Satisfied = true,
+        .Conditions = {}
+    });
+
+    const AIEditorStateHighlight idle =
+        ResolveStateHighlight(document, snapshot, idleID);
+    EXPECT_TRUE(idle.Previous);
+    EXPECT_TRUE(idle.Evaluated);
+    EXPECT_FALSE(idle.Current);
+
+    EXPECT_TRUE(ResolveStateHighlight(document, snapshot, chaseID).Current);
+    EXPECT_TRUE(ResolveStateHighlight(document, snapshot, attackID).Pending);
+
+    const AIEditorTransitionRef* spotted = nullptr;
+    const AIEditorTransitionRef* timeout = nullptr;
+    for (const AIEditorTransitionRef& ref : document.Transitions)
+    {
+        const AI::AIDocumentTransition* transition = document.ResolveTransition(ref);
+        if (!transition)
+            continue;
+        if (transition->Name == "Spotted")
+            spotted = &ref;
+        else if (transition->Name == "Timeout")
+            timeout = &ref;
+    }
+    ASSERT_NE(spotted, nullptr);
+    ASSERT_NE(timeout, nullptr);
+
+    const AIEditorLinkHighlight spottedHighlight =
+        ResolveLinkHighlight(document, snapshot, *spotted);
+    EXPECT_TRUE(spottedHighlight.Evaluated);
+    EXPECT_FALSE(spottedHighlight.Satisfied);
+    EXPECT_FALSE(spottedHighlight.Winner);
+
+    const AIEditorLinkHighlight timeoutHighlight =
+        ResolveLinkHighlight(document, snapshot, *timeout);
+    EXPECT_TRUE(timeoutHighlight.Evaluated);
+    EXPECT_TRUE(timeoutHighlight.Satisfied);
+    EXPECT_TRUE(timeoutHighlight.Winner);
+
+    const std::vector<AI::AITransitionEvent> events{
+        AI::AITransitionEvent{
+            .Time = 1.5,
+            .Entity = UUID(42),
+            .FromState = AI::HashState("Idle"),
+            .ToState = AI::HashState("Chase"),
+            .FromStateName = "Idle",
+            .ToStateName = "Chase",
+            .TransitionName = "Spotted",
+            .Reason = AI::AITransitionReason::Condition,
+            .TimeInPreviousState = 0.75f
+        }
+    };
+
+    const std::vector<AIEditorTransitionHistoryRow> history =BuildTransitionHistory(document, events);
+    ASSERT_EQ(history.size(), 1u);
+    EXPECT_EQ(history[0].FromStateEditorID, idleID);
+    EXPECT_EQ(history[0].ToStateEditorID, chaseID);
+    EXPECT_EQ(history[0].TransitionName, "Spotted");
+    EXPECT_STREQ(TransitionReasonLabel(history[0].Reason), "Condition");
 }
 
 TEST(AIEditorModelTest, NodeSchemaBuildsTypedDefaults)

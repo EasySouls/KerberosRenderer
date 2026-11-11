@@ -95,9 +95,19 @@ struct AIEditorDocument
     /// captured before the call.
     void RemoveTransitions(std::span<const std::pair<size_t, size_t>> transitions);
 
+    /// Appends a copy of the state with a unique name and offset position.
+    /// The copy keeps the source's transitions, existing session IDs survive.
+    uint64_t DuplicateState(uint64_t editorID, glm::vec2 offset = glm::vec2(40.0f));
+
     /// Renames a state and rewrites incoming transition targets. The state keeps
     /// its EditorID.
     void RenameState(uint64_t editorID, std::string newName);
+
+    /// Places states in columns by BFS depth from the entry state. Unreachable
+    /// states are placed in a trailing column. Session IDs are unchanged.
+    void AutoLayoutStates(glm::vec2 origin = glm::vec2(0.0f),
+                          float columnSpacing = 360.0f,
+                          float rowSpacing = 200.0f);
 
     [[nodiscard]] size_t FindStateIndexByName(std::string_view name) const;
 

@@ -1,11 +1,10 @@
 #include "AIEditorPanel.hpp"
 
 #include "AI/AIStateTreeRegistry.hpp"
-#include "AI/AIStateTreeSerializer.hpp"
 #include "Windows/AIEditor/AIEditorConversions.hpp"
+#include "Windows/AIEditor/AIEditorDebugView.hpp"
 #include "Assets/EditorAssetManager.hpp"
 #include "Profiling/TracyInstrumentation.hpp"
-#include "Project/Project.hpp"
 #include "Scene/Scene.hpp"
 #include "Utils/SystemOperations.hpp"
 #include "Widgets/AssetPicker.hpp"
@@ -482,6 +481,22 @@ void AIEditorPanel::DrawTabContent(AIEditorTab& tab)
                         tab.Document.Document.States.size(),
                         tab.Document.Transitions.size());
 
+    ImGui::SameLine();
+    if (ImGui::Button("Frame All"))
+        tab.GraphNeedsRefit = true;
+
+    ImGui::SameLine();
+    ImGui::BeginDisabled(!canEdit);
+    if (ImGui::Button("Auto Layout"))
+    {
+        const AIEditorDocumentSnapshot before = CaptureSnapshot(tab.Document);
+        tab.Document.AutoLayoutStates();
+        tab.RecordDocumentEdit(before, "Auto Layout");
+        tab.PositionedStateIDs.clear();
+        tab.GraphNeedsRefit = true;
+    }
+    ImGui::EndDisabled();
+
     if (!tab.Document.ViewOnly && tab.ValidationDirty)
     {
         tab.Validation = AIEditorValidator::Validate(tab.Document);
@@ -504,6 +519,8 @@ void AIEditorPanel::DrawTabContent(AIEditorTab& tab)
         DrawDocumentPreview(tab);
 
     DrawGraph(tab, canEdit);
+    DrawAITransitionHistory(tab, tab.Document, m_ActiveScene,
+                            m_IsPlaying || m_IsSimulating);
     DrawValidation(tab);
 
 }
@@ -551,8 +568,21 @@ void AIEditorPanel::DrawGraph(AIEditorTab& tab, const bool canEdit)
     const float graphWidth = std::max(120.0f,
         ImGui::GetContentRegionAvail().x - inspectorWidth - style.ItemSpacing.x);
     
+    const bool running = m_IsPlaying || m_IsSimulating;
+
+    const AI::AIAgentDebugSnapshot* runtimeSnapshot = nullptr;
+    if (running && m_ActiveScene)
+    {
+        ImGui::TextDisabled("Debug Agent");
+        ImGui::SameLine();
+        DrawAIAgentPicker(tab, tab.Document, m_ActiveScene);
+
+        if (tab.RuntimeAgent.IsValid())
+            runtimeSnapshot = m_ActiveScene->GetAISystem().GetDebugSnapshot(tab.RuntimeAgent);
+    }
+
     ImGui::BeginChild("##AIGraphHost", ImVec2(graphWidth, height), true);
-    m_Graph.Draw(tab, canEdit);
+    m_Graph.Draw(tab, canEdit, runtimeSnapshot);
     ImGui::EndChild();
     
     ImGui::SameLine();

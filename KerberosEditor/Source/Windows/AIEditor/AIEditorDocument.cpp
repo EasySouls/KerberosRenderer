@@ -4,6 +4,9 @@
 
 #include <algorithm>
 #include <functional>
+#include <limits>
+#include <queue>
+#include <unordered_map>
 #include <utility>
 
 import Kerberos;
@@ -283,6 +286,101 @@ uint64_t AIEditorDocument::MoveTransitionByIndex(const size_t sourceStateIndex,
             return ref.EditorID;
     }
     return 0;
+}
+
+uint64_t AIEditorDocument::DuplicateState(const uint64_t editorID, const glm::vec2 offset)
+{
+    const AIEditorStateRef* stateRef = FindState(editorID);
+    if (!stateRef)
+        return 0;
+
+    const AI::AIDocumentState* source = ResolveState(*stateRef);
+    if (!source)
+        return 0;
+
+    AI::AIDocumentState copy = *source;
+    copy.Name = GenerateUniqueStateName(source->Name + " Copy");
+    copy.EditorPosition += offset;
+
+    const size_t newStateIndex = Document.States.size();
+    Document.States.push_back(std::move(copy));
+
+    const uint64_t newEditorID = NextEditorID++;
+    States.push_back(AIEditorStateRef{
+        .EditorID = newEditorID,
+        .DocumentStateIndex = newStateIndex
+    });
+
+    const AI::AIDocumentState& inserted = Document.States[newStateIndex];
+    for (size_t transitionIndex = 0; transitionIndex < inserted.Transitions.size(); ++transitionIndex)
+    {
+        Transitions.push_back(AIEditorTransitionRef{
+            .EditorID = NextEditorID++,
+            .SourceStateIndex = newStateIndex,
+            .TransitionIndex = transitionIndex
+        });
+    }
+
+    return newEditorID;
+}
+
+void AIEditorDocument::AutoLayoutStates(const glm::vec2 origin,
+                                        const float columnSpacing,
+                                        const float rowSpacing)
+{
+    const size_t stateCount = Document.States.size();
+    if (stateCount == 0)
+        return;
+
+    std::unordered_map<std::string, size_t> indexByName;
+    indexByName.reserve(stateCount);
+    for (size_t i = 0; i < stateCount; ++i)
+        indexByName.emplace(Document.States[i].Name, i);
+
+    constexpr size_t unvisited = std::numeric_limits<size_t>::max();
+    std::vector<size_t> depths(stateCount, unvisited);
+
+    size_t entryIndex = FindStateIndexByName(Document.EntryState);
+    if (entryIndex >= stateCount)
+        entryIndex = 0;
+
+    std::queue<size_t> pending;
+    depths[entryIndex] = 0;
+    pending.push(entryIndex);
+
+    size_t maxDepth = 0;
+    while (!pending.empty())
+    {
+        const size_t stateIndex = pending.front();
+        pending.pop();
+
+        for (const AI::AIDocumentTransition& transition : Document.States[stateIndex].Transitions)
+        {
+            const auto target = indexByName.find(transition.TargetState);
+            if (target == indexByName.end() || depths[target->second] != unvisited)
+                continue;
+
+            depths[target->second] = depths[stateIndex] + 1;
+            maxDepth = std::max(maxDepth, depths[target->second]);
+            pending.push(target->second);
+        }
+    }
+
+    const size_t orphanDepth = maxDepth + 1;
+    for (size_t& depth : depths)
+    {
+        if (depth == unvisited)
+            depth = orphanDepth;
+    }
+
+    std::vector<size_t> rows(orphanDepth + 1, 0);
+    for (size_t i = 0; i < stateCount; ++i)
+    {
+        const size_t depth = depths[i];
+        Document.States[i].EditorPosition = origin +
+            glm::vec2(static_cast<float>(depth) * columnSpacing,
+                      static_cast<float>(rows[depth]++) * rowSpacing);
+    }
 }
 
 void AIEditorDocument::RenameState(const uint64_t editorID, std::string newName)

@@ -40,8 +40,6 @@ private:
     void DrawTransitionRuntime(AIEditorTab& tab, const AIEditorDocument& document,
                                const AIEditorTransitionRef& transitionRef,
                                const Ref<Scene>& activeScene);
-    UUID DrawAgentPicker(AIEditorTab& tab, const AIEditorDocument& document,
-                         const Ref<Scene>& activeScene);
 
     void TrackEdit(AIEditorTab& tab, const AIEditorDocument& document, const char* label);
 

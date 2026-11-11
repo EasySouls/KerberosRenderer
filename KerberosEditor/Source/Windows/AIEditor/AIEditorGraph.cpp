@@ -1,11 +1,14 @@
 #include "AIEditorGraph.hpp"
 #include "AIEditorDocumentCommand.hpp"
 #include "AIEditorGraphIds.hpp"
+#include "AIEditorRuntimeView.hpp"
 
 #include <glm/gtc/epsilon.hpp>
 #include <imgui/imgui.h>
 #include <imgui_node_editor.h>
 
+#include <algorithm>
+#include <cstdio>
 #include <memory>
 #include <span>
 #include <string>
@@ -16,7 +19,34 @@ namespace ed = ax::NodeEditor;
 
 namespace Kerberos {
 
-void AIEditorGraph::Draw(AIEditorTab& tab, const bool canEdit)
+namespace {
+
+const char* TaskStatusLabel(const AI::TaskStatus status)
+{
+    switch (status)
+    {
+    case AI::TaskStatus::Running:   return "Running";
+    case AI::TaskStatus::Succeeded: return "Succeeded";
+    case AI::TaskStatus::Failed:    return "Failed";
+    }
+    return "Unknown";
+}
+
+ImVec4 TaskStatusColor(const AI::TaskStatus status)
+{
+    switch (status)
+    {
+    case AI::TaskStatus::Running:   return ImVec4(0.45f, 0.75f, 1.0f, 1.0f);
+    case AI::TaskStatus::Succeeded: return ImVec4(0.45f, 0.85f, 0.45f, 1.0f);
+    case AI::TaskStatus::Failed:    return ImVec4(1.0f, 0.35f, 0.35f, 1.0f);
+    }
+    return ImVec4(0.65f, 0.65f, 0.65f, 1.0f);
+}
+
+} // namespace
+
+void AIEditorGraph::Draw(AIEditorTab& tab, const bool canEdit,
+                         const AI::AIAgentDebugSnapshot* runtimeSnapshot)
 {
     if (!tab.GraphContext)
         return;
@@ -24,6 +54,27 @@ void AIEditorGraph::Draw(AIEditorTab& tab, const bool canEdit)
     m_NodeToState.clear();
     m_PinRoles.clear();
     m_LinkToTransition.clear();
+    m_ErrorStateIDs.clear();
+    m_WarningStateIDs.clear();
+    m_ErrorTransitionIDs.clear();
+    m_WarningTransitionIDs.clear();
+
+    if (!tab.Document.ViewOnly)
+    {
+        for (const AIEditorIssue& issue : tab.Validation.Issues)
+        {
+            const bool isError = issue.Severity == AIEditorIssueSeverity::Error;
+            if (issue.StateEditorID != 0)
+            {
+                (isError ? m_ErrorStateIDs : m_WarningStateIDs).insert(issue.StateEditorID);
+            }
+            if (issue.TransitionEditorID != 0)
+            {
+                (isError ? m_ErrorTransitionIDs : m_WarningTransitionIDs)
+                    .insert(issue.TransitionEditorID);
+            }
+        }
+    }
     
     AIEditorDocument& document = tab.Document;
     
@@ -44,10 +95,10 @@ void AIEditorGraph::Draw(AIEditorTab& tab, const bool canEdit)
     
     for (AIEditorStateRef& stateRef : document.States)
     {
-        DrawStateNode(tab, document, stateRef, canEdit);
+        DrawStateNode(tab, document, stateRef, canEdit, runtimeSnapshot);
     }
     
-    DrawLinks(tab, document);
+    DrawLinks(document, runtimeSnapshot);
     ApplyPendingSelection(tab);
     HandleCreate(tab, document, canEdit);
     HandleDelete(tab, document, canEdit);
@@ -65,12 +116,15 @@ void AIEditorGraph::Draw(AIEditorTab& tab, const bool canEdit)
     ed::PopStyleColor();
     ed::PopStyleVar(2);
     ed::SetCurrentEditor(nullptr);
+
+    RecordPositionEditIfFinished(tab);
 }
 
 void AIEditorGraph::DrawStateNode(AIEditorTab& tab,
     AIEditorDocument& document,
     const AIEditorStateRef& stateRef,
-    const bool canEdit)
+    const bool canEdit,
+    const AI::AIAgentDebugSnapshot* runtimeSnapshot)
 {
     AI::AIDocumentState* state = document.ResolveState(stateRef);
     if (!state)
@@ -86,19 +140,49 @@ void AIEditorGraph::DrawStateNode(AIEditorTab& tab,
     };
     
     const bool isEntry = document.Document.EntryState == state->Name;
-    
-    ed::PushStyleColor(ed::StyleColor_NodeBorder,
-                       isEntry ? ImVec4(0.35f, 0.75f, 1.0f, 1.0f)
-                               : ImVec4(0.28f, 0.28f, 0.32f, 1.0f));
+
+    AIEditorStateHighlight highlight;
+    if (runtimeSnapshot && runtimeSnapshot->Valid)
+        highlight = ResolveStateHighlight(document, *runtimeSnapshot, stateRef.EditorID);
+
+    ImVec4 borderColor = isEntry ? ImVec4(0.35f, 0.75f, 1.0f, 1.0f)
+                                 : ImVec4(0.28f, 0.28f, 0.32f, 1.0f);
+    if (highlight.Current)
+        borderColor = ImVec4(0.35f, 0.85f, 0.45f, 1.0f);
+    else if (highlight.Pending)
+        borderColor = ImVec4(1.0f, 0.72f, 0.30f, 1.0f);
+    else if (highlight.Previous)
+        borderColor = ImVec4(0.35f, 0.62f, 1.0f, 1.0f);
+    else if (highlight.Evaluated)
+        borderColor = ImVec4(0.85f, 0.85f, 0.90f, 1.0f);
+
+    if (m_ErrorStateIDs.contains(stateRef.EditorID))
+        borderColor = ImVec4(1.0f, 0.30f, 0.30f, 1.0f);
+    else if (m_WarningStateIDs.contains(stateRef.EditorID))
+        borderColor = ImVec4(1.0f, 0.72f, 0.30f, 1.0f);
+
+    ed::PushStyleColor(ed::StyleColor_NodeBorder, borderColor);
 
     ed::BeginNode(nodeId);
     ImGui::PushID(nodeId.AsPointer());
     
     ImGui::TextUnformatted(state->Name.c_str());
+
+    std::string markers;
     if (isEntry)
+        markers += " [entry]";
+    if (highlight.Current)
+        markers += " [current]";
+    if (highlight.Pending)
+        markers += " [pending]";
+    if (highlight.Previous)
+        markers += " [previous]";
+    if (highlight.Evaluated)
+        markers += " [evaluated]";
+    if (!markers.empty())
     {
         ImGui::SameLine();
-        ImGui::TextDisabled("[entry]");
+        ImGui::TextDisabled("%s", markers.c_str());
     }
     ImGui::Separator();
     
@@ -109,9 +193,26 @@ void AIEditorGraph::DrawStateNode(AIEditorTab& tab,
     if (!state->Tasks.empty())
     {
         ImGui::Separator();
-        for (const AI::AINodeDesc& task : state->Tasks)
+        for (size_t i = 0; i < state->Tasks.size(); ++i)
         {
-            ImGui::BulletText("Task: %s", task.Type.c_str());
+            const AI::AINodeDesc& task = state->Tasks[i];
+            if (runtimeSnapshot && runtimeSnapshot->Valid && highlight.Current)
+            {
+                if (i < runtimeSnapshot->Tasks.size())
+                {
+                    const AI::AITaskDebugTrace& trace = runtimeSnapshot->Tasks[i];
+                    ImGui::TextColored(TaskStatusColor(trace.Status), "%s: %s",
+                                       task.Type.c_str(), TaskStatusLabel(trace.Status));
+                }
+                else
+                {
+                    ImGui::TextDisabled("%s (not evaluated)", task.Type.c_str());
+                }
+            }
+            else
+            {
+                ImGui::BulletText("Task: %s", task.Type.c_str());
+            }
         }
     }
     
@@ -168,13 +269,17 @@ void AIEditorGraph::DrawStateNode(AIEditorTab& tab,
         if (glm::epsilonNotEqual(position.x, state->EditorPosition.x, epsilon) ||
             glm::epsilonNotEqual(position.y, state->EditorPosition.y, epsilon))
         {
+            if (!m_PendingPositionEdit)
+                m_PendingPositionEdit = CaptureSnapshot(document);
+
             state->EditorPosition = glm::vec2(position.x, position.y);
             tab.Document.Dirty = true;
         }
     }
 }
 
-void AIEditorGraph::DrawLinks([[maybe_unused]] AIEditorTab& tab, const AIEditorDocument& document)
+void AIEditorGraph::DrawLinks(const AIEditorDocument& document,
+                              const AI::AIAgentDebugSnapshot* runtimeSnapshot)
 {
     for (const AIEditorTransitionRef transitionRef : document.Transitions)
     {
@@ -197,12 +302,53 @@ void AIEditorGraph::DrawLinks([[maybe_unused]] AIEditorTab& tab, const AIEditorD
         m_LinkToTransition[linkId.Get()] = transitionRef.EditorID;
         
         const bool selected = ed::IsLinkSelected(linkId);
-        const ImVec4 color = selected
+        const bool error = m_ErrorTransitionIDs.contains(transitionRef.EditorID);
+        const bool warning = m_WarningTransitionIDs.contains(transitionRef.EditorID);
+
+        AIEditorLinkHighlight highlight;
+        if (runtimeSnapshot && runtimeSnapshot->Valid)
+            highlight = ResolveLinkHighlight(document, *runtimeSnapshot, transitionRef);
+
+        ImVec4 color = selected
             ? ImVec4(0.45f, 0.85f, 1.0f, 1.0f)
             : ImVec4(0.55f, 0.55f, 0.6f, 1.0f);
-        const float thickness = selected ? 3.0f : 2.0f;
+        float thickness = selected ? 3.0f : 2.0f;
+
+        if (highlight.Evaluated)
+        {
+            color = highlight.Satisfied
+                ? ImVec4(0.35f, 0.85f, 0.45f, 1.0f)
+                : ImVec4(1.0f, 0.35f, 0.35f, 1.0f);
+            thickness = highlight.Winner ? 4.5f : 2.5f;
+        }
+
+        if (error)
+        {
+            color = ImVec4(1.0f, 0.30f, 0.30f, 1.0f);
+            thickness = std::max(thickness, 3.0f);
+        }
+        else if (warning && !highlight.Evaluated)
+        {
+            color = ImVec4(1.0f, 0.72f, 0.30f, 1.0f);
+        }
+
+        if (selected)
+        {
+            color = ImVec4(0.45f, 0.85f, 1.0f, 1.0f);
+            thickness = std::max(thickness, 3.5f);
+        }
         
         ed::Link(linkId, startPin, endPin, color, thickness);
+
+        if (ed::GetHoveredLink() == linkId)
+        {
+            const size_t conditionCount = transition->Conditions.size();
+            ImGui::SetTooltip("%s -> %s\nConditions: %zu%s",
+                              transition->Name.empty() ? "<unnamed>" : transition->Name.c_str(),
+                              transition->TargetState.c_str(),
+                              conditionCount,
+                              error ? "\nValidation error" : "");
+        }
     }
 }
 
@@ -472,6 +618,28 @@ void AIEditorGraph::HandleContextMenus(AIEditorTab& tab,
                         }
                     }
 
+                    if (canEdit && ImGui::MenuItem("Rename State..."))
+                    {
+                        m_RenameStateID = it->second;
+                        std::snprintf(m_RenameBuffer, sizeof(m_RenameBuffer),
+                                      "%s", state->Name.c_str());
+                        m_OpenRenamePopup = true;
+                    }
+
+                    if (canEdit && ImGui::MenuItem("Duplicate State"))
+                    {
+                        const AIEditorDocumentSnapshot before = CaptureSnapshot(document);
+                        const uint64_t newID = document.DuplicateState(it->second);
+                        if (newID != 0)
+                        {
+                            tab.RecordDocumentEdit(before, "Duplicate State");
+                            tab.SelectedStateID = newID;
+                            tab.SelectedTransitionID = 0;
+                            tab.PendingNodeSelection = newID;
+                            tab.PendingSelectionReveal = true;
+                        }
+                    }
+
                     if (canEdit && ImGui::MenuItem("Delete State"))
                     {
                         const size_t stateIndex = stateRef->DocumentStateIndex;
@@ -489,9 +657,17 @@ void AIEditorGraph::HandleContextMenus(AIEditorTab& tab,
     if (ImGui::BeginPopup(linkContextId))
     {
         const auto it = m_LinkToTransition.find(m_ContextLink);
-        if (it != m_LinkToTransition.end() && canEdit)
+        if (it != m_LinkToTransition.end())
         {
-            if (ImGui::MenuItem("Delete Transition"))
+            if (ImGui::MenuItem("Edit Transition"))
+            {
+                tab.SelectedTransitionID = it->second;
+                tab.SelectedStateID = 0;
+                tab.PendingLinkSelection = it->second;
+                tab.PendingSelectionReveal = true;
+            }
+
+            if (canEdit && ImGui::MenuItem("Delete Transition"))
             {
                 if (const AIEditorTransitionRef* transitionRef = document.FindTransition(it->second))
                 {
@@ -523,6 +699,36 @@ void AIEditorGraph::HandleContextMenus(AIEditorTab& tab,
         }
         ImGui::EndPopup();
     }
+
+    if (m_OpenRenamePopup)
+    {
+        ImGui::OpenPopup("Rename AI State");
+        m_OpenRenamePopup = false;
+    }
+
+    if (ImGui::BeginPopup("Rename AI State"))
+    {
+        ImGui::TextUnformatted("Rename State");
+        ImGui::SetNextItemWidth(240.0f);
+        ImGui::InputText("##AIRename", m_RenameBuffer, sizeof(m_RenameBuffer));
+
+        if (ImGui::Button("Rename"))
+        {
+            if (m_RenameBuffer[0] != '\0' && document.FindState(m_RenameStateID))
+            {
+                const AIEditorDocumentSnapshot before = CaptureSnapshot(document);
+                document.RenameState(m_RenameStateID, m_RenameBuffer);
+                tab.RecordDocumentEdit(before, "Rename State");
+            }
+            ImGui::CloseCurrentPopup();
+        }
+
+        ImGui::SameLine();
+        if (ImGui::Button("Cancel"))
+            ImGui::CloseCurrentPopup();
+
+        ImGui::EndPopup();
+    }
 }
 
 void AIEditorGraph::ApplyPendingSelection(AIEditorTab& tab)
@@ -552,6 +758,32 @@ void AIEditorGraph::ApplyPendingSelection(AIEditorTab& tab)
     tab.PendingNodeSelection = 0;
     tab.PendingLinkSelection = 0;
     tab.PendingSelectionReveal = false;
+}
+
+void AIEditorGraph::RecordPositionEditIfFinished(AIEditorTab& tab)
+{
+    if (!m_PendingPositionEdit || ImGui::IsMouseDown(ImGuiMouseButton_Left))
+        return;
+
+    bool changed = false;
+    const std::vector<AI::AIDocumentState>& before = m_PendingPositionEdit->Document.States;
+    const std::vector<AI::AIDocumentState>& after = tab.Document.Document.States;
+    const size_t count = std::min(before.size(), after.size());
+
+    for (size_t i = 0; i < count; ++i)
+    {
+        if (before[i].EditorPosition.x != after[i].EditorPosition.x ||
+            before[i].EditorPosition.y != after[i].EditorPosition.y)
+        {
+            changed = true;
+            break;
+        }
+    }
+
+    if (changed)
+        tab.RecordDocumentEdit(std::move(*m_PendingPositionEdit), "Move Nodes");
+
+    m_PendingPositionEdit.reset();
 }
 
 const AIEditorStateRef* AIEditorGraph::FindStateRefByIndex(const AIEditorDocument& document, const size_t index)

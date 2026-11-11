@@ -486,6 +486,23 @@ std::string AssetStatusLabel(const AssetHandle handle,
         {
             ImGui::TextDisabled("%s", path.string().c_str());
             ImGui::Separator();
+
+            if (path.extension() == ".kbrai" && m_OnAIStateTreeActivated)
+            {
+                if (ImGui::MenuItem("Open in AI Editor"))
+                {
+                    if (const Ref<EditorAssetManager> assetManager =
+                            Project::GetActive()->GetEditorAssetManager())
+                    {
+                        const AssetHandle handle = assetManager->ImportAsset(path);
+                        if (handle.IsValid())
+                            m_OnAIStateTreeActivated(handle, path);
+                    }
+                    ImGui::CloseCurrentPopup();
+                }
+                ImGui::Separator();
+            }
+
             if (ImGui::MenuItem("Open"))
             {
                 if (!FileOperations::OpenFile(path.string().c_str()))

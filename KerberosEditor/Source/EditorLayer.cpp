@@ -122,6 +122,15 @@ namespace PROJECT_NAME
 
 		// Selecting an entity in the hierarchy takes over the inspector from any
 		// asset import-options selection, which would otherwise keep precedence.
+		m_HierarchyPanel.SetOnOpenAIStateTree([this](const AssetHandle handle)
+		{
+			if (!handle.IsValid())
+				return;
+
+			m_AIEditorPanel.SetOpen(true);
+			m_AIEditorPanel.OpenAsset(handle);
+		});
+
 		m_HierarchyPanel.SetOnEntitySelected([this](const Entity entity)
 		{
 			if (entity && m_AssetsPanel)

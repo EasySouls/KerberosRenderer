@@ -21,6 +21,7 @@ add_executable(KerberosEditorModelTests
     ../KerberosEditor/Source/Windows/AIEditor/AIEditorValidator.cpp
     ../KerberosEditor/Source/Windows/AIEditor/AIEditorDocumentCommand.cpp
     ../KerberosEditor/Source/Windows/AIEditor/AIEditorNodeSchema.cpp
+    ../KerberosEditor/Source/Windows/AIEditor/AIEditorRuntimeView.cpp
 )
 
 target_include_directories(KerberosEditorModelTests PRIVATE

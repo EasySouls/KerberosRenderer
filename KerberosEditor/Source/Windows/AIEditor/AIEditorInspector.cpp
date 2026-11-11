@@ -621,12 +621,14 @@ void AIEditorInspector::DrawStateRuntime(AIEditorTab& tab,
     
     ImGui::SeparatorText("Runtime");
 
-    const UUID agent = DrawAgentPicker(tab, document, activeScene);
-    if (!agent.IsValid())
+    if (!tab.RuntimeAgent.IsValid())
+    {
+        ImGui::TextDisabled("No agent selected.");
         return;
+    }
 
     const AI::AIAgentDebugSnapshot* snapshot =
-        activeScene->GetAISystem().GetDebugSnapshot(agent);
+        activeScene->GetAISystem().GetDebugSnapshot(tab.RuntimeAgent);
     if (!snapshot || !snapshot->Valid)
     {
         ImGui::TextDisabled("No debug snapshot for this agent yet.");
@@ -680,12 +682,14 @@ void AIEditorInspector::DrawTransitionRuntime(AIEditorTab& tab,
     
     ImGui::SeparatorText("Runtime Conditions");
 
-    const UUID agent = DrawAgentPicker(tab, document, activeScene);
-    if (!agent.IsValid())
+    if (!tab.RuntimeAgent.IsValid())
+    {
+        ImGui::TextDisabled("No agent selected.");
         return;
+    }
 
     const AI::AIAgentDebugSnapshot* snapshot =
-        activeScene->GetAISystem().GetDebugSnapshot(agent);
+        activeScene->GetAISystem().GetDebugSnapshot(tab.RuntimeAgent);
     if (!snapshot || !snapshot->Valid)
     {
         ImGui::TextDisabled("No debug snapshot for this agent yet.");
@@ -745,73 +749,6 @@ void AIEditorInspector::DrawTransitionRuntime(AIEditorTab& tab,
     }
 
     ImGui::TextDisabled("Evaluation stops after the first failing condition.");
-}
-
-UUID AIEditorInspector::DrawAgentPicker(AIEditorTab& tab,
-                                        const AIEditorDocument& document,
-                                        const Ref<Scene>& activeScene)
-{
-    KBR_TRACY_FUNCTION();
-    
-    struct AgentEntry
-    {
-        UUID ID = UUID::Invalid();
-        std::string Label;
-    };
-
-    std::vector<AgentEntry> agents;
-
-    const entt::registry& registry = activeScene->GetRegistry();
-    const auto view = registry.view<AIStateMachineComponent, TagComponent, IDComponent>();
-    for (const entt::entity handle : view)
-    {
-        const AIStateMachineComponent& stateMachine =
-            view.get<AIStateMachineComponent>(handle);
-
-        const bool matches = document.Source == AIEditorDocument::SourceKind::Asset
-            ? stateMachine.TreeAsset == document.Asset
-            : stateMachine.TreeName == document.RegistryName ||
-              stateMachine.Tree == document.CompiledPreview;
-
-        if (!matches)
-            continue;
-
-        const Entity entity(handle, activeScene.get());
-        agents.push_back(AgentEntry{
-            .ID = entity.GetUUID(),
-            .Label = std::format("{} ({})", entity.GetName(), entity.GetUUID())
-        });
-    }
-
-    if (agents.empty())
-    {
-        tab.RuntimeAgent = UUID::Invalid();
-        ImGui::TextDisabled("No agents currently use this tree.");
-        return tab.RuntimeAgent;
-    }
-
-    const bool known = std::ranges::any_of(agents, [&tab](const AgentEntry& entry) {
-        return entry.ID == tab.RuntimeAgent;
-    });
-    if (!known)
-        tab.RuntimeAgent = agents.front().ID;
-
-    const auto current = std::ranges::find_if(agents, [&tab](const AgentEntry& entry) {
-        return entry.ID == tab.RuntimeAgent;
-    });
-    const std::string currentLabel = current != agents.end() ? current->Label : "<none>";
-
-    if (ImGui::BeginCombo("Agent", currentLabel.c_str()))
-    {
-        for (const AgentEntry& entry : agents)
-        {
-            if (ImGui::Selectable(entry.Label.c_str(), entry.ID == tab.RuntimeAgent))
-                tab.RuntimeAgent = entry.ID;
-        }
-        ImGui::EndCombo();
-    }
-
-    return tab.RuntimeAgent;
 }
 
 void AIEditorInspector::TrackEdit(AIEditorTab& tab,

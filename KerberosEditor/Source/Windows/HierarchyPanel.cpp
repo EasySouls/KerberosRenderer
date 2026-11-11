@@ -490,6 +490,11 @@ void HierarchyPanel::SetOnEntitySelected(const std::function<void(Entity)>& call
     m_OnEntitySelected = callback;
 }
 
+void HierarchyPanel::SetOnOpenAIStateTree(const std::function<void(AssetHandle)>& callback)
+{
+    m_OnOpenAIStateTree = callback;
+}
+
 void HierarchyPanel::DrawEntityNode(const Entity& entity)
 {
     const auto& tag = entity.GetComponent<TagComponent>().Tag;
@@ -2878,6 +2883,12 @@ void HierarchyPanel::DrawComponents(const Entity entity)
             }
 
             ImGui::TextDisabled("Asset trees are editable in the AI editor. C++/C# trees are view-only.");
+
+            if (stateMachine.TreeAsset.IsValid())
+            {
+                if (ImGui::Button("Open in AI Editor") && m_OnOpenAIStateTree)
+                    m_OnOpenAIStateTree(stateMachine.TreeAsset);
+            }
 
             const std::vector<std::string> treeNames = AI::AIStateTreeRegistry::GetNames();
             const char* preview = stateMachine.TreeName.empty() ? "<none>" : stateMachine.TreeName.c_str();
