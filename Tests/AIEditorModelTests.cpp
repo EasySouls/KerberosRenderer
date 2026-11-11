@@ -2,6 +2,7 @@
 #include "Windows/AIEditor/AIEditorDocument.hpp"
 #include "Windows/AIEditor/AIEditorDocumentCommand.hpp"
 #include "Windows/AIEditor/AIEditorGraphIds.hpp"
+#include "Windows/AIEditor/AIEditorNodeSchema.hpp"
 #include "Windows/AIEditor/AIEditorValidator.hpp"
 
 #include "AI/AINodes.hpp"
@@ -11,9 +12,11 @@
 #include <gtest/gtest.h>
 
 #include <filesystem>
+#include <optional>
 #include <sstream>
 #include <string>
 #include <utility>
+#include <variant>
 #include <vector>
 
 import Kerberos;
@@ -266,6 +269,58 @@ TEST(AIEditorModelTest, RemoveTransitionsByIndexIsBatchSafe)
     ASSERT_EQ(document.Document.States[1].Transitions.size(), 1u);
     EXPECT_EQ(document.Document.States[1].Transitions[0].Name, "C");
     EXPECT_EQ(document.Transitions.size(), 1u);
+}
+
+TEST(AIEditorModelTest, MoveTransitionByIndexReordersAndReturnsEditorID)
+{
+    AIEditorDocument document = MakeDocument();
+    document.AddState("Idle");
+    document.AddState("Chase");
+    document.AddTransition(0, "Chase", "A");
+    document.AddTransition(0, "Chase", "B");
+    document.AddTransition(0, "Chase", "C");
+
+    ASSERT_EQ(document.Document.States[0].Transitions.size(), 3u);
+
+    const uint64_t movedID = document.MoveTransitionByIndex(0, 0, 2);
+    ASSERT_NE(movedID, 0u);
+
+    const AIEditorTransitionRef* moved = document.FindTransition(movedID);
+    ASSERT_NE(moved, nullptr);
+    EXPECT_EQ(moved->SourceStateIndex, 0u);
+    EXPECT_EQ(moved->TransitionIndex, 2u);
+
+    const std::vector<AI::AIDocumentTransition>& transitions =
+        document.Document.States[0].Transitions;
+    ASSERT_EQ(transitions.size(), 3u);
+    EXPECT_EQ(transitions[0].Name, "B");
+    EXPECT_EQ(transitions[1].Name, "C");
+    EXPECT_EQ(transitions[2].Name, "A");
+}
+
+TEST(AIEditorModelTest, NodeSchemaBuildsTypedDefaults)
+{
+    const std::optional<AI::AINodeTypeInfo> info =
+        AI::FindAINodeType("Wait", AI::AINodeKind::Task);
+    ASSERT_TRUE(info.has_value());
+
+    const AI::AINodeDesc desc = MakeDefaultNodeDesc(*info);
+    EXPECT_EQ(desc.Type, "Wait");
+    ASSERT_EQ(desc.Params.size(), info->Params.size());
+
+    const auto durationIt = desc.Params.find("Duration");
+    ASSERT_NE(durationIt, desc.Params.end());
+    const double* duration = std::get_if<double>(&durationIt->second);
+    ASSERT_NE(duration, nullptr);
+    EXPECT_DOUBLE_EQ(*duration, 1.0);
+}
+
+TEST(AIEditorModelTest, BlackboardKeyParametersAreDetected)
+{
+    EXPECT_TRUE(IsBlackboardKeyParam("Key"));
+    EXPECT_TRUE(IsBlackboardKeyParam("TargetKey"));
+    EXPECT_TRUE(IsBlackboardKeyParam("SomeOtherKey"));
+    EXPECT_FALSE(IsBlackboardKeyParam("Speed"));
 }
 
 TEST(AIEditorModelTest, UniqueNamesAvoidExistingEntries)

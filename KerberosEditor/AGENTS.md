@@ -146,18 +146,32 @@ Editor windows live mainly under
   mark the document dirty. Editable `.kbrai` documents save through
   `AIEditorAssetSession`, which recompiles the asset and force-reimports the
   source; registered C++/C# trees open read-only. Editing is disabled while
-  Play/Simulate is active; the panel still receives scene/runtime context for
-  the later debug phases.
-  Structural edits (create/retarget/delete transitions, delete states, set
-  entry, add state) are undoable per tab via snapshot commands. While the AI
-  Editor window is focused, `EditorLayer` routes Ctrl+Z/Ctrl+Shift+Z/Ctrl+Y and
-  Ctrl+S to the active tab instead of the scene history or scene save;
-  node-position drags are not undoable yet, and Revert clears the history.
+  Play/Simulate is active.
+  The side inspector (`Windows/AIEditor/AIEditorInspector`) follows the selected
+  state or transition. It edits the state name and entry flag, task and
+  condition lists (add/remove/reorder), and the transition name, target, and
+  priority, and it generates parameter widgets from `AINodeTypeInfo::Params`
+  via `AIEditorNodeSchema`. Parameter edits use the same snapshot undo commands;
+  schema defaults are only written when the user actually changes a parameter.
+  Selecting a validation issue or a transition row requests graph selection
+  through the tab's pending-selection fields, which `AIEditorGraph` consumes
+  inside the canvas frame.
+  In Play/Simulate the inspector enables `AISystem` debug capture while the
+  window is open, picks among agents bound to the open tree, and shows the
+  current/previous/evaluated/pending state, time in state, task results, and
+  per-condition transition results. Capture is disabled when the window closes
+  or the editor returns to Edit. Canvas runtime overlays remain Phase 5.
+  Graph and inspector edits (create/retarget/delete transitions, delete states,
+  set entry, add state, add/remove/reorder tasks and conditions, retarget and
+  reorder transitions, rename, parameters) are undoable per tab via snapshot
+  commands. While the AI Editor window is focused, `EditorLayer` routes
+  Ctrl+Z/Ctrl+Shift+Z/Ctrl+Y and Ctrl+S to the active tab instead of the scene
+  history or scene save; node-position drags are not undoable yet, and Revert
+  clears the history.
   Multi-selection deletes resolve every document
   index before mutating so session-ID renumbering cannot remove the wrong
   item. Deleting the entry state promotes the first remaining state (or clears
   the entry when none remain), and new states/transitions receive unique names.
-  The schema-driven inspector and runtime overlays remain Phases 4–5.
   The editor-only model lives in `KerberosEditor/Source/Windows/AIEditor/**`;
   graph IDs, validation, tabs, and undo are editor-local and do not modify
   `AIStateTreeDocument` or `AIStateTreeSerializer`. `AIEditorDocument` stays
@@ -425,7 +439,10 @@ opening a `.kbrai` through `View > AI Editor` and the asset browser, opening a
 registered tree in read-only mode, creating a new tree, save/revert/reimport,
 validation errors blocking save, graph link create/retarget/delete, node deletion,
 multi-selection deletion, entry-state reassignment after deleting the entry,
-unique naming for new states/transitions, structural undo/redo and
+unique naming for new states/transitions, inspector state/transition editing,
+every parameter type, task/condition/transition add-remove-reorder with undo,
+transition retarget/reorder after ID rebuilds, runtime inspector rows in Play,
+debug capture disabled outside Play/Simulate, structural undo/redo and
 history clearing on revert, tab close/discard behavior, and project
 switching clearing AI tabs. For
 undo changes, validate create/delete round-trips (including entity subtrees),

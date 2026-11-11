@@ -1,13 +1,19 @@
 #include "AIEditorDocument.hpp"
 
+#include "Profiling/TracyInstrumentation.hpp"
+
 #include <algorithm>
 #include <functional>
 #include <utility>
+
+import Kerberos;
 
 namespace Kerberos {
 
 void AIEditorDocument::RebuildGraphReferences()
 {
+    KBR_TRACY_FUNCTION();
+    
     States.clear();
     Transitions.clear();
     NextEditorID = 1;
@@ -231,27 +237,52 @@ void AIEditorDocument::RemoveTransitions(
         RebuildGraphReferences();
 }
 
-void AIEditorDocument::MoveTransition(const uint64_t editorID, size_t newIndex)
+void AIEditorDocument::MoveTransition(const uint64_t editorID, const size_t newIndex)
 {
     const AIEditorTransitionRef* transitionRef = FindTransition(editorID);
-    if (!transitionRef || transitionRef->SourceStateIndex >= Document.States.size())
+    if (!transitionRef)
         return;
 
-    AI::AIDocumentState& state = Document.States[transitionRef->SourceStateIndex];
-    if (state.Transitions.empty() || transitionRef->TransitionIndex >= state.Transitions.size())
-        return;
+    MoveTransitionByIndex(transitionRef->SourceStateIndex, transitionRef->TransitionIndex, newIndex);
+}
 
-    newIndex = std::min(newIndex, state.Transitions.size() - 1);
-    if (newIndex == transitionRef->TransitionIndex)
-        return;
+uint64_t AIEditorDocument::MoveTransitionByIndex(const size_t sourceStateIndex,
+                                                 const size_t fromIndex,
+                                                 const size_t toIndex)
+{
+    if (sourceStateIndex >= Document.States.size())
+        return 0;
 
-    AI::AIDocumentTransition transition = std::move(state.Transitions[transitionRef->TransitionIndex]);
+    AI::AIDocumentState& state = Document.States[sourceStateIndex];
+    if (fromIndex >= state.Transitions.size())
+        return 0;
+
+    const size_t targetIndex = std::min(toIndex, state.Transitions.size() - 1);
+    if (fromIndex == targetIndex)
+    {
+        for (const AIEditorTransitionRef& ref : Transitions)
+        {
+            if (ref.SourceStateIndex == sourceStateIndex && ref.TransitionIndex == fromIndex)
+                return ref.EditorID;
+        }
+        return 0;
+    }
+
+    AI::AIDocumentTransition transition = std::move(state.Transitions[fromIndex]);
     state.Transitions.erase(state.Transitions.begin() +
-                            static_cast<std::ptrdiff_t>(transitionRef->TransitionIndex));
-    state.Transitions.insert(state.Transitions.begin() + static_cast<std::ptrdiff_t>(newIndex),
+                            static_cast<std::ptrdiff_t>(fromIndex));
+    state.Transitions.insert(state.Transitions.begin() +
+                             static_cast<std::ptrdiff_t>(targetIndex),
                              std::move(transition));
 
     RebuildGraphReferences();
+
+    for (const AIEditorTransitionRef& ref : Transitions)
+    {
+        if (ref.SourceStateIndex == sourceStateIndex && ref.TransitionIndex == targetIndex)
+            return ref.EditorID;
+    }
+    return 0;
 }
 
 void AIEditorDocument::RenameState(const uint64_t editorID, std::string newName)

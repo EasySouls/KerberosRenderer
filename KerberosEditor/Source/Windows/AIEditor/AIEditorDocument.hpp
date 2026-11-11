@@ -80,6 +80,11 @@ struct AIEditorDocument
     void RemoveTransition(uint64_t editorID);
     void MoveTransition(uint64_t editorID, size_t newIndex);
 
+    /// Moves a transition within its source state and returns its new session editor ID. 
+    /// The source and target indices refer to the document before the call.
+    /// The target index is clamped to the last transition.
+    uint64_t MoveTransitionByIndex(size_t sourceStateIndex, size_t fromIndex, size_t toIndex);
+
     /// Removes states by document index. Indices refer to the document before
     /// the call, so a multi-selection batch can be captured up front. Incoming
     /// transitions are removed, and a removed entry state is replaced by the

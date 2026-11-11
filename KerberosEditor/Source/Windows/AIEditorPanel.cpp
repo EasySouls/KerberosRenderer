@@ -4,6 +4,7 @@
 #include "AI/AIStateTreeSerializer.hpp"
 #include "Windows/AIEditor/AIEditorConversions.hpp"
 #include "Assets/EditorAssetManager.hpp"
+#include "Profiling/TracyInstrumentation.hpp"
 #include "Project/Project.hpp"
 #include "Scene/Scene.hpp"
 #include "Utils/SystemOperations.hpp"
@@ -30,6 +31,8 @@ bool IsEditMode(const bool isPlaying, const bool isSimulating)
 
 void AIEditorPanel::OnImGuiRender()
 {
+    KBR_TRACY_FUNCTION();
+    
     m_Focused = false;
     if (!m_Open)
         return;
@@ -91,10 +94,31 @@ void AIEditorPanel::SetContext(const Ref<Scene>& activeScene,
     m_IsPlaying = isPlaying;
     m_IsSimulating = isSimulating;
     m_IsPaused = isPaused;
+    
+    const bool captureWanted = m_Open && (isPlaying || isSimulating) && activeScene;
+
+    if (m_CaptureScene &&
+        (!captureWanted || m_CaptureScene.get() != activeScene.get()))
+    {
+        m_CaptureScene->GetAISystem().SetDebugCaptureEnabled(false);
+        m_CaptureScene.reset();
+    }
+
+    if (captureWanted)
+    {
+        activeScene->GetAISystem().SetDebugCaptureEnabled(true);
+        m_CaptureScene = activeScene;
+    }
 }
 
 void AIEditorPanel::SetOpen(const bool open)
 {
+    if (!open && m_CaptureScene)
+    {
+        m_CaptureScene->GetAISystem().SetDebugCaptureEnabled(false);
+        m_CaptureScene.reset();
+    }
+
     m_Open = open;
 }
 
@@ -245,6 +269,8 @@ bool AIEditorPanel::OpenAsset(const AssetHandle handle)
 
 bool AIEditorPanel::OpenRegisteredTree(const std::string& name)
 {
+    KBR_TRACY_FUNCTION();
+    
     const Ref<AI::AIStateTree> tree = AI::AIStateTreeRegistry::Find(name);
     if (!tree)
     {
@@ -325,6 +351,8 @@ AI::AIStateTreeDocument AIEditorPanel::MakeDefaultDocument(std::string name)
 
 void AIEditorPanel::DrawToolbar()
 {
+    KBR_TRACY_FUNCTION();
+    
     const bool canEdit = IsEditMode(m_IsPlaying, m_IsSimulating);
 
     AssetHandle assetToOpen = m_AssetPickerHandle;
@@ -386,6 +414,8 @@ void AIEditorPanel::DrawToolbar()
 
 void AIEditorPanel::DrawTabs()
 {
+    KBR_TRACY_FUNCTION();
+    
     if (m_Tabs.empty())
     {
         ImGui::TextDisabled("Open a .kbrai asset or a registered tree to begin.");
@@ -426,6 +456,8 @@ void AIEditorPanel::DrawTabs()
 
 void AIEditorPanel::DrawTabContent(AIEditorTab& tab)
 {
+    KBR_TRACY_FUNCTION();
+    
     const bool canEdit = IsEditMode(m_IsPlaying, m_IsSimulating) && !tab.Document.ViewOnly;
 
     if (tab.Document.ViewOnly)
@@ -467,7 +499,10 @@ void AIEditorPanel::DrawTabContent(AIEditorTab& tab)
     else
         ImGui::TextColored(ImVec4(0.45f, 0.85f, 0.45f, 1.0f), "Validation passed.");
 
-    DrawDocumentPreview(tab);
+    ImGui::Checkbox("Show authored layout (debug)", &m_ShowDocumentPreview);
+    if (m_ShowDocumentPreview)
+        DrawDocumentPreview(tab);
+
     DrawGraph(tab, canEdit);
     DrawValidation(tab);
 
@@ -475,6 +510,8 @@ void AIEditorPanel::DrawTabContent(AIEditorTab& tab)
 
 bool AIEditorPanel::UndoActiveTab()
 {
+    KBR_TRACY_FUNCTION();
+    
     AIEditorTab* tab = GetActiveTab();
     if (!tab || tab->Document.ViewOnly || !IsEditMode(m_IsPlaying, m_IsSimulating) ||
         !tab->UndoRedo.CanUndo())
@@ -489,6 +526,8 @@ bool AIEditorPanel::UndoActiveTab()
 
 bool AIEditorPanel::RedoActiveTab()
 {
+    KBR_TRACY_FUNCTION();
+    
     AIEditorTab* tab = GetActiveTab();
     if (!tab || tab->Document.ViewOnly || !IsEditMode(m_IsPlaying, m_IsSimulating) ||
         !tab->UndoRedo.CanRedo())
@@ -503,13 +542,30 @@ bool AIEditorPanel::RedoActiveTab()
 
 void AIEditorPanel::DrawGraph(AIEditorTab& tab, const bool canEdit)
 {
-    ImGui::BeginChild("##AIGraphHost", ImVec2(0.0f, 480.0f), true);
+    KBR_TRACY_FUNCTION();
+
+    const ImGuiStyle& style = ImGui::GetStyle();
+    constexpr float inspectorWidth = 380.0f;
+    constexpr float height = 520.0f;
+    
+    const float graphWidth = std::max(120.0f,
+        ImGui::GetContentRegionAvail().x - inspectorWidth - style.ItemSpacing.x);
+    
+    ImGui::BeginChild("##AIGraphHost", ImVec2(graphWidth, height), true);
     m_Graph.Draw(tab, canEdit);
+    ImGui::EndChild();
+    
+    ImGui::SameLine();
+    
+    ImGui::BeginChild("##AIInspector", ImVec2(0.0f, height), true);
+    m_Inspector.Draw(tab, canEdit, m_ActiveScene, m_IsPlaying || m_IsSimulating);
     ImGui::EndChild();
 }
 
 void AIEditorPanel::DrawDocumentPreview(const AIEditorTab& tab)
 {
+    KBR_TRACY_FUNCTION();
+    
     ImGui::Separator();
     ImGui::TextDisabled("Authored layout (debug list):");
     ImGui::BeginChild("##AIDocumentPreview", ImVec2(0.0f, 300.0f), true,
@@ -546,8 +602,10 @@ void AIEditorPanel::DrawDocumentPreview(const AIEditorTab& tab)
     ImGui::EndChild();
 }
 
-void AIEditorPanel::DrawValidation(const AIEditorTab& tab)
+void AIEditorPanel::DrawValidation(AIEditorTab& tab)
 {
+    KBR_TRACY_FUNCTION();
+    
     if (tab.Validation.Issues.empty())
         return;
 
@@ -564,10 +622,29 @@ void AIEditorPanel::DrawValidation(const AIEditorTab& tab)
             : issue.Severity == AIEditorIssueSeverity::Warning
             ? ImVec4(1.0f, 0.75f, 0.35f, 1.0f)
             : ImVec4(0.65f, 0.65f, 0.65f, 1.0f);
+        
         ImGui::PushID(static_cast<int>(i));
-        ImGui::TextColored(color, "%s", issue.Message.c_str());
-        if (!issue.StateName.empty())
-            ImGui::SameLine(), ImGui::TextDisabled(" [%s]", issue.StateName.c_str());
+        ImGui::PushStyleColor(ImGuiCol_Text, color);
+        const bool clicked = ImGui::Selectable(issue.Message.c_str());
+        ImGui::PopStyleColor();
+
+        if (clicked)
+        {
+            if (issue.TransitionEditorID != 0)
+            {
+                tab.SelectedTransitionID = issue.TransitionEditorID;
+                tab.SelectedStateID = 0;
+                tab.PendingLinkSelection = issue.TransitionEditorID;
+                tab.PendingSelectionReveal = true;
+            }
+            else if (issue.StateEditorID != 0)
+            {
+                tab.SelectedStateID = issue.StateEditorID;
+                tab.SelectedTransitionID = 0;
+                tab.PendingNodeSelection = issue.StateEditorID;
+                tab.PendingSelectionReveal = true;
+            }
+        }
         ImGui::PopID();
     }
     ImGui::EndChild();
@@ -576,6 +653,8 @@ void AIEditorPanel::DrawValidation(const AIEditorTab& tab)
 
 bool AIEditorPanel::SaveActiveTab()
 {
+    KBR_TRACY_FUNCTION();
+    
     AIEditorTab* tab = GetActiveTab();
     if (!tab || tab->Document.ViewOnly)
         return false;
@@ -607,6 +686,8 @@ bool AIEditorPanel::SaveActiveTab()
 
 bool AIEditorPanel::RevertActiveTab()
 {
+    KBR_TRACY_FUNCTION();
+    
     AIEditorTab* tab = GetActiveTab();
     if (!tab || tab->Document.ViewOnly)
         return false;
@@ -626,6 +707,8 @@ bool AIEditorPanel::RevertActiveTab()
 
 void AIEditorPanel::ValidateActiveTab()
 {
+    KBR_TRACY_FUNCTION();
+    
     AIEditorTab* tab = GetActiveTab();
     if (!tab)
         return;

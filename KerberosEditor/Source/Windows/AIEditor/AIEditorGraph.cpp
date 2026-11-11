@@ -16,18 +16,6 @@ namespace ed = ax::NodeEditor;
 
 namespace Kerberos {
 
-namespace {
-
-void RecordEdit(AIEditorTab& tab, AIEditorDocumentSnapshot before, std::string name)
-{
-    tab.UndoRedo.Record(std::make_unique<AIEditorDocumentCommand>(
-        &tab.Document, std::move(before), CaptureSnapshot(tab.Document), std::move(name)));
-    tab.Document.Dirty = true;
-    tab.ValidationDirty = true;
-}
-
-} // namespace
-
 void AIEditorGraph::Draw(AIEditorTab& tab, const bool canEdit)
 {
     if (!tab.GraphContext)
@@ -60,6 +48,7 @@ void AIEditorGraph::Draw(AIEditorTab& tab, const bool canEdit)
     }
     
     DrawLinks(tab, document);
+    ApplyPendingSelection(tab);
     HandleCreate(tab, document, canEdit);
     HandleDelete(tab, document, canEdit);
     HandleSelection(tab);
@@ -290,7 +279,7 @@ void AIEditorGraph::HandleNewLink(AIEditorTab& tab, AIEditorDocument& document, 
                 document.GenerateUniqueTransitionName(*sourceState);
             const uint64_t newTransitionId = document.AddTransition(
                 sourceStateRef->DocumentStateIndex, targetState->Name, transitionName);
-            RecordEdit(tab, before, "Add Transition");
+            tab.RecordDocumentEdit(before, "Add Transition");
             tab.SelectedTransitionID = newTransitionId;
         }
         
@@ -313,7 +302,7 @@ void AIEditorGraph::HandleNewLink(AIEditorTab& tab, AIEditorDocument& document, 
         {
             const AIEditorDocumentSnapshot before = CaptureSnapshot(document);
             transition->TargetState = targetState->Name;
-            RecordEdit(tab, before, "Retarget Transition");
+            tab.RecordDocumentEdit(before, "Retarget Transition");
         }
 
         tab.SelectedTransitionID = transitionRef->EditorID;
@@ -387,7 +376,7 @@ void AIEditorGraph::HandleDelete(AIEditorTab& tab, AIEditorDocument& document, c
     else
         name = deletedTransitions.size() == 1 ? "Delete Transition" : "Delete Transitions";
 
-    RecordEdit(tab, before, std::move(name));
+    tab.RecordDocumentEdit(before, std::move(name));
     tab.ResetGraphSession();
 }
 
@@ -479,7 +468,7 @@ void AIEditorGraph::HandleContextMenus(AIEditorTab& tab,
                         {
                             const AIEditorDocumentSnapshot before = CaptureSnapshot(document);
                             document.Document.EntryState = state->Name;
-                            RecordEdit(tab, before, "Set Entry State");
+                            tab.RecordDocumentEdit(before, "Set Entry State");
                         }
                     }
 
@@ -488,7 +477,7 @@ void AIEditorGraph::HandleContextMenus(AIEditorTab& tab,
                         const size_t stateIndex = stateRef->DocumentStateIndex;
                         const AIEditorDocumentSnapshot before = CaptureSnapshot(document);
                         document.RemoveStates(std::span<const size_t>(&stateIndex, 1));
-                        RecordEdit(tab, before, "Delete State");
+                        tab.RecordDocumentEdit(before, "Delete State");
                         tab.ResetGraphSession();
                     }
                 }
@@ -504,8 +493,7 @@ void AIEditorGraph::HandleContextMenus(AIEditorTab& tab,
         {
             if (ImGui::MenuItem("Delete Transition"))
             {
-                const AIEditorTransitionRef* transitionRef = document.FindTransition(it->second);
-                if (transitionRef)
+                if (const AIEditorTransitionRef* transitionRef = document.FindTransition(it->second))
                 {
                     const std::pair indices{
                         transitionRef->SourceStateIndex, transitionRef->TransitionIndex
@@ -513,7 +501,7 @@ void AIEditorGraph::HandleContextMenus(AIEditorTab& tab,
                     const AIEditorDocumentSnapshot before = CaptureSnapshot(document);
                     document.RemoveTransitions(
                         std::span<const std::pair<size_t, size_t>>(&indices, 1));
-                    RecordEdit(tab, before, "Delete Transition");
+                    tab.RecordDocumentEdit(before, "Delete Transition");
                     tab.ResetGraphSession();
                 }
             }
@@ -529,12 +517,41 @@ void AIEditorGraph::HandleContextMenus(AIEditorTab& tab,
             const uint64_t id = document.AddState(
                 document.GenerateUniqueStateName("New State"),
                 glm::vec2(m_ContextCanvasPosition.x, m_ContextCanvasPosition.y));
-            RecordEdit(tab, before, "Add State");
+            tab.RecordDocumentEdit(before, "Add State");
             tab.SelectedStateID = id;
             tab.SelectedTransitionID = 0;
         }
         ImGui::EndPopup();
     }
+}
+
+void AIEditorGraph::ApplyPendingSelection(AIEditorTab& tab)
+{
+    if (!tab.PendingNodeSelection && !tab.PendingLinkSelection)
+        return;
+    
+    ed::ClearSelection();
+    
+    if (tab.PendingNodeSelection)
+    {
+        const ed::NodeId nodeId{ AIEditorGraphId::MakeStateNodeId(tab.PendingNodeSelection) };
+        ed::SelectNode(nodeId, false);
+    }
+    
+    if (tab.PendingLinkSelection)
+    {
+        const ed::LinkId linkId{ AIEditorGraphId::MakeTransitionLinkId(tab.PendingLinkSelection) };
+        ed::SelectLink(linkId, false);
+    }
+    
+    if (tab.PendingSelectionReveal)
+    {
+        ed::NavigateToSelection(false);
+    }
+    
+    tab.PendingNodeSelection = 0;
+    tab.PendingLinkSelection = 0;
+    tab.PendingSelectionReveal = false;
 }
 
 const AIEditorStateRef* AIEditorGraph::FindStateRefByIndex(const AIEditorDocument& document, const size_t index)

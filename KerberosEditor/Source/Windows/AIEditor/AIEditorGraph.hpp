@@ -38,6 +38,8 @@ private:
     void HandleSelection(AIEditorTab& tab);
     void HandleContextMenus(AIEditorTab& tab, AIEditorDocument& document, bool canEdit);
 
+    static void ApplyPendingSelection(AIEditorTab& tab);
+
     static const AIEditorStateRef* FindStateRefByIndex(const AIEditorDocument& document, size_t index);
     
 private:
