@@ -11,9 +11,7 @@ if not exist "%SLANGC%" (
 )
 
 "%SLANGC%" simple.slang -target spirv -profile spirv_1_6 -emit-spirv-directly -fvk-use-entrypoint-name -entry vertexMain -entry fragmentMain -o ../Cache/Shaders/simple.spv
-"%SLANGC%" shadowmap.slang -target spirv -profile spirv_1_6 -emit-spirv-directly -fvk-use-entrypoint-name -entry vertexMain -entry fragmentMain -o ../Cache/Shaders/shadowmap.spv
 "%SLANGC%" shadowmap_csm.slang -target spirv -profile spirv_1_6 -emit-spirv-directly -fvk-use-entrypoint-name -entry vertexMain -entry fragmentMain -o ../Cache/Shaders/shadowmap_csm.spv
-"%SLANGC%" pbrbasic.slang -target spirv -profile spirv_1_6 -emit-spirv-directly -fvk-use-entrypoint-name -entry vertexMain -entry fragmentMain -o ../Cache/Shaders/pbrbasic.spv
 "%SLANGC%" pbrtextured.slang -target spirv -profile spirv_1_6 -emit-spirv-directly -fvk-use-entrypoint-name -entry vertexMain -entry fragmentMain -o ../Cache/Shaders/pbrtextured.spv
 "%SLANGC%" skybox.slang -target spirv -profile spirv_1_6 -emit-spirv-directly -fvk-use-entrypoint-name -entry vertexMain -entry fragmentMain -o ../Cache/Shaders/skybox.spv
 "%SLANGC%" genbrdflut.slang -target spirv -profile spirv_1_6 -emit-spirv-directly -fvk-use-entrypoint-name -entry vertexMain -entry fragmentMain -o ../Cache/Shaders/genbrdflut.spv
@@ -31,9 +29,9 @@ if not exist "%SLANGC%" (
 "%SLANGC%" bloom_downsample.slang -target spirv -profile spirv_1_6 -emit-spirv-directly -fvk-use-entrypoint-name -entry computeMain -o ../Cache/Shaders/bloom_downsample.spv
 "%SLANGC%" bloom_upsample.slang -target spirv -profile spirv_1_6 -emit-spirv-directly -fvk-use-entrypoint-name -entry computeMain -o ../Cache/Shaders/bloom_upsample.spv
 "%SLANGC%" spatial_cross_bilateral_blur.slang -target spirv -profile spirv_1_6 -emit-spirv-directly -fvk-use-entrypoint-name -entry computeMain -o ../Cache/Shaders/spatial_cross_bilateral_blur.spv
-"%SLANGC%" smaa_edge.slang -target spirv -profile spirv_1_6 -emit-spirv-directly -fvk-use-entrypoint-name -entry computeMain -o ../Cache/Shaders/smaa_edge.spv
-"%SLANGC%" smaa_weights.slang -target spirv -profile spirv_1_6 -emit-spirv-directly -fvk-use-entrypoint-name -entry computeMain -o ../Cache/Shaders/smaa_weights.spv
-"%SLANGC%" smaa_blend.slang -target spirv -profile spirv_1_6 -emit-spirv-directly -fvk-use-entrypoint-name -entry computeMain -o ../Cache/Shaders/smaa_blend.spv
+"%SLANGC%" smaa_edge.slang -target spirv -profile spirv_1_6 -emit-spirv-directly -fvk-use-entrypoint-name -entry vertexMain -entry fragmentMain -o ../Cache/Shaders/smaa_edge.spv
+"%SLANGC%" smaa_weights.slang -target spirv -profile spirv_1_6 -emit-spirv-directly -fvk-use-entrypoint-name -entry vertexMain -entry fragmentMain -o ../Cache/Shaders/smaa_weights.spv
+"%SLANGC%" smaa_neighbourhood_blend.slang -target spirv -profile spirv_1_6 -emit-spirv-directly -fvk-use-entrypoint-name -entry vertexMain -entry fragmentMain -o ../Cache/Shaders/smaa_neighbourhood_blend.spv
 "%SLANGC%" particle_emit.slang -target spirv -profile spirv_1_6 -emit-spirv-directly -fvk-use-entrypoint-name -entry computeMain -o ../Cache/Shaders/particle_emit.spv
 "%SLANGC%" particle_prepare_simulation.slang -target spirv -profile spirv_1_6 -emit-spirv-directly -fvk-use-entrypoint-name -entry computePrepareSimulate -o ../Cache/Shaders/particle_prepare_simulation.spv
 "%SLANGC%" particle_simulate.slang -target spirv -profile spirv_1_6 -emit-spirv-directly -fvk-use-entrypoint-name -entry computeMain -o ../Cache/Shaders/particle_simulate.spv

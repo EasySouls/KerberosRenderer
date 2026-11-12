@@ -259,13 +259,14 @@ float CalculateVisibility(float3 lightDir, float3 worldPos, float3 N, float shad
 
 LightResult CalculateSunlight(float3 worldPos, float3 N, float3 V, float3 F0, float3 albedo, float metallic, float roughness)
 {
-    float3 lightDir = normalize(globalLighting.sunLight.xyz);
+    float3 lightDir = normalize(globalLighting.sunDirection.xyz);
 
     float visibility = CalculateVisibility(lightDir, worldPos, N, 1e4);
 
     LightResult sunResult = GetDirectLight(lightDir, V, N, F0, albedo, metallic, roughness);
-    sunResult.diffuse = sunResult.diffuse * visibility;
-    sunResult.specular = sunResult.specular * visibility;
+    float3 sunRadiance = globalLighting.sunColor.rgb * globalLighting.sunColor.w * globalLighting.sunDirection.w;
+    sunResult.diffuse = sunResult.diffuse * sunRadiance * visibility;
+    sunResult.specular = sunResult.specular * sunRadiance * visibility;
     return sunResult;
 }
 
@@ -320,7 +321,7 @@ PSOutput fragmentMain(VSOutput input)
     totalDiffuse += sunResult.diffuse;
     totalSpecular += sunResult.specular;
 
-    for (int i = 0; i < scene.lightCount; i++) {
+    for (uint i = 0; i < min(scene.lightCount, MaxLights); i++) {
         GPULight light = sceneLights[i];
 
         LightResult lightResult = CalculateLight(light, input.FragPos_WorldSpace, N, V, F0, albedo, metallic, roughness);
@@ -337,8 +338,9 @@ PSOutput fragmentMain(VSOutput input)
 
     // IBL
     float2 brdf = samplerBRDFLUT.Sample(float2(max(dot(N, V), 0.0), roughness)).rg;
-    float3 reflection = prefilteredReflection(R, roughness).rgb;
-    float3 irradiance = samplerIrradiance.Sample(N).rgb;
+    float environmentIntensity = globalLighting.lightingParams.y;
+    float3 reflection = prefilteredReflection(R, roughness).rgb * environmentIntensity;
+    float3 irradiance = samplerIrradiance.Sample(N).rgb * environmentIntensity;
 
     // Diffuse indirect
     float3 F = F_SchlickR(max(dot(N, V), 0.0), F0, roughness);

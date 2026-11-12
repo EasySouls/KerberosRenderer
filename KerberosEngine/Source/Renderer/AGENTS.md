@@ -165,6 +165,40 @@ every frame.
 semaphores, and queue submissions. Do not extend or mix it with `Graph`
 without first proving it is still used.
 
+## Lighting, exposure, and environment
+
+`GlobalLighting` is three `float4`s, mirrored by the Slang `GlobalLighting`
+struct: `sunDirection` (xyz direction, w = sun enabled), `sunColor` (rgb linear
+color, w = sun illuminance in lux), and `lightingParams` (x = linear exposure
+scale, y = environment intensity, z = output gamma). Keep the C++ static
+asserts and the Slang layout in sync.
+
+Lighting uses physical units. `DirectionalLight::Intensity` is lux and
+`PointLight`/`SpotLight::Intensity` is candela, attenuated by inverse square
+distance and the range window. Authoring colors are sRGB and are converted to
+linear when uploaded (`Renderer::GetLightsFromScene` and the sun path in
+`RecordQueuedSceneRender`). Scene serialization writes `IntensityUnit`; older
+directional lights without that key are migrated from a relative multiplier to
+lux on load. The renderer does not synthesize a sun when the scene has no
+enabled `DirectionalLightComponent`; `Scene::GetSunlight` returns a disabled
+zero-intensity light instead.
+
+Exposure is EV100 plus exposure compensation:
+`exposureScale = 1 / (1.2 * 2^(EV100 + compensation))`. The bloom extract pass
+applies `exposureScale`, `tonemapping_resolve` applies it to the scene, and the
+tonemap operators receive exposure 1 so exposure is applied exactly once. FSR3
+receives the same value as `UpscalerDispatchInfo::preExposure`.
+
+`EnvironmentComponent` selects the scene cubemap in the editor. `Renderer::
+UpdateEnvironment` resolves the first valid `SkyboxTexture` handle, applies the
+component's calibration `Intensity`, and regenerates the irradiance and
+prefiltered cubemaps (`IsSkyboxDirty`) after waiting for the device to idle.
+The bundled Pisa cube is only the fallback when no environment is authored; its
+relative HDR values are calibrated with `DefaultEnvironmentIntensity`. The sky
+shader and PBR ambient terms multiply by the same environment intensity.
+Packed runtime cubemap artifacts are not implemented yet; the editor loads
+`.kbrcubemap` sources directly through `RuntimeAssetLoader`.
+
 ## Resource lifetime and descriptors
 
 Renderer resources must remain alive until all submitted frames that use them

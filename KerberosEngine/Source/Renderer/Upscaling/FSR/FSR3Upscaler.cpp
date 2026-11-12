@@ -332,7 +332,7 @@ namespace Kerberos {
         dispatchDesc.cameraFar = dispatchInfo.cameraFar;
         dispatchDesc.cameraFovAngleVertical = dispatchInfo.cameraFovAngleVertical;
         dispatchDesc.viewSpaceToMetersFactor = dispatchInfo.viewSpaceToMetersFactor;
-        dispatchDesc.preExposure = 1.0f;
+        dispatchDesc.preExposure = dispatchInfo.preExposure;
 
         dispatchDesc.enableSharpening = true;
         dispatchDesc.sharpness = 0.8f;

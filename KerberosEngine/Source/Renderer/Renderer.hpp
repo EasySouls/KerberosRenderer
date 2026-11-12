@@ -178,7 +178,13 @@ public:
     static bool& GetUseBlurForGTAO();
     static GTAOConstants& GetGTAOConstants();
     static float& GetGamma();
-    static float& GetExposure();
+
+    /// Linear exposure scale computed from EV100 and exposure compensation.
+    static float GetExposure();
+    /// Camera exposure in EV100. 15 is approximately sunny 16, 8 is typical
+    /// indoor lighting and 6 is a dim/night scene.
+    static float& GetExposureEV100();
+    static float& GetExposureCompensation();
     static uint32_t GetShadowMapCascadeCount();
     static uint32_t GetShadowMapResolution();
     static AntiAliasingMode& GetAntiAliasingMode();
@@ -218,6 +224,8 @@ public:
 
 private:
     static void UpdateLights(uint32_t currentImage, const std::vector<GPULight>& sceneLights);
+    static void UpdateEnvironment(const Scene& scene);
+    static void UpdateEnvironmentDescriptors();
 
     static void UpdateSceneUniformBuffers(uint32_t currentImage,
                                           const Camera* mainCamera,

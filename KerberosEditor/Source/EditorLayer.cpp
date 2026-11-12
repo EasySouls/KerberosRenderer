@@ -1475,8 +1475,11 @@ namespace PROJECT_NAME
 		ImGui::Text("Light 2: (%.2f, %.2f, %.2f)", m_UniformDataParams.lights[2].x, m_UniformDataParams.lights[2].y, m_UniformDataParams.lights[2].z);
 		ImGui::DragFloat3("Light 4 Direction", glm::value_ptr(m_UniformDataParams.lights[3]), 0.1f);*/
 		ImGui::Text("Lighting settings");
-		float &exposure = Renderer::GetExposure();
-		ImGui::DragFloat("Exposure", &exposure, 0.1f, 0.1f, 10.0f);
+		ImGui::DragFloat("Exposure (EV100)", &Renderer::GetExposureEV100(), 0.1f, -10.0f, 30.0f);
+		if (ImGui::IsItemHovered())
+			ImGui::SetTooltip("15 = sunny 16, 8 = typical indoor, 6 = dim/night scene");
+		ImGui::DragFloat("Exposure Compensation", &Renderer::GetExposureCompensation(), 0.1f, -10.0f, 10.0f);
+		ImGui::Text("Exposure scale: %.6g", Renderer::GetExposure());
 		float &gamma = Renderer::GetGamma();
 		ImGui::DragFloat("Gamma", &gamma, 0.1f, 0.1f, 10.0f);
 		// ImGui::DragFloat3("Ambient Light Color", glm::value_ptr(m_SceneUniformData.ambientLightColor), 0.01f, 0.0f, 1.0f);

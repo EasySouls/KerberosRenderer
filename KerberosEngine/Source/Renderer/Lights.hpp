@@ -4,10 +4,18 @@
 
 namespace Kerberos
 {
+    /// Default physical intensity of a directional light, in lux.
+    inline constexpr float DefaultSunIntensityLux = 100000.0f;
+
+    /// Relative HDR environments (such as the bundled Pisa cube) are not
+    /// calibrated in physical luminance. This factor maps their linear radiance
+    /// into a plausible cd/m^2 range. Calibrated HDR environments should use 1.0.
+    inline constexpr float DefaultEnvironmentIntensity = 50000.0f;
+
     struct DirectionalLight
     {
         alignas(16) glm::vec3 Direction = glm::vec3(0.0f, -1.0f, 0.0f);
-        alignas(4) float Intensity = 1.0f;
+        alignas(4) float Intensity = DefaultSunIntensityLux; // In lux
         alignas(16) glm::vec3 Color = glm::vec3(1.0f);
         alignas(4) bool IsEnabled = true;
         uint8_t _pad[3];

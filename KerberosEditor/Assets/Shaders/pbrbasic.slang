@@ -194,7 +194,7 @@ float4 fragmentMain(VSOutput input)
     // float3 lightDir = normalize(uboParams.lights[0].xyz - input.FragPos_WorldSpace);
 
     // Currently we are using light 0 only for generating the shadow map
-    float3 lightDir = normalize(globalLighting.sunLight.xyz);
+    float3 lightDir = normalize(globalLighting.sunDirection.xyz);
     float shadow = ShadowCalculation(lightDir, N, input.FragPos_LightSpace);
 
     float3 F0 = float3(0.04, 0.04, 0.04);
@@ -205,7 +205,7 @@ float4 fragmentMain(VSOutput input)
 	for (int i = 0; i < 4; i++) {
         // For point lights in the future
         // float3 L = normalize(normalize(uboParams.lights[i].xyz) - input.FragPos_WorldSpace);
-        float3 L = normalize(globalLighting.sunLight.xyz);
+        float3 L = normalize(globalLighting.sunDirection.xyz);
 
         float3 contribution = SpecularContribution(L, V, N, F0, perObject.material);
         if (i == 0) // Only apply shadow to the first light for now
@@ -237,10 +237,10 @@ float4 fragmentMain(VSOutput input)
     float3 color = ambient + Lo;
 
     // Tone mapping
-    color = Uncharted2Tonemap(color * globalLighting.exposure);
+    color = Uncharted2Tonemap(color * globalLighting.lightingParams.x);
     color = color * (1.0f / Uncharted2Tonemap((11.2f).xxx));
     // Gamma correction
-    color = pow(color, (1.0f / globalLighting.gamma).xxx);
+    color = pow(color, (1.0f / globalLighting.lightingParams.z).xxx);
 
     return float4(color, 1.0);
 }

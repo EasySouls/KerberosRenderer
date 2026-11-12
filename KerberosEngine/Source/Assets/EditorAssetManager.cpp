@@ -362,17 +362,38 @@ namespace Kerberos
 		else
 		{
 			const AssetMetadata& metadata = GetMetadata(handle);
-			if (metadata.LibraryPath.empty())
-			{
-				Log::CoreError("Asset {0} has no imported library artifact", handle);
-				return nullptr;
-			}
 
 			const std::filesystem::path& cacheRoot =
 				metadata.SourceRoot == AssetSourceRoot::Engine ? m_EngineCacheRoot : m_CacheRoot;
-			const auto artifactPath = metadata.LibraryPath.is_absolute()
-				? metadata.LibraryPath
-				: cacheRoot / metadata.LibraryPath;
+
+			std::filesystem::path artifactPath;
+			if (metadata.LibraryPath.empty())
+			{
+				// Cubemaps are still authored as .kbrcubemap descriptors with no
+				// cache payload. The editor can load them directly from source so
+				// EnvironmentComponent works.
+				// TODO: Packaged runtime projects should convert them through the pipeline in the future.
+				if (metadata.Type == AssetType::TextureCube)
+				{
+					std::filesystem::path sourceRoot =
+						metadata.SourceRoot == AssetSourceRoot::Engine ? EnginePaths::Assets() : m_AssetsRoot;
+					if (sourceRoot.empty())
+						sourceRoot = Project::GetProjectDirectory() / Project::GetAssetDirectory();
+					artifactPath = sourceRoot / metadata.Filepath;
+				}
+				else
+				{
+					Log::CoreError("Asset {0} has no imported library artifact", handle);
+					return nullptr;
+				}
+			}
+			else
+			{
+				artifactPath = metadata.LibraryPath.is_absolute()
+					? metadata.LibraryPath
+					: cacheRoot / metadata.LibraryPath;
+			}
+
 			asset = RuntimeAssetLoader::Load(handle, metadata, artifactPath, &m_AssetRegistry, cacheRoot);
 			if (!asset)
 			{

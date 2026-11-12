@@ -47,9 +47,12 @@ public struct PerObject
 
 public struct GlobalLighting
 {
-    public float4 sunLight;
-    public float exposure;
-    public float gamma;
+    // xyz = normalized sun direction, w = 1 when a sun is active.
+    public float4 sunDirection;
+    // rgb = linear sun color, w = sun illuminance in lux.
+    public float4 sunColor;
+    // x = exposure scale, y = environment intensity, z = output gamma.
+    public float4 lightingParams;
 };
 
 public struct DrawIndirectCommand 

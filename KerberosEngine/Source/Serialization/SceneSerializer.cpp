@@ -211,6 +211,7 @@ static void SerializeEntity(YAML::Emitter& out, const Entity entity)
         out << YAML::Key << "Color" << YAML::Value << directionalLight.Light.Color;
         out << YAML::Key << "Direction" << YAML::Value << directionalLight.Light.Direction;
         out << YAML::Key << "Intensity" << YAML::Value << directionalLight.Light.Intensity;
+        out << YAML::Key << "IntensityUnit" << YAML::Value << "Lux";
         out << YAML::EndMap;
     }
 
@@ -221,6 +222,7 @@ static void SerializeEntity(YAML::Emitter& out, const Entity entity)
         out << YAML::Key << "Color" << YAML::Value << pointLight.Light.Color;
         out << YAML::Key << "Intensity" << YAML::Value << pointLight.Light.Intensity;
         out << YAML::Key << "Radius" << YAML::Value << pointLight.Light.Radius;
+        out << YAML::Key << "IntensityUnit" << YAML::Value << "Candela";
         out << YAML::EndMap;
     }
 
@@ -234,6 +236,7 @@ static void SerializeEntity(YAML::Emitter& out, const Entity entity)
         out << YAML::Key << "Radius" << YAML::Value << spotLight.Light.Radius;
         out << YAML::Key << "CutOffAngleRadians" << YAML::Value << spotLight.Light.CutOffAngleRadians;
         out << YAML::Key << "OuterCutOffAngleRadians" << YAML::Value << spotLight.Light.OuterCutOffAngleRadians;
+        out << YAML::Key << "IntensityUnit" << YAML::Value << "Candela";
         out << YAML::EndMap;
     }
 
@@ -324,6 +327,7 @@ static void SerializeEntity(YAML::Emitter& out, const Entity entity)
         const auto& environmentComponent = entity.GetComponent<EnvironmentComponent>();
         out << YAML::Key << "SkyboxTexture" << YAML::Value << environmentComponent.SkyboxTexture;
         out << YAML::Key << "IsSkyboxEnabled" << YAML::Value << environmentComponent.IsSkyboxEnabled;
+        out << YAML::Key << "Intensity" << YAML::Value << environmentComponent.Intensity;
         out << YAML::EndMap;
     }
 
@@ -694,7 +698,13 @@ Entity SceneSerializer::DeserializeEntity(const Ref<Scene>& scene, const YAML::N
         auto& directionalLight = deserializedEntity.AddComponent<DirectionalLightComponent>();
         directionalLight.Light.Color = directionalLightComponent["Color"].as<glm::vec3>();
         directionalLight.Light.Direction = directionalLightComponent["Direction"].as<glm::vec3>();
-        directionalLight.Light.Intensity = directionalLightComponent["Intensity"].as<float>();
+
+        const float storedIntensity = directionalLightComponent["Intensity"].as<float>();
+        // Older scenes stored directional intensity as a relative multiplier
+        // where 1.0 was the default sun. Migrate that to lux on load.
+        directionalLight.Light.Intensity = directionalLightComponent["IntensityUnit"].IsDefined()
+            ? storedIntensity
+            : storedIntensity * DefaultSunIntensityLux;
     }
 
     if (auto pointLightComponent = node["PointLightComponent"]) {
@@ -788,6 +798,7 @@ Entity SceneSerializer::DeserializeEntity(const Ref<Scene>& scene, const YAML::N
         auto& environment = deserializedEntity.AddComponent<EnvironmentComponent>();
         environment.SkyboxTexture = AssetHandle(environmentComponent["SkyboxTexture"].as<uint64_t>());
         environment.IsSkyboxEnabled = environmentComponent["IsSkyboxEnabled"].as<bool>();
+        environment.Intensity = environmentComponent["Intensity"].as<float>(DefaultEnvironmentIntensity);
     }
 
     if (auto textComponent = node["TextComponent"]) {

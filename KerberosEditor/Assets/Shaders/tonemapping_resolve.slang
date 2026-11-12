@@ -46,14 +46,17 @@ float4 fragmentMain(VSOutput input) : SV_Target
 {
     float2 uv = input.uv;
 
-    float3 sceneColor = sceneColorTex.Sample(linearSampler, uv).rgb;
+    // Bloom is already stored in exposed units by the bloom extract pass.
+    // Apply exposure to the scene here so both contributions use the same
+    // photometric scale, then tone map without applying exposure a second time.
+    float3 sceneColor = sceneColorTex.Sample(linearSampler, uv).rgb * globalLighting.lightingParams.x;
     float3 bloomColor = bloomSampler.Sample(uv).rgb;
 
     float3 finalHDR = sceneColor + (bloomColor * pc.bloomIntensity);
 
-    float3 ldrColor = ApplyToneMapping(finalHDR, globalLighting.exposure, pc.tonemapOperator);
+    float3 ldrColor = ApplyToneMapping(finalHDR, 1.0f, pc.tonemapOperator);
     
-    ldrColor = ApplyGammaCorrection(ldrColor, globalLighting.gamma);
+    ldrColor = ApplyGammaCorrection(ldrColor, globalLighting.lightingParams.z);
 
     // Calculate luma if needed for FXAA/spatial AA
     float alpha = 1.0;

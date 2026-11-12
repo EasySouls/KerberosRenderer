@@ -1,6 +1,7 @@
 #include "Renderer.hpp"
 #include "Graph.hpp"
 
+#include "Assets/AssetManager.hpp"
 #include "Buffer.hpp"
 #include "AIPerceptionDebugHelpers.hpp"
 #include "ColliderDebugHelpers.hpp"
@@ -18,6 +19,7 @@
 #include "RayTracingSceneCache.hpp"
 #include "SMAA/SMAAAreaTex.hpp"
 #include "SMAA/SMAASearchTex.hpp"
+#include "Scene/Components.hpp"
 #include "Scene/Components/PhysicsComponents.hpp"
 #include "Shaders/Shader.hpp"
 #include "SkyboxUtils.hpp"
@@ -39,7 +41,9 @@
 #include <cmath>
 #include <cstddef>
 #include <limits>
+#include <stdexcept>
 #include <unordered_map>
+#include <utility>
 
 
 import Kerberos;
@@ -68,6 +72,58 @@ glm::mat4 GetWorldTransformWithoutScale(const TransformComponent& transform)
     return rotationMatrix;
 }
 
+/// Authored light colors come from ImGui color pickers and are sRGB-encoded.
+glm::vec3 LightColorToLinear(const glm::vec3& srgb)
+{
+    const glm::vec3 clamped = glm::clamp(srgb, glm::vec3(0.0f), glm::vec3(1.0f));
+    return glm::vec3(
+        clamped.r <= 0.04045f ? clamped.r / 12.92f : std::pow((clamped.r + 0.055f) / 1.055f, 2.4f),
+        clamped.g <= 0.04045f ? clamped.g / 12.92f : std::pow((clamped.g + 0.055f) / 1.055f, 2.4f),
+        clamped.b <= 0.04045f ? clamped.b / 12.92f : std::pow((clamped.b + 0.055f) / 1.055f, 2.4f));
+}
+
+float SanitizeNonNegative(const float value, const char* label)
+{
+    if (!std::isfinite(value) || value < 0.0f)
+    {
+        Log::CoreWarn("Invalid negative or non-finite light value for {} ({}); clamping to 0", label, value);
+        return 0.0f;
+    }
+    return value;
+}
+
+glm::vec3 SanitizeLightColor(const glm::vec3& color, const char* label)
+{
+    if (!std::isfinite(color.r) || !std::isfinite(color.g) || !std::isfinite(color.b))
+    {
+        Log::CoreWarn("Non-finite light color for {}; using white", label);
+        return glm::vec3(1.0f);
+    }
+    return LightColorToLinear(glm::max(color, glm::vec3(0.0f)));
+}
+
+glm::vec3 NormalizeOr(const glm::vec3& direction, const glm::vec3& fallback)
+{
+    if (!std::isfinite(direction.x) || !std::isfinite(direction.y) || !std::isfinite(direction.z))
+        return fallback;
+
+    const float lengthSquared = glm::dot(direction, direction);
+    return lengthSquared > 1e-8f ? direction / std::sqrt(lengthSquared) : fallback;
+}
+
+glm::vec3 GetWorldLightDirection(const glm::mat4& worldTransform, const glm::vec3& localDirection,
+                                 const glm::vec3& fallback = glm::vec3(0.0f, -1.0f, 0.0f))
+{
+    glm::mat3 basis(worldTransform);
+    for (int column = 0; column < 3; ++column)
+    {
+        const float length = glm::length(basis[column]);
+        if (length > 1e-6f)
+            basis[column] /= length;
+    }
+    return NormalizeOr(basis * localDirection, fallback);
+}
+
 struct ShadowMap
 {
     constexpr static int CascadeCount = 4;
@@ -93,8 +149,13 @@ struct Skybox
 {
     Ref<Mesh> SkyboxMesh = nullptr;
     Ref<TextureCube> SkyboxTexture = nullptr;
+    /// Engine fallback used when the scene has no EnvironmentComponent.
+    Ref<TextureCube> DefaultSkyboxTexture = nullptr;
+    AssetHandle CurrentEnvironmentHandle = AssetHandle::Invalid();
     bool IsSkyboxDirty = true; // Flag to indicate if the skybox needs to be re-rendered
     bool ShowSkybox = true;
+    /// Calibration multiplier for relative HDR environments.
+    float Intensity = DefaultEnvironmentIntensity;
     // Generated at runtime
     Ref<Texture2D> LutBrdfTexture = nullptr;
     Ref<TextureCube> IrradianceCubeTexture = nullptr;
@@ -179,10 +240,23 @@ static_assert(sizeof(SceneUniformData) == 656);
 
 struct GlobalLighting
 {
-    alignas(16) glm::vec4 sunLight{ 0.0f, 0.0f, 0.0f, 0.0f };
-    float exposure = 1.0f;
-    float gamma = 2.2f;
+    /// xyz = normalized world-space sun direction, w = 1 when a sun is active.
+    alignas(16) glm::vec4 sunDirection{ 0.0f, -1.0f, 0.0f, 0.0f };
+    /// rgb = linear sun color, w = sun illuminance in lux.
+    alignas(16) glm::vec4 sunColor{ 1.0f, 1.0f, 1.0f, 0.0f };
+    /// x = linear exposure scale, y = environment intensity, z = output gamma.
+    alignas(16) glm::vec4 lightingParams{ 1.0f, DefaultEnvironmentIntensity, 2.2f, 0.0f };
 };
+
+static_assert(sizeof(GlobalLighting) == 48, "GlobalLighting must match the Slang layout");
+static_assert(offsetof(GlobalLighting, sunDirection) == 0);
+static_assert(offsetof(GlobalLighting, sunColor) == 16);
+static_assert(offsetof(GlobalLighting, lightingParams) == 32);
+static_assert(sizeof(GPULight) == 64, "GPULight must match the Slang structured-buffer layout");
+static_assert(offsetof(GPULight, Color) == 0);
+static_assert(offsetof(GPULight, Position) == 16);
+static_assert(offsetof(GPULight, Direction) == 32);
+static_assert(offsetof(GPULight, InnerConeCos) == 48);
 
 struct PerObjectData
 {
@@ -306,6 +380,9 @@ struct BloomData
         uint32_t enablePrefilter = 0;
         uint32_t isExtract = 0;
         float maxBrightness = 0.0f;
+        /// Exposure scale for the extract pass. The bloom chain is stored in
+        /// exposed units so its threshold behaves consistently across EV100.
+        float exposureScale = 1.0f;
     };
 
     struct UpsamplePushConstants
@@ -471,6 +548,10 @@ struct RendererData
     GTAOConstants GTAOData{};
     SMAAData SMAAResources{};
 
+    /// Physical camera exposure. 15 EV100 is approximately sunny 16.
+    float ExposureEV100 = 15.0f;
+    float ExposureCompensation = 0.0f;
+
     std::array<UniformBufferObject, VulkanContext::MaxFramesInFlight> UniformBuffers{};
     std::array<StorageBuffers, VulkanContext::MaxFramesInFlight> StorageBuffers{};
 
@@ -581,8 +662,12 @@ void Renderer::Init()
 
     CreateDefaultMaterials();
 
-    // Setup initial directional light which we will use to generate the shadow map
-    s_Data->GlobalLightingData.sunLight = glm::vec4(0.0f, 1.0f, 0.0f, 0.0f);
+    // Setup initial directional light state; the per-frame path fills this from
+    // the scene's first enabled DirectionalLightComponent.
+    s_Data->GlobalLightingData.sunDirection = glm::vec4(0.0f, -1.0f, 0.0f, 0.0f);
+    s_Data->GlobalLightingData.sunColor = glm::vec4(1.0f, 1.0f, 1.0f, 0.0f);
+    s_Data->GlobalLightingData.lightingParams = glm::vec4(
+        1.0f, DefaultEnvironmentIntensity, 2.2f, 0.0f);
 
     s_Data->TextureManager.Initialize();
 
@@ -706,6 +791,12 @@ void Renderer::RenderScene(
     KBRAssert(!s_Data->PendingRender.IsValid, "Scene has already been queued for rendering!");
 
     ApplyDeferredActions();
+
+    if (scene)
+    {
+        UpdateEnvironment(*scene);
+        CreateSkyboxResources();
+    }
 
     glm::mat4 invView = glm::inverse(view);
 
@@ -1517,16 +1608,35 @@ void Renderer::RecordQueuedSceneRender(const vk::raii::CommandBuffer& cmd)
     const uint32_t currentImage = frameIndex;
 
     const DirectionalLight sunlight = s_Data->PendingRender.Scene->GetSunlight();
-    s_Data->GlobalLightingData.sunLight = glm::vec4(sunlight.Direction, sunlight.Intensity);
+    const glm::vec3 sunDirection = NormalizeOr(sunlight.Direction, glm::vec3(0.0f, -1.0f, 0.0f));
+    const float sunLux = sunlight.IsEnabled
+        ? SanitizeNonNegative(sunlight.Intensity, "sun")
+        : 0.0f;
+
+    s_Data->GlobalLightingData.sunDirection = glm::vec4(
+        sunDirection, (sunlight.IsEnabled && sunLux > 0.0f) ? 1.0f : 0.0f);
+    s_Data->GlobalLightingData.sunColor = glm::vec4(
+        SanitizeLightColor(sunlight.Color, "sun"), sunLux);
 
     const auto getCascadeSplits = [](const float farPlane) -> glm::vec4 {
         return { farPlane / 25.0f, farPlane / 10.0f, farPlane / 2.0f, farPlane };
     };
 
     const auto [lightSpaceMatrices, cascadeSplits] =
-        s_Data->PendingRender.CalculateLightSpaceMatricesFunc(s_Data->GlobalLightingData.sunLight, getCascadeSplits);
+        s_Data->PendingRender.CalculateLightSpaceMatricesFunc(sunDirection, getCascadeSplits);
 
-    const std::vector<GPULight> gpuLights = GetLightsFromScene(*s_Data->PendingRender.Scene.get());
+    std::vector<GPULight> gpuLights = GetLightsFromScene(*s_Data->PendingRender.Scene.get());
+    if (gpuLights.size() > MaxLights)
+    {
+        static bool warnedAboutLightCount = false;
+        if (!warnedAboutLightCount)
+        {
+            Log::CoreWarn("Scene has {} point/spot lights, but the GPU light buffer supports {}; extra lights are dropped.",
+                          gpuLights.size(), MaxLights);
+            warnedAboutLightCount = true;
+        }
+        gpuLights.resize(MaxLights);
+    }
     const uint32_t lightCount = static_cast<uint32_t>(gpuLights.size());
 
     UpdateLights(currentImage, gpuLights);
@@ -1790,13 +1900,15 @@ void Renderer::CreateDefaultMaterials()
 
 void Renderer::CreateResources()
 {
-    // TODO: Set default skybox texture if none is set by the user
-    /*s_Data->Skybox.SkyboxTexture = TextureCube::FromFile(
-        "assets/textures/hdr/pisa_cube.ktx",
-        vk::Format::eR16G16B16A16Sfloat,
-        vk::ImageUsageFlagBits::eSampled
-    );*/
-    s_Data->Skybox.SkyboxTexture = TextureCube::FromFile(EnginePaths::Assets() / "Textures/hdr/pisa_cube.ktx2");
+    // The bundled Pisa cube is a relative HDR asset and acts as the engine
+    // fallback when a scene has no EnvironmentComponent.
+    s_Data->Skybox.DefaultSkyboxTexture =
+        TextureCube::FromFile(EnginePaths::Assets() / "Textures/hdr/pisa_cube.ktx2");
+    s_Data->Skybox.SkyboxTexture = s_Data->Skybox.DefaultSkyboxTexture;
+    s_Data->Skybox.Intensity = DefaultEnvironmentIntensity;
+    s_Data->Skybox.ShowSkybox = true;
+    s_Data->Skybox.CurrentEnvironmentHandle = AssetHandle::Invalid();
+    s_Data->Skybox.IsSkyboxDirty = true;
 
     CreateSkyboxResources();
 
@@ -3867,14 +3979,28 @@ float& Renderer::GetGamma()
 {
     KBRAssert(s_Data != nullptr, "Renderer not initialized!");
 
-    return s_Data->GlobalLightingData.gamma;
+    return s_Data->GlobalLightingData.lightingParams.z;
 }
 
-float& Renderer::GetExposure()
+float Renderer::GetExposure()
 {
     KBRAssert(s_Data != nullptr, "Renderer not initialized!");
 
-    return s_Data->GlobalLightingData.exposure;
+    return s_Data->GlobalLightingData.lightingParams.x;
+}
+
+float& Renderer::GetExposureEV100()
+{
+    KBRAssert(s_Data != nullptr, "Renderer not initialized!");
+
+    return s_Data->ExposureEV100;
+}
+
+float& Renderer::GetExposureCompensation()
+{
+    KBRAssert(s_Data != nullptr, "Renderer not initialized!");
+
+    return s_Data->ExposureCompensation;
 }
 
 uint32_t Renderer::GetShadowMapCascadeCount()
@@ -4264,13 +4390,28 @@ void Renderer::UpdateLights(const uint32_t currentImage, const std::vector<GPULi
 {
     KBR_TRACY_FUNCTION();
 
+    const float ev100 = std::clamp(s_Data->ExposureEV100, -10.0f, 30.0f);
+    const float compensation = std::clamp(s_Data->ExposureCompensation, -10.0f, 10.0f);
+    const float exposureScale = 1.0f / (1.2f * std::exp2(ev100 + compensation));
+
+    s_Data->GlobalLightingData.lightingParams.x = exposureScale;
+    s_Data->GlobalLightingData.lightingParams.y = std::isfinite(s_Data->Skybox.Intensity)
+        ? std::max(s_Data->Skybox.Intensity, 0.0f)
+        : DefaultEnvironmentIntensity;
+    if (!std::isfinite(s_Data->GlobalLightingData.lightingParams.z) ||
+        s_Data->GlobalLightingData.lightingParams.z <= 0.0f)
+    {
+        s_Data->GlobalLightingData.lightingParams.z = 2.2f;
+    }
+
     std::memcpy(s_Data->UniformBuffers[currentImage].globalLighting->GetMappedData(),
                 &s_Data->GlobalLightingData,
                 sizeof(GlobalLighting));
 
+    const size_t lightCount = std::min<size_t>(sceneLights.size(), MaxLights);
     std::memcpy(s_Data->StorageBuffers[currentImage].Lights->GetMappedData(),
                 sceneLights.data(),
-                sceneLights.size() * sizeof(GPULight));
+                lightCount * sizeof(GPULight));
 }
 
 void Renderer::UpdateSceneUniformBuffers(const uint32_t currentImage,
@@ -4395,13 +4536,18 @@ std::vector<GPULight> Renderer::GetLightsFromScene(const Scene& scene)
 
         const auto& tsc = pointLightView.get<TransformComponent>(entity);
         const glm::vec3 position = tsc.WorldTransform[3];
+        if (!std::isfinite(position.x) || !std::isfinite(position.y) || !std::isfinite(position.z))
+        {
+            Log::CoreWarn("Point light has a non-finite world position; skipping");
+            continue;
+        }
 
         GPULight gpuLight{};
         gpuLight.Type = static_cast<uint32_t>(LightType::Point);
         gpuLight.Position = position;
-        gpuLight.Color = pl.Light.Color;
-        gpuLight.Intensity = pl.Light.Intensity;
-        gpuLight.Range = pl.Light.Radius;
+        gpuLight.Color = SanitizeLightColor(pl.Light.Color, "point light");
+        gpuLight.Intensity = SanitizeNonNegative(pl.Light.Intensity, "point light intensity");
+        gpuLight.Range = std::max(SanitizeNonNegative(pl.Light.Radius, "point light radius"), 0.01f);
         sceneLights.push_back(gpuLight);
     }
 
@@ -4413,16 +4559,26 @@ std::vector<GPULight> Renderer::GetLightsFromScene(const Scene& scene)
 
         const auto& tsc = spotLightView.get<TransformComponent>(entity);
         const glm::vec3 position = tsc.WorldTransform[3];
+        if (!std::isfinite(position.x) || !std::isfinite(position.y) || !std::isfinite(position.z))
+        {
+            Log::CoreWarn("Spot light has a non-finite world position; skipping");
+            continue;
+        }
+
+        float innerAngle = std::clamp(sl.Light.CutOffAngleRadians, 0.0f, glm::pi<float>());
+        float outerAngle = std::clamp(sl.Light.OuterCutOffAngleRadians, 0.0f, glm::pi<float>());
+        if (innerAngle > outerAngle)
+            std::swap(innerAngle, outerAngle);
 
         GPULight gpuLight{};
         gpuLight.Type = static_cast<uint32_t>(LightType::Spot);
         gpuLight.Position = position;
-        gpuLight.Direction = sl.Light.Direction;
-        gpuLight.Color = sl.Light.Color;
-        gpuLight.Intensity = sl.Light.Intensity;
-        gpuLight.Range = sl.Light.Radius;
-        gpuLight.InnerConeCos = glm::cos(sl.Light.CutOffAngleRadians);
-        gpuLight.OuterConeCos = glm::cos(sl.Light.OuterCutOffAngleRadians);
+        gpuLight.Direction = GetWorldLightDirection(tsc.WorldTransform, sl.Light.Direction);
+        gpuLight.Color = SanitizeLightColor(sl.Light.Color, "spot light");
+        gpuLight.Intensity = SanitizeNonNegative(sl.Light.Intensity, "spot light intensity");
+        gpuLight.Range = std::max(SanitizeNonNegative(sl.Light.Radius, "spot light radius"), 0.01f);
+        gpuLight.InnerConeCos = glm::cos(innerAngle);
+        gpuLight.OuterConeCos = glm::cos(outerAngle);
         sceneLights.push_back(gpuLight);
     }
 
@@ -6156,7 +6312,8 @@ void Renderer::ApplyUpscaling(const vk::raii::CommandBuffer &cmd, const uint32_t
         .cameraNear = s_Data->PendingRender.NearPlane,
         .cameraFar = s_Data->PendingRender.FarPlane,
         .cameraFovAngleVertical = cameraFovAngleVertical,
-        .viewSpaceToMetersFactor = 1.0f
+        .viewSpaceToMetersFactor = 1.0f,
+        .preExposure = s_Data->GlobalLightingData.lightingParams.x
     };
 
     s_Data->Upscaler->Dispatch(dispatchInfo);
@@ -6267,6 +6424,7 @@ void Renderer::ApplyBloom(const vk::raii::CommandBuffer& cmd, const uint32_t fra
         pushConstants.knee = std::clamp(s_Data->Bloom.Knee, 0.0f, pushConstants.threshold + 1.0f);
         pushConstants.isExtract = 1;
         pushConstants.maxBrightness = s_Data->Bloom.MaxBrightness;
+        pushConstants.exposureScale = s_Data->GlobalLightingData.lightingParams.x;
         cmd.pushConstants<BloomData::DownsamplePushConstants>(
             *s_Data->Bloom.DownsamplePipelineLayout, vk::ShaderStageFlagBits::eCompute, 0, { pushConstants });
 
@@ -6292,6 +6450,7 @@ void Renderer::ApplyBloom(const vk::raii::CommandBuffer& cmd, const uint32_t fra
         pushConstants.threshold = 0.0f;
         pushConstants.knee = 0.0f;
         pushConstants.isExtract = 0;
+        pushConstants.exposureScale = 1.0f;
         cmd.pushConstants<BloomData::DownsamplePushConstants>(
             *s_Data->Bloom.DownsamplePipelineLayout, vk::ShaderStageFlagBits::eCompute, 0, { pushConstants });
 
@@ -6367,7 +6526,8 @@ glm::mat4 Renderer::CalculateLightSpaceMatrix()
         ? glm::normalize(lightDirRaw)
         : glm::vec3(0.0f, 1.0f, 0.0f);*/
 
-    const glm::vec3 lightDir = glm::normalize(glm::vec3(s_Data->GlobalLightingData.sunLight));
+    const glm::vec3 lightDir = NormalizeOr(
+        glm::vec3(s_Data->GlobalLightingData.sunDirection), glm::vec3(0.0f, -1.0f, 0.0f));
 
     const glm::vec3 lightPos = sceneCenter + lightDir * lightDistance;
     s_Data->ShadowMap.LightPosForCalculation = lightPos;
@@ -6773,12 +6933,138 @@ void Renderer::SetupDescriptors()
     }
 }
 
+void Renderer::UpdateEnvironment(const Scene& scene)
+{
+    const EnvironmentComponent* environment = nullptr;
+    const auto environmentView = scene.GetRegistry().view<EnvironmentComponent>();
+    for (const auto entity : environmentView)
+    {
+        const EnvironmentComponent& candidate = environmentView.get<EnvironmentComponent>(entity);
+        if (!environment || (!environment->SkyboxTexture.IsValid() && candidate.SkyboxTexture.IsValid()))
+            environment = &candidate;
+    }
+
+    const AssetHandle desiredHandle =
+        environment && environment->SkyboxTexture.IsValid() ? environment->SkyboxTexture : AssetHandle::Invalid();
+    const float desiredIntensity =
+        environment && environment->SkyboxTexture.IsValid()
+            ? SanitizeNonNegative(environment->Intensity, "environment intensity")
+            : DefaultEnvironmentIntensity;
+    const bool showSkybox = environment ? environment->IsSkyboxEnabled : true;
+
+    bool textureChanged = false;
+    if (desiredHandle.IsValid())
+    {
+        if (desiredHandle != s_Data->Skybox.CurrentEnvironmentHandle)
+        {
+            try
+            {
+                if (!Project::GetActive())
+                    throw std::runtime_error("no active project for asset loading");
+
+                Ref<TextureCube> environmentTexture = AssetManager::AsAsset<TextureCube>(desiredHandle);
+                if (environmentTexture)
+                {
+                    s_Data->Skybox.SkyboxTexture = environmentTexture;
+                    textureChanged = true;
+                }
+                else
+                {
+                    Log::CoreWarn("Environment asset {} is not a valid TextureCube; using the default environment",
+                                  static_cast<uint64_t>(desiredHandle));
+                }
+            }
+            catch (const std::exception& exception)
+            {
+                Log::CoreWarn("Failed to load environment asset {}: {}; using the default environment",
+                              static_cast<uint64_t>(desiredHandle), exception.what());
+            }
+
+            // Do not retry a failing asset every frame. If it becomes valid, the
+            // scene can clear/reassign the component to force a retry.
+            s_Data->Skybox.CurrentEnvironmentHandle = desiredHandle;
+        }
+    }
+    else if (s_Data->Skybox.CurrentEnvironmentHandle.IsValid())
+    {
+        s_Data->Skybox.SkyboxTexture = s_Data->Skybox.DefaultSkyboxTexture;
+        s_Data->Skybox.CurrentEnvironmentHandle = AssetHandle::Invalid();
+        textureChanged = true;
+    }
+
+    if (!s_Data->Skybox.SkyboxTexture)
+        s_Data->Skybox.SkyboxTexture = s_Data->Skybox.DefaultSkyboxTexture;
+
+    if (textureChanged)
+        s_Data->Skybox.IsSkyboxDirty = true;
+
+    s_Data->Skybox.Intensity =
+        s_Data->Skybox.SkyboxTexture == s_Data->Skybox.DefaultSkyboxTexture
+            ? DefaultEnvironmentIntensity
+            : desiredIntensity;
+
+    // Let the renderer's debug "Display Skybox" toggle remain usable when the
+    // scene does not author an EnvironmentComponent.
+    if (environment)
+        s_Data->Skybox.ShowSkybox = showSkybox;
+}
+
+void Renderer::UpdateEnvironmentDescriptors()
+{
+    if (!s_Data->Skybox.SkyboxTexture ||
+        !s_Data->Skybox.IrradianceCubeTexture ||
+        !s_Data->Skybox.PrefilteredCubeTexture ||
+        static_cast<VkDescriptorSet>(*s_Data->DescriptorSets[0].scene) == VK_NULL_HANDLE ||
+        static_cast<VkDescriptorSet>(*s_Data->DescriptorSets[0].skybox) == VK_NULL_HANDLE)
+    {
+        return;
+    }
+
+    auto& device = VulkanContext::Get().GetDevice();
+
+    for (uint32_t i = 0; i < VulkanContext::MaxFramesInFlight; ++i)
+    {
+        const vk::DescriptorImageInfo skyboxImageInfo{
+            .sampler = *s_Data->Skybox.SkyboxTexture->GetSampler(),
+            .imageView = *s_Data->Skybox.SkyboxTexture->GetImageView(),
+            .imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal
+        };
+
+        const std::array descriptorWrites = {
+            vk::WriteDescriptorSet{
+                .dstSet = *s_Data->DescriptorSets[i].scene,
+                .dstBinding = 4,
+                .dstArrayElement = 0,
+                .descriptorCount = 1,
+                .descriptorType = vk::DescriptorType::eCombinedImageSampler,
+                .pImageInfo = &s_Data->Skybox.IrradianceCubeTexture->GetDescriptorInfo()
+            },
+            vk::WriteDescriptorSet{
+                .dstSet = *s_Data->DescriptorSets[i].scene,
+                .dstBinding = 6,
+                .dstArrayElement = 0,
+                .descriptorCount = 1,
+                .descriptorType = vk::DescriptorType::eCombinedImageSampler,
+                .pImageInfo = &s_Data->Skybox.PrefilteredCubeTexture->GetDescriptorInfo()
+            },
+            vk::WriteDescriptorSet{
+                .dstSet = *s_Data->DescriptorSets[i].skybox,
+                .dstBinding = 4,
+                .dstArrayElement = 0,
+                .descriptorCount = 1,
+                .descriptorType = vk::DescriptorType::eCombinedImageSampler,
+                .pImageInfo = &skyboxImageInfo
+            }
+        };
+
+        device.updateDescriptorSets(descriptorWrites, {});
+    }
+}
+
 void Renderer::CreateSkyboxResources()
 {
     KBRAssert(s_Data->Skybox.SkyboxTexture != nullptr,
               "Skybox texture has to be set before creating skybox resources");
-
-    // TODO: Set default skybox texture if none is set by the user
 
     if (s_Data->Skybox.SkyboxMesh == nullptr) {
         // The project has not been initialized this far
@@ -6790,13 +7076,31 @@ void Renderer::CreateSkyboxResources()
         SkyboxUtils::GenerateBRDFLUT(*s_Data->Skybox.LutBrdfTexture);
     }
 
-    s_Data->Skybox.IrradianceCubeTexture = CreateRef<TextureCube>();
-    s_Data->Skybox.PrefilteredCubeTexture = CreateRef<TextureCube>();
+    if (!s_Data->Skybox.IrradianceCubeTexture ||
+        !s_Data->Skybox.PrefilteredCubeTexture ||
+        s_Data->Skybox.IsSkyboxDirty)
+    {
+        if (s_Data->Skybox.IsSkyboxDirty &&
+            (s_Data->Skybox.IrradianceCubeTexture || s_Data->Skybox.PrefilteredCubeTexture))
+        {
+            // The previous IBL maps may still be referenced by an in-flight
+            // frame. Wait before replacing them.
+            VulkanContext::Get().WaitIdle();
+            s_Data->Skybox.IrradianceCubeTexture = nullptr;
+            s_Data->Skybox.PrefilteredCubeTexture = nullptr;
+        }
 
-    SkyboxUtils::GenerateIrradianceCube(
-        *s_Data->Skybox.IrradianceCubeTexture, s_Data->Skybox.SkyboxTexture->descriptor, *s_Data->Skybox.SkyboxMesh);
-    SkyboxUtils::GeneratePrefilteredEnvMap(
-        *s_Data->Skybox.PrefilteredCubeTexture, s_Data->Skybox.SkyboxTexture->descriptor, *s_Data->Skybox.SkyboxMesh);
+        s_Data->Skybox.IrradianceCubeTexture = CreateRef<TextureCube>();
+        s_Data->Skybox.PrefilteredCubeTexture = CreateRef<TextureCube>();
+
+        SkyboxUtils::GenerateIrradianceCube(
+            *s_Data->Skybox.IrradianceCubeTexture, s_Data->Skybox.SkyboxTexture->descriptor, *s_Data->Skybox.SkyboxMesh);
+        SkyboxUtils::GeneratePrefilteredEnvMap(
+            *s_Data->Skybox.PrefilteredCubeTexture, s_Data->Skybox.SkyboxTexture->descriptor, *s_Data->Skybox.SkyboxMesh);
+
+        s_Data->Skybox.IsSkyboxDirty = false;
+        UpdateEnvironmentDescriptors();
+    }
 }
 
 void Renderer::CreateTransparencyResources(const uint32_t width, const uint32_t height)

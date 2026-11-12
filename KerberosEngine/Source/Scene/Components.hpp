@@ -261,6 +261,12 @@ struct EnvironmentComponent
     AssetHandle SkyboxTexture = AssetHandle::Invalid();
     bool IsSkyboxEnabled = true;
 
+    /// Calibration multiplier applied to the environment cubemap and its
+    /// irradiance/prefiltered derivatives. Use 1.0 for physically calibrated
+    /// HDR environments; relative HDR assets such as the bundled Pisa cube
+    /// need the larger DefaultEnvironmentIntensity.
+    float Intensity = DefaultEnvironmentIntensity;
+
     EnvironmentComponent() = default;
     explicit EnvironmentComponent(const AssetHandle& skyboxTexture, const bool isSkyboxEnabled = true)
         : SkyboxTexture(skyboxTexture), IsSkyboxEnabled(isSkyboxEnabled)

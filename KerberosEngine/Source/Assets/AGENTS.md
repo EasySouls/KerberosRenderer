@@ -203,7 +203,10 @@ Deferred texture features (not yet implemented):
   level); mip generation is a separate follow-up.
 - HDR and 16-bit raster sources are decoded as 8-bit by `LoadTextureData`.
 - The cubemap pipeline (`.kbrcubemap`) still uses the no-payload standalone
-  adapter and is not converted to cache artifacts yet.
+  adapter and is not converted to cache artifacts yet. The editor loads these
+  sources directly through `RuntimeAssetLoader` (`TextureCube` case) so
+  `EnvironmentComponent` works in-editor; packaged runtime cubemaps still need a
+  cache-payload importer.
 - The legacy `TextureImporter`/`AssetImporter` direct-loading path remains in
   the codebase.
 - The sRGB import option is editable only for raster sources. Authored KTX/KTX2

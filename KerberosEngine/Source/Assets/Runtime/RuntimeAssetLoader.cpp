@@ -3,6 +3,7 @@
 #include "Assets/Formats/NativeAssetSerializer.hpp"
 #include "Assets/Formats/AnimationFormat.hpp"
 #include "Assets/Formats/SkeletonFormat.hpp"
+#include "Assets/Importers/CubemapImporter.hpp"
 #include "Assets/Importers/MaterialImporter.hpp"
 #include "Assets/Prefab.hpp"
 #include "AI/AIStateTreeAsset.hpp"
@@ -11,6 +12,7 @@
 #include "Renderer/Animation/AnimationClip.hpp"
 #include "Renderer/Animation/Skeleton.hpp"
 #include "Renderer/Textures/Texture2D.hpp"
+#include "Renderer/Textures/TextureCube.hpp"
 #include "Renderer/Vertex.hpp"
 #include "Profiling/Profilers.hpp"
 #include "Renderer/Animation/SkeletalMesh.hpp"
@@ -568,6 +570,16 @@ Ref<Asset> RuntimeAssetLoader::Load(const AssetHandle handle,
 	{
 		case AssetType::Texture2D:
 			return LoadTexture(handle, path);
+		case AssetType::TextureCube:
+		{
+			if (path.extension() == ".ktx2")
+				return TextureCube::FromFile(path);
+
+			Ref<TextureCube> cubemap = CubemapImporter::ImportCubemap(path);
+			if (cubemap)
+				cubemap->GetHandle() = handle;
+			return cubemap;
+		}
 		case AssetType::Material:
 		{
 			NativeAssetRecord record;

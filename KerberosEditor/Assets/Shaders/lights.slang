@@ -21,6 +21,8 @@ static uint LightType_Point = 0;
 static uint LightType_Spot = 1;
 static uint LightType_Area = 2;
 
+public static const uint MaxLights = 512;
+
 float CalculateLightAttenuation(GPULight light, float3 worldPos) 
 {
     //float distance = length(light.position - worldPos);
@@ -36,7 +38,8 @@ float CalculateLightAttenuation(GPULight light, float3 worldPos)
 
     // Windowing function to smoothly fade out at light.range
     float distance = sqrt(distanceSqr);
-    float falloff = clamp(1.0 - pow(distance / light.range, 4.0), 0.0, 1.0);
+    float range = max(light.range, 0.001);
+    float falloff = clamp(1.0 - pow(distance / range, 4.0), 0.0, 1.0);
 
     // Apply windowing to the inverse-square attenuation
     return attenuation * (falloff * falloff);
@@ -60,7 +63,8 @@ float CalculateLightContribution(GPULight light, float3 worldPos)
 {
     float attenuation = 0.0;
     if (light.type == LightType_Spot) {
-        attenuation *= CalculateSpotlightAttenuation(light, worldPos);
+        attenuation = CalculateSpotlightAttenuation(light, worldPos) *
+                      CalculateLightAttenuation(light, worldPos);
     } else {
         attenuation = CalculateLightAttenuation(light, worldPos);
     }

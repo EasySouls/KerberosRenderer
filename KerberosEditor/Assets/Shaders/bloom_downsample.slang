@@ -16,6 +16,7 @@ cbuffer PushConstants
     uint enablePrefilter;
     uint isExtract;
     float maxBrightness;
+    float exposureScale;
 };
 
 float ComputePrefilter(float3 color, float bloomThreshold, float bloomKnee)
@@ -68,6 +69,13 @@ void computeMain(uint3 threadId : SV_DispatchThreadID)
     color += (a + c + g + i) * 0.03125;
     color += (b + d + f + h) * 0.0625;
     color += (j + k + l + m) * 0.125;
+
+    // The bloom chain is stored in exposed units so the threshold is stable
+    // across EV100 settings. Only the extract pass applies exposure.
+    if (isExtract == 1)
+    {
+        color *= exposureScale;
+    }
 
     if (enablePrefilter != 0)
     {

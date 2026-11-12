@@ -18,6 +18,7 @@
 
 #include <glm/gtx/matrix_decompose.hpp>
 
+#include <cmath>
 #include <utility>
 
 
@@ -27,6 +28,31 @@ import Kerberos;
 
 namespace Kerberos
 {
+	namespace
+	{
+		/// Rotate an authored light direction by the entity's world transform.
+		/// Removing the scale from the basis keeps non-uniformly scaled entities
+		/// from skewing the direction.
+		glm::vec3 RotateLightDirection(const glm::mat4& worldTransform, const glm::vec3& direction)
+		{
+			if (glm::dot(direction, direction) < 1e-8f)
+				return glm::vec3(0.0f, -1.0f, 0.0f);
+
+			glm::mat3 basis(worldTransform);
+			for (int column = 0; column < 3; ++column)
+			{
+				const float length = glm::length(basis[column]);
+				if (length > 1e-6f)
+					basis[column] /= length;
+			}
+
+			const glm::vec3 rotated = basis * direction;
+			return glm::dot(rotated, rotated) > 1e-8f
+				? glm::normalize(rotated)
+				: glm::vec3(0.0f, -1.0f, 0.0f);
+		}
+	}
+
 	Scene::Scene()
 		: m_PhysicsSystem(new JoltPhysicsSystem())
 		, m_AnimationRuntime(*this)
@@ -1235,8 +1261,15 @@ Entity Scene::InstantiatePrefab(const AssetHandle prefabHandle, const std::strin
 
 	DirectionalLight Scene::GetSunlight() const 
 	{
-		// Default sunlight pointing upwards, in case there is no directional light in the scene
-		DirectionalLight sunlight{ .Direction = glm::vec3(0.0f, -1.0f, 0.0f) };
+		// No sunlight by default. The renderer must be able to disable the sun
+		// entirely instead of silently falling back to a white directional light.
+		DirectionalLight sunlight{
+			.Direction = glm::vec3(0.0f, -1.0f, 0.0f),
+			.Intensity = 0.0f,
+			.Color = glm::vec3(1.0f),
+			.IsEnabled = false
+		};
+
 		const auto sunView = m_Registry.view<DirectionalLightComponent, TransformComponent>();
 		bool found = false;
 		for (const auto entity : sunView)
@@ -1251,6 +1284,14 @@ Entity Scene::InstantiatePrefab(const AssetHandle prefabHandle, const std::strin
 				}
 
 				sunlight = light.Light;
+				sunlight.Direction = RotateLightDirection(transform.WorldTransform, light.Light.Direction);
+
+				if (!std::isfinite(sunlight.Intensity) || sunlight.Intensity < 0.0f)
+				{
+					Kerberos::Log::CoreWarn("Directional light has an invalid intensity ({}); using 0", sunlight.Intensity);
+					sunlight.Intensity = 0.0f;
+				}
+
 				found = true;
 			}
 		}

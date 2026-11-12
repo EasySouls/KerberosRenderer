@@ -49,6 +49,9 @@ struct UpscalerDispatchInfo {
     float cameraFar;
     float cameraFovAngleVertical; /// Field of view in radians
     float viewSpaceToMetersFactor = 1.0f;
+    /// Exposure scale applied by the tone-mapping pass. Temporal upscalers use it
+    /// to normalize HDR input the same way the presentation path will.
+    float preExposure = 1.0f;
 };
 
 struct UpscalerFrame {

@@ -1575,7 +1575,7 @@ void HierarchyPanel::DrawComponents(const Entity entity)
         if (opened) {
             auto& directionalLight = entity.GetComponent<DirectionalLightComponent>();
             ImGui::ColorEdit3("Color", &directionalLight.Light.Color[0]);
-            if (ImGui::DragFloat("Intensity", &directionalLight.Light.Intensity, 1.0f, 0.0f)) {
+            if (ImGui::DragFloat("Intensity (lux)", &directionalLight.Light.Intensity, 1000.0f, 0.0f, 1000000.0f)) {
                 directionalLight.NeedsUpdate = true;
             }
             DrawVec3Control("Direction", entity.GetUUID(), directionalLight.Light.Direction, 0.0f, 80.0f,
@@ -1617,8 +1617,8 @@ void HierarchyPanel::DrawComponents(const Entity entity)
             auto& pointLight = entity.GetComponent<PointLightComponent>();
             ImGui::Checkbox("Enabled", &pointLight.IsEnabled);
             ImGui::ColorEdit3("Color", &pointLight.Light.Color[0]);
-            ImGui::DragFloat("Intensity", &pointLight.Light.Intensity, 1.0f, 0.0f);
-            ImGui::DragFloat("Radius", &pointLight.Light.Radius, 1.0f, 0.0f);
+            ImGui::DragFloat("Intensity (cd)", &pointLight.Light.Intensity, 1.0f, 0.0f);
+            ImGui::DragFloat("Range", &pointLight.Light.Radius, 1.0f, 0.01f);
 
             ImGui::TreePop();
         }
@@ -1653,9 +1653,10 @@ void HierarchyPanel::DrawComponents(const Entity entity)
         if (opened) {
             auto& spotlight = entity.GetComponent<SpotLightComponent>();
             ImGui::ColorEdit3("Color", &spotlight.Light.Color[0]);
-            ImGui::DragFloat("Intensity", &spotlight.Light.Intensity, 1.0f, 0.0f, 10.0f);
-            ImGui::DragFloat("Inner Cone Cosine Radians", &spotlight.Light.CutOffAngleRadians, 0.01f, 0.0f);
-            ImGui::DragFloat("Outer Cone Cosine Radians", &spotlight.Light.OuterCutOffAngleRadians, 0.01f, 0.0f);
+            ImGui::DragFloat("Intensity (cd)", &spotlight.Light.Intensity, 1.0f, 0.0f, 100000.0f);
+            ImGui::DragFloat("Range", &spotlight.Light.Radius, 1.0f, 0.01f);
+            ImGui::DragFloat("Inner Cutoff (rad)", &spotlight.Light.CutOffAngleRadians, 0.01f, 0.0f, 3.14159f);
+            ImGui::DragFloat("Outer Cutoff (rad)", &spotlight.Light.OuterCutOffAngleRadians, 0.01f, 0.0f, 3.14159f);
             ImGui::Checkbox("Enabled", &spotlight.IsEnabled);
 
             ImGui::TreePop();
@@ -1973,6 +1974,13 @@ void HierarchyPanel::DrawComponents(const Entity entity)
         if (opened) {
             auto& environment = entity.GetComponent<EnvironmentComponent>();
             ImGui::Checkbox("Skybox Enabled", &environment.IsSkyboxEnabled);
+            ImGui::DragFloat("Environment Intensity", &environment.Intensity, 100.0f, 0.0f, 1000000.0f);
+            if (ImGui::IsItemHovered())
+            {
+                ImGui::SetTooltip("Calibration multiplier for the environment cubemap.\n"
+                                  "Use 1.0 for physically calibrated HDR environments.\n"
+                                  "Relative HDR assets such as the bundled Pisa cube need ~50000.");
+            }
 
             /// Render the environment cubemap into an image
             ImGui::Text("Skybox Texture");
