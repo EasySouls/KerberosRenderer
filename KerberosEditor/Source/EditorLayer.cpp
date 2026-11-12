@@ -1528,6 +1528,12 @@ namespace PROJECT_NAME
 		{
 			ImGui::Indent();
 			ImGui::Checkbox("Ray query soft shadows", &Renderer::GetUseRayQueryBasedSoftShadows());
+			ImGui::Checkbox("Ray query ambient occlusion", &Renderer::GetUseRayQueryAmbientOcclusion());
+			if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal))
+			{
+				ImGui::SetTooltip("When enabled, the ray-query path computes AO and the GTAO compute pass is skipped.\n"
+				                  "When disabled, the ray-query path samples GTAO and does not trace AO rays.");
+			}
 			ImGui::Unindent();
 		}
 		else
@@ -1564,6 +1570,8 @@ namespace PROJECT_NAME
 
 		bool& useGTAO = Renderer::GetUseGTAO();
 		ImGui::Checkbox("Use GTAO", &useGTAO);
+		if (Renderer::GetUseRayQueryAmbientOcclusion() && useRayQueryBasedShadows)
+			ImGui::TextDisabled("GTAO compute is skipped while ray query AO is active.");
 		if (useGTAO)
 		{
 			ImGui::Indent();

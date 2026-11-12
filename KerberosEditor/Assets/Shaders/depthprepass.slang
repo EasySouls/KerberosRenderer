@@ -4,6 +4,7 @@ struct VSInput
 {
     float3 Pos;
     float3 Normal;
+    float2 TexCoord;
 };
 
 [[vk::binding(0)]]
@@ -12,17 +13,34 @@ ConstantBuffer<SceneData> scene;
 [[vk::binding(2)]]
 ConstantBuffer<PerObject> perObject;
 
+[[vk::binding(0, 1)]]
+Texture2D globalTextures[];
+[[vk::binding(1, 1)]]
+SamplerState globalSamplers[];
+
 struct VSOutput
 {
     float4 Position : SV_Position;
     float3 ViewNormal : TEXCOORD0;
     float2 Motion : TEXCOORD1;
+    float2 TexCoord : TEXCOORD2;
 };
 
 struct PSOutput
 {
     float4 Normal : SV_Target0;
     float2 Motion : SV_Target1;
+}
+
+float4 SampleBindless(uint packedIndex, float2 uv) {
+    uint texIdx = packedIndex & 0x00FFFFFF;
+    uint sampIdx = packedIndex >> 24;
+
+    if (texIdx == 0) {
+        return float4(1.0, 0.0, 1.0, 1.0);
+    }
+
+    return globalTextures[texIdx].Sample(globalSamplers[sampIdx], uv);
 }
 
 [shader("vertex")]
@@ -43,8 +61,9 @@ VSOutput vertexMain(VSInput input)
     float2 previousNdc = previousClipPosition.xy / previousClipPosition.w;
     output.Motion = (previousNdc - currentNdc) * 0.5 * scene.viewportSize;
 
-    float3 worldNormal = mul((float3x3)perObject.model, input.Normal);
+    float3 worldNormal = mul((float3x3)perObject.worldNormal, input.Normal);
     output.ViewNormal = mul((float3x3)scene.view, worldNormal);
+    output.TexCoord = input.TexCoord;
 
     return output;
 }
@@ -52,6 +71,14 @@ VSOutput vertexMain(VSInput input)
 [shader("fragment")]
 PSOutput fragmentMain(VSOutput inVert)
 {
+    // Alpha-masked geometry must cut out the same fragments here as it does in
+    // the opaque and shadow passes, otherwise the prepass depth/normal/motion
+    // buffers disagree with the visible surface.
+    float4 albedoTex = SampleBindless(perObject.material.albedoTexIndex, inVert.TexCoord);
+    float alpha = albedoTex.a * perObject.material.albedo.a;
+    if (ShouldDiscardAlpha(alpha, perObject.alphaMode, perObject.alphaCutoff))
+        discard;
+
     PSOutput output;
 
     float3 N = normalize(inVert.ViewNormal);

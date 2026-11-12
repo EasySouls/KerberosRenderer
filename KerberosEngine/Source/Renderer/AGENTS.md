@@ -121,7 +121,9 @@ pass because pose evaluation happens on the CPU in `Scene::AnimationRuntime` and
 the skin-matrix upload happens on the CPU in `AnimationSystem::BeginFrame`. The
 skinning pass currently ends with an explicit
 compute-write to vertex-read barrier because the SVB is bound directly by raster
-passes and is not declared as a render-graph resource.
+passes and is not declared as a render-graph resource. The barrier's destination
+stage includes `VERTEX_INPUT` (not only `VERTEX_SHADER`) so the
+`VERTEX_ATTRIBUTE_READ` access is valid.
 
 The grass pass is always registered so the pipeline-statistics query split
 (`query 0` ends, `query 1` begins) stays balanced, but its mesh-statistics query
@@ -199,6 +201,47 @@ relative HDR values are calibrated with `DefaultEnvironmentIntensity`. The sky
 shader and PBR ambient terms multiply by the same environment intensity.
 Packed runtime cubemap artifacts are not implemented yet; the editor loads
 `.kbrcubemap` sources directly through `RuntimeAssetLoader`.
+
+## Materials, alpha modes, and ambient occlusion
+
+`Material::AlphaMode` mirrors glTF's `OPAQUE`/`MASK`/`BLEND` modes (default
+`OPAQUE`) with `AlphaCutoff` default `0.5`. glTF materials import both fields;
+authored `.kbrmat` files serialize them as `AlphaMode`/`AlphaCutoff`, and
+legacy materials that relied on base-color alpha below one are loaded as
+`BLEND`. `IsTransparent()` is true only for `BLEND`, so `MASK` and `OPAQUE`
+both stay in the depth/shadow/opaque passes. The alpha mask is applied in
+`pbrtextured`, `pbr_ray_query_shadows`, `depthprepass`, and `shadowmap_csm`
+using `ShouldDiscardAlpha` from `common.slang` with
+`textureAlpha * baseColorFactor.a`; the shadow pass binds the global texture
+set for this reason. `BLEND` materials render through the existing
+weighted-blended OIT pass, where alpha is `textureAlpha * baseColorFactor.a`
+and emissive/AO participate in the accumulated color.
+
+Alpha mode and cutoff travel in `PerObject` after the 60-byte material block
+(`alphaMode` at offset 256, `alphaCutoff` at 260, `entityID` at 264); keep the
+C++ `PerObjectData` static asserts and the Slang `PerObject` layout in sync.
+
+`lightingParams.w` selects the ambient-occlusion source for the ray-query PBR
+path: `0` samples GTAO and `1` traces RTAO. `UseRayQueryAmbientOcclusion`
+only takes effect when ray-query shadows and the acceleration structures are
+active. The two sources are mutually exclusive: when RTAO is active the GTAO
+compute pass is skipped and the AO image is cleared to neutral white, so no
+frame pays for both. Non-ray-query PBR always samples GTAO.
+
+`pbr_helpers.slang::ApplyNormalVarianceToRoughness` is the derivative-based
+specular anti-aliasing path: it adds the screen-space variance of the shading
+normal to the GGX roughness, which suppresses normal-map minification
+sparkle until generated mip chains exist. Non-finite derivative variance is
+ignored, because screen-space derivatives at primitive edges/helper lanes can
+otherwise turn roughness (and all downstream lighting) into NaN. It is not
+Toksvig (Toksvig folds a normal-length variance into roughness during texture
+prefiltering).
+
+Planned, not implemented:
+- multi-scatter GGX / energy compensation for rough metals
+- generated texture mip chains (including Toksvig-style normal-map filtering)
+- per-material normal scale and occlusion strength
+- clearcoat/sheen material layers (add only when a project needs them)
 
 ## Resource lifetime and descriptors
 

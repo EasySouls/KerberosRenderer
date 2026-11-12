@@ -255,13 +255,18 @@ struct PerObjectData
     alignas(16) glm::mat4 previousModel{ 0.f };
     alignas(16) glm::mat4 worldNormal{ 0.f };
     alignas(16) Material::UniformBlock material;
-    [[maybe_unused]] uint8_t _Padding1[8];
+    [[maybe_unused]] uint8_t _Padding1[4];
+    /// 0 = opaque, 1 = mask, 2 = blend.
+    uint32_t alphaMode = 0;
+    float alphaCutoff = 0.5f;
     uint32_t entityID = std::numeric_limits<uint32_t>::max();
-    [[maybe_unused]] uint8_t _Padding2[24];
+    [[maybe_unused]] uint8_t _Padding2[20];
 };
 
 static_assert(offsetof(PerObjectData, material) == 192);
-static_assert(offsetof(PerObjectData, entityID) == 260);
+static_assert(offsetof(PerObjectData, alphaMode) == 256);
+static_assert(offsetof(PerObjectData, alphaCutoff) == 260);
+static_assert(offsetof(PerObjectData, entityID) == 264);
 static_assert(sizeof(PerObjectData) == 288);
 
 struct SkyboxData
@@ -597,8 +602,6 @@ struct RendererData
 
     constexpr static uint32_t TemporalSequenceLength = 8;
 
-    bool PreviousUseGTAO = true;
-
     Owner<IUpscaler> Upscaler = nullptr;
     RenderGraph::Graph RenderGraph{};
     UpscalerQuality UpscalingQuality = UpscalerQuality::Balanced;
@@ -611,8 +614,12 @@ struct RendererData
 
     bool UseRayQueryBasedShadows = false;
     bool UseRayQueryBasedSoftShadows = false;
+    bool UseRayQueryAmbientOcclusion = false;
     bool UseGTAO = true;
     bool UseBlurredGTAO = true;
+    /// Resolved per frame: RTAO requires the ray-query PBR path, and the two
+    /// ambient-occlusion sources are mutually exclusive.
+    bool GTAOEnabledThisFrame = true;
 
     bool UseFrustumCulling = true;
     bool FreezeFrustum = false;
@@ -974,7 +981,7 @@ void Renderer::RenderGTAO(const vk::raii::CommandBuffer& cmd, const uint32_t fra
 {
     WriteGPUTimestamp(cmd, frameIndex, static_cast<uint32_t>(GPUTimestampQuery::AmbientOcclusionPassBegin));
 
-    if (s_Data->UseGTAO) {
+    if (s_Data->GTAOEnabledThisFrame) {
         BeginRenderPassDebugLabel(cmd, "GTAO Compute Pass");
 
         cmd.bindPipeline(vk::PipelineBindPoint::eCompute, *s_Data->GTAOPipeline->GetVulkanPipeline());
@@ -1107,8 +1114,11 @@ void Renderer::RenderGTAO(const vk::raii::CommandBuffer& cmd, const uint32_t fra
         s_Data->GTAOScratchImage.CurrentLayout =
             s_Data->UseBlurredGTAO ? vk::ImageLayout::eShaderReadOnlyOptimal : vk::ImageLayout::eUndefined;
     }
-    else if (s_Data->PreviousUseGTAO || s_Data->GTAOImage.CurrentLayout == vk::ImageLayout::eUndefined) {
-        // GTAO disabled: clear once to neutral AO (1.0) so PBR keeps full ambient lighting.
+    else {
+        // GTAO disabled (user toggle or RTAO owns the ambient term): fill the
+        // AO image with neutral white so any shader that still samples it keeps
+        // full ambient lighting. Doing this every frame also keeps the image's
+        // tracked layout in sync with the render graph's transfer-dst write.
         constexpr vk::ClearColorValue clearNoAO{ std::array<float, 4>{ 1.0f, 0.0f, 0.0f, 0.0f } };
         constexpr std::array clearRanges = { vk::ImageSubresourceRange{ .aspectMask =
                                                                         vk::ImageAspectFlagBits::eColor,
@@ -1120,8 +1130,6 @@ void Renderer::RenderGTAO(const vk::raii::CommandBuffer& cmd, const uint32_t fra
 
         s_Data->GTAOImage.CurrentLayout = vk::ImageLayout::eShaderReadOnlyOptimal;
     }
-
-    s_Data->PreviousUseGTAO = s_Data->UseGTAO;
 
     WriteGPUTimestamp(cmd, frameIndex, static_cast<uint32_t>(GPUTimestampQuery::AmbientOcclusionPassEnd));
 
@@ -2301,8 +2309,11 @@ void Renderer::CreateResources()
                                                            .offset = 0,
                                                            .size = sizeof(uint32_t) };
 
-        vk::PipelineLayoutCreateInfo pipelineLayoutInfo{ .setLayoutCount = 1,
-                                                         .pSetLayouts = &*s_Data->DescriptorSetLayouts.scene,
+        const std::array<vk::DescriptorSetLayout, 2> shadowSetLayouts = {
+            s_Data->DescriptorSetLayouts.scene, s_Data->TextureManager.GetGlobalDescriptorSetLayout()
+        };
+        vk::PipelineLayoutCreateInfo pipelineLayoutInfo{ .setLayoutCount = static_cast<uint32_t>(shadowSetLayouts.size()),
+                                                         .pSetLayouts = shadowSetLayouts.data(),
                                                          .pushConstantRangeCount = 1,
                                                          .pPushConstantRanges = &pushConstantRange };
 
@@ -3924,6 +3935,13 @@ bool& Renderer::GetUseRayQueryBasedSoftShadows()
     return s_Data->UseRayQueryBasedSoftShadows;
 }
 
+bool& Renderer::GetUseRayQueryAmbientOcclusion()
+{
+    KBRAssert(s_Data != nullptr, "Renderer not initialized!");
+
+    return s_Data->UseRayQueryAmbientOcclusion;
+}
+
 bool& Renderer::GetUseGTAO()
 {
     KBRAssert(s_Data != nullptr, "Renderer not initialized!");
@@ -4358,6 +4376,15 @@ void Renderer::UpdateLights(const uint32_t currentImage, const std::vector<GPULi
         ? std::max(s_Data->Skybox.Intensity, 0.0f)
         : DefaultEnvironmentIntensity;
 
+    // RTAO only exists in the ray-query PBR path. The two AO sources are
+    // mutually exclusive for a frame: RTAO replaces GTAO rather than stacking
+    // on top of it.
+    const bool useRTAO = s_Data->UseRayQueryAmbientOcclusion &&
+        s_Data->UseRayQueryBasedShadows &&
+        IsUsingAccelerationStructures();
+    s_Data->GTAOEnabledThisFrame = s_Data->UseGTAO && !useRTAO;
+    s_Data->GlobalLightingData.lightingParams.w = useRTAO ? 1.0f : 0.0f;
+
     std::memcpy(s_Data->UniformBuffers[currentImage].globalLighting->GetMappedData(),
                 &s_Data->GlobalLightingData,
                 sizeof(GlobalLighting));
@@ -4474,6 +4501,8 @@ void Renderer::UpdatePerObjectUniformBuffer(const uint32_t currentImage,
         }(),
         .worldNormal = glm::inverseTranspose(model),
         .material = materialParams,
+        .alphaMode = static_cast<uint32_t>(material.AlphaMode),
+        .alphaCutoff = std::clamp(material.AlphaCutoff, 0.0f, 1.0f),
         .entityID = entityID
     };
 
@@ -5013,7 +5042,7 @@ void Renderer::CompileAndExecuteRenderGraph(const vk::raii::CommandBuffer& cmd,
         });
 
         s_Data->RenderGraph.AddPass("GTAO Compute", [&](Graph::PassBuilder& builder) -> PassExecuteFunction {
-            if (s_Data->UseGTAO) {
+            if (s_Data->GTAOEnabledThisFrame) {
                 builder.Read(hNormal,
                              vk::ImageLayout::eShaderReadOnlyOptimal,
                              vk::PipelineStageFlagBits2::eComputeShader,
@@ -5329,7 +5358,7 @@ void Renderer::CompileAndExecuteRenderGraph(const vk::raii::CommandBuffer& cmd,
 
     s_Data->DepthImage.CurrentLayout = vk::ImageLayout::eShaderReadOnlyOptimal;
     s_Data->NormalImage.CurrentLayout =
-        s_Data->UseGTAO ? vk::ImageLayout::eShaderReadOnlyOptimal
+        s_Data->GTAOEnabledThisFrame ? vk::ImageLayout::eShaderReadOnlyOptimal
             : vk::ImageLayout::eColorAttachmentOptimal;
     s_Data->MotionImage.CurrentLayout = vk::ImageLayout::eShaderReadOnlyOptimal;
     s_Data->ShadowMap.CurrentLayout = vk::ImageLayout::eShaderReadOnlyOptimal;
@@ -5433,7 +5462,8 @@ void Renderer::RenderShadowPass(const vk::raii::CommandBuffer& cmd,
             cmd.bindDescriptorSets(vk::PipelineBindPoint::eGraphics,
                                    *s_Data->ShadowMap.PipelineLayout,
                                    0,
-                                   { s_Data->DescriptorSets[frameIndex].scene },
+                                   { s_Data->DescriptorSets[frameIndex].scene,
+                                     s_Data->TextureManager.GetGlobalDescriptorSet() },
                                    { dynamicOffset });
 
             RenderMesh(cmd, renderObject);

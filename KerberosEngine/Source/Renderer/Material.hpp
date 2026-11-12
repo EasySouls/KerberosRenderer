@@ -21,6 +21,15 @@ enum class ColorEncoding : std::uint8_t
 	Linear
 };
 
+/// `Opaque` ignores the base-color alpha, `Mask` uses a
+/// hard cutoff, and `Blend` renders through the weighted-blended OIT pass.
+enum class AlphaMode : std::uint8_t
+{
+	Opaque = 0,
+	Mask = 1,
+	Blend = 2
+};
+
 struct Material : public Asset
 {
 	// Parameter block used as uniform buffer block
@@ -46,6 +55,9 @@ struct Material : public Asset
     
 	ColorEncoding ColorEncoding = ColorEncoding::Srgb;
 
+	AlphaMode AlphaMode = AlphaMode::Opaque;
+	float AlphaCutoff = 0.5f;
+
 	Ref<Texture2D> AlbedoTexture = nullptr;
 	Ref<Texture2D> NormalTexture = nullptr;
 	Ref<Texture2D> RoughnessTexture = nullptr;
@@ -53,9 +65,17 @@ struct Material : public Asset
 	Ref<Texture2D> AOTexture = nullptr;
 	Ref<Texture2D> EmissiveTexture = nullptr;
 
+	/// True when the material belongs in the weighted-blended OIT pass.
+	/// Masked materials stay in the opaque pass and are alpha-tested in the
+	/// depth, shadow, and PBR shaders.
 	bool IsTransparent() const 
 	{
-		return Params.AlbedoFactor.a < 1.0f;
+		return AlphaMode == AlphaMode::Blend;
+	}
+
+	bool IsMasked() const
+	{
+		return AlphaMode == AlphaMode::Mask;
 	}
 
 	void ResolveIndices(TextureManager& textureManager);

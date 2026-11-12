@@ -300,13 +300,26 @@ PSOutput fragmentMain(VSOutput input)
     float roughness = clamp(roughnessTex * perObject.material.roughness, 0.0, 1.0);
 
     float2 screenUV = input.Position.xy / scene.viewportSize;
-    float globalAO = globalAoTexture.Sample(screenUV).r;
     float materialAO = SampleBindless(perObject.material.aoTexIndex, input.TexCoord).r;
-    float rtao = CalculateRTAO(input.FragPos_WorldSpace, N, input.Position.xy);
-    float ao = rtao * materialAO;
 
-    float3 albedoTex = SampleBindless(perObject.material.albedoTexIndex, input.TexCoord).rgb;
-    float3 albedo = albedoTex * perObject.material.albedo.rgb;
+    float4 albedoTex = SampleBindless(perObject.material.albedoTexIndex, input.TexCoord);
+    float alpha = albedoTex.a * perObject.material.albedo.a;
+
+    // Evaluate normal-variance specular AA before the alpha-mask discard so the
+    // derivatives are not taken in divergent control flow.
+    roughness = ApplyNormalVarianceToRoughness(N, roughness);
+
+    if (ShouldDiscardAlpha(alpha, perObject.alphaMode, perObject.alphaCutoff))
+        discard;
+
+    // lightingParams.w selects ray-query AO (1) or GTAO (0)
+    float ao = materialAO;
+    if (globalLighting.lightingParams.w > 0.5)
+        ao *= CalculateRTAO(input.FragPos_WorldSpace, N, input.Position.xy);
+    else
+        ao *= globalAoTexture.Sample(screenUV).r;
+
+    float3 albedo = albedoTex.rgb * perObject.material.albedo.rgb;
 
     float3 F0 = float3(0.04, 0.04, 0.04);
     F0 = lerp(F0, albedo, metallic);

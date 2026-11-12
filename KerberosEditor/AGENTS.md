@@ -64,7 +64,10 @@ Editor windows live mainly under
   asset drag/drop, source import, and source-asset selection (single click).
   The material editor loads materials through the asset manager (authored
   `.kbrmat` sources are imported into cache artifacts) and edits texture slots
-  with a filterable dropdown backed by `AssetManager::GetAssetsOfType`. Saving
+  with a filterable dropdown backed by `AssetManager::GetAssetsOfType`. It also
+  edits the glTF alpha mode (`Opaque`/`Mask`/`Blend`) and shows `Alpha Cutoff`
+  for masked materials; `Blend` opacity is the product of texture alpha and the
+  albedo factor alpha. Saving
   writes handle-based texture slots to the source YAML, updates the already
   loaded material instance, and force-reimports the source so the cache artifact
   and future loads stay in sync.

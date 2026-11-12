@@ -173,6 +173,7 @@ public:
     static bool& GetDisplaySkybox();
     static bool& GetUseRayQueryBasedShadows();
     static bool& GetUseRayQueryBasedSoftShadows();
+    static bool& GetUseRayQueryAmbientOcclusion();
     static bool IsRayTracingSupported();
     static bool& GetUseGTAO();
     static bool& GetUseBlurForGTAO();

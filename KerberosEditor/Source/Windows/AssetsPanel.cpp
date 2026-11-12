@@ -1002,6 +1002,21 @@ std::string AssetStatusLabel(const AssetHandle handle,
                 editColor4("Albedo", state.WorkingCopy->Params.AlbedoFactor);
                 ImGui::DragFloat("Roughness", &state.WorkingCopy->Params.RoughnessFactor, 0.01f, 0.0f, 1.0f);
                 ImGui::DragFloat("Metallic", &state.WorkingCopy->Params.MetallicFactor, 0.01f, 0.0f, 1.0f);
+
+                int alphaMode = static_cast<int>(state.WorkingCopy->AlphaMode);
+                const char* alphaModeItems[] = { "Opaque", "Mask", "Blend" };
+                if (ImGui::Combo("Alpha Mode", &alphaMode, alphaModeItems, IM_ARRAYSIZE(alphaModeItems)))
+                    state.WorkingCopy->AlphaMode = static_cast<AlphaMode>(alphaMode);
+                if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal))
+                {
+                    ImGui::SetTooltip("glTF alpha mode. Opaque ignores base-color alpha, Mask discards below the cutoff, "
+                                      "and Blend renders through weighted-blended OIT.");
+                }
+                if (state.WorkingCopy->AlphaMode == AlphaMode::Mask)
+                    ImGui::DragFloat("Alpha Cutoff", &state.WorkingCopy->AlphaCutoff, 0.01f, 0.0f, 1.0f);
+                else if (state.WorkingCopy->AlphaMode == AlphaMode::Blend)
+                    ImGui::TextDisabled("Opacity: texture alpha x Albedo alpha");
+
                 editColor3("Emissive Color", state.WorkingCopy->EmissiveColor);
                 ImGui::DragFloat("Emissive Intensity", &state.WorkingCopy->EmissiveIntensity, 1.0f, 0.0f, 1000.0f);
                 state.WorkingCopy->Params.Emissive =

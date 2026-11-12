@@ -46,6 +46,8 @@ Material::Material(std::string n, const glm::vec4 c, const float r, const float 
     Params.AlbedoFactor = c;
     Params.Emissive = glm::vec3(0.0f);
     ColorEncoding = ColorEncoding::Linear;
+    if (c.a < 1.0f)
+        AlphaMode = AlphaMode::Blend;
 }
 
 Material::Material(std::string name,
@@ -60,6 +62,8 @@ Material::Material(std::string name,
     Params.AlbedoFactor = c;
     Params.Emissive = glm::vec3(0.0f);
     ColorEncoding = ColorEncoding::Linear;
+    if (c.a < 1.0f)
+        AlphaMode = AlphaMode::Blend;
 }
 
 Material::Material(const Material& other): Params(other.Params)
@@ -67,6 +71,8 @@ Material::Material(const Material& other): Params(other.Params)
                                            , EmissiveColor(other.EmissiveColor)
                                            , EmissiveIntensity(other.EmissiveIntensity)
                                            , ColorEncoding(other.ColorEncoding)
+                                           , AlphaMode(other.AlphaMode)
+                                           , AlphaCutoff(other.AlphaCutoff)
                                            , AlbedoTexture(other.AlbedoTexture)
                                            , NormalTexture(other.NormalTexture)
                                            , RoughnessTexture(other.RoughnessTexture)
@@ -85,6 +91,8 @@ Material& Material::operator=(const Material& other)
         EmissiveColor = other.EmissiveColor;
         EmissiveIntensity = other.EmissiveIntensity;
         ColorEncoding = other.ColorEncoding;
+        AlphaMode = other.AlphaMode;
+        AlphaCutoff = other.AlphaCutoff;
         AlbedoTexture = other.AlbedoTexture;
         NormalTexture = other.NormalTexture;
         MetallicTexture = other.MetallicTexture;
@@ -104,6 +112,8 @@ bool Material::operator==(const Material& other) const
            EmissiveColor == other.EmissiveColor &&
            EmissiveIntensity == other.EmissiveIntensity &&
            ColorEncoding == other.ColorEncoding &&
+           AlphaMode == other.AlphaMode &&
+           AlphaCutoff == other.AlphaCutoff &&
            AlbedoTexture == other.AlbedoTexture &&
            NormalTexture == other.NormalTexture &&
            RoughnessTexture == other.RoughnessTexture &&

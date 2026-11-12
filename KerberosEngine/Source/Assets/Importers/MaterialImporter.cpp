@@ -147,6 +147,23 @@ namespace Kerberos
 		material.ColorEncoding = colorEncoding == "linear"
 			? ColorEncoding::Linear
 			: ColorEncoding::Srgb;
+
+		if (node["AlphaMode"])
+		{
+			const std::string alphaMode = node["AlphaMode"].as<std::string>("Opaque");
+			if (alphaMode == "Mask" || alphaMode == "MASK")
+				material.AlphaMode = AlphaMode::Mask;
+			else if (alphaMode == "Blend" || alphaMode == "BLEND")
+				material.AlphaMode = AlphaMode::Blend;
+			else
+				material.AlphaMode = AlphaMode::Opaque;
+		}
+		else
+		{
+			// Legacy authored materials used base-color alpha to mean blending.
+			material.AlphaMode = albedo.a < 1.0f ? AlphaMode::Blend : AlphaMode::Opaque;
+		}
+		material.AlphaCutoff = node["AlphaCutoff"].as<float>(0.5f);
 		material.EmissiveColor = emissiveColor;
 		material.EmissiveIntensity = emissiveIntensity;
 		material.Params = { 
@@ -216,6 +233,10 @@ namespace Kerberos
 		out << YAML::Key << "Name" << YAML::Value << material.Name;
 		out << YAML::Key << "ColorEncoding" << YAML::Value
 			<< (material.ColorEncoding == ColorEncoding::Linear ? "linear" : "sRGB");
+		out << YAML::Key << "AlphaMode" << YAML::Value
+			<< (material.AlphaMode == AlphaMode::Mask ? "Mask"
+				: material.AlphaMode == AlphaMode::Blend ? "Blend" : "Opaque");
+		out << YAML::Key << "AlphaCutoff" << YAML::Value << material.AlphaCutoff;
 		out << YAML::Key << "Albedo" << YAML::Value << material.Params.AlbedoFactor;
 		out << YAML::Key << "Roughness" << YAML::Value << material.Params.RoughnessFactor;
 		out << YAML::Key << "Metallic" << YAML::Value << material.Params.MetallicFactor;

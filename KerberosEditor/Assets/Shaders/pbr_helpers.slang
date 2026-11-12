@@ -25,6 +25,24 @@ public float3 F_SchlickR(float cosTheta, float3 F0, float roughness) {
     return F0 + (max((1.0 - roughness).xxx, F0) - F0) * pow(1.0 - cosTheta, 5.0); 
 }
 
+/// Roughness-aware normal filtering / specular anti-aliasing.
+///
+/// The screen-space derivatives of the shading normal estimate how much the
+/// normal changes inside one pixel footprint. Folding that variance into the
+/// GGX roughness widens the specular lobe exactly when the normal map is
+/// minifying, which removes sparkle/fireflies without blurring the base
+/// normal used for diffuse lighting.
+public float ApplyNormalVarianceToRoughness(float3 N, float roughness)
+{
+    const float3 dNdx = ddx(N);
+    const float3 dNdy = ddy(N);
+    float variance = 0.25 * (dot(dNdx, dNdx) + dot(dNdy, dNdy));
+    // Derivatives are undefined at some edges/helper lanes and can produce NaN/non-finite values.
+    if (!isfinite(variance))
+        variance = 0.0;
+    return sqrt(saturate(roughness * roughness + saturate(variance)));
+}
+
 public struct LightResult {
     public float3 diffuse;
     public float3 specular;

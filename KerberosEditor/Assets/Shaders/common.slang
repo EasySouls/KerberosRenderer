@@ -40,10 +40,21 @@ public struct PerObject
     public float4x4 previousModel;
     public float4x4 worldNormal;
     public Material material;
-    float _Padding1;
+    // 0 = opaque, 1 = mask, 2 = blend.
+    public uint alphaMode;
+    public float alphaCutoff;
     public uint entityID;
     float3 _Padding2;
 };
+
+// Shared alpha-mask test.
+// OPAQUE ignores alpha entirely
+// MASK discards below the cutoff
+// BLEND is handled by the weighted-blended OIT pass.
+public bool ShouldDiscardAlpha(float alpha, uint mode, float cutoff)
+{
+    return mode == 1u && alpha < cutoff;
+}
 
 public struct GlobalLighting
 {

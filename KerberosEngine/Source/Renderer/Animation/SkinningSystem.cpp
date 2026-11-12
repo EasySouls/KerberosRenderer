@@ -278,6 +278,7 @@ void SkinningSystem::AddPasses(RenderGraph::Graph& graph, const uint32_t frameIn
                 .srcStageMask = vk::PipelineStageFlagBits2::eComputeShader,
                 .srcAccessMask = vk::AccessFlagBits2::eShaderWrite,
                 .dstStageMask = vk::PipelineStageFlagBits2::eVertexShader |
+                    vk::PipelineStageFlagBits2::eVertexInput |
                     vk::PipelineStageFlagBits2::eDrawIndirect,
                 .dstAccessMask = vk::AccessFlagBits2::eVertexAttributeRead |
                     vk::AccessFlagBits2::eShaderRead,

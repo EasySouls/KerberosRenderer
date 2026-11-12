@@ -1245,7 +1245,9 @@ bool GLTFSceneImporter::Import(const std::filesystem::path& source, const std::f
         d << "name=" << sanitized
             << ";baseColor=" << pbr.baseColorFactor[0] << "," << pbr.baseColorFactor[1] << "," << pbr.baseColorFactor[2] << "," << pbr.baseColorFactor[3]
             << ";metallic=" << pbr.metallicFactor
-            << ";roughness=" << pbr.roughnessFactor;
+            << ";roughness=" << pbr.roughnessFactor
+            << ";alphaMode=" << (m.alphaMode.empty() ? "OPAQUE" : m.alphaMode)
+            << ";alphaCutoff=" << m.alphaCutoff;
         if (m.emissiveFactor.size() == 3)
             d << ";emissive=" << m.emissiveFactor[0] << "," << m.emissiveFactor[1] << "," << m.emissiveFactor[2];
         d << ";baseColorTexture=" << ImageIndexForTexture(model, pbr.baseColorTexture.index)

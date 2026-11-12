@@ -237,8 +237,15 @@ PSOutput fragmentMain(VSOutput input)
     float ao = globalAO * materialAO;
 
     uint albedoMapIndex = perObject.material.albedoTexIndex;
-    float3 albedoTex = SampleBindless(albedoMapIndex, input.TexCoord).rgb;
-    float3 albedo = albedoTex * perObject.material.albedo.rgb;
+    float4 albedoTex = SampleBindless(albedoMapIndex, input.TexCoord);
+    float alpha = albedoTex.a * perObject.material.albedo.a;
+    
+    roughness = ApplyNormalVarianceToRoughness(N, roughness);
+
+    if (ShouldDiscardAlpha(alpha, perObject.alphaMode, perObject.alphaCutoff))
+        discard;
+
+    float3 albedo = albedoTex.rgb * perObject.material.albedo.rgb;
 
     float3 F0 = float3(0.04, 0.04, 0.04);
     F0 = lerp(F0, albedo, metallic);

@@ -50,6 +50,9 @@ SamplerCube prefilteredMapSampler;
 [[vk::binding(8, 0)]]
 StructuredBuffer<GPULight> sceneLights;
 
+[[vk::binding(9, 0)]]
+Sampler2D<float> globalAoTexture;
+
 [[vk::binding(0, 1)]]
 Texture2D globalTextures[];
 [[vk::binding(1, 1)]]
@@ -192,13 +195,22 @@ PBOITData fragmentMain(VSOutput input)
     uint roughnessTexIndex = perObject.material.roughnessTexIndex;
     float roughnessTex = SampleBindless(roughnessTexIndex, input.TexCoord).g;
     float roughness = clamp(roughnessTex * perObject.material.roughness, 0.0, 1.0);
+    roughness = ApplyNormalVarianceToRoughness(N, roughness);
+
     uint aoTexIndex = perObject.material.aoTexIndex;
     float ao = SampleBindless(aoTexIndex, input.TexCoord).r;
+    // GTAO is only meaningful while ray-query AO is not active for the frame
+    if (globalLighting.lightingParams.w < 0.5)
+    {
+        float2 screenUV = input.Position.xy / scene.viewportSize;
+        ao *= globalAoTexture.Sample(screenUV).r;
+    }
+
     uint albedoMapIndex = perObject.material.albedoTexIndex;
     float4 albedoTex = SampleBindless(albedoMapIndex, input.TexCoord);
     float3 albedo = albedoTex.rgb * perObject.material.albedo.rgb;
 
-    float baseAlpha = albedoTex.a * perObject.material.albedo.a;
+    float baseAlpha = saturate(albedoTex.a * perObject.material.albedo.a);
 
     float3 F0 = float3(0.04);
     F0 = lerp(F0, albedo, metallic);
@@ -234,7 +246,10 @@ PBOITData fragmentMain(VSOutput input)
     totalDiffuse += (kD * irradiance * albedo) * ao;
     totalSpecular += (reflection * (F * brdf.x + brdf.y)) * ao;
 
-    float3 finalColor = (totalDiffuse * baseAlpha) + totalSpecular;
+    float3 emissive = SampleBindless(perObject.material.emissiveTexIndex, input.TexCoord).rgb *
+        perObject.material.emissive;
+
+    float3 finalColor = (totalDiffuse * baseAlpha) + totalSpecular + (emissive * baseAlpha);
 
     float maxSpec = max(totalSpecular.r, max(totalSpecular.g, totalSpecular.b));
     float effectiveAlpha = clamp(baseAlpha + maxSpec, 0.0, 1.0);

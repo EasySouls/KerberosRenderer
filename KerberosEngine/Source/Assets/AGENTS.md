@@ -240,7 +240,7 @@ imported, or are imported lossily:
 - Morph targets and `weights` animation channels.
 - Multiple skins per glTF file; only the first skin is imported for now.
 - Non-joint node animation channels outside the supported skeleton are skipped.
-- `alphaMode`, `alphaCutoff`, and `doubleSided` material settings.
+- `doubleSided` material settings (glTF `alphaMode`/`alphaCutoff` are imported).
 - Texture sampler wrap/filter modes and `KHR_texture_transform`.
 - 16-bit per-channel source images.
 - Draco / meshopt mesh compression and `KHR_materials_*` extensions.
@@ -344,7 +344,13 @@ glTF imports emit native texture artifacts: each referenced image is
 imported as a `.ktx2` file under `Textures/` (via `KTX2Encoder`/`KtxConversion`)
 and registered as a `Texture2D` sub-asset keyed `texture:<imageIndex>`. Native
 material records carry the base color, metallic, roughness, and emissive
-factors plus per-slot texture references by image index. `LoadNativeMaterial`
+factors plus per-slot texture references by image index. They also carry the
+glTF `alphaMode` (`OPAQUE`/`MASK`/`BLEND`) and `alphaCutoff`, which
+`RuntimeAssetLoader` maps to `Material::AlphaMode`/`AlphaCutoff`. Native
+records written before this field existed fall back to treating base-color
+alpha below one as `BLEND`. `GLTFPipelineImporter::Version` is bumped when the
+record schema or derived material semantics change so existing projects
+re-import. `LoadNativeMaterial`
 resolves those references through the registry (`RootSourceHandle` +
 `SubAssetKey`) and loads the matching textures. Authored YAML material files
 are loaded from their cached copies through `MaterialImporter`; their texture

@@ -478,6 +478,7 @@ Ref<Material> LoadNativeMaterial(AssetHandle handle, const std::filesystem::path
 	int metallicRoughnessTexture = -1;
 	int occlusionTexture = -1;
 	int emissiveTexture = -1;
+	bool alphaModeSpecified = false;
 
 	std::istringstream stream(record.Data);
 	std::string field;
@@ -512,6 +513,18 @@ Ref<Material> LoadNativeMaterial(AssetHandle handle, const std::filesystem::path
 			material->EmissiveIntensity = 1.0f;
 			material->Params.Emissive = material->EmissiveColor;
 		}
+		else if (key == "alphaMode")
+		{
+			alphaModeSpecified = true;
+			if (value == "MASK" || value == "Mask")
+				material->AlphaMode = AlphaMode::Mask;
+			else if (value == "BLEND" || value == "Blend")
+				material->AlphaMode = AlphaMode::Blend;
+			else
+				material->AlphaMode = AlphaMode::Opaque;
+		}
+		else if (key == "alphaCutoff")
+			material->AlphaCutoff = std::stof(value);
 		else if (key == "baseColorTexture")
 			baseColorTexture = std::stoi(value);
 		else if (key == "normalTexture")
@@ -523,6 +536,11 @@ Ref<Material> LoadNativeMaterial(AssetHandle handle, const std::filesystem::path
 		else if (key == "emissiveTexture")
 			emissiveTexture = std::stoi(value);
 	}
+
+	// Older native material records did not carry an alpha mode.
+	// Preserve their previous behavior by treating base-color alpha below one as blended.
+	if (!alphaModeSpecified && material->Params.AlbedoFactor.a < 1.0f)
+		material->AlphaMode = AlphaMode::Blend;
 
 	const auto loadTexture = [&](const int imageIndex) -> Ref<Texture2D>
 	{
