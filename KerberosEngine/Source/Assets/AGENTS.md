@@ -142,8 +142,13 @@ referenced by no material slot default to sRGB; an image used by both color
 and data slots is encoded as sRGB with a warning. Raster texture sources use
 the `TextureSrgb["source"]` value from their source `.meta` (default sRGB)
 because raster formats cannot reliably describe their color space; KTX/KTX2
-sources self-describe via their embedded format. Cubemap faces are loaded
-linear and `CubemapData::IsSRGB` selects the sRGB image format in `TextureCube`.
+sources self-describe via their embedded format. Multi-face `.kbrcubemap`
+descriptors pass their `IsSRGB` option through `LoadTextureData`, so 8-bit
+color faces get an sRGB format, 16-bit color faces are linearized, and HDR
+faces stay `RGBA32F`; `TextureCube` then uses each face's specification
+directly. KTX2 inputs are also checked for a DFD sRGB transfer function with a
+UNORM `vkFormat` (common in cubemaps converted from PNG), and the loader
+reinterprets the view as sRGB in that case.
 Authored `.kbrmat` materials warn when a normal/metallic/roughness/AO slot is
 sRGB or an albedo/emissive slot is linear; fix the texture's sRGB import option
 in the texture inspector rather than changing shader math.
@@ -172,7 +177,15 @@ importer reads identity from those headers instead of relying on file names.
 `TexturePipelineImporter` converts texture sources into cached `.ktx2`
 artifacts so runtime loading only consumes KTX2. Raster images are decoded
 (flipped) and encoded; KTX1 sources are converted with the `ktx2ktx2` tool;
-KTX2 sources are copied as-is. Each texture source gets its own cache
+KTX2 sources are copied as-is. Raster loading preserves 16-bit integer data
+(`R16`/`RG16`/`RGB16`/`RGBA16`) and loads HDR `.hdr` sources as `RGBA32F`; it no
+longer funnels those through the 8-bit decoder. Vulkan has no 16-bit
+UNORM+sRGB format, so 16-bit color is linearized during import and marked with
+`TextureSpecification::SourceSrgb`; the KTX2 encoder stores that intent under
+the `KBR_SourceSrgb` key. `KTX2Encoder` writes the base level only; the runtime
+texture loader generates a full chain with `vkCmdBlitImage` when a texture
+arrives with one level, and uploads authored levels unchanged when present.
+Each texture source gets its own cache
 namespace that keeps the source extension (e.g. `Textures/foo.png/foo.ktx2`),
 so same-stem sources such as `foo.png` and `foo.ktx2` never overwrite each
 other. Generated artifacts live only in the cache, never in the source tree,
@@ -207,19 +220,26 @@ through `AIStateMachineComponent::TreeAsset`, which takes precedence over
 `TreeName`.
 
 Deferred texture features (not yet implemented):
-- Generated `.ktx2` artifacts have no mip chain (`KTX2Encoder` writes one
-  level); mip generation is a separate follow-up.
-- HDR and 16-bit raster sources are decoded as 8-bit by `LoadTextureData`.
+- `KTX2Encoder` writes only the base level. Runtime loading generates a full
+  chain with `vkCmdBlitImage` when the format supports blit+linear filtering;
+  compressed KTX2 inputs and formats without those features stay at their
+  authored level count.
+- 16-bit and HDR loading is implemented for standalone raster sources. glTF
+  raster images still pass through tinygltf's 8-bit decode; KTX2 images embedded
+  in or referenced by glTF keep their embedded format.
 - The cubemap pipeline (`.kbrcubemap`) still uses the no-payload standalone
   adapter and is not converted to cache artifacts yet. The editor loads these
   sources directly through `RuntimeAssetLoader` (`TextureCube` case) so
   `EnvironmentComponent` works in-editor; packaged runtime cubemaps still need a
-  cache-payload importer.
+  cache-payload importer. A `Path` entry must point at KTX2; six-face
+  descriptors can use HDR/LDR raster faces. Equirectangular HDR-to-cubemap
+  conversion is not implemented.
 - The legacy `TextureImporter`/`AssetImporter` direct-loading path remains in
   the codebase.
 - The sRGB import option is editable only for raster sources. Authored KTX/KTX2
-  files self-describe sRGB and the option is ignored; a future read-only sRGB
-  display (derived from the embedded format) is planned for the inspector.
+  files self-describe sRGB through their `vkFormat` (and, for converted files,
+  the DFD transfer function); a future read-only sRGB display is planned for the
+  inspector.
 
 Importer extension lookup normalizes the leading dot and case. Unknown file
 types must not silently become `Texture2D`; preserve explicit error/warning
@@ -242,7 +262,8 @@ imported, or are imported lossily:
 - Non-joint node animation channels outside the supported skeleton are skipped.
 - `doubleSided` material settings (glTF `alphaMode`/`alphaCutoff` are imported).
 - Texture sampler wrap/filter modes and `KHR_texture_transform`.
-- 16-bit per-channel source images.
+- Raster glTF images decode at 8-bit; KTX2 images keep their embedded format
+  (including 16-bit/HDR when authored that way).
 - Draco / meshopt mesh compression and `KHR_materials_*` extensions.
 - Multiple scenes per file and punctual lights (`KHR_lights_punctual`).
 

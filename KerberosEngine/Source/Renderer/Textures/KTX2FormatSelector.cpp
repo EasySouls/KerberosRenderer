@@ -12,6 +12,10 @@ vk::Format Select(const ImageFormat format)
 		case ImageFormat::RG8: return vk::Format::eR8G8Unorm;
 		case ImageFormat::RGB8: return vk::Format::eR8G8B8Unorm;
 		case ImageFormat::RGBA8: return vk::Format::eR8G8B8A8Unorm;
+		case ImageFormat::R16: return vk::Format::eR16Unorm;
+		case ImageFormat::RG16: return vk::Format::eR16G16Unorm;
+		case ImageFormat::RGB16: return vk::Format::eR16G16B16Unorm;
+		case ImageFormat::RGBA16: return vk::Format::eR16G16B16A16Unorm;
 		case ImageFormat::RGBA32F: return vk::Format::eR32G32B32A32Sfloat;
         case ImageFormat::SRGB8: return vk::Format::eR8G8B8Srgb;
         case ImageFormat::SRGBA8: return vk::Format::eR8G8B8A8Srgb;
@@ -44,6 +48,14 @@ vk::Format ToSrgb(const vk::Format format)
 		case vk::Format::eR8G8B8Unorm: return vk::Format::eR8G8B8Srgb;
 		case vk::Format::eR8G8B8A8Unorm: return vk::Format::eR8G8B8A8Srgb;
 		case vk::Format::eB8G8R8A8Unorm: return vk::Format::eB8G8R8A8Srgb;
+		case vk::Format::eBc1RgbUnormBlock: return vk::Format::eBc1RgbSrgbBlock;
+		case vk::Format::eBc1RgbaUnormBlock: return vk::Format::eBc1RgbaSrgbBlock;
+		case vk::Format::eBc2UnormBlock: return vk::Format::eBc2SrgbBlock;
+		case vk::Format::eBc3UnormBlock: return vk::Format::eBc3SrgbBlock;
+		case vk::Format::eBc7UnormBlock: return vk::Format::eBc7SrgbBlock;
+		case vk::Format::eEtc2R8G8B8UnormBlock: return vk::Format::eEtc2R8G8B8SrgbBlock;
+		case vk::Format::eEtc2R8G8B8A1UnormBlock: return vk::Format::eEtc2R8G8B8A1SrgbBlock;
+		case vk::Format::eEtc2R8G8B8A8UnormBlock: return vk::Format::eEtc2R8G8B8A8SrgbBlock;
 		default: return format;
 	}
 }

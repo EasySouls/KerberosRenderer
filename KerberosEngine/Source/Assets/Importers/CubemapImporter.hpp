@@ -20,7 +20,7 @@ namespace Kerberos
 		std::filesystem::path FrontPath;
 		std::filesystem::path BackPath;
 
-		bool IsSRGB;
+		bool IsSRGB = false;
 	};
 
 	class CubemapImporter

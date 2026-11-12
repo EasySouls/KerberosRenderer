@@ -5,6 +5,7 @@
 #include "Utils.hpp"
 #include "KTX2Loader.hpp"
 #include "KTX2FormatSelector.hpp"
+#include "MipmapGenerator.hpp"
 #include "Profiling/Profilers.hpp"
 
 import Kerberos;
@@ -31,13 +32,19 @@ TextureCube::TextureCube(const CubemapData& data)
 	m_Specification = firstFace.Specification;
 	width = firstFace.Specification.Width;
 	height = firstFace.Specification.Height;
-	mipLevels = 1;
 	layerCount = 6;
-	usageFlags = vk::ImageUsageFlagBits::eSampled;
-	imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal;
 	format = KTX2FormatSelector::Select(m_Specification.Format);
 	if (data.IsSRGB)
 		format = KTX2FormatSelector::ToSrgb(format);
+
+	const uint32_t fullMipLevels = MipmapGenerator::CalculateMipLevelCount(width, height);
+	const bool generateMipmaps = fullMipLevels > 1 && MipmapGenerator::CanGenerate(format);
+	mipLevels = generateMipmaps ? fullMipLevels : 1;
+
+	usageFlags = vk::ImageUsageFlagBits::eSampled | vk::ImageUsageFlagBits::eTransferDst;
+	if (generateMipmaps)
+		usageFlags |= vk::ImageUsageFlagBits::eTransferSrc;
+	imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal;
 
 	auto& context = VulkanContext::Get();
 	const auto& device = context.GetDevice();
@@ -113,7 +120,11 @@ TextureCube::TextureCube(const CubemapData& data)
 	{
 		context.TransitionImageLayout(copyCmd, image, vk::ImageLayout::eUndefined, vk::ImageLayout::eTransferDstOptimal, subresourceRange);
 		copyCmd.copyBufferToImage(stagingBuffer, image, vk::ImageLayout::eTransferDstOptimal, bufferCopyRegions);
-		context.TransitionImageLayout(copyCmd, image, vk::ImageLayout::eTransferDstOptimal, imageLayout, subresourceRange);
+		if (generateMipmaps)
+			MipmapGenerator::Generate(copyCmd, image, width, height, mipLevels, 6);
+		context.TransitionImageLayout(copyCmd, image,
+			generateMipmaps ? vk::ImageLayout::eTransferSrcOptimal : vk::ImageLayout::eTransferDstOptimal,
+			imageLayout, subresourceRange);
 	});
 
 	CreateSampler(device);
@@ -148,7 +159,7 @@ TextureCube::TextureCube(const std::filesystem::path& filepath)
 
 	KBRAssert(ktxTex != nullptr, "TextureCube::TextureCube - ktxTexture2 is null after loading KTX2 file: {}", filepath.string());
 
-	usageFlags = vk::ImageUsageFlagBits::eSampled;
+	usageFlags = vk::ImageUsageFlagBits::eSampled | vk::ImageUsageFlagBits::eTransferDst;
 	imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal;
 
 	auto& context = VulkanContext::Get();
@@ -156,8 +167,15 @@ TextureCube::TextureCube(const std::filesystem::path& filepath)
 
 	width = ktxTex->baseWidth;
 	height = ktxTex->baseHeight;
-	mipLevels = ktxTex->numLevels;
-	format = static_cast<vk::Format>(ktxTex->vkFormat);
+	format = KTX2Loader::ResolveVulkanFormat(ktxTex);
+
+	const uint32_t ktxLevels = std::max(1u, static_cast<uint32_t>(ktxTex->numLevels));
+	const uint32_t fullMipLevels = MipmapGenerator::CalculateMipLevelCount(width, height);
+	const bool generateMipmaps = ktxLevels <= 1 && fullMipLevels > 1 && MipmapGenerator::CanGenerate(format);
+	mipLevels = generateMipmaps ? fullMipLevels : ktxLevels;
+	const uint32_t uploadedLevels = std::min(ktxLevels, mipLevels);
+	if (generateMipmaps)
+		usageFlags |= vk::ImageUsageFlagBits::eTransferSrc;
 
 	ktx_uint8_t* ktxTextureData = ktxTex->pData;
 	ktx_size_t ktxTextureSize = ktxTex->dataSize;
@@ -192,7 +210,7 @@ TextureCube::TextureCube(const std::filesystem::path& filepath)
 
 	for (uint32_t face = 0; face < 6; ++face)
 	{
-		for (uint32_t level = 0; level < mipLevels; level++)
+		for (uint32_t level = 0; level < uploadedLevels; level++)
 		{
 			ktx_size_t offset;
 			KTX_error_code res = ktxTexture_GetImageOffset((ktxTexture*)ktxTex, level, 0, face, &offset);
@@ -206,8 +224,8 @@ TextureCube::TextureCube(const std::filesystem::path& filepath)
 					.layerCount = 1,
 				},
 				.imageExtent = {
-					.width = ktxTex->baseWidth >> level,
-					.height = ktxTex->baseHeight >> level,
+					.width = std::max(1u, static_cast<uint32_t>(ktxTex->baseWidth) >> level),
+					.height = std::max(1u, static_cast<uint32_t>(ktxTex->baseHeight) >> level),
 					.depth = 1
 				}
 			};
@@ -267,11 +285,14 @@ TextureCube::TextureCube(const std::filesystem::path& filepath)
 			vk::ImageLayout::eTransferDstOptimal,
 			bufferCopyRegions);
 
-		// Change texture image layout to shader read after all mip levels have been copied
+		if (generateMipmaps)
+			MipmapGenerator::Generate(copyCmd, image, width, height, mipLevels, 6);
+
+		// Change texture image layout to shader read after all mip levels are ready
 		context.TransitionImageLayout(
 			copyCmd,
 			image,
-			vk::ImageLayout::eTransferDstOptimal,
+			generateMipmaps ? vk::ImageLayout::eTransferSrcOptimal : vk::ImageLayout::eTransferDstOptimal,
 			imageLayout,
 			subresourceRange);
 	});

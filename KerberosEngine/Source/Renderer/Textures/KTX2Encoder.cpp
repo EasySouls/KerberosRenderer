@@ -30,6 +30,15 @@ bool Encode(const std::filesystem::path& outputPath,
 	if (ktxTexture2_Create(&createInfo, KTX_TEXTURE_CREATE_ALLOC_STORAGE, &texture) != KTX_SUCCESS)
 		return false;
 
+	// Preserve the authored sRGB intent for 16-bit color textures, which have no
+	// UNORM+sRGB Vulkan format and are stored linearized. The loader uses this
+	// only for editor validation/preview metadata, not for sampling behavior.
+	if (specification.SourceSrgb)
+	{
+		constexpr char sourceSrgb = '1';
+		ktxHashList_AddKVPair(&texture->kvDataHead, "KBR_SourceSrgb", 1, &sourceSrgb);
+	}
+
 	const ktx_error_code_e setResult = ktxTexture_SetImageFromMemory(
 		reinterpret_cast<ktxTexture*>(texture), 0, 0, 0, pixels.Data,
 		static_cast<ktx_size_t>(pixels.Size));

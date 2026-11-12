@@ -6,7 +6,8 @@
 #include "Utils/KtxConversion.hpp"
 
 #include <yaml-cpp/yaml.h>
-#include <stb_image.h>
+
+#include <algorithm>
 
 import Kerberos;
 
@@ -36,11 +37,23 @@ namespace Kerberos
 			return nullptr;
 		}
 
-		constexpr bool isFromOneFile = true; // TODO: Support loading cubemap from multiple files
-
-		if (isFromOneFile)
+		// A descriptor can either point at one KTX2 cubemap or list six faces.
+		// The six-face form is what makes HDR (.hdr) environment authoring usable.
+        if (node["Path"].IsDefined())
 		{
 			const std::filesystem::path texPath = node["Path"].as<std::string>();
+
+			std::string extension = texPath.extension().string();
+			std::ranges::transform(extension, extension.begin(), [](const unsigned char value)
+			{
+				return static_cast<char>(std::tolower(value));
+			});
+			if (extension != ".ktx2")
+			{
+				Log::CoreError("CubemapImporter::ImportCubemap - single-file cubemap '{}' must be KTX2; "
+					"use a Cubemap: descriptor with six face paths for HDR/LDR raster faces.", texPath.string());
+				return nullptr;
+			}
 
 			if (NeedsConvertingToKTX2(texPath))
 			{
@@ -83,18 +96,17 @@ namespace Kerberos
 
 		CubemapData cubemapData;
 		cubemapData.Name = descriptor.Name;
-		cubemapData.IsSRGB = descriptor.IsSRGB;
+		// Each face's TextureSpecification already carries the requested color
+		// encoding (sRGB format for 8-bit color, linearized UNORM16 for 16-bit
+		// color, or RGBA32F for HDR), so TextureCube must not reinterpret it again.
+		cubemapData.IsSRGB = false;
 
-		const auto loadFace = [](const std::filesystem::path& facePath) -> FaceData
+		const auto loadFace = [](const std::filesystem::path& facePath, const bool srgb) -> FaceData
 		{
 			FaceData faceData;
 
 			constexpr int desiredChannels = 4;
 			constexpr bool flip = true;
-			// Faces are loaded as linear data.
-			// TextureCube applies the
-			// descriptor's IsSRGB flag when creating the image.
-			constexpr bool srgb = false;
 
 			const auto [spec, buffer] = TextureImporter::LoadTextureData(facePath, flip, desiredChannels, srgb);
 			faceData.Specification = spec;
@@ -102,19 +114,14 @@ namespace Kerberos
 			return faceData;
 		};
 
-		cubemapData.Faces[0] = loadFace(descriptor.RightPath);
-		cubemapData.Faces[1] = loadFace(descriptor.LeftPath);
-		cubemapData.Faces[2] = loadFace(descriptor.TopPath);
-		cubemapData.Faces[3] = loadFace(descriptor.BottomPath);
-		cubemapData.Faces[4] = loadFace(descriptor.FrontPath);
-		cubemapData.Faces[5] = loadFace(descriptor.BackPath);
+		cubemapData.Faces[0] = loadFace(descriptor.RightPath, descriptor.IsSRGB);
+		cubemapData.Faces[1] = loadFace(descriptor.LeftPath, descriptor.IsSRGB);
+		cubemapData.Faces[2] = loadFace(descriptor.TopPath, descriptor.IsSRGB);
+		cubemapData.Faces[3] = loadFace(descriptor.BottomPath, descriptor.IsSRGB);
+		cubemapData.Faces[4] = loadFace(descriptor.FrontPath, descriptor.IsSRGB);
+		cubemapData.Faces[5] = loadFace(descriptor.BackPath, descriptor.IsSRGB);
 
 		Ref<TextureCube> cubemapTexture = CreateRef<TextureCube>(cubemapData);
-
-		for (size_t i = 1; i < cubemapData.Faces.size(); ++i)
-		{
-			stbi_image_free(cubemapData.Faces[i].Buffer.Data);
-		}
 
 		if (!cubemapTexture)
 		{

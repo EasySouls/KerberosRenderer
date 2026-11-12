@@ -122,7 +122,10 @@ namespace Kerberos
 			if (!KTX2Encoder::Encode(artifactAbsolute, specification, buffer))
 				throw std::runtime_error("Failed to encode texture to KTX2 '" + artifactAbsolute.string() + "'");
 
-			result.TextureSrgb["source"] = srgb;
+			// HDR radiance is linear by definition. Do not record an sRGB import
+			// option that would be shown as meaningful in the inspector.
+			result.TextureSrgb["source"] =
+				specification.Format == ImageFormat::RGBA32F ? false : srgb;
 		}
 
 		result.SourceLibraryPath = artifactRelative;
@@ -136,7 +139,8 @@ namespace Kerberos
 
 	uint32_t TexturePipelineImporter::Version() const
 	{
-		return 1;
+		// 2: Preserve 16-bit/HDR raster data and record linearized-16-bit sRGB intent.
+		return 2;
 	}
 
 	AssetType TexturePipelineImporter::SourceAssetType() const

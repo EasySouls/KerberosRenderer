@@ -14,6 +14,7 @@ add_executable(KerberosEngineTests
     PhysicsQueryTests.cpp
     ProjectLoadTests.cpp
     RagdollTests.cpp
+    TexturePipelineTests.cpp
 )
 
 add_executable(KerberosEditorModelTests

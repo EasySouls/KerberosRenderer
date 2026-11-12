@@ -14,6 +14,10 @@ enum class ImageFormat
 	RG8,
 	RGB8,
 	RGBA8,
+	R16,
+	RG16,
+	RGB16,
+	RGBA16,
 	RGBA32F,
 	SRGB8,
     SRGBA8,
@@ -25,6 +29,10 @@ struct TextureSpecification
 	uint32_t Height = 1;
 	ImageFormat Format = ImageFormat::RGBA8;
 	bool GenerateMips = false;
+	/// True when the source was authored in sRGB even if the stored format is
+	/// linear. This is used for 16-bit color textures, which have no Vulkan
+	/// UNORM+sRGB format and are linearized during import.
+	bool SourceSrgb = false;
 };
 
 class Texture : public Asset

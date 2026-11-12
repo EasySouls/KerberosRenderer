@@ -5,6 +5,7 @@
 #include "Utils.hpp"
 #include "KTX2Loader.hpp"
 #include "KTX2FormatSelector.hpp"
+#include "MipmapGenerator.hpp"
 #include "VulkanContext.hpp"
 #include "Profiling/Profilers.hpp"
 
@@ -41,10 +42,16 @@ Texture2D::Texture2D(const TextureSpecification& spec, const Buffer& buffer)
 
 	width = spec.Width;
 	height = spec.Height;
-	mipLevels = 1; // TODO: Parameterize
 	format = KTX2FormatSelector::Select(spec.Format);
+
+	const uint32_t fullMipLevels = MipmapGenerator::CalculateMipLevelCount(width, height);
+	const bool generateMipmaps = fullMipLevels > 1 && MipmapGenerator::CanGenerate(format);
+	mipLevels = generateMipmaps ? fullMipLevels : 1;
+
 	imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal; // TODO: Parameterize
-	usageFlags = vk::ImageUsageFlagBits::eSampled; // TODO: Parameterize
+	usageFlags = vk::ImageUsageFlagBits::eSampled | vk::ImageUsageFlagBits::eTransferDst;
+	if (generateMipmaps)
+		usageFlags |= vk::ImageUsageFlagBits::eTransferSrc;
 
 	// Create a host-visible staging buffer that contains the raw image data
 	vk::BufferCreateInfo bufferCreateInfo{
@@ -78,27 +85,22 @@ Texture2D::Texture2D(const TextureSpecification& spec, const Buffer& buffer)
 	std::memcpy(data, buffer.Data, buffer.Size);
 	stagingMemory.unmapMemory();
 
-	// Setup buffer copy regions for each mip level
+	// The buffer contains the base level only, enerated levels are filled below.
 	std::vector<vk::BufferImageCopy> bufferCopyRegions;
-
-	for (uint32_t i = 0; i < mipLevels; i++) {
-		VkDeviceSize offset = 0; // TODO: Calculate offset when mipmapping is enabled
-		vk::BufferImageCopy bufferCopyRegion{
-			.bufferOffset = offset,
-			.imageSubresource = {
-				.aspectMask = vk::ImageAspectFlagBits::eColor,
-				.mipLevel = i,
-				.baseArrayLayer = 0,
-				.layerCount = 1,
-			},
-			.imageExtent = {
-				.width = std::max(1u, width >> i),
-				.height = std::max(1u, height >> i),
-				.depth = 1
-			}
-		};
-		bufferCopyRegions.push_back(bufferCopyRegion);
-	}
+	bufferCopyRegions.push_back(vk::BufferImageCopy{
+		.bufferOffset = 0,
+		.imageSubresource = {
+			.aspectMask = vk::ImageAspectFlagBits::eColor,
+			.mipLevel = 0,
+			.baseArrayLayer = 0,
+			.layerCount = 1,
+		},
+		.imageExtent = {
+			.width = width,
+			.height = height,
+			.depth = 1
+		}
+	});
 
 	// Create optimal tiled target image
 	vk::ImageCreateInfo imageCreateInfo{
@@ -143,19 +145,24 @@ Texture2D::Texture2D(const TextureSpecification& spec, const Buffer& buffer)
 			vk::ImageLayout::eTransferDstOptimal,
 			subresourceRange);
 
-		// Copy mip levels from staging buffer
+		// Copy the base level from the staging buffer
 		copyCmd.copyBufferToImage(
 			stagingBuffer,
 			image,
 			vk::ImageLayout::eTransferDstOptimal,
 			bufferCopyRegions);
 
-		// Change texture image layout to shader read after all mip levels have been copied
+		if (generateMipmaps)
+		{
+			MipmapGenerator::Generate(copyCmd, image, width, height, mipLevels);
+		}
+
+		// Change texture image layout to shader read after all mip levels are ready
 		this->imageLayout = imageLayout;
 		context.TransitionImageLayout(
 			copyCmd,
 			image,
-			vk::ImageLayout::eTransferDstOptimal,
+			generateMipmaps ? vk::ImageLayout::eTransferSrcOptimal : vk::ImageLayout::eTransferDstOptimal,
 			imageLayout,
 			subresourceRange);
 	});
@@ -202,9 +209,27 @@ Texture2D::Texture2D(const std::filesystem::path& filepath)
 
 	width = ktxTex->baseWidth;
 	height = ktxTex->baseHeight;
-	mipLevels = ktxTex->numLevels;
+	format = KTX2Loader::ResolveVulkanFormat(ktxTex);
 
-	format = static_cast<vk::Format>(ktxTex->vkFormat);
+	const uint32_t ktxLevels = std::max(1u, static_cast<uint32_t>(ktxTex->numLevels));
+	const uint32_t fullMipLevels = MipmapGenerator::CalculateMipLevelCount(width, height);
+	const bool generateMipmaps = ktxLevels <= 1 && fullMipLevels > 1 && MipmapGenerator::CanGenerate(format);
+	mipLevels = generateMipmaps ? fullMipLevels : ktxLevels;
+	const uint32_t uploadedLevels = std::min(ktxLevels, mipLevels);
+
+	// 16-bit color artifacts are linearized on import; remember that they were
+	// authored as sRGB so editor validation does not flag them as data.
+	unsigned int sourceSrgbLength = 0;
+	void* sourceSrgbValue = nullptr;
+	if (ktxHashList_FindValue(&ktxTex->kvDataHead, "KBR_SourceSrgb",
+			&sourceSrgbLength, &sourceSrgbValue) == KTX_SUCCESS && sourceSrgbLength > 0)
+	{
+		m_Specification.SourceSrgb = true;
+	}
+
+	usageFlags = vk::ImageUsageFlagBits::eSampled | vk::ImageUsageFlagBits::eTransferDst;
+	if (generateMipmaps)
+		usageFlags |= vk::ImageUsageFlagBits::eTransferSrc;
 
 	ktx_uint8_t* ktxTextureData = ktxTex->pData;
 	ktx_size_t ktxTextureSize = ktxTex->dataSize;
@@ -239,7 +264,7 @@ Texture2D::Texture2D(const std::filesystem::path& filepath)
 	// Setup buffer copy regions for each mip level
 	std::vector<vk::BufferImageCopy> bufferCopyRegions;
 
-	for (uint32_t i = 0; i < mipLevels; i++) {
+	for (uint32_t i = 0; i < uploadedLevels; i++) {
 		ktx_size_t offset;
 		KTX_error_code res = ktxTexture_GetImageOffset(reinterpret_cast<ktxTexture*>(ktxTex), i, 0, 0, &offset);
 		KBRAssert(res == KTX_SUCCESS, "Texture2D::Texture2D - Failed to get image offset for mip level {}", i);
@@ -303,18 +328,23 @@ Texture2D::Texture2D(const std::filesystem::path& filepath)
 			vk::ImageLayout::eTransferDstOptimal,
 			subresourceRange);
 
-		// Copy mip levels from staging buffer
+		// Copy the authored mip levels from the staging buffer
 		copyCmd.copyBufferToImage(
 			stagingBuffer,
 			image,
 			vk::ImageLayout::eTransferDstOptimal,
 			bufferCopyRegions);
 
-		// Change texture image layout to shader read after all mip levels have been copied
+		if (generateMipmaps)
+		{
+			MipmapGenerator::Generate(copyCmd, image, width, height, mipLevels);
+		}
+
+		// Change texture image layout to shader read after all mip levels are ready
 		context.TransitionImageLayout(
 			copyCmd,
 			image,
-			vk::ImageLayout::eTransferDstOptimal,
+			generateMipmaps ? vk::ImageLayout::eTransferSrcOptimal : vk::ImageLayout::eTransferDstOptimal,
 			imageLayout,
 			subresourceRange);
 	});
@@ -374,7 +404,9 @@ const vk::raii::ImageView& Texture2D::GetImGuiImageView() const
 
 bool Texture2D::IsSrgb() const
 {
-	return GetImGuiDisplayFormat(format) != format;
+	// A 16-bit color source is linearized during import because Vulkan has no 16-bit UNORM+sRGB format.
+	// SourceSrgb preserves that authoring intent for editor validation and previews.
+	return m_Specification.SourceSrgb || GetImGuiDisplayFormat(format) != format;
 }
 
 Texture2D::~Texture2D() 

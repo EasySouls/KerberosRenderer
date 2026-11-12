@@ -231,15 +231,15 @@ frame pays for both. Non-ray-query PBR always samples GTAO.
 `pbr_helpers.slang::ApplyNormalVarianceToRoughness` is the derivative-based
 specular anti-aliasing path: it adds the screen-space variance of the shading
 normal to the GGX roughness, which suppresses normal-map minification
-sparkle until generated mip chains exist. Non-finite derivative variance is
-ignored, because screen-space derivatives at primitive edges/helper lanes can
-otherwise turn roughness (and all downstream lighting) into NaN. It is not
-Toksvig (Toksvig folds a normal-length variance into roughness during texture
-prefiltering).
+sparkle until Toksvig-style normal-map filtering is added. Non-finite derivative
+variance is ignored, because screen-space derivatives at primitive edges/helper
+lanes can otherwise turn roughness (and all downstream lighting) into NaN. It is
+not Toksvig (Toksvig folds a normal-length variance into roughness during
+texture prefiltering).
 
 Planned, not implemented:
 - multi-scatter GGX / energy compensation for rough metals
-- generated texture mip chains (including Toksvig-style normal-map filtering)
+- Toksvig-style normal-map variance in generated mip chains
 - per-material normal scale and occlusion strength
 - clearcoat/sheen material layers (add only when a project needs them)
 
@@ -310,6 +310,30 @@ not linear HDR.
 KTX1 and raster conversion is the asset pipeline's responsibility (see
 `TexturePipelineImporter`), not the loader's; do not reintroduce conversion in
 the loaders.
+
+KTX2 loading uses the embedded `vkFormat` as the source of truth, but
+`KTX2Loader::ResolveVulkanFormat` also reinterprets a UNORM format as sRGB when
+the data format descriptor declares an sRGB transfer function. This covers
+cubemaps/textures converted from PNG that carry UNORM plus sRGB metadata; do not
+skip that check when adding another KTX2 entry point.
+
+Textures upload every mip level present in the KTX2 file. When a texture has only
+the base level, `MipmapGenerator` builds a full chain with `vkCmdBlitImage`
+(linear filtering, one blit per level across all array layers) if the format
+supports blit source/destination and linear filtering; otherwise the texture
+stays at one level. The image must include
+`TRANSFER_SRC` usage and the generator leaves every level in `TRANSFER_SRC` for
+the caller's final transition to `SHADER_READ_ONLY_OPTIMAL`. Compressed formats
+are uploaded as authored and are not generated.
+
+`TextureSpecification` supports 8-bit UNORM/sRGB, 16-bit UNORM (`R16`/`RG16`/
+`RGB16`/`RGBA16`), and `RGBA32F`. HDR `.hdr` sources load as `RGBA32F`; 16-bit
+raster sources keep 16-bit precision. Vulkan has no 16-bit UNORM+sRGB format, so
+16-bit color sources are linearized on import and marked with
+`TextureSpecification::SourceSrgb` (also persisted as the KTX2
+`KBR_SourceSrgb` key) for editor validation; the shader receives linear values.
+KTX2 uploads are limited to blit-compatible formats for generated mips, so
+compressed KTX2 inputs should carry their own chain.
 
 Dynamic uniform offsets must respect
 `minUniformBufferOffsetAlignment`; current per-object allocation also has a
