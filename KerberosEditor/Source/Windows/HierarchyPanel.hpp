@@ -48,6 +48,10 @@ namespace Kerberos
 		 */
 		void SetOnEntitySelected(const std::function<void(Entity)>& callback);
 
+		/// Called when the inspector requests that an AI state tree asset be
+		/// opened in the dedicated AI editor window.
+		void SetOnOpenAIStateTree(const std::function<void(AssetHandle)>& callback);
+
 		void AddComponentPopup(Entity entity);
 
 	private:
@@ -96,6 +100,7 @@ namespace Kerberos
 
 		std::function<void(Entity)> m_OnEntityDeleted;
 		std::function<void(Entity)> m_OnEntitySelected;
+		std::function<void(AssetHandle)> m_OnOpenAIStateTree;
 
 		UndoRedoManager* m_UndoRedo = nullptr;
 

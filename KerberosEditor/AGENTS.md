@@ -39,6 +39,18 @@ labels across windows. Single-type asset fields should use
 the searchable asset list and keeps the matching asset-browser payload as a
 drop target.
 
+## Icon assets and EditorIcons
+
+Editor-authored glyph icons live under `KerberosEditor/Assets/Editor/Icons` as
+white-on-transparent PNGs (with SVG sources and `icons.json` beside them).
+`KerberosEditor/Source/Widgets/EditorIcons` loads them through
+`EnginePaths::Assets()/Editor/Icons` during `EditorLayer::OnAttach`, converts
+them to ImGui texture IDs once, and releases them in `OnDetach`. Panels should
+use its `Draw`/`ImageButton`/`Selectable`/`MenuItem` helpers (tinted from the
+ImGui text color) instead of hard-coded placeholder text or per-panel texture
+loads. Use `ForAssetType` for asset rows and pickers. Add new glyphs to both the
+PNG/SVG set and the `KBR_EDITOR_ICON_LIST` macro.
+
 ## Panels and integration
 
 Editor windows live mainly under
@@ -94,6 +106,15 @@ Editor windows live mainly under
   authored setup only; `Scene::RagdollSystem` owns the runtime bodies,
   constraints, offsets, and blend state. Authored prefab templates do not carry
   the Ragdoll component yet, so add it after instantiation or from C#.
+  The AI components are added through the `AI` component submenu; the
+  "AI Agent" entry creates the blackboard, state machine, controller, and
+  perception together. The inspector binds a persistent `.kbrai` state tree
+  asset through `AssetPicker` (editable in the AI editor) or selects a
+  registered native/C# tree (view-only). It shows the live current/previous
+  state and time in state during Play/Simulate, and edits perception/controller
+  fields plus the authored blackboard values. Runtime blackboard values are
+  shown read-only. Removing any AI component uses the same component-popup
+  pattern as the rest of the hierarchy.
 - `AnimationEditorPanel`: opened from `View > Animation Editor`; it resolves the
   animator from the selected entity, a parent, or the skeleton-linked animator.
   Its timeline shows one lane per event name plus a marker lane, supports
@@ -111,6 +132,66 @@ Editor windows live mainly under
   localHalfExtents, ignore)` or `Physics.OverlapSphere`; the entity-relative
   overload uses the entity's world transform, so a socket-driven weapon is
   enough and no dedicated hitbox component is required.
+- `AIEditorPanel`: opened from `View > AI Editor`; also opened by double-clicking
+  a `.kbrai` asset in `AssetsPanel`. It provides a tabbed document workspace,
+  an AI state-tree asset picker, a registered-tree picker, New/Save/Revert/
+  Validate actions, a validation issue list, a debug layout list, and an
+  `imgui-node-editor` canvas. The canvas draws one node per state (entry badge,
+  task list, one output pin per transition, and a trailing `+ Transition` pin)
+  and one link per transition. Dragging `+ Transition` onto a state input
+  creates a transition, dragging an existing transition pin retargets it, and
+  node/link deletion, entry-state selection, and state creation are available
+  through the canvas context menus. Node drags persist through
+  `AIDocumentState::EditorPosition`; structural edits, entry changes, and drags
+  mark the document dirty. Editable `.kbrai` documents save through
+  `AIEditorAssetSession`, which recompiles the asset and force-reimports the
+  source; registered C++/C# trees open read-only. Editing is disabled while
+  Play/Simulate is active.
+  The side inspector (`Windows/AIEditor/AIEditorInspector`) follows the selected
+  state or transition. It edits the state name and entry flag, task and
+  condition lists (add/remove/reorder), and the transition name, target, and
+  priority, and it generates parameter widgets from `AINodeTypeInfo::Params`
+  via `AIEditorNodeSchema`. Parameter edits use the same snapshot undo commands;
+  schema defaults are only written when the user actually changes a parameter.
+  Selecting a validation issue or a transition row requests graph selection
+  through the tab's pending-selection fields, which `AIEditorGraph` consumes
+  inside the canvas frame.
+  In Play/Simulate the panel enables `AISystem` debug capture while the window
+  is open. The inspector picks among agents bound to the open tree, and the
+  canvas overlays the selected agent's snapshot: current/previous/pending/
+  evaluated node markers and borders, task result rows, candidate link colors
+  (satisfied/unsatisfied), and the winning transition. Capture is disabled when
+  the window closes or the editor returns to Edit; paused scenes keep the last
+  snapshot. A transition history table below the workspace shows capture-relative
+  time, agent, reason, transition name, from/to states, and time in the previous
+  state; clicking a row selects the matching link (or state) and agent.
+  Graph and inspector edits (create/retarget/delete transitions, delete states,
+  set entry, add/duplicate/rename state, add state, add/remove/reorder tasks and
+  conditions, retarget and reorder transitions, rename, parameters, node moves,
+  and auto layout) are undoable per tab via snapshot commands. While the AI
+  Editor window is focused, `EditorLayer` routes Ctrl+Z/Ctrl+Shift+Z/Ctrl+Y and
+  Ctrl+S to the active tab instead of the scene history or scene save; Revert
+  clears the history.
+  Validation failures color error nodes/links red and warnings amber, and link
+  hover tooltips show the transition target and condition count. The toolbar
+  provides `Auto Layout` (BFS from the entry state) and `Frame All`. The asset
+  browser file context menu has `Open in AI Editor`, the folder context menu has
+  `Create AI State Tree...` (prompts for a file name, creates the default
+  document through `AIEditorPanel::CreateAssetAtPath`, imports it, and opens
+  it), and an AI state machine bound to a `.kbrai` asset shows an
+  `Open in AI Editor` button in the inspector.
+  Multi-selection deletes resolve every document
+  index before mutating so session-ID renumbering cannot remove the wrong
+  item. Deleting the entry state promotes the first remaining state (or clears
+  the entry when none remain), and new states/transitions receive unique names.
+  The editor-only model lives in `KerberosEditor/Source/Windows/AIEditor/**`;
+  graph IDs, validation, tabs, and undo are editor-local and do not modify
+  `AIStateTreeDocument` or `AIStateTreeSerializer`. `AIEditorDocument` stays
+  free of ImGui/node-editor dependencies; `AIEditorTab` owns the node-editor
+  context, per-tab undo history, node-position cache, refit request, selection,
+  and runtime agent. UI-free runtime resolution (state/link highlights and
+  history rows) lives in `AIEditorRuntimeView.*`; the shared agent picker and
+  transition-history table live in `AIEditorDebugView.*`.
 - `InspectorPanel`: the unified right-side "Properties" window. It shows entity
   components when an entity is selected and asset import options when a source
   asset is selected in `AssetsPanel` (asset selection takes display precedence).
@@ -122,7 +203,10 @@ Editor windows live mainly under
   staged locally and applied with Apply/Revert, which persists the `.meta` and
   re-imports the source.
 - `ViewportPanel`: rendered image display, viewport resize, camera input, and
-  GPU mouse picking.
+  GPU mouse picking. The `View` menu can overlay physics colliders and AI
+  perception cones; the AI Editor runtime bar also exposes the perception
+  toggle. Perception cones show sight/retain sectors, FOV direction, eye height,
+  and the current target or last-known-position line.
 - project/scene panels: project settings, serialization, scene lifecycle, and
   runtime/editor mode transitions.
 
@@ -165,6 +249,16 @@ record one command on `ImGui::IsItemDeactivatedAfterEdit()`.
 widget already changed the component is safe. Transform commands also
 recalculate entity transforms after applying, and vector-field snapshots are
 keyed by widget ID plus entity UUID so a selection change cannot mix them up.
+
+Gizmo drags in `EditorLayer::DrawViewport` use the same command type.
+`EditorLayer` snapshots the selected entity's authored `TransformComponent`
+before the first `ImGuizmo::Manipulate` call that reports `IsUsing()`, and when
+the gesture ends it records a single `SetComponentValueCommand<TransformComponent>`
+(with a `CalculateEntityTransform` callback) if the decomposed TRS visibly
+changed. Gizmo edits are only recorded in `SceneState::Edit`; Simulate/Play
+manipulate the runtime copy, which is discarded on stop. A pending gesture is
+also committed if the gizmo stops being drawn (selection, gizmo type, or mode
+change).
 
 `SceneSerializer` exposes `SerializeEntitySubtree`/`DeserializeEntitySubtree`
 and shares per-entity deserialization with whole-scene loading. The whole-scene
@@ -216,11 +310,29 @@ immediately. `Scene::UpdateScripts`/`OnRuntimeStart` snapshot the script entity
 list before invoking callbacks so scripts may spawn prefabs during lifecycle
 methods.
 
+Persistent AI trees are `.kbrai` assets bound with
+`AIStateMachineComponent.TreeAsset`; the dedicated AI editor window loads the
+`AIStateTreeAsset` document, edits it, recompiles the runtime tree, and saves it
+through `SaveSource`/the asset manager. Native C++/C# trees are registered with
+`Kerberos.AI.AI.RegisterStateTree(name, docOrJson)` or the C++ registry and
+remain view-only in the editor. Script-owned trees are cleared on project
+open and script-assembly reload, so register them in `OnCreate` (not a static
+constructor). Scripts are not instantiated in Simulate, so C#-registered trees
+are available in Play only; native trees work in both. The managed AI
+components expose blackboard typed get/set, state-machine tree/current state/
+`RequestState`, controller intent, perception fields, and targetable faction.
+Native callback-table additions must be appended at the end on both sides; the
+table is read positionally.
+
 Script classes use the `Kerberos.*` namespace (renamed from
 `Kerberos.Source.Kerberos.*`); `ScriptUtils::MigrateLegacyScriptClassName`
 rewrites the old prefix when scenes/prefabs are deserialized. The built-in
-sample scripts (`Player`, `Camera`, `CameraFollow`) live in `KerberosScriptCoreLib`
-under `Kerberos`; user scripts live in their own per-project assembly.
+sample scripts (`Player`, `Camera`, `CameraFollow`, `CSharpDemoTree`) live in
+`KerberosScriptCoreLib` under `Kerberos`; user scripts live in their own
+per-project assembly. `CSharpDemoTree` registers the view-only `CSharpDemo`
+state tree from `OnCreate`, so attaching it to an entity and entering Play makes
+the tree available in the AI Editor's registered-tree picker. It is the sample
+used to exercise C# trees in the AI Editor and AI runtime inspector.
 
 Each project owns a C# project at `<project>/Assets/Scripts/<PascalName>.csproj`
 (referencing `KerberosScriptCoreLib` through `$(KerberosEnginePath)`, with
@@ -283,7 +395,8 @@ must close and release project resources before the application is destroyed.
 
 Scene updates drive editor/runtime simulation and then queue rendering. The
 Play/Simulate update order is transforms → animation clocks/pose → events →
-scripts → `RagdollSystem::PreparePhysics` → `PhysicsSystem::Update` →
+scripts → `AISystem::Update` (perception → state machine → movement) →
+`RagdollSystem::PreparePhysics` → `PhysicsSystem::Update` →
 `RagdollSystem::ReadPhysicsPose` → `AnimationRuntime::FinalizePose` → queue
 render; the renderer only uploads the already-final skin matrices and joint
 entities/sockets are published from the ragdoll-blended `FinalPose`. Animation
@@ -350,7 +463,22 @@ cmake --build --preset vs2026-debug
 
 For editor changes, validate startup/project load, scene open/save, panel
 navigation, selection/entity deletion, viewport resize, ImGui stack balance,
-drag/drop payloads, asset watcher updates, and runtime/editor transitions. For
+drag/drop payloads, asset watcher updates, and runtime/editor transitions.
+For AI editor changes, run
+`.\out\build\vs2026\Tests\Debug\KerberosEditorModelTests.exe` and manually validate:
+opening a `.kbrai` through `View > AI Editor` and the asset browser, opening a
+registered tree in read-only mode, creating a new tree, save/revert/reimport,
+validation errors blocking save, graph link create/retarget/delete, node deletion,
+multi-selection deletion, entry-state reassignment after deleting the entry,
+unique naming for new states/transitions, inspector state/transition editing,
+every parameter type, task/condition/transition add-remove-reorder with undo,
+transition retarget/reorder after ID rebuilds, node-move undo, rename/duplicate
+state, auto layout, frame-all, validation node/link colors and link tooltips,
+runtime overlays and transition history in Play, history-row selection,
+debug capture disabled outside Play/Simulate, structural undo/redo and
+history clearing on revert, the asset-browser and inspector `Open in AI Editor`
+paths, the folder `Create AI State Tree...` flow (including duplicate-name
+rejection), tab close/discard behavior, and project switching clearing AI tabs. For
 undo changes, validate create/delete round-trips (including entity subtrees),
 component field edits, history clearing on new/open scene, and that history is
 inert during Play/Simulate.

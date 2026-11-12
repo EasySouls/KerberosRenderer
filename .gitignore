@@ -383,3 +383,6 @@ KerberosRenderer_ShutdownProfile.json
 
 # Crash dumps
 *.dmp
+
+# imgui-node-editor file
+KerberosEditor/NodeEditor.json

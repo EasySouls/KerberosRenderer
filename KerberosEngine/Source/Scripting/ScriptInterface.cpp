@@ -10,6 +10,9 @@
 #include "Scene/Components/AnimationComponents.hpp"
 #include "Scene/Components/PhysicsComponents.hpp"
 #include "Scene/Components/AudioComponents.hpp"
+#include "Scene/Components/AIComponents.hpp"
+#include "AI/AIKeys.hpp"
+#include "AI/AIStateTreeRegistry.hpp"
 #include "Assets/AssetManager.hpp"
 #include "Profiling/Profilers.hpp"
 
@@ -172,6 +175,61 @@ namespace Kerberos
 		void* MeshCollider3DComponent_SetIsTrigger;
 		void* MeshCollider3DComponent_GetEnabled;
 		void* MeshCollider3DComponent_SetEnabled;
+
+		void* AI_RegisterStateTree;
+		void* AI_UnregisterStateTree;
+		void* AI_StateTreeExists;
+
+		void* AIBlackboard_HasKey;
+		void* AIBlackboard_RemoveKey;
+		void* AIBlackboard_Clear;
+		void* AIBlackboard_GetFloat;
+		void* AIBlackboard_SetFloat;
+		void* AIBlackboard_GetInt;
+		void* AIBlackboard_SetInt;
+		void* AIBlackboard_GetBool;
+		void* AIBlackboard_SetBool;
+		void* AIBlackboard_GetVec3;
+		void* AIBlackboard_SetVec3;
+		void* AIBlackboard_GetEntity;
+		void* AIBlackboard_SetEntity;
+		void* AIBlackboard_GetString;
+		void* AIBlackboard_SetString;
+
+		void* AIStateMachine_GetTreeName;
+		void* AIStateMachine_SetTreeName;
+		void* AIStateMachine_GetCurrentState;
+		void* AIStateMachine_GetPreviousState;
+		void* AIStateMachine_GetTimeInState;
+		void* AIStateMachine_RequestState;
+		void* AIStateMachine_ResetRuntime;
+
+		void* AIController_GetDesiredVelocity;
+		void* AIController_SetDesiredVelocity;
+		void* AIController_GetLookAtTarget;
+		void* AIController_SetLookAtTarget;
+		void* AIController_GetWantsToAttack;
+		void* AIController_SetWantsToAttack;
+		void* AIController_GetEnabled;
+		void* AIController_SetEnabled;
+
+		void* AIPerception_GetSightRadius;
+		void* AIPerception_SetSightRadius;
+		void* AIPerception_GetLoseRadius;
+		void* AIPerception_SetLoseRadius;
+		void* AIPerception_GetFieldOfView;
+		void* AIPerception_SetFieldOfView;
+		void* AIPerception_GetEyeHeight;
+		void* AIPerception_SetEyeHeight;
+		void* AIPerception_GetInterval;
+		void* AIPerception_SetInterval;
+		void* AIPerception_GetRequireLineOfSight;
+		void* AIPerception_SetRequireLineOfSight;
+		void* AIPerception_GetFactionId;
+		void* AIPerception_SetFactionId;
+
+		void* AITargetable_GetFactionId;
+		void* AITargetable_SetFactionId;
 	};
 
 	/// Component type name to HasComponent check mapping
@@ -249,6 +307,16 @@ namespace Kerberos
 			return [](Entity entity) { return entity.AddComponent<SocketComponent>(); };
 		if (typeName == "RagdollComponent")
 			return [](Entity entity) { return entity.AddComponent<RagdollComponent>(); };
+		if (typeName == "AIBlackboardComponent")
+			return [](Entity entity) { return entity.AddComponent<AIBlackboardComponent>(); };
+		if (typeName == "AIStateMachineComponent")
+			return [](Entity entity) { return entity.AddComponent<AIStateMachineComponent>(); };
+		if (typeName == "AIControllerComponent")
+			return [](Entity entity) { return entity.AddComponent<AIControllerComponent>(); };
+		if (typeName == "AIPerceptionComponent")
+			return [](Entity entity) { return entity.AddComponent<AIPerceptionComponent>(); };
+		if (typeName == "AITargetableComponent")
+			return [](Entity entity) { return entity.AddComponent<AITargetableComponent>(); };
 
 		KBRAssert(false, "Unknown component type: {0}", typeName);
 		return nullptr;
@@ -1823,6 +1891,420 @@ namespace Kerberos
 	}
 
 	// ====================================================================
+	// AI
+	// ====================================================================
+
+	static Entity ResolveAIEntity(const uint64_t entityID)
+	{
+		const Ref<Scene> scene = ScriptEngine::GetSceneContext().lock();
+		return scene ? scene->TryGetEntityByUUID(UUID(entityID)) : Entity{};
+	}
+
+	static AI::BlackboardKey AIBlackboardKey(const char* key)
+	{
+		return key ? AI::HashKey(key) : AI::BlackboardKey{ 0 };
+	}
+
+	static AIBlackboardComponent* TryGetAIBlackboard(const uint64_t entityID)
+	{
+		const Entity entity = ResolveAIEntity(entityID);
+		return entity && entity.HasComponent<AIBlackboardComponent>()
+			? &entity.GetComponent<AIBlackboardComponent>()
+			: nullptr;
+	}
+
+	static AIStateMachineComponent* TryGetAIStateMachine(const uint64_t entityID)
+	{
+		const Entity entity = ResolveAIEntity(entityID);
+		return entity && entity.HasComponent<AIStateMachineComponent>()
+			? &entity.GetComponent<AIStateMachineComponent>()
+			: nullptr;
+	}
+
+	static AIControllerComponent* TryGetAIController(const uint64_t entityID)
+	{
+		const Entity entity = ResolveAIEntity(entityID);
+		return entity && entity.HasComponent<AIControllerComponent>()
+			? &entity.GetComponent<AIControllerComponent>()
+			: nullptr;
+	}
+
+	static AIPerceptionComponent* TryGetAIPerception(const uint64_t entityID)
+	{
+		const Entity entity = ResolveAIEntity(entityID);
+		return entity && entity.HasComponent<AIPerceptionComponent>()
+			? &entity.GetComponent<AIPerceptionComponent>()
+			: nullptr;
+	}
+
+	static AITargetableComponent* TryGetAITargetable(const uint64_t entityID)
+	{
+		const Entity entity = ResolveAIEntity(entityID);
+		return entity && entity.HasComponent<AITargetableComponent>()
+			? &entity.GetComponent<AITargetableComponent>()
+			: nullptr;
+	}
+
+	template <typename T>
+	static T GetPerceptionField(const uint64_t entityID, T AIPerceptionComponent::*field, const T fallback)
+	{
+		const AIPerceptionComponent* perception = TryGetAIPerception(entityID);
+		return perception ? perception->*field : fallback;
+	}
+
+	template <typename T>
+	static void SetPerceptionField(const uint64_t entityID, T AIPerceptionComponent::*field, const T value)
+	{
+		if (AIPerceptionComponent* perception = TryGetAIPerception(entityID))
+			perception->*field = value;
+	}
+
+	static uint8_t AI_RegisterStateTree(const char* name, const char* document)
+	{
+		if (!name || !document)
+			return 0;
+
+		std::string error;
+		const bool registered = AI::AIStateTreeRegistry::RegisterFromDocument(
+			name, document, AI::AIStateTreeOrigin::Script, &error);
+		if (!registered)
+			Log::CoreError("Failed to register C# AI state tree '{}': {}", name, error);
+
+		return registered ? 1 : 0;
+	}
+
+	static uint8_t AI_UnregisterStateTree(const char* name)
+	{
+		return name && AI::AIStateTreeRegistry::Unregister(name) ? 1 : 0;
+	}
+
+	static uint8_t AI_StateTreeExists(const char* name)
+	{
+		return name && AI::AIStateTreeRegistry::Find(name) ? 1 : 0;
+	}
+
+	static uint8_t AIBlackboard_HasKey(const uint64_t entityID, const char* key)
+	{
+		const AIBlackboardComponent* blackboard = TryGetAIBlackboard(entityID);
+		return blackboard && blackboard->Has(AIBlackboardKey(key)) ? 1 : 0;
+	}
+
+	static void AIBlackboard_RemoveKey(const uint64_t entityID, const char* key)
+	{
+		if (AIBlackboardComponent* blackboard = TryGetAIBlackboard(entityID))
+			blackboard->Remove(AIBlackboardKey(key));
+	}
+
+	static void AIBlackboard_Clear(const uint64_t entityID)
+	{
+		if (AIBlackboardComponent* blackboard = TryGetAIBlackboard(entityID))
+			blackboard->Clear();
+	}
+
+	static float AIBlackboard_GetFloat(const uint64_t entityID, const char* key)
+	{
+		const AIBlackboardComponent* blackboard = TryGetAIBlackboard(entityID);
+		const float* value = blackboard ? blackboard->Get<float>(AIBlackboardKey(key)) : nullptr;
+		return value ? *value : 0.0f;
+	}
+
+	static void AIBlackboard_SetFloat(const uint64_t entityID, const char* key, const float value)
+	{
+		if (AIBlackboardComponent* blackboard = TryGetAIBlackboard(entityID))
+			blackboard->Set(AIBlackboardKey(key), value);
+	}
+
+	static std::int64_t AIBlackboard_GetInt(const uint64_t entityID, const char* key)
+	{
+		const AIBlackboardComponent* blackboard = TryGetAIBlackboard(entityID);
+		const auto* value = blackboard ? blackboard->Get<std::int64_t>(AIBlackboardKey(key)) : nullptr;
+		return value ? *value : 0;
+	}
+
+	static void AIBlackboard_SetInt(const uint64_t entityID, const char* key, const std::int64_t value)
+	{
+		if (AIBlackboardComponent* blackboard = TryGetAIBlackboard(entityID))
+			blackboard->Set(AIBlackboardKey(key), value);
+	}
+
+	static uint8_t AIBlackboard_GetBool(const uint64_t entityID, const char* key)
+	{
+		const AIBlackboardComponent* blackboard = TryGetAIBlackboard(entityID);
+		const bool* value = blackboard ? blackboard->Get<bool>(AIBlackboardKey(key)) : nullptr;
+		return value && *value ? 1 : 0;
+	}
+
+	static void AIBlackboard_SetBool(const uint64_t entityID, const char* key, const uint8_t value)
+	{
+		if (AIBlackboardComponent* blackboard = TryGetAIBlackboard(entityID))
+			blackboard->Set(AIBlackboardKey(key), value != 0);
+	}
+
+	static void AIBlackboard_GetVec3(const uint64_t entityID, const char* key, glm::vec3* out)
+	{
+		if (!out)
+			return;
+
+		const AIBlackboardComponent* blackboard = TryGetAIBlackboard(entityID);
+		const glm::vec3* value = blackboard ? blackboard->Get<glm::vec3>(AIBlackboardKey(key)) : nullptr;
+		*out = value ? *value : glm::vec3(0.0f);
+	}
+
+	static void AIBlackboard_SetVec3(const uint64_t entityID, const char* key, const glm::vec3* value)
+	{
+		if (!value)
+			return;
+
+		if (AIBlackboardComponent* blackboard = TryGetAIBlackboard(entityID))
+			blackboard->Set(AIBlackboardKey(key), *value);
+	}
+
+	static uint64_t AIBlackboard_GetEntity(const uint64_t entityID, const char* key)
+	{
+		const AIBlackboardComponent* blackboard = TryGetAIBlackboard(entityID);
+		const UUID* value = blackboard ? blackboard->Get<UUID>(AIBlackboardKey(key)) : nullptr;
+		return value ? static_cast<uint64_t>(*value) : 0;
+	}
+
+	static void AIBlackboard_SetEntity(const uint64_t entityID, const char* key, const uint64_t value)
+	{
+		if (AIBlackboardComponent* blackboard = TryGetAIBlackboard(entityID))
+			blackboard->Set(AIBlackboardKey(key), UUID(value));
+	}
+
+	static const char* AIBlackboard_GetString(const uint64_t entityID, const char* key)
+	{
+		const AIBlackboardComponent* blackboard = TryGetAIBlackboard(entityID);
+		const std::string* value = blackboard ? blackboard->Get<std::string>(AIBlackboardKey(key)) : nullptr;
+		s_StringReturnBuffer = value ? *value : std::string();
+		return s_StringReturnBuffer.c_str();
+	}
+
+	static void AIBlackboard_SetString(const uint64_t entityID, const char* key, const char* value)
+	{
+		if (AIBlackboardComponent* blackboard = TryGetAIBlackboard(entityID))
+			blackboard->Set(AIBlackboardKey(key), std::string(value ? value : ""));
+	}
+
+	static const char* AIStateMachine_GetTreeName(const uint64_t entityID)
+	{
+		const AIStateMachineComponent* stateMachine = TryGetAIStateMachine(entityID);
+		s_StringReturnBuffer = stateMachine ? stateMachine->TreeName : std::string();
+		return s_StringReturnBuffer.c_str();
+	}
+
+	static void AIStateMachine_SetTreeName(const uint64_t entityID, const char* name)
+	{
+		AIStateMachineComponent* stateMachine = TryGetAIStateMachine(entityID);
+		if (!stateMachine)
+			return;
+
+		stateMachine->TreeName = name ? name : "";
+		stateMachine->Tree = AI::AIStateTreeRegistry::Find(stateMachine->TreeName);
+		stateMachine->IsInitialized = false;
+		stateMachine->ResolutionFailed = false;
+		stateMachine->CurrentState = AI::InvalidState;
+		stateMachine->PreviousState = AI::InvalidState;
+		stateMachine->PendingState = AI::InvalidState;
+		stateMachine->TimeInState = 0.0f;
+		stateMachine->TaskInstances.clear();
+	}
+
+	static const char* AIStateMachine_GetCurrentState(const uint64_t entityID)
+	{
+		const AIStateMachineComponent* stateMachine = TryGetAIStateMachine(entityID);
+		const AI::AIStateDefinition* definition =
+			stateMachine && stateMachine->Tree ? stateMachine->Tree->FindState(stateMachine->CurrentState) : nullptr;
+		s_StringReturnBuffer = definition ? definition->Name : std::string();
+		return s_StringReturnBuffer.c_str();
+	}
+
+	static const char* AIStateMachine_GetPreviousState(const uint64_t entityID)
+	{
+		const AIStateMachineComponent* stateMachine = TryGetAIStateMachine(entityID);
+		const AI::AIStateDefinition* definition =
+			stateMachine && stateMachine->Tree ? stateMachine->Tree->FindState(stateMachine->PreviousState) : nullptr;
+		s_StringReturnBuffer = definition ? definition->Name : std::string();
+		return s_StringReturnBuffer.c_str();
+	}
+
+	static float AIStateMachine_GetTimeInState(const uint64_t entityID)
+	{
+		const AIStateMachineComponent* stateMachine = TryGetAIStateMachine(entityID);
+		return stateMachine ? stateMachine->TimeInState : 0.0f;
+	}
+
+	static uint8_t AIStateMachine_RequestState(const uint64_t entityID, const char* stateName)
+	{
+		AIStateMachineComponent* stateMachine = TryGetAIStateMachine(entityID);
+		if (!stateMachine || !stateMachine->Tree || !stateName)
+			return 0;
+
+		const AI::StateID state = AI::HashState(stateName);
+		if (!stateMachine->Tree->HasState(state))
+			return 0;
+
+		stateMachine->PendingState = state;
+		return 1;
+	}
+
+	static void AIStateMachine_ResetRuntime(const uint64_t entityID)
+	{
+		AIStateMachineComponent* stateMachine = TryGetAIStateMachine(entityID);
+		if (!stateMachine)
+			return;
+
+		stateMachine->CurrentState = AI::InvalidState;
+		stateMachine->PreviousState = AI::InvalidState;
+		stateMachine->PendingState = AI::InvalidState;
+		stateMachine->TimeInState = 0.0f;
+		stateMachine->IsInitialized = false;
+		stateMachine->TaskInstances.clear();
+	}
+
+	static void AIController_GetDesiredVelocity(const uint64_t entityID, glm::vec3* out)
+	{
+		if (!out)
+			return;
+		const AIControllerComponent* controller = TryGetAIController(entityID);
+		*out = controller ? controller->DesiredVelocity : glm::vec3(0.0f);
+	}
+
+	static void AIController_SetDesiredVelocity(const uint64_t entityID, const glm::vec3* value)
+	{
+		AIControllerComponent* controller = TryGetAIController(entityID);
+		if (controller && value)
+			controller->DesiredVelocity = *value;
+	}
+
+	static void AIController_GetLookAtTarget(const uint64_t entityID, glm::vec3* out)
+	{
+		if (!out)
+			return;
+		const AIControllerComponent* controller = TryGetAIController(entityID);
+		*out = controller ? controller->LookAtTarget : glm::vec3(0.0f);
+	}
+
+	static void AIController_SetLookAtTarget(const uint64_t entityID, const glm::vec3* value)
+	{
+		AIControllerComponent* controller = TryGetAIController(entityID);
+		if (!controller || !value)
+			return;
+		controller->LookAtTarget = *value;
+		controller->HasLookAt = true;
+	}
+
+	static uint8_t AIController_GetWantsToAttack(const uint64_t entityID)
+	{
+		const AIControllerComponent* controller = TryGetAIController(entityID);
+		return controller && controller->WantsToAttack ? 1 : 0;
+	}
+
+	static void AIController_SetWantsToAttack(const uint64_t entityID, const uint8_t value)
+	{
+		if (AIControllerComponent* controller = TryGetAIController(entityID))
+			controller->WantsToAttack = value != 0;
+	}
+
+	static uint8_t AIController_GetEnabled(const uint64_t entityID)
+	{
+		const AIControllerComponent* controller = TryGetAIController(entityID);
+		return controller && controller->Enabled ? 1 : 0;
+	}
+
+	static void AIController_SetEnabled(const uint64_t entityID, const uint8_t value)
+	{
+		if (AIControllerComponent* controller = TryGetAIController(entityID))
+			controller->Enabled = value != 0;
+	}
+
+	static float AIPerception_GetSightRadius(const uint64_t entityID)
+	{
+		return GetPerceptionField(entityID, &AIPerceptionComponent::SightRadius, 0.0f);
+	}
+
+	static void AIPerception_SetSightRadius(const uint64_t entityID, const float value)
+	{
+		SetPerceptionField(entityID, &AIPerceptionComponent::SightRadius, value);
+	}
+
+	static float AIPerception_GetLoseRadius(const uint64_t entityID)
+	{
+		return GetPerceptionField(entityID, &AIPerceptionComponent::LoseRadius, 0.0f);
+	}
+
+	static void AIPerception_SetLoseRadius(const uint64_t entityID, const float value)
+	{
+		SetPerceptionField(entityID, &AIPerceptionComponent::LoseRadius, value);
+	}
+
+	static float AIPerception_GetFieldOfView(const uint64_t entityID)
+	{
+		return GetPerceptionField(entityID, &AIPerceptionComponent::FieldOfViewDegrees, 0.0f);
+	}
+
+	static void AIPerception_SetFieldOfView(const uint64_t entityID, const float value)
+	{
+		SetPerceptionField(entityID, &AIPerceptionComponent::FieldOfViewDegrees, value);
+	}
+
+	static float AIPerception_GetEyeHeight(const uint64_t entityID)
+	{
+		return GetPerceptionField(entityID, &AIPerceptionComponent::EyeHeight, 0.0f);
+	}
+
+	static void AIPerception_SetEyeHeight(const uint64_t entityID, const float value)
+	{
+		SetPerceptionField(entityID, &AIPerceptionComponent::EyeHeight, value);
+	}
+
+	static float AIPerception_GetInterval(const uint64_t entityID)
+	{
+		return GetPerceptionField(entityID, &AIPerceptionComponent::PerceptionInterval, 0.0f);
+	}
+
+	static void AIPerception_SetInterval(const uint64_t entityID, const float value)
+	{
+		SetPerceptionField(entityID, &AIPerceptionComponent::PerceptionInterval, value);
+	}
+
+	static uint8_t AIPerception_GetRequireLineOfSight(const uint64_t entityID)
+	{
+		const AIPerceptionComponent* perception = TryGetAIPerception(entityID);
+		return perception && perception->RequireLineOfSight ? 1 : 0;
+	}
+
+	static void AIPerception_SetRequireLineOfSight(const uint64_t entityID, const uint8_t value)
+	{
+		if (AIPerceptionComponent* perception = TryGetAIPerception(entityID))
+			perception->RequireLineOfSight = value != 0;
+	}
+
+	static int32_t AIPerception_GetFactionId(const uint64_t entityID)
+	{
+		const AIPerceptionComponent* perception = TryGetAIPerception(entityID);
+		return perception ? static_cast<int32_t>(perception->FactionId) : 0;
+	}
+
+	static void AIPerception_SetFactionId(const uint64_t entityID, const int32_t value)
+	{
+		if (AIPerceptionComponent* perception = TryGetAIPerception(entityID))
+			perception->FactionId = static_cast<std::uint32_t>(value);
+	}
+
+	static int32_t AITargetable_GetFactionId(const uint64_t entityID)
+	{
+		const AITargetableComponent* targetable = TryGetAITargetable(entityID);
+		return targetable ? static_cast<int32_t>(targetable->FactionId) : 0;
+	}
+
+	static void AITargetable_SetFactionId(const uint64_t entityID, const int32_t value)
+	{
+		if (AITargetableComponent* targetable = TryGetAITargetable(entityID))
+			targetable->FactionId = static_cast<std::uint32_t>(value);
+	}
+
+	// ====================================================================
 	// Component Registration
 	// ====================================================================
 
@@ -1852,6 +2334,11 @@ namespace Kerberos
 		RegisterComponent<AnimatorComponent>("Kerberos.Scene.AnimatorComponent");
 		RegisterComponent<SocketComponent>("Kerberos.Scene.SocketComponent");
 		RegisterComponent<RagdollComponent>("Kerberos.Scene.RagdollComponent");
+		RegisterComponent<AIBlackboardComponent>("Kerberos.Scene.AIBlackboardComponent");
+		RegisterComponent<AIStateMachineComponent>("Kerberos.Scene.AIStateMachineComponent");
+		RegisterComponent<AIControllerComponent>("Kerberos.Scene.AIControllerComponent");
+		RegisterComponent<AIPerceptionComponent>("Kerberos.Scene.AIPerceptionComponent");
+		RegisterComponent<AITargetableComponent>("Kerberos.Scene.AITargetableComponent");
 
 		/// Build the native callback table and pass it to the managed side
 		static NativeCallbackTable callbackTable = {};
@@ -1997,6 +2484,61 @@ namespace Kerberos
 		callbackTable.MeshCollider3DComponent_SetIsTrigger = reinterpret_cast<void*>(&MeshCollider3DComponent_SetIsTrigger);
 		callbackTable.MeshCollider3DComponent_GetEnabled = reinterpret_cast<void*>(&MeshCollider3DComponent_GetEnabled);
 		callbackTable.MeshCollider3DComponent_SetEnabled = reinterpret_cast<void*>(&MeshCollider3DComponent_SetEnabled);
+
+		callbackTable.AI_RegisterStateTree = reinterpret_cast<void*>(&AI_RegisterStateTree);
+		callbackTable.AI_UnregisterStateTree = reinterpret_cast<void*>(&AI_UnregisterStateTree);
+		callbackTable.AI_StateTreeExists = reinterpret_cast<void*>(&AI_StateTreeExists);
+
+		callbackTable.AIBlackboard_HasKey = reinterpret_cast<void*>(&AIBlackboard_HasKey);
+		callbackTable.AIBlackboard_RemoveKey = reinterpret_cast<void*>(&AIBlackboard_RemoveKey);
+		callbackTable.AIBlackboard_Clear = reinterpret_cast<void*>(&AIBlackboard_Clear);
+		callbackTable.AIBlackboard_GetFloat = reinterpret_cast<void*>(&AIBlackboard_GetFloat);
+		callbackTable.AIBlackboard_SetFloat = reinterpret_cast<void*>(&AIBlackboard_SetFloat);
+		callbackTable.AIBlackboard_GetInt = reinterpret_cast<void*>(&AIBlackboard_GetInt);
+		callbackTable.AIBlackboard_SetInt = reinterpret_cast<void*>(&AIBlackboard_SetInt);
+		callbackTable.AIBlackboard_GetBool = reinterpret_cast<void*>(&AIBlackboard_GetBool);
+		callbackTable.AIBlackboard_SetBool = reinterpret_cast<void*>(&AIBlackboard_SetBool);
+		callbackTable.AIBlackboard_GetVec3 = reinterpret_cast<void*>(&AIBlackboard_GetVec3);
+		callbackTable.AIBlackboard_SetVec3 = reinterpret_cast<void*>(&AIBlackboard_SetVec3);
+		callbackTable.AIBlackboard_GetEntity = reinterpret_cast<void*>(&AIBlackboard_GetEntity);
+		callbackTable.AIBlackboard_SetEntity = reinterpret_cast<void*>(&AIBlackboard_SetEntity);
+		callbackTable.AIBlackboard_GetString = reinterpret_cast<void*>(&AIBlackboard_GetString);
+		callbackTable.AIBlackboard_SetString = reinterpret_cast<void*>(&AIBlackboard_SetString);
+
+		callbackTable.AIStateMachine_GetTreeName = reinterpret_cast<void*>(&AIStateMachine_GetTreeName);
+		callbackTable.AIStateMachine_SetTreeName = reinterpret_cast<void*>(&AIStateMachine_SetTreeName);
+		callbackTable.AIStateMachine_GetCurrentState = reinterpret_cast<void*>(&AIStateMachine_GetCurrentState);
+		callbackTable.AIStateMachine_GetPreviousState = reinterpret_cast<void*>(&AIStateMachine_GetPreviousState);
+		callbackTable.AIStateMachine_GetTimeInState = reinterpret_cast<void*>(&AIStateMachine_GetTimeInState);
+		callbackTable.AIStateMachine_RequestState = reinterpret_cast<void*>(&AIStateMachine_RequestState);
+		callbackTable.AIStateMachine_ResetRuntime = reinterpret_cast<void*>(&AIStateMachine_ResetRuntime);
+
+		callbackTable.AIController_GetDesiredVelocity = reinterpret_cast<void*>(&AIController_GetDesiredVelocity);
+		callbackTable.AIController_SetDesiredVelocity = reinterpret_cast<void*>(&AIController_SetDesiredVelocity);
+		callbackTable.AIController_GetLookAtTarget = reinterpret_cast<void*>(&AIController_GetLookAtTarget);
+		callbackTable.AIController_SetLookAtTarget = reinterpret_cast<void*>(&AIController_SetLookAtTarget);
+		callbackTable.AIController_GetWantsToAttack = reinterpret_cast<void*>(&AIController_GetWantsToAttack);
+		callbackTable.AIController_SetWantsToAttack = reinterpret_cast<void*>(&AIController_SetWantsToAttack);
+		callbackTable.AIController_GetEnabled = reinterpret_cast<void*>(&AIController_GetEnabled);
+		callbackTable.AIController_SetEnabled = reinterpret_cast<void*>(&AIController_SetEnabled);
+
+		callbackTable.AIPerception_GetSightRadius = reinterpret_cast<void*>(&AIPerception_GetSightRadius);
+		callbackTable.AIPerception_SetSightRadius = reinterpret_cast<void*>(&AIPerception_SetSightRadius);
+		callbackTable.AIPerception_GetLoseRadius = reinterpret_cast<void*>(&AIPerception_GetLoseRadius);
+		callbackTable.AIPerception_SetLoseRadius = reinterpret_cast<void*>(&AIPerception_SetLoseRadius);
+		callbackTable.AIPerception_GetFieldOfView = reinterpret_cast<void*>(&AIPerception_GetFieldOfView);
+		callbackTable.AIPerception_SetFieldOfView = reinterpret_cast<void*>(&AIPerception_SetFieldOfView);
+		callbackTable.AIPerception_GetEyeHeight = reinterpret_cast<void*>(&AIPerception_GetEyeHeight);
+		callbackTable.AIPerception_SetEyeHeight = reinterpret_cast<void*>(&AIPerception_SetEyeHeight);
+		callbackTable.AIPerception_GetInterval = reinterpret_cast<void*>(&AIPerception_GetInterval);
+		callbackTable.AIPerception_SetInterval = reinterpret_cast<void*>(&AIPerception_SetInterval);
+		callbackTable.AIPerception_GetRequireLineOfSight = reinterpret_cast<void*>(&AIPerception_GetRequireLineOfSight);
+		callbackTable.AIPerception_SetRequireLineOfSight = reinterpret_cast<void*>(&AIPerception_SetRequireLineOfSight);
+		callbackTable.AIPerception_GetFactionId = reinterpret_cast<void*>(&AIPerception_GetFactionId);
+		callbackTable.AIPerception_SetFactionId = reinterpret_cast<void*>(&AIPerception_SetFactionId);
+
+		callbackTable.AITargetable_GetFactionId = reinterpret_cast<void*>(&AITargetable_GetFactionId);
+		callbackTable.AITargetable_SetFactionId = reinterpret_cast<void*>(&AITargetable_SetFactionId);
 
 		/// Pass the callback table to the managed side
 		ScriptEngine::SetManagedNativeCallbacks(&callbackTable);

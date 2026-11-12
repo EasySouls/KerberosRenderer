@@ -61,7 +61,8 @@ handle-to-library metadata. Path lookups are linear and case-normalized.
 
 `EditorAssetManager.cpp` currently defines source extensions for textures
 (`.png`, `.jpg`, `.jpeg`, `.ktx`, `.ktx2`), cubemaps, FBX/OBJ/glTF/GLB models,
-Kerberos scenes, WAV audio, materials, prefabs, and animations.
+Kerberos scenes, WAV audio, materials, prefabs, animations, and AI state trees
+(`.kbrai`).
 
 There are two import concepts:
 
@@ -185,6 +186,17 @@ handles through the active asset manager and loads the texture artifacts. It
 must not call `Texture2D::FromFile` on source or legacy paths; unresolved or
 non-handle references are warnings that leave the slot empty. `SaveMaterial`
 writes handles for registered `Texture2D` assets.
+
+`AIStateTreePipelineImporter` handles authored `.kbrai` AI state-tree documents.
+It validates the document with `AIStateTreeSerializer` and copies the source
+YAML into the cache at the source-relative path, so `RuntimeAssetLoader` always
+consumes the registered `LibraryPath`. The imported root type is
+`AssetType::AIStateTree`; `AIStateTreeAsset` stores the editable
+`AIStateTreeDocument` plus the compiled `AIStateTree`. Asset trees are
+registered with `AIStateTreeOrigin::Asset` only when their document name does
+not shadow a native/script tree; entity components bind to the asset directly
+through `AIStateMachineComponent::TreeAsset`, which takes precedence over
+`TreeName`.
 
 Deferred texture features (not yet implemented):
 - Generated `.ktx2` artifacts have no mip chain (`KTX2Encoder` writes one
@@ -327,6 +339,12 @@ resolves those references through the registry (`RootSourceHandle` +
 are loaded from their cached copies through `MaterialImporter`; their texture
 slots are asset handles resolved through the active manager, so the material
 reader no longer depends on source paths or the legacy texture loader.
+
+Editor UI glyphs live under `KerberosEditor/Assets/Editor/Icons` and are loaded
+directly through `TextureImporter` by the editor's `EditorIcons` widget; they
+are not a user-facing project asset type. The editor asset manager may still
+create `.meta` files for them when the engine asset root is scanned, which is
+expected.
 
 The asset browser is `KerberosEditor/Source/Windows/AssetsPanel.cpp`. It
 enumerates the filesystem, looks up handles, previews textures, opens files,

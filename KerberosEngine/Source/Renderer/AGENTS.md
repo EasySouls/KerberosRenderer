@@ -127,6 +127,24 @@ The grass pass is always registered so the pipeline-statistics query split
 (`query 0` ends, `query 1` begins) stays balanced, but its mesh-statistics query
 and the grass draw only run when grass is supported on the device.
 
+## Debug line overlay
+
+`DisplayPhysicsColliders` and `DisplayAIPerception` share one depth-tested line
+pass recorded after transparency. `Renderer::RenderDebugLines` draws whichever
+vertex sets are enabled through the existing line pipeline and per-frame line
+buffer; `RenderStatistics::ColliderLineVertexCount` now reports the combined
+debug-line count. Physics geometry comes from
+`GetColliderLineVerticesFromScene`; AI perception geometry comes from
+`GetAIPerceptionLineVerticesFromScene` and
+`Renderer/AIPerceptionDebugHelpers.hpp`.
+
+The AI overlay draws a ground-plane sight sector (`SightRadius`), a retain
+sector (`LoseRadius`), FOV edge/centre rays, an eye-height marker, and a target
+line from the blackboard (`TargetEntity`/`HasLineOfSight`) or an amber memory
+line to `LastKnownPosition`. It is observation-only and never mutates AI state.
+Line colours come from the per-vertex `LineVertex::Color` attribute; the shared
+line shader already consumes it.
+
 When FSR3 is active, the spatial anti-aliasing pass is skipped and FSR3
 consumes the pre-AA HDR resolve so its internal temporal history receives the
 original jittered samples. Native presentation continues to use the
@@ -228,9 +246,11 @@ Compile shaders from `KerberosEditor\Assets\Shaders`:
 Vulkan validation, synchronization validation, debug labels, shader printf,
 and Tracy zones are important diagnostics. For renderer changes, validate
 swapchain/viewport resize, frame synchronization, graph barriers/layouts,
-descriptor lifetime, and shader compilation. Keep this file updated whenever
-renderer ownership, pass order, synchronization, resource lifetime, or
-validation procedures change.
+descriptor lifetime, and shader compilation. For the AI perception overlay,
+validate Edit/Simulate/Play, FOV changes, 360-degree FOV, sight/lose radii,
+occlusion by depth-tested geometry, many simultaneous agents, and toggling the
+overlay off. Keep this file updated whenever renderer ownership, pass order,
+synchronization, resource lifetime, or validation procedures change.
 
 # Animation and skinning context
 

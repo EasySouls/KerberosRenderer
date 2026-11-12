@@ -1,0 +1,83 @@
+# Sample AI state tree for validating the AI Editor window.
+# Bind this asset to an entity with AIStateMachineComponent.TreeAsset and add
+# AIPerceptionComponent + AIControllerComponent. Mark the player with
+# AITargetableComponent so perception writes TargetEntity.
+Name: EnemyChase
+Entry: Idle
+States:
+  - Name: Idle
+    EditorPosition: [0, 0]
+    Tasks:
+      - Type: Stop
+      - Type: Wait
+        Params:
+          Duration: 0.5
+    Transitions:
+      - To: Chase
+        Name: PlayerSpotted
+        When:
+          - Type: TargetExists
+            Params:
+              TargetKey: TargetEntity
+          - Type: DistanceToTarget
+            Params:
+              TargetKey: TargetEntity
+              Distance: 10.0
+              LessThan: true
+
+  - Name: Chase
+    EditorPosition: [360, 0]
+    Tasks:
+      - Type: ChaseTarget
+        Params:
+          TargetKey: TargetEntity
+          Speed: 4.0
+    Transitions:
+      - To: Attack
+        Name: InAttackRange
+        When:
+          - Type: TargetVisible
+          - Type: DistanceToTarget
+            Params:
+              TargetKey: TargetEntity
+              Distance: 1.8
+              LessThan: true
+      - To: Idle
+        Name: TargetLost
+        When:
+          - Type: BlackboardBool
+            Params:
+              Key: HasLineOfSight
+              Value: false
+      - To: Idle
+        Name: PlayerEscaped
+        When:
+          - Type: DistanceToTarget
+            Params:
+              TargetKey: TargetEntity
+              Distance: 14.0
+              LessThan: false
+
+  - Name: Attack
+    EditorPosition: [720, 0]
+    Tasks:
+      - Type: FaceTarget
+        Params:
+          TargetKey: TargetEntity
+      - Type: AttackTarget
+    Transitions:
+      - To: Chase
+        Name: TargetEscaped
+        When:
+          - Type: DistanceToTarget
+            Params:
+              TargetKey: TargetEntity
+              Distance: 2.2
+              LessThan: false
+      - To: Idle
+        Name: TargetLost
+        When:
+          - Type: BlackboardBool
+            Params:
+              Key: HasLineOfSight
+              Value: false

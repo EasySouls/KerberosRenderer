@@ -63,6 +63,15 @@ AssetRegistry:
     ParentHandle: 3035278573088996826
     SubAssetKey: mesh:1_2
     ImportVersion: 1
+  - Handle: 65735543264767146
+    Type: Texture2D
+    Path: Editor\Icons\scene_manifest.png
+    SourceRoot: 0
+    LibraryPath: Editor\Icons\scene_manifest.png\scene_manifest.ktx2
+    RootSourceHandle: 65735543264767146
+    ParentHandle: 0
+    SubAssetKey: ""
+    ImportVersion: 1
   - Handle: 66019000018970975
     Type: Mesh
     Path: Models\retroufo\Meshes\mesh_62_0.kbrmesh
@@ -420,6 +429,15 @@ AssetRegistry:
     ParentHandle: 9416030371750910923
     SubAssetKey: mesh:62_0
     ImportVersion: 1
+  - Handle: 315318750417116777
+    Type: Texture2D
+    Path: Editor\Icons\component_environment.png
+    SourceRoot: 0
+    LibraryPath: Editor\Icons\component_environment.png\component_environment.ktx2
+    RootSourceHandle: 315318750417116777
+    ParentHandle: 0
+    SubAssetKey: ""
+    ImportVersion: 1
   - Handle: 326954921228814986
     Type: Mesh
     Path: Models\gltf\glTF-Embedded\Buggy\Meshes\mesh_35_0_technic_shaft_x8_SOLIDS_1.kbrmesh
@@ -429,12 +447,30 @@ AssetRegistry:
     ParentHandle: 7563732692318888728
     SubAssetKey: mesh:35_0
     ImportVersion: 1
+  - Handle: 329146747443103603
+    Type: Texture2D
+    Path: Editor\Icons\transport_play.ktx2
+    SourceRoot: 0
+    LibraryPath: Editor\Icons\transport_play.ktx2\transport_play.ktx2
+    RootSourceHandle: 329146747443103603
+    ParentHandle: 0
+    SubAssetKey: ""
+    ImportVersion: 1
   - Handle: 342257920881037543
     Type: Texture2D
     Path: Models\sponza\2051777328469649772.ktx
     SourceRoot: 0
     LibraryPath: Models\sponza\2051777328469649772.ktx\2051777328469649772.ktx2
     RootSourceHandle: 342257920881037543
+    ParentHandle: 0
+    SubAssetKey: ""
+    ImportVersion: 1
+  - Handle: 347286600322666329
+    Type: Texture2D
+    Path: Editor\Icons\log_debug.png
+    SourceRoot: 0
+    LibraryPath: Editor\Icons\log_debug.png\log_debug.ktx2
+    RootSourceHandle: 347286600322666329
     ParentHandle: 0
     SubAssetKey: ""
     ImportVersion: 1
@@ -549,6 +585,15 @@ AssetRegistry:
     ParentHandle: 2238632335295528690
     SubAssetKey: mesh:33_0
     ImportVersion: 1
+  - Handle: 473163895563393753
+    Type: Texture2D
+    Path: Editor\Icons\slot_normal.ktx2
+    SourceRoot: 0
+    LibraryPath: Editor\Icons\slot_normal.ktx2\slot_normal.ktx2
+    RootSourceHandle: 473163895563393753
+    ParentHandle: 0
+    SubAssetKey: ""
+    ImportVersion: 1
   - Handle: 477066314760794267
     Type: Material
     Path: Models\vulkanscene_shadow\Materials\Black_002.kbrmaterial
@@ -657,6 +702,15 @@ AssetRegistry:
     RootSourceHandle: 15629215700429853565
     ParentHandle: 15629215700429853565
     SubAssetKey: mesh:1_2
+    ImportVersion: 1
+  - Handle: 520782542656906288
+    Type: Texture2D
+    Path: Editor\Icons\component_ai_perception.ktx2
+    SourceRoot: 0
+    LibraryPath: Editor\Icons\component_ai_perception.ktx2\component_ai_perception.ktx2
+    RootSourceHandle: 520782542656906288
+    ParentHandle: 0
+    SubAssetKey: ""
     ImportVersion: 1
   - Handle: 521282590742550571
     Type: Mesh
@@ -998,6 +1052,15 @@ AssetRegistry:
     ParentHandle: 11581378365515906497
     SubAssetKey: mesh:36_0
     ImportVersion: 1
+  - Handle: 717671431190736579
+    Type: Texture2D
+    Path: Editor\Icons\action_copy.ktx2
+    SourceRoot: 0
+    LibraryPath: Editor\Icons\action_copy.ktx2\action_copy.ktx2
+    RootSourceHandle: 717671431190736579
+    ParentHandle: 0
+    SubAssetKey: ""
+    ImportVersion: 1
   - Handle: 720880729053213870
     Type: Mesh
     Path: Models\retroufo\Meshes\mesh_61_0.kbrmesh
@@ -1133,6 +1196,15 @@ AssetRegistry:
     ParentHandle: 6090326326702746238
     SubAssetKey: mesh:73_0
     ImportVersion: 1
+  - Handle: 803475689682564493
+    Type: Texture2D
+    Path: Editor\Icons\status_registered.png
+    SourceRoot: 0
+    LibraryPath: Editor\Icons\status_registered.png\status_registered.ktx2
+    RootSourceHandle: 803475689682564493
+    ParentHandle: 0
+    SubAssetKey: ""
+    ImportVersion: 1
   - Handle: 806353171552726859
     Type: Mesh
     Path: Models\sponza\sponza\Meshes\mesh_11_0_Mesh_0.011.kbrmesh
@@ -1150,6 +1222,15 @@ AssetRegistry:
     RootSourceHandle: 7563732692318888728
     ParentHandle: 7563732692318888728
     SubAssetKey: mesh:100_0
+    ImportVersion: 1
+  - Handle: 823817805363365296
+    Type: Texture2D
+    Path: Editor\Icons\transport_resume.png
+    SourceRoot: 0
+    LibraryPath: Editor\Icons\transport_resume.png\transport_resume.ktx2
+    RootSourceHandle: 823817805363365296
+    ParentHandle: 0
+    SubAssetKey: ""
     ImportVersion: 1
   - Handle: 826660977942041830
     Type: Mesh
@@ -1311,6 +1392,15 @@ AssetRegistry:
     RootSourceHandle: 7563732692318888728
     ParentHandle: 7563732692318888728
     SubAssetKey: mesh:15_0
+    ImportVersion: 1
+  - Handle: 930419169782916706
+    Type: Texture2D
+    Path: Editor\Icons\action_copy.png
+    SourceRoot: 0
+    LibraryPath: Editor\Icons\action_copy.png\action_copy.ktx2
+    RootSourceHandle: 930419169782916706
+    ParentHandle: 0
+    SubAssetKey: ""
     ImportVersion: 1
   - Handle: 931781633261993300
     Type: SkinnedMesh
@@ -1520,6 +1610,24 @@ AssetRegistry:
     Dependencies:
       - 7040673874607876108
       - 16851151495070434988
+  - Handle: 1035547905703303889
+    Type: SkinnedMesh
+    Path: Models\rpg-character\E10 attack anims\Meshes\skinnedmesh_0_0_Cube.kbrskinnedmesh
+    SourceRoot: 0
+    LibraryPath: Models\rpg-character\E10 attack anims\Meshes\skinnedmesh_0_0_Cube.kbrskinnedmesh
+    RootSourceHandle: 4305741975815557537
+    ParentHandle: 4305741975815557537
+    SubAssetKey: skinnedmesh:0_0
+    ImportVersion: 1
+  - Handle: 1050962411038694246
+    Type: Texture2D
+    Path: Editor\Icons\action_reveal.png
+    SourceRoot: 0
+    LibraryPath: Editor\Icons\action_reveal.png\action_reveal.ktx2
+    RootSourceHandle: 1050962411038694246
+    ParentHandle: 0
+    SubAssetKey: ""
+    ImportVersion: 1
   - Handle: 1064926839345368994
     Type: Mesh
     Path: Models\gltf\glTF-Embedded\Buggy\Meshes\mesh_39_1_technic_2_2_l_p_SOLIDS_3.kbrmesh
@@ -1590,6 +1698,15 @@ AssetRegistry:
     RootSourceHandle: 10754239399539981869
     ParentHandle: 10754239399539981869
     SubAssetKey: mesh:0_0
+    ImportVersion: 1
+  - Handle: 1099362908180143809
+    Type: Texture2D
+    Path: Editor\Icons\action_clear.png
+    SourceRoot: 0
+    LibraryPath: Editor\Icons\action_clear.png\action_clear.ktx2
+    RootSourceHandle: 1099362908180143809
+    ParentHandle: 0
+    SubAssetKey: ""
     ImportVersion: 1
   - Handle: 1106258551251021404
     Type: Prefab
@@ -1662,6 +1779,15 @@ AssetRegistry:
     RootSourceHandle: 7563732692318888728
     ParentHandle: 7563732692318888728
     SubAssetKey: material:43
+    ImportVersion: 1
+  - Handle: 1181471637839126031
+    Type: Material
+    Path: Models\rpg-character\E10 attack anims\Materials\Pants.001.kbrmaterial
+    SourceRoot: 0
+    LibraryPath: Models\rpg-character\E10 attack anims\Materials\Pants.001.kbrmaterial
+    RootSourceHandle: 4305741975815557537
+    ParentHandle: 4305741975815557537
+    SubAssetKey: material:10
     ImportVersion: 1
   - Handle: 1203762810446429532
     Type: Mesh
@@ -1964,6 +2090,15 @@ AssetRegistry:
     ParentHandle: 14244998688843197978
     SubAssetKey: mesh:20_0
     ImportVersion: 1
+  - Handle: 1337463223511719530
+    Type: Texture2D
+    Path: Editor\Icons\status_not_imported.ktx2
+    SourceRoot: 0
+    LibraryPath: Editor\Icons\status_not_imported.ktx2\status_not_imported.ktx2
+    RootSourceHandle: 1337463223511719530
+    ParentHandle: 0
+    SubAssetKey: ""
+    ImportVersion: 1
   - Handle: 1342046151382216585
     Type: Material
     Path: Models\vulkanscenemodels\Materials\Black_003.kbrmaterial
@@ -2235,6 +2370,15 @@ AssetRegistry:
     ParentHandle: 641661085910201849
     SubAssetKey: material:1
     ImportVersion: 1
+  - Handle: 1482221848654966731
+    Type: SkinnedMesh
+    Path: Models\rpg-character\E10 attack anims\Meshes\skinnedmesh_4_1_Cube.011.kbrskinnedmesh
+    SourceRoot: 0
+    LibraryPath: Models\rpg-character\E10 attack anims\Meshes\skinnedmesh_4_1_Cube.011.kbrskinnedmesh
+    RootSourceHandle: 4305741975815557537
+    ParentHandle: 4305741975815557537
+    SubAssetKey: skinnedmesh:4_1
+    ImportVersion: 1
   - Handle: 1484235269068801105
     Type: Material
     Path: Models\gltf\glTF-Embedded\Buggy\Materials\Material_28.kbrmaterial
@@ -2270,6 +2414,15 @@ AssetRegistry:
     RootSourceHandle: 5174649278247987669
     ParentHandle: 5174649278247987669
     SubAssetKey: mesh:14_0
+    ImportVersion: 1
+  - Handle: 1498714517861265139
+    Type: Texture2D
+    Path: Editor\Icons\file_meta.ktx2
+    SourceRoot: 0
+    LibraryPath: Editor\Icons\file_meta.ktx2\file_meta.ktx2
+    RootSourceHandle: 1498714517861265139
+    ParentHandle: 0
+    SubAssetKey: ""
     ImportVersion: 1
   - Handle: 1499192188495969054
     Type: Texture2D
@@ -2405,6 +2558,15 @@ AssetRegistry:
     RootSourceHandle: 6532463041022503106
     ParentHandle: 6532463041022503106
     SubAssetKey: mesh:48_0
+    ImportVersion: 1
+  - Handle: 1572719430350776745
+    Type: Texture2D
+    Path: Editor\Icons\transport_stop.png
+    SourceRoot: 0
+    LibraryPath: Editor\Icons\transport_stop.png\transport_stop.ktx2
+    RootSourceHandle: 1572719430350776745
+    ParentHandle: 0
+    SubAssetKey: ""
     ImportVersion: 1
   - Handle: 1578765701471827581
     Type: Mesh
@@ -2664,6 +2826,33 @@ AssetRegistry:
     ParentHandle: 11581378365515906497
     SubAssetKey: mesh:41_0
     ImportVersion: 1
+  - Handle: 1720279988053479126
+    Type: Texture2D
+    Path: Editor\Icons\component_audio_listener.png
+    SourceRoot: 0
+    LibraryPath: Editor\Icons\component_audio_listener.png\component_audio_listener.ktx2
+    RootSourceHandle: 1720279988053479126
+    ParentHandle: 0
+    SubAssetKey: ""
+    ImportVersion: 1
+  - Handle: 1720529535264630920
+    Type: Texture2D
+    Path: Editor\Icons\status_not_imported.png
+    SourceRoot: 0
+    LibraryPath: Editor\Icons\status_not_imported.png\status_not_imported.ktx2
+    RootSourceHandle: 1720529535264630920
+    ParentHandle: 0
+    SubAssetKey: ""
+    ImportVersion: 1
+  - Handle: 1723524976386422055
+    Type: Texture2D
+    Path: Editor\Icons\component_skinned_mesh.png
+    SourceRoot: 0
+    LibraryPath: Editor\Icons\component_skinned_mesh.png\component_skinned_mesh.ktx2
+    RootSourceHandle: 1723524976386422055
+    ParentHandle: 0
+    SubAssetKey: ""
+    ImportVersion: 1
   - Handle: 1738909821503380307
     Type: Mesh
     Path: Models\gltf\glTF-Embedded\Buggy\Meshes\mesh_11_0_technic_driver_torso_p_SOLIDS_1.kbrmesh
@@ -2754,12 +2943,30 @@ AssetRegistry:
     ParentHandle: 9659550559801413317
     SubAssetKey: mesh:70_0
     ImportVersion: 1
+  - Handle: 1813572021555857403
+    Type: Material
+    Path: Models\rpg-character\E10 attack anims\Materials\Underclothes.001.kbrmaterial
+    SourceRoot: 0
+    LibraryPath: Models\rpg-character\E10 attack anims\Materials\Underclothes.001.kbrmaterial
+    RootSourceHandle: 4305741975815557537
+    ParentHandle: 4305741975815557537
+    SubAssetKey: material:11
+    ImportVersion: 1
   - Handle: 1814812369213250009
     Type: Texture2D
     Path: Textures\stonefloor01_color_rgba.ktx
     SourceRoot: 0
     LibraryPath: Textures\stonefloor01_color_rgba.ktx\stonefloor01_color_rgba.ktx2
     RootSourceHandle: 1814812369213250009
+    ParentHandle: 0
+    SubAssetKey: ""
+    ImportVersion: 1
+  - Handle: 1815447411430169450
+    Type: Texture2D
+    Path: Editor\Icons\script.png
+    SourceRoot: 0
+    LibraryPath: Editor\Icons\script.png\script.ktx2
+    RootSourceHandle: 1815447411430169450
     ParentHandle: 0
     SubAssetKey: ""
     ImportVersion: 1
@@ -2978,6 +3185,15 @@ AssetRegistry:
     ParentHandle: 2238632335295528690
     SubAssetKey: material:75
     ImportVersion: 1
+  - Handle: 1977194368223822471
+    Type: Texture2D
+    Path: Editor\Icons\log_trace.png
+    SourceRoot: 0
+    LibraryPath: Editor\Icons\log_trace.png\log_trace.ktx2
+    RootSourceHandle: 1977194368223822471
+    ParentHandle: 0
+    SubAssetKey: ""
+    ImportVersion: 1
   - Handle: 1984775087532290249
     Type: Mesh
     Path: Models\gltf\glTF-Embedded\Buggy\Meshes\mesh_64_1_prt_2_8_t_SOLIDS_4.kbrmesh
@@ -3190,6 +3406,15 @@ AssetRegistry:
     ParentHandle: 8240355766732467400
     SubAssetKey: mesh:0_1
     ImportVersion: 1
+  - Handle: 2137187406491026928
+    Type: Mesh
+    Path: Models\rpg-character\E10 attack anims\Meshes\mesh_2_2_Cube.008.kbrmesh
+    SourceRoot: 0
+    LibraryPath: Models\rpg-character\E10 attack anims\Meshes\mesh_2_2_Cube.008.kbrmesh
+    RootSourceHandle: 4305741975815557537
+    ParentHandle: 4305741975815557537
+    SubAssetKey: mesh:2_2
+    ImportVersion: 1
   - Handle: 2144688099878703756
     Type: Mesh
     Path: Models\retroufo_glow\Meshes\mesh_58_0_Mesh_58.001.kbrmesh
@@ -3234,6 +3459,15 @@ AssetRegistry:
     RootSourceHandle: 11734900932705191300
     ParentHandle: 11734900932705191300
     SubAssetKey: material:4
+    ImportVersion: 1
+  - Handle: 2171867462123190709
+    Type: Texture2D
+    Path: Editor\Icons\asset_skeleton.ktx2
+    SourceRoot: 0
+    LibraryPath: Editor\Icons\asset_skeleton.ktx2\asset_skeleton.ktx2
+    RootSourceHandle: 2171867462123190709
+    ParentHandle: 0
+    SubAssetKey: ""
     ImportVersion: 1
   - Handle: 2171915110125973741
     Type: Texture2D
@@ -3306,6 +3540,15 @@ AssetRegistry:
     RootSourceHandle: 11581378365515906497
     ParentHandle: 11581378365515906497
     SubAssetKey: mesh:57_0
+    ImportVersion: 1
+  - Handle: 2209729666129960233
+    Type: Texture2D
+    Path: Editor\Icons\state_paused.png
+    SourceRoot: 0
+    LibraryPath: Editor\Icons\state_paused.png\state_paused.ktx2
+    RootSourceHandle: 2209729666129960233
+    ParentHandle: 0
+    SubAssetKey: ""
     ImportVersion: 1
   - Handle: 2217148277162620653
     Type: Mesh
@@ -3405,6 +3648,15 @@ AssetRegistry:
     RootSourceHandle: 2238632335295528690
     ParentHandle: 2238632335295528690
     SubAssetKey: mesh:36_0
+    ImportVersion: 1
+  - Handle: 2292075948512733030
+    Type: SkinnedMesh
+    Path: Models\rpg-character\E10 attack anims\Meshes\skinnedmesh_6_1_Cube.010.kbrskinnedmesh
+    SourceRoot: 0
+    LibraryPath: Models\rpg-character\E10 attack anims\Meshes\skinnedmesh_6_1_Cube.010.kbrskinnedmesh
+    RootSourceHandle: 4305741975815557537
+    ParentHandle: 4305741975815557537
+    SubAssetKey: skinnedmesh:6_1
     ImportVersion: 1
   - Handle: 2292989877418582707
     Type: Texture2D
@@ -3522,6 +3774,15 @@ AssetRegistry:
     RootSourceHandle: 10152496132570147302
     ParentHandle: 10152496132570147302
     SubAssetKey: animation:0
+    ImportVersion: 1
+  - Handle: 2335628266026483155
+    Type: Texture2D
+    Path: Editor\Icons\asset_skinnedmesh.ktx2
+    SourceRoot: 0
+    LibraryPath: Editor\Icons\asset_skinnedmesh.ktx2\asset_skinnedmesh.ktx2
+    RootSourceHandle: 2335628266026483155
+    ParentHandle: 0
+    SubAssetKey: ""
     ImportVersion: 1
   - Handle: 2335743399210946556
     Type: Mesh
@@ -4290,6 +4551,15 @@ AssetRegistry:
       - 9854740304369352919
       - 14930605295910208938
       - 15075671552907394857
+  - Handle: 2522227947634570685
+    Type: Texture2D
+    Path: Editor\Icons\component_box_collider.png
+    SourceRoot: 0
+    LibraryPath: Editor\Icons\component_box_collider.png\component_box_collider.ktx2
+    RootSourceHandle: 2522227947634570685
+    ParentHandle: 0
+    SubAssetKey: ""
+    ImportVersion: 1
   - Handle: 2522812860630357364
     Type: Mesh
     Path: Models\treasure_glow\Meshes\mesh_17_1_Cylinder.024.kbrmesh
@@ -4353,6 +4623,15 @@ AssetRegistry:
     ParentHandle: 7563732692318888728
     SubAssetKey: material:27
     ImportVersion: 1
+  - Handle: 2554530543029680129
+    Type: Texture2D
+    Path: Editor\Icons\file_unknown.png
+    SourceRoot: 0
+    LibraryPath: Editor\Icons\file_unknown.png\file_unknown.ktx2
+    RootSourceHandle: 2554530543029680129
+    ParentHandle: 0
+    SubAssetKey: ""
+    ImportVersion: 1
   - Handle: 2556333281111323033
     Type: Material
     Path: Models\gltf\glTF-Embedded\Buggy\Materials\Material_20_20.kbrmaterial
@@ -4413,6 +4692,15 @@ AssetRegistry:
     SourceRoot: 0
     LibraryPath: Models\sponza\2969916736137545357.ktx2\2969916736137545357.ktx2
     RootSourceHandle: 2587394987656728442
+    ParentHandle: 0
+    SubAssetKey: ""
+    ImportVersion: 1
+  - Handle: 2588044351528302082
+    Type: Texture2D
+    Path: Editor\Icons\state_edit.png
+    SourceRoot: 0
+    LibraryPath: Editor\Icons\state_edit.png\state_edit.ktx2
+    RootSourceHandle: 2588044351528302082
     ParentHandle: 0
     SubAssetKey: ""
     ImportVersion: 1
@@ -4521,6 +4809,15 @@ AssetRegistry:
     ParentHandle: 2238632335295528690
     SubAssetKey: material:22
     ImportVersion: 1
+  - Handle: 2651483122329328769
+    Type: Texture2D
+    Path: Editor\Icons\component_socket.ktx2
+    SourceRoot: 0
+    LibraryPath: Editor\Icons\component_socket.ktx2\component_socket.ktx2
+    RootSourceHandle: 2651483122329328769
+    ParentHandle: 0
+    SubAssetKey: ""
+    ImportVersion: 1
   - Handle: 2661784628827312689
     Type: Mesh
     Path: Models\retroufo\Meshes\mesh_76_0_Mesh_76.kbrmesh
@@ -4556,6 +4853,15 @@ AssetRegistry:
     RootSourceHandle: 14121002741739587132
     ParentHandle: 14121002741739587132
     SubAssetKey: mesh:5_0
+    ImportVersion: 1
+  - Handle: 2691167546071534612
+    Type: Material
+    Path: Models\rpg-character\E10 attack anims\Materials\Hair.kbrmaterial
+    SourceRoot: 0
+    LibraryPath: Models\rpg-character\E10 attack anims\Materials\Hair.kbrmaterial
+    RootSourceHandle: 4305741975815557537
+    ParentHandle: 4305741975815557537
+    SubAssetKey: material:7
     ImportVersion: 1
   - Handle: 2694571779950163833
     Type: Material
@@ -4611,6 +4917,15 @@ AssetRegistry:
     ParentHandle: 2238632335295528690
     SubAssetKey: material:29
     ImportVersion: 1
+  - Handle: 2733720351044369369
+    Type: Material
+    Path: Models\rpg-character\E10 attack anims\Materials\Shirt.kbrmaterial
+    SourceRoot: 0
+    LibraryPath: Models\rpg-character\E10 attack anims\Materials\Shirt.kbrmaterial
+    RootSourceHandle: 4305741975815557537
+    ParentHandle: 4305741975815557537
+    SubAssetKey: material:13
+    ImportVersion: 1
   - Handle: 2738678219806132504
     Type: Mesh
     Path: Models\retroufo_glow\Meshes\mesh_47_0.kbrmesh
@@ -4637,6 +4952,15 @@ AssetRegistry:
     RootSourceHandle: 11824251895976750977
     ParentHandle: 11824251895976750977
     SubAssetKey: material:5
+    ImportVersion: 1
+  - Handle: 2772826404395064751
+    Type: Texture2D
+    Path: Editor\Icons\panel_viewport.png
+    SourceRoot: 0
+    LibraryPath: Editor\Icons\panel_viewport.png\panel_viewport.ktx2
+    RootSourceHandle: 2772826404395064751
+    ParentHandle: 0
+    SubAssetKey: ""
     ImportVersion: 1
   - Handle: 2778697245522543696
     Type: Mesh
@@ -4733,6 +5057,15 @@ AssetRegistry:
       - 534126962233704142
       - 5734159455103572291
       - 4618149021998797964
+  - Handle: 2814997420374026600
+    Type: Texture2D
+    Path: Editor\Icons\action_delete.ktx2
+    SourceRoot: 0
+    LibraryPath: Editor\Icons\action_delete.ktx2\action_delete.ktx2
+    RootSourceHandle: 2814997420374026600
+    ParentHandle: 0
+    SubAssetKey: ""
+    ImportVersion: 1
   - Handle: 2815510886732158274
     Type: Mesh
     Path: Models\rpg-character\E10 attack anims\Meshes\mesh_1_1_CUSurfPatch.kbrmesh
@@ -4969,6 +5302,15 @@ AssetRegistry:
     ParentHandle: 4418998681810053475
     SubAssetKey: mesh:0_0
     ImportVersion: 1
+  - Handle: 2909335854861158012
+    Type: Texture2D
+    Path: Editor\Icons\action_reimport.png
+    SourceRoot: 0
+    LibraryPath: Editor\Icons\action_reimport.png\action_reimport.ktx2
+    RootSourceHandle: 2909335854861158012
+    ParentHandle: 0
+    SubAssetKey: ""
+    ImportVersion: 1
   - Handle: 2914662617455277501
     Type: Material
     Path: Models\shadowscene_fire\Materials\m2_08___Default.kbrmaterial
@@ -5030,6 +5372,15 @@ AssetRegistry:
     RootSourceHandle: 5174649278247987669
     ParentHandle: 5174649278247987669
     SubAssetKey: mesh:44_0
+    ImportVersion: 1
+  - Handle: 2943548076498182029
+    Type: Texture2D
+    Path: Editor\Icons\component_static_mesh.ktx2
+    SourceRoot: 0
+    LibraryPath: Editor\Icons\component_static_mesh.ktx2\component_static_mesh.ktx2
+    RootSourceHandle: 2943548076498182029
+    ParentHandle: 0
+    SubAssetKey: ""
     ImportVersion: 1
   - Handle: 2946692073651942850
     Type: Prefab
@@ -5223,6 +5574,15 @@ AssetRegistry:
     RootSourceHandle: 6148802185286014116
     ParentHandle: 6148802185286014116
     SubAssetKey: mesh:35_0
+    ImportVersion: 1
+  - Handle: 3052540025222108189
+    Type: Texture2D
+    Path: Editor\Icons\unlock.ktx2
+    SourceRoot: 0
+    LibraryPath: Editor\Icons\unlock.ktx2\unlock.ktx2
+    RootSourceHandle: 3052540025222108189
+    ParentHandle: 0
+    SubAssetKey: ""
     ImportVersion: 1
   - Handle: 3060643797347433318
     Type: Prefab
@@ -5839,6 +6199,15 @@ AssetRegistry:
     ParentHandle: 758760977254712444
     SubAssetKey: mesh:11_1
     ImportVersion: 1
+  - Handle: 3371117645377184995
+    Type: Texture2D
+    Path: Editor\Icons\action_search.ktx2
+    SourceRoot: 0
+    LibraryPath: Editor\Icons\action_search.ktx2\action_search.ktx2
+    RootSourceHandle: 3371117645377184995
+    ParentHandle: 0
+    SubAssetKey: ""
+    ImportVersion: 1
   - Handle: 3372908465342114805
     Type: Mesh
     Path: Models\retroufo_red_lowpoly\Meshes\mesh_39_0_Mesh_51.kbrmesh
@@ -5983,6 +6352,15 @@ AssetRegistry:
     ParentHandle: 15527510207928805383
     SubAssetKey: mesh:1_0
     ImportVersion: 1
+  - Handle: 3458925685272414244
+    Type: Texture2D
+    Path: Editor\Icons\file.ktx2
+    SourceRoot: 0
+    LibraryPath: Editor\Icons\file.ktx2\file.ktx2
+    RootSourceHandle: 3458925685272414244
+    ParentHandle: 0
+    SubAssetKey: ""
+    ImportVersion: 1
   - Handle: 3464414755218451215
     Type: Mesh
     Path: Models\retroufo\Meshes\mesh_74_0_Mesh_74.kbrmesh
@@ -6017,6 +6395,15 @@ AssetRegistry:
     RootSourceHandle: 5517711370043161873
     ParentHandle: 5517711370043161873
     SubAssetKey: mesh:5_0
+    ImportVersion: 1
+  - Handle: 3484586975503323886
+    Type: Material
+    Path: Models\rpg-character\E10 attack anims\Materials\Blade.kbrmaterial
+    SourceRoot: 0
+    LibraryPath: Models\rpg-character\E10 attack anims\Materials\Blade.kbrmaterial
+    RootSourceHandle: 4305741975815557537
+    ParentHandle: 4305741975815557537
+    SubAssetKey: material:5
     ImportVersion: 1
   - Handle: 3486779317052954359
     Type: Texture2D
@@ -6469,6 +6856,15 @@ AssetRegistry:
     ParentHandle: 15982454909274218888
     SubAssetKey: mesh:39_0
     ImportVersion: 1
+  - Handle: 3677770867680874985
+    Type: Animation
+    Path: Models\rpg-character\E10 attack anims\Animations\Grip right.kbranimation
+    SourceRoot: 0
+    LibraryPath: Models\rpg-character\E10 attack anims\Animations\Grip right.kbranimation
+    RootSourceHandle: 4305741975815557537
+    ParentHandle: 4305741975815557537
+    SubAssetKey: animation:2
+    ImportVersion: 1
   - Handle: 3686564287702014730
     Type: Mesh
     Path: Models\treasure_smooth\Meshes\mesh_15_1_Cylinder.016.kbrmesh
@@ -6536,6 +6932,24 @@ AssetRegistry:
     ParentHandle: 4021286257923355776
     SubAssetKey: material:2
     ImportVersion: 1
+  - Handle: 3715238859666291081
+    Type: Texture2D
+    Path: Editor\Icons\shader.ktx2
+    SourceRoot: 0
+    LibraryPath: Editor\Icons\shader.ktx2\shader.ktx2
+    RootSourceHandle: 3715238859666291081
+    ParentHandle: 0
+    SubAssetKey: ""
+    ImportVersion: 1
+  - Handle: 3716871437632394948
+    Type: Texture2D
+    Path: Editor\Icons\folder_open.ktx2
+    SourceRoot: 0
+    LibraryPath: Editor\Icons\folder_open.ktx2\folder_open.ktx2
+    RootSourceHandle: 3716871437632394948
+    ParentHandle: 0
+    SubAssetKey: ""
+    ImportVersion: 1
   - Handle: 3725541886454758420
     Type: Texture2D
     Path: Models\sponza\8481240838833932244.ktx
@@ -6553,6 +6967,15 @@ AssetRegistry:
     RootSourceHandle: 14244998688843197978
     ParentHandle: 14244998688843197978
     SubAssetKey: mesh:3_0
+    ImportVersion: 1
+  - Handle: 3728122837868131935
+    Type: Texture2D
+    Path: Editor\Icons\state_simulate.png
+    SourceRoot: 0
+    LibraryPath: Editor\Icons\state_simulate.png\state_simulate.ktx2
+    RootSourceHandle: 3728122837868131935
+    ParentHandle: 0
+    SubAssetKey: ""
     ImportVersion: 1
   - Handle: 3735746775094547165
     Type: Mesh
@@ -6779,6 +7202,15 @@ AssetRegistry:
     ParentHandle: 4418998681810053475
     SubAssetKey: mesh:5_0
     ImportVersion: 1
+  - Handle: 3865628312608935461
+    Type: Texture2D
+    Path: Editor\Icons\component_tag.png
+    SourceRoot: 0
+    LibraryPath: Editor\Icons\component_tag.png\component_tag.ktx2
+    RootSourceHandle: 3865628312608935461
+    ParentHandle: 0
+    SubAssetKey: ""
+    ImportVersion: 1
   - Handle: 3871592921812365011
     Type: Mesh
     Path: Models\gltf\glTF-Embedded\Buggy\Meshes\mesh_46_0_body_73.kbrmesh
@@ -6850,6 +7282,15 @@ AssetRegistry:
     RootSourceHandle: 9659550559801413317
     ParentHandle: 9659550559801413317
     SubAssetKey: mesh:10_0
+    ImportVersion: 1
+  - Handle: 3908308608096010963
+    Type: Texture2D
+    Path: Editor\Icons\action_reimport.ktx2
+    SourceRoot: 0
+    LibraryPath: Editor\Icons\action_reimport.ktx2\action_reimport.ktx2
+    RootSourceHandle: 3908308608096010963
+    ParentHandle: 0
+    SubAssetKey: ""
     ImportVersion: 1
   - Handle: 3911043468842173093
     Type: Mesh
@@ -7029,6 +7470,15 @@ AssetRegistry:
     ParentHandle: 7563732692318888728
     SubAssetKey: mesh:86_0
     ImportVersion: 1
+  - Handle: 4033235249683459341
+    Type: Texture2D
+    Path: Editor\Icons\asset_scene.ktx2
+    SourceRoot: 0
+    LibraryPath: Editor\Icons\asset_scene.ktx2\asset_scene.ktx2
+    RootSourceHandle: 4033235249683459341
+    ParentHandle: 0
+    SubAssetKey: ""
+    ImportVersion: 1
   - Handle: 4038268879696797313
     Type: Mesh
     Path: Models\treasure_smooth\Meshes\mesh_64_0_Cylinder.026.kbrmesh
@@ -7064,6 +7514,15 @@ AssetRegistry:
     RootSourceHandle: 6090326326702746238
     ParentHandle: 6090326326702746238
     SubAssetKey: mesh:0_0
+    ImportVersion: 1
+  - Handle: 4078154389318545277
+    Type: Texture2D
+    Path: Editor\Icons\status_registered.ktx2
+    SourceRoot: 0
+    LibraryPath: Editor\Icons\status_registered.ktx2\status_registered.ktx2
+    RootSourceHandle: 4078154389318545277
+    ParentHandle: 0
+    SubAssetKey: ""
     ImportVersion: 1
   - Handle: 4084424766298171239
     Type: Material
@@ -7214,6 +7673,15 @@ AssetRegistry:
     ParentHandle: 2238632335295528690
     SubAssetKey: material:26
     ImportVersion: 1
+  - Handle: 4146337053313785955
+    Type: Texture2D
+    Path: Editor\Icons\action_wireframe.ktx2
+    SourceRoot: 0
+    LibraryPath: Editor\Icons\action_wireframe.ktx2\action_wireframe.ktx2
+    RootSourceHandle: 4146337053313785955
+    ParentHandle: 0
+    SubAssetKey: ""
+    ImportVersion: 1
   - Handle: 4149055192999790122
     Type: Mesh
     Path: Models\oaktree\Meshes\mesh_1_0_tree.002.kbrmesh
@@ -7241,6 +7709,15 @@ AssetRegistry:
     ParentHandle: 1526250459739876399
     SubAssetKey: material:0
     ImportVersion: 1
+  - Handle: 4172909413890867784
+    Type: Texture2D
+    Path: Editor\Icons\component_ai_agent.png
+    SourceRoot: 0
+    LibraryPath: Editor\Icons\component_ai_agent.png\component_ai_agent.ktx2
+    RootSourceHandle: 4172909413890867784
+    ParentHandle: 0
+    SubAssetKey: ""
+    ImportVersion: 1
   - Handle: 4173316132475875962
     Type: Mesh
     Path: Models\shadowscene_fire\Meshes\mesh_5_0_meshId1_name.kbrmesh
@@ -7258,6 +7735,15 @@ AssetRegistry:
     RootSourceHandle: 9416030371750910923
     ParentHandle: 9416030371750910923
     SubAssetKey: mesh:11_0
+    ImportVersion: 1
+  - Handle: 4187933988406976178
+    Type: SkinnedMesh
+    Path: Models\rpg-character\E10 attack anims\Meshes\skinnedmesh_7_0_Cube.004.kbrskinnedmesh
+    SourceRoot: 0
+    LibraryPath: Models\rpg-character\E10 attack anims\Meshes\skinnedmesh_7_0_Cube.004.kbrskinnedmesh
+    RootSourceHandle: 4305741975815557537
+    ParentHandle: 4305741975815557537
+    SubAssetKey: skinnedmesh:7_0
     ImportVersion: 1
   - Handle: 4195610585879657395
     Type: Mesh
@@ -7322,6 +7808,15 @@ AssetRegistry:
     ParentHandle: 8858309372063028477
     SubAssetKey: mesh:18_0
     ImportVersion: 1
+  - Handle: 4277993827835464925
+    Type: Texture2D
+    Path: Editor\Icons\component_hierarchy.png
+    SourceRoot: 0
+    LibraryPath: Editor\Icons\component_hierarchy.png\component_hierarchy.ktx2
+    RootSourceHandle: 4277993827835464925
+    ParentHandle: 0
+    SubAssetKey: ""
+    ImportVersion: 1
   - Handle: 4292143499501521346
     Type: Mesh
     Path: Models\retroufo\Meshes\mesh_40_0.kbrmesh
@@ -7358,6 +7853,15 @@ AssetRegistry:
     ParentHandle: 10152496132570147302
     SubAssetKey: skinnedmesh:0_0
     ImportVersion: 1
+  - Handle: 4307021749226755225
+    Type: Texture2D
+    Path: Editor\Icons\transport_resume.ktx2
+    SourceRoot: 0
+    LibraryPath: Editor\Icons\transport_resume.ktx2\transport_resume.ktx2
+    RootSourceHandle: 4307021749226755225
+    ParentHandle: 0
+    SubAssetKey: ""
+    ImportVersion: 1
   - Handle: 4307766448632484663
     Type: Material
     Path: Models\retroufo_glow\Materials\Material_0.001.kbrmaterial
@@ -7386,6 +7890,15 @@ AssetRegistry:
     RootSourceHandle: 9420112938983857962
     ParentHandle: 9420112938983857962
     SubAssetKey: material:7
+    ImportVersion: 1
+  - Handle: 4323126229136225152
+    Type: Texture2D
+    Path: Editor\Icons\slot_unset.ktx2
+    SourceRoot: 0
+    LibraryPath: Editor\Icons\slot_unset.ktx2\slot_unset.ktx2
+    RootSourceHandle: 4323126229136225152
+    ParentHandle: 0
+    SubAssetKey: ""
     ImportVersion: 1
   - Handle: 4327264825173013818
     Type: Material
@@ -7766,6 +8279,15 @@ AssetRegistry:
     ParentHandle: 13025862333548612002
     SubAssetKey: material:3
     ImportVersion: 1
+  - Handle: 4499060138082397438
+    Type: Texture2D
+    Path: Editor\Icons\action_close.ktx2
+    SourceRoot: 0
+    LibraryPath: Editor\Icons\action_close.ktx2\action_close.ktx2
+    RootSourceHandle: 4499060138082397438
+    ParentHandle: 0
+    SubAssetKey: ""
+    ImportVersion: 1
   - Handle: 4503138336453610937
     Type: Material
     Path: Models\retroufo_glow\Materials\Material_6.001.kbrmaterial
@@ -7774,6 +8296,15 @@ AssetRegistry:
     RootSourceHandle: 6148802185286014116
     ParentHandle: 6148802185286014116
     SubAssetKey: material:6
+    ImportVersion: 1
+  - Handle: 4507004349266868807
+    Type: Texture2D
+    Path: Editor\Icons\component_prefab.ktx2
+    SourceRoot: 0
+    LibraryPath: Editor\Icons\component_prefab.ktx2\component_prefab.ktx2
+    RootSourceHandle: 4507004349266868807
+    ParentHandle: 0
+    SubAssetKey: ""
     ImportVersion: 1
   - Handle: 4508423482691568998
     Type: Material
@@ -8102,6 +8633,15 @@ AssetRegistry:
     RootSourceHandle: 641661085910201849
     ParentHandle: 641661085910201849
     SubAssetKey: mesh:18_0
+    ImportVersion: 1
+  - Handle: 4610749777571759239
+    Type: Texture2D
+    Path: Editor\Icons\hierarchy_child.png
+    SourceRoot: 0
+    LibraryPath: Editor\Icons\hierarchy_child.png\hierarchy_child.ktx2
+    RootSourceHandle: 4610749777571759239
+    ParentHandle: 0
+    SubAssetKey: ""
     ImportVersion: 1
   - Handle: 4613210287800966632
     Type: Material
@@ -8611,6 +9151,15 @@ AssetRegistry:
     ParentHandle: 9416030371750910923
     SubAssetKey: mesh:17_1
     ImportVersion: 1
+  - Handle: 4784861843106426317
+    Type: Texture2D
+    Path: Editor\Icons\action_refresh.png
+    SourceRoot: 0
+    LibraryPath: Editor\Icons\action_refresh.png\action_refresh.ktx2
+    RootSourceHandle: 4784861843106426317
+    ParentHandle: 0
+    SubAssetKey: ""
+    ImportVersion: 1
   - Handle: 4786253084902786376
     Type: Material
     Path: Models\gltf\glTF-Embedded\Buggy\Materials\Material_25_89.kbrmaterial
@@ -8646,6 +9195,15 @@ AssetRegistry:
     RootSourceHandle: 7563732692318888728
     ParentHandle: 7563732692318888728
     SubAssetKey: mesh:10_0
+    ImportVersion: 1
+  - Handle: 4809297881309000650
+    Type: Texture2D
+    Path: Editor\Icons\panel_console.ktx2
+    SourceRoot: 0
+    LibraryPath: Editor\Icons\panel_console.ktx2\panel_console.ktx2
+    RootSourceHandle: 4809297881309000650
+    ParentHandle: 0
+    SubAssetKey: ""
     ImportVersion: 1
   - Handle: 4812313406763805242
     Type: Material
@@ -8721,6 +9279,15 @@ AssetRegistry:
     RootSourceHandle: 11581378365515906497
     ParentHandle: 11581378365515906497
     SubAssetKey: mesh:64_1
+    ImportVersion: 1
+  - Handle: 4881256758361107649
+    Type: Texture2D
+    Path: Editor\Icons\asset_texturecube.png
+    SourceRoot: 0
+    LibraryPath: Editor\Icons\asset_texturecube.png\asset_texturecube.ktx2
+    RootSourceHandle: 4881256758361107649
+    ParentHandle: 0
+    SubAssetKey: ""
     ImportVersion: 1
   - Handle: 4883435856563118917
     Type: Prefab
@@ -8824,6 +9391,15 @@ AssetRegistry:
     ParentHandle: 0
     SubAssetKey: ""
     ImportVersion: 1
+  - Handle: 4904853902900221008
+    Type: Texture2D
+    Path: Editor\Icons\action_close.png
+    SourceRoot: 0
+    LibraryPath: Editor\Icons\action_close.png\action_close.ktx2
+    RootSourceHandle: 4904853902900221008
+    ParentHandle: 0
+    SubAssetKey: ""
+    ImportVersion: 1
   - Handle: 4906670410853966970
     Type: Skeleton
     Path: Models\CesiumMan\glTF-Embedded\CesiumMan\Skeletons\Armature.kbrskeleton
@@ -8850,6 +9426,15 @@ AssetRegistry:
     RootSourceHandle: 15629215700429853565
     ParentHandle: 15629215700429853565
     SubAssetKey: skinnedmesh:9_0
+    ImportVersion: 1
+  - Handle: 4912246843197678851
+    Type: Texture2D
+    Path: Editor\Icons\action_redo.ktx2
+    SourceRoot: 0
+    LibraryPath: Editor\Icons\action_redo.ktx2\action_redo.ktx2
+    RootSourceHandle: 4912246843197678851
+    ParentHandle: 0
+    SubAssetKey: ""
     ImportVersion: 1
   - Handle: 4912775707394979138
     Type: Mesh
@@ -8986,6 +9571,15 @@ AssetRegistry:
     ParentHandle: 12460365323498653085
     SubAssetKey: texture:35
     ImportVersion: 1
+  - Handle: 4993231773262823339
+    Type: Texture2D
+    Path: Editor\Icons\component_id.ktx2
+    SourceRoot: 0
+    LibraryPath: Editor\Icons\component_id.ktx2\component_id.ktx2
+    RootSourceHandle: 4993231773262823339
+    ParentHandle: 0
+    SubAssetKey: ""
+    ImportVersion: 1
   - Handle: 4996438343932424535
     Type: Material
     Path: Models\retroufo\Materials\Material_5.kbrmaterial
@@ -8994,6 +9588,15 @@ AssetRegistry:
     RootSourceHandle: 6090326326702746238
     ParentHandle: 6090326326702746238
     SubAssetKey: material:5
+    ImportVersion: 1
+  - Handle: 4996708083872805912
+    Type: Texture2D
+    Path: Editor\Icons\state_edit.ktx2
+    SourceRoot: 0
+    LibraryPath: Editor\Icons\state_edit.ktx2\state_edit.ktx2
+    RootSourceHandle: 4996708083872805912
+    ParentHandle: 0
+    SubAssetKey: ""
     ImportVersion: 1
   - Handle: 4998664589896258548
     Type: Mesh
@@ -9058,6 +9661,15 @@ AssetRegistry:
     ParentHandle: 15982454909274218888
     SubAssetKey: material:3
     ImportVersion: 1
+  - Handle: 5032557961557769817
+    Type: Texture2D
+    Path: Editor\Icons\component_mesh_collider.ktx2
+    SourceRoot: 0
+    LibraryPath: Editor\Icons\component_mesh_collider.ktx2\component_mesh_collider.ktx2
+    RootSourceHandle: 5032557961557769817
+    ParentHandle: 0
+    SubAssetKey: ""
+    ImportVersion: 1
   - Handle: 5036353221110241332
     Type: Material
     Path: Models\rpg-character\E10 attack anims\Materials\Underclothes.001.kbrmaterial
@@ -9093,6 +9705,15 @@ AssetRegistry:
     RootSourceHandle: 2238632335295528690
     ParentHandle: 2238632335295528690
     SubAssetKey: material:98
+    ImportVersion: 1
+  - Handle: 5047721038985653421
+    Type: Texture2D
+    Path: Editor\Icons\project.ktx2
+    SourceRoot: 0
+    LibraryPath: Editor\Icons\project.ktx2\project.ktx2
+    RootSourceHandle: 5047721038985653421
+    ParentHandle: 0
+    SubAssetKey: ""
     ImportVersion: 1
   - Handle: 5055868043358197054
     Type: Mesh
@@ -9197,6 +9818,15 @@ AssetRegistry:
     RootSourceHandle: 2238632335295528690
     ParentHandle: 2238632335295528690
     SubAssetKey: mesh:102_0
+    ImportVersion: 1
+  - Handle: 5072033336193604211
+    Type: Texture2D
+    Path: Editor\Icons\transport_stop.ktx2
+    SourceRoot: 0
+    LibraryPath: Editor\Icons\transport_stop.ktx2\transport_stop.ktx2
+    RootSourceHandle: 5072033336193604211
+    ParentHandle: 0
+    SubAssetKey: ""
     ImportVersion: 1
   - Handle: 5072918679463645307
     Type: Mesh
@@ -9324,6 +9954,15 @@ AssetRegistry:
     ParentHandle: 6532463041022503106
     SubAssetKey: mesh:8_0
     ImportVersion: 1
+  - Handle: 5128211638951241909
+    Type: Texture2D
+    Path: Editor\Icons\component_static_mesh.png
+    SourceRoot: 0
+    LibraryPath: Editor\Icons\component_static_mesh.png\component_static_mesh.ktx2
+    RootSourceHandle: 5128211638951241909
+    ParentHandle: 0
+    SubAssetKey: ""
+    ImportVersion: 1
   - Handle: 5133775919293875269
     Type: Mesh
     Path: Models\retroufo_red_lowpoly\Meshes\mesh_21_0_Mesh_21.kbrmesh
@@ -9387,6 +10026,15 @@ AssetRegistry:
     ParentHandle: 0
     SubAssetKey: ""
     ImportVersion: 1
+  - Handle: 5166212488345454267
+    Type: Texture2D
+    Path: Editor\Icons\notification_warning.ktx2
+    SourceRoot: 0
+    LibraryPath: Editor\Icons\notification_warning.ktx2\notification_warning.ktx2
+    RootSourceHandle: 5166212488345454267
+    ParentHandle: 0
+    SubAssetKey: ""
+    ImportVersion: 1
   - Handle: 5166991818168815824
     Type: Prefab
     Path: Models\suzanne_lods.gltf
@@ -9431,6 +10079,15 @@ AssetRegistry:
     RootSourceHandle: 6532463041022503106
     ParentHandle: 6532463041022503106
     SubAssetKey: mesh:24_0
+    ImportVersion: 1
+  - Handle: 5203454838019989916
+    Type: Texture2D
+    Path: Editor\Icons\component_camera.ktx2
+    SourceRoot: 0
+    LibraryPath: Editor\Icons\component_camera.ktx2\component_camera.ktx2
+    RootSourceHandle: 5203454838019989916
+    ParentHandle: 0
+    SubAssetKey: ""
     ImportVersion: 1
   - Handle: 5205891399445915687
     Type: Material
@@ -9507,6 +10164,15 @@ AssetRegistry:
     Dependencies:
       - 18412254707622116676
       - 16870403839334099498
+  - Handle: 5251220087606847135
+    Type: Texture2D
+    Path: Editor\Icons\asset_prefab.ktx2
+    SourceRoot: 0
+    LibraryPath: Editor\Icons\asset_prefab.ktx2\asset_prefab.ktx2
+    RootSourceHandle: 5251220087606847135
+    ParentHandle: 0
+    SubAssetKey: ""
+    ImportVersion: 1
   - Handle: 5255452391917226795
     Type: Mesh
     Path: Models\retroufo_glow\Meshes\mesh_31_0_Mesh_31.001.kbrmesh
@@ -9578,6 +10244,15 @@ AssetRegistry:
     RootSourceHandle: 11581378365515906497
     ParentHandle: 11581378365515906497
     SubAssetKey: mesh:45_0
+    ImportVersion: 1
+  - Handle: 5315280239920242695
+    Type: Texture2D
+    Path: Editor\Icons\asset_texture2d.ktx2
+    SourceRoot: 0
+    LibraryPath: Editor\Icons\asset_texture2d.ktx2\asset_texture2d.ktx2
+    RootSourceHandle: 5315280239920242695
+    ParentHandle: 0
+    SubAssetKey: ""
     ImportVersion: 1
   - Handle: 5315894139399275913
     Type: Material
@@ -9699,6 +10374,15 @@ AssetRegistry:
     Path: Scenes\PrefabTest.kerberos
     SourceRoot: 0
     RootSourceHandle: 5353941436593895798
+    ParentHandle: 0
+    SubAssetKey: ""
+    ImportVersion: 1
+  - Handle: 5355360451637406834
+    Type: Texture2D
+    Path: Editor\Icons\status_ready.png
+    SourceRoot: 0
+    LibraryPath: Editor\Icons\status_ready.png\status_ready.ktx2
+    RootSourceHandle: 5355360451637406834
     ParentHandle: 0
     SubAssetKey: ""
     ImportVersion: 1
@@ -9864,6 +10548,15 @@ AssetRegistry:
     ParentHandle: 7563732692318888728
     SubAssetKey: mesh:95_0
     ImportVersion: 1
+  - Handle: 5388404724730902629
+    Type: Texture2D
+    Path: Editor\Icons\notification_info.png
+    SourceRoot: 0
+    LibraryPath: Editor\Icons\notification_info.png\notification_info.ktx2
+    RootSourceHandle: 5388404724730902629
+    ParentHandle: 0
+    SubAssetKey: ""
+    ImportVersion: 1
   - Handle: 5413312760506220020
     Type: Material
     Path: Models\chinesedragon\Materials\m1_03___Default.kbrmaterial
@@ -9972,6 +10665,15 @@ AssetRegistry:
     ParentHandle: 11581378365515906497
     SubAssetKey: mesh:35_0
     ImportVersion: 1
+  - Handle: 5451951974532815443
+    Type: Material
+    Path: Models\rpg-character\E10 attack anims\Materials\Metal Dark.kbrmaterial
+    SourceRoot: 0
+    LibraryPath: Models\rpg-character\E10 attack anims\Materials\Metal Dark.kbrmaterial
+    RootSourceHandle: 4305741975815557537
+    ParentHandle: 4305741975815557537
+    SubAssetKey: material:4
+    ImportVersion: 1
   - Handle: 5454637852205955349
     Type: Material
     Path: Models\gltf\glTF-Embedded\Buggy\Materials\Material_26_110.kbrmaterial
@@ -9980,6 +10682,15 @@ AssetRegistry:
     RootSourceHandle: 7563732692318888728
     ParentHandle: 7563732692318888728
     SubAssetKey: material:110
+    ImportVersion: 1
+  - Handle: 5470013108132139869
+    Type: Texture2D
+    Path: Editor\Icons\state_play.png
+    SourceRoot: 0
+    LibraryPath: Editor\Icons\state_play.png\state_play.ktx2
+    RootSourceHandle: 5470013108132139869
+    ParentHandle: 0
+    SubAssetKey: ""
     ImportVersion: 1
   - Handle: 5470310239353848791
     Type: Mesh
@@ -10049,6 +10760,15 @@ AssetRegistry:
     Path: ImportedModels\sponza\Material_18.kbrmat
     SourceRoot: 0
     RootSourceHandle: 5504598352782067988
+    ParentHandle: 0
+    SubAssetKey: ""
+    ImportVersion: 1
+  - Handle: 5512970516261281047
+    Type: Texture2D
+    Path: Editor\Icons\asset_mesh.png
+    SourceRoot: 0
+    LibraryPath: Editor\Icons\asset_mesh.png\asset_mesh.ktx2
+    RootSourceHandle: 5512970516261281047
     ParentHandle: 0
     SubAssetKey: ""
     ImportVersion: 1
@@ -10205,6 +10925,15 @@ AssetRegistry:
     ParentHandle: 6148802185286014116
     SubAssetKey: mesh:38_0
     ImportVersion: 1
+  - Handle: 5610828909658487621
+    Type: Texture2D
+    Path: Editor\Icons\panel_debug.ktx2
+    SourceRoot: 0
+    LibraryPath: Editor\Icons\panel_debug.ktx2\panel_debug.ktx2
+    RootSourceHandle: 5610828909658487621
+    ParentHandle: 0
+    SubAssetKey: ""
+    ImportVersion: 1
   - Handle: 5612235856839324777
     Type: Mesh
     Path: Models\sponza\sponza\Meshes\mesh_0_1_Mesh_0.kbrmesh
@@ -10231,6 +10960,15 @@ AssetRegistry:
     RootSourceHandle: 2238632335295528690
     ParentHandle: 2238632335295528690
     SubAssetKey: mesh:88_0
+    ImportVersion: 1
+  - Handle: 5638646141062046007
+    Type: SkinnedMesh
+    Path: Models\rpg-character\E10 attack anims\Meshes\skinnedmesh_4_0_Cube.011.kbrskinnedmesh
+    SourceRoot: 0
+    LibraryPath: Models\rpg-character\E10 attack anims\Meshes\skinnedmesh_4_0_Cube.011.kbrskinnedmesh
+    RootSourceHandle: 4305741975815557537
+    ParentHandle: 4305741975815557537
+    SubAssetKey: skinnedmesh:4_0
     ImportVersion: 1
   - Handle: 5638766017765482698
     Type: Material
@@ -10285,6 +11023,15 @@ AssetRegistry:
     SourceRoot: 0
     LibraryPath: Models\fireplace\fireplace.kbrprefab
     RootSourceHandle: 5691109480301621905
+    ParentHandle: 0
+    SubAssetKey: ""
+    ImportVersion: 1
+  - Handle: 5693179027905824229
+    Type: Texture2D
+    Path: Editor\Icons\status_ready.ktx2
+    SourceRoot: 0
+    LibraryPath: Editor\Icons\status_ready.ktx2\status_ready.ktx2
+    RootSourceHandle: 5693179027905824229
     ParentHandle: 0
     SubAssetKey: ""
     ImportVersion: 1
@@ -10418,6 +11165,15 @@ AssetRegistry:
     RootSourceHandle: 9659550559801413317
     ParentHandle: 9659550559801413317
     SubAssetKey: mesh:16_0
+    ImportVersion: 1
+  - Handle: 5807695533376767997
+    Type: Texture2D
+    Path: Editor\Icons\component_capsule_collider.png
+    SourceRoot: 0
+    LibraryPath: Editor\Icons\component_capsule_collider.png\component_capsule_collider.ktx2
+    RootSourceHandle: 5807695533376767997
+    ParentHandle: 0
+    SubAssetKey: ""
     ImportVersion: 1
   - Handle: 5808246575810161645
     Type: Prefab
@@ -10748,6 +11504,15 @@ AssetRegistry:
     SourceRoot: 0
     LibraryPath: Models\plane\plane.kbrprefab
     RootSourceHandle: 5954077952050993354
+    ParentHandle: 0
+    SubAssetKey: ""
+    ImportVersion: 1
+  - Handle: 5955565143932578788
+    Type: Texture2D
+    Path: Editor\Icons\folder_open.png
+    SourceRoot: 0
+    LibraryPath: Editor\Icons\folder_open.png\folder_open.ktx2
+    RootSourceHandle: 5955565143932578788
     ParentHandle: 0
     SubAssetKey: ""
     ImportVersion: 1
@@ -11158,6 +11923,15 @@ AssetRegistry:
     ParentHandle: 9416030371750910923
     SubAssetKey: mesh:9_0
     ImportVersion: 1
+  - Handle: 6215142472961169666
+    Type: Texture2D
+    Path: Editor\Icons\gizmo_rotate.ktx2
+    SourceRoot: 0
+    LibraryPath: Editor\Icons\gizmo_rotate.ktx2\gizmo_rotate.ktx2
+    RootSourceHandle: 6215142472961169666
+    ParentHandle: 0
+    SubAssetKey: ""
+    ImportVersion: 1
   - Handle: 6225337204799780866
     Type: Mesh
     Path: Models\treasure_glow\Meshes\mesh_39_0_Cube.022.kbrmesh
@@ -11183,6 +11957,15 @@ AssetRegistry:
     RootSourceHandle: 7091104109938620452
     ParentHandle: 7091104109938620452
     SubAssetKey: mesh:2_1
+    ImportVersion: 1
+  - Handle: 6237452442835906203
+    Type: Texture2D
+    Path: Editor\Icons\transport_pause.ktx2
+    SourceRoot: 0
+    LibraryPath: Editor\Icons\transport_pause.ktx2\transport_pause.ktx2
+    RootSourceHandle: 6237452442835906203
+    ParentHandle: 0
+    SubAssetKey: ""
     ImportVersion: 1
   - Handle: 6238035296533204066
     Type: Texture2D
@@ -11682,6 +12465,15 @@ AssetRegistry:
     ParentHandle: 11824251895976750977
     SubAssetKey: mesh:31_0
     ImportVersion: 1
+  - Handle: 6493109157952150518
+    Type: Texture2D
+    Path: Editor\Icons\component_skeleton.png
+    SourceRoot: 0
+    LibraryPath: Editor\Icons\component_skeleton.png\component_skeleton.ktx2
+    RootSourceHandle: 6493109157952150518
+    ParentHandle: 0
+    SubAssetKey: ""
+    ImportVersion: 1
   - Handle: 6494421235198371520
     Type: Texture2D
     Path: Models\avocado\Avocado\Textures\texture_0_Avocado_baseColor.ktx2
@@ -11708,6 +12500,15 @@ AssetRegistry:
     RootSourceHandle: 2238632335295528690
     ParentHandle: 2238632335295528690
     SubAssetKey: mesh:86_0
+    ImportVersion: 1
+  - Handle: 6526287620771287032
+    Type: Texture2D
+    Path: Editor\Icons\shader.png
+    SourceRoot: 0
+    LibraryPath: Editor\Icons\shader.png\shader.ktx2
+    RootSourceHandle: 6526287620771287032
+    ParentHandle: 0
+    SubAssetKey: ""
     ImportVersion: 1
   - Handle: 6531237496614749465
     Type: Mesh
@@ -11987,6 +12788,15 @@ AssetRegistry:
       - 7676785537016524265
       - 7644254885853398686
       - 4972867595889922113
+  - Handle: 6664393257901157104
+    Type: Texture2D
+    Path: Editor\Icons\component_ai_controller.png
+    SourceRoot: 0
+    LibraryPath: Editor\Icons\component_ai_controller.png\component_ai_controller.ktx2
+    RootSourceHandle: 6664393257901157104
+    ParentHandle: 0
+    SubAssetKey: ""
+    ImportVersion: 1
   - Handle: 6665712026118286940
     Type: Texture2D
     Path: Models\FlightHelmet\glTF\FlightHelmet_baseColor2.png
@@ -12246,6 +13056,24 @@ AssetRegistry:
     ParentHandle: 601935324361006322
     SubAssetKey: texture:0
     ImportVersion: 1
+  - Handle: 6778567736381960233
+    Type: Animation
+    Path: Models\rpg-character\E10 attack anims\Animations\Run.kbranimation
+    SourceRoot: 0
+    LibraryPath: Models\rpg-character\E10 attack anims\Animations\Run.kbranimation
+    RootSourceHandle: 4305741975815557537
+    ParentHandle: 4305741975815557537
+    SubAssetKey: animation:5
+    ImportVersion: 1
+  - Handle: 6789044285209125297
+    Type: Texture2D
+    Path: Editor\Icons\slot_metallic.png
+    SourceRoot: 0
+    LibraryPath: Editor\Icons\slot_metallic.png\slot_metallic.ktx2
+    RootSourceHandle: 6789044285209125297
+    ParentHandle: 0
+    SubAssetKey: ""
+    ImportVersion: 1
   - Handle: 6797707575429681525
     Type: Material
     Path: Models\treasure_smooth\Materials\Material_001.kbrmaterial
@@ -12254,6 +13082,15 @@ AssetRegistry:
     RootSourceHandle: 9416030371750910923
     ParentHandle: 9416030371750910923
     SubAssetKey: material:0
+    ImportVersion: 1
+  - Handle: 6807717656733874411
+    Type: Texture2D
+    Path: Editor\Icons\action_paste.ktx2
+    SourceRoot: 0
+    LibraryPath: Editor\Icons\action_paste.ktx2\action_paste.ktx2
+    RootSourceHandle: 6807717656733874411
+    ParentHandle: 0
+    SubAssetKey: ""
     ImportVersion: 1
   - Handle: 6811793006144546850
     Type: Mesh
@@ -12272,6 +13109,15 @@ AssetRegistry:
     RootSourceHandle: 2238632335295528690
     ParentHandle: 2238632335295528690
     SubAssetKey: mesh:80_0
+    ImportVersion: 1
+  - Handle: 6829131188348744400
+    Type: Material
+    Path: Models\rpg-character\E10 attack anims\Materials\Black.kbrmaterial
+    SourceRoot: 0
+    LibraryPath: Models\rpg-character\E10 attack anims\Materials\Black.kbrmaterial
+    RootSourceHandle: 4305741975815557537
+    ParentHandle: 4305741975815557537
+    SubAssetKey: material:12
     ImportVersion: 1
   - Handle: 6831886059678299664
     Type: Material
@@ -12344,6 +13190,15 @@ AssetRegistry:
     ParentHandle: 6532463041022503106
     SubAssetKey: mesh:41_0
     ImportVersion: 1
+  - Handle: 6872942970522268544
+    Type: Mesh
+    Path: Models\rpg-character\E10 attack anims\Meshes\mesh_1_2_CUSurfPatch.kbrmesh
+    SourceRoot: 0
+    LibraryPath: Models\rpg-character\E10 attack anims\Meshes\mesh_1_2_CUSurfPatch.kbrmesh
+    RootSourceHandle: 4305741975815557537
+    ParentHandle: 4305741975815557537
+    SubAssetKey: mesh:1_2
+    ImportVersion: 1
   - Handle: 6872976369200393987
     Type: Texture2D
     Path: Flame03-hollow_16x4.png
@@ -12380,6 +13235,15 @@ AssetRegistry:
     ParentHandle: 2238632335295528690
     SubAssetKey: material:84
     ImportVersion: 1
+  - Handle: 6885817122531550465
+    Type: Texture2D
+    Path: Editor\Icons\action_add.ktx2
+    SourceRoot: 0
+    LibraryPath: Editor\Icons\action_add.ktx2\action_add.ktx2
+    RootSourceHandle: 6885817122531550465
+    ParentHandle: 0
+    SubAssetKey: ""
+    ImportVersion: 1
   - Handle: 6889311843245929269
     Type: Material
     Path: Models\vulkanscenelogos\Materials\White Emissive.kbrmaterial
@@ -12388,6 +13252,24 @@ AssetRegistry:
     RootSourceHandle: 3183028465703412286
     ParentHandle: 3183028465703412286
     SubAssetKey: material:0
+    ImportVersion: 1
+  - Handle: 6896817626921845943
+    Type: Texture2D
+    Path: Editor\Icons\gizmo_translate.png
+    SourceRoot: 0
+    LibraryPath: Editor\Icons\gizmo_translate.png\gizmo_translate.ktx2
+    RootSourceHandle: 6896817626921845943
+    ParentHandle: 0
+    SubAssetKey: ""
+    ImportVersion: 1
+  - Handle: 6903231479761520738
+    Type: Texture2D
+    Path: Editor\Icons\transport_play.png
+    SourceRoot: 0
+    LibraryPath: Editor\Icons\transport_play.png\transport_play.ktx2
+    RootSourceHandle: 6903231479761520738
+    ParentHandle: 0
+    SubAssetKey: ""
     ImportVersion: 1
   - Handle: 6908520765687543397
     Type: Mesh
@@ -12424,6 +13306,15 @@ AssetRegistry:
     RootSourceHandle: 3234291855590370197
     ParentHandle: 3234291855590370197
     SubAssetKey: mesh:58_0
+    ImportVersion: 1
+  - Handle: 6928627264088623660
+    Type: Texture2D
+    Path: Editor\Icons\unlock.png
+    SourceRoot: 0
+    LibraryPath: Editor\Icons\unlock.png\unlock.ktx2
+    RootSourceHandle: 6928627264088623660
+    ParentHandle: 0
+    SubAssetKey: ""
     ImportVersion: 1
   - Handle: 6937769365296522446
     Type: Mesh
@@ -12469,6 +13360,15 @@ AssetRegistry:
     RootSourceHandle: 14244998688843197978
     ParentHandle: 14244998688843197978
     SubAssetKey: mesh:42_0
+    ImportVersion: 1
+  - Handle: 6953970805644140642
+    Type: Texture2D
+    Path: Editor\Icons\action_cut.ktx2
+    SourceRoot: 0
+    LibraryPath: Editor\Icons\action_cut.ktx2\action_cut.ktx2
+    RootSourceHandle: 6953970805644140642
+    ParentHandle: 0
+    SubAssetKey: ""
     ImportVersion: 1
   - Handle: 6956139923314990433
     Type: Material
@@ -12630,6 +13530,15 @@ AssetRegistry:
     ParentHandle: 11581378365515906497
     SubAssetKey: mesh:6_0
     ImportVersion: 1
+  - Handle: 7078848938917098952
+    Type: Texture2D
+    Path: Editor\Icons\action_save.png
+    SourceRoot: 0
+    LibraryPath: Editor\Icons\action_save.png\action_save.ktx2
+    RootSourceHandle: 7078848938917098952
+    ParentHandle: 0
+    SubAssetKey: ""
+    ImportVersion: 1
   - Handle: 7079123099362233088
     Type: Mesh
     Path: Models\treasure_smooth\Meshes\mesh_5_0_Cylinder.006.kbrmesh
@@ -12683,6 +13592,15 @@ AssetRegistry:
     RootSourceHandle: 12460365323498653085
     ParentHandle: 12460365323498653085
     SubAssetKey: texture:37
+    ImportVersion: 1
+  - Handle: 7105023272418850322
+    Type: Material
+    Path: Models\rpg-character\E10 attack anims\Materials\Emblem.kbrmaterial
+    SourceRoot: 0
+    LibraryPath: Models\rpg-character\E10 attack anims\Materials\Emblem.kbrmaterial
+    RootSourceHandle: 4305741975815557537
+    ParentHandle: 4305741975815557537
+    SubAssetKey: material:3
     ImportVersion: 1
   - Handle: 7106688573770238539
     Type: Mesh
@@ -12818,6 +13736,15 @@ AssetRegistry:
     RootSourceHandle: 8801818670981289446
     ParentHandle: 8801818670981289446
     SubAssetKey: mesh:0_0
+    ImportVersion: 1
+  - Handle: 7210036931062970238
+    Type: Texture2D
+    Path: Editor\Icons\file_unknown.ktx2
+    SourceRoot: 0
+    LibraryPath: Editor\Icons\file_unknown.ktx2\file_unknown.ktx2
+    RootSourceHandle: 7210036931062970238
+    ParentHandle: 0
+    SubAssetKey: ""
     ImportVersion: 1
   - Handle: 7210733410758481789
     Type: Material
@@ -12986,6 +13913,15 @@ AssetRegistry:
     ParentHandle: 5174649278247987669
     SubAssetKey: mesh:50_0
     ImportVersion: 1
+  - Handle: 7268815116723510721
+    Type: Texture2D
+    Path: Editor\Icons\asset_material.ktx2
+    SourceRoot: 0
+    LibraryPath: Editor\Icons\asset_material.ktx2\asset_material.ktx2
+    RootSourceHandle: 7268815116723510721
+    ParentHandle: 0
+    SubAssetKey: ""
+    ImportVersion: 1
   - Handle: 7272400312529272481
     Type: Material
     Path: Models\gltf\glTF-Embedded\Buggy\Materials\Material_25_9.kbrmaterial
@@ -13004,6 +13940,15 @@ AssetRegistry:
     ParentHandle: 3234291855590370197
     SubAssetKey: mesh:6_0
     ImportVersion: 1
+  - Handle: 7290231823787638097
+    Type: Texture2D
+    Path: Editor\Icons\component_transform.ktx2
+    SourceRoot: 0
+    LibraryPath: Editor\Icons\component_transform.ktx2\component_transform.ktx2
+    RootSourceHandle: 7290231823787638097
+    ParentHandle: 0
+    SubAssetKey: ""
+    ImportVersion: 1
   - Handle: 7294441969814079591
     Type: Material
     Path: Models\chinesedragon\Materials\m0_01___Default.003.kbrmaterial
@@ -13012,6 +13957,15 @@ AssetRegistry:
     RootSourceHandle: 15753802058579588179
     ParentHandle: 15753802058579588179
     SubAssetKey: material:0
+    ImportVersion: 1
+  - Handle: 7294464094012296673
+    Type: Texture2D
+    Path: Editor\Icons\asset_scene.png
+    SourceRoot: 0
+    LibraryPath: Editor\Icons\asset_scene.png\asset_scene.ktx2
+    RootSourceHandle: 7294464094012296673
+    ParentHandle: 0
+    SubAssetKey: ""
     ImportVersion: 1
   - Handle: 7295327370831891917
     Type: Mesh
@@ -13162,6 +14116,15 @@ AssetRegistry:
     ParentHandle: 16229948255603088891
     SubAssetKey: mesh:0_0
     ImportVersion: 1
+  - Handle: 7338296465526643862
+    Type: Texture2D
+    Path: Editor\Icons\component_ai_controller.ktx2
+    SourceRoot: 0
+    LibraryPath: Editor\Icons\component_ai_controller.ktx2\component_ai_controller.ktx2
+    RootSourceHandle: 7338296465526643862
+    ParentHandle: 0
+    SubAssetKey: ""
+    ImportVersion: 1
   - Handle: 7342950236452348064
     Type: Mesh
     Path: Models\treasure_glow\Meshes\mesh_44_0_Cube.027.kbrmesh
@@ -13198,6 +14161,15 @@ AssetRegistry:
     ParentHandle: 7563732692318888728
     SubAssetKey: mesh:56_1
     ImportVersion: 1
+  - Handle: 7349671769144695604
+    Type: Texture2D
+    Path: Editor\Icons\action_redo.png
+    SourceRoot: 0
+    LibraryPath: Editor\Icons\action_redo.png\action_redo.ktx2
+    RootSourceHandle: 7349671769144695604
+    ParentHandle: 0
+    SubAssetKey: ""
+    ImportVersion: 1
   - Handle: 7358859689305362401
     Type: Mesh
     Path: Models\retroufo_red_lowpoly\Meshes\mesh_5_0_Mesh_5.kbrmesh
@@ -13206,6 +14178,15 @@ AssetRegistry:
     RootSourceHandle: 11824251895976750977
     ParentHandle: 11824251895976750977
     SubAssetKey: mesh:5_0
+    ImportVersion: 1
+  - Handle: 7360819436465132634
+    Type: Texture2D
+    Path: Editor\Icons\asset_sound.png
+    SourceRoot: 0
+    LibraryPath: Editor\Icons\asset_sound.png\asset_sound.ktx2
+    RootSourceHandle: 7360819436465132634
+    ParentHandle: 0
+    SubAssetKey: ""
     ImportVersion: 1
   - Handle: 7369344464009974263
     Type: Mesh
@@ -13242,6 +14223,15 @@ AssetRegistry:
     RootSourceHandle: 5787152634952397426
     ParentHandle: 5787152634952397426
     SubAssetKey: mesh:0_0
+    ImportVersion: 1
+  - Handle: 7403049381841048997
+    Type: Texture2D
+    Path: Editor\Icons\action_search.png
+    SourceRoot: 0
+    LibraryPath: Editor\Icons\action_search.png\action_search.ktx2
+    RootSourceHandle: 7403049381841048997
+    ParentHandle: 0
+    SubAssetKey: ""
     ImportVersion: 1
   - Handle: 7406437769366554508
     Type: Material
@@ -13305,6 +14295,15 @@ AssetRegistry:
     RootSourceHandle: 18146978209962790870
     ParentHandle: 18146978209962790870
     SubAssetKey: mesh:5_2
+    ImportVersion: 1
+  - Handle: 7440596514222144143
+    Type: Texture2D
+    Path: Editor\Icons\state_simulate.ktx2
+    SourceRoot: 0
+    LibraryPath: Editor\Icons\state_simulate.ktx2\state_simulate.ktx2
+    RootSourceHandle: 7440596514222144143
+    ParentHandle: 0
+    SubAssetKey: ""
     ImportVersion: 1
   - Handle: 7441895838196593016
     Type: Texture2D
@@ -13401,6 +14400,15 @@ AssetRegistry:
     RootSourceHandle: 8858309372063028477
     ParentHandle: 8858309372063028477
     SubAssetKey: mesh:36_0
+    ImportVersion: 1
+  - Handle: 7517242854350178442
+    Type: Texture2D
+    Path: Editor\Icons\slot_roughness.png
+    SourceRoot: 0
+    LibraryPath: Editor\Icons\slot_roughness.png\slot_roughness.ktx2
+    RootSourceHandle: 7517242854350178442
+    ParentHandle: 0
+    SubAssetKey: ""
     ImportVersion: 1
   - Handle: 7519831954270829081
     Type: Material
@@ -13669,6 +14677,15 @@ AssetRegistry:
     ParentHandle: 10026642830330170129
     SubAssetKey: mesh:56_0
     ImportVersion: 1
+  - Handle: 7635144182844247358
+    Type: Texture2D
+    Path: Editor\Icons\component_spot_light.png
+    SourceRoot: 0
+    LibraryPath: Editor\Icons\component_spot_light.png\component_spot_light.ktx2
+    RootSourceHandle: 7635144182844247358
+    ParentHandle: 0
+    SubAssetKey: ""
+    ImportVersion: 1
   - Handle: 7637785149677090998
     Type: Mesh
     Path: Models\gltf\glTF-Embedded\Buggy\Meshes\mesh_47_0_technic_shaft_x8_SOLIDS_3.kbrmesh
@@ -13677,6 +14694,15 @@ AssetRegistry:
     RootSourceHandle: 2238632335295528690
     ParentHandle: 2238632335295528690
     SubAssetKey: mesh:47_0
+    ImportVersion: 1
+  - Handle: 7642756484215805783
+    Type: Texture2D
+    Path: Editor\Icons\component_joint.ktx2
+    SourceRoot: 0
+    LibraryPath: Editor\Icons\component_joint.ktx2\component_joint.ktx2
+    RootSourceHandle: 7642756484215805783
+    ParentHandle: 0
+    SubAssetKey: ""
     ImportVersion: 1
   - Handle: 7644080631679312852
     Type: Mesh
@@ -13695,6 +14721,15 @@ AssetRegistry:
     RootSourceHandle: 12460365323498653085
     ParentHandle: 12460365323498653085
     SubAssetKey: mesh:8_0
+    ImportVersion: 1
+  - Handle: 7646610276096510100
+    Type: Texture2D
+    Path: Editor\Icons\action_remove.png
+    SourceRoot: 0
+    LibraryPath: Editor\Icons\action_remove.png\action_remove.ktx2
+    RootSourceHandle: 7646610276096510100
+    ParentHandle: 0
+    SubAssetKey: ""
     ImportVersion: 1
   - Handle: 7659316133122624676
     Type: Mesh
@@ -13912,6 +14947,15 @@ AssetRegistry:
     ParentHandle: 6532463041022503106
     SubAssetKey: mesh:53_0
     ImportVersion: 1
+  - Handle: 7729418892602829938
+    Type: SkinnedMesh
+    Path: Models\rpg-character\E10 attack anims\Meshes\skinnedmesh_6_0_Cube.010.kbrskinnedmesh
+    SourceRoot: 0
+    LibraryPath: Models\rpg-character\E10 attack anims\Meshes\skinnedmesh_6_0_Cube.010.kbrskinnedmesh
+    RootSourceHandle: 4305741975815557537
+    ParentHandle: 4305741975815557537
+    SubAssetKey: skinnedmesh:6_0
+    ImportVersion: 1
   - Handle: 7735099694345556992
     Type: Mesh
     Path: Models\treasure_glow\Meshes\mesh_7_1_Cylinder.008.kbrmesh
@@ -14066,6 +15110,15 @@ AssetRegistry:
     ParentHandle: 10934383581697002570
     SubAssetKey: mesh:3_0
     ImportVersion: 1
+  - Handle: 7784469865285554574
+    Type: Texture2D
+    Path: Editor\Icons\slot_albedo.ktx2
+    SourceRoot: 0
+    LibraryPath: Editor\Icons\slot_albedo.ktx2\slot_albedo.ktx2
+    RootSourceHandle: 7784469865285554574
+    ParentHandle: 0
+    SubAssetKey: ""
+    ImportVersion: 1
   - Handle: 7784683720713895759
     Type: Mesh
     Path: Models\retroufo_glow\Meshes\mesh_47_0.kbrmesh
@@ -14190,6 +15243,15 @@ AssetRegistry:
     ParentHandle: 12460365323498653085
     SubAssetKey: texture:32
     ImportVersion: 1
+  - Handle: 7853989574926657527
+    Type: Texture2D
+    Path: Editor\Icons\slot_occlusion.ktx2
+    SourceRoot: 0
+    LibraryPath: Editor\Icons\slot_occlusion.ktx2\slot_occlusion.ktx2
+    RootSourceHandle: 7853989574926657527
+    ParentHandle: 0
+    SubAssetKey: ""
+    ImportVersion: 1
   - Handle: 7857678234156334798
     Type: Mesh
     Path: Models\retroufo\Meshes\mesh_6_0_Mesh_6.kbrmesh
@@ -14207,6 +15269,15 @@ AssetRegistry:
     RootSourceHandle: 5174649278247987669
     ParentHandle: 5174649278247987669
     SubAssetKey: mesh:26_0
+    ImportVersion: 1
+  - Handle: 7865806123936119761
+    Type: Texture2D
+    Path: Editor\Icons\log_error.png
+    SourceRoot: 0
+    LibraryPath: Editor\Icons\log_error.png\log_error.ktx2
+    RootSourceHandle: 7865806123936119761
+    ParentHandle: 0
+    SubAssetKey: ""
     ImportVersion: 1
   - Handle: 7873690126921198170
     Type: Material
@@ -14402,6 +15473,15 @@ AssetRegistry:
       - 16539255779372617851
       - 2490434181940629293
       - 14018914032420182354
+  - Handle: 7968416739843200451
+    Type: Texture2D
+    Path: Editor\Icons\component_hierarchy.ktx2
+    SourceRoot: 0
+    LibraryPath: Editor\Icons\component_hierarchy.ktx2\component_hierarchy.ktx2
+    RootSourceHandle: 7968416739843200451
+    ParentHandle: 0
+    SubAssetKey: ""
+    ImportVersion: 1
   - Handle: 7976294653743271374
     Type: Material
     Path: Models\gltf\glTF-Embedded\Buggy\Materials\Material_20_32.kbrmaterial
@@ -14464,6 +15544,15 @@ AssetRegistry:
     RootSourceHandle: 8858309372063028477
     ParentHandle: 8858309372063028477
     SubAssetKey: mesh:59_0
+    ImportVersion: 1
+  - Handle: 8014463531605774084
+    Type: Texture2D
+    Path: Editor\Icons\log_warning.ktx2
+    SourceRoot: 0
+    LibraryPath: Editor\Icons\log_warning.ktx2\log_warning.ktx2
+    RootSourceHandle: 8014463531605774084
+    ParentHandle: 0
+    SubAssetKey: ""
     ImportVersion: 1
   - Handle: 8015071400378123525
     Type: Material
@@ -14544,6 +15633,15 @@ AssetRegistry:
     RootSourceHandle: 8801818670981289446
     ParentHandle: 8801818670981289446
     SubAssetKey: mesh:1_0
+    ImportVersion: 1
+  - Handle: 8051322363352389458
+    Type: Texture2D
+    Path: Editor\Icons\component_id.png
+    SourceRoot: 0
+    LibraryPath: Editor\Icons\component_id.png\component_id.ktx2
+    RootSourceHandle: 8051322363352389458
+    ParentHandle: 0
+    SubAssetKey: ""
     ImportVersion: 1
   - Handle: 8057126180203421072
     Type: Mesh
@@ -14762,6 +15860,15 @@ AssetRegistry:
     ParentHandle: 11734900932705191300
     SubAssetKey: mesh:1_0
     ImportVersion: 1
+  - Handle: 8153246846858854361
+    Type: Texture2D
+    Path: Editor\Icons\state_paused.ktx2
+    SourceRoot: 0
+    LibraryPath: Editor\Icons\state_paused.ktx2\state_paused.ktx2
+    RootSourceHandle: 8153246846858854361
+    ParentHandle: 0
+    SubAssetKey: ""
+    ImportVersion: 1
   - Handle: 8157722233262723395
     Type: Mesh
     Path: Models\deferred_floor\Meshes\mesh_0_0_Plane.kbrmesh
@@ -14884,6 +15991,15 @@ AssetRegistry:
     ParentHandle: 11581378365515906497
     SubAssetKey: mesh:18_0
     ImportVersion: 1
+  - Handle: 8243689666994297628
+    Type: SkinnedMesh
+    Path: Models\rpg-character\E10 attack anims\Meshes\skinnedmesh_6_2_Cube.010.kbrskinnedmesh
+    SourceRoot: 0
+    LibraryPath: Models\rpg-character\E10 attack anims\Meshes\skinnedmesh_6_2_Cube.010.kbrskinnedmesh
+    RootSourceHandle: 4305741975815557537
+    ParentHandle: 4305741975815557537
+    SubAssetKey: skinnedmesh:6_2
+    ImportVersion: 1
   - Handle: 8252223875184043138
     Type: Mesh
     Path: Models\retroufo_glow\Meshes\mesh_17_0.kbrmesh
@@ -14956,6 +16072,15 @@ AssetRegistry:
     ParentHandle: 15982454909274218888
     SubAssetKey: material:6
     ImportVersion: 1
+  - Handle: 8286108450360737650
+    Type: Texture2D
+    Path: Editor\Icons\log_error.ktx2
+    SourceRoot: 0
+    LibraryPath: Editor\Icons\log_error.ktx2\log_error.ktx2
+    RootSourceHandle: 8286108450360737650
+    ParentHandle: 0
+    SubAssetKey: ""
+    ImportVersion: 1
   - Handle: 8287000730571130896
     Type: Material
     Path: Models\gltf\glTF-Embedded\Buggy\Materials\Material_25_41.kbrmaterial
@@ -14991,6 +16116,15 @@ AssetRegistry:
     RootSourceHandle: 6532463041022503106
     ParentHandle: 6532463041022503106
     SubAssetKey: mesh:12_0
+    ImportVersion: 1
+  - Handle: 8328559270474472240
+    Type: Texture2D
+    Path: Editor\Icons\action_save.ktx2
+    SourceRoot: 0
+    LibraryPath: Editor\Icons\action_save.ktx2\action_save.ktx2
+    RootSourceHandle: 8328559270474472240
+    ParentHandle: 0
+    SubAssetKey: ""
     ImportVersion: 1
   - Handle: 8330741641611113359
     Type: Material
@@ -15194,6 +16328,15 @@ AssetRegistry:
     ParentHandle: 4418998681810053475
     SubAssetKey: material:8
     ImportVersion: 1
+  - Handle: 8424574490939400522
+    Type: Texture2D
+    Path: Editor\Icons\slot_emissive.ktx2
+    SourceRoot: 0
+    LibraryPath: Editor\Icons\slot_emissive.ktx2\slot_emissive.ktx2
+    RootSourceHandle: 8424574490939400522
+    ParentHandle: 0
+    SubAssetKey: ""
+    ImportVersion: 1
   - Handle: 8430190228102266732
     Type: Mesh
     Path: Models\samplescene\Meshes\mesh_2_0_Plane03_Plane03.001.kbrmesh
@@ -15277,6 +16420,15 @@ AssetRegistry:
     ParentHandle: 3183028465703412286
     SubAssetKey: mesh:0_0
     ImportVersion: 1
+  - Handle: 8489050351446761629
+    Type: Texture2D
+    Path: Editor\Icons\status_missing.ktx2
+    SourceRoot: 0
+    LibraryPath: Editor\Icons\status_missing.ktx2\status_missing.ktx2
+    RootSourceHandle: 8489050351446761629
+    ParentHandle: 0
+    SubAssetKey: ""
+    ImportVersion: 1
   - Handle: 8494450573973231434
     Type: Mesh
     Path: Models\retroufo\Meshes\mesh_50_0_Mesh_50.kbrmesh
@@ -15301,6 +16453,15 @@ AssetRegistry:
     SourceRoot: 0
     LibraryPath: Models\cerberus\roughness.ktx\roughness.ktx2
     RootSourceHandle: 8509263561951193761
+    ParentHandle: 0
+    SubAssetKey: ""
+    ImportVersion: 1
+  - Handle: 8543076015774836399
+    Type: Texture2D
+    Path: Editor\Icons\gizmo_scale.ktx2
+    SourceRoot: 0
+    LibraryPath: Editor\Icons\gizmo_scale.ktx2\gizmo_scale.ktx2
+    RootSourceHandle: 8543076015774836399
     ParentHandle: 0
     SubAssetKey: ""
     ImportVersion: 1
@@ -15656,6 +16817,15 @@ AssetRegistry:
     ParentHandle: 12460365323498653085
     SubAssetKey: texture:29
     ImportVersion: 1
+  - Handle: 8715573280626982871
+    Type: Texture2D
+    Path: Editor\Icons\action_duplicate.png
+    SourceRoot: 0
+    LibraryPath: Editor\Icons\action_duplicate.png\action_duplicate.ktx2
+    RootSourceHandle: 8715573280626982871
+    ParentHandle: 0
+    SubAssetKey: ""
+    ImportVersion: 1
   - Handle: 8716285976739381367
     Type: Material
     Path: Models\samplebuilding\Materials\Material_004.kbrmaterial
@@ -15673,6 +16843,24 @@ AssetRegistry:
     RootSourceHandle: 7563732692318888728
     ParentHandle: 7563732692318888728
     SubAssetKey: mesh:13_1
+    ImportVersion: 1
+  - Handle: 8719455171461543083
+    Type: Material
+    Path: Models\rpg-character\E10 attack anims\Materials\Metal.002.kbrmaterial
+    SourceRoot: 0
+    LibraryPath: Models\rpg-character\E10 attack anims\Materials\Metal.002.kbrmaterial
+    RootSourceHandle: 4305741975815557537
+    ParentHandle: 4305741975815557537
+    SubAssetKey: material:8
+    ImportVersion: 1
+  - Handle: 8725094050839767269
+    Type: Texture2D
+    Path: Editor\Icons\component_point_light.ktx2
+    SourceRoot: 0
+    LibraryPath: Editor\Icons\component_point_light.ktx2\component_point_light.ktx2
+    RootSourceHandle: 8725094050839767269
+    ParentHandle: 0
+    SubAssetKey: ""
     ImportVersion: 1
   - Handle: 8734642922576286623
     Type: Texture2D
@@ -15850,6 +17038,24 @@ AssetRegistry:
     ParentHandle: 15982454909274218888
     SubAssetKey: mesh:12_0
     ImportVersion: 1
+  - Handle: 8816459984236310340
+    Type: Texture2D
+    Path: Editor\Icons\file_meta.png
+    SourceRoot: 0
+    LibraryPath: Editor\Icons\file_meta.png\file_meta.ktx2
+    RootSourceHandle: 8816459984236310340
+    ParentHandle: 0
+    SubAssetKey: ""
+    ImportVersion: 1
+  - Handle: 8818405518836453615
+    Type: Texture2D
+    Path: Editor\Icons\collapsed.png
+    SourceRoot: 0
+    LibraryPath: Editor\Icons\collapsed.png\collapsed.ktx2
+    RootSourceHandle: 8818405518836453615
+    ParentHandle: 0
+    SubAssetKey: ""
+    ImportVersion: 1
   - Handle: 8823648244018877269
     Type: Material
     Path: Models\gltf\glTF-Embedded\Buggy\Materials\Material_20_28.kbrmaterial
@@ -15967,6 +17173,24 @@ AssetRegistry:
     ParentHandle: 3035278573088996826
     SubAssetKey: animation:7
     ImportVersion: 1
+  - Handle: 8899752000599375042
+    Type: Texture2D
+    Path: Editor\Icons\component_sprite.png
+    SourceRoot: 0
+    LibraryPath: Editor\Icons\component_sprite.png\component_sprite.ktx2
+    RootSourceHandle: 8899752000599375042
+    ParentHandle: 0
+    SubAssetKey: ""
+    ImportVersion: 1
+  - Handle: 8914081141552364495
+    Type: Texture2D
+    Path: Editor\Icons\panel_animation_editor.png
+    SourceRoot: 0
+    LibraryPath: Editor\Icons\panel_animation_editor.png\panel_animation_editor.ktx2
+    RootSourceHandle: 8914081141552364495
+    ParentHandle: 0
+    SubAssetKey: ""
+    ImportVersion: 1
   - Handle: 8916310257274511192
     Type: Mesh
     Path: Models\retroufo\Meshes\mesh_13_0.kbrmesh
@@ -15975,6 +17199,15 @@ AssetRegistry:
     RootSourceHandle: 6090326326702746238
     ParentHandle: 6090326326702746238
     SubAssetKey: mesh:13_0
+    ImportVersion: 1
+  - Handle: 8925802160684085615
+    Type: Texture2D
+    Path: Editor\Icons\action_fullscreen.png
+    SourceRoot: 0
+    LibraryPath: Editor\Icons\action_fullscreen.png\action_fullscreen.ktx2
+    RootSourceHandle: 8925802160684085615
+    ParentHandle: 0
+    SubAssetKey: ""
     ImportVersion: 1
   - Handle: 8929343782306784380
     Type: Mesh
@@ -16174,6 +17407,15 @@ AssetRegistry:
     ParentHandle: 18268071128944098402
     SubAssetKey: mesh:1_2
     ImportVersion: 1
+  - Handle: 9086404620508534646
+    Type: Texture2D
+    Path: Editor\Icons\action_fullscreen.ktx2
+    SourceRoot: 0
+    LibraryPath: Editor\Icons\action_fullscreen.ktx2\action_fullscreen.ktx2
+    RootSourceHandle: 9086404620508534646
+    ParentHandle: 0
+    SubAssetKey: ""
+    ImportVersion: 1
   - Handle: 9098676511818133536
     Type: Material
     Path: Models\gltf\glTF-Embedded\Buggy\Materials\Material_20_68.kbrmaterial
@@ -16209,6 +17451,15 @@ AssetRegistry:
     RootSourceHandle: 2238632335295528690
     ParentHandle: 2238632335295528690
     SubAssetKey: material:78
+    ImportVersion: 1
+  - Handle: 9109244126636068619
+    Type: Texture2D
+    Path: Editor\Icons\component_directional_light.ktx2
+    SourceRoot: 0
+    LibraryPath: Editor\Icons\component_directional_light.ktx2\component_directional_light.ktx2
+    RootSourceHandle: 9109244126636068619
+    ParentHandle: 0
+    SubAssetKey: ""
     ImportVersion: 1
   - Handle: 9122612234018649089
     Type: Prefab
@@ -16278,6 +17529,15 @@ AssetRegistry:
     RootSourceHandle: 15982454909274218888
     ParentHandle: 15982454909274218888
     SubAssetKey: mesh:58_0
+    ImportVersion: 1
+  - Handle: 9150926039696105293
+    Type: Texture2D
+    Path: Editor\Icons\font.ktx2
+    SourceRoot: 0
+    LibraryPath: Editor\Icons\font.ktx2\font.ktx2
+    RootSourceHandle: 9150926039696105293
+    ParentHandle: 0
+    SubAssetKey: ""
     ImportVersion: 1
   - Handle: 9161065078628216421
     Type: SkinnedMesh
@@ -16357,6 +17617,15 @@ AssetRegistry:
     SourceRoot: 0
     LibraryPath: Editor\file_icon.ktx2\file_icon.ktx2
     RootSourceHandle: 9207290162331324666
+    ParentHandle: 0
+    SubAssetKey: ""
+    ImportVersion: 1
+  - Handle: 9210360011012642105
+    Type: Texture2D
+    Path: Editor\Icons\asset_texturecube.ktx2
+    SourceRoot: 0
+    LibraryPath: Editor\Icons\asset_texturecube.ktx2\asset_texturecube.ktx2
+    RootSourceHandle: 9210360011012642105
     ParentHandle: 0
     SubAssetKey: ""
     ImportVersion: 1
@@ -16448,6 +17717,15 @@ AssetRegistry:
     ParentHandle: 6532463041022503106
     SubAssetKey: mesh:54_0
     ImportVersion: 1
+  - Handle: 9254944209732936890
+    Type: Texture2D
+    Path: Editor\Icons\csproj.png
+    SourceRoot: 0
+    LibraryPath: Editor\Icons\csproj.png\csproj.ktx2
+    RootSourceHandle: 9254944209732936890
+    ParentHandle: 0
+    SubAssetKey: ""
+    ImportVersion: 1
   - Handle: 9260572434991507761
     Type: Texture2D
     Path: Models\sponza\12501374198249454378.ktx2
@@ -16520,6 +17798,15 @@ AssetRegistry:
     ParentHandle: 7563732692318888728
     SubAssetKey: mesh:90_0
     ImportVersion: 1
+  - Handle: 9301272997973393145
+    Type: Texture2D
+    Path: Editor\Icons\hierarchy_child.ktx2
+    SourceRoot: 0
+    LibraryPath: Editor\Icons\hierarchy_child.ktx2\hierarchy_child.ktx2
+    RootSourceHandle: 9301272997973393145
+    ParentHandle: 0
+    SubAssetKey: ""
+    ImportVersion: 1
   - Handle: 9306104543907443755
     Type: Texture2D
     Path: Textures\stonefloor02_color_rgba.ktx
@@ -16576,6 +17863,15 @@ AssetRegistry:
     ImportVersion: 1
     Dependencies:
       - 12347388624183850527
+  - Handle: 9324333084131767747
+    Type: Texture2D
+    Path: Editor\Icons\collapsed.ktx2
+    SourceRoot: 0
+    LibraryPath: Editor\Icons\collapsed.ktx2\collapsed.ktx2
+    RootSourceHandle: 9324333084131767747
+    ParentHandle: 0
+    SubAssetKey: ""
+    ImportVersion: 1
   - Handle: 9328034932219273923
     Type: Material
     Path: Models\gltf\glTF-Embedded\Buggy\Materials\Material_23_133.kbrmaterial
@@ -16611,6 +17907,15 @@ AssetRegistry:
     RootSourceHandle: 8858309372063028477
     ParentHandle: 8858309372063028477
     SubAssetKey: mesh:64_0
+    ImportVersion: 1
+  - Handle: 9359795590763500622
+    Type: Texture2D
+    Path: Editor\Icons\component_sprite.ktx2
+    SourceRoot: 0
+    LibraryPath: Editor\Icons\component_sprite.ktx2\component_sprite.ktx2
+    RootSourceHandle: 9359795590763500622
+    ParentHandle: 0
+    SubAssetKey: ""
     ImportVersion: 1
   - Handle: 9369297552604712732
     Type: Material
@@ -16882,6 +18187,15 @@ AssetRegistry:
     ParentHandle: 6532463041022503106
     SubAssetKey: mesh:4_0
     ImportVersion: 1
+  - Handle: 9531743925593056350
+    Type: Texture2D
+    Path: Editor\Icons\component_text.png
+    SourceRoot: 0
+    LibraryPath: Editor\Icons\component_text.png\component_text.ktx2
+    RootSourceHandle: 9531743925593056350
+    ParentHandle: 0
+    SubAssetKey: ""
+    ImportVersion: 1
   - Handle: 9536358466810035950
     Type: Material
     Path: Models\samplescene\Materials\_02_-_Default.001.kbrmaterial
@@ -16935,6 +18249,15 @@ AssetRegistry:
     RootSourceHandle: 758760977254712444
     ParentHandle: 758760977254712444
     SubAssetKey: mesh:1_0
+    ImportVersion: 1
+  - Handle: 9562414944774630695
+    Type: Texture2D
+    Path: Editor\Icons\panel_debug.png
+    SourceRoot: 0
+    LibraryPath: Editor\Icons\panel_debug.png\panel_debug.ktx2
+    RootSourceHandle: 9562414944774630695
+    ParentHandle: 0
+    SubAssetKey: ""
     ImportVersion: 1
   - Handle: 9564715248260373126
     Type: Material
@@ -17044,6 +18367,15 @@ AssetRegistry:
     ParentHandle: 8858309372063028477
     SubAssetKey: mesh:9_1
     ImportVersion: 1
+  - Handle: 9641039618741001747
+    Type: Texture2D
+    Path: Editor\Icons\component_ai_blackboard.png
+    SourceRoot: 0
+    LibraryPath: Editor\Icons\component_ai_blackboard.png\component_ai_blackboard.ktx2
+    RootSourceHandle: 9641039618741001747
+    ParentHandle: 0
+    SubAssetKey: ""
+    ImportVersion: 1
   - Handle: 9649088412287590480
     Type: Mesh
     Path: Models\retroufo_glow\Meshes\mesh_19_0.kbrmesh
@@ -17086,6 +18418,15 @@ AssetRegistry:
     SourceRoot: 0
     LibraryPath: Models\sponza\3628158980083700836.ktx2\3628158980083700836.ktx2
     RootSourceHandle: 9662247309291806680
+    ParentHandle: 0
+    SubAssetKey: ""
+    ImportVersion: 1
+  - Handle: 9662871912578629986
+    Type: Texture2D
+    Path: Editor\Icons\component_ai_targetable.png
+    SourceRoot: 0
+    LibraryPath: Editor\Icons\component_ai_targetable.png\component_ai_targetable.ktx2
+    RootSourceHandle: 9662871912578629986
     ParentHandle: 0
     SubAssetKey: ""
     ImportVersion: 1
@@ -17134,6 +18475,15 @@ AssetRegistry:
     ParentHandle: 2238632335295528690
     SubAssetKey: mesh:9_0
     ImportVersion: 1
+  - Handle: 9685044319707898809
+    Type: Material
+    Path: Models\rpg-character\E10 attack anims\Materials\Metal.kbrmaterial
+    SourceRoot: 0
+    LibraryPath: Models\rpg-character\E10 attack anims\Materials\Metal.kbrmaterial
+    RootSourceHandle: 4305741975815557537
+    ParentHandle: 4305741975815557537
+    SubAssetKey: material:1
+    ImportVersion: 1
   - Handle: 9701108424161383682
     Type: Mesh
     Path: Models\retroufo_glow\Meshes\mesh_20_0_Mesh_20.001.kbrmesh
@@ -17151,6 +18501,15 @@ AssetRegistry:
     RootSourceHandle: 758760977254712444
     ParentHandle: 758760977254712444
     SubAssetKey: material:3
+    ImportVersion: 1
+  - Handle: 9719365016594983041
+    Type: Animation
+    Path: Models\rpg-character\E10 attack anims\Animations\Sword_atk01.kbranimation
+    SourceRoot: 0
+    LibraryPath: Models\rpg-character\E10 attack anims\Animations\Sword_atk01.kbranimation
+    RootSourceHandle: 4305741975815557537
+    ParentHandle: 4305741975815557537
+    SubAssetKey: animation:6
     ImportVersion: 1
   - Handle: 9740765187577293731
     Type: Texture2D
@@ -17233,6 +18592,15 @@ AssetRegistry:
     ParentHandle: 13025862333548612002
     SubAssetKey: material:6
     ImportVersion: 1
+  - Handle: 9796909110005869829
+    Type: Texture2D
+    Path: Editor\Icons\notification_warning.png
+    SourceRoot: 0
+    LibraryPath: Editor\Icons\notification_warning.png\notification_warning.ktx2
+    RootSourceHandle: 9796909110005869829
+    ParentHandle: 0
+    SubAssetKey: ""
+    ImportVersion: 1
   - Handle: 9797996615882474973
     Type: Texture2D
     Path: Models\sponza\sponza\Textures\texture_21_13982482287905699490.ktx2
@@ -17251,6 +18619,15 @@ AssetRegistry:
     ParentHandle: 583060611811443193
     SubAssetKey: material:1
     ImportVersion: 1
+  - Handle: 9801498185059839209
+    Type: SkinnedMesh
+    Path: Models\rpg-character\E10 attack anims\Meshes\skinnedmesh_5_0_Cube.003.kbrskinnedmesh
+    SourceRoot: 0
+    LibraryPath: Models\rpg-character\E10 attack anims\Meshes\skinnedmesh_5_0_Cube.003.kbrskinnedmesh
+    RootSourceHandle: 4305741975815557537
+    ParentHandle: 4305741975815557537
+    SubAssetKey: skinnedmesh:5_0
+    ImportVersion: 1
   - Handle: 9802067281274391955
     Type: Texture2D
     Path: Models\sponza\sponza\Textures\texture_43_10381718147657362067.ktx2
@@ -17259,6 +18636,15 @@ AssetRegistry:
     RootSourceHandle: 3592214733151679049
     ParentHandle: 3592214733151679049
     SubAssetKey: texture:43
+    ImportVersion: 1
+  - Handle: 9804103304921763512
+    Type: Texture2D
+    Path: Editor\Icons\component_audio_3d.ktx2
+    SourceRoot: 0
+    LibraryPath: Editor\Icons\component_audio_3d.ktx2\component_audio_3d.ktx2
+    RootSourceHandle: 9804103304921763512
+    ParentHandle: 0
+    SubAssetKey: ""
     ImportVersion: 1
   - Handle: 9808448206523787780
     Type: Mesh
@@ -17493,6 +18879,15 @@ AssetRegistry:
     RootSourceHandle: 8858309372063028477
     ParentHandle: 8858309372063028477
     SubAssetKey: mesh:5_0
+    ImportVersion: 1
+  - Handle: 9914015321278046936
+    Type: Material
+    Path: Models\rpg-character\E10 attack anims\Materials\Wood.kbrmaterial
+    SourceRoot: 0
+    LibraryPath: Models\rpg-character\E10 attack anims\Materials\Wood.kbrmaterial
+    RootSourceHandle: 4305741975815557537
+    ParentHandle: 4305741975815557537
+    SubAssetKey: material:2
     ImportVersion: 1
   - Handle: 9921626738468206613
     Type: Texture2D
@@ -18097,6 +19492,15 @@ AssetRegistry:
     ParentHandle: 15629215700429853565
     SubAssetKey: material:13
     ImportVersion: 1
+  - Handle: 10129455116371517214
+    Type: Texture2D
+    Path: Editor\Icons\project.png
+    SourceRoot: 0
+    LibraryPath: Editor\Icons\project.png\project.ktx2
+    RootSourceHandle: 10129455116371517214
+    ParentHandle: 0
+    SubAssetKey: ""
+    ImportVersion: 1
   - Handle: 10139219631869340974
     Type: Mesh
     Path: Models\suzanne_lods\Meshes\mesh_3_0_Suzanne.004.kbrmesh
@@ -18132,6 +19536,15 @@ AssetRegistry:
     RootSourceHandle: 8858309372063028477
     ParentHandle: 8858309372063028477
     SubAssetKey: mesh:7_0
+    ImportVersion: 1
+  - Handle: 10187690181617938430
+    Type: Texture2D
+    Path: Editor\Icons\action_open.png
+    SourceRoot: 0
+    LibraryPath: Editor\Icons\action_open.png\action_open.ktx2
+    RootSourceHandle: 10187690181617938430
+    ParentHandle: 0
+    SubAssetKey: ""
     ImportVersion: 1
   - Handle: 10188161284715390614
     Type: SkinnedMesh
@@ -18329,6 +19742,15 @@ AssetRegistry:
     ParentHandle: 2238632335295528690
     SubAssetKey: mesh:60_0
     ImportVersion: 1
+  - Handle: 10264621732861170032
+    Type: AIStateTree
+    Path: AIStateTrees\EnemyChase.kbrai
+    SourceRoot: 0
+    LibraryPath: AIStateTrees\EnemyChase.kbrai
+    RootSourceHandle: 10264621732861170032
+    ParentHandle: 0
+    SubAssetKey: ""
+    ImportVersion: 1
   - Handle: 10265223364733305163
     Type: Mesh
     Path: Models\treasure_smooth\Meshes\mesh_31_0_Cube.014.kbrmesh
@@ -18472,6 +19894,24 @@ AssetRegistry:
     ParentHandle: 8240355766732467400
     SubAssetKey: material:1
     ImportVersion: 1
+  - Handle: 10339467284847887651
+    Type: Texture2D
+    Path: Editor\Icons\notification_error.png
+    SourceRoot: 0
+    LibraryPath: Editor\Icons\notification_error.png\notification_error.ktx2
+    RootSourceHandle: 10339467284847887651
+    ParentHandle: 0
+    SubAssetKey: ""
+    ImportVersion: 1
+  - Handle: 10341183184668171312
+    Type: Texture2D
+    Path: Editor\Icons\panel_assets.png
+    SourceRoot: 0
+    LibraryPath: Editor\Icons\panel_assets.png\panel_assets.ktx2
+    RootSourceHandle: 10341183184668171312
+    ParentHandle: 0
+    SubAssetKey: ""
+    ImportVersion: 1
   - Handle: 10356400034888341863
     Type: Mesh
     Path: Models\plants\Meshes\mesh_9_0_trop_shrub_04.kbrmesh
@@ -18480,6 +19920,15 @@ AssetRegistry:
     RootSourceHandle: 4418998681810053475
     ParentHandle: 4418998681810053475
     SubAssetKey: mesh:9_0
+    ImportVersion: 1
+  - Handle: 10374704827112448795
+    Type: Texture2D
+    Path: Editor\Icons\gizmo_select.ktx2
+    SourceRoot: 0
+    LibraryPath: Editor\Icons\gizmo_select.ktx2\gizmo_select.ktx2
+    RootSourceHandle: 10374704827112448795
+    ParentHandle: 0
+    SubAssetKey: ""
     ImportVersion: 1
   - Handle: 10376296709207270545
     Type: Mesh
@@ -18535,6 +19984,15 @@ AssetRegistry:
     ParentHandle: 12502348395066231312
     SubAssetKey: mesh:1_0
     ImportVersion: 1
+  - Handle: 10428000883894521887
+    Type: Texture2D
+    Path: Editor\Icons\panel_console.png
+    SourceRoot: 0
+    LibraryPath: Editor\Icons\panel_console.png\panel_console.ktx2
+    RootSourceHandle: 10428000883894521887
+    ParentHandle: 0
+    SubAssetKey: ""
+    ImportVersion: 1
   - Handle: 10429068930189833379
     Type: Material
     Path: Models\gltf\glTF-Embedded\Buggy\Materials\Material_20.kbrmaterial
@@ -18561,6 +20019,15 @@ AssetRegistry:
     RootSourceHandle: 7563732692318888728
     ParentHandle: 7563732692318888728
     SubAssetKey: mesh:25_0
+    ImportVersion: 1
+  - Handle: 10447350371558661137
+    Type: Material
+    Path: Models\rpg-character\E10 attack anims\Materials\Metal_dark.kbrmaterial
+    SourceRoot: 0
+    LibraryPath: Models\rpg-character\E10 attack anims\Materials\Metal_dark.kbrmaterial
+    RootSourceHandle: 4305741975815557537
+    ParentHandle: 4305741975815557537
+    SubAssetKey: material:9
     ImportVersion: 1
   - Handle: 10449426092230065647
     Type: Material
@@ -18604,6 +20071,15 @@ AssetRegistry:
       - 831259579599790036
       - 15404717240208903974
       - 11714242919892543203
+  - Handle: 10454420986721192765
+    Type: Texture2D
+    Path: Editor\Icons\component_text.ktx2
+    SourceRoot: 0
+    LibraryPath: Editor\Icons\component_text.ktx2\component_text.ktx2
+    RootSourceHandle: 10454420986721192765
+    ParentHandle: 0
+    SubAssetKey: ""
+    ImportVersion: 1
   - Handle: 10454730498976926859
     Type: Mesh
     Path: Models\sponza\sponza\Meshes\mesh_4_0_Mesh_0.004.kbrmesh
@@ -18875,6 +20351,15 @@ AssetRegistry:
     ParentHandle: 0
     SubAssetKey: ""
     ImportVersion: 1
+  - Handle: 10566487977898146252
+    Type: Material
+    Path: Models\rpg-character\E10 attack anims\Materials\Shoe.kbrmaterial
+    SourceRoot: 0
+    LibraryPath: Models\rpg-character\E10 attack anims\Materials\Shoe.kbrmaterial
+    RootSourceHandle: 4305741975815557537
+    ParentHandle: 4305741975815557537
+    SubAssetKey: material:14
+    ImportVersion: 1
   - Handle: 10573414513939495040
     Type: Mesh
     Path: Models\vulkanscene_shadow\Meshes\mesh_5_0_Cube.001.kbrmesh
@@ -18938,6 +20423,15 @@ AssetRegistry:
     ParentHandle: 3234291855590370197
     SubAssetKey: mesh:9_0
     ImportVersion: 1
+  - Handle: 10623216582257604502
+    Type: Texture2D
+    Path: Editor\Icons\panel_properties.ktx2
+    SourceRoot: 0
+    LibraryPath: Editor\Icons\panel_properties.ktx2\panel_properties.ktx2
+    RootSourceHandle: 10623216582257604502
+    ParentHandle: 0
+    SubAssetKey: ""
+    ImportVersion: 1
   - Handle: 10626170448407709572
     Type: Mesh
     Path: Models\vulkanscenelogos\Meshes\mesh_1_0_Mesh.001.kbrmesh
@@ -18946,6 +20440,15 @@ AssetRegistry:
     RootSourceHandle: 3183028465703412286
     ParentHandle: 3183028465703412286
     SubAssetKey: mesh:1_0
+    ImportVersion: 1
+  - Handle: 10629211666146332648
+    Type: Texture2D
+    Path: Editor\Icons\asset_mesh.ktx2
+    SourceRoot: 0
+    LibraryPath: Editor\Icons\asset_mesh.ktx2\asset_mesh.ktx2
+    RootSourceHandle: 10629211666146332648
+    ParentHandle: 0
+    SubAssetKey: ""
     ImportVersion: 1
   - Handle: 10631568413642174140
     Type: Mesh
@@ -18964,6 +20467,15 @@ AssetRegistry:
     RootSourceHandle: 14244998688843197978
     ParentHandle: 14244998688843197978
     SubAssetKey: mesh:67_0
+    ImportVersion: 1
+  - Handle: 10633308391646740974
+    Type: SkinnedMesh
+    Path: Models\rpg-character\E10 attack anims\Meshes\skinnedmesh_7_1_Cube.004.kbrskinnedmesh
+    SourceRoot: 0
+    LibraryPath: Models\rpg-character\E10 attack anims\Meshes\skinnedmesh_7_1_Cube.004.kbrskinnedmesh
+    RootSourceHandle: 4305741975815557537
+    ParentHandle: 4305741975815557537
+    SubAssetKey: skinnedmesh:7_1
     ImportVersion: 1
   - Handle: 10634128575058830436
     Type: Mesh
@@ -19153,6 +20665,15 @@ AssetRegistry:
     RootSourceHandle: 601935324361006322
     ParentHandle: 601935324361006322
     SubAssetKey: mesh:1_0
+    ImportVersion: 1
+  - Handle: 10752427348002723230
+    Type: Texture2D
+    Path: Editor\Icons\log_info.ktx2
+    SourceRoot: 0
+    LibraryPath: Editor\Icons\log_info.ktx2\log_info.ktx2
+    RootSourceHandle: 10752427348002723230
+    ParentHandle: 0
+    SubAssetKey: ""
     ImportVersion: 1
   - Handle: 10752467999614165881
     Type: Material
@@ -19419,6 +20940,15 @@ AssetRegistry:
     ParentHandle: 8240355766732467400
     SubAssetKey: mesh:3_1
     ImportVersion: 1
+  - Handle: 10878116267406143702
+    Type: Texture2D
+    Path: Editor\Icons\component_prefab.png
+    SourceRoot: 0
+    LibraryPath: Editor\Icons\component_prefab.png\component_prefab.ktx2
+    RootSourceHandle: 10878116267406143702
+    ParentHandle: 0
+    SubAssetKey: ""
+    ImportVersion: 1
   - Handle: 10881124940085977282
     Type: Prefab
     Path: Models\sampleroom.gltf
@@ -19436,6 +20966,15 @@ AssetRegistry:
     RootSourceHandle: 7563732692318888728
     ParentHandle: 7563732692318888728
     SubAssetKey: material:64
+    ImportVersion: 1
+  - Handle: 10887718219182596011
+    Type: Texture2D
+    Path: Editor\Icons\asset_sound.ktx2
+    SourceRoot: 0
+    LibraryPath: Editor\Icons\asset_sound.ktx2\asset_sound.ktx2
+    RootSourceHandle: 10887718219182596011
+    ParentHandle: 0
+    SubAssetKey: ""
     ImportVersion: 1
   - Handle: 10890016073514527069
     Type: Mesh
@@ -19530,6 +21069,15 @@ AssetRegistry:
     ParentHandle: 6532463041022503106
     SubAssetKey: mesh:50_0
     ImportVersion: 1
+  - Handle: 10942281059765550180
+    Type: Texture2D
+    Path: Editor\Icons\action_add.png
+    SourceRoot: 0
+    LibraryPath: Editor\Icons\action_add.png\action_add.ktx2
+    RootSourceHandle: 10942281059765550180
+    ParentHandle: 0
+    SubAssetKey: ""
+    ImportVersion: 1
   - Handle: 10945848080352941944
     Type: Mesh
     Path: Models\retroufo\Meshes\mesh_51_0.kbrmesh
@@ -19556,6 +21104,15 @@ AssetRegistry:
     RootSourceHandle: 6148802185286014116
     ParentHandle: 6148802185286014116
     SubAssetKey: mesh:22_0
+    ImportVersion: 1
+  - Handle: 10955294817930613254
+    Type: Texture2D
+    Path: Editor\Icons\gizmo_rotate.png
+    SourceRoot: 0
+    LibraryPath: Editor\Icons\gizmo_rotate.png\gizmo_rotate.ktx2
+    RootSourceHandle: 10955294817930613254
+    ParentHandle: 0
+    SubAssetKey: ""
     ImportVersion: 1
   - Handle: 10970783368113515400
     Type: Material
@@ -19655,6 +21212,15 @@ AssetRegistry:
     RootSourceHandle: 15982454909274218888
     ParentHandle: 15982454909274218888
     SubAssetKey: material:0
+    ImportVersion: 1
+  - Handle: 10993595115304671097
+    Type: Texture2D
+    Path: Editor\Icons\log_info.png
+    SourceRoot: 0
+    LibraryPath: Editor\Icons\log_info.png\log_info.ktx2
+    RootSourceHandle: 10993595115304671097
+    ParentHandle: 0
+    SubAssetKey: ""
     ImportVersion: 1
   - Handle: 10999740023053926886
     Type: Mesh
@@ -19789,6 +21355,15 @@ AssetRegistry:
     ParentHandle: 3035278573088996826
     SubAssetKey: skinnedmesh:4_1
     ImportVersion: 1
+  - Handle: 11039601377560754294
+    Type: Texture2D
+    Path: Editor\Icons\component_point_light.png
+    SourceRoot: 0
+    LibraryPath: Editor\Icons\component_point_light.png\component_point_light.ktx2
+    RootSourceHandle: 11039601377560754294
+    ParentHandle: 0
+    SubAssetKey: ""
+    ImportVersion: 1
   - Handle: 11042137105885818331
     Type: Mesh
     Path: Models\gltf\glTF-Embedded\Buggy\Meshes\mesh_62_0_body_64.kbrmesh
@@ -19869,6 +21444,15 @@ AssetRegistry:
     RootSourceHandle: 8858309372063028477
     ParentHandle: 8858309372063028477
     SubAssetKey: mesh:15_0
+    ImportVersion: 1
+  - Handle: 11062624968605000527
+    Type: Texture2D
+    Path: Editor\Icons\transport_simulate.png
+    SourceRoot: 0
+    LibraryPath: Editor\Icons\transport_simulate.png\transport_simulate.ktx2
+    RootSourceHandle: 11062624968605000527
+    ParentHandle: 0
+    SubAssetKey: ""
     ImportVersion: 1
   - Handle: 11063085919712126248
     Type: Mesh
@@ -20053,6 +21637,15 @@ AssetRegistry:
     ParentHandle: 12460365323498653085
     SubAssetKey: texture:17
     ImportVersion: 1
+  - Handle: 11192847656431237819
+    Type: Texture2D
+    Path: Editor\Icons\transport_pause.png
+    SourceRoot: 0
+    LibraryPath: Editor\Icons\transport_pause.png\transport_pause.ktx2
+    RootSourceHandle: 11192847656431237819
+    ParentHandle: 0
+    SubAssetKey: ""
+    ImportVersion: 1
   - Handle: 11198965735022850380
     Type: Material
     Path: Models\reflection_scene\Materials\m3_01___Default2.kbrmaterial
@@ -20071,6 +21664,24 @@ AssetRegistry:
     ParentHandle: 3234291855590370197
     SubAssetKey: mesh:16_0
     ImportVersion: 1
+  - Handle: 11200273049705854875
+    Type: Texture2D
+    Path: Editor\Icons\slot_occlusion.png
+    SourceRoot: 0
+    LibraryPath: Editor\Icons\slot_occlusion.png\slot_occlusion.ktx2
+    RootSourceHandle: 11200273049705854875
+    ParentHandle: 0
+    SubAssetKey: ""
+    ImportVersion: 1
+  - Handle: 11202597355292115989
+    Type: Texture2D
+    Path: Editor\Icons\asset_texture2d.png
+    SourceRoot: 0
+    LibraryPath: Editor\Icons\asset_texture2d.png\asset_texture2d.ktx2
+    RootSourceHandle: 11202597355292115989
+    ParentHandle: 0
+    SubAssetKey: ""
+    ImportVersion: 1
   - Handle: 11209709768206622639
     Type: Material
     Path: Models\gltf\glTF-Embedded\Buggy\Materials\Material_25_89.kbrmaterial
@@ -20079,6 +21690,15 @@ AssetRegistry:
     RootSourceHandle: 2238632335295528690
     ParentHandle: 2238632335295528690
     SubAssetKey: material:89
+    ImportVersion: 1
+  - Handle: 11210786805910524886
+    Type: SkinnedMesh
+    Path: Models\rpg-character\E10 attack anims\Meshes\skinnedmesh_8_0_Cube.006.kbrskinnedmesh
+    SourceRoot: 0
+    LibraryPath: Models\rpg-character\E10 attack anims\Meshes\skinnedmesh_8_0_Cube.006.kbrskinnedmesh
+    RootSourceHandle: 4305741975815557537
+    ParentHandle: 4305741975815557537
+    SubAssetKey: skinnedmesh:8_0
     ImportVersion: 1
   - Handle: 11213850054013355861
     Type: Mesh
@@ -20312,6 +21932,15 @@ AssetRegistry:
     ParentHandle: 6148802185286014116
     SubAssetKey: mesh:65_0
     ImportVersion: 1
+  - Handle: 11322498374753307396
+    Type: Texture2D
+    Path: Editor\Icons\notification_error.ktx2
+    SourceRoot: 0
+    LibraryPath: Editor\Icons\notification_error.ktx2\notification_error.ktx2
+    RootSourceHandle: 11322498374753307396
+    ParentHandle: 0
+    SubAssetKey: ""
+    ImportVersion: 1
   - Handle: 11342803983401859568
     Type: Mesh
     Path: Models\gltf\glTF-Embedded\Buggy\Meshes\mesh_49_1_technic_shaft_x4_SOLIDS_1.kbrmesh
@@ -20356,6 +21985,15 @@ AssetRegistry:
     RootSourceHandle: 2238632335295528690
     ParentHandle: 2238632335295528690
     SubAssetKey: material:37
+    ImportVersion: 1
+  - Handle: 11375696565231611982
+    Type: Mesh
+    Path: Models\rpg-character\E10 attack anims\Meshes\mesh_2_1_Cube.008.kbrmesh
+    SourceRoot: 0
+    LibraryPath: Models\rpg-character\E10 attack anims\Meshes\mesh_2_1_Cube.008.kbrmesh
+    RootSourceHandle: 4305741975815557537
+    ParentHandle: 4305741975815557537
+    SubAssetKey: mesh:2_1
     ImportVersion: 1
   - Handle: 11376872668017452767
     Type: Mesh
@@ -20458,6 +22096,15 @@ AssetRegistry:
     RootSourceHandle: 9416030371750910923
     ParentHandle: 9416030371750910923
     SubAssetKey: mesh:4_0
+    ImportVersion: 1
+  - Handle: 11421626664961272940
+    Type: Texture2D
+    Path: Editor\Icons\file.png
+    SourceRoot: 0
+    LibraryPath: Editor\Icons\file.png\file.ktx2
+    RootSourceHandle: 11421626664961272940
+    ParentHandle: 0
+    SubAssetKey: ""
     ImportVersion: 1
   - Handle: 11423077252510668463
     Type: Mesh
@@ -20653,6 +22300,15 @@ AssetRegistry:
       - 16539255779372617851
       - 2490434181940629293
       - 14018914032420182354
+  - Handle: 11497255736312003181
+    Type: Texture2D
+    Path: Editor\Icons\asset_animation.png
+    SourceRoot: 0
+    LibraryPath: Editor\Icons\asset_animation.png\asset_animation.ktx2
+    RootSourceHandle: 11497255736312003181
+    ParentHandle: 0
+    SubAssetKey: ""
+    ImportVersion: 1
   - Handle: 11497361245315055422
     Type: Mesh
     Path: Models\sphere\Meshes\mesh_0_0_Sphere.kbrmesh
@@ -20725,6 +22381,15 @@ AssetRegistry:
     ParentHandle: 7563732692318888728
     SubAssetKey: material:32
     ImportVersion: 1
+  - Handle: 11541924258277310624
+    Type: Texture2D
+    Path: Editor\Icons\slot_normal.png
+    SourceRoot: 0
+    LibraryPath: Editor\Icons\slot_normal.png\slot_normal.ktx2
+    RootSourceHandle: 11541924258277310624
+    ParentHandle: 0
+    SubAssetKey: ""
+    ImportVersion: 1
   - Handle: 11542382408239116250
     Type: SkinnedMesh
     Path: Models\rpg-character\E10 attack anims\Meshes\skinnedmesh_4_0_Cube.011.kbrskinnedmesh
@@ -20742,6 +22407,15 @@ AssetRegistry:
     RootSourceHandle: 10881124940085977282
     ParentHandle: 10881124940085977282
     SubAssetKey: mesh:0_0
+    ImportVersion: 1
+  - Handle: 11561094506859812676
+    Type: Texture2D
+    Path: Editor\Icons\component_ai_agent.ktx2
+    SourceRoot: 0
+    LibraryPath: Editor\Icons\component_ai_agent.ktx2\component_ai_agent.ktx2
+    RootSourceHandle: 11561094506859812676
+    ParentHandle: 0
+    SubAssetKey: ""
     ImportVersion: 1
   - Handle: 11567578544644244289
     Type: Mesh
@@ -20914,6 +22588,15 @@ AssetRegistry:
     ParentHandle: 4021286257923355776
     SubAssetKey: mesh:1_0
     ImportVersion: 1
+  - Handle: 11603586783225699361
+    Type: Texture2D
+    Path: Editor\Icons\component_sphere_collider.png
+    SourceRoot: 0
+    LibraryPath: Editor\Icons\component_sphere_collider.png\component_sphere_collider.ktx2
+    RootSourceHandle: 11603586783225699361
+    ParentHandle: 0
+    SubAssetKey: ""
+    ImportVersion: 1
   - Handle: 11605713019263956152
     Type: Texture2D
     Path: Models\sponza\sponza\Textures\texture_16_white.ktx2
@@ -20993,6 +22676,24 @@ AssetRegistry:
     RootSourceHandle: 7385917506964830292
     ParentHandle: 7385917506964830292
     SubAssetKey: material:1
+    ImportVersion: 1
+  - Handle: 11656356992614184140
+    Type: Texture2D
+    Path: Editor\Icons\component_capsule_collider.ktx2
+    SourceRoot: 0
+    LibraryPath: Editor\Icons\component_capsule_collider.ktx2\component_capsule_collider.ktx2
+    RootSourceHandle: 11656356992614184140
+    ParentHandle: 0
+    SubAssetKey: ""
+    ImportVersion: 1
+  - Handle: 11666533780288127335
+    Type: Texture2D
+    Path: Editor\Icons\component_transform.png
+    SourceRoot: 0
+    LibraryPath: Editor\Icons\component_transform.png\component_transform.ktx2
+    RootSourceHandle: 11666533780288127335
+    ParentHandle: 0
+    SubAssetKey: ""
     ImportVersion: 1
   - Handle: 11672070579435410442
     Type: Prefab
@@ -21154,6 +22855,24 @@ AssetRegistry:
     ParentHandle: 16835977733133731886
     SubAssetKey: mesh:5_0
     ImportVersion: 1
+  - Handle: 11757910728169195796
+    Type: Texture2D
+    Path: Editor\Icons\gizmo_scale.png
+    SourceRoot: 0
+    LibraryPath: Editor\Icons\gizmo_scale.png\gizmo_scale.ktx2
+    RootSourceHandle: 11757910728169195796
+    ParentHandle: 0
+    SubAssetKey: ""
+    ImportVersion: 1
+  - Handle: 11762100166540924770
+    Type: Texture2D
+    Path: Editor\Icons\visibility_off.png
+    SourceRoot: 0
+    LibraryPath: Editor\Icons\visibility_off.png\visibility_off.ktx2
+    RootSourceHandle: 11762100166540924770
+    ParentHandle: 0
+    SubAssetKey: ""
+    ImportVersion: 1
   - Handle: 11765714727260817111
     Type: Material
     Path: Models\vulkanscene_shadow\Materials\White_002.kbrmaterial
@@ -21262,6 +22981,15 @@ AssetRegistry:
     ParentHandle: 6090326326702746238
     SubAssetKey: mesh:15_0
     ImportVersion: 1
+  - Handle: 11855652165269880500
+    Type: Texture2D
+    Path: Editor\Icons\action_import.png
+    SourceRoot: 0
+    LibraryPath: Editor\Icons\action_import.png\action_import.ktx2
+    RootSourceHandle: 11855652165269880500
+    ParentHandle: 0
+    SubAssetKey: ""
+    ImportVersion: 1
   - Handle: 11877099295548848296
     Type: Mesh
     Path: Models\retroufo_glow\Meshes\mesh_9_0.kbrmesh
@@ -21279,6 +23007,15 @@ AssetRegistry:
     RootSourceHandle: 7563732692318888728
     ParentHandle: 7563732692318888728
     SubAssetKey: mesh:69_0
+    ImportVersion: 1
+  - Handle: 11885783665879648473
+    Type: Texture2D
+    Path: Editor\Icons\expanded.ktx2
+    SourceRoot: 0
+    LibraryPath: Editor\Icons\expanded.ktx2\expanded.ktx2
+    RootSourceHandle: 11885783665879648473
+    ParentHandle: 0
+    SubAssetKey: ""
     ImportVersion: 1
   - Handle: 11891306468433839501
     Type: Texture2D
@@ -21362,6 +23099,15 @@ AssetRegistry:
     RootSourceHandle: 758760977254712444
     ParentHandle: 758760977254712444
     SubAssetKey: mesh:9_0
+    ImportVersion: 1
+  - Handle: 11938260127798620053
+    Type: Texture2D
+    Path: Editor\Icons\slot_albedo.png
+    SourceRoot: 0
+    LibraryPath: Editor\Icons\slot_albedo.png\slot_albedo.ktx2
+    RootSourceHandle: 11938260127798620053
+    ParentHandle: 0
+    SubAssetKey: ""
     ImportVersion: 1
   - Handle: 11944084361240645595
     Type: Mesh
@@ -21516,6 +23262,15 @@ AssetRegistry:
     ParentHandle: 4418998681810053475
     SubAssetKey: material:3
     ImportVersion: 1
+  - Handle: 12034855433636713062
+    Type: Texture2D
+    Path: Editor\Icons\slot_unset.png
+    SourceRoot: 0
+    LibraryPath: Editor\Icons\slot_unset.png\slot_unset.ktx2
+    RootSourceHandle: 12034855433636713062
+    ParentHandle: 0
+    SubAssetKey: ""
+    ImportVersion: 1
   - Handle: 12037211705042327235
     Type: Mesh
     Path: Models\treasure_smooth\Meshes\mesh_63_0_Cube.047.kbrmesh
@@ -21653,6 +23408,15 @@ AssetRegistry:
     ParentHandle: 5166991818168815824
     SubAssetKey: material:0
     ImportVersion: 1
+  - Handle: 12128271897810124391
+    Type: Texture2D
+    Path: Editor\Icons\component_rigidbody.ktx2
+    SourceRoot: 0
+    LibraryPath: Editor\Icons\component_rigidbody.ktx2\component_rigidbody.ktx2
+    RootSourceHandle: 12128271897810124391
+    ParentHandle: 0
+    SubAssetKey: ""
+    ImportVersion: 1
   - Handle: 12130637288963333809
     Type: Mesh
     Path: Models\retroufo_glow\Meshes\mesh_54_0_Mesh_54.001.kbrmesh
@@ -21701,6 +23465,15 @@ AssetRegistry:
     Dependencies:
       - 2958360366441488348
       - 9484433506672029625
+  - Handle: 12183831647673995910
+    Type: Texture2D
+    Path: Editor\Icons\action_cut.png
+    SourceRoot: 0
+    LibraryPath: Editor\Icons\action_cut.png\action_cut.ktx2
+    RootSourceHandle: 12183831647673995910
+    ParentHandle: 0
+    SubAssetKey: ""
+    ImportVersion: 1
   - Handle: 12203435296484054623
     Type: Mesh
     Path: Models\retroufo_glow\Meshes\mesh_65_0.kbrmesh
@@ -21841,6 +23614,15 @@ AssetRegistry:
       - 534126962233704142
       - 5734159455103572291
       - 4618149021998797964
+  - Handle: 12245117870272292116
+    Type: Texture2D
+    Path: Editor\Icons\action_refresh.ktx2
+    SourceRoot: 0
+    LibraryPath: Editor\Icons\action_refresh.ktx2\action_refresh.ktx2
+    RootSourceHandle: 12245117870272292116
+    ParentHandle: 0
+    SubAssetKey: ""
+    ImportVersion: 1
   - Handle: 12273150898644864466
     Type: Mesh
     Path: Models\lavaplanet\Meshes\mesh_0_0_Sphere.001.kbrmesh
@@ -21858,6 +23640,15 @@ AssetRegistry:
     RootSourceHandle: 2238632335295528690
     ParentHandle: 2238632335295528690
     SubAssetKey: mesh:44_0
+    ImportVersion: 1
+  - Handle: 12275244416510180146
+    Type: Texture2D
+    Path: Editor\Icons\log_debug.ktx2
+    SourceRoot: 0
+    LibraryPath: Editor\Icons\log_debug.ktx2\log_debug.ktx2
+    RootSourceHandle: 12275244416510180146
+    ParentHandle: 0
+    SubAssetKey: ""
     ImportVersion: 1
   - Handle: 12283285806827189756
     Type: Prefab
@@ -22365,6 +24156,15 @@ AssetRegistry:
     ParentHandle: 6090326326702746238
     SubAssetKey: mesh:7_0
     ImportVersion: 1
+  - Handle: 12465973599841226336
+    Type: Texture2D
+    Path: Editor\Icons\status_missing.png
+    SourceRoot: 0
+    LibraryPath: Editor\Icons\status_missing.png\status_missing.ktx2
+    RootSourceHandle: 12465973599841226336
+    ParentHandle: 0
+    SubAssetKey: ""
+    ImportVersion: 1
   - Handle: 12472929774496773263
     Type: Mesh
     Path: Models\gltf\glTF-Embedded\Buggy\Meshes\mesh_99_0_body_19.kbrmesh
@@ -22800,6 +24600,24 @@ AssetRegistry:
     ParentHandle: 7563732692318888728
     SubAssetKey: mesh:30_0
     ImportVersion: 1
+  - Handle: 12649301006877971610
+    Type: SkinnedMesh
+    Path: Models\rpg-character\E10 attack anims\Meshes\skinnedmesh_3_0_Cylinder.004.kbrskinnedmesh
+    SourceRoot: 0
+    LibraryPath: Models\rpg-character\E10 attack anims\Meshes\skinnedmesh_3_0_Cylinder.004.kbrskinnedmesh
+    RootSourceHandle: 4305741975815557537
+    ParentHandle: 4305741975815557537
+    SubAssetKey: skinnedmesh:3_0
+    ImportVersion: 1
+  - Handle: 12664099275433543593
+    Type: Texture2D
+    Path: Editor\Icons\asset_animation.ktx2
+    SourceRoot: 0
+    LibraryPath: Editor\Icons\asset_animation.ktx2\asset_animation.ktx2
+    RootSourceHandle: 12664099275433543593
+    ParentHandle: 0
+    SubAssetKey: ""
+    ImportVersion: 1
   - Handle: 12664750158192379189
     Type: Prefab
     Path: Models\displacement_plane\displacement_plane.kbrprefab
@@ -22902,6 +24720,15 @@ AssetRegistry:
     ParentHandle: 15629215700429853565
     SubAssetKey: material:6
     ImportVersion: 1
+  - Handle: 12735890994167634027
+    Type: Texture2D
+    Path: Editor\Icons\panel_assets.ktx2
+    SourceRoot: 0
+    LibraryPath: Editor\Icons\panel_assets.ktx2\panel_assets.ktx2
+    RootSourceHandle: 12735890994167634027
+    ParentHandle: 0
+    SubAssetKey: ""
+    ImportVersion: 1
   - Handle: 12736486477289918943
     Type: Mesh
     Path: Models\rpg-character\E10 attack anims\Meshes\mesh_2_1_Cube.008.kbrmesh
@@ -22910,6 +24737,15 @@ AssetRegistry:
     RootSourceHandle: 15629215700429853565
     ParentHandle: 15629215700429853565
     SubAssetKey: mesh:2_1
+    ImportVersion: 1
+  - Handle: 12738098377286293537
+    Type: Texture2D
+    Path: Editor\Icons\component_ai_perception.png
+    SourceRoot: 0
+    LibraryPath: Editor\Icons\component_ai_perception.png\component_ai_perception.ktx2
+    RootSourceHandle: 12738098377286293537
+    ParentHandle: 0
+    SubAssetKey: ""
     ImportVersion: 1
   - Handle: 12748857462298536078
     Type: Mesh
@@ -22938,6 +24774,15 @@ AssetRegistry:
     ParentHandle: 758760977254712444
     SubAssetKey: mesh:3_0
     ImportVersion: 1
+  - Handle: 12765775545616074229
+    Type: Texture2D
+    Path: Editor\Icons\component_audio_listener.ktx2
+    SourceRoot: 0
+    LibraryPath: Editor\Icons\component_audio_listener.ktx2\component_audio_listener.ktx2
+    RootSourceHandle: 12765775545616074229
+    ParentHandle: 0
+    SubAssetKey: ""
+    ImportVersion: 1
   - Handle: 12770291889718159796
     Type: Texture2D
     Path: Models\FlightHelmet\glTF\FlightHelmet\Textures\texture_11_FlightHelmet_normal3.ktx2
@@ -22964,6 +24809,15 @@ AssetRegistry:
     RootSourceHandle: 6148802185286014116
     ParentHandle: 6148802185286014116
     SubAssetKey: mesh:12_0
+    ImportVersion: 1
+  - Handle: 12776057918541136962
+    Type: Texture2D
+    Path: Editor\Icons\lock.ktx2
+    SourceRoot: 0
+    LibraryPath: Editor\Icons\lock.ktx2\lock.ktx2
+    RootSourceHandle: 12776057918541136962
+    ParentHandle: 0
+    SubAssetKey: ""
     ImportVersion: 1
   - Handle: 12776191293310346989
     Type: Mesh
@@ -23064,6 +24918,15 @@ AssetRegistry:
     ParentHandle: 7385917506964830292
     SubAssetKey: material:5
     ImportVersion: 1
+  - Handle: 12851200126010290917
+    Type: Mesh
+    Path: Models\rpg-character\E10 attack anims\Meshes\mesh_2_3_Cube.008.kbrmesh
+    SourceRoot: 0
+    LibraryPath: Models\rpg-character\E10 attack anims\Meshes\mesh_2_3_Cube.008.kbrmesh
+    RootSourceHandle: 4305741975815557537
+    ParentHandle: 4305741975815557537
+    SubAssetKey: mesh:2_3
+    ImportVersion: 1
   - Handle: 12858080878187143849
     Type: Mesh
     Path: Models\retroufo\Meshes\mesh_59_0_Mesh_59.kbrmesh
@@ -23159,6 +25022,15 @@ AssetRegistry:
     ParentHandle: 11734900932705191300
     SubAssetKey: mesh:8_0
     ImportVersion: 1
+  - Handle: 12925549424231012941
+    Type: Texture2D
+    Path: Editor\Icons\script.ktx2
+    SourceRoot: 0
+    LibraryPath: Editor\Icons\script.ktx2\script.ktx2
+    RootSourceHandle: 12925549424231012941
+    ParentHandle: 0
+    SubAssetKey: ""
+    ImportVersion: 1
   - Handle: 12926576783441300841
     Type: Texture2D
     Path: Models\FlightHelmet\glTF\FlightHelmet\Textures\texture_8_FlightHelmet_normal2.ktx2
@@ -23202,6 +25074,15 @@ AssetRegistry:
     ParentHandle: 0
     SubAssetKey: ""
     ImportVersion: 1
+  - Handle: 12935604582081777798
+    Type: Texture2D
+    Path: Editor\Icons\hierarchy_entity.png
+    SourceRoot: 0
+    LibraryPath: Editor\Icons\hierarchy_entity.png\hierarchy_entity.ktx2
+    RootSourceHandle: 12935604582081777798
+    ParentHandle: 0
+    SubAssetKey: ""
+    ImportVersion: 1
   - Handle: 12949134737831295205
     Type: Mesh
     Path: Models\treasure_glow\Meshes\mesh_34_0_Cube.017.kbrmesh
@@ -23238,6 +25119,15 @@ AssetRegistry:
     ParentHandle: 0
     SubAssetKey: ""
     ImportVersion: 1
+  - Handle: 12976809336251080970
+    Type: Texture2D
+    Path: Editor\Icons\component_ai_state_machine.ktx2
+    SourceRoot: 0
+    LibraryPath: Editor\Icons\component_ai_state_machine.ktx2\component_ai_state_machine.ktx2
+    RootSourceHandle: 12976809336251080970
+    ParentHandle: 0
+    SubAssetKey: ""
+    ImportVersion: 1
   - Handle: 12979419490445913657
     Type: Material
     Path: Models\gltf\glTF-Embedded\Buggy\Materials\Material_20_23.kbrmaterial
@@ -23256,6 +25146,15 @@ AssetRegistry:
     ParentHandle: 18268071128944098402
     SubAssetKey: mesh:3_0
     ImportVersion: 1
+  - Handle: 12983179029429472283
+    Type: Mesh
+    Path: Models\rpg-character\E10 attack anims\Meshes\mesh_1_0_CUSurfPatch.kbrmesh
+    SourceRoot: 0
+    LibraryPath: Models\rpg-character\E10 attack anims\Meshes\mesh_1_0_CUSurfPatch.kbrmesh
+    RootSourceHandle: 4305741975815557537
+    ParentHandle: 4305741975815557537
+    SubAssetKey: mesh:1_0
+    ImportVersion: 1
   - Handle: 12997006272394453829
     Type: Mesh
     Path: Models\gltf\glTF-Embedded\Buggy\Meshes\mesh_21_0_body_97.kbrmesh
@@ -23273,6 +25172,15 @@ AssetRegistry:
     RootSourceHandle: 758760977254712444
     ParentHandle: 758760977254712444
     SubAssetKey: material:1
+    ImportVersion: 1
+  - Handle: 13000739389102060310
+    Type: Texture2D
+    Path: Editor\Icons\component_audio_2d.ktx2
+    SourceRoot: 0
+    LibraryPath: Editor\Icons\component_audio_2d.ktx2\component_audio_2d.ktx2
+    RootSourceHandle: 13000739389102060310
+    ParentHandle: 0
+    SubAssetKey: ""
     ImportVersion: 1
   - Handle: 13001090993521738740
     Type: Mesh
@@ -23309,6 +25217,15 @@ AssetRegistry:
     ParentHandle: 7563732692318888728
     SubAssetKey: mesh:1_0
     ImportVersion: 1
+  - Handle: 13022868486275438565
+    Type: Texture2D
+    Path: Editor\Icons\action_wireframe.png
+    SourceRoot: 0
+    LibraryPath: Editor\Icons\action_wireframe.png\action_wireframe.ktx2
+    RootSourceHandle: 13022868486275438565
+    ParentHandle: 0
+    SubAssetKey: ""
+    ImportVersion: 1
   - Handle: 13025862333548612002
     Type: Prefab
     Path: Models\color_teapot_spheres.gltf
@@ -23326,6 +25243,15 @@ AssetRegistry:
     RootSourceHandle: 9416030371750910923
     ParentHandle: 9416030371750910923
     SubAssetKey: mesh:41_0
+    ImportVersion: 1
+  - Handle: 13036592889871937706
+    Type: Texture2D
+    Path: Editor\Icons\visibility_on.png
+    SourceRoot: 0
+    LibraryPath: Editor\Icons\visibility_on.png\visibility_on.ktx2
+    RootSourceHandle: 13036592889871937706
+    ParentHandle: 0
+    SubAssetKey: ""
     ImportVersion: 1
   - Handle: 13045918899540343577
     Type: Mesh
@@ -23458,6 +25384,15 @@ AssetRegistry:
     Dependencies:
       - 2781957408488098424
       - 17600187571117543440
+  - Handle: 13112963247339302050
+    Type: Texture2D
+    Path: Editor\Icons\component_box_collider.ktx2
+    SourceRoot: 0
+    LibraryPath: Editor\Icons\component_box_collider.ktx2\component_box_collider.ktx2
+    RootSourceHandle: 13112963247339302050
+    ParentHandle: 0
+    SubAssetKey: ""
+    ImportVersion: 1
   - Handle: 13116385175445263721
     Type: Mesh
     Path: Models\gltf\glTF-Embedded\Buggy\Meshes\mesh_17_2_technic_driver_head_p_SOLIDS_1.kbrmesh
@@ -23511,6 +25446,15 @@ AssetRegistry:
     RootSourceHandle: 3520666591821939054
     ParentHandle: 3520666591821939054
     SubAssetKey: material:5
+    ImportVersion: 1
+  - Handle: 13139013013967296521
+    Type: SkinnedMesh
+    Path: Models\rpg-character\E10 attack anims\Meshes\skinnedmesh_9_0_Cube.007.kbrskinnedmesh
+    SourceRoot: 0
+    LibraryPath: Models\rpg-character\E10 attack anims\Meshes\skinnedmesh_9_0_Cube.007.kbrskinnedmesh
+    RootSourceHandle: 4305741975815557537
+    ParentHandle: 4305741975815557537
+    SubAssetKey: skinnedmesh:9_0
     ImportVersion: 1
   - Handle: 13142977048567504243
     Type: Material
@@ -23586,6 +25530,24 @@ AssetRegistry:
     SourceRoot: 0
     LibraryPath: Models\cerberus\normal.ktx\normal.ktx2
     RootSourceHandle: 13144785108643752847
+    ParentHandle: 0
+    SubAssetKey: ""
+    ImportVersion: 1
+  - Handle: 13158138866925462444
+    Type: Texture2D
+    Path: Editor\Icons\action_new.ktx2
+    SourceRoot: 0
+    LibraryPath: Editor\Icons\action_new.ktx2\action_new.ktx2
+    RootSourceHandle: 13158138866925462444
+    ParentHandle: 0
+    SubAssetKey: ""
+    ImportVersion: 1
+  - Handle: 13186598671402224470
+    Type: Texture2D
+    Path: Editor\Icons\log_critical.png
+    SourceRoot: 0
+    LibraryPath: Editor\Icons\log_critical.png\log_critical.ktx2
+    RootSourceHandle: 13186598671402224470
     ParentHandle: 0
     SubAssetKey: ""
     ImportVersion: 1
@@ -23669,6 +25631,15 @@ AssetRegistry:
     RootSourceHandle: 12460365323498653085
     ParentHandle: 12460365323498653085
     SubAssetKey: texture:3
+    ImportVersion: 1
+  - Handle: 13222064568768651492
+    Type: Texture2D
+    Path: Editor\Icons\action_reload.ktx2
+    SourceRoot: 0
+    LibraryPath: Editor\Icons\action_reload.ktx2\action_reload.ktx2
+    RootSourceHandle: 13222064568768651492
+    ParentHandle: 0
+    SubAssetKey: ""
     ImportVersion: 1
   - Handle: 13228901819499699917
     Type: Mesh
@@ -23822,6 +25793,15 @@ AssetRegistry:
       - 10048740920767042867
       - 11428765155000874933
       - 14579146944165023871
+  - Handle: 13258801625830851747
+    Type: Texture2D
+    Path: Editor\Icons\notification_info.ktx2
+    SourceRoot: 0
+    LibraryPath: Editor\Icons\notification_info.ktx2\notification_info.ktx2
+    RootSourceHandle: 13258801625830851747
+    ParentHandle: 0
+    SubAssetKey: ""
+    ImportVersion: 1
   - Handle: 13259666478499508309
     Type: Mesh
     Path: Models\treasure_smooth\Meshes\mesh_15_0_Cylinder.016.kbrmesh
@@ -23885,6 +25865,15 @@ AssetRegistry:
     ParentHandle: 8858309372063028477
     SubAssetKey: mesh:20_0
     ImportVersion: 1
+  - Handle: 13278630048010764280
+    Type: Texture2D
+    Path: Editor\Icons\action_undo.png
+    SourceRoot: 0
+    LibraryPath: Editor\Icons\action_undo.png\action_undo.ktx2
+    RootSourceHandle: 13278630048010764280
+    ParentHandle: 0
+    SubAssetKey: ""
+    ImportVersion: 1
   - Handle: 13279267463078789603
     Type: Mesh
     Path: Models\treasure_smooth\Meshes\mesh_49_0_Cube.032.kbrmesh
@@ -23902,6 +25891,15 @@ AssetRegistry:
     RootSourceHandle: 2238632335295528690
     ParentHandle: 2238632335295528690
     SubAssetKey: material:109
+    ImportVersion: 1
+  - Handle: 13281035937163943270
+    Type: Texture2D
+    Path: Editor\Icons\panel_toolbar.png
+    SourceRoot: 0
+    LibraryPath: Editor\Icons\panel_toolbar.png\panel_toolbar.ktx2
+    RootSourceHandle: 13281035937163943270
+    ParentHandle: 0
+    SubAssetKey: ""
     ImportVersion: 1
   - Handle: 13283518107073305951
     Type: Texture2D
@@ -24261,6 +26259,15 @@ AssetRegistry:
     ParentHandle: 18268071128944098402
     SubAssetKey: mesh:1_0
     ImportVersion: 1
+  - Handle: 13498044774077379866
+    Type: Texture2D
+    Path: Editor\Icons\component_ragdoll.png
+    SourceRoot: 0
+    LibraryPath: Editor\Icons\component_ragdoll.png\component_ragdoll.ktx2
+    RootSourceHandle: 13498044774077379866
+    ParentHandle: 0
+    SubAssetKey: ""
+    ImportVersion: 1
   - Handle: 13498146022453698849
     Type: Prefab
     Path: Models\teapot.gltf
@@ -24306,6 +26313,15 @@ AssetRegistry:
     ParentHandle: 15629215700429853565
     SubAssetKey: skinnedmesh:7_1
     ImportVersion: 1
+  - Handle: 13515487106589923906
+    Type: SkinnedMesh
+    Path: Models\rpg-character\E10 attack anims\Meshes\skinnedmesh_7_3_Cube.004.kbrskinnedmesh
+    SourceRoot: 0
+    LibraryPath: Models\rpg-character\E10 attack anims\Meshes\skinnedmesh_7_3_Cube.004.kbrskinnedmesh
+    RootSourceHandle: 4305741975815557537
+    ParentHandle: 4305741975815557537
+    SubAssetKey: skinnedmesh:7_3
+    ImportVersion: 1
   - Handle: 13524098986818665160
     Type: Mesh
     Path: Models\retroufo\Meshes\mesh_72_0_Mesh_72.kbrmesh
@@ -24333,6 +26349,15 @@ AssetRegistry:
     ParentHandle: 10934383581697002570
     SubAssetKey: mesh:3_2
     ImportVersion: 1
+  - Handle: 13525904928091437900
+    Type: Texture2D
+    Path: Editor\Icons\component_ai_blackboard.ktx2
+    SourceRoot: 0
+    LibraryPath: Editor\Icons\component_ai_blackboard.ktx2\component_ai_blackboard.ktx2
+    RootSourceHandle: 13525904928091437900
+    ParentHandle: 0
+    SubAssetKey: ""
+    ImportVersion: 1
   - Handle: 13530838795069703881
     Type: Texture2D
     Path: Models\sponza\11490520546946913238.ktx2
@@ -24359,6 +26384,15 @@ AssetRegistry:
     RootSourceHandle: 6343751048385443592
     ParentHandle: 6343751048385443592
     SubAssetKey: mesh:0_0
+    ImportVersion: 1
+  - Handle: 13544153457919124570
+    Type: Texture2D
+    Path: Editor\Icons\panel_hierarchy.ktx2
+    SourceRoot: 0
+    LibraryPath: Editor\Icons\panel_hierarchy.ktx2\panel_hierarchy.ktx2
+    RootSourceHandle: 13544153457919124570
+    ParentHandle: 0
+    SubAssetKey: ""
     ImportVersion: 1
   - Handle: 13546692404257460859
     Type: Mesh
@@ -24559,6 +26593,15 @@ AssetRegistry:
     ParentHandle: 641661085910201849
     SubAssetKey: mesh:5_0
     ImportVersion: 1
+  - Handle: 13698506564772485761
+    Type: Texture2D
+    Path: Editor\Icons\asset_skeleton.png
+    SourceRoot: 0
+    LibraryPath: Editor\Icons\asset_skeleton.png\asset_skeleton.ktx2
+    RootSourceHandle: 13698506564772485761
+    ParentHandle: 0
+    SubAssetKey: ""
+    ImportVersion: 1
   - Handle: 13700488267314399770
     Type: Mesh
     Path: Models\samplebuilding_glass\Meshes\mesh_4_0_Circle.004.kbrmesh
@@ -24693,6 +26736,15 @@ AssetRegistry:
     ParentHandle: 15982454909274218888
     SubAssetKey: material:4
     ImportVersion: 1
+  - Handle: 13775692860681541409
+    Type: Texture2D
+    Path: Editor\Icons\folder.ktx2
+    SourceRoot: 0
+    LibraryPath: Editor\Icons\folder.ktx2\folder.ktx2
+    RootSourceHandle: 13775692860681541409
+    ParentHandle: 0
+    SubAssetKey: ""
+    ImportVersion: 1
   - Handle: 13776328120998914996
     Type: Mesh
     Path: Models\treasure_smooth\Meshes\mesh_38_0_Cube.021.kbrmesh
@@ -24762,6 +26814,15 @@ AssetRegistry:
     SourceRoot: 0
     LibraryPath: Materials\ground.kbrmat
     RootSourceHandle: 13819414350232774500
+    ParentHandle: 0
+    SubAssetKey: ""
+    ImportVersion: 1
+  - Handle: 13820724540837749682
+    Type: Texture2D
+    Path: Editor\Icons\action_settings.png
+    SourceRoot: 0
+    LibraryPath: Editor\Icons\action_settings.png\action_settings.ktx2
+    RootSourceHandle: 13820724540837749682
     ParentHandle: 0
     SubAssetKey: ""
     ImportVersion: 1
@@ -24927,6 +26988,15 @@ AssetRegistry:
     ParentHandle: 16654277587415935315
     SubAssetKey: material:0
     ImportVersion: 1
+  - Handle: 13934084654725721804
+    Type: Texture2D
+    Path: Editor\Icons\action_new.png
+    SourceRoot: 0
+    LibraryPath: Editor\Icons\action_new.png\action_new.ktx2
+    RootSourceHandle: 13934084654725721804
+    ParentHandle: 0
+    SubAssetKey: ""
+    ImportVersion: 1
   - Handle: 13937729104993768037
     Type: Mesh
     Path: Models\gltf\glTF-Embedded\Buggy\Meshes\mesh_101_0_body_15.kbrmesh
@@ -25008,6 +27078,15 @@ AssetRegistry:
     ParentHandle: 2238632335295528690
     SubAssetKey: material:144
     ImportVersion: 1
+  - Handle: 14001539838915926596
+    Type: Texture2D
+    Path: Editor\Icons\log_trace.ktx2
+    SourceRoot: 0
+    LibraryPath: Editor\Icons\log_trace.ktx2\log_trace.ktx2
+    RootSourceHandle: 14001539838915926596
+    ParentHandle: 0
+    SubAssetKey: ""
+    ImportVersion: 1
   - Handle: 14001651161357485109
     Type: Texture2D
     Path: Textures\vulkan_cloth_rgba.ktx
@@ -25043,6 +27122,15 @@ AssetRegistry:
     RootSourceHandle: 15982454909274218888
     ParentHandle: 15982454909274218888
     SubAssetKey: mesh:27_0
+    ImportVersion: 1
+  - Handle: 14008572249159401846
+    Type: Texture2D
+    Path: Editor\Icons\component_ragdoll.ktx2
+    SourceRoot: 0
+    LibraryPath: Editor\Icons\component_ragdoll.ktx2\component_ragdoll.ktx2
+    RootSourceHandle: 14008572249159401846
+    ParentHandle: 0
+    SubAssetKey: ""
     ImportVersion: 1
   - Handle: 14015987889294557573
     Type: Texture2D
@@ -25194,6 +27282,15 @@ AssetRegistry:
       - 15909321591445486065
       - 16307412626118450618
       - 8606083415468637272
+  - Handle: 14074413821838435386
+    Type: Texture2D
+    Path: Editor\Icons\visibility_off.ktx2
+    SourceRoot: 0
+    LibraryPath: Editor\Icons\visibility_off.ktx2\visibility_off.ktx2
+    RootSourceHandle: 14074413821838435386
+    ParentHandle: 0
+    SubAssetKey: ""
+    ImportVersion: 1
   - Handle: 14089368209694446383
     Type: Mesh
     Path: Models\gltf\glTF-Embedded\Buggy\Meshes\mesh_55_1_technic_1_2_side_p_SOLIDS_3.kbrmesh
@@ -25202,6 +27299,15 @@ AssetRegistry:
     RootSourceHandle: 7563732692318888728
     ParentHandle: 7563732692318888728
     SubAssetKey: mesh:55_1
+    ImportVersion: 1
+  - Handle: 14092947666009883664
+    Type: Texture2D
+    Path: Editor\Icons\component_script.png
+    SourceRoot: 0
+    LibraryPath: Editor\Icons\component_script.png\component_script.ktx2
+    RootSourceHandle: 14092947666009883664
+    ParentHandle: 0
+    SubAssetKey: ""
     ImportVersion: 1
   - Handle: 14118277549339764565
     Type: Mesh
@@ -25274,6 +27380,15 @@ AssetRegistry:
     RootSourceHandle: 3234291855590370197
     ParentHandle: 3234291855590370197
     SubAssetKey: mesh:11_1
+    ImportVersion: 1
+  - Handle: 14164243090023851384
+    Type: Texture2D
+    Path: Editor\Icons\asset_material.png
+    SourceRoot: 0
+    LibraryPath: Editor\Icons\asset_material.png\asset_material.ktx2
+    RootSourceHandle: 14164243090023851384
+    ParentHandle: 0
+    SubAssetKey: ""
     ImportVersion: 1
   - Handle: 14183304525916820678
     Type: Mesh
@@ -25380,6 +27495,15 @@ AssetRegistry:
     RootSourceHandle: 7385917506964830292
     ParentHandle: 7385917506964830292
     SubAssetKey: material:2
+    ImportVersion: 1
+  - Handle: 14236979862761810529
+    Type: Texture2D
+    Path: Editor\Icons\component_mesh_collider.png
+    SourceRoot: 0
+    LibraryPath: Editor\Icons\component_mesh_collider.png\component_mesh_collider.ktx2
+    RootSourceHandle: 14236979862761810529
+    ParentHandle: 0
+    SubAssetKey: ""
     ImportVersion: 1
   - Handle: 14241480018658901510
     Type: Material
@@ -25497,6 +27621,15 @@ AssetRegistry:
     RootSourceHandle: 7563732692318888728
     ParentHandle: 7563732692318888728
     SubAssetKey: mesh:17_0
+    ImportVersion: 1
+  - Handle: 14324560475026039346
+    Type: Texture2D
+    Path: Editor\Icons\component_ai_state_machine.png
+    SourceRoot: 0
+    LibraryPath: Editor\Icons\component_ai_state_machine.png\component_ai_state_machine.ktx2
+    RootSourceHandle: 14324560475026039346
+    ParentHandle: 0
+    SubAssetKey: ""
     ImportVersion: 1
   - Handle: 14325199921490956556
     Type: Material
@@ -25836,6 +27969,15 @@ AssetRegistry:
     ParentHandle: 9659550559801413317
     SubAssetKey: mesh:44_0
     ImportVersion: 1
+  - Handle: 14483877704815670606
+    Type: Texture2D
+    Path: Editor\Icons\lock.png
+    SourceRoot: 0
+    LibraryPath: Editor\Icons\lock.png\lock.ktx2
+    RootSourceHandle: 14483877704815670606
+    ParentHandle: 0
+    SubAssetKey: ""
+    ImportVersion: 1
   - Handle: 14490528903981536392
     Type: Texture2D
     Path: Textures\skysphere_rgba.ktx
@@ -25937,12 +28079,30 @@ AssetRegistry:
     ParentHandle: 11581378365515906497
     SubAssetKey: mesh:30_0
     ImportVersion: 1
+  - Handle: 14544013760336133228
+    Type: Texture2D
+    Path: Editor\Icons\component_animator.ktx2
+    SourceRoot: 0
+    LibraryPath: Editor\Icons\component_animator.ktx2\component_animator.ktx2
+    RootSourceHandle: 14544013760336133228
+    ParentHandle: 0
+    SubAssetKey: ""
+    ImportVersion: 1
   - Handle: 14544762050738413302
     Type: Prefab
     Path: Models\torusknot.gltf
     SourceRoot: 0
     LibraryPath: Models\torusknot\torusknot.kbrprefab
     RootSourceHandle: 14544762050738413302
+    ParentHandle: 0
+    SubAssetKey: ""
+    ImportVersion: 1
+  - Handle: 14554415081948103857
+    Type: Texture2D
+    Path: Editor\Icons\asset_skinnedmesh.png
+    SourceRoot: 0
+    LibraryPath: Editor\Icons\asset_skinnedmesh.png\asset_skinnedmesh.ktx2
+    RootSourceHandle: 14554415081948103857
     ParentHandle: 0
     SubAssetKey: ""
     ImportVersion: 1
@@ -26277,6 +28437,15 @@ AssetRegistry:
     ParentHandle: 2238632335295528690
     SubAssetKey: mesh:18_0
     ImportVersion: 1
+  - Handle: 14724568854452483773
+    Type: Texture2D
+    Path: Editor\Icons\component_camera.png
+    SourceRoot: 0
+    LibraryPath: Editor\Icons\component_camera.png\component_camera.ktx2
+    RootSourceHandle: 14724568854452483773
+    ParentHandle: 0
+    SubAssetKey: ""
+    ImportVersion: 1
   - Handle: 14726201336942933696
     Type: Mesh
     Path: Models\retroufo\Meshes\mesh_1_0.kbrmesh
@@ -26339,6 +28508,15 @@ AssetRegistry:
     RootSourceHandle: 7563732692318888728
     ParentHandle: 7563732692318888728
     SubAssetKey: material:101
+    ImportVersion: 1
+  - Handle: 14778524446616451260
+    Type: Texture2D
+    Path: Editor\Icons\folder.png
+    SourceRoot: 0
+    LibraryPath: Editor\Icons\folder.png\folder.ktx2
+    RootSourceHandle: 14778524446616451260
+    ParentHandle: 0
+    SubAssetKey: ""
     ImportVersion: 1
   - Handle: 14785156586819347211
     Type: Texture2D
@@ -26475,6 +28653,15 @@ AssetRegistry:
     ParentHandle: 4583108925942140699
     SubAssetKey: mesh:0_0
     ImportVersion: 1
+  - Handle: 14868248134671410484
+    Type: Animation
+    Path: Models\rpg-character\E10 attack anims\Animations\Punch.kbranimation
+    SourceRoot: 0
+    LibraryPath: Models\rpg-character\E10 attack anims\Animations\Punch.kbranimation
+    RootSourceHandle: 4305741975815557537
+    ParentHandle: 4305741975815557537
+    SubAssetKey: animation:4
+    ImportVersion: 1
   - Handle: 14879467559709340461
     Type: Mesh
     Path: Models\sponza\sponza\Meshes\mesh_11_0_Mesh_0.011.kbrmesh
@@ -26585,6 +28772,15 @@ AssetRegistry:
     Dependencies:
       - 12064393690909774098
       - 11719855867745150039
+  - Handle: 14951421456994171670
+    Type: Texture2D
+    Path: Editor\Icons\action_delete.png
+    SourceRoot: 0
+    LibraryPath: Editor\Icons\action_delete.png\action_delete.ktx2
+    RootSourceHandle: 14951421456994171670
+    ParentHandle: 0
+    SubAssetKey: ""
+    ImportVersion: 1
   - Handle: 14953955289341262681
     Type: Material
     Path: Models\gltf\glTF-Embedded\Buggy\Materials\Material_25_25.kbrmaterial
@@ -26701,6 +28897,15 @@ AssetRegistry:
     RootSourceHandle: 8858309372063028477
     ParentHandle: 8858309372063028477
     SubAssetKey: mesh:11_1
+    ImportVersion: 1
+  - Handle: 15011415278021413878
+    Type: Skeleton
+    Path: Models\rpg-character\E10 attack anims\Skeletons\Armature.kbrskeleton
+    SourceRoot: 0
+    LibraryPath: Models\rpg-character\E10 attack anims\Skeletons\Armature.kbrskeleton
+    RootSourceHandle: 4305741975815557537
+    ParentHandle: 4305741975815557537
+    SubAssetKey: skeleton:0
     ImportVersion: 1
   - Handle: 15021609930156133957
     Type: Mesh
@@ -26959,6 +29164,24 @@ AssetRegistry:
     ParentHandle: 8240355766732467400
     SubAssetKey: mesh:0_2
     ImportVersion: 1
+  - Handle: 15212372815913059899
+    Type: Texture2D
+    Path: Editor\Icons\prefab_artifact.ktx2
+    SourceRoot: 0
+    LibraryPath: Editor\Icons\prefab_artifact.ktx2\prefab_artifact.ktx2
+    RootSourceHandle: 15212372815913059899
+    ParentHandle: 0
+    SubAssetKey: ""
+    ImportVersion: 1
+  - Handle: 15214285033488340011
+    Type: Texture2D
+    Path: Editor\Icons\panel_toolbar.ktx2
+    SourceRoot: 0
+    LibraryPath: Editor\Icons\panel_toolbar.ktx2\panel_toolbar.ktx2
+    RootSourceHandle: 15214285033488340011
+    ParentHandle: 0
+    SubAssetKey: ""
+    ImportVersion: 1
   - Handle: 15216535864246803467
     Type: Mesh
     Path: Models\retroufo_glow\Meshes\mesh_67_0_Mesh_67.001.kbrmesh
@@ -27088,6 +29311,15 @@ AssetRegistry:
     ParentHandle: 3234291855590370197
     SubAssetKey: mesh:55_0
     ImportVersion: 1
+  - Handle: 15284353082494496849
+    Type: Texture2D
+    Path: Editor\Icons\action_save_as.ktx2
+    SourceRoot: 0
+    LibraryPath: Editor\Icons\action_save_as.ktx2\action_save_as.ktx2
+    RootSourceHandle: 15284353082494496849
+    ParentHandle: 0
+    SubAssetKey: ""
+    ImportVersion: 1
   - Handle: 15284576504272775947
     Type: Texture2D
     Path: Models\sponza\5823059166183034438.ktx2
@@ -27123,6 +29355,15 @@ AssetRegistry:
     RootSourceHandle: 2238632335295528690
     ParentHandle: 2238632335295528690
     SubAssetKey: mesh:80_1
+    ImportVersion: 1
+  - Handle: 15305242374995089091
+    Type: Texture2D
+    Path: Editor\Icons\gizmo_select.png
+    SourceRoot: 0
+    LibraryPath: Editor\Icons\gizmo_select.png\gizmo_select.ktx2
+    RootSourceHandle: 15305242374995089091
+    ParentHandle: 0
+    SubAssetKey: ""
     ImportVersion: 1
   - Handle: 15319195372512534832
     Type: SkinnedMesh
@@ -27168,6 +29409,15 @@ AssetRegistry:
     RootSourceHandle: 8858309372063028477
     ParentHandle: 8858309372063028477
     SubAssetKey: mesh:18_1
+    ImportVersion: 1
+  - Handle: 15339043358829250818
+    Type: Texture2D
+    Path: Editor\Icons\component_audio_3d.png
+    SourceRoot: 0
+    LibraryPath: Editor\Icons\component_audio_3d.png\component_audio_3d.ktx2
+    RootSourceHandle: 15339043358829250818
+    ParentHandle: 0
+    SubAssetKey: ""
     ImportVersion: 1
   - Handle: 15359715577557902630
     Type: Prefab
@@ -27484,6 +29734,15 @@ AssetRegistry:
     ParentHandle: 2238632335295528690
     SubAssetKey: material:52
     ImportVersion: 1
+  - Handle: 15360659209178925381
+    Type: Texture2D
+    Path: Editor\Icons\action_clear.ktx2
+    SourceRoot: 0
+    LibraryPath: Editor\Icons\action_clear.ktx2\action_clear.ktx2
+    RootSourceHandle: 15360659209178925381
+    ParentHandle: 0
+    SubAssetKey: ""
+    ImportVersion: 1
   - Handle: 15365318760336023716
     Type: Mesh
     Path: Models\treasure_smooth\Meshes\mesh_2_0_Icosphere.kbrmesh
@@ -27529,6 +29788,63 @@ AssetRegistry:
     ParentHandle: 11130684027942237427
     SubAssetKey: mesh:9_0
     ImportVersion: 1
+  - Handle: 15386540721054847204
+    Type: Prefab
+    Path: Models\rpg-character\E10 attack anims\E10 attack anims.kbrprefab
+    SourceRoot: 0
+    LibraryPath: Models\rpg-character\E10 attack anims\E10 attack anims.kbrprefab
+    RootSourceHandle: 4305741975815557537
+    ParentHandle: 4305741975815557537
+    SubAssetKey: prefab:0
+    ImportVersion: 1
+    Dependencies:
+      - 18079861330739840838
+      - 17266163430964559687
+      - 3677770867680874985
+      - 16129093600440634480
+      - 14868248134671410484
+      - 6778567736381960233
+      - 9719365016594983041
+      - 16723559485276577740
+      - 18149411874969945416
+      - 6829131188348744400
+      - 17677828085084226605
+      - 3484586975503323886
+      - 7105023272418850322
+      - 2691167546071534612
+      - 5451951974532815443
+      - 8719455171461543083
+      - 9685044319707898809
+      - 10447350371558661137
+      - 1181471637839126031
+      - 2733720351044369369
+      - 10566487977898146252
+      - 18055606631925482877
+      - 1813572021555857403
+      - 9914015321278046936
+      - 12983179029429472283
+      - 17262037482304731964
+      - 6872942970522268544
+      - 18215699765627995909
+      - 11375696565231611982
+      - 2137187406491026928
+      - 12851200126010290917
+      - 1035547905703303889
+      - 12649301006877971610
+      - 5638646141062046007
+      - 1482221848654966731
+      - 9801498185059839209
+      - 7729418892602829938
+      - 2292075948512733030
+      - 8243689666994297628
+      - 17018780635686188047
+      - 4187933988406976178
+      - 10633308391646740974
+      - 16224973223440914016
+      - 13515487106589923906
+      - 11210786805910524886
+      - 13139013013967296521
+      - 15011415278021413878
   - Handle: 15391192099309581438
     Type: Mesh
     Path: Models\treasure_glow\Meshes\mesh_36_0_Cube.019.kbrmesh
@@ -27632,6 +29948,15 @@ AssetRegistry:
       - 3945424138475985788
       - 7570950184735313774
       - 15666979490344848543
+  - Handle: 15424703958691433754
+    Type: Texture2D
+    Path: Editor\Icons\slot_metallic.ktx2
+    SourceRoot: 0
+    LibraryPath: Editor\Icons\slot_metallic.ktx2\slot_metallic.ktx2
+    RootSourceHandle: 15424703958691433754
+    ParentHandle: 0
+    SubAssetKey: ""
+    ImportVersion: 1
   - Handle: 15432000256010330129
     Type: Mesh
     Path: Models\torusknot\Meshes\mesh_0_0_torusknot.001.kbrmesh
@@ -27650,6 +29975,15 @@ AssetRegistry:
     ParentHandle: 0
     SubAssetKey: ""
     ImportVersion: 1
+  - Handle: 15456889144329648814
+    Type: Texture2D
+    Path: Editor\Icons\slot_emissive.png
+    SourceRoot: 0
+    LibraryPath: Editor\Icons\slot_emissive.png\slot_emissive.ktx2
+    RootSourceHandle: 15456889144329648814
+    ParentHandle: 0
+    SubAssetKey: ""
+    ImportVersion: 1
   - Handle: 15462070879749610509
     Type: Mesh
     Path: Models\samplescene\Meshes\mesh_8_0_Cylinder02_Cylinder02.001.kbrmesh
@@ -27658,6 +29992,15 @@ AssetRegistry:
     RootSourceHandle: 583060611811443193
     ParentHandle: 583060611811443193
     SubAssetKey: mesh:8_0
+    ImportVersion: 1
+  - Handle: 15465522076224809729
+    Type: Texture2D
+    Path: Editor\Icons\action_open.ktx2
+    SourceRoot: 0
+    LibraryPath: Editor\Icons\action_open.ktx2\action_open.ktx2
+    RootSourceHandle: 15465522076224809729
+    ParentHandle: 0
+    SubAssetKey: ""
     ImportVersion: 1
   - Handle: 15477343650167752744
     Type: Mesh
@@ -27820,6 +30163,15 @@ AssetRegistry:
       - 534126962233704142
       - 5734159455103572291
       - 4618149021998797964
+  - Handle: 15531589329087635390
+    Type: Texture2D
+    Path: Editor\Icons\panel_hierarchy.png
+    SourceRoot: 0
+    LibraryPath: Editor\Icons\panel_hierarchy.png\panel_hierarchy.ktx2
+    RootSourceHandle: 15531589329087635390
+    ParentHandle: 0
+    SubAssetKey: ""
+    ImportVersion: 1
   - Handle: 15541316076469110096
     Type: Mesh
     Path: Models\retroufo\Meshes\mesh_37_0.kbrmesh
@@ -28037,6 +30389,15 @@ AssetRegistry:
     RootSourceHandle: 7563732692318888728
     ParentHandle: 7563732692318888728
     SubAssetKey: material:118
+    ImportVersion: 1
+  - Handle: 15684953131014515017
+    Type: Texture2D
+    Path: Editor\Icons\action_paste.png
+    SourceRoot: 0
+    LibraryPath: Editor\Icons\action_paste.png\action_paste.ktx2
+    RootSourceHandle: 15684953131014515017
+    ParentHandle: 0
+    SubAssetKey: ""
     ImportVersion: 1
   - Handle: 15699797043758853420
     Type: Prefab
@@ -28312,6 +30673,15 @@ AssetRegistry:
     RootSourceHandle: 6090326326702746238
     ParentHandle: 6090326326702746238
     SubAssetKey: mesh:56_0
+    ImportVersion: 1
+  - Handle: 15818970899646557380
+    Type: Texture2D
+    Path: Editor\Icons\component_animator.png
+    SourceRoot: 0
+    LibraryPath: Editor\Icons\component_animator.png\component_animator.ktx2
+    RootSourceHandle: 15818970899646557380
+    ParentHandle: 0
+    SubAssetKey: ""
     ImportVersion: 1
   - Handle: 15826843741539850443
     Type: Mesh
@@ -28625,6 +30995,15 @@ AssetRegistry:
     ParentHandle: 4021286257923355776
     SubAssetKey: material:5
     ImportVersion: 1
+  - Handle: 15991141380252945281
+    Type: Texture2D
+    Path: Editor\Icons\component_spot_light.ktx2
+    SourceRoot: 0
+    LibraryPath: Editor\Icons\component_spot_light.ktx2\component_spot_light.ktx2
+    RootSourceHandle: 15991141380252945281
+    ParentHandle: 0
+    SubAssetKey: ""
+    ImportVersion: 1
   - Handle: 15993620633563459219
     Type: Mesh
     Path: Models\retroufo\Meshes\mesh_1_0_Mesh_1.kbrmesh
@@ -28724,6 +31103,15 @@ AssetRegistry:
     ParentHandle: 7563732692318888728
     SubAssetKey: mesh:43_0
     ImportVersion: 1
+  - Handle: 16055194679932854839
+    Type: Texture2D
+    Path: Editor\Icons\hierarchy_entity.ktx2
+    SourceRoot: 0
+    LibraryPath: Editor\Icons\hierarchy_entity.ktx2\hierarchy_entity.ktx2
+    RootSourceHandle: 16055194679932854839
+    ParentHandle: 0
+    SubAssetKey: ""
+    ImportVersion: 1
   - Handle: 16063897914697295705
     Type: Mesh
     Path: Models\treasure_smooth\Meshes\mesh_16_0_Cylinder.023.kbrmesh
@@ -28732,6 +31120,15 @@ AssetRegistry:
     RootSourceHandle: 9416030371750910923
     ParentHandle: 9416030371750910923
     SubAssetKey: mesh:16_0
+    ImportVersion: 1
+  - Handle: 16064050858156932132
+    Type: Texture2D
+    Path: Editor\Icons\action_settings.ktx2
+    SourceRoot: 0
+    LibraryPath: Editor\Icons\action_settings.ktx2\action_settings.ktx2
+    RootSourceHandle: 16064050858156932132
+    ParentHandle: 0
+    SubAssetKey: ""
     ImportVersion: 1
   - Handle: 16067470754732103414
     Type: Mesh
@@ -28909,6 +31306,15 @@ AssetRegistry:
     ParentHandle: 6532463041022503106
     SubAssetKey: mesh:56_0
     ImportVersion: 1
+  - Handle: 16129093600440634480
+    Type: Animation
+    Path: Models\rpg-character\E10 attack anims\Animations\Idle.kbranimation
+    SourceRoot: 0
+    LibraryPath: Models\rpg-character\E10 attack anims\Animations\Idle.kbranimation
+    RootSourceHandle: 4305741975815557537
+    ParentHandle: 4305741975815557537
+    SubAssetKey: animation:3
+    ImportVersion: 1
   - Handle: 16141030472009779464
     Type: Mesh
     Path: Models\treasure_glow\Meshes\mesh_12_1_Cylinder.013.kbrmesh
@@ -28926,6 +31332,15 @@ AssetRegistry:
     RootSourceHandle: 13789860686184306386
     ParentHandle: 13789860686184306386
     SubAssetKey: skinnedmesh:0_0
+    ImportVersion: 1
+  - Handle: 16146442096279666963
+    Type: Texture2D
+    Path: Editor\Icons\component_directional_light.png
+    SourceRoot: 0
+    LibraryPath: Editor\Icons\component_directional_light.png\component_directional_light.ktx2
+    RootSourceHandle: 16146442096279666963
+    ParentHandle: 0
+    SubAssetKey: ""
     ImportVersion: 1
   - Handle: 16147826980923608216
     Type: Mesh
@@ -29020,6 +31435,15 @@ AssetRegistry:
     ParentHandle: 12460365323498653085
     SubAssetKey: texture:23
     ImportVersion: 1
+  - Handle: 16171201852498901438
+    Type: Texture2D
+    Path: Editor\Icons\action_exit.ktx2
+    SourceRoot: 0
+    LibraryPath: Editor\Icons\action_exit.ktx2\action_exit.ktx2
+    RootSourceHandle: 16171201852498901438
+    ParentHandle: 0
+    SubAssetKey: ""
+    ImportVersion: 1
   - Handle: 16177480571354307606
     Type: Prefab
     Path: ImportedModels\armor\armor.kbrprefab
@@ -29080,6 +31504,15 @@ AssetRegistry:
     RootSourceHandle: 16223881143684236986
     ParentHandle: 0
     SubAssetKey: ""
+    ImportVersion: 1
+  - Handle: 16224973223440914016
+    Type: SkinnedMesh
+    Path: Models\rpg-character\E10 attack anims\Meshes\skinnedmesh_7_2_Cube.004.kbrskinnedmesh
+    SourceRoot: 0
+    LibraryPath: Models\rpg-character\E10 attack anims\Meshes\skinnedmesh_7_2_Cube.004.kbrskinnedmesh
+    RootSourceHandle: 4305741975815557537
+    ParentHandle: 4305741975815557537
+    SubAssetKey: skinnedmesh:7_2
     ImportVersion: 1
   - Handle: 16225665965403181144
     Type: Mesh
@@ -29143,6 +31576,15 @@ AssetRegistry:
     RootSourceHandle: 7563732692318888728
     ParentHandle: 7563732692318888728
     SubAssetKey: mesh:79_1
+    ImportVersion: 1
+  - Handle: 16284644939279322679
+    Type: Texture2D
+    Path: Editor\Icons\action_save_as.png
+    SourceRoot: 0
+    LibraryPath: Editor\Icons\action_save_as.png\action_save_as.ktx2
+    RootSourceHandle: 16284644939279322679
+    ParentHandle: 0
+    SubAssetKey: ""
     ImportVersion: 1
   - Handle: 16286479860060054715
     Type: Mesh
@@ -29413,6 +31855,15 @@ AssetRegistry:
       - 534126962233704142
       - 5734159455103572291
       - 4618149021998797964
+  - Handle: 16451859623603345730
+    Type: Texture2D
+    Path: Editor\Icons\expanded.png
+    SourceRoot: 0
+    LibraryPath: Editor\Icons\expanded.png\expanded.ktx2
+    RootSourceHandle: 16451859623603345730
+    ParentHandle: 0
+    SubAssetKey: ""
+    ImportVersion: 1
   - Handle: 16464206661516444817
     Type: Mesh
     Path: Models\retroufo\Meshes\mesh_57_0.kbrmesh
@@ -29604,6 +32055,15 @@ AssetRegistry:
     RootSourceHandle: 6532463041022503106
     ParentHandle: 6532463041022503106
     SubAssetKey: mesh:59_0
+    ImportVersion: 1
+  - Handle: 16551591582373468439
+    Type: Texture2D
+    Path: Editor\Icons\action_reload.png
+    SourceRoot: 0
+    LibraryPath: Editor\Icons\action_reload.png\action_reload.ktx2
+    RootSourceHandle: 16551591582373468439
+    ParentHandle: 0
+    SubAssetKey: ""
     ImportVersion: 1
   - Handle: 16551616236970743279
     Type: Texture2D
@@ -29833,6 +32293,15 @@ AssetRegistry:
     ParentHandle: 8858309372063028477
     SubAssetKey: mesh:57_0
     ImportVersion: 1
+  - Handle: 16657211056336337780
+    Type: Texture2D
+    Path: Editor\Icons\component_particles.png
+    SourceRoot: 0
+    LibraryPath: Editor\Icons\component_particles.png\component_particles.ktx2
+    RootSourceHandle: 16657211056336337780
+    ParentHandle: 0
+    SubAssetKey: ""
+    ImportVersion: 1
   - Handle: 16659274455491592946
     Type: Material
     Path: Models\gltf\glTF-Embedded\Buggy\Materials\Material_20_51.kbrmaterial
@@ -29910,6 +32379,15 @@ AssetRegistry:
     ParentHandle: 5517711370043161873
     SubAssetKey: material:6
     ImportVersion: 1
+  - Handle: 16711631075730705086
+    Type: Texture2D
+    Path: Editor\Icons\visibility_on.ktx2
+    SourceRoot: 0
+    LibraryPath: Editor\Icons\visibility_on.ktx2\visibility_on.ktx2
+    RootSourceHandle: 16711631075730705086
+    ParentHandle: 0
+    SubAssetKey: ""
+    ImportVersion: 1
   - Handle: 16716218856421156534
     Type: Material
     Path: Models\sponza\sponza\Materials\Material_21.kbrmaterial
@@ -29969,6 +32447,15 @@ AssetRegistry:
       - 534126962233704142
       - 5734159455103572291
       - 4618149021998797964
+  - Handle: 16723559485276577740
+    Type: Animation
+    Path: Models\rpg-character\E10 attack anims\Animations\Sword_atk02.kbranimation
+    SourceRoot: 0
+    LibraryPath: Models\rpg-character\E10 attack anims\Animations\Sword_atk02.kbranimation
+    RootSourceHandle: 4305741975815557537
+    ParentHandle: 4305741975815557537
+    SubAssetKey: animation:7
+    ImportVersion: 1
   - Handle: 16733718623912003778
     Type: Texture2D
     Path: Editor\outlined_gray_play_button.png
@@ -30058,6 +32545,15 @@ AssetRegistry:
     Dependencies:
       - 11008397584026526313
       - 14980645760096826226
+  - Handle: 16755525944663602997
+    Type: Texture2D
+    Path: Editor\Icons\log_critical.ktx2
+    SourceRoot: 0
+    LibraryPath: Editor\Icons\log_critical.ktx2\log_critical.ktx2
+    RootSourceHandle: 16755525944663602997
+    ParentHandle: 0
+    SubAssetKey: ""
+    ImportVersion: 1
   - Handle: 16765894761400630375
     Type: Mesh
     Path: Models\retroufo_glow\Meshes\mesh_9_0_Mesh_9.001.kbrmesh
@@ -30146,6 +32642,15 @@ AssetRegistry:
     RootSourceHandle: 11824251895976750977
     ParentHandle: 11824251895976750977
     SubAssetKey: material:1
+    ImportVersion: 1
+  - Handle: 16834465218873835465
+    Type: Texture2D
+    Path: Editor\Icons\component_sphere_collider.ktx2
+    SourceRoot: 0
+    LibraryPath: Editor\Icons\component_sphere_collider.ktx2\component_sphere_collider.ktx2
+    RootSourceHandle: 16834465218873835465
+    ParentHandle: 0
+    SubAssetKey: ""
     ImportVersion: 1
   - Handle: 16834502057826066923
     Type: Texture2D
@@ -30308,6 +32813,15 @@ AssetRegistry:
     ParentHandle: 516790474266850667
     SubAssetKey: mesh:1_0
     ImportVersion: 1
+  - Handle: 16921544250958538009
+    Type: Texture2D
+    Path: Editor\Icons\asset_prefab.png
+    SourceRoot: 0
+    LibraryPath: Editor\Icons\asset_prefab.png\asset_prefab.ktx2
+    RootSourceHandle: 16921544250958538009
+    ParentHandle: 0
+    SubAssetKey: ""
+    ImportVersion: 1
   - Handle: 16923694788902762780
     Type: Texture2D
     Path: Assets\Flame03-hollow_16x4.png
@@ -30441,6 +32955,15 @@ AssetRegistry:
     RootSourceHandle: 7563732692318888728
     ParentHandle: 7563732692318888728
     SubAssetKey: mesh:93_0
+    ImportVersion: 1
+  - Handle: 17018780635686188047
+    Type: SkinnedMesh
+    Path: Models\rpg-character\E10 attack anims\Meshes\skinnedmesh_6_3_Cube.010.kbrskinnedmesh
+    SourceRoot: 0
+    LibraryPath: Models\rpg-character\E10 attack anims\Meshes\skinnedmesh_6_3_Cube.010.kbrskinnedmesh
+    RootSourceHandle: 4305741975815557537
+    ParentHandle: 4305741975815557537
+    SubAssetKey: skinnedmesh:6_3
     ImportVersion: 1
   - Handle: 17025539891869089431
     Type: Mesh
@@ -30607,6 +33130,15 @@ AssetRegistry:
     ParentHandle: 9416030371750910923
     SubAssetKey: mesh:60_0
     ImportVersion: 1
+  - Handle: 17113674972925467639
+    Type: Texture2D
+    Path: Editor\Icons\action_reveal.ktx2
+    SourceRoot: 0
+    LibraryPath: Editor\Icons\action_reveal.ktx2\action_reveal.ktx2
+    RootSourceHandle: 17113674972925467639
+    ParentHandle: 0
+    SubAssetKey: ""
+    ImportVersion: 1
   - Handle: 17117992340410757106
     Type: Material
     Path: Models\gltf\glTF-Embedded\Buggy\Materials\Material_24_99.kbrmaterial
@@ -30624,6 +33156,15 @@ AssetRegistry:
     RootSourceHandle: 13577412551968241284
     ParentHandle: 13577412551968241284
     SubAssetKey: mesh:0_0
+    ImportVersion: 1
+  - Handle: 17145239983967480059
+    Type: Texture2D
+    Path: Editor\Icons\action_import.ktx2
+    SourceRoot: 0
+    LibraryPath: Editor\Icons\action_import.ktx2\action_import.ktx2
+    RootSourceHandle: 17145239983967480059
+    ParentHandle: 0
+    SubAssetKey: ""
     ImportVersion: 1
   - Handle: 17164040778592405191
     Type: Texture2D
@@ -30723,6 +33264,15 @@ AssetRegistry:
     ParentHandle: 0
     SubAssetKey: ""
     ImportVersion: 1
+  - Handle: 17200143861790600957
+    Type: Texture2D
+    Path: Editor\Icons\component_joint.png
+    SourceRoot: 0
+    LibraryPath: Editor\Icons\component_joint.png\component_joint.ktx2
+    RootSourceHandle: 17200143861790600957
+    ParentHandle: 0
+    SubAssetKey: ""
+    ImportVersion: 1
   - Handle: 17213127900663895753
     Type: Mesh
     Path: Models\treasure_smooth\Meshes\mesh_12_1_Cylinder.013.kbrmesh
@@ -30731,6 +33281,15 @@ AssetRegistry:
     RootSourceHandle: 11581378365515906497
     ParentHandle: 11581378365515906497
     SubAssetKey: mesh:12_1
+    ImportVersion: 1
+  - Handle: 17222807817004830850
+    Type: Texture2D
+    Path: Editor\Icons\panel_viewport.ktx2
+    SourceRoot: 0
+    LibraryPath: Editor\Icons\panel_viewport.ktx2\panel_viewport.ktx2
+    RootSourceHandle: 17222807817004830850
+    ParentHandle: 0
+    SubAssetKey: ""
     ImportVersion: 1
   - Handle: 17223852617644547826
     Type: Mesh
@@ -30929,6 +33488,15 @@ AssetRegistry:
     ParentHandle: 2238632335295528690
     SubAssetKey: mesh:56_0
     ImportVersion: 1
+  - Handle: 17246609607712681156
+    Type: Texture2D
+    Path: Editor\Icons\action_duplicate.ktx2
+    SourceRoot: 0
+    LibraryPath: Editor\Icons\action_duplicate.ktx2\action_duplicate.ktx2
+    RootSourceHandle: 17246609607712681156
+    ParentHandle: 0
+    SubAssetKey: ""
+    ImportVersion: 1
   - Handle: 17251490179221814025
     Type: Mesh
     Path: Models\retroufo\Meshes\mesh_31_0.kbrmesh
@@ -30983,6 +33551,24 @@ AssetRegistry:
     ParentHandle: 2238632335295528690
     SubAssetKey: mesh:69_0
     ImportVersion: 1
+  - Handle: 17262037482304731964
+    Type: Mesh
+    Path: Models\rpg-character\E10 attack anims\Meshes\mesh_1_1_CUSurfPatch.kbrmesh
+    SourceRoot: 0
+    LibraryPath: Models\rpg-character\E10 attack anims\Meshes\mesh_1_1_CUSurfPatch.kbrmesh
+    RootSourceHandle: 4305741975815557537
+    ParentHandle: 4305741975815557537
+    SubAssetKey: mesh:1_1
+    ImportVersion: 1
+  - Handle: 17266163430964559687
+    Type: Animation
+    Path: Models\rpg-character\E10 attack anims\Animations\Grip left.kbranimation
+    SourceRoot: 0
+    LibraryPath: Models\rpg-character\E10 attack anims\Animations\Grip left.kbranimation
+    RootSourceHandle: 4305741975815557537
+    ParentHandle: 4305741975815557537
+    SubAssetKey: animation:1
+    ImportVersion: 1
   - Handle: 17267809046051717591
     Type: Mesh
     Path: Models\retroufo\Meshes\mesh_56_0.kbrmesh
@@ -31001,6 +33587,15 @@ AssetRegistry:
     ParentHandle: 3520666591821939054
     SubAssetKey: mesh:4_0
     ImportVersion: 1
+  - Handle: 17281950648082761182
+    Type: Texture2D
+    Path: Editor\Icons\gizmo_translate.ktx2
+    SourceRoot: 0
+    LibraryPath: Editor\Icons\gizmo_translate.ktx2\gizmo_translate.ktx2
+    RootSourceHandle: 17281950648082761182
+    ParentHandle: 0
+    SubAssetKey: ""
+    ImportVersion: 1
   - Handle: 17282291384573012014
     Type: Mesh
     Path: Models\retroufo\Meshes\mesh_36_0.kbrmesh
@@ -31009,6 +33604,15 @@ AssetRegistry:
     RootSourceHandle: 6090326326702746238
     ParentHandle: 6090326326702746238
     SubAssetKey: mesh:36_0
+    ImportVersion: 1
+  - Handle: 17285313036882471667
+    Type: Texture2D
+    Path: Editor\Icons\transport_simulate.ktx2
+    SourceRoot: 0
+    LibraryPath: Editor\Icons\transport_simulate.ktx2\transport_simulate.ktx2
+    RootSourceHandle: 17285313036882471667
+    ParentHandle: 0
+    SubAssetKey: ""
     ImportVersion: 1
   - Handle: 17285376242291219888
     Type: Texture2D
@@ -31139,6 +33743,15 @@ AssetRegistry:
     ParentHandle: 6148802185286014116
     SubAssetKey: mesh:21_0
     ImportVersion: 1
+  - Handle: 17299756701647480973
+    Type: Texture2D
+    Path: Editor\Icons\component_script.ktx2
+    SourceRoot: 0
+    LibraryPath: Editor\Icons\component_script.ktx2\component_script.ktx2
+    RootSourceHandle: 17299756701647480973
+    ParentHandle: 0
+    SubAssetKey: ""
+    ImportVersion: 1
   - Handle: 17303150632536323362
     Type: Mesh
     Path: Models\gltf\glTF-Embedded\Buggy\Meshes\mesh_78_1_prt_1_16_SOLIDS_1.kbrmesh
@@ -31193,6 +33806,15 @@ AssetRegistry:
     ParentHandle: 6148802185286014116
     SubAssetKey: mesh:72_0
     ImportVersion: 1
+  - Handle: 17380782343951831519
+    Type: Texture2D
+    Path: Editor\Icons\log_warning.png
+    SourceRoot: 0
+    LibraryPath: Editor\Icons\log_warning.png\log_warning.ktx2
+    RootSourceHandle: 17380782343951831519
+    ParentHandle: 0
+    SubAssetKey: ""
+    ImportVersion: 1
   - Handle: 17381698776258828218
     Type: Mesh
     Path: Models\samplebuilding\Meshes\mesh_5_2_Cube.004.kbrmesh
@@ -31219,6 +33841,15 @@ AssetRegistry:
     RootSourceHandle: 9659550559801413317
     ParentHandle: 9659550559801413317
     SubAssetKey: mesh:36_0
+    ImportVersion: 1
+  - Handle: 17392583126809436044
+    Type: Texture2D
+    Path: Editor\Icons\component_ai_targetable.ktx2
+    SourceRoot: 0
+    LibraryPath: Editor\Icons\component_ai_targetable.ktx2\component_ai_targetable.ktx2
+    RootSourceHandle: 17392583126809436044
+    ParentHandle: 0
+    SubAssetKey: ""
     ImportVersion: 1
   - Handle: 17396761942409581284
     Type: Material
@@ -31369,6 +34000,24 @@ AssetRegistry:
     ParentHandle: 12502348395066231312
     SubAssetKey: mesh:0_0
     ImportVersion: 1
+  - Handle: 17451077020823251707
+    Type: Texture2D
+    Path: Editor\Icons\action_exit.png
+    SourceRoot: 0
+    LibraryPath: Editor\Icons\action_exit.png\action_exit.ktx2
+    RootSourceHandle: 17451077020823251707
+    ParentHandle: 0
+    SubAssetKey: ""
+    ImportVersion: 1
+  - Handle: 17455165070986302794
+    Type: Texture2D
+    Path: Editor\Icons\component_model.png
+    SourceRoot: 0
+    LibraryPath: Editor\Icons\component_model.png\component_model.ktx2
+    RootSourceHandle: 17455165070986302794
+    ParentHandle: 0
+    SubAssetKey: ""
+    ImportVersion: 1
   - Handle: 17456811138723484252
     Type: Material
     Path: Models\retroufo\Materials\Material_2.kbrmaterial
@@ -31452,6 +34101,15 @@ AssetRegistry:
     RootSourceHandle: 7563732692318888728
     ParentHandle: 7563732692318888728
     SubAssetKey: mesh:85_0
+    ImportVersion: 1
+  - Handle: 17515828737333116551
+    Type: Texture2D
+    Path: Editor\Icons\state_play.ktx2
+    SourceRoot: 0
+    LibraryPath: Editor\Icons\state_play.ktx2\state_play.ktx2
+    RootSourceHandle: 17515828737333116551
+    ParentHandle: 0
+    SubAssetKey: ""
     ImportVersion: 1
   - Handle: 17517135568493140696
     Type: Mesh
@@ -31606,6 +34264,15 @@ AssetRegistry:
     ParentHandle: 7563732692318888728
     SubAssetKey: material:116
     ImportVersion: 1
+  - Handle: 17613790687689568596
+    Type: Texture2D
+    Path: Editor\Icons\slot_roughness.ktx2
+    SourceRoot: 0
+    LibraryPath: Editor\Icons\slot_roughness.ktx2\slot_roughness.ktx2
+    RootSourceHandle: 17613790687689568596
+    ParentHandle: 0
+    SubAssetKey: ""
+    ImportVersion: 1
   - Handle: 17617067283694090250
     Type: Material
     Path: Models\torusknot\Materials\Default OBJ.001.kbrmaterial
@@ -31669,6 +34336,15 @@ AssetRegistry:
     ParentHandle: 3520666591821939054
     SubAssetKey: mesh:2_0
     ImportVersion: 1
+  - Handle: 17654548229271958430
+    Type: Texture2D
+    Path: Editor\Icons\scene_manifest.ktx2
+    SourceRoot: 0
+    LibraryPath: Editor\Icons\scene_manifest.ktx2\scene_manifest.ktx2
+    RootSourceHandle: 17654548229271958430
+    ParentHandle: 0
+    SubAssetKey: ""
+    ImportVersion: 1
   - Handle: 17661218481974994647
     Type: Mesh
     Path: Models\plants\Meshes\mesh_6_0_trop_shrub_01.kbrmesh
@@ -31695,6 +34371,15 @@ AssetRegistry:
     RootSourceHandle: 10026642830330170129
     ParentHandle: 10026642830330170129
     SubAssetKey: mesh:66_0
+    ImportVersion: 1
+  - Handle: 17677828085084226605
+    Type: Material
+    Path: Models\rpg-character\E10 attack anims\Materials\Blade highlight.kbrmaterial
+    SourceRoot: 0
+    LibraryPath: Models\rpg-character\E10 attack anims\Materials\Blade highlight.kbrmaterial
+    RootSourceHandle: 4305741975815557537
+    ParentHandle: 4305741975815557537
+    SubAssetKey: material:6
     ImportVersion: 1
   - Handle: 17691606435435993211
     Type: Material
@@ -31869,6 +34554,15 @@ AssetRegistry:
       - 15967789415134879816
       - 16286479860060054715
       - 881513903830402923
+  - Handle: 17775389126569368003
+    Type: Texture2D
+    Path: Editor\Icons\component_socket.png
+    SourceRoot: 0
+    LibraryPath: Editor\Icons\component_socket.png\component_socket.ktx2
+    RootSourceHandle: 17775389126569368003
+    ParentHandle: 0
+    SubAssetKey: ""
+    ImportVersion: 1
   - Handle: 17779262847355913705
     Type: Mesh
     Path: Models\gltf\glTF-Embedded\Buggy\Meshes\mesh_52_0_technic_bump_support_p_SOLIDS_1.kbrmesh
@@ -31887,6 +34581,15 @@ AssetRegistry:
     ParentHandle: 15527510207928805383
     SubAssetKey: mesh:3_0
     ImportVersion: 1
+  - Handle: 17785580586314118954
+    Type: Texture2D
+    Path: Editor\Icons\component_audio_2d.png
+    SourceRoot: 0
+    LibraryPath: Editor\Icons\component_audio_2d.png\component_audio_2d.ktx2
+    RootSourceHandle: 17785580586314118954
+    ParentHandle: 0
+    SubAssetKey: ""
+    ImportVersion: 1
   - Handle: 17785830098075412180
     Type: Mesh
     Path: Models\retroufo\Meshes\mesh_2_0_Mesh_2.kbrmesh
@@ -31904,6 +34607,15 @@ AssetRegistry:
     RootSourceHandle: 7563732692318888728
     ParentHandle: 7563732692318888728
     SubAssetKey: mesh:24_0
+    ImportVersion: 1
+  - Handle: 17798047104554960580
+    Type: Texture2D
+    Path: Editor\Icons\font.png
+    SourceRoot: 0
+    LibraryPath: Editor\Icons\font.png\font.ktx2
+    RootSourceHandle: 17798047104554960580
+    ParentHandle: 0
+    SubAssetKey: ""
     ImportVersion: 1
   - Handle: 17802817333122630903
     Type: SkinnedMesh
@@ -31991,6 +34703,15 @@ AssetRegistry:
     ParentHandle: 7563732692318888728
     SubAssetKey: material:147
     ImportVersion: 1
+  - Handle: 17852373080396144261
+    Type: Texture2D
+    Path: Editor\Icons\component_particles.ktx2
+    SourceRoot: 0
+    LibraryPath: Editor\Icons\component_particles.ktx2\component_particles.ktx2
+    RootSourceHandle: 17852373080396144261
+    ParentHandle: 0
+    SubAssetKey: ""
+    ImportVersion: 1
   - Handle: 17857141204144294150
     Type: Mesh
     Path: Models\retroufo_glow\Meshes\mesh_36_0.kbrmesh
@@ -32071,6 +34792,15 @@ AssetRegistry:
     RootSourceHandle: 2238632335295528690
     ParentHandle: 2238632335295528690
     SubAssetKey: mesh:89_0
+    ImportVersion: 1
+  - Handle: 17885865848452981031
+    Type: Texture2D
+    Path: Editor\Icons\component_skinned_mesh.ktx2
+    SourceRoot: 0
+    LibraryPath: Editor\Icons\component_skinned_mesh.ktx2\component_skinned_mesh.ktx2
+    RootSourceHandle: 17885865848452981031
+    ParentHandle: 0
+    SubAssetKey: ""
     ImportVersion: 1
   - Handle: 17892572518878110509
     Type: Texture2D
@@ -32243,6 +34973,15 @@ AssetRegistry:
     ParentHandle: 2238632335295528690
     SubAssetKey: material:124
     ImportVersion: 1
+  - Handle: 17974290632820925392
+    Type: Texture2D
+    Path: Editor\Icons\component_skeleton.ktx2
+    SourceRoot: 0
+    LibraryPath: Editor\Icons\component_skeleton.ktx2\component_skeleton.ktx2
+    RootSourceHandle: 17974290632820925392
+    ParentHandle: 0
+    SubAssetKey: ""
+    ImportVersion: 1
   - Handle: 17980577717874425935
     Type: Material
     Path: Models\gltf\glTF-Embedded\Buggy\Materials\Material_20_42.kbrmaterial
@@ -32391,6 +35130,15 @@ AssetRegistry:
     ParentHandle: 6090326326702746238
     SubAssetKey: mesh:72_0
     ImportVersion: 1
+  - Handle: 18055606631925482877
+    Type: Material
+    Path: Models\rpg-character\E10 attack anims\Materials\Skin.kbrmaterial
+    SourceRoot: 0
+    LibraryPath: Models\rpg-character\E10 attack anims\Materials\Skin.kbrmaterial
+    RootSourceHandle: 4305741975815557537
+    ParentHandle: 4305741975815557537
+    SubAssetKey: material:0
+    ImportVersion: 1
   - Handle: 18063665634527537509
     Type: Mesh
     Path: Models\treasure_glow\Meshes\mesh_8_1_Cylinder.009.kbrmesh
@@ -32417,6 +35165,15 @@ AssetRegistry:
     RootSourceHandle: 2238632335295528690
     ParentHandle: 2238632335295528690
     SubAssetKey: material:70
+    ImportVersion: 1
+  - Handle: 18079861330739840838
+    Type: Animation
+    Path: Models\rpg-character\E10 attack anims\Animations\Combat_idle.kbranimation
+    SourceRoot: 0
+    LibraryPath: Models\rpg-character\E10 attack anims\Animations\Combat_idle.kbranimation
+    RootSourceHandle: 4305741975815557537
+    ParentHandle: 4305741975815557537
+    SubAssetKey: animation:0
     ImportVersion: 1
   - Handle: 18089760612083291288
     Type: Material
@@ -32540,6 +35297,15 @@ AssetRegistry:
     ParentHandle: 9659550559801413317
     SubAssetKey: mesh:38_0
     ImportVersion: 1
+  - Handle: 18140972681762121663
+    Type: Texture2D
+    Path: Editor\Icons\component_rigidbody.png
+    SourceRoot: 0
+    LibraryPath: Editor\Icons\component_rigidbody.png\component_rigidbody.ktx2
+    RootSourceHandle: 18140972681762121663
+    ParentHandle: 0
+    SubAssetKey: ""
+    ImportVersion: 1
   - Handle: 18144568367400846806
     Type: Mesh
     Path: Models\gltf\glTF-Embedded\Buggy\Meshes\mesh_38_0_body_76.kbrmesh
@@ -32566,6 +35332,15 @@ AssetRegistry:
     RootSourceHandle: 7563732692318888728
     ParentHandle: 7563732692318888728
     SubAssetKey: material:82
+    ImportVersion: 1
+  - Handle: 18149411874969945416
+    Type: Animation
+    Path: Models\rpg-character\E10 attack anims\Animations\Walk.kbranimation
+    SourceRoot: 0
+    LibraryPath: Models\rpg-character\E10 attack anims\Animations\Walk.kbranimation
+    RootSourceHandle: 4305741975815557537
+    ParentHandle: 4305741975815557537
+    SubAssetKey: animation:8
     ImportVersion: 1
   - Handle: 18151804373240704927
     Type: Mesh
@@ -32630,6 +35405,15 @@ AssetRegistry:
     ParentHandle: 7563732692318888728
     SubAssetKey: mesh:52_0
     ImportVersion: 1
+  - Handle: 18198824983814334006
+    Type: Texture2D
+    Path: Editor\Icons\action_undo.ktx2
+    SourceRoot: 0
+    LibraryPath: Editor\Icons\action_undo.ktx2\action_undo.ktx2
+    RootSourceHandle: 18198824983814334006
+    ParentHandle: 0
+    SubAssetKey: ""
+    ImportVersion: 1
   - Handle: 18199518086992031830
     Type: Material
     Path: Models\gltf\glTF-Embedded\Buggy\Materials\Material_26_142.kbrmaterial
@@ -32639,6 +35423,15 @@ AssetRegistry:
     ParentHandle: 2238632335295528690
     SubAssetKey: material:142
     ImportVersion: 1
+  - Handle: 18204064313708894849
+    Type: Texture2D
+    Path: Editor\Icons\component_model.ktx2
+    SourceRoot: 0
+    LibraryPath: Editor\Icons\component_model.ktx2\component_model.ktx2
+    RootSourceHandle: 18204064313708894849
+    ParentHandle: 0
+    SubAssetKey: ""
+    ImportVersion: 1
   - Handle: 18204370178851919445
     Type: Texture2D
     Path: Models\sponza\755318871556304029.ktx2
@@ -32647,6 +35440,15 @@ AssetRegistry:
     RootSourceHandle: 18204370178851919445
     ParentHandle: 0
     SubAssetKey: ""
+    ImportVersion: 1
+  - Handle: 18215699765627995909
+    Type: Mesh
+    Path: Models\rpg-character\E10 attack anims\Meshes\mesh_2_0_Cube.008.kbrmesh
+    SourceRoot: 0
+    LibraryPath: Models\rpg-character\E10 attack anims\Meshes\mesh_2_0_Cube.008.kbrmesh
+    RootSourceHandle: 4305741975815557537
+    ParentHandle: 4305741975815557537
+    SubAssetKey: mesh:2_0
     ImportVersion: 1
   - Handle: 18215846470715262713
     Type: Texture2D
@@ -32692,6 +35494,24 @@ AssetRegistry:
     RootSourceHandle: 11581378365515906497
     ParentHandle: 11581378365515906497
     SubAssetKey: mesh:44_0
+    ImportVersion: 1
+  - Handle: 18228985841952125887
+    Type: Texture2D
+    Path: Editor\Icons\csproj.ktx2
+    SourceRoot: 0
+    LibraryPath: Editor\Icons\csproj.ktx2\csproj.ktx2
+    RootSourceHandle: 18228985841952125887
+    ParentHandle: 0
+    SubAssetKey: ""
+    ImportVersion: 1
+  - Handle: 18239847667882211125
+    Type: Texture2D
+    Path: Editor\Icons\prefab_artifact.png
+    SourceRoot: 0
+    LibraryPath: Editor\Icons\prefab_artifact.png\prefab_artifact.ktx2
+    RootSourceHandle: 18239847667882211125
+    ParentHandle: 0
+    SubAssetKey: ""
     ImportVersion: 1
   - Handle: 18245232241625387382
     Type: Mesh
@@ -32799,6 +35619,15 @@ AssetRegistry:
     RootSourceHandle: 14121002741739587132
     ParentHandle: 14121002741739587132
     SubAssetKey: mesh:8_0
+    ImportVersion: 1
+  - Handle: 18320177998914771449
+    Type: Texture2D
+    Path: Editor\Icons\panel_animation_editor.ktx2
+    SourceRoot: 0
+    LibraryPath: Editor\Icons\panel_animation_editor.ktx2\panel_animation_editor.ktx2
+    RootSourceHandle: 18320177998914771449
+    ParentHandle: 0
+    SubAssetKey: ""
     ImportVersion: 1
   - Handle: 18325670982947397201
     Type: Texture2D
@@ -32922,6 +35751,15 @@ AssetRegistry:
       - 11031869725504210015
       - 9542226848623277704
       - 10296748612005700666
+  - Handle: 18405888691453240071
+    Type: Texture2D
+    Path: Editor\Icons\component_tag.ktx2
+    SourceRoot: 0
+    LibraryPath: Editor\Icons\component_tag.ktx2\component_tag.ktx2
+    RootSourceHandle: 18405888691453240071
+    ParentHandle: 0
+    SubAssetKey: ""
+    ImportVersion: 1
   - Handle: 18407551125778049701
     Type: Mesh
     Path: Models\gltf\glTF-Embedded\Buggy\Meshes\mesh_83_0_body_51.kbrmesh
@@ -32948,6 +35786,33 @@ AssetRegistry:
     RootSourceHandle: 9659550559801413317
     ParentHandle: 9659550559801413317
     SubAssetKey: material:3
+    ImportVersion: 1
+  - Handle: 18422825436107776644
+    Type: Texture2D
+    Path: Editor\Icons\component_environment.ktx2
+    SourceRoot: 0
+    LibraryPath: Editor\Icons\component_environment.ktx2\component_environment.ktx2
+    RootSourceHandle: 18422825436107776644
+    ParentHandle: 0
+    SubAssetKey: ""
+    ImportVersion: 1
+  - Handle: 18422931950070667609
+    Type: Texture2D
+    Path: Editor\Icons\panel_properties.png
+    SourceRoot: 0
+    LibraryPath: Editor\Icons\panel_properties.png\panel_properties.ktx2
+    RootSourceHandle: 18422931950070667609
+    ParentHandle: 0
+    SubAssetKey: ""
+    ImportVersion: 1
+  - Handle: 18426613784127785517
+    Type: Texture2D
+    Path: Editor\Icons\action_remove.ktx2
+    SourceRoot: 0
+    LibraryPath: Editor\Icons\action_remove.ktx2\action_remove.ktx2
+    RootSourceHandle: 18426613784127785517
+    ParentHandle: 0
+    SubAssetKey: ""
     ImportVersion: 1
   - Handle: 18438522205623407034
     Type: Material

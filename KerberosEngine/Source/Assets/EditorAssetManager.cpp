@@ -6,6 +6,8 @@
 #include "Assets/Importers/StandaloneAssetPipelineImporter.hpp"
 #include "Assets/Importers/TexturePipelineImporter.hpp"
 #include "Assets/Importers/MaterialPipelineImporter.hpp"
+#include "Assets/Importers/AIStateTreePipelineImporter.hpp"
+#include "AI/AIStateTreeRegistry.hpp"
 #include "Importers/GLTFPipelineImporter.hpp"
 #include "Assets/Formats/NativeAssetSerializer.hpp"
 #include "Profiling/Profilers.hpp"
@@ -69,7 +71,8 @@ namespace Kerberos
 		{ ".wav", AssetType::Sound }, // TODO: Add more audio file types when supported
 		{ ".kbrmat", AssetType::Material },
 		{ ".kbrprefab", AssetType::Prefab },
-		{ ".kbranim", AssetType::Animation }
+		{ ".kbranim", AssetType::Animation },
+		{ ".kbrai", AssetType::AIStateTree }
 	};
 
 	static std::vector<std::string> SourceAssetExtensions()
@@ -125,6 +128,9 @@ namespace Kerberos
 	{
 		KBR_TRACY_FUNCTION();
 
+		// Asset-origin trees are re-registered when their .kbrai assets load.
+		AI::AIStateTreeRegistry::ClearAssetTrees();
+
 		m_AssetsRoot = std::filesystem::absolute(assetsRoot);
 		m_CacheRoot = cacheRoot.empty() ? m_AssetsRoot / "Cache" : std::filesystem::absolute(cacheRoot);
 		m_EngineCacheRoot = EnginePaths::Assets() / "Cache";
@@ -135,12 +141,13 @@ namespace Kerberos
 		m_ImporterRegistry.Register(CreateRef<GLTFPipelineImporter>());
 		m_ImporterRegistry.Register(CreateRef<TexturePipelineImporter>());
 		m_ImporterRegistry.Register(CreateRef<MaterialPipelineImporter>());
+		m_ImporterRegistry.Register(CreateRef<AIStateTreePipelineImporter>());
 		for (const auto& [extension, type] : sourceAssetExtensionMap)
 		{
 			if (extension == ".gltf" || extension == ".glb")
 				continue;
-
-			if (type == AssetType::Texture2D || type == AssetType::Material)
+            // Skip every type which has it's own importer
+			if (type == AssetType::Texture2D || type == AssetType::Material || type == AssetType::AIStateTree)
 				continue;
 
 			// Register a generic standalone importer for all other asset types

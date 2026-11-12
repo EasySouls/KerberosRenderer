@@ -154,6 +154,37 @@ target_include_directories(ImGuizmo SYSTEM PRIVATE
 
 target_link_libraries(ImGuizmo PUBLIC imgui)
 
+# imgui-node-editor
+add_library(imgui_node_editor STATIC)
+
+target_sources(imgui_node_editor PRIVATE
+    imgui-node-editor/crude_json.cpp
+    imgui-node-editor/crude_json.h
+    imgui-node-editor/imgui_bezier_math.h
+    imgui-node-editor/imgui_bezier_math.inl
+    imgui-node-editor/imgui_canvas.cpp
+    imgui-node-editor/imgui_canvas.h
+    imgui-node-editor/imgui_extra_math.h
+    imgui-node-editor/imgui_extra_math.inl
+    imgui-node-editor/imgui_node_editor.cpp
+    imgui-node-editor/imgui_node_editor.h
+    imgui-node-editor/imgui_node_editor_api.cpp
+    imgui-node-editor/imgui_node_editor_internal.h
+    imgui-node-editor/imgui_node_editor_internal.inl
+)
+
+target_include_directories(imgui_node_editor SYSTEM PUBLIC
+    ${CMAKE_CURRENT_SOURCE_DIR}/imgui-node-editor
+)
+
+target_link_libraries(imgui_node_editor PUBLIC imgui)
+
+if(MSVC)
+    target_compile_options(imgui_node_editor PRIVATE /w)
+else()
+    target_compile_options(imgui_node_editor PRIVATE -w)
+endif()
+
 # Header-only libraries
 
 # glm
@@ -211,7 +242,7 @@ target_link_libraries(dotnet INTERFACE
 )
 
 set_target_properties(
-    glfw imgui yaml-cpp msdf-atlas-gen freetype ktx
+    glfw imgui imgui_node_editor yaml-cpp msdf-atlas-gen freetype ktx
     ImGuizmo assimp Jolt tinygltf stb spdlog glm
     filewatch miniaudio EnTT dotnet
     PROPERTIES FOLDER "KerberosEngine/ThirdParty"

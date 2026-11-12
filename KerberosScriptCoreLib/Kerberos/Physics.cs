@@ -72,7 +72,7 @@ public static class Physics
     /// driven by animation.
     /// </summary>
     public static Entity[] OverlapBox(Entity source, Vector3 localCenter, Vector3 localHalfExtents,
-                                      Entity ignore = null)
+                                      Entity? ignore = null)
     {
         if (source == null)
             return Array.Empty<Entity>();
@@ -115,7 +115,7 @@ public static class Physics
     /// Returns entities overlapping a sphere defined in the source entity's local space.
     /// </summary>
     public static Entity[] OverlapSphere(Entity source, Vector3 localCenter, float radius,
-                                         Entity ignore = null)
+                                         Entity? ignore = null)
     {
         if (source == null)
             return Array.Empty<Entity>();

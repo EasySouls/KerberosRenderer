@@ -512,4 +512,159 @@ namespace Kerberos.Scene
     public class AudioListenerComponent : Component
     {
     }
+
+    // ----------------------------- AI -----------------------------
+
+    public class AIBlackboardComponent : Component
+    {
+        public bool Has(string key) => InternalCalls.AIBlackboard_HasKey(Entity.GetID(), key);
+
+        public void Remove(string key) => InternalCalls.AIBlackboard_RemoveKey(Entity.GetID(), key);
+
+        public void Clear() => InternalCalls.AIBlackboard_Clear(Entity.GetID());
+
+        public bool GetBool(string key) => InternalCalls.AIBlackboard_GetBool(Entity.GetID(), key);
+
+        public void SetBool(string key, bool value) => InternalCalls.AIBlackboard_SetBool(Entity.GetID(), key, value);
+
+        public long GetInt(string key) => InternalCalls.AIBlackboard_GetInt(Entity.GetID(), key);
+
+        public void SetInt(string key, long value) => InternalCalls.AIBlackboard_SetInt(Entity.GetID(), key, value);
+
+        public float GetFloat(string key) => InternalCalls.AIBlackboard_GetFloat(Entity.GetID(), key);
+
+        public void SetFloat(string key, float value) => InternalCalls.AIBlackboard_SetFloat(Entity.GetID(), key, value);
+
+        public Vector3 GetVector3(string key)
+        {
+            InternalCalls.AIBlackboard_GetVec3(Entity.GetID(), key, out Vector3 value);
+            return value;
+        }
+
+        public void SetVector3(string key, Vector3 value)
+            => InternalCalls.AIBlackboard_SetVec3(Entity.GetID(), key, ref value);
+
+        public Entity? GetEntity(string key)
+        {
+            ulong id = InternalCalls.AIBlackboard_GetEntity(Entity.GetID(), key);
+            return id == 0 ? null : new Entity(id);
+        }
+
+        public void SetEntity(string key, Entity? value)
+            => InternalCalls.AIBlackboard_SetEntity(Entity.GetID(), key, value?.GetID() ?? 0);
+
+        public string GetString(string key) => InternalCalls.AIBlackboard_GetString(Entity.GetID(), key);
+
+        public void SetString(string key, string value)
+            => InternalCalls.AIBlackboard_SetString(Entity.GetID(), key, value);
+    }
+
+    public class AIStateMachineComponent : Component
+    {
+        public string TreeName
+        {
+            get => InternalCalls.AIStateMachine_GetTreeName(Entity.GetID());
+            set => InternalCalls.AIStateMachine_SetTreeName(Entity.GetID(), value);
+        }
+
+        public string CurrentState => InternalCalls.AIStateMachine_GetCurrentState(Entity.GetID());
+
+        public string PreviousState => InternalCalls.AIStateMachine_GetPreviousState(Entity.GetID());
+
+        public float TimeInState => InternalCalls.AIStateMachine_GetTimeInState(Entity.GetID());
+
+        public bool RequestState(string stateName)
+            => InternalCalls.AIStateMachine_RequestState(Entity.GetID(), stateName);
+
+        public void ResetRuntime() => InternalCalls.AIStateMachine_ResetRuntime(Entity.GetID());
+    }
+
+    public class AIControllerComponent : Component
+    {
+        public bool Enabled
+        {
+            get => InternalCalls.AIController_GetEnabled(Entity.GetID());
+            set => InternalCalls.AIController_SetEnabled(Entity.GetID(), value);
+        }
+
+        public Vector3 DesiredVelocity
+        {
+            get
+            {
+                InternalCalls.AIController_GetDesiredVelocity(Entity.GetID(), out Vector3 value);
+                return value;
+            }
+            set => InternalCalls.AIController_SetDesiredVelocity(Entity.GetID(), ref value);
+        }
+
+        public Vector3 LookAtTarget
+        {
+            get
+            {
+                InternalCalls.AIController_GetLookAtTarget(Entity.GetID(), out Vector3 value);
+                return value;
+            }
+            set => InternalCalls.AIController_SetLookAtTarget(Entity.GetID(), ref value);
+        }
+
+        public bool WantsToAttack
+        {
+            get => InternalCalls.AIController_GetWantsToAttack(Entity.GetID());
+            set => InternalCalls.AIController_SetWantsToAttack(Entity.GetID(), value);
+        }
+    }
+
+    public class AIPerceptionComponent : Component
+    {
+        public float SightRadius
+        {
+            get => InternalCalls.AIPerception_GetSightRadius(Entity.GetID());
+            set => InternalCalls.AIPerception_SetSightRadius(Entity.GetID(), value);
+        }
+
+        public float LoseRadius
+        {
+            get => InternalCalls.AIPerception_GetLoseRadius(Entity.GetID());
+            set => InternalCalls.AIPerception_SetLoseRadius(Entity.GetID(), value);
+        }
+
+        public float FieldOfViewDegrees
+        {
+            get => InternalCalls.AIPerception_GetFieldOfView(Entity.GetID());
+            set => InternalCalls.AIPerception_SetFieldOfView(Entity.GetID(), value);
+        }
+
+        public float EyeHeight
+        {
+            get => InternalCalls.AIPerception_GetEyeHeight(Entity.GetID());
+            set => InternalCalls.AIPerception_SetEyeHeight(Entity.GetID(), value);
+        }
+
+        public float PerceptionInterval
+        {
+            get => InternalCalls.AIPerception_GetInterval(Entity.GetID());
+            set => InternalCalls.AIPerception_SetInterval(Entity.GetID(), value);
+        }
+
+        public bool RequireLineOfSight
+        {
+            get => InternalCalls.AIPerception_GetRequireLineOfSight(Entity.GetID());
+            set => InternalCalls.AIPerception_SetRequireLineOfSight(Entity.GetID(), value);
+        }
+
+        public int FactionId
+        {
+            get => InternalCalls.AIPerception_GetFactionId(Entity.GetID());
+            set => InternalCalls.AIPerception_SetFactionId(Entity.GetID(), value);
+        }
+    }
+
+    public class AITargetableComponent : Component
+    {
+        public int FactionId
+        {
+            get => InternalCalls.AITargetable_GetFactionId(Entity.GetID());
+            set => InternalCalls.AITargetable_SetFactionId(Entity.GetID(), value);
+        }
+    }
 }

@@ -2,7 +2,11 @@
 #include "Graph.hpp"
 
 #include "Buffer.hpp"
+#include "AIPerceptionDebugHelpers.hpp"
 #include "ColliderDebugHelpers.hpp"
+#include "AI/AIKeys.hpp"
+#include "Scene/Components/AIComponents.hpp"
+#include "Scene/Entity.hpp"
 #include "ComputePipeline.hpp"
 #include "Core/EnginePaths.hpp"
 #include "DescriptorAllocator.hpp"
@@ -29,6 +33,7 @@
 #include "Scene/Components/AnimationComponents.hpp"
 
 #include <glm/gtc/matrix_inverse.hpp>
+#include <glm/gtc/quaternion.hpp>
 
 #include <algorithm>
 #include <cmath>
@@ -529,6 +534,7 @@ struct RendererData
     // Settings
     bool DisplayDebugNormals = false;
     bool DisplayPhysicsColliders = false;
+    bool DisplayAIPerception = false;
 
     bool UseRayQueryBasedShadows = false;
     bool UseRayQueryBasedSoftShadows = false;
@@ -1235,29 +1241,32 @@ void Renderer::RenderTransparent(const vk::raii::CommandBuffer& cmd,
     Log::CoreTrace("Transparent pass done!");
 }
 
-void Renderer::RenderPhysicsColliders(const vk::raii::CommandBuffer& cmd,
-                                      const std::vector<LineVertex>& colliderLineVertices,
-                                      const uint32_t currentImage,
-                                      const vk::Viewport& viewport,
-                                      const vk::Rect2D renderArea)
+void Renderer::RenderDebugLines(const vk::raii::CommandBuffer& cmd,
+                                const std::vector<LineVertex>& debugLineVertices,
+                                const uint32_t currentImage,
+                                const vk::Viewport& viewport,
+                                const vk::Rect2D renderArea)
 {
-    if (!s_Data->DisplayPhysicsColliders || colliderLineVertices.empty())
+    if ((!s_Data->DisplayPhysicsColliders && !s_Data->DisplayAIPerception) ||
+        debugLineVertices.empty())
+    {
         return;
+    }
     
     constexpr uint32_t maxVertexCount = ColliderDebugHelpers::ColliderDebugMaxVertices;
     const uint32_t vertexCount =
-        std::min<uint32_t>(static_cast<uint32_t>(colliderLineVertices.size()), maxVertexCount);
+        std::min<uint32_t>(static_cast<uint32_t>(debugLineVertices.size()), maxVertexCount);
 
     if (vertexCount < 1)
         return;
 
-    if (vertexCount < colliderLineVertices.size()) {
+    if (vertexCount < debugLineVertices.size()) {
         Log::CoreWarn(
-            "Too many collider lines to render! Max: {}, Actual: {}", maxVertexCount, colliderLineVertices.size());
+            "Too many debug lines to render! Max: {}, Actual: {}", maxVertexCount, debugLineVertices.size());
     }
 
     const auto& lineBuffer = s_Data->ColliderLineBuffers[currentImage];
-    std::memcpy(lineBuffer.MappedData, colliderLineVertices.data(), sizeof(LineVertex) * vertexCount);
+    std::memcpy(lineBuffer.MappedData, debugLineVertices.data(), sizeof(LineVertex) * vertexCount);
 
     vk::RenderingAttachmentInfo colorAttachmentInfo{
         .imageView = s_Data->ColorImage.ImageView,
@@ -1423,9 +1432,19 @@ void Renderer::RecordQueuedSceneRender(const vk::raii::CommandBuffer& cmd)
 
     auto [allObjects, uniqueMaterials] =
         GetRenderObjectsAndUniqueMaterialsFromScene(*s_Data->PendingRender.Scene.get(), &frameArena);
-    const auto colliderLineVertices = s_Data->DisplayPhysicsColliders
-                                          ? GetColliderLineVerticesFromScene(*s_Data->PendingRender.Scene.get())
-                                          : std::vector<LineVertex>{};
+    std::vector<LineVertex> debugLineVertices;
+    if (s_Data->DisplayPhysicsColliders)
+    {
+        const std::vector<LineVertex> colliderLines =
+            GetColliderLineVerticesFromScene(*s_Data->PendingRender.Scene.get());
+        debugLineVertices.insert(debugLineVertices.end(), colliderLines.begin(), colliderLines.end());
+    }
+    if (s_Data->DisplayAIPerception)
+    {
+        const std::vector<LineVertex> perceptionLines =
+            GetAIPerceptionLineVerticesFromScene(*s_Data->PendingRender.Scene.get());
+        debugLineVertices.insert(debugLineVertices.end(), perceptionLines.begin(), perceptionLines.end());
+    }
 
     // Update all per-object uniform buffers once
     for (const auto& renderObject : allObjects) {
@@ -1467,7 +1486,7 @@ void Renderer::RecordQueuedSceneRender(const vk::raii::CommandBuffer& cmd)
     renderStatistics = {};
     renderStatistics.RenderObjectCount = static_cast<uint32_t>(renderObjects.size());
     renderStatistics.UniqueMaterialCount = static_cast<uint32_t>(uniqueMaterials.size());
-    renderStatistics.ColliderLineVertexCount = static_cast<uint32_t>(colliderLineVertices.size());
+    renderStatistics.ColliderLineVertexCount = static_cast<uint32_t>(debugLineVertices.size());
 
     for (const auto& renderObject : renderObjects) {
         if (!renderObject.Mesh)
@@ -1530,7 +1549,7 @@ void Renderer::RecordQueuedSceneRender(const vk::raii::CommandBuffer& cmd)
     UpdateParticles(cmd, frameIndex, frameDescriptorAllocator, time, currentProjection);
 
     CompileAndExecuteRenderGraph(
-        cmd, frameIndex, currentImage, allObjects, renderObjects, &frameArena, colliderLineVertices);
+        cmd, frameIndex, currentImage, allObjects, renderObjects, &frameArena, debugLineVertices);
 
     //RenderPrePass(cmd, frameIndex, renderObjects, currentImage);
 
@@ -1611,7 +1630,7 @@ void Renderer::RecordQueuedSceneRender(const vk::raii::CommandBuffer& cmd)
 
     //RenderTransparent(cmd, frameIndex, renderObjects, currentImage, viewport, renderArea);
 
-    //RenderPhysicsColliders(cmd, colliderLineVertices, currentImage, viewport, renderArea);
+    //RenderDebugLines(cmd, debugLineVertices, currentImage, viewport, renderArea);
 
     //// Transition all images needed for the resolve pass to shader read optimal (color, depth, accumulation, revealage,
     //// distortion) and transition resolve image to color attachment optimal
@@ -3799,6 +3818,13 @@ bool& Renderer::GetDisplayPhysicsColliders()
     return s_Data->DisplayPhysicsColliders;
 }
 
+bool& Renderer::GetDisplayAIPerception()
+{
+    KBRAssert(s_Data != nullptr, "Renderer not initialized!");
+
+    return s_Data->DisplayAIPerception;
+}
+
 bool& Renderer::GetDisplaySkybox()
 {
     KBRAssert(s_Data != nullptr, "Renderer not initialized!");
@@ -4519,6 +4545,62 @@ std::pair<std::pmr::vector<RenderObject>, std::pmr::set<Ref<Material>>> Renderer
     return { renderObjects, uniqueMaterials };
 }
 
+std::vector<LineVertex> Renderer::GetAIPerceptionLineVerticesFromScene(const Scene& scene)
+{
+    KBR_TRACY_FUNCTION();
+
+    std::vector<LineVertex> vertices;
+    const auto perceptionView = scene.m_Registry.view<TransformComponent, AIPerceptionComponent>();
+
+    for (const entt::entity handle : perceptionView)
+    {
+        const TransformComponent& transform = perceptionView.get<TransformComponent>(handle);
+        const AIPerceptionComponent& perception =
+            perceptionView.get<AIPerceptionComponent>(handle);
+
+        const glm::vec3 feet = glm::vec3(transform.WorldTransform[3]);
+        const glm::vec3 forward = glm::quat(transform.Rotation) * glm::vec3(0.0f, 0.0f, 1.0f);
+
+        AIPerceptionDebugHelpers::AppendConeLines(vertices, feet, forward,
+            perception.SightRadius, perception.LoseRadius,
+            glm::radians(perception.FieldOfViewDegrees), perception.EyeHeight);
+
+        const AIBlackboardComponent* blackboard = scene.m_Registry.try_get<AIBlackboardComponent>(handle);
+        if (!blackboard)
+            continue;
+
+        const glm::vec3 eye = feet + glm::vec3(0.0f, perception.EyeHeight, 0.0f);
+        const UUID* targetID = blackboard->Get<UUID>(perception.TargetKey);
+
+        if (targetID && targetID->IsValid())
+        {
+            const Entity target = scene.TryGetEntityByUUID(*targetID);
+            if (target && target.HasComponent<TransformComponent>())
+            {
+                const glm::vec3 targetEye =
+                    glm::vec3(target.GetComponent<TransformComponent>().WorldTransform[3]) +
+                    glm::vec3(0.0f, perception.EyeHeight, 0.0f);
+
+                const bool* hasLineOfSight = blackboard->Get<bool>(AI::HasLineOfSight);
+                const bool visible = !hasLineOfSight || *hasLineOfSight;
+
+                ColliderDebugHelpers::AddLine(vertices, eye, targetEye,
+                    visible ? AIPerceptionDebugHelpers::SightColor
+                            : glm::vec3(1.0f, 0.2f, 0.2f));
+            }
+        }
+        else if (const glm::vec3* lastKnown =
+                     blackboard->Get<glm::vec3>(AI::LastKnownPosition))
+        {
+            const glm::vec3 lastEye = *lastKnown + glm::vec3(0.0f, perception.EyeHeight, 0.0f);
+            ColliderDebugHelpers::AddLine(vertices, eye, lastEye,
+                                          AIPerceptionDebugHelpers::LoseColor);
+        }
+    }
+
+    return vertices;
+}
+
 std::vector<LineVertex> Renderer::GetColliderLineVerticesFromScene(const Scene& scene)
 {
     KBR_TRACY_FUNCTION();
@@ -4609,7 +4691,7 @@ void Renderer::CompileAndExecuteRenderGraph(const vk::raii::CommandBuffer& cmd,
                                             const RenderObjectContainer& allObjects,
                                             const RenderObjectContainer& renderObjects,
                                             std::pmr::memory_resource* frameArena,
-                                            const std::vector<LineVertex>& colliderLineVertices)
+                                            const std::vector<LineVertex>& debugLineVertices)
 {
     KBR_TRACY_FUNCTION();
 
@@ -4943,8 +5025,9 @@ void Renderer::CompileAndExecuteRenderGraph(const vk::raii::CommandBuffer& cmd,
                           vk::PipelineStageFlagBits2::eColorAttachmentOutput,
                           vk::AccessFlagBits2::eColorAttachmentWrite);
 
-            // Physics colliders render into the opaque color target from within
-            // this pass, so declare the color write here as well.
+            // Debug line overlays (physics colliders and AI perception) render
+            // into the opaque color target from within this pass, so declare the
+            // color write here as well.
             builder.Write(hColor,
                           vk::ImageLayout::eColorAttachmentOptimal,
                           vk::PipelineStageFlagBits2::eColorAttachmentOutput,
@@ -4956,7 +5039,7 @@ void Renderer::CompileAndExecuteRenderGraph(const vk::raii::CommandBuffer& cmd,
 
             return [=](const vk::raii::CommandBuffer& execCmd) {
                 Renderer::RenderTransparent(execCmd, frameIndex, renderObjects, currentImage, viewport, renderArea);
-                Renderer::RenderPhysicsColliders(execCmd, colliderLineVertices, currentImage, viewport, renderArea);
+                Renderer::RenderDebugLines(execCmd, debugLineVertices, currentImage, viewport, renderArea);
             };
         });
 

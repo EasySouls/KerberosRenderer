@@ -8,6 +8,7 @@
 #include "Core/UUID.hpp"
 #include "Physics/Jolt/JoltPhysicsSystem.hpp"
 #include "Assets/Asset.hpp"
+#include "AI/AISystem.hpp"
 
 #include <entt/single_include/entt/entt.hpp>
 #include <string_view>
@@ -124,6 +125,9 @@ namespace Kerberos
 		RagdollSystem& GetRagdollSystem();
 		const RagdollSystem& GetRagdollSystem() const;
 
+		AISystem& GetAISystem();
+        const AISystem& GetAISystem() const;
+
 		/// Dispatches events collected by the animation runtime. No-op outside Play mode.
 		void DispatchAnimationEvents();
 
@@ -133,6 +137,8 @@ namespace Kerberos
 		/// Creates a deep copy that preserves UUIDs and authored component data
 		/// while resetting transient runtime state.
 		static Ref<Scene> Copy(const Ref<Scene>& other);
+
+		const entt::registry& GetRegistry() const { return m_Registry; }
 
 		static constexpr AssetType Type = AssetType::Scene;
 
@@ -187,6 +193,7 @@ namespace Kerberos
 		JoltPhysicsSystem* m_PhysicsSystem;
         AnimationRuntime m_AnimationRuntime;
 		RagdollSystem m_RagdollSystem;
+        AISystem m_AISystem;
 
 		friend class Entity;
 		friend class Renderer;
@@ -199,5 +206,6 @@ namespace Kerberos
 		friend class ParticleSystem;
         friend class AnimationSystem;
         friend class SkinningSystem;
+        friend class AISystem;
 	};
 }

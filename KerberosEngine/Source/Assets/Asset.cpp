@@ -26,6 +26,8 @@ AssetType AssetTypeFromString(const std::string_view typeStr)
         return AssetType::SkinnedMesh;
     if (typeStr == "Animation" || typeStr == "AnimationClip") // "AnimationClip" is the legacy serialized name
         return AssetType::Animation;
+    if (typeStr == "AIStateTree")
+        return AssetType::AIStateTree;
 
     KBRAssert("Unknown asset type: {0}", typeStr);
     return AssetType::Texture2D;
@@ -54,6 +56,8 @@ std::string_view AssetTypeToString(const AssetType type)
         return "SkinnedMesh";
     case AssetType::Animation:
         return "Animation";
+    case AssetType::AIStateTree:
+        return "AIStateTree";
     default:
         break;
     }
