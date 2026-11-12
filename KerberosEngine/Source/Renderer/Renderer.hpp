@@ -177,7 +177,6 @@ public:
     static bool& GetUseGTAO();
     static bool& GetUseBlurForGTAO();
     static GTAOConstants& GetGTAOConstants();
-    static float& GetGamma();
 
     /// Linear exposure scale computed from EV100 and exposure compensation.
     static float GetExposure();

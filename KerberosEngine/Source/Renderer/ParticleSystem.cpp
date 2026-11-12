@@ -1,4 +1,5 @@
 #include "ParticleSystem.hpp"
+#include "Core/Color.hpp"
 #include "Core/Core.hpp"
 
 #include "DescriptorManager.hpp"
@@ -89,8 +90,9 @@ struct alignas(16) SpawnRequest
         request.maxVelocity = emitter.MaxVelocity;
         request.minAcceleration = emitter.MinAcceleration;
         request.maxAcceleration = emitter.MaxAcceleration;
-        request.startColor = emitter.StartColor;
-        request.endColor = emitter.EndColor;
+        // Particle colors are authored in sRGB
+        request.startColor = Kerberos::SrgbToLinear(emitter.StartColor);
+        request.endColor = Kerberos::SrgbToLinear(emitter.EndColor);
         request.startSize = emitter.StartSize;
         request.endSize = emitter.EndSize;
         request.subUVGrid = emitter.SubUVGrid;

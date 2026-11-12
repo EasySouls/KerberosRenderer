@@ -141,6 +141,12 @@ namespace Kerberos
 		const std::string emissiveTexPath = node["EmissiveTexture"].as<std::string>("");
 		Material material;
 		material.Name = name;
+		// Authored .kbrmat colors come from the editor color picker (sRGB).
+		// Native glTF materials round-trip their linear encoding explicitly.
+		const std::string colorEncoding = node["ColorEncoding"].as<std::string>("sRGB");
+		material.ColorEncoding = colorEncoding == "linear"
+			? ColorEncoding::Linear
+			: ColorEncoding::Srgb;
 		material.EmissiveColor = emissiveColor;
 		material.EmissiveIntensity = emissiveIntensity;
 		material.Params = { 
@@ -156,6 +162,25 @@ namespace Kerberos
 		material.RoughnessTexture = LoadTextureByHandle(roughnessTexPath, absolutePath);
 		material.AOTexture = LoadTextureByHandle(aoTexPath, absolutePath);
 		material.EmissiveTexture = LoadTextureByHandle(emissiveTexPath, absolutePath);
+
+		const auto checkTextureColorSpace = [](const Ref<Texture2D>& texture,
+			const bool expectedSrgb, const char* slot, const std::string& materialName)
+		{
+			if (texture && texture->IsSrgb() != expectedSrgb)
+			{
+				Log::CoreWarn("Material '{}' slot '{}' is {} but should be {}; check the texture's sRGB import option.",
+					materialName, slot, texture->IsSrgb() ? "sRGB" : "linear",
+					expectedSrgb ? "sRGB" : "linear");
+			}
+		};
+
+		checkTextureColorSpace(material.AlbedoTexture, true, "AlbedoTexture", material.Name);
+		checkTextureColorSpace(material.NormalTexture, false, "NormalTexture", material.Name);
+		checkTextureColorSpace(material.MetallicTexture, false, "MetallicTexture", material.Name);
+		checkTextureColorSpace(material.RoughnessTexture, false, "RoughnessTexture", material.Name);
+		checkTextureColorSpace(material.AOTexture, false, "AOTexture", material.Name);
+		checkTextureColorSpace(material.EmissiveTexture, true, "EmissiveTexture", material.Name);
+
 		return CreateRef<Material>(material);
 	}
 
@@ -189,6 +214,8 @@ namespace Kerberos
 		YAML::Emitter out;
 		out << YAML::BeginMap;
 		out << YAML::Key << "Name" << YAML::Value << material.Name;
+		out << YAML::Key << "ColorEncoding" << YAML::Value
+			<< (material.ColorEncoding == ColorEncoding::Linear ? "linear" : "sRGB");
 		out << YAML::Key << "Albedo" << YAML::Value << material.Params.AlbedoFactor;
 		out << YAML::Key << "Roughness" << YAML::Value << material.Params.RoughnessFactor;
 		out << YAML::Key << "Metallic" << YAML::Value << material.Params.MetallicFactor;

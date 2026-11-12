@@ -9,6 +9,7 @@
 #include "Scene/Components/AIComponents.hpp"
 #include "Scene/Entity.hpp"
 #include "ComputePipeline.hpp"
+#include "Core/Color.hpp"
 #include "Core/EnginePaths.hpp"
 #include "DescriptorAllocator.hpp"
 #include "GraphicsPipeline.hpp"
@@ -72,21 +73,11 @@ glm::mat4 GetWorldTransformWithoutScale(const TransformComponent& transform)
     return rotationMatrix;
 }
 
-/// Authored light colors come from ImGui color pickers and are sRGB-encoded.
-glm::vec3 LightColorToLinear(const glm::vec3& srgb)
-{
-    const glm::vec3 clamped = glm::clamp(srgb, glm::vec3(0.0f), glm::vec3(1.0f));
-    return glm::vec3(
-        clamped.r <= 0.04045f ? clamped.r / 12.92f : std::pow((clamped.r + 0.055f) / 1.055f, 2.4f),
-        clamped.g <= 0.04045f ? clamped.g / 12.92f : std::pow((clamped.g + 0.055f) / 1.055f, 2.4f),
-        clamped.b <= 0.04045f ? clamped.b / 12.92f : std::pow((clamped.b + 0.055f) / 1.055f, 2.4f));
-}
-
 float SanitizeNonNegative(const float value, const char* label)
 {
     if (!std::isfinite(value) || value < 0.0f)
     {
-        Log::CoreWarn("Invalid negative or non-finite light value for {} ({}); clamping to 0", label, value);
+        Log::CoreWarn("Invalid negative or non-finite light value for {} ({}), clamping to 0", label, value);
         return 0.0f;
     }
     return value;
@@ -96,10 +87,10 @@ glm::vec3 SanitizeLightColor(const glm::vec3& color, const char* label)
 {
     if (!std::isfinite(color.r) || !std::isfinite(color.g) || !std::isfinite(color.b))
     {
-        Log::CoreWarn("Non-finite light color for {}; using white", label);
+        Log::CoreWarn("Non-finite light color for {}, using white", label);
         return glm::vec3(1.0f);
     }
-    return LightColorToLinear(glm::max(color, glm::vec3(0.0f)));
+    return SrgbToLinear(glm::max(color, glm::vec3(0.0f)));
 }
 
 glm::vec3 NormalizeOr(const glm::vec3& direction, const glm::vec3& fallback)
@@ -244,8 +235,8 @@ struct GlobalLighting
     alignas(16) glm::vec4 sunDirection{ 0.0f, -1.0f, 0.0f, 0.0f };
     /// rgb = linear sun color, w = sun illuminance in lux.
     alignas(16) glm::vec4 sunColor{ 1.0f, 1.0f, 1.0f, 0.0f };
-    /// x = linear exposure scale, y = environment intensity, z = output gamma.
-    alignas(16) glm::vec4 lightingParams{ 1.0f, DefaultEnvironmentIntensity, 2.2f, 0.0f };
+    /// x = linear exposure scale, y = environment intensity, z/w reserved.
+    alignas(16) glm::vec4 lightingParams{ 1.0f, DefaultEnvironmentIntensity, 0.0f, 0.0f };
 };
 
 static_assert(sizeof(GlobalLighting) == 48, "GlobalLighting must match the Slang layout");
@@ -668,7 +659,7 @@ void Renderer::Init()
     s_Data->GlobalLightingData.sunDirection = glm::vec4(0.0f, -1.0f, 0.0f, 0.0f);
     s_Data->GlobalLightingData.sunColor = glm::vec4(1.0f, 1.0f, 1.0f, 0.0f);
     s_Data->GlobalLightingData.lightingParams = glm::vec4(
-        1.0f, DefaultEnvironmentIntensity, 2.2f, 0.0f);
+        1.0f, DefaultEnvironmentIntensity, 0.0f, 0.0f);
 
     s_Data->TextureManager.Initialize();
 
@@ -3950,13 +3941,6 @@ GTAOConstants& Renderer::GetGTAOConstants()
     return s_Data->GTAOData;
 }
 
-float& Renderer::GetGamma()
-{
-    KBRAssert(s_Data != nullptr, "Renderer not initialized!");
-
-    return s_Data->GlobalLightingData.lightingParams.z;
-}
-
 float Renderer::GetExposure()
 {
     KBRAssert(s_Data != nullptr, "Renderer not initialized!");
@@ -4373,11 +4357,6 @@ void Renderer::UpdateLights(const uint32_t currentImage, const std::vector<GPULi
     s_Data->GlobalLightingData.lightingParams.y = std::isfinite(s_Data->Skybox.Intensity)
         ? std::max(s_Data->Skybox.Intensity, 0.0f)
         : DefaultEnvironmentIntensity;
-    if (!std::isfinite(s_Data->GlobalLightingData.lightingParams.z) ||
-        s_Data->GlobalLightingData.lightingParams.z <= 0.0f)
-    {
-        s_Data->GlobalLightingData.lightingParams.z = 2.2f;
-    }
 
     std::memcpy(s_Data->UniformBuffers[currentImage].globalLighting->GetMappedData(),
                 &s_Data->GlobalLightingData,
@@ -4475,6 +4454,13 @@ void Renderer::UpdatePerObjectUniformBuffer(const uint32_t currentImage,
 {
     KBR_TRACY_FUNCTION();
 
+    Material::UniformBlock materialParams = material.Params;
+    if (material.ColorEncoding == ColorEncoding::Srgb)
+    {
+        materialParams.AlbedoFactor = SrgbToLinear(materialParams.AlbedoFactor);
+        materialParams.Emissive = SrgbToLinear(material.EmissiveColor) * material.EmissiveIntensity;
+    }
+
     s_Data->PerObjectData = {
         .model = model,
         .previousModel = [&]() {
@@ -4487,7 +4473,7 @@ void Renderer::UpdatePerObjectUniformBuffer(const uint32_t currentImage,
             return previous;
         }(),
         .worldNormal = glm::inverseTranspose(model),
-        .material = material.Params,
+        .material = materialParams,
         .entityID = entityID
     };
 
@@ -4513,7 +4499,7 @@ std::vector<GPULight> Renderer::GetLightsFromScene(const Scene& scene)
         const glm::vec3 position = tsc.WorldTransform[3];
         if (!std::isfinite(position.x) || !std::isfinite(position.y) || !std::isfinite(position.z))
         {
-            Log::CoreWarn("Point light has a non-finite world position; skipping");
+            Log::CoreWarn("Point light has a non-finite world position, skipping");
             continue;
         }
 

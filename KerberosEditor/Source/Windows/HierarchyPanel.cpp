@@ -25,6 +25,7 @@
 #include "Undo/DuplicateEntityCommand.hpp"
 #include "Undo/InstantiatePrefabCommand.hpp"
 #include "Undo/SetComponentValueCommand.hpp"
+#include "Widgets/ColorWidgets.hpp"
 #include "Widgets/EditorIcons.hpp"
 #include "Undo/UndoRedoManager.hpp"
 #include "Widgets/AssetPicker.hpp"
@@ -1540,7 +1541,7 @@ void HierarchyPanel::DrawComponents(const Entity entity)
 
         if (opened) {
             auto& spriteRenderer = entity.GetComponent<SpriteRendererComponent>();
-            ImGui::ColorEdit4("Color", &spriteRenderer.Color[0]);
+            Editor::ColorWidgets::SrgbColorEdit4("Color", spriteRenderer.Color);
 
             ImGui::TreePop();
         }
@@ -1574,7 +1575,7 @@ void HierarchyPanel::DrawComponents(const Entity entity)
 
         if (opened) {
             auto& directionalLight = entity.GetComponent<DirectionalLightComponent>();
-            ImGui::ColorEdit3("Color", &directionalLight.Light.Color[0]);
+            Editor::ColorWidgets::SrgbColorEdit3("Color", directionalLight.Light.Color);
             if (ImGui::DragFloat("Intensity (lux)", &directionalLight.Light.Intensity, 1000.0f, 0.0f, 1000000.0f)) {
                 directionalLight.NeedsUpdate = true;
             }
@@ -1616,7 +1617,7 @@ void HierarchyPanel::DrawComponents(const Entity entity)
         if (opened) {
             auto& pointLight = entity.GetComponent<PointLightComponent>();
             ImGui::Checkbox("Enabled", &pointLight.IsEnabled);
-            ImGui::ColorEdit3("Color", &pointLight.Light.Color[0]);
+            Editor::ColorWidgets::SrgbColorEdit3("Color", pointLight.Light.Color);
             ImGui::DragFloat("Intensity (cd)", &pointLight.Light.Intensity, 1.0f, 0.0f);
             ImGui::DragFloat("Range", &pointLight.Light.Radius, 1.0f, 0.01f);
 
@@ -1652,7 +1653,7 @@ void HierarchyPanel::DrawComponents(const Entity entity)
 
         if (opened) {
             auto& spotlight = entity.GetComponent<SpotLightComponent>();
-            ImGui::ColorEdit3("Color", &spotlight.Light.Color[0]);
+            Editor::ColorWidgets::SrgbColorEdit3("Color", spotlight.Light.Color);
             ImGui::DragFloat("Intensity (cd)", &spotlight.Light.Intensity, 1.0f, 0.0f, 100000.0f);
             ImGui::DragFloat("Range", &spotlight.Light.Radius, 1.0f, 0.01f);
             ImGui::DragFloat("Inner Cutoff (rad)", &spotlight.Light.CutOffAngleRadians, 0.01f, 0.0f, 3.14159f);
@@ -2212,8 +2213,8 @@ void HierarchyPanel::DrawComponents(const Entity entity)
             ImGui::DragFloat3("Acceleration Range Min", glm::value_ptr(particleEmitter.MinAcceleration), 0.1f);
             ImGui::DragFloat3("Acceleration Range Max", glm::value_ptr(particleEmitter.MaxAcceleration), 0.1f);
 
-            ImGui::ColorEdit4("Start Color", &particleEmitter.StartColor[0]);
-            ImGui::ColorEdit4("End Color", &particleEmitter.EndColor[0]);
+            Editor::ColorWidgets::SrgbColorEdit4("Start Color", particleEmitter.StartColor);
+            Editor::ColorWidgets::SrgbColorEdit4("End Color", particleEmitter.EndColor);
 
             float* sizeRange = &particleEmitter.StartSize;
             ImGui::DragFloat2("Size Range", sizeRange, 0.1f, 0.0f);

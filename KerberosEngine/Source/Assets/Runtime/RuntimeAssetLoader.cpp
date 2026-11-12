@@ -470,6 +470,8 @@ Ref<Material> LoadNativeMaterial(AssetHandle handle, const std::filesystem::path
 	auto material = CreateRef<Material>();
 	material->GetHandle() = handle;
 	material->Name = path.stem().string();
+	// glTF 2.0 baseColorFactor and emissiveFactor are defined in linear space.
+	material->ColorEncoding = ColorEncoding::Linear;
 
 	int baseColorTexture = -1;
 	int normalTexture = -1;

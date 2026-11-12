@@ -72,6 +72,17 @@ float3 ACESFittedTonemap(float3 color, float exposure, float3 white)
     return color_tonemapped / white_tonemapped;
 }
 
+/// Exact sRGB display encoding. The engine does not expose a gamma control:
+/// authored assets are sRGB, rendering is linear, and presentation is sRGB.
+public float3 LinearToSrgb(float3 color)
+{
+    const float3 c = saturate(color);
+    const float3 low = c * 12.92f;
+    const float3 high = 1.055f * pow(max(c, 0.0f), (1.0f / 2.4f).xxx) - 0.055f;
+    return lerp(low, high, step(float3(0.0031308f), c));
+}
+
+// Kept for older/experimental shaders that are not part of the active build.
 public float3 ApplyGammaCorrection(float3 color, float gamma)
 {
     return pow(color, (1.0f / gamma).xxx);

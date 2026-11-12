@@ -4,10 +4,12 @@
 #include "Assets/Asset.hpp"
 #include "Assets/AssetManager.hpp"
 #include "Assets/Importers/MaterialImporter.hpp"
+#include "Core/Color.hpp"
 #include "Profiling/Profilers.hpp"
 #include "Project/Project.hpp"
 #include "Utils/SystemOperations.hpp"
 #include "Widgets/AssetPicker.hpp"
+#include "Widgets/ColorWidgets.hpp"
 #include "Widgets/EditorIcons.hpp"
 
 #include <imgui/imgui.h>
@@ -908,6 +910,34 @@ std::string AssetStatusLabel(const AssetHandle handle,
         EditorIcons::Draw(icon);
         ImGui::SameLine(0.0f, 4.0f);
         AssetPicker::DrawAsset(label, AssetType::Texture2D, texture, "Search textures...");
+
+        const bool dataSlot = name.find("Normal") != std::string_view::npos ||
+                              name.find("Metallic") != std::string_view::npos ||
+                              name.find("Roughness") != std::string_view::npos ||
+                              name.find("AO") != std::string_view::npos;
+        const bool colorSlot = name.find("Albedo") != std::string_view::npos ||
+                               name.find("Emissive") != std::string_view::npos;
+
+        if (texture && dataSlot && texture->IsSrgb())
+        {
+            ImGui::SameLine();
+            ImGui::TextColored(ImVec4(1.0f, 0.7f, 0.2f, 1.0f), "sRGB data");
+            if (ImGui::IsItemHovered())
+            {
+                ImGui::SetTooltip("Normal, metallic, roughness, and AO maps are data, not color.\n"
+                                  "Turn off sRGB in the texture inspector so the shader reads linear values.");
+            }
+        }
+        else if (texture && colorSlot && !texture->IsSrgb())
+        {
+            ImGui::SameLine();
+            ImGui::TextColored(ImVec4(1.0f, 0.7f, 0.2f, 1.0f), "linear color");
+            if (ImGui::IsItemHovered())
+            {
+                ImGui::SetTooltip("Albedo and emissive maps are authored in sRGB.\n"
+                                  "Turn on sRGB in the texture inspector so sampling decodes them to linear.");
+            }
+        }
     }
 
 	std::filesystem::path AssetsPanel::GetRelativePath(const std::filesystem::path& path) const
@@ -942,10 +972,37 @@ std::string AssetStatusLabel(const AssetHandle handle,
                     state.WorkingCopy->Name = nameBuffer;
                 }
 
-                ImGui::ColorEdit4("Albedo", &state.WorkingCopy->Params.AlbedoFactor[0]);
+                const bool linearMaterial =
+                    state.WorkingCopy->ColorEncoding == ColorEncoding::Linear;
+                ImGui::TextDisabled("Color encoding: %s", linearMaterial
+                    ? "Linear (glTF 2.0 factors)"
+                    : "sRGB (authored)");
+
+                const auto editColor4 = [&](const char* label, glm::vec4& value) {
+                    if (!linearMaterial)
+                        return Editor::ColorWidgets::SrgbColorEdit4(label, value);
+
+                    glm::vec4 display = LinearToSrgb(value);
+                    if (!Editor::ColorWidgets::SrgbColorEdit4(label, display))
+                        return false;
+                    value = SrgbToLinear(display);
+                    return true;
+                };
+                const auto editColor3 = [&](const char* label, glm::vec3& value) {
+                    if (!linearMaterial)
+                        return Editor::ColorWidgets::SrgbColorEdit3(label, value);
+
+                    glm::vec3 display = LinearToSrgb(value);
+                    if (!Editor::ColorWidgets::SrgbColorEdit3(label, display))
+                        return false;
+                    value = SrgbToLinear(display);
+                    return true;
+                };
+
+                editColor4("Albedo", state.WorkingCopy->Params.AlbedoFactor);
                 ImGui::DragFloat("Roughness", &state.WorkingCopy->Params.RoughnessFactor, 0.01f, 0.0f, 1.0f);
                 ImGui::DragFloat("Metallic", &state.WorkingCopy->Params.MetallicFactor, 0.01f, 0.0f, 1.0f);
-                ImGui::ColorEdit3("Emissive Color", &state.WorkingCopy->EmissiveColor[0]);
+                editColor3("Emissive Color", state.WorkingCopy->EmissiveColor);
                 ImGui::DragFloat("Emissive Intensity", &state.WorkingCopy->EmissiveIntensity, 1.0f, 0.0f, 1000.0f);
                 state.WorkingCopy->Params.Emissive =
                     state.WorkingCopy->EmissiveColor * state.WorkingCopy->EmissiveIntensity;

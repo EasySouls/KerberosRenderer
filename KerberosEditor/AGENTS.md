@@ -34,7 +34,11 @@ after the current ImGui loop and stack cleanup.
 
 Preserve ImGui Begin/End, popup, ID, style-color, columns/table, and drag/drop
 pairing rules. Give repeated controls stable `##` IDs and avoid duplicate
-labels across windows. Single-type asset fields should use
+labels across windows. Authoring color pickers use
+`Widgets/ColorWidgets` (`SrgbColorEdit3/4`); they display 0..255 via
+`ImGuiColorEditFlags_Uint8` as a UI choice only while storing normalized sRGB
+values. Do not treat picker values as linear; the renderer converts authored
+sRGB at the GPU boundary, while native glTF factors remain linear. Single-type asset fields should use
 `Widgets/AssetPicker` instead of custom button/drop-target pairs; it provides
 the searchable asset list and keeps the matching asset-browser payload as a
 drop target.

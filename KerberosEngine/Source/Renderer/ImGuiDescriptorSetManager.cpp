@@ -29,7 +29,7 @@ namespace Kerberos
 		if (it != m_TextureDescriptorSets.end())
 			return it->second;
 
-		const vk::DescriptorSet descriptorSet = VulkanContext::GenerateImGuiDescriptorSet(texture->GetSampler(), texture->GetImageView());
+		const vk::DescriptorSet descriptorSet = VulkanContext::GenerateImGuiDescriptorSet(texture->GetSampler(), texture->GetImGuiImageView());
 		m_TextureDescriptorSets[texture] = descriptorSet;
 		return descriptorSet;
 	}

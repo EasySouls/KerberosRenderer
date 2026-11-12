@@ -63,11 +63,11 @@ PSOutput fragmentMain(VSOutput input)
     float3 sampleUV = float3(input.UVW.x, -input.UVW.y, input.UVW.z);
     float3 color = samplerEnv.Sample(sampleUV).rgb * globalLighting.lightingParams.y;
 
- //   // Tone mapping
- //   color = Uncharted2Tonemap(color * globalLighting.exposure);
+    //Tone mapping
+    //color = Uncharted2Tonemap(color * globalLighting.exposure);
 	//color = color * (1.0f / Uncharted2Tonemap((11.2f).xxx));
- //   // Gamma correction
- //   color = pow(color, (1.0f / globalLighting.gamma).xxx);
+    
+    // Gamma correction is applied once in tonemapping_resolve.
 
     float bloomMask = 0.0;
 

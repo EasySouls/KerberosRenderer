@@ -48,8 +48,7 @@ float4 fragmentMain(VSOutput input) : SV_Target
     float3 finalHDR = sceneColor + (bloomColor * pc.bloomIntensity);
 
     float3 ldrColor = saturate(ApplyToneMapping(finalHDR, 1.0f, pc.tonemapOperator));
-
-    ldrColor = ApplyGammaCorrection(ldrColor, globalLighting.lightingParams.z);
+    ldrColor = LinearToSrgb(ldrColor);
 
     return float4(ldrColor, 1.0);
 }

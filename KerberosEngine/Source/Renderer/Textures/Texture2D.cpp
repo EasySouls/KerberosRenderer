@@ -10,6 +10,24 @@
 
 import Kerberos;
 
+namespace
+{
+	vk::Format GetImGuiDisplayFormat(const vk::Format format)
+	{
+		switch (format)
+		{
+			case vk::Format::eR8G8B8A8Srgb: return vk::Format::eR8G8B8A8Unorm;
+			case vk::Format::eB8G8R8A8Srgb: return vk::Format::eB8G8R8A8Unorm;
+			case vk::Format::eR8G8B8Srgb: return vk::Format::eR8G8B8Unorm;
+			case vk::Format::eA8B8G8R8SrgbPack32: return vk::Format::eA8B8G8R8UnormPack32;
+			case vk::Format::eBc1RgbaSrgbBlock: return vk::Format::eBc1RgbaUnormBlock;
+			case vk::Format::eBc3SrgbBlock: return vk::Format::eBc3UnormBlock;
+			case vk::Format::eBc7SrgbBlock: return vk::Format::eBc7UnormBlock;
+			default: return format;
+		}
+	}
+}
+
 namespace Kerberos {
 
 Texture2D::Texture2D(const TextureSpecification& spec, const Buffer& buffer)
@@ -84,6 +102,7 @@ Texture2D::Texture2D(const TextureSpecification& spec, const Buffer& buffer)
 
 	// Create optimal tiled target image
 	vk::ImageCreateInfo imageCreateInfo{
+		.flags = vk::ImageCreateFlagBits::eMutableFormat,
 		.imageType = vk::ImageType::e2D,
 		.format = format,
 		.extent = {.width = width, .height = height, .depth = 1 },
@@ -150,6 +169,7 @@ Texture2D::Texture2D(const TextureSpecification& spec, const Buffer& buffer)
 		.subresourceRange = {.aspectMask = vk::ImageAspectFlagBits::eColor, .baseMipLevel = 0, .levelCount = mipLevels, .baseArrayLayer = 0, .layerCount = 1 },
 	};
 	view = device.createImageView(viewCreateInfo);
+	CreateImGuiDisplayView(device, format);
 
 	// Update descriptor image info member that can be used for setting up descriptor sets
 	UpdateDescriptor();
@@ -242,6 +262,7 @@ Texture2D::Texture2D(const std::filesystem::path& filepath)
 
 	// Create optimal tiled target image
 	vk::ImageCreateInfo imageCreateInfo{
+		.flags = vk::ImageCreateFlagBits::eMutableFormat,
 		.imageType = vk::ImageType::e2D,
 		.format = format,
 		.extent = {.width = width, .height = height, .depth = 1 },
@@ -314,12 +335,46 @@ Texture2D::Texture2D(const std::filesystem::path& filepath)
 		.subresourceRange = {.aspectMask = vk::ImageAspectFlagBits::eColor, .baseMipLevel = 0, .levelCount = mipLevels, .baseArrayLayer = 0, .layerCount = 1 },
 	};
 	view = device.createImageView(viewCreateInfo);
+	CreateImGuiDisplayView(device, format);
 
 	// Update descriptor image info member that can be used for setting up descriptor sets
 	UpdateDescriptor();
 
 	const std::string debugName = filepath.stem().string();
 	SetDebugName(debugName);
+}
+
+void Texture2D::CreateImGuiDisplayView(const vk::raii::Device& device, const vk::Format imageFormat)
+{
+	const vk::Format displayFormat = GetImGuiDisplayFormat(imageFormat);
+	if (displayFormat == imageFormat)
+		return;
+
+	const vk::ImageViewCreateInfo viewCreateInfo{
+		.image = image,
+		.viewType = vk::ImageViewType::e2D,
+		.format = displayFormat,
+		.subresourceRange = {
+			.aspectMask = vk::ImageAspectFlagBits::eColor,
+			.baseMipLevel = 0,
+			.levelCount = mipLevels,
+			.baseArrayLayer = 0,
+			.layerCount = 1
+		}
+	};
+
+	m_ImGuiImageView = device.createImageView(viewCreateInfo);
+	m_HasImGuiImageView = true;
+}
+
+const vk::raii::ImageView& Texture2D::GetImGuiImageView() const
+{
+	return m_HasImGuiImageView ? m_ImGuiImageView : view;
+}
+
+bool Texture2D::IsSrgb() const
+{
+	return GetImGuiDisplayFormat(format) != format;
 }
 
 Texture2D::~Texture2D() 

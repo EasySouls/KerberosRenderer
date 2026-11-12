@@ -240,7 +240,7 @@ float4 fragmentMain(VSOutput input)
     color = Uncharted2Tonemap(color * globalLighting.lightingParams.x);
     color = color * (1.0f / Uncharted2Tonemap((11.2f).xxx));
     // Gamma correction
-    color = pow(color, (1.0f / globalLighting.lightingParams.z).xxx);
+    color = pow(color, (1.0f / 2.2f).xxx);
 
     return float4(color, 1.0);
 }

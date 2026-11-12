@@ -170,8 +170,9 @@ without first proving it is still used.
 `GlobalLighting` is three `float4`s, mirrored by the Slang `GlobalLighting`
 struct: `sunDirection` (xyz direction, w = sun enabled), `sunColor` (rgb linear
 color, w = sun illuminance in lux), and `lightingParams` (x = linear exposure
-scale, y = environment intensity, z = output gamma). Keep the C++ static
-asserts and the Slang layout in sync.
+scale, y = environment intensity, z/w reserved). Keep the C++ static
+asserts and the Slang layout in sync. Output transfer is fixed to exact sRGB;
+there is no runtime gamma control.
 
 Lighting uses physical units. `DirectionalLight::Intensity` is lux and
 `PointLight`/`SpotLight::Intensity` is candela, attenuated by inverse square
@@ -228,15 +229,28 @@ objects. Texture slots are packed with sampler selection and exhaustion is an
 explicit error. `Material::ResolveIndices` converts material texture handles
 to global texture indices.
 
+**Authored colors are sRGB.** Editor material/light/particle colors are stored
+as normalized sRGB factors and converted to linear at the GPU upload boundary
+(`Core/Color.hpp`). `Material::ColorEncoding` distinguishes authored `.kbrmat`
+materials (`Srgb`) from native glTF factors and built-in physical metals
+(`Linear`); `UpdatePerObjectUniformBuffer` converts only the former. glTF
+`baseColorFactor`/`emissiveFactor` remain linear per the glTF 2.0 spec. Lights,
+sun colors, and particle spawn colors are likewise authored sRGB and converted
+before reaching shaders. Editor `ColorEdit` widgets use
+`ImGuiColorEditFlags_Uint8` as a display choice only.
+
 sRGB textures rely on hardware decode: color textures are stored with `*Srgb`
 formats so sampling returns linear values, and the image view must carry the
-same sRGB format as the image (`KTX2FormatSelector::Select`/`ToSrgb`). The
+same sRGB format as the image (`KTX2FormatSelector::Select`/`ToSrgb`). For ImGui
+previews/icons, `Texture2D::GetImGuiImageView` supplies a non-sRGB view of the
+same image (the image is created with `MUTABLE_FORMAT`), because ImGui renders
+into a UNORM swapchain and would otherwise decode texels a second time. The
 output chain stays linear HDR until `tonemapping_resolve` applies exposure,
-ACES Fitted (default), clamping, and manual sRGB gamma into the display-referred
-`FinalImage`; that image is sampled by ImGui and presented through a UNORM
-swapchain, so there is exactly one decode and one encode. Do not switch the
-swapchain to sRGB without removing that shader gamma. sRGB images must remain
-sampled-only (no storage usage).
+ACES Fitted (default), clamping, and the exact sRGB encode into the
+display-referred `FinalImage`; that image is sampled by ImGui and presented
+through a UNORM swapchain, so there is exactly one decode and one encode. Do
+not switch the swapchain to sRGB without removing that shader encode. sRGB
+images must remain sampled-only (no storage usage).
 
 Bloom extraction runs in exposed units with a luminance-based prefilter and a
 default intensity of 0.05; keep the threshold/knee/max brightness in exposed

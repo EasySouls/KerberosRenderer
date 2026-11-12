@@ -13,6 +13,14 @@
 
 namespace Kerberos  {
 
+/// Encoding of the authored color factors stored on a Material. 
+/// The renderer converts sRGB-authored factors to linear in the per-object uniform buffer.
+enum class ColorEncoding : std::uint8_t
+{
+	Srgb,
+	Linear
+};
+
 struct Material : public Asset
 {
 	// Parameter block used as uniform buffer block
@@ -35,6 +43,8 @@ struct Material : public Asset
 
 	glm::vec3 EmissiveColor{ 0.0f };
 	float EmissiveIntensity{ 0.0f };
+    
+	ColorEncoding ColorEncoding = ColorEncoding::Srgb;
 
 	Ref<Texture2D> AlbedoTexture = nullptr;
 	Ref<Texture2D> NormalTexture = nullptr;

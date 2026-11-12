@@ -1480,8 +1480,7 @@ namespace PROJECT_NAME
 			ImGui::SetTooltip("15 = sunny 16, 8 = typical indoor, 6 = dim/night scene");
 		ImGui::DragFloat("Exposure Compensation", &Renderer::GetExposureCompensation(), 0.1f, -10.0f, 10.0f);
 		ImGui::Text("Exposure scale: %.6g", Renderer::GetExposure());
-		float &gamma = Renderer::GetGamma();
-		ImGui::DragFloat("Gamma", &gamma, 0.1f, 0.1f, 10.0f);
+		ImGui::TextDisabled("Output transfer: exact sRGB (not adjustable)");
 		// ImGui::DragFloat3("Ambient Light Color", glm::value_ptr(m_SceneUniformData.ambientLightColor), 0.01f, 0.0f, 1.0f);
 
 		ImGui::Separator();

@@ -144,6 +144,14 @@ the `TextureSrgb["source"]` value from their source `.meta` (default sRGB)
 because raster formats cannot reliably describe their color space; KTX/KTX2
 sources self-describe via their embedded format. Cubemap faces are loaded
 linear and `CubemapData::IsSRGB` selects the sRGB image format in `TextureCube`.
+Authored `.kbrmat` materials warn when a normal/metallic/roughness/AO slot is
+sRGB or an albedo/emissive slot is linear; fix the texture's sRGB import option
+in the texture inspector rather than changing shader math.
+
+glTF material color factors are linear by specification and are loaded with
+`Material::ColorEncoding::Linear`; authored `.kbrmat` factors are sRGB and are
+converted by the renderer. Do not apply an sRGB-to-linear conversion to glTF
+`baseColorFactor` or `emissiveFactor` again.
 
 All artifacts produced by a glTF import are written under a per-source cache
 namespace derived from the source path relative to the assets root (extension
