@@ -11,10 +11,11 @@
 #include "Windows/InspectorPanel.hpp"
 #include "Undo/UndoRedoManager.hpp"
 
-#include "Renderer/Textures/Texture2D.hpp"
 #include "Buffer.hpp"
 #include "Core/Core.hpp"
+#include "Core/UUID.hpp"
 #include "Scene/Camera/Camera.hpp"
+#include "Scene/Components.hpp"
 #include "Events/MouseButtonPressedEvent.hpp"
 #include "Events/WindowDropEvent.hpp"
 
@@ -81,6 +82,13 @@ namespace Kerberos
 		bool OnKeyPressed(const KeyPressedEvent& event);
 		bool OnMouseButtonPressed(const MouseButtonPressedEvent& event);
 		bool OnWindowDrop(const WindowDropEvent& event);
+	    
+	    /// Captures the transform of the gizmo entity before a manipulation starts,
+	    /// so the whole drag is recorded as one undo command.
+	    void BeginGizmoEdit(const Entity& entity);
+
+	    /// Records the finished gizmo drag, if it actually changed the transform.
+	    void CommitGizmoEdit();
 
 		void Undo();
 		void Redo();
@@ -148,6 +156,16 @@ namespace Kerberos
 			Scale = 120
 		};
 		GizmoType m_GizmoType = GizmoType::None;
+
+		/// Pre-drag transform of the entity being manipulated by the gizmo. Active
+		/// spans the whole gesture so it becomes a single undo command.
+		struct GizmoEditSnapshot
+		{
+			UUID EntityID = UUID::Invalid();
+			TransformComponent Before;
+			bool Active = false;
+		};
+		GizmoEditSnapshot m_GizmoEdit;
 
 		bool m_IsFullScreenPersistent = true;
 

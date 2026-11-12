@@ -15,8 +15,10 @@
 #include "Renderer/Upscaling/UpscalerTypes.hpp"
 #include "Scripting/ScriptEngine.hpp"
 #include "Undo/InstantiatePrefabCommand.hpp"
+#include "Undo/SetComponentValueCommand.hpp"
 #include "Widgets/EditorIcons.hpp"
 
+#include <glm/gtc/epsilon.hpp>
 #include <glm/gtc/matrix_inverse.hpp>
 #include <glm/gtc/type_ptr.hpp>
 #include <imgui/imgui.h>
@@ -956,6 +958,11 @@ namespace PROJECT_NAME
 
 			const float snapValues[3] = {snap ? snapValue : 0.0f, snap ? snapValue : 0.0f, snap ? snapValue : 0.0f};
 
+			/// The first Manipulate of a drag writes into the transform, so the
+			/// pre-drag value has to be captured before it runs.
+			if (!m_GizmoEdit.Active)
+				BeginGizmoEdit(selectedEntity);
+
 			ImGuizmo::Manipulate(glm::value_ptr(cameraView), glm::value_ptr(cameraProjection),
 													 static_cast<ImGuizmo::OPERATION>(m_GizmoType), ImGuizmo::WORLD, glm::value_ptr(transform), nullptr, snapValues);
 
@@ -979,9 +986,80 @@ namespace PROJECT_NAME
 
 				CalculateEntityTransform(selectedEntity);
 			}
+			else
+			{
+				CommitGizmoEdit();
+			}
+		}
+		else
+		{
+			/// The gizmo stopped being drawn mid-gesture (selection/gizmo/mode change)
+			CommitGizmoEdit();
 		}
 
 		ImGui::End();
+	}
+
+	void EditorLayer::BeginGizmoEdit(const Entity& entity)
+	{
+		/// Runtime edits target the scene copy, which is discarded when Play or
+		/// Simulate stops, so only edit-mode drags are recorded.
+		if (m_SceneState != SceneState::Edit || !entity || !entity.HasComponent<TransformComponent>())
+			return;
+
+		m_GizmoEdit.EntityID = entity.GetUUID();
+		m_GizmoEdit.Before = entity.GetComponent<TransformComponent>();
+		m_GizmoEdit.Active = true;
+	}
+
+	void EditorLayer::CommitGizmoEdit()
+	{
+		if (!m_GizmoEdit.Active)
+			return;
+
+		const UUID entityID = m_GizmoEdit.EntityID;
+		const TransformComponent before = m_GizmoEdit.Before;
+		m_GizmoEdit = {};
+
+		if (!m_ActiveScene)
+			return;
+
+		const Entity entity = m_ActiveScene->TryGetEntityByUUID(entityID);
+		if (!entity || !entity.HasComponent<TransformComponent>())
+			return;
+
+		const TransformComponent& after = entity.GetComponent<TransformComponent>();
+
+		/// A click that only grabs a handle can round-trip through the matrix
+		/// decomposition, so ignore changes below a visible threshold.
+		constexpr float epsilon = 1.0e-5f;
+		if (glm::all(glm::epsilonEqual(before.Translation, after.Translation, epsilon)) &&
+			glm::all(glm::epsilonEqual(before.Rotation, after.Rotation, epsilon)) &&
+			glm::all(glm::epsilonEqual(before.Scale, after.Scale, epsilon)))
+			return;
+
+		std::string commandName = "Gizmo Transform";
+		switch (m_GizmoType)
+		{
+		case GizmoType::Translate:
+			commandName = "Gizmo Translate";
+			break;
+		case GizmoType::Rotate:
+			commandName = "Gizmo Rotate";
+			break;
+		case GizmoType::Scale:
+			commandName = "Gizmo Scale";
+			break;
+		default:
+			break;
+		}
+
+		m_UndoRedo.Record(std::make_unique<SetComponentValueCommand<TransformComponent>>(
+			m_ActiveScene, entityID, before, after, std::move(commandName),
+			[scene = m_ActiveScene](const Entity target) {
+				if (scene)
+					scene->CalculateEntityTransform(target);
+			}));
 	}
 
 	void EditorLayer::DrawUIToolbar()

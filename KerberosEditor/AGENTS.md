@@ -250,6 +250,16 @@ widget already changed the component is safe. Transform commands also
 recalculate entity transforms after applying, and vector-field snapshots are
 keyed by widget ID plus entity UUID so a selection change cannot mix them up.
 
+Gizmo drags in `EditorLayer::DrawViewport` use the same command type.
+`EditorLayer` snapshots the selected entity's authored `TransformComponent`
+before the first `ImGuizmo::Manipulate` call that reports `IsUsing()`, and when
+the gesture ends it records a single `SetComponentValueCommand<TransformComponent>`
+(with a `CalculateEntityTransform` callback) if the decomposed TRS visibly
+changed. Gizmo edits are only recorded in `SceneState::Edit`; Simulate/Play
+manipulate the runtime copy, which is discarded on stop. A pending gesture is
+also committed if the gizmo stops being drawn (selection, gizmo type, or mode
+change).
+
 `SceneSerializer` exposes `SerializeEntitySubtree`/`DeserializeEntitySubtree`
 and shares per-entity deserialization with whole-scene loading. The whole-scene
 path still loads every entity in the file, while the subtree path restores only
