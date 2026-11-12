@@ -374,7 +374,6 @@ private:
     static void SetupBloomDescriptors();
     static void CreateBloomResources(uint32_t width, uint32_t height);
 
-    static void CreateTonemappedImage(uint32_t width, uint32_t height);
     static void SetupTonemappingResolveDescriptors();
     static void CreateOutputImage(uint32_t width, uint32_t height);
     static void CreateFinalImage(uint32_t width, uint32_t height);

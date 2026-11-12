@@ -1581,7 +1581,7 @@ namespace PROJECT_NAME
 		}
 
 		AntiAliasingMode &aaMode = Renderer::GetAntiAliasingMode();
-		const char *aaModeItems[] = {"None", "FXAA", "SMAA", "TAA"};
+		const char *aaModeItems[] = {"None", "FXAA", "SMAA"};
 		if (ImGui::Combo("Anti-aliasing mode", reinterpret_cast<int *>(&aaMode), aaModeItems, IM_ARRAYSIZE(aaModeItems)))
 		{
 			Renderer::GetAntiAliasingMode() = static_cast<AntiAliasingMode>(aaMode);

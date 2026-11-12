@@ -4,7 +4,11 @@
 #define SMAA_INCLUDE_VS 1
 #define SMAA_INCLUDE_PS 1
 
-struct PushConstants { float4 rtMetrics; };
+struct PushConstants 
+{ 
+    float4 rtMetrics;
+    float exposureScale; 
+};
 [[vk::push_constant]] PushConstants pc;
 #define SMAA_RT_METRICS pc.rtMetrics
 

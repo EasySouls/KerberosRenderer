@@ -231,10 +231,23 @@ to global texture indices.
 sRGB textures rely on hardware decode: color textures are stored with `*Srgb`
 formats so sampling returns linear values, and the image view must carry the
 same sRGB format as the image (`KTX2FormatSelector::Select`/`ToSrgb`). The
-output chain stays linear HDR until `tonemapping_resolve` applies manual gamma
-into a UNORM swapchain, so there is exactly one decode and one encode; do not
-switch the swapchain to sRGB without removing that shader gamma. sRGB images
-must remain sampled-only (no storage usage).
+output chain stays linear HDR until `tonemapping_resolve` applies exposure,
+ACES Fitted (default), clamping, and manual sRGB gamma into the display-referred
+`FinalImage`; that image is sampled by ImGui and presented through a UNORM
+swapchain, so there is exactly one decode and one encode. Do not switch the
+swapchain to sRGB without removing that shader gamma. sRGB images must remain
+sampled-only (no storage usage).
+
+Bloom extraction runs in exposed units with a luminance-based prefilter and a
+default intensity of 0.05; keep the threshold/knee/max brightness in exposed
+units when changing the tone-mapping exposure. `ColorImage.a` is still the bloom
+mask (opaque geometry = 1, sky/particles = 0) rather than material opacity; a
+dedicated mask attachment is future work. FXAA derives tone-compressed luma
+itself. SMAA edge detection receives the scene exposure through its push
+constants and tone-compresses edge samples; its neighborhood blend remains in
+linear HDR. TAA is intentionally absent from the UI until implemented. The
+`TonemappedImage` intermediate was removed; `FinalImage` is display-referred,
+not linear HDR.
 
 `Texture2D`/`TextureCube` file-loading constructors accept only `.ktx2`.
 KTX1 and raster conversion is the asset pipeline's responsibility (see

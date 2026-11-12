@@ -6,9 +6,14 @@
 
 struct PushConstants {
     float4 rtMetrics; // (1/w, 1/h, w, h)
+    float exposureScale;
 };
 [[vk::push_constant]] PushConstants pc;
 #define SMAA_RT_METRICS pc.rtMetrics
+
+// The scene color entering this pass is raw physical HDR. Move it into an
+// exposed, display-referred range before SMAA applies its 0..1 thresholds.
+#define SMAA_COLOR_TRANSFORM(c) (((c) * pc.exposureScale) / (1.0 + (c) * pc.exposureScale))
 
 #include "SMAA.hlsl"
 

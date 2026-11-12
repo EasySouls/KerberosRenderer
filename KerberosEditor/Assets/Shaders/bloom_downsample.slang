@@ -21,7 +21,9 @@ cbuffer PushConstants
 
 float ComputePrefilter(float3 color, float bloomThreshold, float bloomKnee)
 {
-    float brightness = max(color.r, max(color.g, color.b));
+    // Luminance matches perceived brightness better than the brightest
+    // channel, especially for saturated lights.
+    float brightness = dot(color, float3(0.2126, 0.7152, 0.0722));
     float safeBrightness = max(brightness, 1e-5);
 
     float safeKnee = max(bloomKnee, 1e-5);

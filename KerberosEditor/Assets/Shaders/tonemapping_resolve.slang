@@ -14,7 +14,6 @@ struct PushConstants {
     float2 inverseScreenSize;
     float bloomIntensity;
     float tonemapOperator;
-    bool needsLuma;
 };
 [[vk::push_constant]] 
 PushConstants pc;
@@ -35,12 +34,6 @@ VSOutput vertexMain(uint vertexID : SV_VertexID)
     return output;
 }
 
-// Calculate perceptual luma from LDR color
-float CalculateLuma(float3 ldrColor)
-{
-    return dot(ldrColor, float3(0.299, 0.587, 0.114));
-}
-
 [shader("fragment")]
 float4 fragmentMain(VSOutput input) : SV_Target
 {
@@ -54,16 +47,9 @@ float4 fragmentMain(VSOutput input) : SV_Target
 
     float3 finalHDR = sceneColor + (bloomColor * pc.bloomIntensity);
 
-    float3 ldrColor = ApplyToneMapping(finalHDR, 1.0f, pc.tonemapOperator);
-    
+    float3 ldrColor = saturate(ApplyToneMapping(finalHDR, 1.0f, pc.tonemapOperator));
+
     ldrColor = ApplyGammaCorrection(ldrColor, globalLighting.lightingParams.z);
 
-    // Calculate luma if needed for FXAA/spatial AA
-    float alpha = 1.0;
-    if (pc.needsLuma)
-    {
-        alpha = CalculateLuma(ldrColor);
-    }
-    
-    return float4(ldrColor, alpha);
+    return float4(ldrColor, 1.0);
 }

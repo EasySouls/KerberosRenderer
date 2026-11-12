@@ -298,7 +298,6 @@ struct TonemappingResolvePushConstants
     glm::vec2 inverseScreenSize{ 0.0f, 0.0f };
     float bloomIntensity = 0.05f;
     float tonemapOperator = 0.0f; // 0 = Uncharted, 1 = Reinhard, 2 = ACES Filmic, 3 = ACES Fitted
-    uint32_t needsLuma = 1u;      // 1 if using FXAA/spatial AA, 0 otherwise
 };
 
 struct FXAAPushConstants
@@ -344,6 +343,9 @@ struct SMAAData
     {
         glm::vec2 InverseViewportSize{ 0.0f, 0.0f };
         glm::vec2 ViewportSize{ 0.0f, 0.0f };
+        /// Used by the edge-detection pass to move HDR color into an exposed,
+        /// tone-compressed space before applying SMAA's display-referred thresholds.
+        float ExposureScale = 1.0f;
     };
 };
 
@@ -361,7 +363,7 @@ struct BloomData
     uint32_t MipLevels = DefaultMipLevels;
 
     float FilterRadius = 1.0f;
-    float Intensity = 1.0f;
+    float Intensity = 0.05f;
     BloomMode Mode = BloomMode::BrightPassPrefilter;
     float Threshold = 1.0f;
     float Knee = 0.1f;
@@ -500,7 +502,6 @@ struct RendererData
     ImageData NormalImage;
     ImageData ResolveImage;
     ImageData BloomMaskImage;
-    ImageData TonemappedImage;
     ImageData CompositeImage;
     ImageData FinalImage;
     ImageData PickingImage;
@@ -630,7 +631,7 @@ struct RendererData
     uint32_t CulledObjectCount = 0;
 
     AntiAliasingMode AntiAliasingMode = AntiAliasingMode::SMAA;
-    TonemappingOperator TonemappingOperator = TonemappingOperator::ACES;
+    TonemappingOperator TonemappingOperator = TonemappingOperator::ACESFitted;
 };
 
 } // namespace
@@ -2915,12 +2916,6 @@ void Renderer::CreateResources()
         s_Data->TonemappingResolvePipelineLayout = vk::raii::PipelineLayout{ device, tonemappingPipelineLayoutInfo };
         context.SetObjectDebugName(s_Data->TonemappingResolvePipelineLayout, "Tonemapping Resolve Pipeline Layout");
 
-        s_Data->TonemappedImage.Format = s_Data->ResolveImage.Format;
-
-        const uint32_t initialImageWidth = static_cast<uint32_t>(s_Data->RenderSize.x);
-        const uint32_t initialImageHeight = static_cast<uint32_t>(s_Data->RenderSize.y);
-
-        CreateTonemappedImage(initialImageWidth, initialImageHeight);
         Ref<Shader> tonemappingShader = CreateRef<Shader>("tonemapping_resolve", "Tonemapping Resolve");
 
         GraphicsPipelineSpecification tonemappingPipelineSpec{};
@@ -2936,7 +2931,7 @@ void Renderer::CreateResources()
         tonemappingPipelineSpec.EnableDepthTest = false;
         tonemappingPipelineSpec.EnableDepthWrite = false;
         tonemappingPipelineSpec.BlendModes = { BlendMode::None };
-        tonemappingPipelineSpec.ColorAttachmentFormats = { s_Data->TonemappedImage.Format };
+        tonemappingPipelineSpec.ColorAttachmentFormats = { s_Data->ResolveImage.Format };
         tonemappingPipelineSpec.DepthAttachmentFormat = std::nullopt;
         tonemappingPipelineSpec.DynamicStates = commonDynamicStates;
 
@@ -3316,7 +3311,6 @@ void Renderer::ResizeResources(const uint32_t width, const uint32_t height)
     s_Data->ResolveImage.Clear();
     s_Data->ReactiveImage.Clear();
     s_Data->BloomMaskImage.Clear();
-    s_Data->TonemappedImage.Clear();
     s_Data->CompositeImage.Clear();
     s_Data->FinalImage.Clear();
     s_Data->OutputImage.Clear();
@@ -3328,8 +3322,6 @@ void Renderer::ResizeResources(const uint32_t width, const uint32_t height)
     s_Data->SMAAResources.BlendImage.Clear();
 
     // Recreate resources with new size
-
-    CreateTonemappedImage(renderWidth, renderHeight);
 
     CreateReactiveImage(renderWidth, renderHeight);
     CreateFXAAImage(renderWidth, renderHeight);
@@ -3724,22 +3716,6 @@ void Renderer::ResizeResources(const uint32_t width, const uint32_t height)
                                   .baseArrayLayer = 0,
                                   .layerCount = 1 }
         };
-        const vk::ImageMemoryBarrier2 tonemappedImageBarrier = {
-            .srcStageMask = vk::PipelineStageFlagBits2::eTopOfPipe,
-            .srcAccessMask = {},
-            .dstStageMask = vk::PipelineStageFlagBits2::eFragmentShader,
-            .dstAccessMask = vk::AccessFlagBits2::eShaderRead,
-            .oldLayout = vk::ImageLayout::eUndefined,
-            .newLayout = vk::ImageLayout::eShaderReadOnlyOptimal,
-            .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-            .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-            .image = s_Data->TonemappedImage.Image,
-            .subresourceRange = { .aspectMask = vk::ImageAspectFlagBits::eColor,
-                                  .baseMipLevel = 0,
-                                  .levelCount = 1,
-                                  .baseArrayLayer = 0,
-                                  .layerCount = 1 }
-        };
         const vk::ImageMemoryBarrier2 compositeImageBarrier = {
             .srcStageMask = vk::PipelineStageFlagBits2::eTopOfPipe,
             .srcAccessMask = {},
@@ -3805,7 +3781,6 @@ void Renderer::ResizeResources(const uint32_t width, const uint32_t height)
                                   .layerCount = 1 }
         };
         const std::array barriers = { resolveImageBarrier,
-                                      tonemappedImageBarrier,
                                       compositeImageBarrier,
                                       colorOutputImageBarrier,
                                       bloomImageBarrier,
@@ -5743,7 +5718,6 @@ void Renderer::ApplyTonemapping(const vk::raii::CommandBuffer& cmd, uint32_t fra
     tonemappingConstants.inverseScreenSize = glm::vec2(1.0f) / s_Data->OutputSize;
     tonemappingConstants.bloomIntensity = s_Data->Bloom.Intensity;
     tonemappingConstants.tonemapOperator = static_cast<float>(s_Data->TonemappingOperator);
-    tonemappingConstants.needsLuma = (s_Data->AntiAliasingMode == AntiAliasingMode::FXAA) ? 1u : 0u;
 
     cmd.pushConstants<TonemappingResolvePushConstants>(
         *s_Data->TonemappingResolvePipelineLayout, vk::ShaderStageFlagBits::eFragment, 0, { tonemappingConstants });
@@ -5844,6 +5818,11 @@ void Renderer::ApplyAntiAliasing(const vk::raii::CommandBuffer& cmd, const uint3
         ApplySMAA(cmd, frameIndex, renderArea, viewport);
     }
     else if (s_Data->AntiAliasingMode == AntiAliasingMode::TAA) {
+        // TODO: TAA is not implemented yet
+        ApplyNoOpPostProcessing(cmd, frameIndex, renderArea, viewport);
+    }
+    else {
+        ApplyNoOpPostProcessing(cmd, frameIndex, renderArea, viewport);
     }
 
     //EndRenderPassDebugLabel(cmd);
@@ -5941,6 +5920,7 @@ void Renderer::ApplySMAA(const vk::raii::CommandBuffer& cmd,
     SMAAData::PushConstants smaaPushConstants;
     smaaPushConstants.InverseViewportSize = glm::vec2(1.0f) / s_Data->RenderSize;
     smaaPushConstants.ViewportSize = s_Data->RenderSize;
+    smaaPushConstants.ExposureScale = s_Data->GlobalLightingData.lightingParams.x;
 
     // Transfer edges image to color attachment optimal for the edge detection pass
     {
@@ -7637,7 +7617,7 @@ void Renderer::SetupFXAADescriptors()
         s_Data->DescriptorSets[i].fxaa = std::move(fxaaDescriptorSets[i]);
         context.SetObjectDebugName(s_Data->DescriptorSets[i].fxaa, "FXAA Descriptor Set[" + std::to_string(i) + "]");
 
-        const vk::DescriptorImageInfo tonemappedImageInfo{ .sampler = nullptr,
+        const vk::DescriptorImageInfo resolveImageInfo{ .sampler = nullptr,
                                                            .imageView = *s_Data->ResolveImage.ImageView,
                                                            .imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal };
 
@@ -7661,7 +7641,7 @@ void Renderer::SetupFXAADescriptors()
                                     .dstArrayElement = 0,
                                     .descriptorCount = 1,
                                     .descriptorType = vk::DescriptorType::eSampledImage,
-                                    .pImageInfo = &tonemappedImageInfo },
+                                    .pImageInfo = &resolveImageInfo },
             vk::WriteDescriptorSet{ .dstSet = *s_Data->DescriptorSets[i].fxaa,
                                     .dstBinding = 1,
                                     .dstArrayElement = 0,
@@ -7925,39 +7905,6 @@ void Renderer::CreateBloomResources(const uint32_t width, const uint32_t height)
     s_Data->Bloom.UpsamplePipeline = CreateRef<ComputePipeline>(bloomUpsamplePipelineSpec);
 }
 
-void Renderer::CreateTonemappedImage(const uint32_t width, const uint32_t height)
-{
-    KBRAssert(s_Data->TonemappedImage.Format != vk::Format::eUndefined,
-              "Tonemapped image format has to be set before creating tonemapped image!");
-
-    auto& context = VulkanContext::Get();
-    const auto& device = context.GetDevice();
-
-    constexpr uint32_t mipLevels = 1;
-
-    CreateImage(device,
-                width,
-                height,
-                mipLevels,
-                vk::SampleCountFlagBits::e1,
-                s_Data->TonemappedImage.Format,
-                vk::ImageTiling::eOptimal,
-                vk::ImageUsageFlagBits::eColorAttachment | vk::ImageUsageFlagBits::eSampled,
-                vk::MemoryPropertyFlagBits::eDeviceLocal,
-                s_Data->TonemappedImage.Image,
-                s_Data->TonemappedImage.ImageMemory);
-
-    context.SetObjectDebugName(s_Data->TonemappedImage.Image, "Tonemapped Image");
-    context.SetObjectDebugName(s_Data->TonemappedImage.ImageMemory, "Tonemapped Image Memory");
-
-    s_Data->TonemappedImage.ImageView = CreateImageView(device,
-                                                        s_Data->TonemappedImage.Image,
-                                                        s_Data->TonemappedImage.Format,
-                                                        vk::ImageAspectFlagBits::eColor,
-                                                        mipLevels);
-    context.SetObjectDebugName(s_Data->TonemappedImage.ImageView, "Tonemapped Image View");
-}
-
 void Renderer::SetupTonemappingResolveDescriptors()
 {
     KBRAssert(s_Data->DescriptorPool != nullptr,
@@ -8071,6 +8018,8 @@ void Renderer::CreateFinalImage(const uint32_t width, const uint32_t height)
 {
     KBRAssert(s_Data->CompositeImage.Format != vk::Format::eUndefined,
               "Final image format has to be set before creating the final image!");
+
+    s_Data->FinalImage.Format = s_Data->CompositeImage.Format;
 
     auto& context = VulkanContext::Get();
     const auto& device = context.GetDevice();
@@ -8439,7 +8388,7 @@ void Renderer::SetupSMAADescriptors()
         .sampler = *s_Data->PointSampler,
         .imageView = nullptr,
     };
-    const vk::DescriptorImageInfo tonemappedImageInfo{ .sampler = *s_Data->LinearSampler,
+    const vk::DescriptorImageInfo resolveImageInfo{ .sampler = *s_Data->LinearSampler,
                                                        .imageView = *s_Data->ResolveImage.ImageView,
                                                        .imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal };
 
@@ -8462,7 +8411,7 @@ void Renderer::SetupSMAADescriptors()
                                         .dstArrayElement = 0,
                                         .descriptorCount = 1,
                                         .descriptorType = vk::DescriptorType::eCombinedImageSampler,
-                                        .pImageInfo = &tonemappedImageInfo },
+                                        .pImageInfo = &resolveImageInfo },
                 vk::WriteDescriptorSet{ .dstSet = *s_Data->SMAAResources.DescriptorSets[i].EdgeDetection,
                                         .dstBinding = 1,
                                         .dstArrayElement = 0,
@@ -8561,7 +8510,7 @@ void Renderer::SetupSMAADescriptors()
                                         .dstArrayElement = 0,
                                         .descriptorCount = 1,
                                         .descriptorType = vk::DescriptorType::eCombinedImageSampler,
-                                        .pImageInfo = &tonemappedImageInfo },
+                                        .pImageInfo = &resolveImageInfo },
                 vk::WriteDescriptorSet{ .dstSet = *s_Data->SMAAResources.DescriptorSets[i].NeighbourhoodBlend,
                                         .dstBinding = 1,
                                         .dstArrayElement = 0,

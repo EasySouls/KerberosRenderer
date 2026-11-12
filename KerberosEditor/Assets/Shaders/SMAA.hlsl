@@ -593,6 +593,13 @@
 //-----------------------------------------------------------------------------
 // Misc functions
 
+// Optional transform applied only to colors sampled for color/luma edge
+// detection. The default keeps the original SMAA behavior.
+// The runtime shader uses exposure + tone compression for HDR input.
+#ifndef SMAA_COLOR_TRANSFORM
+#define SMAA_COLOR_TRANSFORM(c) (c)
+#endif
+
 /**
  * Gathers current pixel, and the top-left neighbors.
  */
@@ -702,10 +709,10 @@ float2 SMAALumaEdgeDetectionPS(float2 texcoord,
 
     // Calculate lumas:
     float3 weights = float3(0.2126, 0.7152, 0.0722);
-    float L = dot(SMAASamplePoint(colorTex, texcoord).rgb, weights);
+    float L = dot(SMAA_COLOR_TRANSFORM(SMAASamplePoint(colorTex, texcoord).rgb), weights);
 
-    float Lleft = dot(SMAASamplePoint(colorTex, offset[0].xy).rgb, weights);
-    float Ltop  = dot(SMAASamplePoint(colorTex, offset[0].zw).rgb, weights);
+    float Lleft = dot(SMAA_COLOR_TRANSFORM(SMAASamplePoint(colorTex, offset[0].xy).rgb), weights);
+    float Ltop  = dot(SMAA_COLOR_TRANSFORM(SMAASamplePoint(colorTex, offset[0].zw).rgb), weights);
 
     // We do the usual threshold:
     float4 delta;
@@ -717,16 +724,16 @@ float2 SMAALumaEdgeDetectionPS(float2 texcoord,
         discard;
 
     // Calculate right and bottom deltas:
-    float Lright = dot(SMAASamplePoint(colorTex, offset[1].xy).rgb, weights);
-    float Lbottom  = dot(SMAASamplePoint(colorTex, offset[1].zw).rgb, weights);
+    float Lright = dot(SMAA_COLOR_TRANSFORM(SMAASamplePoint(colorTex, offset[1].xy).rgb), weights);
+    float Lbottom  = dot(SMAA_COLOR_TRANSFORM(SMAASamplePoint(colorTex, offset[1].zw).rgb), weights);
     delta.zw = abs(L - float2(Lright, Lbottom));
 
     // Calculate the maximum delta in the direct neighborhood:
     float2 maxDelta = max(delta.xy, delta.zw);
 
     // Calculate left-left and top-top deltas:
-    float Lleftleft = dot(SMAASamplePoint(colorTex, offset[2].xy).rgb, weights);
-    float Ltoptop = dot(SMAASamplePoint(colorTex, offset[2].zw).rgb, weights);
+    float Lleftleft = dot(SMAA_COLOR_TRANSFORM(SMAASamplePoint(colorTex, offset[2].xy).rgb), weights);
+    float Ltoptop = dot(SMAA_COLOR_TRANSFORM(SMAASamplePoint(colorTex, offset[2].zw).rgb), weights);
     delta.zw = abs(float2(Lleft, Ltop) - float2(Lleftleft, Ltoptop));
 
     // Calculate the final maximum delta:
@@ -761,13 +768,13 @@ float2 SMAAColorEdgeDetectionPS(float2 texcoord,
 
     // Calculate color deltas:
     float4 delta;
-    float3 C = SMAASamplePoint(colorTex, texcoord).rgb;
+    float3 C = SMAA_COLOR_TRANSFORM(SMAASamplePoint(colorTex, texcoord).rgb);
 
-    float3 Cleft = SMAASamplePoint(colorTex, offset[0].xy).rgb;
+    float3 Cleft = SMAA_COLOR_TRANSFORM(SMAASamplePoint(colorTex, offset[0].xy).rgb);
     float3 t = abs(C - Cleft);
     delta.x = max(max(t.r, t.g), t.b);
 
-    float3 Ctop  = SMAASamplePoint(colorTex, offset[0].zw).rgb;
+    float3 Ctop  = SMAA_COLOR_TRANSFORM(SMAASamplePoint(colorTex, offset[0].zw).rgb);
     t = abs(C - Ctop);
     delta.y = max(max(t.r, t.g), t.b);
 
@@ -779,11 +786,11 @@ float2 SMAAColorEdgeDetectionPS(float2 texcoord,
         discard;
 
     // Calculate right and bottom deltas:
-    float3 Cright = SMAASamplePoint(colorTex, offset[1].xy).rgb;
+    float3 Cright = SMAA_COLOR_TRANSFORM(SMAASamplePoint(colorTex, offset[1].xy).rgb);
     t = abs(C - Cright);
     delta.z = max(max(t.r, t.g), t.b);
 
-    float3 Cbottom  = SMAASamplePoint(colorTex, offset[1].zw).rgb;
+    float3 Cbottom  = SMAA_COLOR_TRANSFORM(SMAASamplePoint(colorTex, offset[1].zw).rgb);
     t = abs(C - Cbottom);
     delta.w = max(max(t.r, t.g), t.b);
 
@@ -791,11 +798,11 @@ float2 SMAAColorEdgeDetectionPS(float2 texcoord,
     float2 maxDelta = max(delta.xy, delta.zw);
 
     // Calculate left-left and top-top deltas:
-    float3 Cleftleft  = SMAASamplePoint(colorTex, offset[2].xy).rgb;
+    float3 Cleftleft  = SMAA_COLOR_TRANSFORM(SMAASamplePoint(colorTex, offset[2].xy).rgb);
     t = abs(C - Cleftleft);
     delta.z = max(max(t.r, t.g), t.b);
 
-    float3 Ctoptop = SMAASamplePoint(colorTex, offset[2].zw).rgb;
+    float3 Ctoptop = SMAA_COLOR_TRANSFORM(SMAASamplePoint(colorTex, offset[2].zw).rgb);
     t = abs(C - Ctoptop);
     delta.w = max(max(t.r, t.g), t.b);
 
