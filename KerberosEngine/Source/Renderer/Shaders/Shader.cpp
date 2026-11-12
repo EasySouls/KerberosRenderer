@@ -2,8 +2,8 @@
 #include "Core/Core.hpp"
 #include "Core/EnginePaths.hpp"
 
-#include "IO.hpp"
 #include "VulkanContext.hpp"
+#include "ShaderCache.hpp"
 #include "SlangCompiler.hpp"
 #include "Profiling/Profilers.hpp"
 
@@ -118,47 +118,28 @@ namespace Kerberos
 		Utils::CreateCacheDirectoryIfNeeded();
 
 		std::filesystem::path shadersPath = EnginePaths::Shaders();
-		std::filesystem::path cacheDirectory = Utils::GetCacheDirectory();
 		m_Filepath = shadersPath / (filepath.string() + std::string(".slang"));
+		m_CachedSpirvPath = ShaderCache::GetSpirvPath(filepath.stem().string());
 
-		/// Get source file modification time
-		std::filesystem::file_time_type sourceModTime{};
-		if (!filepath.empty() && std::filesystem::exists(m_Filepath))
+		const bool needsCompilation = !ShaderCache::IsFresh(m_CachedSpirvPath);
+		if (needsCompilation)
 		{
-			sourceModTime = std::filesystem::last_write_time(m_Filepath);
+			Log::CoreInfo("No up-to-date cached SPIR-V found. Compiling shader: {}", filepath.filename().string());
 		}
-
-		bool needsCompilation = true;
-		const std::filesystem::path cachedSpirvPath = cacheDirectory / (filepath.stem().string() + ".spv");
-		if (std::filesystem::exists(cachedSpirvPath)) 
+		else
 		{
-			const std::filesystem::file_time_type cachedModTime = std::filesystem::last_write_time(cachedSpirvPath);
-			if (cachedModTime >= sourceModTime) 
-			{
-				Log::CoreInfo("Loading cached SPIR-V for shader: {}", filepath.filename().string());
-				needsCompilation = false;
-			} 
-			else 
-			{
-				Log::CoreInfo("Cached SPIR-V is outdated. Recompiling shader: {}", filepath.filename().string());
-				needsCompilation = true;
-			}
-		} 
-		else 
-		{
-			Log::CoreInfo("No cached SPIR-V found. Compiling shader: {}", filepath.filename().string());
-			needsCompilation = true;
-			
+			Log::CoreInfo("Loading cached SPIR-V for shader: {}", filepath.filename().string());
 		}
 
 		if (needsCompilation) 
 		{
 			try
 			{
-				m_SpirvCode = SlangCompiler::CompileToSpirv(m_Filepath);
+				const CompiledShader compiled = SlangCompiler::CompileToSpirv(m_Filepath);
+				m_SpirvCode = compiled.Spirv;
 
-				std::ofstream outFile(cachedSpirvPath, std::ios::binary);
-				outFile.write(reinterpret_cast<const char*>(m_SpirvCode.data()), static_cast<std::streamsize>(m_SpirvCode.size() * sizeof(uint32_t)));
+				if (!ShaderCache::WriteArtifacts(m_CachedSpirvPath, m_SpirvCode, compiled.Dependencies, compiled.CompilerBuildTag))
+					Log::CoreWarn("Failed to write shader cache artifacts for '{}'", filepath.filename().string());
 			}
 			catch (const CompilationFailedException& e)
 			{
@@ -173,9 +154,7 @@ namespace Kerberos
 		}
 		else
 		{
-			const auto shaderCode = IO::ReadFile(cachedSpirvPath);
-			m_SpirvCode.resize(shaderCode.size() / sizeof(uint32_t));
-			std::memcpy(m_SpirvCode.data(), shaderCode.data(), shaderCode.size());
+			m_SpirvCode = ShaderCache::ReadSpirv(m_CachedSpirvPath);
 		}
 		
 		if (m_SpirvCode.empty()) 
@@ -205,22 +184,33 @@ namespace Kerberos
 	{
 		KBR_TRACY_FUNCTION();
 
+		if (ShaderCache::IsFresh(m_CachedSpirvPath))
+		{
+			Log::CoreInfo("Shader '{}' is already up to date. No recompilation needed.", m_Filepath.filename().string());
+			return false;
+		}
+
 		try 
 		{
-			const auto spirvCode = SlangCompiler::CompileToSpirv(m_Filepath);
-			if (spirvCode.empty()) 
+			const CompiledShader compiled = SlangCompiler::CompileToSpirv(m_Filepath);
+			if (compiled.Spirv.empty()) 
 			{
 				Log::CoreError("Recompilation produced empty SPIR-V code for shader: {}", m_Filepath.filename().string());
 				return std::unexpected("Recompilation produced empty SPIR-V code");
 			}
 
-			if (spirvCode == m_SpirvCode)
+			// Keep the on-disk cache in sync even when the bytecode did not change, so a
+			// comment-only edit to a shared file does not trigger another recompile later.
+			if (!ShaderCache::WriteArtifacts(m_CachedSpirvPath, compiled.Spirv, compiled.Dependencies, compiled.CompilerBuildTag))
+				Log::CoreWarn("Failed to write shader cache artifacts for '{}'", m_Filepath.filename().string());
+
+			if (compiled.Spirv == m_SpirvCode)
 			{
-				Log::CoreInfo("Shader '{}' is already up to date. No recompilation needed.", m_Filepath.filename().string());
+				Log::CoreInfo("Shader '{}' was recompiled without SPIR-V changes.", m_Filepath.filename().string());
 				return false;
 			}
 
-			m_SpirvCode = spirvCode;
+			m_SpirvCode = compiled.Spirv;
 
 			const vk::ShaderModuleCreateInfo shaderInfo{
 				.codeSize = m_SpirvCode.size() * sizeof(uint32_t),

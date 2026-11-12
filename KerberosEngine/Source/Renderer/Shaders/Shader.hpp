@@ -27,8 +27,9 @@ namespace Kerberos
 		Shader& operator=(Shader&&) = default;
 
 		/*
-		* Recompiles the shader if the source file has been modified since the last compilation.
-		* Returns true if the shader was successfully recompiled, false if recompilation was not needed, and an error message if recompilation failed.
+		* Recompiles the shader if its cached SPIR-V (or any transitive dependency) is stale.
+		* Returns true if the shader was successfully recompiled with changed bytecode, false if
+		* recompilation was not needed, and an error message if recompilation failed.
 		*/
 		std::expected<bool, std::string> Recompile();
 
@@ -43,5 +44,6 @@ namespace Kerberos
 		std::vector<uint32_t> m_SpirvCode;
 		std::vector<ShaderStageEntry> m_StageEntries;
 		std::filesystem::path m_Filepath;
+		std::filesystem::path m_CachedSpirvPath;
 	};
 }

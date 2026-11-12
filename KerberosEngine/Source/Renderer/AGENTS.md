@@ -328,9 +328,30 @@ and supports recompilation. Tests may request a hidden GLFW window through
 `ApplicationSpecification::Headless`; this still creates the normal Vulkan
 context and renderer and is not a software or no-GPU mode.
 
+Cache freshness is dependency-aware. `SlangCompiler::CompileToSpirv` returns a
+`CompiledShader` carrying the transitive dependency list reported by
+`IModule::getDependencyFileCount`/`getDependencyFilePath`: the entry source,
+transitively `#include`d files, and imported modules (Slang records module
+imports as file dependencies). `ShaderCache` writes `<name>.spv.deps` beside
+each artifact with a manifest format version, the Slang build tag, and
+dependency paths relative to `EnginePaths::Shaders()` when possible. `Shader`
+and `GrassSystem` only load a cached artifact when `ShaderCache::IsFresh`
+reports every dependency unchanged and the cached SPIR-V has a valid header.
+Artifacts and manifests are written to temp files and renamed, so a partial
+write can never be observed as fresh. Changing `common.slang`,
+`pbr_helpers.slang`, `lights.slang`, `ao.slang`, `particles.slang`,
+`tonemapping.slang`, or `SMAA.hlsl` therefore recompiles exactly the shaders
+that depend on it, both at startup and through `Shader::Recompile()`, which
+early-outs for fresh shaders and rewrites the on-disk cache after a successful
+compile. `GrassSystem` caches its shader-object stages under `grass_task`,
+`grass_mesh`, and `grass_fragment` keys.
+
 Shader source/build mapping is duplicated between runtime shader usage and
 `KerberosEditor/Assets/Shaders/compile_shaders.bat`. Update both when adding
-or renaming shaders.
+or renaming shaders. `compile_shaders.bat` writes `Assets/Cache/Shaders/*.spv`
+while Debug builds read `Assets/Cache/Shaders/Debug`; because batch-produced
+artifacts have no `.deps` manifest, the first runtime load recompiles them once
+and writes the manifest.
 
 ## Validation and diagnostics
 

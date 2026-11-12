@@ -2,6 +2,7 @@
 
 #include "VulkanContext.hpp"
 #include "Utils.hpp"
+#include "Shaders/ShaderCache.hpp"
 #include "Shaders/SlangCompiler.hpp"
 
 #include "Profiling/Profilers.hpp"
@@ -187,9 +188,22 @@ namespace Kerberos
         auto& context = VulkanContext::Get();
         const auto& device = context.GetDevice();
 
-        const auto taskSpv = SlangCompiler::CompileToSpirv("grass.slang", {ShaderEntryPoint::Task});
-        const auto meshSpv = SlangCompiler::CompileToSpirv("grass.slang", {ShaderEntryPoint::Mesh});
-        const auto fragSpv = SlangCompiler::CompileToSpirv("grass.slang", {ShaderEntryPoint::Fragment});
+        // Shader objects need separate SPIR-V modules per stage, so cache each stage under its own key.
+        const auto loadStage = [](const std::string_view cacheName, const ShaderEntryPoint entryPoint)
+        {
+            const std::filesystem::path cachedSpirvPath = ShaderCache::GetSpirvPath(cacheName);
+            if (ShaderCache::IsFresh(cachedSpirvPath))
+                return ShaderCache::ReadSpirv(cachedSpirvPath);
+
+            const auto [Spirv, Dependencies, CompilerBuildTag] = SlangCompiler::CompileToSpirv("grass.slang", { entryPoint });
+            if (!ShaderCache::WriteArtifacts(cachedSpirvPath, Spirv, Dependencies, CompilerBuildTag))
+                Log::CoreWarn("Failed to write grass shader cache artifacts for '{}'", cacheName);
+            return Spirv;
+        };
+
+        const auto taskSpv = loadStage("grass_task", ShaderEntryPoint::Task);
+        const auto meshSpv = loadStage("grass_mesh", ShaderEntryPoint::Mesh);
+        const auto fragSpv = loadStage("grass_fragment", ShaderEntryPoint::Fragment);
 
         const vk::DescriptorSetLayout setLayouts[] = { *m_SetLayout };
 

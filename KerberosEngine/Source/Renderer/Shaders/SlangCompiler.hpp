@@ -2,6 +2,7 @@
 
 #include "ShaderEntryPoints.hpp"
 
+#include <cstdint>
 #include <filesystem>
 #include <source_location>
 #include <stdexcept>
@@ -21,6 +22,18 @@ public:
 	std::source_location Location;
 };
 
+/**
+ * Result of compiling a Slang entry module.
+ * Dependencies contains every file the module needs, including the entry source
+ * itself, transitively #included files, and imported modules.
+ */
+struct CompiledShader
+{
+	std::vector<uint32_t> Spirv;
+	std::vector<std::filesystem::path> Dependencies;
+	std::string CompilerBuildTag;
+};
+
 class SlangCompiler
 {
 public:
@@ -31,9 +44,12 @@ public:
 	 * @param filepath The path to the Slang shader file.
 	 * @param entryPoints A list of entry points to compile. If empty, all entry points will be compiled.
      * @throws CompilationFailedException if the compilation fails.
-	 * @return A vector containing the compiled SPIR-V bytecode.
+	 * @return The compiled SPIR-V bytecode plus the transitive source dependency list.
 	 */
-	static std::vector<uint32_t> CompileToSpirv(const std::filesystem::path& filepath, const std::vector<ShaderEntryPoint>& entryPoints = {});
+	static CompiledShader CompileToSpirv(const std::filesystem::path& filepath, const std::vector<ShaderEntryPoint>& entryPoints = {});
+
+	/// Build tag of the Slang library backing the compiler. Used to invalidate caches across SDK upgrades.
+	static std::string GetCompilerBuildTag();
 };
 
 }

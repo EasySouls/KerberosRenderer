@@ -23,7 +23,14 @@ static Slang::ComPtr<slang::IGlobalSession> GetGlobalSession()
 	return globalSession;
 }
 
-std::vector<uint32_t> SlangCompiler::CompileToSpirv(const std::filesystem::path& filepath, const std::vector<ShaderEntryPoint>& entryPoints)
+std::string SlangCompiler::GetCompilerBuildTag()
+{
+	const Slang::ComPtr<slang::IGlobalSession> globalSession = GetGlobalSession();
+	const char* buildTag = globalSession->getBuildTagString();
+	return buildTag != nullptr ? buildTag : "unknown";
+}
+
+CompiledShader SlangCompiler::CompileToSpirv(const std::filesystem::path& filepath, const std::vector<ShaderEntryPoint>& entryPoints)
 {
 	KBR_TRACY_FUNCTION();
 
@@ -106,6 +113,17 @@ std::vector<uint32_t> SlangCompiler::CompileToSpirv(const std::filesystem::path&
 	if (moduleDiagnostics)
 	{
 		Log::CoreWarn("Shader compilation diagnostics: {}", static_cast<const char*>(moduleDiagnostics->getBufferPointer()));
+	}
+
+	// Slang records imported modules as file dependencies of the importing module, so this
+	// list is the complete transitive invalidation set (entry point, #includes, and imports).
+	std::vector<std::filesystem::path> dependencies;
+	const SlangInt32 dependencyCount = module->getDependencyFileCount();
+	dependencies.reserve(static_cast<size_t>(dependencyCount));
+	for (SlangInt32 i = 0; i < dependencyCount; ++i)
+	{
+		if (const char* dependencyPath = module->getDependencyFilePath(i))
+			dependencies.emplace_back(dependencyPath);
 	}
 
 	std::vector<IComponentType*> entryPointComponents;
@@ -228,7 +246,11 @@ std::vector<uint32_t> SlangCompiler::CompileToSpirv(const std::filesystem::path&
 	std::memcpy(spirvCode.data(), codeData, codeSize * sizeof(uint32_t));
 	//spirvCode.insert(spirvCode.end(), codeData, codeData + codeSize);
 
-	return spirvCode;
+	CompiledShader result;
+	result.Spirv = std::move(spirvCode);
+	result.Dependencies = std::move(dependencies);
+	result.CompilerBuildTag = GetCompilerBuildTag();
+	return result;
 }
 
 }
