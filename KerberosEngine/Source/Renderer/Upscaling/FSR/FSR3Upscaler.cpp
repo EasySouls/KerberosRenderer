@@ -15,6 +15,7 @@ namespace Kerberos {
     namespace {
         constexpr float GetUpscaleRatio(const UpscalerQuality quality) {
             switch (quality) {
+                case UpscalerQuality::NativeAA:         return 1.0f;
                 case UpscalerQuality::UltraQuality:     return 1.3f;
                 case UpscalerQuality::Quality:          return 1.5f;
                 case UpscalerQuality::Balanced:         return 1.7f;

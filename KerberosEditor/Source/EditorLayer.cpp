@@ -1599,12 +1599,16 @@ namespace PROJECT_NAME
             ImGui::Indent();
 
             UpscalerQuality upscalingQuality = Renderer::GetUpscalingQuality();
-            const char* upscalingModeQualityItems[] = { "Ultra Quality", "Quality", "Balanced", "Performance", "Ultra Performance" };
+            const char* upscalingModeQualityItems[] = { "Native AA", "Ultra Quality", "Quality", "Balanced", "Performance", "Ultra Performance" };
             if (ImGui::Combo("Quality",
                              reinterpret_cast<int*>(&upscalingQuality),
                              upscalingModeQualityItems,
                              IM_ARRAYSIZE(upscalingModeQualityItems))) {
                 Renderer::SetUpscalingQuality(static_cast<UpscalerQuality>(upscalingQuality));
+            }
+            if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal)) {
+                ImGui::SetTooltip("Native AA renders at the display resolution and uses FSR3's temporal\n"
+                                  "anti-aliasing at 1.0x. The spatial anti-aliasing pass stays disabled.");
             }
 
 			ImGui::Unindent();

@@ -12,10 +12,18 @@ enum class UpscalerType {
 };
 
 enum class UpscalerQuality {
+    /// Renders at native (display) resolution and uses the upscaler only for
+    /// its temporal anti-aliasing.
+    NativeAA,
+    // Renders at 77% of display resolution.
     UltraQuality,
+    // Renders at 66% of display resolution.
     Quality,
+    // Renders at 58% of display resolution.
     Balanced,
+    // Renders at 50% of display resolution.
     Performance,
+    // Renders at 33% of display resolution.
     UltraPerformance
 };
 

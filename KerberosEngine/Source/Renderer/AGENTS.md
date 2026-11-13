@@ -174,6 +174,14 @@ consumes the pre-AA HDR resolve so its internal temporal history receives the
 original jittered samples. Native presentation continues to use the
 anti-aliasing pass and composite image.
 
+`UpscalerQuality::NativeAA` is FSR3's 1.0x preset: the upscaler renders at
+display resolution (`RenderSize == OutputSize`), FSR3 still receives jitter and
+runs its temporal accumulation, and the anti-aliasing pass remains skipped
+because upscaling mode is still FSR3. The other presets scale `RenderSize`
+through `FSR3Upscaler::GetUpscaleRatio` / `GetInverseUpscaleRatio`, which the
+renderer uses for every offscreen scene resource, so a quality change recreates
+those resources.
+
 FSR3 receives the sub-pixel jitter through `UpscalerDispatchInfo`/the upscaler
 dispatch; the scene projection carries that jitter for rendering, while the
 motion-vector pass uses unjittered current/previous projections. Because the
