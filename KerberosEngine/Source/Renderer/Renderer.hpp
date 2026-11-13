@@ -98,6 +98,7 @@ struct RenderObject
     AABB WorldAABB{};
     uint32_t UBOIndex = 0;
     std::optional<SkinnedDraw> Skinned{};
+    bool CastShadows = true;
     std::string_view DebugName{};
 };
 

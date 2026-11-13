@@ -1586,13 +1586,12 @@ void Renderer::RecordQueuedSceneRender(const vk::raii::CommandBuffer& cmd)
 
     // Update all per-object uniform buffers once
     for (const auto& renderObject : allObjects) {
-        const auto& [Transform, Mesh, Material, EntityID, WorldAABB, UBOIndex, Skinned, DebugName] = renderObject;
-
-        Ref<Kerberos::Material> material = Material;
+        Ref<Kerberos::Material> material = renderObject.Material;
         if (material == nullptr)
             material = s_Data->MaterialRegistry.Get("DebugPink");
 
-        UpdatePerObjectUniformBuffer(frameIndex, UBOIndex, Transform, *material, EntityID);
+        UpdatePerObjectUniformBuffer(
+            frameIndex, renderObject.UBOIndex, renderObject.Transform, *material, renderObject.EntityID);
     }
 
     RenderObjectContainer renderObjects;
@@ -4949,6 +4948,7 @@ std::pair<std::pmr::vector<RenderObject>, std::pmr::set<Ref<Material>>> Renderer
         renderObject.Mesh = staticMesh.StaticMesh;
         renderObject.Material = staticMesh.MeshMaterial;
         renderObject.EntityID = static_cast<uint32_t>(entity);
+        renderObject.CastShadows = staticMesh.CastShadows;
         renderObject.DebugName = meshView.get<TagComponent>(entity).Tag;
 
         renderObject.WorldAABB = CalculateWorldAABB(staticMesh.StaticMesh->GetBoundingBox(), renderObject.Transform);
@@ -4971,6 +4971,7 @@ std::pair<std::pmr::vector<RenderObject>, std::pmr::set<Ref<Material>>> Renderer
         renderObject.Transform = transform.WorldTransform;
         renderObject.Material = skinnedMesh.Material;
         renderObject.EntityID = static_cast<uint32_t>(entity);
+        renderObject.CastShadows = skinnedMesh.CastShadows;
         renderObject.DebugName = skinnedView.get<TagComponent>(entity).Tag;
 
         renderObject.WorldAABB = CalculateWorldAABB(skinnedMesh.Mesh->GetBoundingBox(), renderObject.Transform);
@@ -5829,6 +5830,8 @@ void Renderer::RenderShadowPass(const vk::raii::CommandBuffer& cmd,
         const RenderObjectContainer culledObjects = FrustumCullRenderObjects(renderObjects, frustum, arena);
 
         for (const auto& renderObject : culledObjects) {
+            if (!renderObject.CastShadows)
+                continue;
             if (renderObject.Material != nullptr && renderObject.Material->IsTransparent())
                 continue;
 
@@ -5906,6 +5909,8 @@ void Renderer::RenderOmniShadowPass(const vk::raii::CommandBuffer& cmd,
         lightObjects.clear();
         for (const RenderObject& renderObject : renderObjects)
         {
+            if (!renderObject.CastShadows)
+                continue;
             if (renderObject.Material && renderObject.Material->IsTransparent())
                 continue;
 

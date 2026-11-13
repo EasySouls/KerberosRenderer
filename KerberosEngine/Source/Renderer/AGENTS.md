@@ -253,7 +253,9 @@ point-light shadows while ray-query shadows are enabled.
 caster it pre-filters `allObjects` once with a light-sphere vs. world-AABB test,
 then for each of the six cube faces constructs the 90-degree perspective face
 view (using the same face directions/up vectors as the skybox capture), builds
-the face frustum, and draws only objects whose AABB intersects it. The
+the face frustum, and draws only objects whose AABB intersects it. The CSM and
+omni shadow passes both skip `RenderObject.CastShadows == false`; the static and
+skinned mesh component flags are copied into `RenderObject.CastShadows`. The
 pre-filter also skips the light's owning entity mesh (`ShadowCasterEntityID`)
 and small meshes whose AABB contains the light, so an authored lamp/fixture mesh
 cannot fill its own cube map with near inside faces and shadow the whole scene.
@@ -517,10 +519,10 @@ swapchain/viewport resize, frame synchronization, graph barriers/layouts,
 descriptor lifetime, and shader compilation. For point/omni shadows, validate
 0, 1, 16, and 17+ candidates, camera-frustum light culling, per-face mesh
 culling, a point light authored inside its lamp/fixture mesh, alpha-masked
-casters, slot reassignment, the enable toggle, ray-query
-shadow mode, wide PCF, depth bias, the slot/face preview, and the separate
-OmniShadow GPU timing line; run Vulkan validation and synchronization validation
-to catch cube-array layout or descriptor mistakes. Validate GPU timings with
+casters, slot reassignment, the enable toggle, mesh `CastShadows` toggles,
+ray-query shadow mode, wide PCF, depth bias, the slot/face preview, and the
+separate OmniShadow GPU timing line; run Vulkan validation and synchronization
+validation to catch cube-array layout or descriptor mistakes. Validate GPU timings with
 FSR3 on and off: every timing line must remain valid, and skipped anti-aliasing
 or omni-shadow passes must report a near-zero duration rather than invalidating
 the whole query pool. For the AI perception overlay,
