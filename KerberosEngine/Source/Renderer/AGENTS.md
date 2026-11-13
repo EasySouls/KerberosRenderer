@@ -74,6 +74,12 @@ entry point), so:
   `ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_KHR` when the acceleration
   structure extension is active.
 
+The point/omni shadow path additionally requires
+`VkPhysicalDeviceFeatures::imageCubeArray`, which is the core device feature
+needed for the `CUBE_ARRAY` view sampled through `SamplerCubeArrayShadow`.
+`VulkanContext` enables it for the active device; devices that do not
+advertise it cannot create or sample the point-shadow cube array.
+
 Swapchain format/present-mode selection and image-count rules live in
 `VulkanContext.cpp`. Swapchain recreation rebuilds swapchain-owned views,
 color, and depth resources, but does not recreate renderer-owned offscreen
@@ -102,19 +108,26 @@ The active pass order is approximately:
    `Scene::AnimationRuntime` and the skin-matrix upload happens in
    `AnimationSystem::BeginFrame`)
 2. depth pre-pass
-3. shadows
-4. GTAO
-5. opaque
-6. particles
-7. grass
-8. transparent
-9. transparency resolve
-10. bloom
-11. anti-aliasing
-12. upscaling
-13. tonemapping
-14. presentation
-15. mouse picking
+3. directional shadow cascades
+4. omni (point light) shadow cubemaps
+5. GTAO
+6. opaque
+7. particles
+8. grass
+9. transparent
+10. transparency resolve
+11. bloom
+12. anti-aliasing
+13. upscaling
+14. tonemapping
+15. presentation
+16. mouse picking
+
+The omni shadow pass is a separate graph pass after the directional
+cascades. It writes the fixed `PointShadowMap` cube array, and the opaque and
+transparent passes read it. The pass is registered even when no point light is
+selected so the cube-array layout and the paired `OmniShadowBegin` /
+`OmniShadowEnd` timestamps stay defined.
 
 The skinning pass is added before the depth pre-pass; animation has no graph
 pass because pose evaluation happens on the CPU in `Scene::AnimationRuntime` and
@@ -172,9 +185,9 @@ without first proving it is still used.
 `GlobalLighting` is three `float4`s, mirrored by the Slang `GlobalLighting`
 struct: `sunDirection` (xyz direction, w = sun enabled), `sunColor` (rgb linear
 color, w = sun illuminance in lux), and `lightingParams` (x = linear exposure
-scale, y = environment intensity, z/w reserved). Keep the C++ static
-asserts and the Slang layout in sync. Output transfer is fixed to exact sRGB;
-there is no runtime gamma control.
+scale, y = environment intensity, z = wide point-shadow PCF toggle, w = RTAO
+toggle). Keep the C++ static asserts and the Slang layout in sync. Output
+transfer is fixed to exact sRGB; there is no runtime gamma control.
 
 Lighting uses physical units. `DirectionalLight::Intensity` is lux and
 `PointLight`/`SpotLight::Intensity` is candela, attenuated by inverse square
@@ -202,6 +215,77 @@ shader and PBR ambient terms multiply by the same environment intensity.
 Packed runtime cubemap artifacts are not implemented yet; the editor loads
 `.kbrcubemap` sources directly through `RuntimeAssetLoader`.
 
+## Point and omni shadows
+
+Point lights use a fixed hardware-filtered cube-map array; there is no 2D
+shadow atlas. `Renderer.cpp` owns `PointShadowMap`: a `CUBE_COMPATIBLE`
+`D32_SFLOAT` image of `16 * 6 = 96` layers at `512 x 512`, a `CUBE_ARRAY` read
+view for `SamplerCubeArrayShadow`, and one 2D view per face for rendering. The
+comparison sampler is linear with `GreaterOrEqual` and an opaque-white border,
+matching the CSM sampler; the shader treats a comparison result of 1 as
+occluded and returns `1 - SampleCmp(...)` as visibility.
+
+`GPULight` is 80 bytes and carries `ShadowSlot` (`-1` = no shadow),
+`ShadowNear`, and `ShadowFar` after the existing material block. Keep the C++
+static asserts and the `lights.slang` layout in sync. `ShadowSlot` selects the
+cube-array layer; a light without a slot still illuminates.
+
+`AssignOmniShadowCasters` runs before the light buffer upload. It builds the
+main-camera frustum, rejects point-light spheres outside it, scores the
+remaining lights with `intensity * range / distanceToCamera^2`, sorts by score,
+clamps to `min(PointShadowMaxCasters, PointShadowMap::MaxCasters)`, and assigns
+slots `0..N-1`. The active casters are copied into `PointShadowCasters` for the
+render pass. Lights beyond the budget keep `ShadowSlot = -1` and illuminate
+without shadows.
+
+`RenderOmniShadowPass` runs as the "Omni Shadow Pass" graph pass. For each
+caster it pre-filters `allObjects` once with a light-sphere vs. world-AABB test,
+then for each of the six cube faces constructs the 90-degree perspective face
+view (using the same face directions/up vectors as the skybox capture), builds
+the face frustum, and draws only objects whose AABB intersects it. Transparent
+materials are skipped; alpha-masked materials use the shared global texture set.
+The pass clears each active face and renders with `shadowmap_omni` using
+front-face culling and depth bias, pushing the face view-projection as a vertex
+push constant.
+
+The cube array is bound to scene-set binding `10` and sampled in `pbrtextured`
+and `transparent` through `lights.slang::CalculatePointShadowVisibility`. The
+helper reconstructs the zero-to-one perspective depth from
+`ShadowNear`/`ShadowFar`, applies a distance-scaled normal offset, and uses
+`SampleCmp` for hardware PCF. When `lightingParams.z > 0.5`, it widens the
+filter with a 3x3 tangent-plane loop. `pbr_ray_query_shadows` already traces
+point-light shadows and does not sample binding 10.
+
+`OmniShadowBegin`/`OmniShadowEnd` are separate GPU timestamp queries and
+resolve to `GPUTimings::OmniShadowPassMilliseconds`, independent of the
+directional `ShadowPassMilliseconds`. `RenderStatistics` exposes
+`PointShadowCandidateCount` and `PointShadowCasterCount` for the debug panel,
+which also has enable/max-caster/wide-PCF/depth-bias controls and a slot/face
+preview.
+
+Point/omni shadow invariants:
+
+- The omni graph pass must import and transition `PointShadowMap.Image` over all
+  96 layers; it must not import the CSM `ShadowMap.Image` with the omni range.
+- The opaque pass and the transparent pass must declare reads of the
+  point-shadow cube array. The transparent pass also samples the CSM map, so it
+  must declare that read too.
+- `PointShadowMaxCasters` is a user cap, not the allocation size; clamp it to
+  `PointShadowMap::MaxCasters` before use.
+- Clear `PointShadowCasters` and the candidate/caster statistics even when point
+  shadows are disabled, and check the enabled flag in the pass as well.
+- Shadow vertex shaders that sample the albedo alpha must declare `Pos`,
+  `Normal`, `Tangent`, and `TexCoord` in order (or use explicit vertex
+  locations) so `TexCoord` is location 3. `shadowmap_csm` and
+  `shadowmap_omni` share this requirement.
+- Assign casters after the `MaxLights` clamp so selected lights are actually in
+  the uploaded light buffer.
+- The debug preview descriptor lookup is
+  `slot * PointShadowMap::FaceCount + face`; the slot/face selectors map
+  directly onto the 96 per-face views.
+- The point-shadow path requires `imageCubeArray` and a depth format with
+  comparison sampling; gate resource creation on device support.
+
 ## Materials, alpha modes, and ambient occlusion
 
 `Material::AlphaMode` mirrors glTF's `OPAQUE`/`MASK`/`BLEND` modes (default
@@ -210,9 +294,9 @@ authored `.kbrmat` files serialize them as `AlphaMode`/`AlphaCutoff`, and
 legacy materials that relied on base-color alpha below one are loaded as
 `BLEND`. `IsTransparent()` is true only for `BLEND`, so `MASK` and `OPAQUE`
 both stay in the depth/shadow/opaque passes. The alpha mask is applied in
-`pbrtextured`, `pbr_ray_query_shadows`, `depthprepass`, and `shadowmap_csm`
-using `ShouldDiscardAlpha` from `common.slang` with
-`textureAlpha * baseColorFactor.a`; the shadow pass binds the global texture
+`pbrtextured`, `pbr_ray_query_shadows`, `depthprepass`, `shadowmap_csm`, and
+`shadowmap_omni` using `ShouldDiscardAlpha` from `common.slang` with
+`textureAlpha * baseColorFactor.a`; the shadow passes bind the global texture
 set for this reason. `BLEND` materials render through the existing
 weighted-blended OIT pass, where alpha is `textureAlpha * baseColorFactor.a`
 and emissive/AO participate in the accumulated color.
@@ -368,7 +452,9 @@ write can never be observed as fresh. Changing `common.slang`,
 that depend on it, both at startup and through `Shader::Recompile()`, which
 early-outs for fresh shaders and rewrites the on-disk cache after a successful
 compile. `GrassSystem` caches its shader-object stages under `grass_task`,
-`grass_mesh`, and `grass_fragment` keys.
+`grass_mesh`, and `grass_fragment` keys. `shadowmap_omni` is the point-shadow
+depth-only shader; its `shadowmap_omni.spv` artifact is listed in
+`compile_shaders.bat` alongside `shadowmap_csm.spv`.
 
 Shader source/build mapping is duplicated between runtime shader usage and
 `KerberosEditor/Assets/Shaders/compile_shaders.bat`. Update both when adding
@@ -395,7 +481,12 @@ Compile shaders from `KerberosEditor\Assets\Shaders`:
 Vulkan validation, synchronization validation, debug labels, shader printf,
 and Tracy zones are important diagnostics. For renderer changes, validate
 swapchain/viewport resize, frame synchronization, graph barriers/layouts,
-descriptor lifetime, and shader compilation. For the AI perception overlay,
+descriptor lifetime, and shader compilation. For point/omni shadows, validate
+0, 1, 16, and 17+ candidates, camera-frustum light culling, per-face mesh
+culling, alpha-masked casters, slot reassignment, the enable toggle, wide PCF,
+depth bias, the slot/face preview, and the separate OmniShadow GPU timing line;
+run Vulkan validation and synchronization validation to catch cube-array layout
+or descriptor mistakes. For the AI perception overlay,
 validate Edit/Simulate/Play, FOV changes, 360-degree FOV, sight/lose radii,
 occlusion by depth-tested geometry, many simultaneous agents, and toggling the
 overlay off. Keep this file updated whenever renderer ownership, pass order,

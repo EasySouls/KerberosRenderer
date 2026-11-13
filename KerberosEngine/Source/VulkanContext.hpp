@@ -157,6 +157,7 @@ namespace Kerberos
 		bool SupportsMeshShaders() const;
 		bool SupportsShaderObjects() const;
 		bool SupportsRayTracing() const;
+	    bool SupportsCubeArrays() const;
 
 		static vk::DescriptorSet GenerateImGuiDescriptorSet(const vk::raii::Sampler& sampler,
 															const vk::raii::ImageView& imageView, 

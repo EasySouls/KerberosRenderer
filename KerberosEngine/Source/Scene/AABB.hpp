@@ -22,7 +22,9 @@ namespace Kerberos
 		bool Contains(const glm::vec3& point) const;
 
 		bool IsInsideFrustum(const Frustum& frustum) const;
+	    bool IsIntersectingSphere(const glm::vec3& center, float radius) const;
 	};
 
 	bool IsAABBInsideFrustum(const AABB& aabb, const Frustum& frustum);
+    bool IsAABBIntersectingSphere(const AABB& aabb, const glm::vec3& center, float radius);
 }

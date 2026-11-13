@@ -30,7 +30,12 @@ namespace Kerberos
 		return IsAABBInsideFrustum(*this, frustum);
 	}
 
-	bool IsAABBInsideFrustum(const AABB& aabb, const Frustum& frustum)
+    bool AABB::IsIntersectingSphere(const glm::vec3& center, const float radius) const
+    {
+        return IsAABBIntersectingSphere(*this, center, radius);
+    }
+
+    bool IsAABBInsideFrustum(const AABB& aabb, const Frustum& frustum)
 	{
 		KBR_TRACY_FUNCTION();
 
@@ -47,4 +52,13 @@ namespace Kerberos
 		}
 		return true;
 	}
+
+    bool IsAABBIntersectingSphere(const AABB& aabb, const glm::vec3& center, const float radius)
+    {
+	    KBR_TRACY_FUNCTION();
+	    
+        const glm::vec3 closest = glm::clamp(center, aabb.Min, aabb.Max);
+	    const glm::vec3 delta = center - closest;
+	    return glm::dot(delta, delta) <= radius * radius;
+    }
 }

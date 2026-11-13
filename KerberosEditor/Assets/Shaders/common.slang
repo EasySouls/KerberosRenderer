@@ -62,7 +62,7 @@ public struct GlobalLighting
     public float4 sunDirection;
     // rgb = linear sun color, w = sun illuminance in lux.
     public float4 sunColor;
-    // x = exposure scale, y = environment intensity, z/w = reserved.
+    // x = exposure scale, y = environment intensity, z = wide PCF, w = RTAO on
     public float4 lightingParams;
 };
 

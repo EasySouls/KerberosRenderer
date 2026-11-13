@@ -1,8 +1,8 @@
 #include "kbrpch.hpp"
 #include "Frustum.hpp"
 
-#include "Profiling/Profilers.hpp"
 #include "Renderer/Renderer.hpp"
+#include "Profiling/TracyInstrumentation.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -17,6 +17,8 @@ namespace Kerberos
 	                                    const float farPlane,
 	                                    const glm::vec3& lightDir)
 	{
+	    KBR_TRACY_FUNCTION();
+	    
 		const glm::mat4 proj = glm::perspective(fov, aspectRatio, nearPlane, farPlane);
 
 		const auto corners = GetFrustumCornersWorldSpace(proj, view);
@@ -202,4 +204,16 @@ namespace Kerberos
 
 		return { matrices, cascadeSplits };
 	}
+
+    bool IsSphereOutsideFrustum(const Frustum& frustum, const glm::vec3& center, const float radius)
+    {
+	    KBR_TRACY_FUNCTION();
+	    
+        for (const auto& [Normal, Distance] : frustum.Planes)
+        {
+            if (glm::dot(Normal, center) + Distance < -radius)
+                return true;
+        }
+	    return false;
+    }
 }

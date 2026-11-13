@@ -1360,6 +1360,7 @@ namespace PROJECT_NAME
 			ImGui::Text("Frame: %.3f ms", gpuTimings.FrameMilliseconds);
 			ImGui::Text("Depth Pre-Pass: %.3f ms", gpuTimings.DepthPrePassMilliseconds);
 			ImGui::Text("Shadow: %.3f ms", gpuTimings.ShadowPassMilliseconds);
+			ImGui::Text("OmniShadow: %.3f ms", gpuTimings.OmniShadowPassMilliseconds);
 			ImGui::Text("Opaque: %.3f ms", gpuTimings.OpaquePassMilliseconds);
 			ImGui::Text("Grass: %.3f ms", gpuTimings.GrassPassMilliseconds);
 			ImGui::Text("Particles Simulate: %.3f ms", gpuTimings.ParticlesSimulateMilliseconds);
@@ -1504,6 +1505,41 @@ namespace PROJECT_NAME
 		ImGui::DragFloat("Constant Factor", &ConstantFactor, 0.001f, 0.0f, 5.0f);
 		ImGui::DragFloat("Clamp", &Clamp, 0.001f, 0.0f, 1.0f);
 		ImGui::DragFloat("Slope Factor", &SlopeFactor, 0.01f, 0.0f, 10.0f);
+	    
+	    ImGui::SeparatorText("Point Light Shadows");
+	    ImGui::Checkbox("Enable point shadows", &Renderer::GetPointShadowsEnabled());
+
+	    int maxCasters = static_cast<int>(Renderer::GetMaxPointShadowCasters());
+	    if (ImGui::SliderInt("Max point shadow casters", &maxCasters, 0,
+                             static_cast<int>(Renderer::GetPointShadowCasterCapacity())))
+	    {
+	        Renderer::GetMaxPointShadowCasters() = static_cast<uint32_t>(maxCasters);
+	    }
+
+	    ImGui::Checkbox("Wide PCF (3x3)", &Renderer::GetUseWidePointShadowPCF());
+
+	    auto& pointBias = Renderer::GetPointShadowDepthBiasSettings();
+	    ImGui::DragFloat("Point bias constant", &pointBias.ConstantFactor, 0.001f, 0.0f, 5.0f);
+	    ImGui::DragFloat("Point bias clamp", &pointBias.Clamp, 0.001f, 0.0f, 1.0f);
+	    ImGui::DragFloat("Point bias slope", &pointBias.SlopeFactor, 0.01f, 0.0f, 10.0f);
+
+	    const RenderStatistics stats = Renderer::GetLatestRenderStatistics();
+	    ImGui::Text("Candidates: %u", stats.PointShadowCandidateCount);
+	    ImGui::Text("Active casters: %u", stats.PointShadowCasterCount);
+	    ImGui::Text("Allocation: %u casters x 6 faces @ %u x %u",
+                    Renderer::GetPointShadowCasterCapacity(),
+                    Renderer::GetPointShadowResolution(),
+                    Renderer::GetPointShadowResolution());
+
+	    static int previewSlot = 0;
+	    static int previewFace = 0;
+	    ImGui::SliderInt("Preview slot", &previewSlot, 0,
+                         static_cast<int>(Renderer::GetPointShadowCasterCapacity()) - 1);
+	    ImGui::SliderInt("Preview face", &previewFace, 0, 5);
+	    ImGui::Image(Renderer::GetPointShadowDepthImageID(
+                         static_cast<uint32_t>(previewSlot),
+                         static_cast<uint32_t>(previewFace)),
+                     ImVec2(256.0f, 256.0f));
 
 		ImGui::Separator();
 

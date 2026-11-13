@@ -34,6 +34,7 @@ struct GPUTimings
     float FrameMilliseconds = 0.0f;
     float DepthPrePassMilliseconds = 0.0f;
     float ShadowPassMilliseconds = 0.0f;
+    float OmniShadowPassMilliseconds = 0.0f;
     float OpaquePassMilliseconds = 0.0f;
     float GrassPassMilliseconds = 0.0f;
     float ParticlesDrawMilliseconds = 0.0f;
@@ -56,6 +57,8 @@ struct RenderStatistics
     uint32_t IndexCount = 0;
     uint32_t FaceCount = 0;
     uint32_t ColliderLineVertexCount = 0;
+    uint32_t PointShadowCandidateCount = 0;
+    uint32_t PointShadowCasterCount = 0;
     bool IsValid = false;
 };
 
@@ -205,6 +208,14 @@ public:
     static void SetUpscalingMode(UpscalerType mode);
     static UpscalerQuality GetUpscalingQuality();
     static void SetUpscalingQuality(UpscalerQuality quality);
+    
+    static bool& GetPointShadowsEnabled();
+    static uint32_t& GetMaxPointShadowCasters();
+    static bool& GetUseWidePointShadowPCF();
+    static DepthBias& GetPointShadowDepthBiasSettings();
+    static uint32_t GetPointShadowCasterCapacity();
+    static uint32_t GetPointShadowResolution();
+    static uint64_t GetPointShadowDepthImageID(uint32_t slot, uint32_t face);
 
     static glm::vec2 GetOutputImageSize();
     static glm::vec2 GetRenderImageSize();
@@ -275,6 +286,11 @@ private:
                                  uint32_t frameIndex,
                                  const RenderObjectContainer& renderObjects,
                                  std::pmr::memory_resource* arena);
+    
+    static void RenderOmniShadowPass(const vk::raii::CommandBuffer& cmd,
+                                      uint32_t frameIndex,
+                                      const RenderObjectContainer& renderObjects,
+                                      std::pmr::memory_resource* arena);
 
     static void UpdateParticles(const vk::raii::CommandBuffer& cmd,
                                 uint32_t frameIndex,
@@ -349,6 +365,11 @@ private:
     static void HandleMousePickingReadback(const vk::raii::CommandBuffer& cmd);
 
     static void RenderMesh(const vk::raii::CommandBuffer& cmd, const RenderObject& renderObject);
+    
+    static void AssignOmniShadowCasters(std::vector<GPULight>& lights,
+                                        const glm::mat4& view, 
+                                        const glm::mat4& projection, 
+                                        const glm::vec3& cameraPos);
 
     static void EnqueueDeferredAction(DeferredAction&& action);
     static void ApplyDeferredActions();

@@ -4,6 +4,7 @@ struct VSInput
 {
     float3 Pos;
     float3 Normal;
+    float4 Tangent;
     float2 TexCoord;
 };
 

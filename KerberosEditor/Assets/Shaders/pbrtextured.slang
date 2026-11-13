@@ -56,6 +56,9 @@ StructuredBuffer<GPULight> sceneLights;
 [[vk::binding(9, 0)]]
 Sampler2D<float> globalAoTexture;
 
+[[vk::binding(10, 0)]]
+SamplerCubeArrayShadow pointShadowMap;
+
 [[vk::binding(0, 1)]]
 Texture2D globalTextures[];
 [[vk::binding(1, 1)]]
@@ -211,6 +214,14 @@ LightResult CalculateLight(GPULight light, float3 worldPos, float3 N, float3 V, 
 
     float3 radiance = CalculateLightColor(light, worldPos);
     LightResult res = GetDirectLight(L, V, N, F0, albedo, metallic, roughness);
+    
+    if (max(radiance.r, max(radiance.g, radiance.b)) > 0.0)
+    {
+        const float visibility = CalculatePointShadowVisibility(pointShadowMap, light, worldPos, N, globalLighting.lightingParams.z > 0.5);
+        res.diffuse *= visibility;
+        res.specular *= visibility;
+    }
+    
     res.diffuse = res.diffuse * radiance;
     res.specular = res.specular * radiance;
     return res;

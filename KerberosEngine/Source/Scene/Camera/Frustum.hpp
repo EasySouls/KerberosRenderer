@@ -64,4 +64,6 @@ namespace Kerberos
 		float farClip,
 		const glm::vec3& lightDir,
 		const std::function<glm::vec4(float)>& getCascadeSplits);
+
+    bool IsSphereOutsideFrustum(const Frustum& frustum, const glm::vec3& center, float radius);
 }

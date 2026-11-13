@@ -15,6 +15,11 @@ public struct GPULight {
 
     public float width;
     public float height;
+    
+    public int shadowSlot;
+    public float shadowNear;
+    public float shadowFar;
+    public float _shadowPadding;
 };
 
 static uint LightType_Point = 0;
@@ -80,4 +85,73 @@ public float3 CalculateLightColor(GPULight light, float3 worldPos)
 {
     float contribution = CalculateLightContribution(light, worldPos);
     return light.color * contribution;
+}
+
+public float CalculatePointShadowVisibility(
+    SamplerCubeArrayShadow shadowMap,
+    GPULight light,
+    float3 worldPos,
+    float3 N,
+    bool widePcf)
+{
+    if (light.shadowSlot < 0 || light.shadowFar <= light.shadowNear)
+        return 1.0;
+
+    const float3 toFrag = worldPos - light.position;
+    const float axisDistance = max(max(abs(toFrag.x), abs(toFrag.y)), abs(toFrag.z));
+
+    if (axisDistance >= light.shadowFar)
+        return 1.0;
+
+    // TODO: Might be able to hardcode the widht and height, since we use only one size currently
+    uint width, height, elements;
+    shadowMap.GetDimensions(width, height, elements);
+    const float resolution = max((float)width, 1.0);
+
+    // At 90 degrees, a face spans 2 * distance world units.
+    const float worldPerTexel = 2.0 * max(axisDistance, light.shadowNear) / resolution;
+
+    const float3 biasedWorldPos = worldPos + N * (worldPerTexel * 1.5);
+    const float3 dir = biasedWorldPos - light.position;
+    const float maxAxis = max(max(abs(dir.x), abs(dir.y)), abs(dir.z));
+
+    if (maxAxis <= light.shadowNear)
+        return 1.0;
+
+    // Matches the GLM zero-to-one perspective used for the CPU cube-face matrix.
+    float depth =
+        (light.shadowFar * (maxAxis - light.shadowNear)) /
+        ((light.shadowFar - light.shadowNear) * maxAxis);
+    const float reference = saturate(depth - 0.00002);
+
+    const float arrayIndex = (float)light.shadowSlot;
+    float shadow;
+
+    if (widePcf)
+    {
+        const float3 up = abs(dir.y) < 0.99 ? float3(0.0, 1.0, 0.0) : float3(1.0, 0.0, 0.0);
+        const float3 tangent = normalize(cross(up, dir));
+        const float3 bitangent = cross(dir, tangent);
+        const float texelAngle = 1.57079632679 / resolution;
+        const float offsetScale = texelAngle * maxAxis;
+
+        shadow = 0.0;
+        for (int y = -1; y <= 1; ++y)
+        {
+            for (int x = -1; x <= 1; ++x)
+            {
+                const float3 offsetDir = dir + tangent * (x * offsetScale) + bitangent * (y * offsetScale);
+                shadow += shadowMap.SampleCmp(float4(offsetDir, arrayIndex), reference);
+            }
+        }
+        shadow /= 9.0;
+    }
+    else
+    {
+        shadow = shadowMap.SampleCmp(float4(dir, arrayIndex), reference);
+    }
+
+    // Sampler uses GreaterOrEqual + white border, matching the CSM path,
+    // a comparison result of 1 means the fragment is occluded.
+    return 1.0 - shadow;
 }

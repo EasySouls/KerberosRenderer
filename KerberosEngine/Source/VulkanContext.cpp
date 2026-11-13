@@ -1196,7 +1196,12 @@ namespace Kerberos
 			m_SupportedFeatures.get<vk::PhysicalDeviceRayQueryFeaturesKHR>().rayQuery;
 	}
 
-	VulkanContext::QueueFamilyInfo VulkanContext::FindQueueFamilies(const vk::raii::PhysicalDevice& physicalDevice, const vk::raii::SurfaceKHR& surface)
+    bool VulkanContext::SupportsCubeArrays() const
+    {
+        return m_SupportedFeatures.get<vk::PhysicalDeviceFeatures2>().features.imageCubeArray;
+    }
+
+    VulkanContext::QueueFamilyInfo VulkanContext::FindQueueFamilies(const vk::raii::PhysicalDevice& physicalDevice, const vk::raii::SurfaceKHR& surface)
 	{
 		QueueFamilyInfo queueFamilyInfo{};
 
@@ -1343,11 +1348,11 @@ namespace Kerberos
 		 features.features.depthBiasClamp = true;
 		 features.features.samplerAnisotropy = true;
 		 features.features.pipelineStatisticsQuery = true;
+		 features.features.imageCubeArray = m_SupportedFeatures.get<vk::PhysicalDeviceFeatures2>().features.imageCubeArray;
 		 features.features.shaderInt64 = m_SupportedFeatures.get<vk::PhysicalDeviceFeatures2>().features.shaderInt64;
          features.features.shaderInt16 = m_SupportedFeatures.get<vk::PhysicalDeviceFeatures2>().features.shaderInt16;
 		 features.features.robustBufferAccess = false;
 		 features.features.fullDrawIndexUint32 = false;
-		 features.features.imageCubeArray = false;
 		 features.features.tessellationShader = false;
 		 features.features.sampleRateShading = false;
 		 features.features.dualSrcBlend = false;

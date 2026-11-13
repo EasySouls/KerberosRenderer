@@ -53,6 +53,9 @@ StructuredBuffer<GPULight> sceneLights;
 [[vk::binding(9, 0)]]
 Sampler2D<float> globalAoTexture;
 
+[[vk::binding(10, 0)]]
+SamplerCubeArrayShadow pointShadowMap;
+
 [[vk::binding(0, 1)]]
 Texture2D globalTextures[];
 [[vk::binding(1, 1)]]
@@ -232,6 +235,14 @@ PBOITData fragmentMain(VSOutput input)
         float3 radiance = CalculateLightColor(light, input.FragPos_WorldSpace);
 
         LightResult lightResult = GetDirectLight(L, V, N, F0, albedo, metallic, roughness);
+        
+        if (max(radiance.r, max(radiance.g, radiance.b)) > 0.0)
+        {
+            const float visibility = CalculatePointShadowVisibility(pointShadowMap, light, input.FragPos_WorldSpace, N, globalLighting.lightingParams.z > 0.5);
+            lightResult.diffuse *= visibility;
+            lightResult.specular *= visibility;
+        }
+        
         totalDiffuse += lightResult.diffuse * radiance;
         totalSpecular += lightResult.specular * radiance;
     }

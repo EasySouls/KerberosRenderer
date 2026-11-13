@@ -214,6 +214,12 @@ Editor windows live mainly under
   perception cones; the AI Editor runtime bar also exposes the perception
   toggle. Perception cones show sight/retain sectors, FOV direction, eye height,
   and the current target or last-known-position line.
+- Renderer debug window (`EditorLayer`): GPU timings, renderer and pipeline
+  statistics, shadow-map preview, and point/omni shadow controls. The
+  point-shadow section exposes enable, max active casters, wide PCF, and point
+  depth-bias settings, plus candidate/caster counts and a slot/face cube
+  preview. GPU timings reports `OmniShadowPassMilliseconds` separately from
+  the directional shadow pass.
 - project/scene panels: project settings, serialization, scene lifecycle, and
   runtime/editor mode transitions.
 
@@ -425,7 +431,9 @@ It fits each cascade to the camera frustum and snaps the light-space origin to
 shadow-map texels while preserving the ortho extents. Duplicating the
 calculation without snapping, or snapping min/max independently, makes the
 shadow grid swim as the camera moves; temporal upscaling turns that into
-lagging/snapping shadows.
+lagging/snapping shadows. Point/omni shadows do not use the CSM cascade
+matrices; each active point light renders its own six cube faces, while the
+main camera frustum is still used to cull point-light shadow candidates.
 
 Scene serialization must preserve authored component
 data while leaving transient runtime state transient. Scene and project
@@ -488,7 +496,9 @@ paths, the folder `Create AI State Tree...` flow (including duplicate-name
 rejection), tab close/discard behavior, and project switching clearing AI tabs. For
 undo changes, validate create/delete round-trips (including entity subtrees),
 component field edits, history clearing on new/open scene, and that history is
-inert during Play/Simulate.
+inert during Play/Simulate. For the point/omni shadow debug controls, validate
+toggling, max active casters, wide PCF, point depth bias, the slot/face preview,
+candidate vs. active caster counts, and the separate OmniShadow GPU timing line.
 Run shader compilation when the editor changes shader assets. Update this
 file whenever editor lifecycle, panel ownership, threading, UI conventions,
 project/scene integration, or validation procedures change.
