@@ -64,6 +64,6 @@ namespace Kerberos
 	    alignas(4)  int32_t ShadowSlot = -1;
 	    alignas(4)  float ShadowNear = 0.05f;
 	    alignas(4)  float ShadowFar = 0.0f;
-	    alignas(4)  float _ShadowPadding = 0.0f;
+	    alignas(4)  uint32_t ShadowCasterEntityID = 0;
     };
 }

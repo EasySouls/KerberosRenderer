@@ -218,8 +218,10 @@ Editor windows live mainly under
   statistics, shadow-map preview, and point/omni shadow controls. The
   point-shadow section exposes enable, max active casters, wide PCF, and point
   depth-bias settings, plus candidate/caster counts and a slot/face cube
-  preview. GPU timings reports `OmniShadowPassMilliseconds` separately from
-  the directional shadow pass.
+  preview. Its controls are disabled when the device lacks cube-array support.
+  GPU timings reports `OmniShadowPassMilliseconds` separately from the
+  directional shadow pass and reports a near-zero fallback when the omni pass is
+  skipped (feature disabled or ray-query shadows active).
 - project/scene panels: project settings, serialization, scene lifecycle, and
   runtime/editor mode transitions.
 

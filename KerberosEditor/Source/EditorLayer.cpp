@@ -1388,6 +1388,8 @@ namespace PROJECT_NAME
 			ImGui::Text("Indices: %u", renderStatistics.IndexCount);
 			ImGui::Text("Faces: %u", renderStatistics.FaceCount);
 			ImGui::Text("Debug line vertices: %u", renderStatistics.ColliderLineVertexCount);
+			ImGui::Text("Omnishadow candidate count: %u", renderStatistics.PointShadowCandidateCount);
+			ImGui::Text("Omnishadow caster count: %u", renderStatistics.PointShadowCasterCount);
 		}
 		else
 		{
@@ -1507,6 +1509,8 @@ namespace PROJECT_NAME
 		ImGui::DragFloat("Slope Factor", &SlopeFactor, 0.01f, 0.0f, 10.0f);
 	    
 	    ImGui::SeparatorText("Point Light Shadows");
+	    const bool pointShadowSupported = Renderer::IsPointShadowSupported();
+	    ImGui::BeginDisabled(!pointShadowSupported);
 	    ImGui::Checkbox("Enable point shadows", &Renderer::GetPointShadowsEnabled());
 
 	    int maxCasters = static_cast<int>(Renderer::GetMaxPointShadowCasters());
@@ -1531,15 +1535,21 @@ namespace PROJECT_NAME
                     Renderer::GetPointShadowResolution(),
                     Renderer::GetPointShadowResolution());
 
-	    static int previewSlot = 0;
-	    static int previewFace = 0;
-	    ImGui::SliderInt("Preview slot", &previewSlot, 0,
-                         static_cast<int>(Renderer::GetPointShadowCasterCapacity()) - 1);
-	    ImGui::SliderInt("Preview face", &previewFace, 0, 5);
-	    ImGui::Image(Renderer::GetPointShadowDepthImageID(
-                         static_cast<uint32_t>(previewSlot),
-                         static_cast<uint32_t>(previewFace)),
-                     ImVec2(256.0f, 256.0f));
+	    if (pointShadowSupported)
+	    {
+	        static int previewSlot = 0;
+	        static int previewFace = 0;
+	        ImGui::SliderInt("Preview slot", &previewSlot, 0,
+                             static_cast<int>(Renderer::GetPointShadowCasterCapacity()) - 1);
+	        ImGui::SliderInt("Preview face", &previewFace, 0, 5);
+	        ImGui::Image(Renderer::GetPointShadowDepthImageID(
+                             static_cast<uint32_t>(previewSlot),
+                             static_cast<uint32_t>(previewFace)),
+                         ImVec2(256.0f, 256.0f));
+	    }
+	    ImGui::EndDisabled();
+	    if (!pointShadowSupported)
+	        ImGui::TextDisabled("Point shadows require cube-array image support.");
 
 		ImGui::Separator();
 

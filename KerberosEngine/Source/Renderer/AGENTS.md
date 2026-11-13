@@ -125,9 +125,11 @@ The active pass order is approximately:
 
 The omni shadow pass is a separate graph pass after the directional
 cascades. It writes the fixed `PointShadowMap` cube array, and the opaque and
-transparent passes read it. The pass is registered even when no point light is
-selected so the cube-array layout and the paired `OmniShadowBegin` /
-`OmniShadowEnd` timestamps stay defined.
+transparent passes read it. The pass is registered when point shadows are
+enabled, cube arrays are supported, and ray-query shadows are off; it may still
+run with zero active casters. When it is omitted, the cube array stays in its
+shader-read initialization layout and the timestamp fallback described below
+keeps the timing queries complete.
 
 The skinning pass is added before the depth pre-pass; animation has no graph
 pass because pose evaluation happens on the CPU in `Scene::AnimationRuntime` and
@@ -226,8 +228,10 @@ matching the CSM sampler; the shader treats a comparison result of 1 as
 occluded and returns `1 - SampleCmp(...)` as visibility.
 
 `GPULight` is 80 bytes and carries `ShadowSlot` (`-1` = no shadow),
-`ShadowNear`, and `ShadowFar` after the existing material block. Keep the C++
-static asserts and the `lights.slang` layout in sync. `ShadowSlot` selects the
+`ShadowNear`, `ShadowFar`, and `ShadowCasterEntityID` (the owning light entity,
+used to exclude its lamp/fixture mesh from its own cube map) after the existing
+material block. Keep the C++ static asserts and the `lights.slang` layout in
+sync. `ShadowSlot` selects the
 cube-array layer; a light without a slot still illuminates.
 
 `AssignOmniShadowCasters` runs before the light buffer upload. It builds the
@@ -238,15 +242,30 @@ slots `0..N-1`. The active casters are copied into `PointShadowCasters` for the
 render pass. Lights beyond the budget keep `ShadowSlot = -1` and illuminate
 without shadows.
 
+If point shadows are disabled, cube arrays are unsupported, or ray-query
+shadows are enabled, the assignment clears the caster list and both
+`RenderStatistics` counts, leaves every `ShadowSlot` at `-1`, and returns. The
+omni graph pass is omitted in that case. Ray-query opaque lighting traces
+point-light shadows itself, so raster transparent geometry does not receive
+point-light shadows while ray-query shadows are enabled.
+
 `RenderOmniShadowPass` runs as the "Omni Shadow Pass" graph pass. For each
 caster it pre-filters `allObjects` once with a light-sphere vs. world-AABB test,
 then for each of the six cube faces constructs the 90-degree perspective face
 view (using the same face directions/up vectors as the skybox capture), builds
-the face frustum, and draws only objects whose AABB intersects it. Transparent
-materials are skipped; alpha-masked materials use the shared global texture set.
+the face frustum, and draws only objects whose AABB intersects it. The
+pre-filter also skips the light's owning entity mesh (`ShadowCasterEntityID`)
+and small meshes whose AABB contains the light, so an authored lamp/fixture mesh
+cannot fill its own cube map with near inside faces and shadow the whole scene.
+Transparent materials are skipped; alpha-masked materials use the shared global
+texture set.
 The pass clears each active face and renders with `shadowmap_omni` using
 front-face culling and depth bias, pushing the face view-projection as a vertex
 push constant.
+
+The cube array is transitioned to shader-read once at creation, so it remains a
+valid scene-descriptor target when the omni pass is skipped. When the pass runs,
+the render graph transitions it to a depth attachment and back to shader-read.
 
 The cube array is bound to scene-set binding `10` and sampled in `pbrtextured`
 and `transparent` through `lights.slang::CalculatePointShadowVisibility`. The
@@ -258,7 +277,11 @@ point-light shadows and does not sample binding 10.
 
 `OmniShadowBegin`/`OmniShadowEnd` are separate GPU timestamp queries and
 resolve to `GPUTimings::OmniShadowPassMilliseconds`, independent of the
-directional `ShadowPassMilliseconds`. `RenderStatistics` exposes
+directional `ShadowPassMilliseconds`. Every timestamp query must be written
+each frame: `vkGetQueryPoolResults` reports the entire pool as not ready if even
+one query is unwritten. `WriteMissingGPUTimestamps` tracks written queries per
+frame and writes paired zero-duration fallbacks for skipped passes (for example
+anti-aliasing under FSR3, or an omitted omni pass). `RenderStatistics` exposes
 `PointShadowCandidateCount` and `PointShadowCasterCount` for the debug panel,
 which also has enable/max-caster/wide-PCF/depth-bias controls and a slot/face
 preview.
@@ -273,7 +296,14 @@ Point/omni shadow invariants:
 - `PointShadowMaxCasters` is a user cap, not the allocation size; clamp it to
   `PointShadowMap::MaxCasters` before use.
 - Clear `PointShadowCasters` and the candidate/caster statistics even when point
-  shadows are disabled, and check the enabled flag in the pass as well.
+  shadows are disabled, unsupported, or superseded by ray-query shadows, and
+  check the active condition in the pass as well. Omit the omni graph pass when
+  it is inactive; the cube array's creation-time shader-read transition keeps
+  the scene descriptor valid.
+- Every GPU timestamp query must be written every frame. Skipped or conditional
+  passes must still receive their timestamp pair through
+  `WriteMissingGPUTimestamps`, or the whole timing readback becomes
+  `eNotReady`.
 - Shadow vertex shaders that sample the albedo alpha must declare `Pos`,
   `Normal`, `Tangent`, and `TexCoord` in order (or use explicit vertex
   locations) so `TexCoord` is location 3. `shadowmap_csm` and
@@ -284,7 +314,10 @@ Point/omni shadow invariants:
   `slot * PointShadowMap::FaceCount + face`; the slot/face selectors map
   directly onto the 96 per-face views.
 - The point-shadow path requires `imageCubeArray` and a depth format with
-  comparison sampling; gate resource creation on device support.
+  comparison sampling; gate resource creation on device support. Without cube
+  arrays the renderer disables the pass and preview, leaves all shadow slots at
+  `-1`, and binds the CSM depth view as a descriptor placeholder so the shared
+  scene layout remains populated.
 
 ## Materials, alpha modes, and ambient occlusion
 
@@ -483,10 +516,14 @@ and Tracy zones are important diagnostics. For renderer changes, validate
 swapchain/viewport resize, frame synchronization, graph barriers/layouts,
 descriptor lifetime, and shader compilation. For point/omni shadows, validate
 0, 1, 16, and 17+ candidates, camera-frustum light culling, per-face mesh
-culling, alpha-masked casters, slot reassignment, the enable toggle, wide PCF,
-depth bias, the slot/face preview, and the separate OmniShadow GPU timing line;
-run Vulkan validation and synchronization validation to catch cube-array layout
-or descriptor mistakes. For the AI perception overlay,
+culling, a point light authored inside its lamp/fixture mesh, alpha-masked
+casters, slot reassignment, the enable toggle, ray-query
+shadow mode, wide PCF, depth bias, the slot/face preview, and the separate
+OmniShadow GPU timing line; run Vulkan validation and synchronization validation
+to catch cube-array layout or descriptor mistakes. Validate GPU timings with
+FSR3 on and off: every timing line must remain valid, and skipped anti-aliasing
+or omni-shadow passes must report a near-zero duration rather than invalidating
+the whole query pool. For the AI perception overlay,
 validate Edit/Simulate/Play, FOV changes, 360-degree FOV, sight/lose radii,
 occlusion by depth-tested geometry, many simultaneous agents, and toggling the
 overlay off. Keep this file updated whenever renderer ownership, pass order,

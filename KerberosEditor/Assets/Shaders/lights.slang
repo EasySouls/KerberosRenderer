@@ -19,7 +19,7 @@ public struct GPULight {
     public int shadowSlot;
     public float shadowNear;
     public float shadowFar;
-    public float _shadowPadding;
+    public uint shadowCasterEntityID;
 };
 
 static uint LightType_Point = 0;

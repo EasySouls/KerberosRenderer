@@ -162,6 +162,7 @@ struct PointShadowCaster
     float Near = 0.05f;
     float Far = 0.0f;
     uint32_t Slot = 0;
+    uint32_t EntityID = 0;
 };
 
 struct Skybox
@@ -280,6 +281,7 @@ static_assert(offsetof(GPULight, InnerConeCos) == 48);
 static_assert(offsetof(GPULight, ShadowSlot) == 64);
 static_assert(offsetof(GPULight, ShadowNear) == 68);
 static_assert(offsetof(GPULight, ShadowFar) == 72);
+static_assert(offsetof(GPULight, ShadowCasterEntityID) == 76);
 
 struct PerObjectData
 {
@@ -615,6 +617,7 @@ struct RendererData
     MousePickingReadback MousePickingReadback{};
 
     std::vector<vk::raii::QueryPool> GPUTimestampQueryPools;
+    std::array<std::array<bool, static_cast<size_t>(GPUTimestampQuery::Count)>, VulkanContext::MaxFramesInFlight> GPUTimestampWritten{};
     float GPUTimestampPeriodNanoseconds = 0.0f;
     bool SupportsGPUTimestamps = false;
     GPUTimings LatestGPUTimings{};
@@ -1645,6 +1648,8 @@ void Renderer::RecordQueuedSceneRender(const vk::raii::CommandBuffer& cmd)
 
     ResetQueryPools(cmd, frameIndex);
 
+    s_Data->GPUTimestampWritten[frameIndex].fill(false);
+
     cmd.beginQuery(s_Data->PipelineStatisticsQueryPools[frameIndex], 0, {});
 
     WriteGPUTimestamp(cmd, frameIndex, static_cast<uint32_t>(GPUTimestampQuery::FrameBegin));
@@ -1916,6 +1921,7 @@ void Renderer::RecordQueuedSceneRender(const vk::raii::CommandBuffer& cmd)
     //}
 
     WriteGPUTimestamp(cmd, frameIndex, static_cast<uint32_t>(GPUTimestampQuery::FrameEnd));
+    WriteMissingGPUTimestamps(cmd, frameIndex);
 
     s_Data->HasTemporalHistory = true;
     cmd.endQuery(s_Data->PipelineStatisticsQueryPools[frameIndex], 1);
@@ -2366,6 +2372,11 @@ void Renderer::CreateResources()
         
         // Create the point shadow resources
         s_Data->PointShadowMap.Enabled = context.SupportsCubeArrays();
+        if (!s_Data->PointShadowMap.Enabled)
+        {
+            Log::CoreWarn("Point light shadows disabled: the device does not support cube-array images. "
+                          "The scene-set cube-array binding uses the CSM shadow view as a placeholder.");
+        }
         if (s_Data->PointShadowMap.Enabled)
         {
             s_Data->PointShadowMap.Format = context.FindSupportedFormat(
@@ -2435,8 +2446,27 @@ void Renderer::CreateResources()
                                           .layerCount = 1 } };
                 s_Data->PointShadowMap.FaceImageViews.emplace_back(device, faceViewInfo);
                 context.SetObjectDebugName(s_Data->PointShadowMap.FaceImageViews.back(),
-                                           "Omni Shadow Face View [" + std::to_string(layer) + "]");
+                                           std::format("Omni Shadow Face View [{}]", layer));
             }
+            
+            context.Submit(VulkanContext::OperationType::Graphics, [&](const vk::raii::CommandBuffer& transitionCmd) {
+                    constexpr vk::ImageSubresourceRange pointShadowRange{
+                        .aspectMask = vk::ImageAspectFlagBits::eDepth,
+                        .baseMipLevel = 0,
+                        .levelCount = 1,
+                        .baseArrayLayer = 0,
+                        .layerCount = PointShadowMap::LayerCount
+                    };
+                    context.TransitionImageLayout(
+                        transitionCmd,
+                        s_Data->PointShadowMap.Image,
+                        vk::ImageLayout::eUndefined,
+                        vk::ImageLayout::eShaderReadOnlyOptimal,
+                        pointShadowRange,
+                        vk::PipelineStageFlagBits2::eTopOfPipe,
+                        vk::PipelineStageFlagBits2::eFragmentShader);
+                });
+            s_Data->PointShadowMap.CurrentLayout = vk::ImageLayout::eShaderReadOnlyOptimal;
         }
 
         // We do this here, because the descriptors will use the shadow map image view,
@@ -2511,45 +2541,47 @@ void Renderer::CreateResources()
         s_Data->ShadowMap.Pipeline = CreateRef<GraphicsPipeline>(shadowPipelineSpec);
         
         // Omnishadows
-
-        constexpr vk::PushConstantRange omniPushRange{
-            .stageFlags = vk::ShaderStageFlagBits::eVertex,
-            .offset = 0,
-            .size = sizeof(glm::mat4) };
-
-        const std::array<vk::DescriptorSetLayout, 2> omniShadowSetLayouts = {
-            s_Data->DescriptorSetLayouts.scene,
-            s_Data->TextureManager.GetGlobalDescriptorSetLayout()
-        };
-
-        const vk::PipelineLayoutCreateInfo omniShadowLayoutInfo{
-            .setLayoutCount = static_cast<uint32_t>(omniShadowSetLayouts.size()),
-            .pSetLayouts = omniShadowSetLayouts.data(),
-            .pushConstantRangeCount = 1,
-            .pPushConstantRanges = &omniPushRange };
-        s_Data->PointShadowMap.PipelineLayout = vk::raii::PipelineLayout{ device, omniShadowLayoutInfo };
-
-        Ref<Shader> omniShadowShader = CreateRef<Shader>("shadowmap_omni", "OmniShadowMap");
-
-        const auto omniShadowBindingDesc = Vertex::GetBindingDescription();
-        const auto omniShadowAttributeDescs = Vertex::GetAttributeDescriptions();
-
-        GraphicsPipelineSpecification omniShadowPipelineSpec{};
-        omniShadowPipelineSpec.Name = "Omni Shadow Map Pipeline";
-        omniShadowPipelineSpec.Shader = omniShadowShader;
-        omniShadowPipelineSpec.PipelineLayout = *s_Data->PointShadowMap.PipelineLayout;
-        omniShadowPipelineSpec.BindingDescription = omniShadowBindingDesc;
-        omniShadowPipelineSpec.InputAttributeDescriptions = { omniShadowAttributeDescs.begin(), omniShadowAttributeDescs.end() };
-        omniShadowPipelineSpec.SampleCount = vk::SampleCountFlagBits::e1;
-        omniShadowPipelineSpec.CullMode = CullMode::Front;
-        omniShadowPipelineSpec.EnableDepthClamp = true;
-        omniShadowPipelineSpec.EnableDepthBias = true;
-        omniShadowPipelineSpec.EnableDepthTest = true;
-        omniShadowPipelineSpec.EnableDepthWrite = true;
-        omniShadowPipelineSpec.DepthTestFunc = DepthTestFunc::LessOrEqual;
-        omniShadowPipelineSpec.DepthAttachmentFormat = s_Data->PointShadowMap.Format;
-        omniShadowPipelineSpec.DynamicStates = shadowMapDynamicState;
-        s_Data->PointShadowMap.Pipeline = CreateRef<GraphicsPipeline>(omniShadowPipelineSpec);
+        if (s_Data->PointShadowMap.Enabled)
+        {
+            constexpr vk::PushConstantRange omniPushRange{
+                .stageFlags = vk::ShaderStageFlagBits::eVertex,
+                .offset = 0,
+                .size = sizeof(glm::mat4) };
+            
+            const std::array<vk::DescriptorSetLayout, 2> omniShadowSetLayouts = {
+                s_Data->DescriptorSetLayouts.scene,
+                s_Data->TextureManager.GetGlobalDescriptorSetLayout()
+            };
+            
+            const vk::PipelineLayoutCreateInfo omniShadowLayoutInfo{
+                .setLayoutCount = static_cast<uint32_t>(omniShadowSetLayouts.size()),
+                .pSetLayouts = omniShadowSetLayouts.data(),
+                .pushConstantRangeCount = 1,
+                .pPushConstantRanges = &omniPushRange };
+            s_Data->PointShadowMap.PipelineLayout = vk::raii::PipelineLayout{ device, omniShadowLayoutInfo };
+            
+            Ref<Shader> omniShadowShader = CreateRef<Shader>("shadowmap_omni", "OmniShadowMap");
+            
+            const auto omniShadowBindingDesc = Vertex::GetBindingDescription();
+            const auto omniShadowAttributeDescs = Vertex::GetAttributeDescriptions();
+            
+            GraphicsPipelineSpecification omniShadowPipelineSpec{};
+            omniShadowPipelineSpec.Name = "Omni Shadow Map Pipeline";
+            omniShadowPipelineSpec.Shader = omniShadowShader;
+            omniShadowPipelineSpec.PipelineLayout = *s_Data->PointShadowMap.PipelineLayout;
+            omniShadowPipelineSpec.BindingDescription = omniShadowBindingDesc;
+            omniShadowPipelineSpec.InputAttributeDescriptions = { omniShadowAttributeDescs.begin(), omniShadowAttributeDescs.end() };
+            omniShadowPipelineSpec.SampleCount = vk::SampleCountFlagBits::e1;
+            omniShadowPipelineSpec.CullMode = CullMode::Front;
+            omniShadowPipelineSpec.EnableDepthClamp = true;
+            omniShadowPipelineSpec.EnableDepthBias = true;
+            omniShadowPipelineSpec.EnableDepthTest = true;
+            omniShadowPipelineSpec.EnableDepthWrite = true;
+            omniShadowPipelineSpec.DepthTestFunc = DepthTestFunc::LessOrEqual;
+            omniShadowPipelineSpec.DepthAttachmentFormat = s_Data->PointShadowMap.Format;
+            omniShadowPipelineSpec.DynamicStates = shadowMapDynamicState;
+            s_Data->PointShadowMap.Pipeline = CreateRef<GraphicsPipeline>(omniShadowPipelineSpec);
+        }
     }
 
     std::vector commonDynamicStates = { vk::DynamicState::eViewport, vk::DynamicState::eScissor };
@@ -3437,17 +3469,20 @@ void Renderer::CreateResources()
                 std::format("Shadow Map Descriptor Set for ImGui {}", i));
         }
         
-        for (uint32_t layer = 0; layer < PointShadowMap::LayerCount; ++layer)
+        if (s_Data->PointShadowMap.Enabled)
         {
-            s_Data->PointShadowMap.PreviewDescriptorSets[layer] =
-                VulkanContext::GenerateImGuiDescriptorSet(
-                    s_Data->ColorSampler,
-                    s_Data->PointShadowMap.FaceImageViews[layer]);
-            
-            context.SetObjectDebugName(
-                reinterpret_cast<uint64_t>(static_cast<VkDescriptorSet>(s_Data->PointShadowMap.PreviewDescriptorSets[layer])),
-                vk::ObjectType::eDescriptorSet,
-                std::format("Omni Shadow Map Descriptor Set for ImGui {}", layer));
+            for (uint32_t layer = 0; layer < PointShadowMap::LayerCount; ++layer)
+            {
+                s_Data->PointShadowMap.PreviewDescriptorSets[layer] =
+                    VulkanContext::GenerateImGuiDescriptorSet(
+                        s_Data->ColorSampler,
+                        s_Data->PointShadowMap.FaceImageViews[layer]);
+
+                context.SetObjectDebugName(
+                    reinterpret_cast<uint64_t>(static_cast<VkDescriptorSet>(s_Data->PointShadowMap.PreviewDescriptorSets[layer])),
+                    vk::ObjectType::eDescriptorSet,
+                    std::format("Omni Shadow Map Descriptor Set for ImGui {}", layer));
+            }
         }
     }
 
@@ -4331,6 +4366,11 @@ DepthBias& Renderer::GetPointShadowDepthBiasSettings()
     return s_Data->PointShadowDepthBias;
 }
 
+bool Renderer::IsPointShadowSupported()
+{
+    return s_Data && s_Data->PointShadowMap.Enabled;
+}
+
 uint32_t Renderer::GetPointShadowCasterCapacity()
 {
     return s_Data->PointShadowMap.MaxCasters;
@@ -4437,7 +4477,32 @@ void Renderer::WriteGPUTimestamp(const vk::raii::CommandBuffer& cmd, const uint3
         s_Data->GPUTimestampQueryPools[frameIndex] == nullptr)
         return;
 
+    auto& written = s_Data->GPUTimestampWritten[frameIndex];
+    if (index < written.size())
+        written[index] = true;
+
     cmd.writeTimestamp2(vk::PipelineStageFlagBits2::eBottomOfPipe, s_Data->GPUTimestampQueryPools[frameIndex], index);
+}
+
+void Renderer::WriteMissingGPUTimestamps(const vk::raii::CommandBuffer& cmd, const uint32_t frameIndex)
+{
+    if (!s_Data->SupportsGPUTimestamps || frameIndex >= s_Data->GPUTimestampQueryPools.size() ||
+        s_Data->GPUTimestampQueryPools[frameIndex] == nullptr)
+        return;
+
+    auto& written = s_Data->GPUTimestampWritten[frameIndex];
+    for (size_t i = 0; i < written.size(); ++i)
+    {
+        if (written[i])
+            continue;
+
+        // A skipped pass still needs both of its timestamp queries written, or
+        // vkGetQueryPoolResults reports the whole pool as not ready.
+        cmd.writeTimestamp2(vk::PipelineStageFlagBits2::eBottomOfPipe,
+                            s_Data->GPUTimestampQueryPools[frameIndex],
+                            static_cast<uint32_t>(i));
+        written[i] = true;
+    }
 }
 
 void Renderer::ResolveGPUTimings(const uint32_t frameIndex)
@@ -4788,6 +4853,8 @@ std::vector<GPULight> Renderer::GetLightsFromScene(const Scene& scene)
         gpuLight.Color = SanitizeLightColor(pl.Light.Color, "point light");
         gpuLight.Intensity = SanitizeNonNegative(pl.Light.Intensity, "point light intensity");
         gpuLight.Range = std::max(SanitizeNonNegative(pl.Light.Radius, "point light radius"), 0.01f);
+        // Used by the omni shadow pass to exclude the light's own lamp/fixture mesh.
+        gpuLight.ShadowCasterEntityID = static_cast<uint32_t>(entity);
         sceneLights.push_back(gpuLight);
     }
 
@@ -5270,7 +5337,12 @@ vk::PipelineStageFlagBits2::eFragmentShader,
         const auto hComposite = s_Data->RenderGraph.ImportImage(*s_Data->CompositeImage.Image, compositeState, colorRange);
         const auto hOutput = s_Data->RenderGraph.ImportImage(*s_Data->OutputImage.Image, outputState, colorRange);
         const auto hFinal = s_Data->RenderGraph.ImportImage(*s_Data->FinalImage.Image, finalState, colorRange);
-        const auto hPointShadow = s_Data->RenderGraph.ImportImage(*s_Data->PointShadowMap.Image, omniShadowState, omniShadowRange);
+
+        ImageHandle hPointShadow{};
+        if (s_Data->PointShadowMap.Enabled)
+        {
+            hPointShadow = s_Data->RenderGraph.ImportImage(*s_Data->PointShadowMap.Image, omniShadowState, omniShadowRange);
+        }
 
         s_Data->AnimationSystem.AddPasses(s_Data->RenderGraph, frameIndex);
         s_Data->SkinningSystem.AddPasses(s_Data->RenderGraph, frameIndex);
@@ -5303,19 +5375,25 @@ vk::PipelineStageFlagBits2::eFragmentShader,
             };
         });
         
-        s_Data->RenderGraph.AddPass("Omni Shadow Pass", [&](Graph::PassBuilder& builder) -> PassExecuteFunction
-            {
-                builder.Write(hPointShadow,
-                              vk::ImageLayout::eDepthAttachmentOptimal,
-                              vk::PipelineStageFlagBits2::eEarlyFragmentTests |
-                              vk::PipelineStageFlagBits2::eLateFragmentTests,
-                              vk::AccessFlagBits2::eDepthStencilAttachmentWrite);
-            
-                return [=](const vk::raii::CommandBuffer& execCmd)
+        const bool omniShadowsActive = s_Data->PointShadowsEnabled &&
+                                       s_Data->PointShadowMap.Enabled &&
+                                       !s_Data->UseRayQueryBasedShadows;
+        if (omniShadowsActive)
+        {
+            s_Data->RenderGraph.AddPass("Omni Shadow Pass", [&](Graph::PassBuilder& builder) -> PassExecuteFunction
                 {
-                    Renderer::RenderOmniShadowPass(execCmd, frameIndex, allObjects, frameArena);
-                };
-            });
+                    builder.Write(hPointShadow,
+                                  vk::ImageLayout::eDepthAttachmentOptimal,
+                                  vk::PipelineStageFlagBits2::eEarlyFragmentTests |
+                                  vk::PipelineStageFlagBits2::eLateFragmentTests,
+                                  vk::AccessFlagBits2::eDepthStencilAttachmentWrite);
+
+                    return [=](const vk::raii::CommandBuffer& execCmd)
+                    {
+                        Renderer::RenderOmniShadowPass(execCmd, frameIndex, allObjects, frameArena);
+                    };
+                });
+        }
 
         s_Data->RenderGraph.AddPass("GTAO Compute", [&](Graph::PassBuilder& builder) -> PassExecuteFunction {
             if (s_Data->GTAOEnabledThisFrame) {
@@ -5357,10 +5435,13 @@ vk::PipelineStageFlagBits2::eFragmentShader,
                          vk::ImageLayout::eShaderReadOnlyOptimal,
                          vk::PipelineStageFlagBits2::eFragmentShader,
                          vk::AccessFlagBits2::eShaderRead);
-            builder.Read(hPointShadow,
-                         vk::ImageLayout::eShaderReadOnlyOptimal,
-                         vk::PipelineStageFlagBits2::eFragmentShader,
-                         vk::AccessFlagBits2::eShaderRead);
+            if (hPointShadow)
+            {
+                builder.Read(hPointShadow,
+                             vk::ImageLayout::eShaderReadOnlyOptimal,
+                             vk::PipelineStageFlagBits2::eFragmentShader,
+                             vk::AccessFlagBits2::eShaderRead);
+            }
 
             builder.Write(hColor,
                           vk::ImageLayout::eColorAttachmentOptimal,
@@ -5442,10 +5523,13 @@ vk::PipelineStageFlagBits2::eFragmentShader,
                          vk::ImageLayout::eShaderReadOnlyOptimal,
                          vk::PipelineStageFlagBits2::eFragmentShader,
                          vk::AccessFlagBits2::eShaderRead);
-            builder.Read(hPointShadow,
-                         vk::ImageLayout::eShaderReadOnlyOptimal,
-                         vk::PipelineStageFlagBits2::eFragmentShader,
-                         vk::AccessFlagBits2::eShaderRead);
+            if (hPointShadow)
+            {
+                builder.Read(hPointShadow,
+                             vk::ImageLayout::eShaderReadOnlyOptimal,
+                             vk::PipelineStageFlagBits2::eFragmentShader,
+                             vk::AccessFlagBits2::eShaderRead);
+            }
             
             builder.Write(hAccum,
                           vk::ImageLayout::eColorAttachmentOptimal,
@@ -5651,7 +5735,8 @@ vk::PipelineStageFlagBits2::eFragmentShader,
             : vk::ImageLayout::eColorAttachmentOptimal;
     s_Data->MotionImage.CurrentLayout = vk::ImageLayout::eShaderReadOnlyOptimal;
     s_Data->ShadowMap.CurrentLayout = vk::ImageLayout::eShaderReadOnlyOptimal;
-    s_Data->PointShadowMap.CurrentLayout = vk::ImageLayout::eShaderReadOnlyOptimal;
+    if (s_Data->PointShadowMap.Enabled)
+        s_Data->PointShadowMap.CurrentLayout = vk::ImageLayout::eShaderReadOnlyOptimal;
     s_Data->ReactiveImage.CurrentLayout = vk::ImageLayout::eShaderReadOnlyOptimal;
     s_Data->PickingImage.CurrentLayout = vk::ImageLayout::eTransferSrcOptimal;
     s_Data->OutputImage.CurrentLayout = vk::ImageLayout::eShaderReadOnlyOptimal;
@@ -5794,7 +5879,10 @@ void Renderer::RenderOmniShadowPass(const vk::raii::CommandBuffer& cmd,
     
     WriteGPUTimestamp(cmd, frameIndex, static_cast<uint32_t>(GPUTimestampQuery::OmniShadowBegin));
     
-    if (!s_Data->PointShadowMap.Enabled || s_Data->PointShadowCasters.empty())
+    const bool omniShadowsActive = s_Data->PointShadowsEnabled &&
+                                   s_Data->PointShadowMap.Enabled &&
+                                   !s_Data->UseRayQueryBasedShadows;
+    if (!omniShadowsActive || s_Data->PointShadowCasters.empty())
     {
         WriteGPUTimestamp(cmd, frameIndex, static_cast<uint32_t>(GPUTimestampQuery::OmniShadowEnd));
         return;
@@ -5820,6 +5908,20 @@ void Renderer::RenderOmniShadowPass(const vk::raii::CommandBuffer& cmd,
         {
             if (renderObject.Material && renderObject.Material->IsTransparent())
                 continue;
+
+            // Skip the point light entity's own mesh
+            // TODO: Does not work for submeshes
+            if (renderObject.EntityID == caster.EntityID)
+                continue;
+
+            if (renderObject.WorldAABB.Contains(caster.Position))
+            {
+                const glm::vec3 size = renderObject.WorldAABB.GetSize();
+                const float maxExtent = std::max(size.x, std::max(size.y, size.z));
+                if (maxExtent <= caster.Far * 0.02f)
+                    continue;
+            }
+
             if (!IsAABBIntersectingSphere(
                     renderObject.WorldAABB, caster.Position, caster.Far))
                 continue;
@@ -5856,7 +5958,7 @@ void Renderer::RenderOmniShadowPass(const vk::raii::CommandBuffer& cmd,
                 .pColorAttachments = nullptr,
                 .pDepthAttachment = &depthAttachment };
 
-            BeginRenderPassDebugLabel(cmd, "Omni Shadow Pass (slot/face)");
+            BeginRenderPassDebugLabel(cmd, std::format("Omni Shadow Pass (slot: {}/face: {})", caster.Slot, face));
             cmd.beginRendering(renderingInfo);
             cmd.setViewport(0, vk::Viewport{
                 .x = 0.0f, .y = 0.0f,
@@ -7046,7 +7148,22 @@ void Renderer::AssignOmniShadowCasters(std::vector<GPULight>& lights,
 {
     KBR_TRACY_FUNCTION();
     
-    if (!s_Data->PointShadowsEnabled)
+    s_Data->PointShadowCasters.clear();
+    s_Data->PointShadowCandidateCount = 0;
+    s_Data->LatestRenderStatistics.PointShadowCandidateCount = 0;
+    s_Data->LatestRenderStatistics.PointShadowCasterCount = 0;
+
+    for (GPULight& light : lights)
+    {
+        light.ShadowSlot = -1;
+        light.ShadowNear = 0.05f;
+        light.ShadowFar = 0.0f;
+    }
+
+    const bool omniShadowsActive = s_Data->PointShadowsEnabled &&
+                                   s_Data->PointShadowMap.Enabled &&
+                                   !s_Data->UseRayQueryBasedShadows;
+    if (!omniShadowsActive)
         return;
     
     struct Candidate
@@ -7057,9 +7174,6 @@ void Renderer::AssignOmniShadowCasters(std::vector<GPULight>& lights,
     
     const Frustum cameraFrustum = Frustum::CreateFromViewProjection(projection * view);
     const uint32_t maxCasters = std::min(s_Data->PointShadowMaxCasters, PointShadowMap::MaxCasters);
-    
-    s_Data->PointShadowCasters.clear();
-    s_Data->PointShadowCandidateCount = 0;
     
     std::vector<Candidate> candidates;
     candidates.reserve(lights.size());
@@ -7109,7 +7223,11 @@ void Renderer::AssignOmniShadowCasters(std::vector<GPULight>& lights,
         light.ShadowFar = farValue;
 
         s_Data->PointShadowCasters.push_back(
-            { .Position = light.Position, .Near = nearValue, .Far = farValue, .Slot = static_cast<uint32_t>(slot) });
+            { .Position = light.Position,
+              .Near = nearValue,
+              .Far = farValue,
+              .Slot = static_cast<uint32_t>(slot),
+              .EntityID = light.ShadowCasterEntityID });
     }
     
     s_Data->LatestRenderStatistics.PointShadowCandidateCount = s_Data->PointShadowCandidateCount;
@@ -7345,8 +7463,12 @@ void Renderer::SetupDescriptors()
                                                          .imageView = *s_Data->GTAOImage.ImageView,
                                                          .imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal };
         
+        // Keep the descriptor set valid even if cubeImageArrays are not supported
+        const vk::ImageView omniShadowView = s_Data->PointShadowMap.Enabled
+            ? *s_Data->PointShadowMap.ReadImageView
+            : *s_Data->ShadowMap.ReadImageView;
         const vk::DescriptorImageInfo omniShadowImageInfo{  .sampler = *s_Data->PointShadowSampler,
-                                                            .imageView = *s_Data->PointShadowMap.ReadImageView,
+                                                            .imageView = omniShadowView,
                                                             .imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal };
 
         const std::vector descriptorWrites = {

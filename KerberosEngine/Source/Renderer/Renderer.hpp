@@ -213,6 +213,7 @@ public:
     static uint32_t& GetMaxPointShadowCasters();
     static bool& GetUseWidePointShadowPCF();
     static DepthBias& GetPointShadowDepthBiasSettings();
+    static bool IsPointShadowSupported();
     static uint32_t GetPointShadowCasterCapacity();
     static uint32_t GetPointShadowResolution();
     static uint64_t GetPointShadowDepthImageID(uint32_t slot, uint32_t face);
@@ -356,6 +357,7 @@ private:
     static void ApplyBloom(const vk::raii::CommandBuffer& cmd, uint32_t frameIndex);
 
     static void WriteGPUTimestamp(const vk::raii::CommandBuffer& cmd, uint32_t frameIndex, uint32_t index);
+    static void WriteMissingGPUTimestamps(const vk::raii::CommandBuffer& cmd, uint32_t frameIndex);
     static void ResolveGPUTimings(uint32_t frameIndex);
     static void ResetQueryPools(const vk::raii::CommandBuffer& cmd, uint32_t frameIndex);
     static void ResolvePipelineStatistics(uint32_t frameIndex);
