@@ -321,10 +321,10 @@ Point/omni shadow invariants:
   passes must still receive their timestamp pair through
   `WriteMissingGPUTimestamps`, or the whole timing readback becomes
   `eNotReady`.
-- Shadow vertex shaders that sample the albedo alpha must declare `Pos`,
-  `Normal`, `Tangent`, and `TexCoord` in order (or use explicit vertex
-  locations) so `TexCoord` is location 3. `shadowmap_csm` and
-  `shadowmap_omni` share this requirement.
+- Every vertex shader that consumes the shared `Vertex` layout and samples the
+  albedo alpha must declare `Pos`, `Normal`, `Tangent`, and `TexCoord` in order
+  (or use explicit vertex locations) so `TexCoord` is location 3.
+  `depthprepass`, `shadowmap_csm`, and `shadowmap_omni` share this requirement.
 - Assign casters after the `MaxLights` clamp so selected lights are actually in
   the uploaded light buffer.
 - The debug preview descriptor lookup is
