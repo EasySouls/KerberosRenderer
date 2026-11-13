@@ -36,6 +36,7 @@
 #include "Scene/Components/AnimationComponents.hpp"
 
 #include <glm/gtc/matrix_inverse.hpp>
+#include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/quaternion.hpp>
 
 #include <algorithm>
@@ -658,6 +659,7 @@ struct RendererData
     bool DisplayDebugNormals = false;
     bool DisplayPhysicsColliders = false;
     bool DisplayAIPerception = false;
+    bool DisplayMeshAABBs = false;
 
     bool UseRayQueryBasedShadows = false;
     bool UseRayQueryBasedSoftShadows = false;
@@ -1385,7 +1387,7 @@ void Renderer::RenderDebugLines(const vk::raii::CommandBuffer& cmd,
                                 const vk::Viewport& viewport,
                                 const vk::Rect2D renderArea)
 {
-    if ((!s_Data->DisplayPhysicsColliders && !s_Data->DisplayAIPerception) ||
+    if ((!s_Data->DisplayPhysicsColliders && !s_Data->DisplayAIPerception && !s_Data->DisplayMeshAABBs) ||
         debugLineVertices.empty())
     {
         return;
@@ -1582,6 +1584,19 @@ void Renderer::RecordQueuedSceneRender(const vk::raii::CommandBuffer& cmd)
         const std::vector<LineVertex> perceptionLines =
             GetAIPerceptionLineVerticesFromScene(*s_Data->PendingRender.Scene.get());
         debugLineVertices.insert(debugLineVertices.end(), perceptionLines.begin(), perceptionLines.end());
+    }
+    if (s_Data->DisplayMeshAABBs)
+    {
+        constexpr glm::vec3 debugAABBColor{ 0.1f, 0.9f, 1.0f };
+        for (const RenderObject& renderObject : allObjects)
+        {
+            const glm::vec3 halfExtents = renderObject.WorldAABB.GetSize() * 0.5f;
+            ColliderDebugHelpers::AddBoxLines(
+                debugLineVertices,
+                glm::translate(glm::mat4(1.0f), renderObject.WorldAABB.GetCenter()),
+                halfExtents,
+                debugAABBColor);
+        }
     }
 
     // Update all per-object uniform buffers once
@@ -4149,6 +4164,13 @@ bool& Renderer::GetDisplayAIPerception()
     return s_Data->DisplayAIPerception;
 }
 
+bool& Renderer::GetDisplayMeshAABBs()
+{
+    KBRAssert(s_Data != nullptr, "Renderer not initialized!");
+
+    return s_Data->DisplayMeshAABBs;
+}
+
 bool& Renderer::GetDisplaySkybox()
 {
     KBRAssert(s_Data != nullptr, "Renderer not initialized!");
@@ -5545,9 +5567,9 @@ vk::PipelineStageFlagBits2::eFragmentShader,
                           vk::PipelineStageFlagBits2::eColorAttachmentOutput,
                           vk::AccessFlagBits2::eColorAttachmentWrite);
 
-            // Debug line overlays (physics colliders and AI perception) render
-            // into the opaque color target from within this pass, so declare the
-            // color write here as well.
+            // Debug line overlays (physics colliders, mesh AABBs, and AI
+            // perception) render into the opaque color target from within this
+            // pass, so declare the color write here as well.
             builder.Write(hColor,
                           vk::ImageLayout::eColorAttachmentOptimal,
                           vk::PipelineStageFlagBits2::eColorAttachmentOutput,

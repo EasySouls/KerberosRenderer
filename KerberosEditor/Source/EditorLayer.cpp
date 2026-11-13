@@ -1564,6 +1564,7 @@ namespace PROJECT_NAME
 		ImGui::Checkbox("Display Skybox", &Renderer::GetDisplaySkybox());
 		ImGui::Checkbox("Display normals", &Renderer::GetDisplayDebugNormals());
 		ImGui::Checkbox("Display physics colliders", &Renderer::GetDisplayPhysicsColliders());
+		ImGui::Checkbox("Display mesh AABBs", &Renderer::GetDisplayMeshAABBs());
 		ImGui::Checkbox("Display AI perception", &Renderer::GetDisplayAIPerception());
 
 		bool &useRayQueryBasedShadows = Renderer::GetUseRayQueryBasedShadows();

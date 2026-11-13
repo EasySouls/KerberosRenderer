@@ -21,9 +21,15 @@ SkeletalMesh::SkeletalMesh(const std::vector<SkinVertex>& vertices, const std::v
 
     AABB boundingBox;
 
-    for (const auto& vertex : vertices) {
-        boundingBox.Min = glm::min(boundingBox.Min, vertex.Position);
-        boundingBox.Max = glm::max(boundingBox.Max, vertex.Position);
+    if (!vertices.empty())
+    {
+        boundingBox.Min = vertices.front().Position;
+        boundingBox.Max = vertices.front().Position;
+
+        for (const auto& vertex : vertices) {
+            boundingBox.Min = glm::min(boundingBox.Min, vertex.Position);
+            boundingBox.Max = glm::max(boundingBox.Max, vertex.Position);
+        }
     }
     m_BoundingBox = boundingBox;
 }

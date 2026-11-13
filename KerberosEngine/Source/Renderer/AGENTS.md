@@ -146,14 +146,21 @@ and the grass draw only run when grass is supported on the device.
 
 ## Debug line overlay
 
-`DisplayPhysicsColliders` and `DisplayAIPerception` share one depth-tested line
-pass recorded after transparency. `Renderer::RenderDebugLines` draws whichever
-vertex sets are enabled through the existing line pipeline and per-frame line
-buffer; `RenderStatistics::ColliderLineVertexCount` now reports the combined
-debug-line count. Physics geometry comes from
-`GetColliderLineVerticesFromScene`; AI perception geometry comes from
-`GetAIPerceptionLineVerticesFromScene` and
+`DisplayPhysicsColliders`, `DisplayMeshAABBs`, and `DisplayAIPerception` share
+one depth-tested line pass recorded after transparency.
+`Renderer::RenderDebugLines` draws whichever vertex sets are enabled through the
+existing line pipeline and per-frame line buffer;
+`RenderStatistics::ColliderLineVertexCount` now reports the combined debug-line
+count. Physics geometry comes from `GetColliderLineVerticesFromScene`; mesh
+bounds come from the `RenderObject::WorldAABB` values built for the frame; AI
+perception geometry comes from `GetAIPerceptionLineVerticesFromScene` and
 `Renderer/AIPerceptionDebugHelpers.hpp`.
+
+Mesh bounds are seeded from real vertices (`Mesh.cpp`, `SkeletalMesh.cpp`), not
+from the default zero AABB, so a mesh whose geometry is offset from its local
+origin does not get an origin-inflated box. The debug AABB overlay draws one
+wireframe box per render object and is the quickest way to verify frustum
+culling behaviour.
 
 The AI overlay draws a ground-plane sight sector (`SightRadius`), a retain
 sector (`LoseRadius`), FOV edge/centre rays, an eye-height marker, and a target

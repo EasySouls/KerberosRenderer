@@ -34,7 +34,8 @@ namespace Kerberos
 			vertices.push_back(MakeLineVertex(b, color));
 		}
 
-		static void AddBoxLines(std::vector<LineVertex>& vertices, const glm::mat4& transform, const glm::vec3& halfExtents)
+		static void AddBoxLines(std::vector<LineVertex>& vertices, const glm::mat4& transform, const glm::vec3& halfExtents,
+		                        const glm::vec3& color = ColliderDebugColor)
 		{
 			const std::array<glm::vec3, 8> corners = {
 				glm::vec3(-halfExtents.x, -halfExtents.y, -halfExtents.z), glm::vec3(halfExtents.x, -halfExtents.y, -halfExtents.z),
@@ -55,7 +56,7 @@ namespace Kerberos
 			};
 			for (const auto& [a, b] : edges)
 			{
-				AddLine(vertices, worldCorners[a], worldCorners[b]);
+				AddLine(vertices, worldCorners[a], worldCorners[b], color);
 			}
 		}
 

@@ -174,6 +174,7 @@ public:
     static bool& GetDisplayDebugNormals();
     static bool& GetDisplayPhysicsColliders();
     static bool& GetDisplayAIPerception();
+    static bool& GetDisplayMeshAABBs();
     static bool& GetDisplaySkybox();
     static bool& GetUseRayQueryBasedShadows();
     static bool& GetUseRayQueryBasedSoftShadows();
