@@ -261,6 +261,12 @@ imported, or are imported lossily:
 - Multiple skins per glTF file; only the first skin is imported for now.
 - Non-joint node animation channels outside the supported skeleton are skipped.
 - `doubleSided` material settings (glTF `alphaMode`/`alphaCutoff` are imported).
+- `TANGENT` is generated during glTF import when a primitive omits it or
+  supplies degenerate tangents, using positions, normals, UVs, and indices. If
+  UVs are absent, the generated tangent basis falls back to an arbitrary basis
+  orthogonal to the normal; normal maps on such meshes are not correctly
+  oriented. Bump the importer version when changing this behavior so cached
+  meshes rebuild.
 - Texture sampler wrap/filter modes and `KHR_texture_transform`.
 - Raster glTF images decode at 8-bit; KTX2 images keep their embedded format
   (including 16-bit/HDR when authored that way).

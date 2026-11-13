@@ -76,6 +76,8 @@ Editor windows live mainly under
   (skeletons, skinned meshes, joints, and animators). Its window context menu
   also has a debug "Create Skinned Test Mesh" action that builds a procedural
   two-bone strip for validating the skinning path without imported glTF data.
+  Static and skinned mesh `Cast Shadows` flags are honored by both the CSM and
+  omni shadow passes.
   Single-asset component fields use the shared
   `KerberosEditor/Source/Widgets/AssetPicker` searchable dropdown, which keeps
   the matching asset-browser drag/drop payload working. The Animator component

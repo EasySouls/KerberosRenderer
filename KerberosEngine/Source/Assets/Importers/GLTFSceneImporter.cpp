@@ -518,6 +518,117 @@ bool WriteRecord(const std::filesystem::path& root, const std::string& folder, c
     return !ec && NativeAssetSerializer::SerializeRecord({ .Version = NativeAssetFormatVersion, .Kind = kind, .SourceIndex = index, .LocalKey = key, .Data = data }, path);
 }
 
+bool IsFiniteVector(const glm::vec3& value)
+{
+    return std::isfinite(value.x) && std::isfinite(value.y) && std::isfinite(value.z);
+}
+
+template <typename TVertex>
+bool HasUsableTangents(const std::vector<TVertex>& vertices)
+{
+    if (vertices.empty())
+        return false;
+
+    for (const TVertex& vertex : vertices)
+    {
+        const glm::vec3 tangent = glm::vec3(vertex.Tangent);
+        if (!IsFiniteVector(tangent) || glm::dot(tangent, tangent) <= 1e-8f)
+            return false;
+    }
+    return true;
+}
+
+/// Generates per-vertex tangents from positions, normals, UVs and triangle indices.
+/// Degenerate UV triangles and missing UVs fall back to an arbitrary basis 
+/// orthogonal to the vertex normal.
+template <typename TVertex>
+void GenerateTangents(std::vector<TVertex>& vertices, const std::vector<uint32_t>& indices)
+{
+    if (vertices.empty())
+        return;
+
+    std::vector<glm::vec3> tangentAccumulation(vertices.size(), glm::vec3(0.0f));
+    std::vector<glm::vec3> bitangentAccumulation(vertices.size(), glm::vec3(0.0f));
+    std::vector<glm::vec3> normalAccumulation(vertices.size(), glm::vec3(0.0f));
+
+    const size_t indexCount = indices.empty() ? vertices.size() : indices.size();
+    const auto indexAt = [&](const size_t index) -> uint32_t
+    {
+        return indices.empty() ? static_cast<uint32_t>(index) : indices[index];
+    };
+
+    for (size_t i = 0; i + 2 < indexCount; i += 3)
+    {
+        const uint32_t i0 = indexAt(i);
+        const uint32_t i1 = indexAt(i + 1);
+        const uint32_t i2 = indexAt(i + 2);
+        if (i0 >= vertices.size() || i1 >= vertices.size() || i2 >= vertices.size())
+            continue;
+
+        const TVertex& v0 = vertices[i0];
+        const TVertex& v1 = vertices[i1];
+        const TVertex& v2 = vertices[i2];
+
+        const glm::vec3 edge1 = v1.Position - v0.Position;
+        const glm::vec3 edge2 = v2.Position - v0.Position;
+        const glm::vec3 faceNormal = glm::cross(edge1, edge2);
+
+        normalAccumulation[i0] += faceNormal;
+        normalAccumulation[i1] += faceNormal;
+        normalAccumulation[i2] += faceNormal;
+
+        const glm::vec2 deltaUV1 = v1.TexCoord - v0.TexCoord;
+        const glm::vec2 deltaUV2 = v2.TexCoord - v0.TexCoord;
+        const float determinant = deltaUV1.x * deltaUV2.y - deltaUV2.x * deltaUV1.y;
+        if (std::abs(determinant) <= 1e-8f)
+            continue;
+
+        const float inverseDeterminant = 1.0f / determinant;
+        const glm::vec3 tangent =
+            (edge1 * deltaUV2.y - edge2 * deltaUV1.y) * inverseDeterminant;
+        const glm::vec3 bitangent =
+            (edge2 * deltaUV1.x - edge1 * deltaUV2.x) * inverseDeterminant;
+
+        tangentAccumulation[i0] += tangent;
+        tangentAccumulation[i1] += tangent;
+        tangentAccumulation[i2] += tangent;
+        bitangentAccumulation[i0] += bitangent;
+        bitangentAccumulation[i1] += bitangent;
+        bitangentAccumulation[i2] += bitangent;
+    }
+
+    for (size_t i = 0; i < vertices.size(); ++i)
+    {
+        TVertex& vertex = vertices[i];
+
+        glm::vec3 normal = vertex.Normal;
+        if (!IsFiniteVector(normal) || glm::dot(normal, normal) <= 1e-8f)
+            normal = normalAccumulation[i];
+        if (!IsFiniteVector(normal) || glm::dot(normal, normal) <= 1e-8f)
+            normal = glm::vec3(0.0f, 1.0f, 0.0f);
+        normal = glm::normalize(normal);
+        vertex.Normal = normal;
+
+        glm::vec3 tangent = tangentAccumulation[i];
+        tangent -= normal * glm::dot(normal, tangent);
+        if (!IsFiniteVector(tangent) || glm::dot(tangent, tangent) <= 1e-8f)
+        {
+            const glm::vec3 axis = std::abs(normal.y) < 0.99f
+                ? glm::vec3(0.0f, 1.0f, 0.0f)
+                : glm::vec3(1.0f, 0.0f, 0.0f);
+            tangent = glm::normalize(glm::cross(axis, normal));
+        }
+        else
+        {
+            tangent = glm::normalize(tangent);
+        }
+
+        const glm::vec3 bitangent = bitangentAccumulation[i];
+        const float handedness = glm::dot(glm::cross(normal, tangent), bitangent) < 0.0f ? -1.0f : 1.0f;
+        vertex.Tangent = glm::vec4(tangent, handedness);
+    }
+}
+
 bool WriteMesh(const std::filesystem::path& root, const size_t mesh, const size_t primitive,
     const tinygltf::Model& model, const tinygltf::Primitive& p)
 {
@@ -527,6 +638,8 @@ bool WriteMesh(const std::filesystem::path& root, const size_t mesh, const size_
     const auto it = p.attributes.find("POSITION");
     if (it == p.attributes.end())
         return false;
+
+    const bool hasTangentAttribute = p.attributes.contains("TANGENT");
 
     const auto& positionAccessor = model.accessors[it->second];
     if (positionAccessor.bufferView < 0 || positionAccessor.type != TINYGLTF_TYPE_VEC3)
@@ -555,13 +668,16 @@ bool WriteMesh(const std::filesystem::path& root, const size_t mesh, const size_
             return false;
     }
 
+    if (p.indices >= 0 && !ReadIndices(model, model.accessors[p.indices], payload.Indices))
+        return false;
+
+    if (!hasTangentAttribute || !HasUsableTangents(vertices))
+        GenerateTangents(vertices, payload.Indices);
+
     payload.VertexStride = sizeof(Vertex);
     payload.VertexData.resize(vertices.size() * sizeof(Vertex));
     if (!vertices.empty())
         std::memcpy(payload.VertexData.data(), vertices.data(), payload.VertexData.size());
-
-    if (p.indices >= 0 && !ReadIndices(model, model.accessors[p.indices], payload.Indices))
-        return false;
 
     std::error_code ec;
     const auto path = root / "Meshes" / (MeshArtifactName(mesh, primitive, model.meshes[mesh].name) + ".kbrmesh");
@@ -594,6 +710,8 @@ bool WriteSkinnedMesh(const std::filesystem::path& root, const size_t mesh, cons
     const auto& weightsAccessor = model.accessors[weightsIt->second];
     if (jointsAccessor.count < positionAccessor.count || weightsAccessor.count < positionAccessor.count)
         return false;
+
+    const bool hasTangentAttribute = p.attributes.contains("TANGENT");
 
     std::vector<SkinVertex> vertices(positionAccessor.count);
     for (size_t i = 0; i < vertices.size(); ++i)
@@ -652,13 +770,16 @@ bool WriteSkinnedMesh(const std::filesystem::path& root, const size_t mesh, cons
     }
 
     NativeMeshPayload payload;
+    if (p.indices >= 0 && !ReadIndices(model, model.accessors[p.indices], payload.Indices))
+        return false;
+
+    if (!hasTangentAttribute || !HasUsableTangents(vertices))
+        GenerateTangents(vertices, payload.Indices);
+
     payload.VertexStride = sizeof(SkinVertex);
     payload.VertexData.resize(vertices.size() * sizeof(SkinVertex));
     if (!vertices.empty())
         std::memcpy(payload.VertexData.data(), vertices.data(), payload.VertexData.size());
-
-    if (p.indices >= 0 && !ReadIndices(model, model.accessors[p.indices], payload.Indices))
-        return false;
 
     std::error_code ec;
     const auto path = root / "Meshes"

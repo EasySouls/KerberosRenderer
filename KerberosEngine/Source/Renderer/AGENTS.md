@@ -491,6 +491,12 @@ compile. `GrassSystem` caches its shader-object stages under `grass_task`,
 depth-only shader; its `shadowmap_omni.spv` artifact is listed in
 `compile_shaders.bat` alongside `shadowmap_csm.spv`.
 
+The glTF importer generates per-vertex tangents from positions, normals, UVs,
+and triangle indices when a primitive omits `TANGENT` or supplies degenerate
+tangents. PBR shaders can therefore assume a valid tangent basis. Meshes without
+UVs receive an arbitrary tangent basis orthogonal to the normal; normal maps on
+such meshes are not correctly oriented.
+
 Shader source/build mapping is duplicated between runtime shader usage and
 `KerberosEditor/Assets/Shaders/compile_shaders.bat`. Update both when adding
 or renaming shaders. `compile_shaders.bat` writes `Assets/Cache/Shaders/*.spv`
@@ -522,7 +528,9 @@ culling, a point light authored inside its lamp/fixture mesh, alpha-masked
 casters, slot reassignment, the enable toggle, mesh `CastShadows` toggles,
 ray-query shadow mode, wide PCF, depth bias, the slot/face preview, and the
 separate OmniShadow GPU timing line; run Vulkan validation and synchronization
-validation to catch cube-array layout or descriptor mistakes. Validate GPU timings with
+validation to catch cube-array layout or descriptor mistakes. Reimport a glTF
+mesh that omits `TANGENT` and verify generated tangents plus direct sun and
+point-light response. Validate GPU timings with
 FSR3 on and off: every timing line must remain valid, and skipped anti-aliasing
 or omni-shadow passes must report a near-zero duration rather than invalidating
 the whole query pool. For the AI perception overlay,

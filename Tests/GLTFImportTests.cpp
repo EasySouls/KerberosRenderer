@@ -7,6 +7,7 @@
 #include "Renderer/Animation/AnimationEvaluator.hpp"
 #include "Renderer/Animation/Skeleton.hpp"
 #include "Renderer/Animation/SkeletalMesh.hpp"
+#include "Renderer/Vertex.hpp"
 
 #include <gtest/gtest.h>
 
@@ -136,6 +137,46 @@ TEST_F(GLTFImportTest, ImportsCesiumManSkeletonAnimationAndSkinnedMesh)
 	EXPECT_EQ(skinnedMesh.VertexStride, sizeof(Kerberos::SkinVertex));
 	EXPECT_GT(skinnedMesh.VertexData.size(), 0u);
 	EXPECT_FALSE(skinnedMesh.Indices.empty());
+
+	const auto* skinnedVertices = reinterpret_cast<const Kerberos::SkinVertex*>(skinnedMesh.VertexData.data());
+	const size_t skinnedVertexCount = skinnedMesh.VertexData.size() / sizeof(Kerberos::SkinVertex);
+	for (size_t i = 0; i < skinnedVertexCount; ++i)
+	{
+		const glm::vec3 tangent = glm::vec3(skinnedVertices[i].Tangent);
+		const glm::vec3 normal = glm::normalize(skinnedVertices[i].Normal);
+		EXPECT_TRUE(std::isfinite(tangent.x) && std::isfinite(tangent.y) && std::isfinite(tangent.z));
+		EXPECT_GT(glm::dot(tangent, tangent), 0.5f);
+		EXPECT_NEAR(glm::dot(glm::normalize(tangent), normal), 0.0f, 1e-3f);
+		EXPECT_TRUE(std::isfinite(skinnedVertices[i].Tangent.w));
+	}
+}
+
+TEST_F(GLTFImportTest, GeneratesTangentsForStaticMeshWithoutTangentAttribute)
+{
+	const std::filesystem::path source = std::filesystem::path{ KBR_SOURCE_DIR } / "KerberosEditor" / "Assets" / "Models" / "donut.glb";
+	ASSERT_TRUE(std::filesystem::exists(source)) << source.string();
+
+	ASSERT_TRUE(Kerberos::GLTFSceneImporter::Import(source, m_Output, "donut", nullptr));
+
+	const auto meshPath = FindArtifact(m_Output, ".kbrmesh");
+	ASSERT_FALSE(meshPath.empty());
+
+	Kerberos::NativeMeshPayload mesh;
+	ASSERT_TRUE(Kerberos::NativeAssetSerializer::DeserializeMesh(meshPath, mesh));
+	ASSERT_EQ(mesh.VertexStride, sizeof(Kerberos::Vertex));
+	ASSERT_GT(mesh.VertexData.size(), 0u);
+
+	const auto* vertices = reinterpret_cast<const Kerberos::Vertex*>(mesh.VertexData.data());
+	const size_t vertexCount = mesh.VertexData.size() / sizeof(Kerberos::Vertex);
+	for (size_t i = 0; i < vertexCount; ++i)
+	{
+		const glm::vec3 tangent = glm::vec3(vertices[i].Tangent);
+		const glm::vec3 normal = glm::normalize(vertices[i].Normal);
+		EXPECT_TRUE(std::isfinite(tangent.x) && std::isfinite(tangent.y) && std::isfinite(tangent.z));
+		EXPECT_GT(glm::dot(tangent, tangent), 0.5f);
+		EXPECT_NEAR(glm::dot(glm::normalize(tangent), normal), 0.0f, 1e-3f);
+		EXPECT_TRUE(std::isfinite(vertices[i].Tangent.w));
+	}
 }
 
 TEST_F(GLTFImportTest, EvaluatesImportedCesiumManAnimation)
