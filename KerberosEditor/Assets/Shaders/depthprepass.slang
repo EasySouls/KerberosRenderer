@@ -75,10 +75,12 @@ PSOutput fragmentMain(VSOutput inVert)
     // Alpha-masked geometry must cut out the same fragments here as it does in
     // the opaque and shadow passes, otherwise the prepass depth/normal/motion
     // buffers disagree with the visible surface.
-    float4 albedoTex = SampleBindless(perObject.material.albedoTexIndex, inVert.TexCoord);
-    float alpha = albedoTex.a * perObject.material.albedo.a;
-    if (ShouldDiscardAlpha(alpha, perObject.alphaMode, perObject.alphaCutoff))
-        discard;
+    if (perObject.alphaMode == 1u) {
+        float4 albedoTex = SampleBindless(perObject.material.albedoTexIndex, inVert.TexCoord);
+        float alpha = albedoTex.a * perObject.material.albedo.a;
+        if (alpha < perObject.alphaCutoff)
+            discard;
+    }
 
     PSOutput output;
 

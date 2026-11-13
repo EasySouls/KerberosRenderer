@@ -51,8 +51,10 @@ VSOutput vertexMain(VSInput input)
 [shader("fragment")]
 void fragmentMain(VSOutput input) : SV_Target
 {
-    const float4 albedoTex = SampleBindless(perObject.material.albedoTexIndex, input.TexCoord);
-    const float alpha = albedoTex.a * perObject.material.albedo.a;
-    if (ShouldDiscardAlpha(alpha, perObject.alphaMode, perObject.alphaCutoff))
-        discard;
+    if (perObject.alphaMode == 1u) {
+        float4 albedoTex = SampleBindless(perObject.material.albedoTexIndex, input.TexCoord);
+        float alpha = albedoTex.a * perObject.material.albedo.a;
+        if (alpha < perObject.alphaCutoff)
+            discard;
+    }
 }

@@ -57,8 +57,10 @@ void fragmentMain(VSOutput input) : SV_Target
 {
     // Match the opaque-pass alpha mask so cutout geometry casts a correct
     // shadow instead of a solid quad.
-    float4 albedoTex = SampleBindless(perObject.material.albedoTexIndex, input.TexCoord);
-    float alpha = albedoTex.a * perObject.material.albedo.a;
-    if (ShouldDiscardAlpha(alpha, perObject.alphaMode, perObject.alphaCutoff))
-        discard;
+    if (perObject.alphaMode == 1u) {
+        float4 albedoTex = SampleBindless(perObject.material.albedoTexIndex, input.TexCoord);
+        float alpha = albedoTex.a * perObject.material.albedo.a;
+        if (alpha < perObject.alphaCutoff)
+            discard;
+    }
 }
