@@ -343,13 +343,31 @@ Point/omni shadow invariants:
 authored `.kbrmat` files serialize them as `AlphaMode`/`AlphaCutoff`, and
 legacy materials that relied on base-color alpha below one are loaded as
 `BLEND`. `IsTransparent()` is true only for `BLEND`, so `MASK` and `OPAQUE`
-both stay in the depth/shadow/opaque passes. The alpha mask is applied in
-`pbrtextured`, `pbr_ray_query_shadows`, `depthprepass`, `shadowmap_csm`, and
-`shadowmap_omni` using `ShouldDiscardAlpha` from `common.slang` with
-`textureAlpha * baseColorFactor.a`; the shadow passes bind the global texture
-set for this reason. `BLEND` materials render through the existing
-weighted-blended OIT pass, where alpha is `textureAlpha * baseColorFactor.a`
-and emissive/AO participate in the accumulated color.
+both stay in the depth/shadow/opaque passes. `pbrtextured` and
+`pbr_ray_query_shadows` apply the mask with `ShouldDiscardAlpha` from
+`common.slang` using `textureAlpha * baseColorFactor.a`; `BLEND` materials
+render through the existing weighted-blended OIT pass, where alpha is
+`textureAlpha * baseColorFactor.a` and emissive/AO participate in the
+accumulated color.
+
+The depth prepass and the CSM/omni shadow passes use an `enableAlphaTest`
+Slang specialization constant instead of the runtime `alphaMode` branch.
+`CreateAlphaTestPipelineVariant` builds two pipelines per pass
+(`DepthPrePassPipeline`/`DepthPrePassMaskedPipeline`,
+`ShadowMap::Pipeline`/`MaskedPipeline`,
+`PointShadowMap::Pipeline`/`MaskedPipeline`): the opaque variant compiles out
+the albedo sample and `discard` so opaque casters keep early depth testing, and
+the masked variant samples `textureAlpha * baseColorFactor.a` against
+`alphaCutoff`. Each pass groups its casters into opaque/masked buckets with
+`BuildCasterBuckets`, then binds each pipeline once per bucket instead of per
+object. Opaque casters are sorted front-to-back (camera or light view) and
+masked casters by albedo texture then mesh for cache locality. Pipelines that
+share a shader module must be recreated with `GraphicsPipeline::Recompile(true)`
+after the first variant recompiles it, otherwise the later variant early-outs
+and keeps stale SPIR-V; `RecompileShaders` does this for the masked shadow,
+masked prepass, PCF, and soft ray-query variants. Any new shader that consumes
+the shared vertex layout still has to declare `Pos`, `Normal`, `Tangent`,
+`TexCoord` in order so `TexCoord` lands at location 3.
 
 Alpha mode and cutoff travel in `PerObject` after the 60-byte material block
 (`alphaMode` at offset 256, `alphaCutoff` at 260, `entityID` at 264); keep the

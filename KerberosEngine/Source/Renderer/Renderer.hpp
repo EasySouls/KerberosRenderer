@@ -304,7 +304,8 @@ private:
     static void RenderPrePass(const vk::raii::CommandBuffer& cmd,
                               uint32_t frameIndex,
                               const RenderObjectContainer& renderObjects,
-                              uint32_t currentImage);
+                              uint32_t currentImage,
+                              std::pmr::memory_resource* arena);
 
     static void RenderGTAO(const vk::raii::CommandBuffer& cmd, uint32_t frameIndex, uint32_t currentImage);
 

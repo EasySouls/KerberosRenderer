@@ -44,6 +44,7 @@
 #include <cstddef>
 #include <limits>
 #include <stdexcept>
+#include <tuple>
 #include <unordered_map>
 #include <utility>
 
@@ -53,6 +54,101 @@ import Kerberos;
 namespace {
 
 using namespace Kerberos;
+
+struct CasterBuckets
+{
+    std::pmr::vector<const RenderObject*> Opaque;
+    std::pmr::vector<const RenderObject*> Masked;
+
+    explicit CasterBuckets(std::pmr::memory_resource* arena)
+        : Opaque(arena)
+        , Masked(arena)
+    {
+    }
+};
+
+template <typename KeyFunc>
+void SortCasterBucket(std::pmr::vector<const RenderObject*>& bucket, KeyFunc keyFunc)
+{
+    std::sort(bucket.begin(),
+              bucket.end(),
+              [&keyFunc](const RenderObject* lhs, const RenderObject* rhs)
+              {
+                  const auto lhsKey = keyFunc(*lhs);
+                  const auto rhsKey = keyFunc(*rhs);
+                  if (lhsKey != rhsKey)
+                      return lhsKey < rhsKey;
+                  return lhs < rhs;
+              });
+}
+
+uint32_t MaterialSortKey(const RenderObject& object)
+{
+    return object.Material != nullptr ? object.Material->Params.AlbedoIndex : 0u;
+}
+
+void SortMaskedCasters(std::pmr::vector<const RenderObject*>& bucket)
+{
+    // Group masked casters by albedo texture so consecutive draws sample the
+    // same texture, then by mesh to keep vertex data contiguous.
+    SortCasterBucket(bucket,
+                     [](const RenderObject& object)
+                     {
+                         return std::tuple{ MaterialSortKey(object), object.Mesh.get() };
+                     });
+}
+
+/// Builds the opaque/masked caster buckets used to bind one depth-only
+/// pipeline per group instead of per object.
+template <typename ObjectContainer>
+CasterBuckets BuildCasterBuckets(const ObjectContainer& objects,
+                                 std::pmr::memory_resource* arena,
+                                 const bool requireCastShadows)
+{
+    CasterBuckets buckets(arena);
+    buckets.Opaque.reserve(objects.size());
+
+    for (const RenderObject& object : objects)
+    {
+        if (requireCastShadows && !object.CastShadows)
+            continue;
+        if (object.Material != nullptr && object.Material->IsTransparent())
+            continue;
+
+        if (object.Material != nullptr && object.Material->IsMasked())
+            buckets.Masked.push_back(&object);
+        else
+            buckets.Opaque.push_back(&object);
+    }
+
+    return buckets;
+}
+
+/// Clones a depth-only pipeline specification with the fragment-stage
+/// `enableAlphaTest` specialization set to 0 (opaque) or 1 (masked).
+Ref<GraphicsPipeline> CreateAlphaTestPipelineVariant(const GraphicsPipelineSpecification& base,
+                                                     const bool alphaTest)
+{
+    GraphicsPipelineSpecification specification = base;
+    if (alphaTest)
+        specification.Name = base.Name + " (Masked)";
+
+    const uint32_t enableAlphaTest = alphaTest ? 1u : 0u;
+    constexpr vk::SpecializationMapEntry mapEntry{
+        .constantID = 0,
+        .offset = 0,
+        .size = sizeof(uint32_t)
+    };
+    const vk::SpecializationInfo specializationInfo{
+        .mapEntryCount = 1,
+        .pMapEntries = &mapEntry,
+        .dataSize = sizeof(uint32_t),
+        .pData = &enableAlphaTest
+    };
+
+    specification.SpecializationMapEntries[vk::ShaderStageFlagBits::eFragment] = specializationInfo;
+    return CreateRef<GraphicsPipeline>(specification);
+}
 
 glm::mat4 GetWorldTransformWithoutScale(const TransformComponent& transform)
 {
@@ -128,6 +224,8 @@ struct ShadowMap
     vk::ImageLayout CurrentLayout = vk::ImageLayout::eUndefined;
     vk::raii::PipelineLayout PipelineLayout = nullptr;
     Ref<GraphicsPipeline> Pipeline = nullptr;
+    /// Alpha-tested variant used only for masked casters.
+    Ref<GraphicsPipeline> MaskedPipeline = nullptr;
 
     // Settings
     uint32_t Size = 2048;
@@ -152,6 +250,8 @@ struct PointShadowMap
     vk::ImageLayout CurrentLayout = vk::ImageLayout::eUndefined;
     vk::raii::PipelineLayout PipelineLayout = nullptr;
     Ref<GraphicsPipeline> Pipeline = nullptr;
+    /// Alpha-tested variant used only for masked casters.
+    Ref<GraphicsPipeline> MaskedPipeline = nullptr;
     std::array<vk::DescriptorSet, LayerCount> PreviewDescriptorSets{};
     
     bool Enabled = true;
@@ -556,6 +656,8 @@ struct RendererData
 
     vk::raii::PipelineLayout PBRPipelineLayout = nullptr;
     Ref<GraphicsPipeline> DepthPrePassPipeline = nullptr;
+    /// Alpha-tested variant used only for masked meshes.
+    Ref<GraphicsPipeline> DepthPrePassMaskedPipeline = nullptr;
     Ref<GraphicsPipeline> PBROpaquePipeline = nullptr;
     Ref<GraphicsPipeline> PBROpaquePipelinePCF = nullptr;
     Ref<GraphicsPipeline> SkyboxPipeline = nullptr;
@@ -888,7 +990,11 @@ void Renderer::UpdateParticles(const vk::raii::CommandBuffer& cmd,
     WriteGPUTimestamp(cmd, frameIndex, static_cast<uint32_t>(GPUTimestampQuery::ParticlesSimulateEnd));
 }
 
-void Renderer::RenderPrePass(const vk::raii::CommandBuffer& cmd, const uint32_t frameIndex, const RenderObjectContainer& renderObjects, const uint32_t currentImage)
+void Renderer::RenderPrePass(const vk::raii::CommandBuffer& cmd,
+                             const uint32_t frameIndex,
+                             const RenderObjectContainer& renderObjects,
+                             const uint32_t currentImage,
+                             std::pmr::memory_resource* arena)
 {
     WriteGPUTimestamp(cmd, frameIndex, static_cast<uint32_t>(GPUTimestampQuery::DepthPrePassBegin));
 
@@ -1002,22 +1108,44 @@ void Renderer::RenderPrePass(const vk::raii::CommandBuffer& cmd, const uint32_t 
     cmd.setViewport(0, viewport);
     cmd.setScissor(0, renderArea);
 
-    cmd.bindPipeline(vk::PipelineBindPoint::eGraphics, *s_Data->DepthPrePassPipeline->GetVulkanPipeline());
+    CasterBuckets buckets = BuildCasterBuckets(renderObjects, arena, false);
 
-    for (const auto& renderObject : renderObjects) {
-        if (renderObject.Material != nullptr && renderObject.Material->IsTransparent())
-            continue;
+    const glm::vec3 cameraPos = s_Data->SceneUniformData.camPos;
+    SortCasterBucket(buckets.Opaque,
+                     [&cameraPos](const RenderObject& object)
+                     {
+                         const glm::vec3 offset = object.WorldAABB.GetCenter() - cameraPos;
+                         return std::tuple{ glm::dot(offset, offset), object.Mesh.get() };
+                     });
+    SortMaskedCasters(buckets.Masked);
 
-        uint32_t dynamicOffset = static_cast<uint32_t>(renderObject.UBOIndex * s_Data->DynamicAlignment);
+    const auto drawBucket = [&](const std::pmr::vector<const RenderObject*>& bucket)
+    {
+        for (const RenderObject* renderObject : bucket)
+        {
+            const uint32_t dynamicOffset = static_cast<uint32_t>(renderObject->UBOIndex * s_Data->DynamicAlignment);
 
-        cmd.bindDescriptorSets(
-            vk::PipelineBindPoint::eGraphics,
-            *s_Data->PBRPipelineLayout,
-            0,
-            { s_Data->DescriptorSets[currentImage].scene, s_Data->TextureManager.GetGlobalDescriptorSet() },
-            { dynamicOffset });
+            cmd.bindDescriptorSets(
+                vk::PipelineBindPoint::eGraphics,
+                *s_Data->PBRPipelineLayout,
+                0,
+                { s_Data->DescriptorSets[currentImage].scene, s_Data->TextureManager.GetGlobalDescriptorSet() },
+                { dynamicOffset });
 
-        RenderMesh(cmd, renderObject);
+            RenderMesh(cmd, *renderObject);
+        }
+    };
+
+    if (!buckets.Opaque.empty())
+    {
+        s_Data->DepthPrePassPipeline->Bind(cmd);
+        drawBucket(buckets.Opaque);
+    }
+
+    if (!buckets.Masked.empty())
+    {
+        s_Data->DepthPrePassMaskedPipeline->Bind(cmd);
+        drawBucket(buckets.Masked);
     }
 
     cmd.endRendering();
@@ -2552,7 +2680,8 @@ void Renderer::CreateResources()
         shadowPipelineSpec.DepthAttachmentFormat = s_Data->ShadowMap.Format;
         shadowPipelineSpec.DynamicStates = shadowMapDynamicState;
 
-        s_Data->ShadowMap.Pipeline = CreateRef<GraphicsPipeline>(shadowPipelineSpec);
+        s_Data->ShadowMap.Pipeline = CreateAlphaTestPipelineVariant(shadowPipelineSpec, false);
+        s_Data->ShadowMap.MaskedPipeline = CreateAlphaTestPipelineVariant(shadowPipelineSpec, true);
         
         // Omnishadows
         if (s_Data->PointShadowMap.Enabled)
@@ -2594,7 +2723,8 @@ void Renderer::CreateResources()
             omniShadowPipelineSpec.DepthTestFunc = DepthTestFunc::LessOrEqual;
             omniShadowPipelineSpec.DepthAttachmentFormat = s_Data->PointShadowMap.Format;
             omniShadowPipelineSpec.DynamicStates = shadowMapDynamicState;
-            s_Data->PointShadowMap.Pipeline = CreateRef<GraphicsPipeline>(omniShadowPipelineSpec);
+            s_Data->PointShadowMap.Pipeline = CreateAlphaTestPipelineVariant(omniShadowPipelineSpec, false);
+            s_Data->PointShadowMap.MaskedPipeline = CreateAlphaTestPipelineVariant(omniShadowPipelineSpec, true);
         }
     }
 
@@ -2866,7 +2996,8 @@ void Renderer::CreateResources()
         depthPrepassPipelineSpec.DepthAttachmentFormat = s_Data->DepthImage.Format;
         depthPrepassPipelineSpec.DynamicStates = commonDynamicStates;
 
-        s_Data->DepthPrePassPipeline = CreateRef<GraphicsPipeline>(depthPrepassPipelineSpec);
+        s_Data->DepthPrePassPipeline = CreateAlphaTestPipelineVariant(depthPrepassPipelineSpec, false);
+        s_Data->DepthPrePassMaskedPipeline = CreateAlphaTestPipelineVariant(depthPrepassPipelineSpec, true);
 
         Ref<Shader> pbrShader = CreateRef<Shader>("pbrtextured", "PBR");
 
@@ -4074,18 +4205,24 @@ void Renderer::RecompileShaders()
 
     if (const auto& shadowMapPipeline = s_Data->ShadowMap.Pipeline)
         shadowMapPipeline->Recompile();
+    if (const auto& shadowMapMaskedPipeline = s_Data->ShadowMap.MaskedPipeline)
+        shadowMapMaskedPipeline->Recompile(true);
     if (const auto& omniShadowPipeline = s_Data->PointShadowMap.Pipeline)
         omniShadowPipeline->Recompile();
+    if (const auto& omniShadowMaskedPipeline = s_Data->PointShadowMap.MaskedPipeline)
+        omniShadowMaskedPipeline->Recompile(true);
     if (const auto& depthPrePassPipeline = s_Data->DepthPrePassPipeline)
         depthPrePassPipeline->Recompile();
+    if (const auto& depthPrePassMaskedPipeline = s_Data->DepthPrePassMaskedPipeline)
+        depthPrePassMaskedPipeline->Recompile(true);
     if (const auto& pbrOpaquePipeline = s_Data->PBROpaquePipeline)
         pbrOpaquePipeline->Recompile();
     if (const auto& pbrOpaquePipelinePCF = s_Data->PBROpaquePipelinePCF)
-        pbrOpaquePipelinePCF->Recompile();
+        pbrOpaquePipelinePCF->Recompile(true);
     if (const auto& pbrRayQueryShadowsPipeline = s_Data->PBRRayQueryShadowsPipeline)
         pbrRayQueryShadowsPipeline->Recompile();
     if (const auto& pbrRayQuerySoftShadowsPipeline = s_Data->PBRRayQuerySoftShadowsPipeline)
-        pbrRayQuerySoftShadowsPipeline->Recompile();
+        pbrRayQuerySoftShadowsPipeline->Recompile(true);
     if (const auto& normalDebugPipeline = s_Data->NormalDebugPipeline)
         normalDebugPipeline->Recompile();
     if (const auto& colliderLinesPipeline = s_Data->ColliderLinesPipeline)
@@ -5384,7 +5521,7 @@ vk::PipelineStageFlagBits2::eFragmentShader,
                           vk::PipelineStageFlagBits2::eColorAttachmentOutput,
                           vk::AccessFlagBits2::eColorAttachmentWrite);
             return [=](const vk::raii::CommandBuffer& execCmd) {
-                Renderer::RenderPrePass(execCmd, frameIndex, renderObjects, currentImage);
+                Renderer::RenderPrePass(execCmd, frameIndex, renderObjects, currentImage, frameArena);
             };
         });
 
@@ -5808,7 +5945,9 @@ void Renderer::RenderShadowPass(const vk::raii::CommandBuffer& cmd,
 
     cmd.pipelineBarrier2(dependencyInfo);*/
 
-    cmd.bindPipeline(vk::PipelineBindPoint::eGraphics, *s_Data->ShadowMap.Pipeline->GetVulkanPipeline());
+    // Bind the default variant once so the pipeline layout is bound before the
+    // per-cascade push constants are recorded. Buckets rebind as needed.
+    s_Data->ShadowMap.Pipeline->Bind(cmd);
     cmd.setDepthBias(s_Data->DepthBias.ConstantFactor, s_Data->DepthBias.Clamp, s_Data->DepthBias.SlopeFactor);
 
     const vk::Rect2D renderArea{ .offset = vk::Offset2D{ .x = 0, .y = 0 },
@@ -5851,22 +5990,44 @@ void Renderer::RenderShadowPass(const vk::raii::CommandBuffer& cmd,
         Frustum frustum = Frustum::CreateFromViewProjection(s_Data->SceneUniformData.lightSpaceMatrices[cascadeIndex]);
         const RenderObjectContainer culledObjects = FrustumCullRenderObjects(renderObjects, frustum, arena);
 
-        for (const auto& renderObject : culledObjects) {
-            if (!renderObject.CastShadows)
-                continue;
-            if (renderObject.Material != nullptr && renderObject.Material->IsTransparent())
-                continue;
+        CasterBuckets buckets = BuildCasterBuckets(culledObjects, arena, true);
 
-            const uint32_t dynamicOffset = static_cast<uint32_t>(renderObject.UBOIndex * s_Data->DynamicAlignment);
+        const glm::mat4& lightSpaceMatrix = s_Data->SceneUniformData.lightSpaceMatrices[cascadeIndex];
+        SortCasterBucket(buckets.Opaque, [&lightSpaceMatrix](const RenderObject& object){
+            const glm::vec4 clip =
+                lightSpaceMatrix * glm::vec4(object.WorldAABB.GetCenter(), 1.0f);
+            const float depth = clip.w != 0.0f ? clip.z / clip.w : clip.z;
+            return std::tuple{ depth, object.Mesh.get() };
+        });
+        SortMaskedCasters(buckets.Masked);
 
-            cmd.bindDescriptorSets(vk::PipelineBindPoint::eGraphics,
-                                   *s_Data->ShadowMap.PipelineLayout,
-                                   0,
-                                   { s_Data->DescriptorSets[frameIndex].scene,
-                                     s_Data->TextureManager.GetGlobalDescriptorSet() },
-                                   { dynamicOffset });
+        const auto drawBucket = [&](const std::pmr::vector<const RenderObject*>& bucket)
+        {
+            for (const RenderObject* renderObject : bucket)
+            {
+                const uint32_t dynamicOffset = static_cast<uint32_t>(renderObject->UBOIndex * s_Data->DynamicAlignment);
 
-            RenderMesh(cmd, renderObject);
+                cmd.bindDescriptorSets(vk::PipelineBindPoint::eGraphics,
+                                       *s_Data->ShadowMap.PipelineLayout,
+                                       0,
+                                       { s_Data->DescriptorSets[frameIndex].scene,
+                                         s_Data->TextureManager.GetGlobalDescriptorSet() },
+                                       { dynamicOffset });
+
+                RenderMesh(cmd, *renderObject);
+            }
+        };
+
+        if (!buckets.Opaque.empty())
+        {
+            s_Data->ShadowMap.Pipeline->Bind(cmd);
+            drawBucket(buckets.Opaque);
+        }
+
+        if (!buckets.Masked.empty())
+        {
+            s_Data->ShadowMap.MaskedPipeline->Bind(cmd);
+            drawBucket(buckets.Masked);
         }
 
         cmd.endRendering();
@@ -5917,18 +6078,20 @@ void Renderer::RenderOmniShadowPass(const vk::raii::CommandBuffer& cmd,
         .offset = { .x = 0, .y = 0 },
         .extent = { .width = PointShadowMap::Size, .height = PointShadowMap::Size } };
 
-    cmd.bindPipeline(vk::PipelineBindPoint::eGraphics,
-                     *s_Data->PointShadowMap.Pipeline->GetVulkanPipeline());
+    // Bind the default variant once so the pipeline layout is bound before the
+    // per-face push constants are recorded. Buckets rebind as needed.
+    s_Data->PointShadowMap.Pipeline->Bind(cmd);
     cmd.setDepthBias(s_Data->PointShadowDepthBias.ConstantFactor,
                      s_Data->PointShadowDepthBias.Clamp,
                      s_Data->PointShadowDepthBias.SlopeFactor);
 
-    std::pmr::vector<const RenderObject*> lightObjects(arena);
-    lightObjects.reserve(renderObjects.size());
-    
+    CasterBuckets lightBuckets(arena);
+
     for (const PointShadowCaster& caster : s_Data->PointShadowCasters)
     {
-        lightObjects.clear();
+        lightBuckets.Opaque.clear();
+        lightBuckets.Masked.clear();
+
         for (const RenderObject& renderObject : renderObjects)
         {
             if (!renderObject.CastShadows)
@@ -5952,11 +6115,21 @@ void Renderer::RenderOmniShadowPass(const vk::raii::CommandBuffer& cmd,
             if (!IsAABBIntersectingSphere(
                     renderObject.WorldAABB, caster.Position, caster.Far))
                 continue;
-            lightObjects.push_back(&renderObject);
+
+            if (renderObject.Material && renderObject.Material->IsMasked())
+                lightBuckets.Masked.push_back(&renderObject);
+            else
+                lightBuckets.Opaque.push_back(&renderObject);
         }
 
-        if (lightObjects.empty())
+        if (lightBuckets.Opaque.empty() && lightBuckets.Masked.empty())
             continue;
+
+        SortCasterBucket(lightBuckets.Opaque, [&caster](const RenderObject& object){
+            const glm::vec3 offset = object.WorldAABB.GetCenter() - caster.Position;
+            return std::tuple{ glm::dot(offset, offset), object.Mesh.get() };
+        });
+        SortMaskedCasters(lightBuckets.Masked);
 
         const glm::mat4 lightProjection = glm::perspective(glm::radians(90.0f), 1.0f, caster.Near, caster.Far);
 
@@ -5997,23 +6170,37 @@ void Renderer::RenderOmniShadowPass(const vk::raii::CommandBuffer& cmd,
                 *s_Data->PointShadowMap.PipelineLayout,
                 vk::ShaderStageFlagBits::eVertex, 0, { viewProjection });
 
-            for (const RenderObject* renderObject : lightObjects)
+            const auto drawBucket = [&](const std::pmr::vector<const RenderObject*>& bucket)
             {
-                if (!renderObject->WorldAABB.IsInsideFrustum(faceFrustum))
-                    continue;
+                for (const RenderObject* renderObject : bucket)
+                {
+                    if (!renderObject->WorldAABB.IsInsideFrustum(faceFrustum))
+                        continue;
 
-                const uint32_t dynamicOffset =
-                    static_cast<uint32_t>(renderObject->UBOIndex * s_Data->DynamicAlignment);
+                    const uint32_t dynamicOffset = static_cast<uint32_t>(renderObject->UBOIndex * s_Data->DynamicAlignment);
 
-                cmd.bindDescriptorSets(
-                    vk::PipelineBindPoint::eGraphics,
-                    *s_Data->PointShadowMap.PipelineLayout,
-                    0,
-                    { s_Data->DescriptorSets[frameIndex].scene,
-                      s_Data->TextureManager.GetGlobalDescriptorSet() },
-                    { dynamicOffset });
+                    cmd.bindDescriptorSets(
+                        vk::PipelineBindPoint::eGraphics,
+                        *s_Data->PointShadowMap.PipelineLayout,
+                        0,
+                        { s_Data->DescriptorSets[frameIndex].scene,
+                          s_Data->TextureManager.GetGlobalDescriptorSet() },
+                        { dynamicOffset });
 
-                RenderMesh(cmd, *renderObject);
+                    RenderMesh(cmd, *renderObject);
+                }
+            };
+
+            if (!lightBuckets.Opaque.empty())
+            {
+                s_Data->PointShadowMap.Pipeline->Bind(cmd);
+                drawBucket(lightBuckets.Opaque);
+            }
+
+            if (!lightBuckets.Masked.empty())
+            {
+                s_Data->PointShadowMap.MaskedPipeline->Bind(cmd);
+                drawBucket(lightBuckets.Masked);
             }
 
             cmd.endRendering();

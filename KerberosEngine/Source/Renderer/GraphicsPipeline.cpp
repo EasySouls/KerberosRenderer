@@ -145,7 +145,7 @@ namespace Kerberos
 		cmd.bindPipeline(vk::PipelineBindPoint::eGraphics, m_Pipeline);
 	}
 
-	void GraphicsPipeline::Recompile() 
+	void GraphicsPipeline::Recompile(const bool force)
 	{
 		KBR_TRACY_FUNCTION();
 
@@ -158,7 +158,7 @@ namespace Kerberos
 			Log::CoreError("Failed to recompile shader for graphics pipeline: {}", m_Specification.Name);
 			return;
 		}
-		if (!*result)
+		if (!*result && !force)
 		{
 			Log::CoreInfo("Shader for graphics pipeline '{}' is already up to date. No recompilation needed.", m_Specification.Name);
 			return;

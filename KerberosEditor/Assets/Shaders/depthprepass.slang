@@ -15,9 +15,12 @@ ConstantBuffer<SceneData> scene;
 ConstantBuffer<PerObject> perObject;
 
 [[vk::binding(0, 1)]]
-Texture2D globalTextures[];
+Texture2D globalTextures[]; 
 [[vk::binding(1, 1)]]
 SamplerState globalSamplers[];
+
+// 0 = depth-only (opaque geometry), 1 = alpha-tested (masked geometry).
+[SpecializationConstant] const int enableAlphaTest = 1;
 
 struct VSOutput
 {
@@ -74,8 +77,9 @@ PSOutput fragmentMain(VSOutput inVert)
 {
     // Alpha-masked geometry must cut out the same fragments here as it does in
     // the opaque and shadow passes, otherwise the prepass depth/normal/motion
-    // buffers disagree with the visible surface.
-    if (perObject.alphaMode == 1u) {
+    // buffers disagree with the visible surface. The opaque variant compiles
+    // this block out entirely.
+    if (enableAlphaTest != 0) {
         float4 albedoTex = SampleBindless(perObject.material.albedoTexIndex, inVert.TexCoord);
         float alpha = albedoTex.a * perObject.material.albedo.a;
         if (alpha < perObject.alphaCutoff)

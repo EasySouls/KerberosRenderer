@@ -91,7 +91,10 @@ namespace Kerberos
 
 		void Bind(const vk::raii::CommandBuffer& cmd) const;
 
-		void Recompile();
+		/// Recreates the pipeline when its shader changed. Pass `force` to
+		/// recreate a pipeline that shares its shader with an already
+		/// recompiled variant.
+		void Recompile(bool force = false);
 
 		const vk::raii::Pipeline& GetVulkanPipeline() const { return m_Pipeline; }
 

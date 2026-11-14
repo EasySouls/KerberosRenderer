@@ -19,6 +19,9 @@ Texture2D globalTextures[];
 [[vk::binding(1, 1)]]
 SamplerState globalSamplers[];
 
+// 0 = depth-only (opaque casters), 1 = alpha-tested (masked casters).
+[SpecializationConstant] const int enableAlphaTest = 1;
+
 struct PushConstants
 {
     uint cascadeIndex;
@@ -55,9 +58,10 @@ VSOutput vertexMain(VSInput input) {
 [shader("fragment")]
 void fragmentMain(VSOutput input) : SV_Target
 {
-    // Match the opaque-pass alpha mask so cutout geometry casts a correct
-    // shadow instead of a solid quad.
-    if (perObject.alphaMode == 1u) {
+    // Masked casters sample the base-color alpha so cutout geometry casts a
+    // correct shadow instead of a solid quad. This whole block is compiled out
+    // of the opaque variant, which lets it keep early depth testing.
+    if (enableAlphaTest != 0) {
         float4 albedoTex = SampleBindless(perObject.material.albedoTexIndex, input.TexCoord);
         float alpha = albedoTex.a * perObject.material.albedo.a;
         if (alpha < perObject.alphaCutoff)
