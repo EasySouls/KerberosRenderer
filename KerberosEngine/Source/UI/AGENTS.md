@@ -115,6 +115,17 @@ are in em units.
 `UIFontLibrary` never depends on `EditorAssetManager`, so a future standalone
 game executable can use the same path.
 
+`UIFontLibrary::GetFontFiles()` is the cached list the editor font picker draws.
+It must never be re-derived per frame: the list is built once (project
+`Fonts/`, project asset-tree fallback, then `EnginePaths::Assets()/Fonts`) and
+is only rescanned when the active project changes (`EnsureProjectKey`, which
+also clears the resolved-path cache because authored paths are
+project-relative) or when a scanned root's `last_write_time` moves, which is
+polled at most once per 500 ms. Font atlas generation is expensive (seconds for
+the full Latin-1 charset), so `Get()` is also called from `UISystem::Update` to
+warm atlases outside command recording; do not move font creation into a draw
+path.
+
 ## Shader contract
 
 `ui.slang` binds the global bindless texture set at set 0 (bindings 0 and 1),
@@ -143,7 +154,8 @@ texture set is bound with `cmd.bindDescriptorSets`.
 The hierarchy "Add Component" popup has a `UI` submenu: `UI Canvas`, plus
 presets for Panel, Text, Button, Toggle, Bar, Text Input, Image, and World Label.
 Presets add a preconfigured `UIElementComponent`; the inspector edits layout,
-style, type-specific fields, fonts (discovered `.ttf`/`.otf` files), and shows
+style, type-specific fields, fonts (the picker draws the cached
+`UIFontLibrary::GetFontFiles()` list, never its own directory scan), and shows
 runtime state while the scene is running.
 
 Undo for UI component edits is a single `SetComponentValueCommand` per gesture,

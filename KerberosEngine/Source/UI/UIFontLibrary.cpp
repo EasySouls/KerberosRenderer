@@ -18,6 +18,11 @@ namespace {
 
 constexpr std::array<double, 7> FontEmBuckets = { 16.0, 20.0, 24.0, 32.0, 40.0, 48.0, 64.0 };
 
+/// How often the cached font picker list rescans its directories. 
+// The inspector draws the picker every frame, so it must not walk the filesystem
+/// per frame
+constexpr std::chrono::milliseconds FontFileRefreshInterval{ 500 };
+
 std::string NormalizePathString(std::filesystem::path path)
 {
     KBR_TRACY_FUNCTION();
@@ -76,6 +81,13 @@ void UIFontLibrary::Shutdown()
 {
 	m_Entries.clear();
 	m_ResolvedPaths.clear();
+	m_HasProject = false;
+	m_ProjectDirectory.clear();
+	m_FontFiles.clear();
+	m_FontRoots.clear();
+	m_FontRootStamps.clear();
+	m_FontFilesScanned = false;
+	m_NextFontFileCheck = {};
 	m_TextureManager = nullptr;
 }
 
@@ -131,26 +143,108 @@ std::string UIFontLibrary::MakeAuthoredPath(const std::filesystem::path& absolut
 	return NormalizePathString(absolutePath);
 }
 
-std::vector<std::string> UIFontLibrary::DiscoverFontFiles()
+void UIFontLibrary::EnsureProjectKey()
 {
-    KBR_TRACY_FUNCTION();
-    
+	const Ref<Project> project = Project::GetActive();
+	const bool hasProject = project != nullptr;
+
+	if (hasProject == m_HasProject &&
+	    (!hasProject || Project::GetProjectDirectory() == m_ProjectDirectory))
+	{
+		return;
+	}
+
+	// Authored font paths resolve against the project asset directory and the
+	// discovered file list is built from it, so both caches are stale.
+	m_HasProject = hasProject;
+	m_ProjectDirectory = hasProject ? Project::GetProjectDirectory() : std::filesystem::path{};
+	m_ResolvedPaths.clear();
+	m_FontFilesScanned = false;
+	m_NextFontFileCheck = {};
+}
+
+void UIFontLibrary::ScanFontFiles()
+{
+	KBR_TRACY_FUNCTION();
+
 	std::vector<std::string> files;
+	std::vector<std::filesystem::path> roots;
 
 	if (const Ref<Project> project = Project::GetActive())
 	{
 		const auto projectAssetDirectory = Project::GetAssetDirectory();
-		CollectFontFiles(projectAssetDirectory / "Fonts", projectAssetDirectory, files);
+		const auto projectFontsDirectory = projectAssetDirectory / "Fonts";
+
+		roots.push_back(projectFontsDirectory);
+		CollectFontFiles(projectFontsDirectory, projectAssetDirectory, files);
+
+		// Projects without a Fonts directory fall back to their whole asset tree.
 		if (files.empty())
+		{
+			roots.push_back(projectAssetDirectory);
 			CollectFontFiles(projectAssetDirectory, projectAssetDirectory, files);
+		}
 	}
 
 	const auto engineAssets = EnginePaths::Assets();
-	CollectFontFiles(engineAssets / "Fonts", engineAssets, files);
+	const auto engineFontsDirectory = engineAssets / "Fonts";
+	roots.push_back(engineFontsDirectory);
+	CollectFontFiles(engineFontsDirectory, engineAssets, files);
 
 	std::ranges::sort(files);
 	files.erase(std::ranges::unique(files).begin(), files.end());
-	return files;
+
+	m_FontFiles = std::move(files);
+
+	m_FontRoots = std::move(roots);
+	m_FontRootStamps.clear();
+	m_FontRootStamps.reserve(m_FontRoots.size());
+	for (const auto& root : m_FontRoots)
+	{
+		std::error_code error;
+		const auto stamp = std::filesystem::last_write_time(root, error);
+		// A missing directory keeps the default stamp so that creating it later
+		// is detected as a change.
+		m_FontRootStamps.push_back(error ? std::filesystem::file_time_type{} : stamp);
+	}
+
+	m_FontFilesScanned = true;
+	m_NextFontFileCheck = std::chrono::steady_clock::now() + FontFileRefreshInterval;
+}
+
+bool UIFontLibrary::FontRootsChanged()
+{
+	const auto now = std::chrono::steady_clock::now();
+	if (now < m_NextFontFileCheck)
+		return false;
+
+	m_NextFontFileCheck = now + FontFileRefreshInterval;
+
+	for (size_t i = 0; i < m_FontRoots.size(); ++i)
+	{
+		std::error_code error;
+		const auto stamp = std::filesystem::last_write_time(m_FontRoots[i], error);
+		if (error || stamp != m_FontRootStamps[i])
+			return true;
+	}
+
+	return false;
+}
+
+const std::vector<std::string>& UIFontLibrary::GetFontFiles()
+{
+	EnsureProjectKey();
+
+	if (!m_FontFilesScanned || FontRootsChanged())
+		ScanFontFiles();
+
+	return m_FontFiles;
+}
+
+void UIFontLibrary::InvalidateFontFiles()
+{
+	m_FontFilesScanned = false;
+	m_NextFontFileCheck = {};
 }
 
 double UIFontLibrary::SelectEmSize(const float fontSize)
@@ -170,6 +264,8 @@ Ref<Font> UIFontLibrary::Get(const std::string& authoredPath, const float fontSi
 {
     KBR_TRACY_FUNCTION();
     
+	EnsureProjectKey();
+
 	std::filesystem::path resolved;
 	if (const auto cached = m_ResolvedPaths.find(authoredPath); cached != m_ResolvedPaths.end())
 	{

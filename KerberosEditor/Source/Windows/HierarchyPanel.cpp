@@ -3181,7 +3181,7 @@ bool UIEnumCombo(const char* label, TEnum& value, const std::initializer_list<co
 bool UIFontCombo(const char* label, std::string& fontPath)
 {
     bool changed = false;
-    const std::vector<std::string> fonts = UIFontLibrary::DiscoverFontFiles();
+    const std::vector<std::string>& fonts = UIFontLibrary::Get().GetFontFiles();
     if (ImGui::BeginCombo(label, fontPath.c_str()))
     {
         for (const std::string& font : fonts)
