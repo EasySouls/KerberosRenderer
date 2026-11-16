@@ -13,6 +13,8 @@ Use the subsystem context files when working in their scopes:
   loading, and the asset browser.
 - `KerberosEngine/Source/Renderer/AGENTS.md` — renderer, Vulkan context and
   resources, the render graph, shaders, and the particle system.
+- `KerberosEngine/Source/UI/AGENTS.md` — runtime game UI: components, layout,
+  interaction, draw data, the UI render pass, and UI fonts.
 - `KerberosEngine/Source/AI/AGENTS.md` — AI identifiers, blackboards, state
   trees, node factory/registry, perception, movement, and C# authoring.
 - `KerberosEditor/AGENTS.md` — editor lifecycle, panels, and project/scene

@@ -20,7 +20,7 @@ namespace Kerberos
 	class Font
 	{
 	public:
-		explicit Font(std::string name, const std::filesystem::path& filepath);
+		explicit Font(std::string name, const std::filesystem::path& filepath, double emSize = 40.0);
 		~Font();
 
 		Font(const Font& other) = delete;
@@ -32,6 +32,8 @@ namespace Kerberos
 		FontMetrics GetMetrics() const;
 		const std::string& GetName() const { return m_Name; }
 		const std::filesystem::path& GetFilepath() const { return m_Filepath; }
+		/// Atlas em size this font was rasterized at. Used to pick a crisp size bucket.
+		double GetEmSize() const { return m_EmSize; }
 
 		bool HasCharacter(char c) const;
 		void GetQuadAtlasBounds(char character, double& al, double& ab, double& ar, double& at) const;
@@ -42,6 +44,7 @@ namespace Kerberos
 	private:
 		std::string m_Name;
 		std::filesystem::path m_Filepath;
+		double m_EmSize = 40.0;
 
 		MSDFData* m_MSDFData = nullptr;
 		Ref<Texture2D> m_AtlasTexture;

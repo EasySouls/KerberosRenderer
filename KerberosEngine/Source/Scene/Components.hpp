@@ -13,8 +13,6 @@
 #include "Renderer/Lights.hpp"
 #include "Renderer/Material.hpp"
 #include "Renderer/Mesh.hpp"
-#include "Renderer/Textures/Texture.hpp"
-#include "Renderer/Textures/TextureCube.hpp"
 #include "Scene/AABB.hpp"
 #include "Scene/Camera/SceneCamera.hpp"
 

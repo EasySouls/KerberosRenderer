@@ -331,6 +331,70 @@ static void SerializeEntity(YAML::Emitter& out, const Entity entity)
         out << YAML::EndMap;
     }
 
+    if (entity.HasComponent<UICanvasComponent>()) {
+        out << YAML::Key << "UICanvasComponent";
+        out << YAML::BeginMap;
+        const auto& canvas = entity.GetComponent<UICanvasComponent>();
+        out << YAML::Key << "Visible" << YAML::Value << canvas.Visible;
+        out << YAML::Key << "SortOrder" << YAML::Value << canvas.SortOrder;
+        out << YAML::Key << "InputEnabled" << YAML::Value << canvas.InputEnabled;
+        out << YAML::Key << "BlockSceneInput" << YAML::Value << canvas.BlockSceneInput;
+        out << YAML::Key << "ScaleMode" << YAML::Value << ToString(canvas.ScaleMode);
+        out << YAML::Key << "ReferenceHeight" << YAML::Value << canvas.ReferenceHeight;
+        out << YAML::Key << "ReferenceWidth" << YAML::Value << canvas.ReferenceWidth;
+        out << YAML::EndMap;
+    }
+
+    if (entity.HasComponent<UIElementComponent>()) {
+        out << YAML::Key << "UIElementComponent";
+        out << YAML::BeginMap;
+        const auto& element = entity.GetComponent<UIElementComponent>();
+
+        out << YAML::Key << "Type" << YAML::Value << ToString(element.Type);
+        out << YAML::Key << "Space" << YAML::Value << ToString(element.Space);
+        out << YAML::Key << "Anchor" << YAML::Value << ToString(element.Anchor);
+        out << YAML::Key << "Pivot" << YAML::Value << element.Pivot;
+        out << YAML::Key << "Offset" << YAML::Value << element.Offset;
+        out << YAML::Key << "Size" << YAML::Value << element.Size;
+        out << YAML::Key << "Margin" << YAML::Value << element.Margin;
+        out << YAML::Key << "SortOrder" << YAML::Value << element.SortOrder;
+        out << YAML::Key << "Visible" << YAML::Value << element.Visible;
+        out << YAML::Key << "Interactable" << YAML::Value << element.Interactable;
+        out << YAML::Key << "ClipChildren" << YAML::Value << element.ClipChildren;
+        out << YAML::Key << "Opacity" << YAML::Value << element.Opacity;
+
+        out << YAML::Key << "Color" << YAML::Value << element.Color;
+        out << YAML::Key << "GradientColor" << YAML::Value << element.GradientColor;
+        out << YAML::Key << "GradientDirection" << YAML::Value << ToString(element.GradientDirection);
+        out << YAML::Key << "BorderColor" << YAML::Value << element.BorderColor;
+        out << YAML::Key << "BorderWidth" << YAML::Value << element.BorderWidth;
+        out << YAML::Key << "CornerRadius" << YAML::Value << element.CornerRadius;
+        out << YAML::Key << "Texture" << YAML::Value << element.Texture;
+
+        out << YAML::Key << "Text" << YAML::Value << element.Text;
+        out << YAML::Key << "FontPath" << YAML::Value << element.FontPath;
+        out << YAML::Key << "FontSize" << YAML::Value << element.FontSize;
+        out << YAML::Key << "TextAlign" << YAML::Value << ToString(element.TextAlign);
+        out << YAML::Key << "WrapWidth" << YAML::Value << element.WrapWidth;
+        out << YAML::Key << "TextColor" << YAML::Value << element.TextColor;
+        out << YAML::Key << "ShadowColor" << YAML::Value << element.ShadowColor;
+        out << YAML::Key << "ShadowOffset" << YAML::Value << element.ShadowOffset;
+
+        out << YAML::Key << "HoverColor" << YAML::Value << element.HoverColor;
+        out << YAML::Key << "PressColor" << YAML::Value << element.PressColor;
+        out << YAML::Key << "DisabledColor" << YAML::Value << element.DisabledColor;
+
+        out << YAML::Key << "Value" << YAML::Value << element.Value;
+        out << YAML::Key << "FillColor" << YAML::Value << element.FillColor;
+        out << YAML::Key << "BackgroundColor" << YAML::Value << element.BackgroundColor;
+        out << YAML::Key << "FillDirection" << YAML::Value << ToString(element.FillDirection);
+
+        out << YAML::Key << "IsOn" << YAML::Value << element.IsOn;
+        out << YAML::Key << "Placeholder" << YAML::Value << element.Placeholder;
+        out << YAML::Key << "MaxLength" << YAML::Value << element.MaxLength;
+        out << YAML::EndMap;
+    }
+
     if (entity.HasComponent<TextComponent>()) {
         out << YAML::Key << "TextComponent";
         out << YAML::BeginMap;
@@ -799,6 +863,66 @@ Entity SceneSerializer::DeserializeEntity(const Ref<Scene>& scene, const YAML::N
         environment.SkyboxTexture = AssetHandle(environmentComponent["SkyboxTexture"].as<uint64_t>());
         environment.IsSkyboxEnabled = environmentComponent["IsSkyboxEnabled"].as<bool>();
         environment.Intensity = environmentComponent["Intensity"].as<float>(DefaultEnvironmentIntensity);
+    }
+
+    if (auto canvasNode = node["UICanvasComponent"]) {
+        auto& canvas = deserializedEntity.AddComponent<UICanvasComponent>();
+        canvas.Visible = canvasNode["Visible"].as<bool>(true);
+        canvas.SortOrder = canvasNode["SortOrder"].as<int>(0);
+        canvas.InputEnabled = canvasNode["InputEnabled"].as<bool>(true);
+        canvas.BlockSceneInput = canvasNode["BlockSceneInput"].as<bool>(false);
+        canvas.ScaleMode = UIScaleModeFromString(canvasNode["ScaleMode"].as<std::string>("MatchHeight"));
+        canvas.ReferenceHeight = canvasNode["ReferenceHeight"].as<float>(1080.0f);
+        canvas.ReferenceWidth = canvasNode["ReferenceWidth"].as<float>(1920.0f);
+    }
+
+    if (auto elementNode = node["UIElementComponent"]) {
+        auto& element = deserializedEntity.AddComponent<UIElementComponent>();
+
+        element.Type = UIElementTypeFromString(elementNode["Type"].as<std::string>("Panel"));
+        element.Space = UISpaceFromString(elementNode["Space"].as<std::string>("Canvas"));
+        element.Anchor = UIAnchorFromString(elementNode["Anchor"].as<std::string>("TopLeft"));
+        element.Pivot = elementNode["Pivot"].as<glm::vec2>(element.Pivot);
+        element.Offset = elementNode["Offset"].as<glm::vec2>(element.Offset);
+        element.Size = elementNode["Size"].as<glm::vec2>(element.Size);
+        element.Margin = elementNode["Margin"].as<glm::vec4>(element.Margin);
+        element.SortOrder = elementNode["SortOrder"].as<int>(0);
+        element.Visible = elementNode["Visible"].as<bool>(true);
+        element.Interactable = elementNode["Interactable"].as<bool>(true);
+        element.ClipChildren = elementNode["ClipChildren"].as<bool>(false);
+        element.Opacity = elementNode["Opacity"].as<float>(1.0f);
+
+        element.Color = elementNode["Color"].as<glm::vec4>(element.Color);
+        element.GradientColor = elementNode["GradientColor"].as<glm::vec4>(element.GradientColor);
+        element.GradientDirection =
+            UIGradientDirectionFromString(elementNode["GradientDirection"].as<std::string>("None"));
+        element.BorderColor = elementNode["BorderColor"].as<glm::vec4>(element.BorderColor);
+        element.BorderWidth = elementNode["BorderWidth"].as<float>(0.0f);
+        element.CornerRadius = elementNode["CornerRadius"].as<float>(0.0f);
+        element.Texture = AssetHandle(elementNode["Texture"].as<uint64_t>(0));
+
+        element.Text = elementNode["Text"].as<std::string>("");
+        element.FontPath = elementNode["FontPath"].as<std::string>(element.FontPath);
+        element.FontSize = elementNode["FontSize"].as<float>(20.0f);
+        element.TextAlign = UITextAlignFromString(elementNode["TextAlign"].as<std::string>("Left"));
+        element.WrapWidth = elementNode["WrapWidth"].as<float>(0.0f);
+        element.TextColor = elementNode["TextColor"].as<glm::vec4>(element.TextColor);
+        element.ShadowColor = elementNode["ShadowColor"].as<glm::vec4>(element.ShadowColor);
+        element.ShadowOffset = elementNode["ShadowOffset"].as<glm::vec2>(element.ShadowOffset);
+
+        element.HoverColor = elementNode["HoverColor"].as<glm::vec4>(element.HoverColor);
+        element.PressColor = elementNode["PressColor"].as<glm::vec4>(element.PressColor);
+        element.DisabledColor = elementNode["DisabledColor"].as<glm::vec4>(element.DisabledColor);
+
+        element.Value = elementNode["Value"].as<float>(1.0f);
+        element.FillColor = elementNode["FillColor"].as<glm::vec4>(element.FillColor);
+        element.BackgroundColor = elementNode["BackgroundColor"].as<glm::vec4>(element.BackgroundColor);
+        element.FillDirection =
+            UIFillDirectionFromString(elementNode["FillDirection"].as<std::string>("LeftToRight"));
+
+        element.IsOn = elementNode["IsOn"].as<bool>(false);
+        element.Placeholder = elementNode["Placeholder"].as<std::string>("");
+        element.MaxLength = elementNode["MaxLength"].as<uint32_t>(64);
     }
 
     if (auto textComponent = node["TextComponent"]) {

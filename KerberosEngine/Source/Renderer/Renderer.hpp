@@ -46,6 +46,7 @@ struct GPUTimings
     float TonemappingPassMilliseconds = 0.0f;
     float AntialiasingPassMilliseconds = 0.0f;
     float UpscalingPassMilliseconds = 0.0f;
+    float GameUIPassMilliseconds = 0.0f;
     bool IsValid = false;
 };
 
@@ -358,6 +359,8 @@ private:
     static void ApplyUpscaling(const vk::raii::CommandBuffer& cmd, uint32_t frameIndex);
 
     static void ApplyBloom(const vk::raii::CommandBuffer& cmd, uint32_t frameIndex);
+    
+    static void RenderGameUI(const vk::raii::CommandBuffer& cmd, uint32_t frameIndex);
 
     static void WriteGPUTimestamp(const vk::raii::CommandBuffer& cmd, uint32_t frameIndex, uint32_t index);
     static void WriteMissingGPUTimestamps(const vk::raii::CommandBuffer& cmd, uint32_t frameIndex);

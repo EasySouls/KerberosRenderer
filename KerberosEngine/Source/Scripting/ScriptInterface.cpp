@@ -15,6 +15,7 @@
 #include "AI/AIStateTreeRegistry.hpp"
 #include "Assets/AssetManager.hpp"
 #include "Profiling/Profilers.hpp"
+#include "Renderer/Renderer.hpp"
 
 #include <algorithm>
 
@@ -230,6 +231,43 @@ namespace Kerberos
 
 		void* AITargetable_GetFactionId;
 		void* AITargetable_SetFactionId;
+
+		// Game UI
+		void* UI_IsInputCaptured;
+		void* UIElement_SetText;
+		void* UIElement_GetText;
+		void* UIElement_SetValue;
+		void* UIElement_GetValue;
+		void* UIElement_SetVisible;
+		void* UIElement_GetVisible;
+		void* UIElement_GetClicked;
+		void* UIElement_GetIsHovered;
+		void* UIElement_SetIsOn;
+		void* UIElement_GetIsOn;
+		void* UIElement_GetInputText;
+		void* UICanvas_SetVisible;
+		void* UICanvas_GetVisible;
+		void* UICanvas_SetBlockSceneInput;
+		void* UICanvas_GetBlockSceneInput;
+
+		// Graphics settings facade
+		void* Graphics_IsRayTracingSupported;
+		void* Graphics_GetRayQueryShadows;
+		void* Graphics_SetRayQueryShadows;
+		void* Graphics_GetRayQuerySoftShadows;
+		void* Graphics_SetRayQuerySoftShadows;
+		void* Graphics_GetRayQueryAmbientOcclusion;
+		void* Graphics_SetRayQueryAmbientOcclusion;
+		void* Graphics_GetGtao;
+		void* Graphics_SetGtao;
+		void* Graphics_GetPointShadows;
+		void* Graphics_SetPointShadows;
+		void* Graphics_GetPcf;
+		void* Graphics_SetPcf;
+		void* Graphics_GetExposureCompensation;
+		void* Graphics_SetExposureCompensation;
+		void* Graphics_GetAntiAliasing;
+		void* Graphics_SetAntiAliasing;
 	};
 
 	/// Component type name to HasComponent check mapping
@@ -285,6 +323,10 @@ namespace Kerberos
 			return [](Entity entity) { return entity.AddComponent<EnvironmentComponent>(); };
 		if (typeName == "TextComponent")
 			return [](Entity entity) { return entity.AddComponent<TextComponent>(); };
+		if (typeName == "UICanvasComponent")
+			return [](Entity entity) { return entity.AddComponent<UICanvasComponent>(); };
+		if (typeName == "UIElementComponent")
+			return [](Entity entity) { return entity.AddComponent<UIElementComponent>(); };
 		if (typeName == "RigidBody3DComponent")
 			return [](Entity entity) { return entity.AddComponent<RigidBody3DComponent>(); };
 		if (typeName == "BoxCollider3DComponent")
@@ -2305,6 +2347,164 @@ namespace Kerberos
 	}
 
 	// ====================================================================
+	// Game UI
+	// ====================================================================
+
+	static Entity ResolveUIEntity(const uint64_t entityID)
+	{
+		const Ref<Scene> scene = ScriptEngine::GetSceneContext().lock();
+		return scene ? scene->TryGetEntityByUUID(UUID(entityID)) : Entity{};
+	}
+
+	static UIElementComponent* TryGetUIElement(const uint64_t entityID)
+	{
+		const Entity entity = ResolveUIEntity(entityID);
+		return entity && entity.HasComponent<UIElementComponent>()
+			? &entity.GetComponent<UIElementComponent>()
+			: nullptr;
+	}
+
+	static UICanvasComponent* TryGetUICanvas(const uint64_t entityID)
+	{
+		const Entity entity = ResolveUIEntity(entityID);
+		return entity && entity.HasComponent<UICanvasComponent>()
+			? &entity.GetComponent<UICanvasComponent>()
+			: nullptr;
+	}
+
+	static uint8_t UI_IsInputCaptured()
+	{
+		const Ref<Scene> scene = ScriptEngine::GetSceneContext().lock();
+		return scene && scene->IsUIInputCaptured() ? 1 : 0;
+	}
+
+	static void UIElement_SetText(const uint64_t entityID, const char* text)
+	{
+		if (UIElementComponent* element = TryGetUIElement(entityID))
+			element->Text = text ? text : "";
+	}
+
+	static const char* UIElement_GetText(const uint64_t entityID)
+	{
+		const UIElementComponent* element = TryGetUIElement(entityID);
+		s_StringReturnBuffer = element ? element->Text : std::string{};
+		return s_StringReturnBuffer.c_str();
+	}
+
+	static void UIElement_SetValue(const uint64_t entityID, const float value)
+	{
+		if (UIElementComponent* element = TryGetUIElement(entityID))
+			element->Value = std::clamp(value, 0.0f, 1.0f);
+	}
+
+	static float UIElement_GetValue(const uint64_t entityID)
+	{
+		const UIElementComponent* element = TryGetUIElement(entityID);
+		return element ? element->Value : 0.0f;
+	}
+
+	static void UIElement_SetVisible(const uint64_t entityID, const uint8_t visible)
+	{
+		if (UIElementComponent* element = TryGetUIElement(entityID))
+			element->Visible = visible != 0;
+	}
+
+	static uint8_t UIElement_GetVisible(const uint64_t entityID)
+	{
+		const UIElementComponent* element = TryGetUIElement(entityID);
+		return element && element->Visible ? 1 : 0;
+	}
+
+	static uint8_t UIElement_GetClicked(const uint64_t entityID)
+	{
+		const UIElementComponent* element = TryGetUIElement(entityID);
+		return element && element->Clicked ? 1 : 0;
+	}
+
+	static uint8_t UIElement_GetIsHovered(const uint64_t entityID)
+	{
+		const UIElementComponent* element = TryGetUIElement(entityID);
+		return element && element->IsHovered ? 1 : 0;
+	}
+
+	static void UIElement_SetIsOn(const uint64_t entityID, const uint8_t isOn)
+	{
+		if (UIElementComponent* element = TryGetUIElement(entityID))
+			element->IsOn = isOn != 0;
+	}
+
+	static uint8_t UIElement_GetIsOn(const uint64_t entityID)
+	{
+		const UIElementComponent* element = TryGetUIElement(entityID);
+		return element && element->IsOn ? 1 : 0;
+	}
+
+	static const char* UIElement_GetInputText(const uint64_t entityID)
+	{
+		const UIElementComponent* element = TryGetUIElement(entityID);
+		s_StringReturnBuffer = element ? element->InputBuffer : std::string{};
+		return s_StringReturnBuffer.c_str();
+	}
+
+	static void UICanvas_SetVisible(const uint64_t entityID, const uint8_t visible)
+	{
+		if (UICanvasComponent* canvas = TryGetUICanvas(entityID))
+			canvas->Visible = visible != 0;
+	}
+
+	static uint8_t UICanvas_GetVisible(const uint64_t entityID)
+	{
+		const UICanvasComponent* canvas = TryGetUICanvas(entityID);
+		return canvas && canvas->Visible ? 1 : 0;
+	}
+
+	static void UICanvas_SetBlockSceneInput(const uint64_t entityID, const uint8_t block)
+	{
+		if (UICanvasComponent* canvas = TryGetUICanvas(entityID))
+			canvas->BlockSceneInput = block != 0;
+	}
+
+	static uint8_t UICanvas_GetBlockSceneInput(const uint64_t entityID)
+	{
+		const UICanvasComponent* canvas = TryGetUICanvas(entityID);
+		return canvas && canvas->BlockSceneInput ? 1 : 0;
+	}
+
+	// ====================================================================
+	// Graphics settings facade
+	// ====================================================================
+
+	static uint8_t Graphics_IsRayTracingSupported() { return Renderer::IsRayTracingSupported() ? 1 : 0; }
+
+	static uint8_t Graphics_GetRayQueryShadows() { return Renderer::GetUseRayQueryBasedShadows() ? 1 : 0; }
+	static void Graphics_SetRayQueryShadows(const uint8_t value) { Renderer::GetUseRayQueryBasedShadows() = value != 0; }
+
+	static uint8_t Graphics_GetRayQuerySoftShadows() { return Renderer::GetUseRayQueryBasedSoftShadows() ? 1 : 0; }
+	static void Graphics_SetRayQuerySoftShadows(const uint8_t value) { Renderer::GetUseRayQueryBasedSoftShadows() = value != 0; }
+
+	static uint8_t Graphics_GetRayQueryAmbientOcclusion() { return Renderer::GetUseRayQueryAmbientOcclusion() ? 1 : 0; }
+	static void Graphics_SetRayQueryAmbientOcclusion(const uint8_t value) { Renderer::GetUseRayQueryAmbientOcclusion() = value != 0; }
+
+	static uint8_t Graphics_GetGtao() { return Renderer::GetUseGTAO() ? 1 : 0; }
+	static void Graphics_SetGtao(const uint8_t value) { Renderer::GetUseGTAO() = value != 0; }
+
+	static uint8_t Graphics_GetPointShadows() { return Renderer::GetPointShadowsEnabled() ? 1 : 0; }
+	static void Graphics_SetPointShadows(const uint8_t value) { Renderer::GetPointShadowsEnabled() = value != 0; }
+
+	static uint8_t Graphics_GetPcf() { return Renderer::GetIsPCFEnabledForShadowMap() ? 1 : 0; }
+	static void Graphics_SetPcf(const uint8_t value) { Renderer::GetIsPCFEnabledForShadowMap() = value != 0; }
+
+	static float Graphics_GetExposureCompensation() { return Renderer::GetExposureCompensation(); }
+	static void Graphics_SetExposureCompensation(const float value) { Renderer::GetExposureCompensation() = value; }
+
+	static int32_t Graphics_GetAntiAliasing() { return static_cast<int32_t>(Renderer::GetAntiAliasingMode()); }
+	static void Graphics_SetAntiAliasing(const int32_t value)
+	{
+		const auto mode = static_cast<AntiAliasingMode>(std::clamp<int32_t>(value, 0, 3));
+		Renderer::GetAntiAliasingMode() = mode;
+	}
+
+	// ====================================================================
 	// Component Registration
 	// ====================================================================
 
@@ -2328,6 +2528,8 @@ namespace Kerberos
 		RegisterComponent<CapsuleCollider3DComponent>("Kerberos.Scene.CapsuleCollider3DComponent");
 		RegisterComponent<MeshCollider3DComponent>("Kerberos.Scene.MeshCollider3DComponent");
 		RegisterComponent<TextComponent>("Kerberos.Scene.TextComponent");
+		RegisterComponent<UICanvasComponent>("Kerberos.Scene.UICanvasComponent");
+		RegisterComponent<UIElementComponent>("Kerberos.Scene.UIElementComponent");
 		RegisterComponent<AudioSource2DComponent>("Kerberos.Scene.AudioSource2DComponent");
 		RegisterComponent<AudioSource3DComponent>("Kerberos.Scene.AudioSource3DComponent");
 		RegisterComponent<AudioListenerComponent>("Kerberos.Scene.AudioListenerComponent");
@@ -2539,6 +2741,41 @@ namespace Kerberos
 
 		callbackTable.AITargetable_GetFactionId = reinterpret_cast<void*>(&AITargetable_GetFactionId);
 		callbackTable.AITargetable_SetFactionId = reinterpret_cast<void*>(&AITargetable_SetFactionId);
+
+		callbackTable.UI_IsInputCaptured = reinterpret_cast<void*>(&UI_IsInputCaptured);
+		callbackTable.UIElement_SetText = reinterpret_cast<void*>(&UIElement_SetText);
+		callbackTable.UIElement_GetText = reinterpret_cast<void*>(&UIElement_GetText);
+		callbackTable.UIElement_SetValue = reinterpret_cast<void*>(&UIElement_SetValue);
+		callbackTable.UIElement_GetValue = reinterpret_cast<void*>(&UIElement_GetValue);
+		callbackTable.UIElement_SetVisible = reinterpret_cast<void*>(&UIElement_SetVisible);
+		callbackTable.UIElement_GetVisible = reinterpret_cast<void*>(&UIElement_GetVisible);
+		callbackTable.UIElement_GetClicked = reinterpret_cast<void*>(&UIElement_GetClicked);
+		callbackTable.UIElement_GetIsHovered = reinterpret_cast<void*>(&UIElement_GetIsHovered);
+		callbackTable.UIElement_SetIsOn = reinterpret_cast<void*>(&UIElement_SetIsOn);
+		callbackTable.UIElement_GetIsOn = reinterpret_cast<void*>(&UIElement_GetIsOn);
+		callbackTable.UIElement_GetInputText = reinterpret_cast<void*>(&UIElement_GetInputText);
+		callbackTable.UICanvas_SetVisible = reinterpret_cast<void*>(&UICanvas_SetVisible);
+		callbackTable.UICanvas_GetVisible = reinterpret_cast<void*>(&UICanvas_GetVisible);
+		callbackTable.UICanvas_SetBlockSceneInput = reinterpret_cast<void*>(&UICanvas_SetBlockSceneInput);
+		callbackTable.UICanvas_GetBlockSceneInput = reinterpret_cast<void*>(&UICanvas_GetBlockSceneInput);
+
+		callbackTable.Graphics_IsRayTracingSupported = reinterpret_cast<void*>(&Graphics_IsRayTracingSupported);
+		callbackTable.Graphics_GetRayQueryShadows = reinterpret_cast<void*>(&Graphics_GetRayQueryShadows);
+		callbackTable.Graphics_SetRayQueryShadows = reinterpret_cast<void*>(&Graphics_SetRayQueryShadows);
+		callbackTable.Graphics_GetRayQuerySoftShadows = reinterpret_cast<void*>(&Graphics_GetRayQuerySoftShadows);
+		callbackTable.Graphics_SetRayQuerySoftShadows = reinterpret_cast<void*>(&Graphics_SetRayQuerySoftShadows);
+		callbackTable.Graphics_GetRayQueryAmbientOcclusion = reinterpret_cast<void*>(&Graphics_GetRayQueryAmbientOcclusion);
+		callbackTable.Graphics_SetRayQueryAmbientOcclusion = reinterpret_cast<void*>(&Graphics_SetRayQueryAmbientOcclusion);
+		callbackTable.Graphics_GetGtao = reinterpret_cast<void*>(&Graphics_GetGtao);
+		callbackTable.Graphics_SetGtao = reinterpret_cast<void*>(&Graphics_SetGtao);
+		callbackTable.Graphics_GetPointShadows = reinterpret_cast<void*>(&Graphics_GetPointShadows);
+		callbackTable.Graphics_SetPointShadows = reinterpret_cast<void*>(&Graphics_SetPointShadows);
+		callbackTable.Graphics_GetPcf = reinterpret_cast<void*>(&Graphics_GetPcf);
+		callbackTable.Graphics_SetPcf = reinterpret_cast<void*>(&Graphics_SetPcf);
+		callbackTable.Graphics_GetExposureCompensation = reinterpret_cast<void*>(&Graphics_GetExposureCompensation);
+		callbackTable.Graphics_SetExposureCompensation = reinterpret_cast<void*>(&Graphics_SetExposureCompensation);
+		callbackTable.Graphics_GetAntiAliasing = reinterpret_cast<void*>(&Graphics_GetAntiAliasing);
+		callbackTable.Graphics_SetAntiAliasing = reinterpret_cast<void*>(&Graphics_SetAntiAliasing);
 
 		/// Pass the callback table to the managed side
 		ScriptEngine::SetManagedNativeCallbacks(&callbackTable);

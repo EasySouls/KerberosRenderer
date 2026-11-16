@@ -271,6 +271,8 @@ namespace PROJECT_NAME
 		{
 			KBR_TRACY_SCOPE("Scene::OnUpdate");
 
+			FeedUIInput();
+
 			switch (m_SceneState)
 			{
 			case SceneState::Edit:
@@ -309,6 +311,7 @@ namespace PROJECT_NAME
 
 		EventDispatcher dispatcher(event);
 		dispatcher.Dispatch<KeyPressedEvent>(KBR_BIND_FN(EditorLayer::OnKeyPressed));
+		dispatcher.Dispatch<KeyTypedEvent>(KBR_BIND_FN(EditorLayer::OnKeyTyped));
 		dispatcher.Dispatch<MouseButtonPressedEvent>(KBR_BIND_FN(EditorLayer::OnMouseButtonPressed));
 		dispatcher.Dispatch<WindowDropEvent>(KBR_BIND_FN(EditorLayer::OnWindowDrop));
 	}
@@ -911,7 +914,10 @@ namespace PROJECT_NAME
 		m_ViewportFocused = ImGui::IsWindowFocused();
 		m_ViewportHovered = ImGui::IsWindowHovered();
 
-		Application::Get().BlockEvents(!m_ViewportHovered);
+		/// In Play mode a focused viewport also owns keyboard events so game UI text
+		/// fields keep receiving input when the cursor leaves the viewport.
+		const bool viewportWantsEvents = m_ViewportHovered || (m_SceneState == SceneState::Play && m_ViewportFocused);
+		Application::Get().BlockEvents(!viewportWantsEvents);
 
 		m_ViewportSize = {ImGui::GetContentRegionAvail().x, ImGui::GetContentRegionAvail().y};
 
@@ -1372,6 +1378,7 @@ namespace PROJECT_NAME
 			ImGui::Text("Antialiasing: %.3f ms", gpuTimings.AntialiasingPassMilliseconds);
 			ImGui::Text("Tonemapping: %.3f ms", gpuTimings.TonemappingPassMilliseconds);
 			ImGui::Text("Upscaling: %.3f ms", gpuTimings.UpscalingPassMilliseconds);
+			ImGui::Text("Game UI: %.3f ms", gpuTimings.GameUIPassMilliseconds);
 		}
 		else
 		{
@@ -1715,8 +1722,75 @@ namespace PROJECT_NAME
 		m_ActiveScene->CalculateEntityTransform(entity);
 	}
 
+	bool EditorLayer::OnKeyTyped(const KeyTypedEvent &event)
+	{
+		if (m_SceneState != SceneState::Play)
+			return false;
+
+		if (!m_ViewportFocused || m_DoesImGuiWantInput)
+			return false;
+
+		const int codepoint = event.GetKeyCode();
+		if (codepoint >= 32 && codepoint < 127)
+			m_UITypedCharacters.push_back(static_cast<char>(codepoint));
+
+		return false;
+	}
+
+	void EditorLayer::FeedUIInput()
+	{
+	    KBR_TRACY_FUNCTION();
+	    
+		if (!m_ActiveScene)
+			return;
+
+		UIInputState input{};
+
+		const glm::vec2 outputSize = Renderer::GetOutputImageSize();
+		const glm::vec2 viewportSize = m_ViewportBounds[1] - m_ViewportBounds[0];
+		const glm::vec2 scale = (viewportSize.x > 1.0f && viewportSize.y > 1.0f)
+		                            ? glm::vec2(outputSize.x / viewportSize.x, outputSize.y / viewportSize.y)
+		                            : glm::vec2(1.0f);
+
+		const glm::vec2 local = (Input::GetMousePosition() - glm::vec2(m_ViewportBounds[0].x, m_ViewportBounds[0].y)) * scale;
+		input.MousePosition = local;
+		input.MouseInsideViewport = m_ViewportHovered && local.x >= 0.0f && local.y >= 0.0f &&
+		                           local.x <= outputSize.x && local.y <= outputSize.y;
+		input.LeftDown = Input::IsMouseButtonPressed(Mouse::ButtonLeft);
+		input.RightDown = Input::IsMouseButtonPressed(Mouse::ButtonRight);
+
+		input.TypedCharacters = std::move(m_UITypedCharacters);
+		m_UITypedCharacters.clear();
+
+		input.Backspace = m_UIInputBackspace;
+		input.Enter = m_UIInputEnter;
+		input.Tab = m_UIInputTab;
+		input.Escape = m_UIInputEscape;
+		m_UIInputBackspace = false;
+		m_UIInputEnter = false;
+		m_UIInputTab = false;
+		m_UIInputEscape = false;
+
+		m_ActiveScene->SetUIInput(input);
+	}
+
 	bool EditorLayer::OnKeyPressed(const KeyPressedEvent &event)
 	{
+		/// Game UI text input runs before the editor shortcut gate so key repeat
+		/// reaches text fields while the viewport owns the keyboard.
+		if (m_SceneState == SceneState::Play && m_ViewportFocused && !m_DoesImGuiWantInput)
+		{
+			switch (event.GetKeyCode())
+			{
+			case Key::Backspace: m_UIInputBackspace = true; break;
+			case Key::Enter:
+			case Key::KPEnter: m_UIInputEnter = true; break;
+			case Key::Tab: m_UIInputTab = true; break;
+			case Key::Escape: m_UIInputEscape = true; break;
+			default: break;
+			}
+		}
+
 		/// Shortcuts
 		if (event.GetRepeatCount() > 0)
 			return false;

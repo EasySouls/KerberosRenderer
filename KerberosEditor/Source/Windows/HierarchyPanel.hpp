@@ -66,6 +66,11 @@ namespace Kerberos
 
 		void ExecuteCreateEntity(const std::string& name);
 
+		/// Adds a UIElementComponent preconfigured for the requested element type.
+		void AddUIElementWithPreset(Entity entity, UIElementType type);
+		void DrawUICanvasComponent(Entity entity);
+		void DrawUIElementComponent(Entity entity);
+
 		void DrawVec3Control(const std::string& label,
 			UUID entityID,
 			glm::vec3& values,
@@ -96,8 +101,18 @@ namespace Kerberos
 		/// being dragged onto its script fields.
 		Entity m_PendingSelectedEntity;
 
-		std::vector<Entity> m_DeletionQueue;
+		/// Snapshot for undoable UI component edits, committed when the gesture ends.
+		struct UIComponentEditState
+		{
+			UIElementComponent ElementBefore;
+			UICanvasComponent CanvasBefore;
+			UUID Entity = UUID::Invalid();
+			bool ElementActive = false;
+			bool CanvasActive = false;
+		};
+		UIComponentEditState m_UIEdit;
 
+		std::vector<Entity> m_DeletionQueue;
 		std::function<void(Entity)> m_OnEntityDeleted;
 		std::function<void(Entity)> m_OnEntitySelected;
 		std::function<void(AssetHandle)> m_OnOpenAIStateTree;

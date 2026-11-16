@@ -18,6 +18,7 @@
 #include "Scene/Components.hpp"
 #include "Events/MouseButtonPressedEvent.hpp"
 #include "Events/WindowDropEvent.hpp"
+#include "Events/KeyTypedEvent.hpp"
 
 #include <glm/glm.hpp>
 
@@ -80,8 +81,12 @@ namespace Kerberos
 		void CalculateEntityTransform(const Entity& entity) const;
 
 		bool OnKeyPressed(const KeyPressedEvent& event);
+		bool OnKeyTyped(const KeyTypedEvent& event);
 		bool OnMouseButtonPressed(const MouseButtonPressedEvent& event);
 		bool OnWindowDrop(const WindowDropEvent& event);
+
+		/// Builds this frame's game-UI input snapshot and hands it to the active scene.
+		void FeedUIInput();
 	    
 	    /// Captures the transform of the gizmo entity before a manipulation starts,
 	    /// so the whole drag is recorded as one undo command.
@@ -143,7 +148,14 @@ namespace Kerberos
 
 		bool m_ViewportFocused = false;
 		bool m_ViewportHovered = false;
-		std::array<glm::vec2, 2> m_ViewportBounds;
+		std::array<glm::vec2, 2> m_ViewportBounds{ glm::vec2(0.0f), glm::vec2(0.0f) };
+
+		/// Buffered game-UI keyboard input for the current frame.
+		std::string m_UITypedCharacters;
+		bool m_UIInputBackspace = false;
+		bool m_UIInputEnter = false;
+		bool m_UIInputTab = false;
+		bool m_UIInputEscape = false;
 
 		bool m_DoesImGuiWantInput = false;
 

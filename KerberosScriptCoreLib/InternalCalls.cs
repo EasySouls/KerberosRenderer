@@ -181,6 +181,14 @@ namespace Kerberos
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
         internal delegate byte AIEntityNameFn(ulong entityID, IntPtr name);
 
+        internal delegate byte NoArgBoolFn();
+        internal delegate byte GraphicsGetBoolFn();
+        internal delegate void GraphicsSetBoolFn(byte value);
+        internal delegate float GraphicsGetFloatFn();
+        internal delegate void GraphicsSetFloatFn(float value);
+        internal delegate int GraphicsGetIntFn();
+        internal delegate void GraphicsSetIntFn(int value);
+
         // ====================================================================
         // Stored delegate instances (prevent GC collection)
         // ====================================================================
@@ -381,6 +389,43 @@ namespace Kerberos
 
         private static GetIntFn? s_AITargetableGetFactionId;
         private static SetIntFn? s_AITargetableSetFactionId;
+
+        // Game UI
+        private static NoArgBoolFn? s_UI_IsInputCaptured;
+        private static SetStringFn? s_UIElementSetText;
+        private static GetStringFn? s_UIElementGetText;
+        private static SetFloatFn? s_UIElementSetValue;
+        private static GetFloatFn? s_UIElementGetValue;
+        private static SetBoolFn? s_UIElementSetVisible;
+        private static GetBoolFn? s_UIElementGetVisible;
+        private static GetBoolFn? s_UIElementGetClicked;
+        private static GetBoolFn? s_UIElementGetIsHovered;
+        private static SetBoolFn? s_UIElementSetIsOn;
+        private static GetBoolFn? s_UIElementGetIsOn;
+        private static GetStringFn? s_UIElementGetInputText;
+        private static SetBoolFn? s_UICanvasSetVisible;
+        private static GetBoolFn? s_UICanvasGetVisible;
+        private static SetBoolFn? s_UICanvasSetBlockSceneInput;
+        private static GetBoolFn? s_UICanvasGetBlockSceneInput;
+
+        // Graphics settings facade
+        private static NoArgBoolFn? s_GraphicsIsRayTracingSupported;
+        private static GraphicsGetBoolFn? s_GraphicsGetRayQueryShadows;
+        private static GraphicsSetBoolFn? s_GraphicsSetRayQueryShadows;
+        private static GraphicsGetBoolFn? s_GraphicsGetRayQuerySoftShadows;
+        private static GraphicsSetBoolFn? s_GraphicsSetRayQuerySoftShadows;
+        private static GraphicsGetBoolFn? s_GraphicsGetRayQueryAmbientOcclusion;
+        private static GraphicsSetBoolFn? s_GraphicsSetRayQueryAmbientOcclusion;
+        private static GraphicsGetBoolFn? s_GraphicsGetGtao;
+        private static GraphicsSetBoolFn? s_GraphicsSetGtao;
+        private static GraphicsGetBoolFn? s_GraphicsGetPointShadows;
+        private static GraphicsSetBoolFn? s_GraphicsSetPointShadows;
+        private static GraphicsGetBoolFn? s_GraphicsGetPcf;
+        private static GraphicsSetBoolFn? s_GraphicsSetPcf;
+        private static GraphicsGetFloatFn? s_GraphicsGetExposureCompensation;
+        private static GraphicsSetFloatFn? s_GraphicsSetExposureCompensation;
+        private static GraphicsGetIntFn? s_GraphicsGetAntiAliasing;
+        private static GraphicsSetIntFn? s_GraphicsSetAntiAliasing;
 
         // ====================================================================
         // Initialization - called from C++ to provide function pointers
@@ -596,6 +641,41 @@ namespace Kerberos
 
             s_AITargetableGetFactionId = Marshal.GetDelegateForFunctionPointer<GetIntFn>(ReadNext());
             s_AITargetableSetFactionId = Marshal.GetDelegateForFunctionPointer<SetIntFn>(ReadNext());
+
+            s_UI_IsInputCaptured = Marshal.GetDelegateForFunctionPointer<NoArgBoolFn>(ReadNext());
+            s_UIElementSetText = Marshal.GetDelegateForFunctionPointer<SetStringFn>(ReadNext());
+            s_UIElementGetText = Marshal.GetDelegateForFunctionPointer<GetStringFn>(ReadNext());
+            s_UIElementSetValue = Marshal.GetDelegateForFunctionPointer<SetFloatFn>(ReadNext());
+            s_UIElementGetValue = Marshal.GetDelegateForFunctionPointer<GetFloatFn>(ReadNext());
+            s_UIElementSetVisible = Marshal.GetDelegateForFunctionPointer<SetBoolFn>(ReadNext());
+            s_UIElementGetVisible = Marshal.GetDelegateForFunctionPointer<GetBoolFn>(ReadNext());
+            s_UIElementGetClicked = Marshal.GetDelegateForFunctionPointer<GetBoolFn>(ReadNext());
+            s_UIElementGetIsHovered = Marshal.GetDelegateForFunctionPointer<GetBoolFn>(ReadNext());
+            s_UIElementSetIsOn = Marshal.GetDelegateForFunctionPointer<SetBoolFn>(ReadNext());
+            s_UIElementGetIsOn = Marshal.GetDelegateForFunctionPointer<GetBoolFn>(ReadNext());
+            s_UIElementGetInputText = Marshal.GetDelegateForFunctionPointer<GetStringFn>(ReadNext());
+            s_UICanvasSetVisible = Marshal.GetDelegateForFunctionPointer<SetBoolFn>(ReadNext());
+            s_UICanvasGetVisible = Marshal.GetDelegateForFunctionPointer<GetBoolFn>(ReadNext());
+            s_UICanvasSetBlockSceneInput = Marshal.GetDelegateForFunctionPointer<SetBoolFn>(ReadNext());
+            s_UICanvasGetBlockSceneInput = Marshal.GetDelegateForFunctionPointer<GetBoolFn>(ReadNext());
+
+            s_GraphicsIsRayTracingSupported = Marshal.GetDelegateForFunctionPointer<NoArgBoolFn>(ReadNext());
+            s_GraphicsGetRayQueryShadows = Marshal.GetDelegateForFunctionPointer<GraphicsGetBoolFn>(ReadNext());
+            s_GraphicsSetRayQueryShadows = Marshal.GetDelegateForFunctionPointer<GraphicsSetBoolFn>(ReadNext());
+            s_GraphicsGetRayQuerySoftShadows = Marshal.GetDelegateForFunctionPointer<GraphicsGetBoolFn>(ReadNext());
+            s_GraphicsSetRayQuerySoftShadows = Marshal.GetDelegateForFunctionPointer<GraphicsSetBoolFn>(ReadNext());
+            s_GraphicsGetRayQueryAmbientOcclusion = Marshal.GetDelegateForFunctionPointer<GraphicsGetBoolFn>(ReadNext());
+            s_GraphicsSetRayQueryAmbientOcclusion = Marshal.GetDelegateForFunctionPointer<GraphicsSetBoolFn>(ReadNext());
+            s_GraphicsGetGtao = Marshal.GetDelegateForFunctionPointer<GraphicsGetBoolFn>(ReadNext());
+            s_GraphicsSetGtao = Marshal.GetDelegateForFunctionPointer<GraphicsSetBoolFn>(ReadNext());
+            s_GraphicsGetPointShadows = Marshal.GetDelegateForFunctionPointer<GraphicsGetBoolFn>(ReadNext());
+            s_GraphicsSetPointShadows = Marshal.GetDelegateForFunctionPointer<GraphicsSetBoolFn>(ReadNext());
+            s_GraphicsGetPcf = Marshal.GetDelegateForFunctionPointer<GraphicsGetBoolFn>(ReadNext());
+            s_GraphicsSetPcf = Marshal.GetDelegateForFunctionPointer<GraphicsSetBoolFn>(ReadNext());
+            s_GraphicsGetExposureCompensation = Marshal.GetDelegateForFunctionPointer<GraphicsGetFloatFn>(ReadNext());
+            s_GraphicsSetExposureCompensation = Marshal.GetDelegateForFunctionPointer<GraphicsSetFloatFn>(ReadNext());
+            s_GraphicsGetAntiAliasing = Marshal.GetDelegateForFunctionPointer<GraphicsGetIntFn>(ReadNext());
+            s_GraphicsSetAntiAliasing = Marshal.GetDelegateForFunctionPointer<GraphicsSetIntFn>(ReadNext());
         }
 
         // ====================================================================
@@ -1443,6 +1523,88 @@ namespace Kerberos
 
         internal static void AITargetable_SetFactionId(ulong entityID, int value)
             => s_AITargetableSetFactionId?.Invoke(entityID, value);
+
+        // ----------------------------- Game UI -----------------------------
+
+        internal static bool UI_IsInputCaptured()
+            => s_UI_IsInputCaptured?.Invoke() != 0;
+
+        internal static void UIElement_SetText(ulong entityID, string text)
+        {
+            IntPtr ptr = Marshal.StringToHGlobalAnsi(text);
+            try { s_UIElementSetText?.Invoke(entityID, ptr); }
+            finally { Marshal.FreeHGlobal(ptr); }
+        }
+
+        internal static string UIElement_GetText(ulong entityID)
+        {
+            IntPtr ptr = s_UIElementGetText?.Invoke(entityID) ?? IntPtr.Zero;
+            return ptr != IntPtr.Zero ? Marshal.PtrToStringAnsi(ptr) ?? string.Empty : string.Empty;
+        }
+
+        internal static void UIElement_SetValue(ulong entityID, float value)
+            => s_UIElementSetValue?.Invoke(entityID, value);
+
+        internal static float UIElement_GetValue(ulong entityID)
+            => s_UIElementGetValue?.Invoke(entityID) ?? 0.0f;
+
+        internal static void UIElement_SetVisible(ulong entityID, bool visible)
+            => s_UIElementSetVisible?.Invoke(entityID, visible ? (byte)1 : (byte)0);
+
+        internal static bool UIElement_GetVisible(ulong entityID)
+            => s_UIElementGetVisible?.Invoke(entityID) != 0;
+
+        internal static bool UIElement_GetClicked(ulong entityID)
+            => s_UIElementGetClicked?.Invoke(entityID) != 0;
+
+        internal static bool UIElement_GetIsHovered(ulong entityID)
+            => s_UIElementGetIsHovered?.Invoke(entityID) != 0;
+
+        internal static void UIElement_SetIsOn(ulong entityID, bool isOn)
+            => s_UIElementSetIsOn?.Invoke(entityID, isOn ? (byte)1 : (byte)0);
+
+        internal static bool UIElement_GetIsOn(ulong entityID)
+            => s_UIElementGetIsOn?.Invoke(entityID) != 0;
+
+        internal static string UIElement_GetInputText(ulong entityID)
+        {
+            IntPtr ptr = s_UIElementGetInputText?.Invoke(entityID) ?? IntPtr.Zero;
+            return ptr != IntPtr.Zero ? Marshal.PtrToStringAnsi(ptr) ?? string.Empty : string.Empty;
+        }
+
+        internal static void UICanvas_SetVisible(ulong entityID, bool visible)
+            => s_UICanvasSetVisible?.Invoke(entityID, visible ? (byte)1 : (byte)0);
+
+        internal static bool UICanvas_GetVisible(ulong entityID)
+            => s_UICanvasGetVisible?.Invoke(entityID) != 0;
+
+        internal static void UICanvas_SetBlockSceneInput(ulong entityID, bool block)
+            => s_UICanvasSetBlockSceneInput?.Invoke(entityID, block ? (byte)1 : (byte)0);
+
+        internal static bool UICanvas_GetBlockSceneInput(ulong entityID)
+            => s_UICanvasGetBlockSceneInput?.Invoke(entityID) != 0;
+
+        // ------------------------- Graphics settings -------------------------
+
+        internal static bool Graphics_IsRayTracingSupported()
+            => s_GraphicsIsRayTracingSupported?.Invoke() != 0;
+
+        internal static bool Graphics_GetRayQueryShadows() => s_GraphicsGetRayQueryShadows?.Invoke() != 0;
+        internal static void Graphics_SetRayQueryShadows(bool value) => s_GraphicsSetRayQueryShadows?.Invoke(value ? (byte)1 : (byte)0);
+        internal static bool Graphics_GetRayQuerySoftShadows() => s_GraphicsGetRayQuerySoftShadows?.Invoke() != 0;
+        internal static void Graphics_SetRayQuerySoftShadows(bool value) => s_GraphicsSetRayQuerySoftShadows?.Invoke(value ? (byte)1 : (byte)0);
+        internal static bool Graphics_GetRayQueryAmbientOcclusion() => s_GraphicsGetRayQueryAmbientOcclusion?.Invoke() != 0;
+        internal static void Graphics_SetRayQueryAmbientOcclusion(bool value) => s_GraphicsSetRayQueryAmbientOcclusion?.Invoke(value ? (byte)1 : (byte)0);
+        internal static bool Graphics_GetGtao() => s_GraphicsGetGtao?.Invoke() != 0;
+        internal static void Graphics_SetGtao(bool value) => s_GraphicsSetGtao?.Invoke(value ? (byte)1 : (byte)0);
+        internal static bool Graphics_GetPointShadows() => s_GraphicsGetPointShadows?.Invoke() != 0;
+        internal static void Graphics_SetPointShadows(bool value) => s_GraphicsSetPointShadows?.Invoke(value ? (byte)1 : (byte)0);
+        internal static bool Graphics_GetPcf() => s_GraphicsGetPcf?.Invoke() != 0;
+        internal static void Graphics_SetPcf(bool value) => s_GraphicsSetPcf?.Invoke(value ? (byte)1 : (byte)0);
+        internal static float Graphics_GetExposureCompensation() => s_GraphicsGetExposureCompensation?.Invoke() ?? 0.0f;
+        internal static void Graphics_SetExposureCompensation(float value) => s_GraphicsSetExposureCompensation?.Invoke(value);
+        internal static int Graphics_GetAntiAliasing() => s_GraphicsGetAntiAliasing?.Invoke() ?? 0;
+        internal static void Graphics_SetAntiAliasing(int value) => s_GraphicsSetAntiAliasing?.Invoke(value);
 
     }
 }

@@ -48,8 +48,8 @@ public struct PerObject
 };
 
 // Shared alpha-mask test.
-// OPAQUE ignores alpha entirely
-// MASK discards below the cutoff
+// OPAQUE ignores alpha entirely.
+// MASK discards below the cutoff.
 // BLEND is handled by the weighted-blended OIT pass.
 public bool ShouldDiscardAlpha(float alpha, uint mode, float cutoff)
 {

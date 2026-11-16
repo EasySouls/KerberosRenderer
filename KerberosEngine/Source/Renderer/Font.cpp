@@ -76,8 +76,8 @@ namespace Kerberos
 		return atlasTexture;
 	}
 
-	Font::Font(std::string name, const std::filesystem::path& filepath)
-		: m_Name(std::move(name)), m_Filepath(filepath), m_MSDFData(new MSDFData{})
+	Font::Font(std::string name, const std::filesystem::path& filepath, const double emSize)
+		: m_Name(std::move(name)), m_Filepath(filepath), m_EmSize(emSize), m_MSDFData(new MSDFData{})
 	{
 		KBR_TRACY_FUNCTION();
 
@@ -141,15 +141,15 @@ namespace Kerberos
 		atlasPacker.setSpacing(1);
 		atlasPacker.setDimensionsConstraint(msdf_atlas::DimensionsConstraint::POWER_OF_TWO_RECTANGLE);
 		atlasPacker.setOriginPixelAlignment(true);
-		double emSize = 40.0;
-		atlasPacker.setScale(emSize);
+		double atlasEmSize = m_EmSize;
+		atlasPacker.setScale(atlasEmSize);
 
 		int remaining = atlasPacker.pack(m_MSDFData->Glyphs.data(), static_cast<int>(m_MSDFData->Glyphs.size()));
 		KBRAssert(remaining == 0, "Could not pack all glyphs into the atlas! {} glyphs remaining", remaining);
 
 		int width, height;
 		atlasPacker.getDimensions(width, height);
-		emSize = atlasPacker.getScale();
+		atlasEmSize = atlasPacker.getScale();
 
 		constexpr uint64_t lcgMultiplier = 6364136223846793005ull;
 		constexpr uint64_t lcgIncrement = 1442695040888963407ull;

@@ -34,6 +34,8 @@
 #include "Animation/AnimationSystem.hpp"
 #include "Animation/SkinningSystem.hpp"
 #include "Scene/Components/AnimationComponents.hpp"
+#include "UI/UIFontLibrary.hpp"
+#include "UI/UIRenderer.hpp"
 
 #include <glm/gtc/matrix_inverse.hpp>
 #include <glm/gtc/matrix_transform.hpp>
@@ -602,6 +604,8 @@ enum class GPUTimestampQuery : uint32_t
     AntialiasingPassEnd,
     UpscalingPassBegin,
     UpscalingPassEnd,
+    GameUIPassBegin,
+    GameUIPassEnd,
     FrameEnd,
     Count
 };
@@ -733,6 +737,7 @@ struct RendererData
 
     RayTracingSceneCache RayTracingCache{};
     ParticleSystem ParticleSystem{};
+    UIRenderer UIRender{};
     GrassSystem GrassSystem{};
     AnimationSystem AnimationSystem{};
     SkinningSystem SkinningSystem{};
@@ -850,6 +855,9 @@ void Renderer::Init()
                            static_cast<uint32_t>(s_Data->OutputSize.y * upscaleRatio) };
 
     CreateResources();
+
+    UIFontLibrary::Get().Initialize(&s_Data->TextureManager);
+    s_Data->UIRender.Init(s_Data->TextureManager, s_Data->FinalImage.Format);
 }
 
 void Renderer::Shutdown()
@@ -881,6 +889,8 @@ void Renderer::Shutdown()
     }
     
     s_Data->Upscaler->Release();
+    s_Data->UIRender.Shutdown();
+    UIFontLibrary::Get().Shutdown();
     s_Data->SkinningSystem.Shutdown();
     s_Data->AnimationSystem.Shutdown();
 
@@ -4735,6 +4745,8 @@ void Renderer::ResolveGPUTimings(const uint32_t frameIndex)
         toMilliseconds(GPUTimestampQuery::TonemappingPassBegin, GPUTimestampQuery::TonemappingPassEnd);
     s_Data->LatestGPUTimings.UpscalingPassMilliseconds =
         toMilliseconds(GPUTimestampQuery::UpscalingPassBegin, GPUTimestampQuery::UpscalingPassEnd);
+    s_Data->LatestGPUTimings.GameUIPassMilliseconds =
+        toMilliseconds(GPUTimestampQuery::GameUIPassBegin, GPUTimestampQuery::GameUIPassEnd);
     s_Data->LatestGPUTimings.IsValid = true;
 }
 
@@ -5858,6 +5870,19 @@ vk::PipelineStageFlagBits2::eFragmentShader,
             return [=](const vk::raii::CommandBuffer& execCmd)
             {
                 Renderer::ApplyTonemapping(execCmd, frameIndex);
+            };
+        });
+
+        s_Data->RenderGraph.AddPass("Game UI", [&](Graph::PassBuilder& builder) -> PassExecuteFunction
+        {
+            builder.Write(hFinal,
+                          vk::ImageLayout::eColorAttachmentOptimal,
+                          vk::PipelineStageFlagBits2::eColorAttachmentOutput,
+                          vk::AccessFlagBits2::eColorAttachmentRead | vk::AccessFlagBits2::eColorAttachmentWrite);
+
+            return [=](const vk::raii::CommandBuffer& execCmd)
+            {
+                RenderGameUI(execCmd, frameIndex);
             };
         });
 
@@ -7236,6 +7261,56 @@ void Renderer::ApplyBloom(const vk::raii::CommandBuffer& cmd, const uint32_t fra
     cmd.pipelineBarrier2(finalDependencyInfo);*/
 
     WriteGPUTimestamp(cmd, frameIndex, static_cast<uint32_t>(GPUTimestampQuery::BloomPassEnd));
+}
+
+void Renderer::RenderGameUI(const vk::raii::CommandBuffer& cmd, const uint32_t frameIndex)
+{
+    KBR_TRACY_FUNCTION();
+
+    WriteGPUTimestamp(cmd, frameIndex, static_cast<uint32_t>(GPUTimestampQuery::GameUIPassBegin));
+
+    Scene& scene = *s_Data->PendingRender.Scene;
+    const glm::mat4 viewProjection = s_Data->PendingRender.Projection * s_Data->PendingRender.View;
+
+    const UIDrawData& drawData = scene.GetUISystem().BuildDrawData(
+        scene, s_Data->OutputSize, viewProjection,
+        [](const AssetHandle& handle) -> uint32_t
+        {
+            if (!handle.IsValid())
+                return 0;
+
+            const Ref<Texture2D> texture = AssetManager::GetAsset<Texture2D>(handle);
+            if (!texture)
+                return 0;
+
+            return TextureManager::Pack(s_Data->TextureManager.GetTextureIndex(texture),
+                                        DefaultSampler::LinearClamp);
+        });
+
+    if (drawData.Empty())
+        return;
+
+    const vk::RenderingAttachmentInfo attachmentInfo{
+        .imageView = s_Data->FinalImage.ImageView,
+        .imageLayout = vk::ImageLayout::eColorAttachmentOptimal,
+        .loadOp = vk::AttachmentLoadOp::eLoad,
+        .storeOp = vk::AttachmentStoreOp::eStore
+    };
+
+    const vk::RenderingInfo renderingInfo{
+        .renderArea = { .offset = { .x = 0, .y = 0 },
+                        .extent = { .width = static_cast<uint32_t>(s_Data->OutputSize.x),
+                                    .height = static_cast<uint32_t>(s_Data->OutputSize.y) } },
+        .layerCount = 1,
+        .colorAttachmentCount = 1,
+        .pColorAttachments = &attachmentInfo
+    };
+
+    cmd.beginRendering(renderingInfo);
+    s_Data->UIRender.Render(cmd, frameIndex, drawData, s_Data->OutputSize);
+    cmd.endRendering();
+    
+    WriteGPUTimestamp(cmd, frameIndex, static_cast<uint32_t>(GPUTimestampQuery::GameUIPassEnd));
 }
 
 glm::mat4 Renderer::CalculateLightSpaceMatrix()

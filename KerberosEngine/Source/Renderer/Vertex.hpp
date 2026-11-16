@@ -101,6 +101,39 @@ namespace Kerberos
 			};
 		}
 	};
+
+struct UIVertex
+{
+    glm::vec2 Position;         // Output pixels, top-left origin
+    glm::vec2 UV;               // Texture atlas
+    glm::vec4 Color;            // Authored/derived display color (sRGB values)
+    glm::vec2 LocalUV;          // 0..1 inside the quad, used by the rounded-rect SDF
+    glm::vec4 Style;            // xy = half size, z = corner radius, w = border width
+    uint32_t TextureIndex = 0;  // TextureManager::Pack(index, sampler)
+    uint32_t Mode = 0;          // UIDrawMode
+    
+    static vk::VertexInputBindingDescription GetBindingDescription()
+    {
+        return { .binding = 0, .stride = sizeof(UIVertex), .inputRate = vk::VertexInputRate::eVertex };
+    }
+    
+    static std::array<vk::VertexInputAttributeDescription, 7> GetAttributeDescriptions()
+    {
+        return {
+            vk::VertexInputAttributeDescription(0, 0, vk::Format::eR32G32Sfloat, offsetof(UIVertex, Position)),
+            vk::VertexInputAttributeDescription(1, 0, vk::Format::eR32G32Sfloat, offsetof(UIVertex, UV)),
+            vk::VertexInputAttributeDescription(2, 0, vk::Format::eR32G32B32A32Sfloat, offsetof(UIVertex, Color)),
+            vk::VertexInputAttributeDescription(3, 0, vk::Format::eR32G32Sfloat, offsetof(UIVertex, LocalUV)),
+            vk::VertexInputAttributeDescription(4, 0, vk::Format::eR32G32B32A32Sfloat, offsetof(UIVertex, Style)),
+            vk::VertexInputAttributeDescription(5, 0, vk::Format::eR32Uint, offsetof(UIVertex, TextureIndex)),
+            vk::VertexInputAttributeDescription(6, 0, vk::Format::eR32Uint, offsetof(UIVertex, Mode))
+        };
+    }
+};
+
+static_assert(sizeof(UIVertex) == 64, "UIVertex must stay tightly packed for the UI pipeline");
+
+
 }
 
 template<>
@@ -157,4 +190,26 @@ struct std::hash<Kerberos::LineVertex>
 		combine(v.Color);
 		return seed;
 	}
+};
+
+template<>
+struct std::hash<Kerberos::UIVertex>
+{
+    size_t operator()(const Kerberos::UIVertex& v) const noexcept
+    {
+        size_t seed = 0;
+        const auto combine = [&seed]<typename T>(const T & value)
+        {
+            seed ^= std::hash<std::decay_t<T>>{}(value)
+                +0x9e3779b9 + (seed << 6) + (seed >> 2);
+        };
+        combine(v.Position);
+        combine(v.UV);
+        combine(v.Color);
+        combine(v.LocalUV);
+        combine(v.Style);
+        combine(v.TextureIndex);
+        combine(v.Mode);
+        return seed;
+    }
 };

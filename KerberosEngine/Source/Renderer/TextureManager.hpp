@@ -30,6 +30,9 @@ namespace Kerberos
 
 		uint32_t GetTextureIndex(AssetHandle handle);
 		uint32_t GetTextureIndex(const Ref<Texture2D>& texture);
+		/// Registers a texture that is not a project asset (for example a font
+		/// atlas created at runtime) and returns its bindless table slot.
+		uint32_t RegisterTexture(const Ref<Texture2D>& texture);
 
 		vk::DescriptorSetLayout GetGlobalDescriptorSetLayout() const;
 		vk::DescriptorSet GetGlobalDescriptorSet() const;
@@ -53,6 +56,7 @@ namespace Kerberos
 
 	private:
 		std::unordered_map<AssetHandle, uint32_t> m_AssetToSlotMap{};
+		std::unordered_map<const Texture2D*, uint32_t> m_TransientTextureToSlotMap{};
 		std::vector<uint32_t> m_FreeSlots{};
 
 		vk::raii::DescriptorSetLayout m_DescriptorSetLayout = nullptr;

@@ -232,6 +232,38 @@ systems. Keep ownership clear: UI state belongs to the panel, persistent
 scene/project state belongs to the corresponding engine object, and GPU
 resources belong to Vulkan/renderer owners.
 
+## Game UI authoring and input
+
+The runtime game UI is authored with `UICanvasComponent` and
+`UIElementComponent` (see `KerberosEngine/Source/UI/AGENTS.md`). They are
+edited in `HierarchyPanel::DrawUICanvasComponent` / `DrawUIElementComponent`;
+the "Add Component" popup has a `UI` submenu with a canvas entry and one preset
+per element type (Panel, Text, Button, Toggle, Bar, Text Input, Image, World
+Label). Presets are created by `AddUIElementWithPreset`. Component edits record
+one `SetComponentValueCommand` per gesture when the last item in the component
+block deactivates.
+
+`EditorLayer::FeedUIInput` runs at the start of `Scene::OnUpdate` and builds a
+`UIInputState` from the viewport bounds, `Input::GetMousePosition`,
+`Renderer::GetOutputImageSize`, and the buffered keyboard state. `OnKeyTyped`
+accumulates ASCII characters only while Play is active, the viewport is focused,
+and `m_DoesImGuiWantInput` is false. `OnKeyPressed` buffers Backspace, Enter,
+Tab, and Escape before the editor shortcut gate so key repeat reaches text
+fields.
+
+UI rendering happens in the renderer, not in the editor: the "Game UI" graph
+pass draws into `FinalImage`, which the viewport already displays. Edit mode
+lays out authored UI without interaction, so the canvas is visible while
+authoring.
+
+C# access: `Kerberos.Scene.UIElementComponent` (`Text`, `Value`, `Visible`,
+`Clicked`, `IsHovered`, `IsOn`, `InputText`),
+`Kerberos.Scene.UICanvasComponent` (`Visible`, `BlockSceneInput`),
+`Kerberos.Core.UI.InputCaptured`, and `Kerberos.Graphics` for renderer toggles
+(ray-query shadows/soft shadows/RTAO, GTAO, point shadows, PCF, exposure
+compensation, anti-aliasing mode). `Kerberos.Graphics` ray-tracing setters are
+gated on `IsRayTracingSupported`, matching the editor's disabled controls.
+
 ## Undo and redo
 
 `EditorLayer` owns the `UndoRedoManager` (`KerberosEditor/Source/Undo`) and
@@ -503,6 +535,11 @@ component field edits, history clearing on new/open scene, and that history is
 inert during Play/Simulate. For the point/omni shadow debug controls, validate
 toggling, max active casters, wide PCF, point depth bias, the slot/face preview,
 candidate vs. active caster counts, and the separate OmniShadow GPU timing line.
+For game UI changes, validate every preset, nested anchor layout at several
+viewport sizes, gradient/border/radius rendering, MSDF text, Play-mode
+hover/press/click, text input focus and key repeat, `UI.InputCaptured`
+suppressing gameplay input, pause-menu interaction, scene save/load round-trip,
+and the Play/Stop transient reset.
 Run shader compilation when the editor changes shader assets. Update this
 file whenever editor lifecycle, panel ownership, threading, UI conventions,
 project/scene integration, or validation procedures change.

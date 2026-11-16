@@ -192,6 +192,24 @@ namespace Kerberos
 		return GetTextureIndex(texture->GetHandle());
 	}
 
+	uint32_t TextureManager::RegisterTexture(const Ref<Texture2D>& texture)
+	{
+		KBR_TRACY_FUNCTION();
+
+		if (!texture)
+			return GetWhiteTexture();
+
+		const auto key = texture.get();
+		if (const auto it = m_TransientTextureToSlotMap.find(key); it != m_TransientTextureToSlotMap.end())
+			return it->second;
+
+		const vk::ImageView imageView = texture->GetImageView();
+		const uint32_t slot = AllocateSlot();
+		UpdateGlobalDescriptorSet(slot, imageView);
+		m_TransientTextureToSlotMap[key] = slot;
+		return slot;
+	}
+
 	vk::DescriptorSetLayout TextureManager::GetGlobalDescriptorSetLayout() const 
 	{
 		KBRAssert(m_DescriptorSetLayout != nullptr, "Global descriptor set layout is not initialized!");

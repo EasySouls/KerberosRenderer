@@ -9,6 +9,7 @@
 #include "Physics/Jolt/JoltPhysicsSystem.hpp"
 #include "Assets/Asset.hpp"
 #include "AI/AISystem.hpp"
+#include "UI/UISystem.hpp"
 
 #include <entt/single_include/entt/entt.hpp>
 #include <string_view>
@@ -125,6 +126,16 @@ namespace Kerberos
 		RagdollSystem& GetRagdollSystem();
 		const RagdollSystem& GetRagdollSystem() const;
 
+		UISystem& GetUISystem() { return m_UISystem; }
+		const UISystem& GetUISystem() const { return m_UISystem; }
+
+		/// Per-frame host input snapshot for the game UI (Play/Simulate/Edit).
+		void SetUIInput(const UIInputState& input) { m_UIInput = input; }
+		const UIInputState& GetUIInput() const { return m_UIInput; }
+
+		/// True while a modal UI canvas or a focused text field wants pointer/keyboard input.
+		bool IsUIInputCaptured() const { return m_UISystem.IsInputCaptured(); }
+
 		AISystem& GetAISystem();
         const AISystem& GetAISystem() const;
 
@@ -194,6 +205,8 @@ namespace Kerberos
         AnimationRuntime m_AnimationRuntime;
 		RagdollSystem m_RagdollSystem;
         AISystem m_AISystem;
+        UISystem m_UISystem;
+        UIInputState m_UIInput{};
 
 		friend class Entity;
 		friend class Renderer;
@@ -207,5 +220,6 @@ namespace Kerberos
         friend class AnimationSystem;
         friend class SkinningSystem;
         friend class AISystem;
+        friend class UISystem;
 	};
 }

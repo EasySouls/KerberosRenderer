@@ -74,6 +74,8 @@ namespace Kerberos
 
 		m_IsRunning = true;
 
+		m_UISystem.ResetTransientState(*this);
+
 		m_PhysicsSystem->Initialize(shared_from_this());
 		m_RagdollSystem.Reset();
 
@@ -185,6 +187,10 @@ namespace Kerberos
         DispatchAnimationEvents();
         m_AnimationRuntime.FinalizePose(ts);
 
+		// Preview the authored UI in Edit mode, interaction stays disabled.
+		m_UISystem.Update(*this, { static_cast<float>(m_ViewportWidth), static_cast<float>(m_ViewportHeight) },
+		                  camera.GetViewProjectionMatrix(), {}, false);
+
 		Render3DEditor(camera, ts);
 	}
 
@@ -209,6 +215,9 @@ namespace Kerberos
 
         m_AnimationRuntime.FinalizePose(ts);
 
+		m_UISystem.Update(*this, { static_cast<float>(m_ViewportWidth), static_cast<float>(m_ViewportHeight) },
+		                  camera.GetViewProjectionMatrix(), {}, false);
+
 		Render3DEditor(camera, ts);
 	}
 
@@ -221,6 +230,17 @@ namespace Kerberos
 		m_AnimationRuntime.AdvanceClocks(ts, m_IsScenePaused);
         m_AnimationRuntime.EvaluatePose();
         DispatchAnimationEvents();
+
+		const auto& [primaryCam, primaryCamTransform] = FindPrimaryCamera();
+
+		// UI interaction runs before scripts so Clicked/IsHovered are visible this frame.
+		// It runs outside the paused block so pause menus stay interactive.
+		if (primaryCam != nullptr)
+		{
+			m_UISystem.Update(*this,
+			                  { static_cast<float>(m_ViewportWidth), static_cast<float>(m_ViewportHeight) },
+			                  primaryCam->GetViewProjectionMatrix(), m_UIInput, true);
+		}
 
 		if (!m_IsScenePaused)
 		{
@@ -258,18 +278,18 @@ namespace Kerberos
 
         m_AnimationRuntime.FinalizePose(ts);
 
-		const auto& [primaryCam, primaryCamTransform] = FindPrimaryCamera();
+		const auto& [renderCam, renderCamTransform] = FindPrimaryCamera();
 
-		if (primaryCam == nullptr)
+		if (renderCam == nullptr)
 		{
 			Log::CoreError("Cannot render the scene in play mode: no primary camera was found.");
 			return;
 		}
 
 		if (m_Is3D)
-			Render3DRuntime(primaryCam, primaryCamTransform, ts);
+			Render3DRuntime(renderCam, renderCamTransform, ts);
 		else
-			Render2DRuntime(primaryCam, primaryCamTransform, ts);
+			Render2DRuntime(renderCam, renderCamTransform, ts);
 	}
 
 	Entity Scene::CreateEntity(const std::string& name, const UUID parentId)
@@ -964,6 +984,19 @@ Entity Scene::InstantiatePrefab(const AssetHandle prefabHandle, const std::strin
 			newEntity.AddComponent<EnvironmentComponent>(sourceRegistry.get<EnvironmentComponent>(sourceEntity));
 		if (sourceRegistry.all_of<TextComponent>(sourceEntity))
 			newEntity.AddComponent<TextComponent>(sourceRegistry.get<TextComponent>(sourceEntity));
+		if (sourceRegistry.all_of<UICanvasComponent>(sourceEntity))
+			newEntity.AddComponent<UICanvasComponent>(sourceRegistry.get<UICanvasComponent>(sourceEntity));
+		if (sourceRegistry.all_of<UIElementComponent>(sourceEntity))
+		{
+			auto element = sourceRegistry.get<UIElementComponent>(sourceEntity);
+			element.IsHovered = false;
+			element.IsPressed = false;
+			element.IsFocused = false;
+			element.Clicked = false;
+			element.InputBuffer.clear();
+			element.CaretIndex = 0;
+			newEntity.AddComponent<UIElementComponent>(std::move(element));
+		}
 		if (sourceRegistry.all_of<AudioSource2DComponent>(sourceEntity))
 			newEntity.AddComponent<AudioSource2DComponent>(sourceRegistry.get<AudioSource2DComponent>(sourceEntity));
 		if (sourceRegistry.all_of<AudioSource3DComponent>(sourceEntity))
@@ -1552,6 +1585,16 @@ Entity Scene::InstantiatePrefab(const AssetHandle prefabHandle, const std::strin
 
 	template <>
 	void Scene::OnComponentAdded<TextComponent>(Entity, TextComponent&)
+	{
+	}
+
+	template <>
+	void Scene::OnComponentAdded<UICanvasComponent>(Entity, UICanvasComponent&)
+	{
+	}
+
+	template <>
+	void Scene::OnComponentAdded<UIElementComponent>(Entity, UIElementComponent&)
 	{
 	}
 

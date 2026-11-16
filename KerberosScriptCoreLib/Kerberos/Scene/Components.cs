@@ -455,7 +455,7 @@ namespace Kerberos.Scene
     }
 
     public class TextComponent : Component
-    {
+    {        
         public string Text
         {
             get => InternalCalls.TextComponent_GetText(Entity.GetID());
@@ -665,6 +665,67 @@ namespace Kerberos.Scene
         {
             get => InternalCalls.AITargetable_GetFactionId(Entity.GetID());
             set => InternalCalls.AITargetable_SetFactionId(Entity.GetID(), value);
+        }
+    }
+
+    /// <summary>
+    /// One retained game UI element. The element type (panel, text, button, bar and so on)
+    /// is authored in the editor.
+    /// </summary>
+    public class UIElementComponent : Component
+    {
+        public string Text
+        {
+            get => InternalCalls.UIElement_GetText(Entity.GetID());
+            set => InternalCalls.UIElement_SetText(Entity.GetID(), value);
+        }
+
+        /// <summary>Normalized bar fill amount in [0, 1].</summary>
+        public float Value
+        {
+            get => InternalCalls.UIElement_GetValue(Entity.GetID());
+            set
+            {
+                if (value < 0.0f || value > 1.0f)
+                    throw new ArgumentOutOfRangeException(nameof(value), "UI bar value must be in [0, 1].");
+                InternalCalls.UIElement_SetValue(Entity.GetID(), value);
+            }
+        }
+
+        public bool Visible
+        {
+            get => InternalCalls.UIElement_GetVisible(Entity.GetID());
+            set => InternalCalls.UIElement_SetVisible(Entity.GetID(), value);
+        }
+
+        /// <summary>True for one UI update after a press-release inside the element.</summary>
+        public bool Clicked => InternalCalls.UIElement_GetClicked(Entity.GetID());
+
+        public bool IsHovered => InternalCalls.UIElement_GetIsHovered(Entity.GetID());
+
+        public bool IsOn
+        {
+            get => InternalCalls.UIElement_GetIsOn(Entity.GetID());
+            set => InternalCalls.UIElement_SetIsOn(Entity.GetID(), value);
+        }
+
+        /// <summary>Current text of a focused text input field.</summary>
+        public string InputText => InternalCalls.UIElement_GetInputText(Entity.GetID());
+    }
+
+    public class UICanvasComponent : Component
+    {
+        public bool Visible
+        {
+            get => InternalCalls.UICanvas_GetVisible(Entity.GetID());
+            set => InternalCalls.UICanvas_SetVisible(Entity.GetID(), value);
+        }
+
+        /// <summary>When true while visible, gameplay should ignore pointer/keyboard input.</summary>
+        public bool BlockSceneInput
+        {
+            get => InternalCalls.UICanvas_GetBlockSceneInput(Entity.GetID());
+            set => InternalCalls.UICanvas_SetBlockSceneInput(Entity.GetID(), value);
         }
     }
 }

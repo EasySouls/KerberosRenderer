@@ -29,12 +29,14 @@
 #include "Widgets/EditorIcons.hpp"
 #include "Undo/UndoRedoManager.hpp"
 #include "Widgets/AssetPicker.hpp"
+#include "UI/UIFontLibrary.hpp"
 
 #include <glm/gtc/type_ptr.hpp>
 #include <imgui/imgui.h>
 #include <imgui/imgui_internal.h>
 
 #include <algorithm>
+#include <array>
 #include <filesystem>
 #include <format>
 #include <iterator>
@@ -729,6 +731,61 @@ void HierarchyPanel::AddComponentPopup(const Entity entity)
         if (EditorIcons::MenuItem(EditorIcon::ComponentText, "Text")) {
             AddComponentWithCheck<TextComponent>(entity);
             ImGui::CloseCurrentPopup();
+        }
+
+        EditorIcons::Draw(EditorIcon::ComponentText);
+        ImGui::SameLine(0.0f, 6.0f);
+        if (ImGui::BeginMenu("UI"))
+        {
+            if (EditorIcons::MenuItem(EditorIcon::ComponentEnvironment, "UI Canvas")) {
+                AddComponentWithCheck<UICanvasComponent>(entity);
+                ImGui::CloseCurrentPopup();
+            }
+            ImGui::Separator();
+            if (EditorIcons::MenuItem(EditorIcon::ComponentText, "Panel")) {
+                AddUIElementWithPreset(entity, UIElementType::Panel);
+                ImGui::CloseCurrentPopup();
+            }
+            if (EditorIcons::MenuItem(EditorIcon::ComponentText, "Text")) {
+                AddUIElementWithPreset(entity, UIElementType::Text);
+                ImGui::CloseCurrentPopup();
+            }
+            if (EditorIcons::MenuItem(EditorIcon::ComponentText, "Button")) {
+                AddUIElementWithPreset(entity, UIElementType::Button);
+                ImGui::CloseCurrentPopup();
+            }
+            if (EditorIcons::MenuItem(EditorIcon::ComponentText, "Toggle")) {
+                AddUIElementWithPreset(entity, UIElementType::Toggle);
+                ImGui::CloseCurrentPopup();
+            }
+            if (EditorIcons::MenuItem(EditorIcon::ComponentText, "Bar")) {
+                AddUIElementWithPreset(entity, UIElementType::Bar);
+                ImGui::CloseCurrentPopup();
+            }
+            if (EditorIcons::MenuItem(EditorIcon::ComponentText, "Text Input")) {
+                AddUIElementWithPreset(entity, UIElementType::TextInput);
+                ImGui::CloseCurrentPopup();
+            }
+            if (EditorIcons::MenuItem(EditorIcon::ComponentSprite, "Image")) {
+                AddUIElementWithPreset(entity, UIElementType::Image);
+                ImGui::CloseCurrentPopup();
+            }
+            ImGui::Separator();
+            if (EditorIcons::MenuItem(EditorIcon::ComponentText, "World Label")) {
+                AddUIElementWithPreset(entity, UIElementType::Text);
+                if (entity.HasComponent<UIElementComponent>()) {
+                    auto& element = entity.GetComponent<UIElementComponent>();
+                    element.Space = UISpace::World;
+                    element.Anchor = UIAnchor::BottomCenter;
+                    element.Pivot = glm::vec2(0.5f, 1.0f);
+                    element.Offset = glm::vec2(0.0f, 24.0f);
+                    element.Size = glm::vec2(220.0f, 32.0f);
+                    element.Text = "Text";
+                    element.TextAlign = UITextAlign::Center;
+                }
+                ImGui::CloseCurrentPopup();
+            }
+            ImGui::EndMenu();
         }
 
         EditorIcons::Draw(EditorIcon::ComponentAudio2d);
@@ -2065,7 +2122,7 @@ void HierarchyPanel::DrawComponents(const Entity entity)
             ImGui::TreePop();
         }
         if (componentDeleted) {
-            entity.RemoveComponent<EnvironmentComponent>();
+            entity.RemoveComponent<TextComponent>();
         }
     }
     if (entity.HasComponent<AudioSource2DComponent>()) {
@@ -3101,6 +3158,415 @@ void HierarchyPanel::DrawComponents(const Entity entity)
         if (componentDeleted)
             entity.RemoveComponent<AITargetableComponent>();
     }
+
+    DrawUICanvasComponent(entity);
+    DrawUIElementComponent(entity);
+}
+
+namespace {
+
+template <typename TEnum>
+bool UIEnumCombo(const char* label, TEnum& value, const std::initializer_list<const char*>& items)
+{
+    const std::vector<const char*> names(items);
+    int current = static_cast<int>(value);
+    if (ImGui::Combo(label, &current, names.data(), static_cast<int>(names.size())))
+    {
+        value = static_cast<TEnum>(current);
+        return true;
+    }
+    return false;
+}
+
+bool UIFontCombo(const char* label, std::string& fontPath)
+{
+    bool changed = false;
+    const std::vector<std::string> fonts = UIFontLibrary::DiscoverFontFiles();
+    if (ImGui::BeginCombo(label, fontPath.c_str()))
+    {
+        for (const std::string& font : fonts)
+        {
+            const bool selected = font == fontPath;
+            if (ImGui::Selectable(font.c_str(), selected))
+            {
+                fontPath = font;
+                changed = true;
+            }
+            if (selected)
+                ImGui::SetItemDefaultFocus();
+        }
+        if (fonts.empty())
+            ImGui::TextDisabled("No .ttf/.otf found under Fonts/");
+        ImGui::EndCombo();
+    }
+    char buffer[260];
+    strcpy_s(buffer, sizeof(buffer), fontPath.c_str());
+    if (ImGui::InputText("Font Path", buffer, sizeof(buffer)))
+    {
+        fontPath = buffer;
+        changed = true;
+    }
+    return changed;
+}
+
+bool UIMultilineText(const char* label, std::string& text)
+{
+    std::vector<char> buffer(1024, '\0');
+    strcpy_s(buffer.data(), buffer.size(), text.c_str());
+    if (ImGui::InputTextMultiline(label, buffer.data(), buffer.size(),
+                                  ImVec2(-1.0f, ImGui::GetTextLineHeight() * 3.0f)))
+    {
+        text = buffer.data();
+        return true;
+    }
+    return false;
+}
+
+bool UISingleLineText(const char* label, std::string& text)
+{
+    char buffer[256];
+    strcpy_s(buffer, sizeof(buffer), text.c_str());
+    if (ImGui::InputText(label, buffer, sizeof(buffer)))
+    {
+        text = buffer;
+        return true;
+    }
+    return false;
+}
+
+}
+
+void HierarchyPanel::AddUIElementWithPreset(Entity entity, const UIElementType type)
+{
+    if (entity.HasComponent<UIElementComponent>())
+    {
+        m_NotificationManager.AddNotification("Entity already has a UI Element component!", Notification::Type::Warning);
+        return;
+    }
+
+    auto& element = entity.AddComponent<UIElementComponent>();
+    element.Type = type;
+    element.Anchor = UIAnchor::TopLeft;
+    element.Pivot = glm::vec2(0.0f, 0.0f);
+    element.Offset = glm::vec2(32.0f, 32.0f);
+    element.FontSize = 20.0f;
+    element.TextAlign = UITextAlign::Center;
+    element.HoverColor = glm::vec4(1.2f, 1.2f, 1.2f, 1.0f);
+    element.PressColor = glm::vec4(0.8f, 0.8f, 0.8f, 1.0f);
+    element.DisabledColor = glm::vec4(0.55f, 0.55f, 0.55f, 1.0f);
+
+    switch (type)
+    {
+    case UIElementType::Panel:
+        element.Anchor = UIAnchor::Center;
+        element.Pivot = glm::vec2(0.5f, 0.5f);
+        element.Offset = glm::vec2(0.0f, 0.0f);
+        element.Size = glm::vec2(480.0f, 280.0f);
+        element.Color = glm::vec4(0.06f, 0.06f, 0.08f, 0.9f);
+        element.BorderColor = glm::vec4(0.35f, 0.35f, 0.4f, 1.0f);
+        element.BorderWidth = 1.0f;
+        element.CornerRadius = 8.0f;
+        break;
+
+    case UIElementType::Text:
+        element.Size = glm::vec2(420.0f, 32.0f);
+        element.Text = "Text";
+        element.TextAlign = UITextAlign::Left;
+        element.Color = glm::vec4(0.0f, 0.0f, 0.0f, 0.0f);
+        break;
+
+    case UIElementType::Button:
+        element.Anchor = UIAnchor::Center;
+        element.Pivot = glm::vec2(0.5f, 0.5f);
+        element.Offset = glm::vec2(0.0f, 0.0f);
+        element.Size = glm::vec2(320.0f, 56.0f);
+        element.Text = "Button";
+        element.FontSize = 24.0f;
+        element.Color = glm::vec4(0.13f, 0.13f, 0.16f, 0.95f);
+        element.HoverColor = glm::vec4(1.35f, 1.35f, 1.35f, 1.0f);
+        element.PressColor = glm::vec4(0.75f, 0.75f, 0.75f, 1.0f);
+        element.BorderColor = glm::vec4(0.45f, 0.45f, 0.5f, 1.0f);
+        element.BorderWidth = 1.0f;
+        element.CornerRadius = 6.0f;
+        break;
+
+    case UIElementType::Toggle:
+        element.Anchor = UIAnchor::MiddleLeft;
+        element.Pivot = glm::vec2(0.0f, 0.5f);
+        element.Offset = glm::vec2(32.0f, 0.0f);
+        element.Size = glm::vec2(220.0f, 40.0f);
+        element.Text = "Toggle";
+        element.TextAlign = UITextAlign::Left;
+        element.FontSize = 20.0f;
+        element.Color = glm::vec4(0.13f, 0.13f, 0.16f, 0.95f);
+        element.HoverColor = glm::vec4(1.3f, 1.3f, 1.3f, 1.0f);
+        element.PressColor = glm::vec4(0.8f, 0.8f, 0.8f, 1.0f);
+        element.CornerRadius = 20.0f;
+        break;
+
+    case UIElementType::Bar:
+        element.Size = glm::vec2(420.0f, 22.0f);
+        element.Offset = glm::vec2(32.0f, 32.0f);
+        element.Value = 1.0f;
+        element.FillColor = glm::vec4(0.68f, 0.12f, 0.12f, 1.0f);
+        element.BackgroundColor = glm::vec4(0.0f, 0.0f, 0.0f, 0.65f);
+        element.BorderColor = glm::vec4(0.9f, 0.9f, 0.9f, 0.35f);
+        element.BorderWidth = 1.0f;
+        element.CornerRadius = 4.0f;
+        break;
+
+    case UIElementType::TextInput:
+        element.Size = glm::vec2(320.0f, 40.0f);
+        element.Placeholder = "Type...";
+        element.FontSize = 20.0f;
+        element.TextAlign = UITextAlign::Left;
+        element.BackgroundColor = glm::vec4(0.0f, 0.0f, 0.0f, 0.5f);
+        element.BorderColor = glm::vec4(0.6f, 0.6f, 0.6f, 1.0f);
+        element.BorderWidth = 1.0f;
+        element.CornerRadius = 4.0f;
+        break;
+
+    case UIElementType::Image:
+        element.Size = glm::vec2(128.0f, 128.0f);
+        element.Color = glm::vec4(1.0f);
+        break;
+
+    default:
+        KBRAssert("Invalid UIElementType");
+        break;
+    }
+}
+
+void HierarchyPanel::DrawUICanvasComponent(const Entity entity)
+{
+    if (!entity.HasComponent<UICanvasComponent>())
+        return;
+
+    ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(6, 6));
+    EditorIcons::Draw(EditorIcon::ComponentEnvironment);
+    ImGui::SameLine(0.0f, 4.0f);
+    const bool opened = ImGui::TreeNodeEx(
+        reinterpret_cast<void*>(typeid(UICanvasComponent).hash_code()), ImGuiTreeNodeFlags_DefaultOpen, "UI Canvas");
+    ImGui::SameLine(ImGui::GetContentRegionAvail().x - 20.f);
+    if (ImGui::Button("+##UICanvas", ImVec2{ 20, 20 }))
+        ImGui::OpenPopup("UICanvasComponentSettings");
+    ImGui::PopStyleVar();
+
+    bool componentDeleted = false;
+    if (ImGui::BeginPopup("UICanvasComponentSettings"))
+    {
+        ImGui::Text("UI Canvas Settings");
+        ImGui::Separator();
+        if (ImGui::MenuItem("Remove Component"))
+        {
+            componentDeleted = true;
+            ImGui::CloseCurrentPopup();
+        }
+        ImGui::EndPopup();
+    }
+
+    if (opened)
+    {
+        auto& canvas = entity.GetComponent<UICanvasComponent>();
+        const UUID entityID = entity.GetUUID();
+
+        if (!m_UIEdit.CanvasActive || m_UIEdit.Entity != entityID)
+            m_UIEdit.CanvasBefore = canvas;
+        m_UIEdit.Entity = entityID;
+
+        bool changed = false;
+        changed |= ImGui::Checkbox("Visible##UICanvas", &canvas.Visible);
+        changed |= ImGui::DragInt("Sort Order##UICanvas", &canvas.SortOrder, 0.1f);
+        changed |= ImGui::Checkbox("Input Enabled##UICanvas", &canvas.InputEnabled);
+        changed |= ImGui::Checkbox("Block Scene Input##UICanvas", &canvas.BlockSceneInput);
+        changed |= UIEnumCombo("Scale Mode##UICanvas", canvas.ScaleMode, { "Match Height", "Match Width", "None" });
+        changed |= ImGui::DragFloat("Reference Height##UICanvas", &canvas.ReferenceHeight, 1.0f, 64.0f, 8192.0f);
+        changed |= ImGui::DragFloat("Reference Width##UICanvas", &canvas.ReferenceWidth, 1.0f, 64.0f, 8192.0f);
+
+        if (ImGui::IsAnyItemActive())
+        {
+            m_UIEdit.CanvasActive = true;
+        }
+        else if (m_UIEdit.CanvasActive)
+        {
+            if (m_UndoRedo)
+            {
+                m_UndoRedo->Record(std::make_unique<SetComponentValueCommand<UICanvasComponent>>(
+                    m_Context, entityID, m_UIEdit.CanvasBefore, canvas, "Edit UI Canvas"));
+            }
+            m_UIEdit.CanvasActive = false;
+        }
+
+        ImGui::TreePop();
+    }
+
+    if (componentDeleted)
+        entity.RemoveComponent<UICanvasComponent>();
+}
+
+void HierarchyPanel::DrawUIElementComponent(const Entity entity)
+{
+    if (!entity.HasComponent<UIElementComponent>())
+        return;
+
+    ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(6, 6));
+    EditorIcons::Draw(EditorIcon::ComponentText);
+    ImGui::SameLine(0.0f, 4.0f);
+    const bool opened = ImGui::TreeNodeEx(
+        reinterpret_cast<void*>(typeid(UIElementComponent).hash_code()), ImGuiTreeNodeFlags_DefaultOpen, "UI Element");
+    ImGui::SameLine(ImGui::GetContentRegionAvail().x - 20.f);
+    if (ImGui::Button("+##UIElement", ImVec2{ 20, 20 }))
+        ImGui::OpenPopup("UIElementComponentSettings");
+    ImGui::PopStyleVar();
+
+    bool componentDeleted = false;
+    if (ImGui::BeginPopup("UIElementComponentSettings"))
+    {
+        ImGui::Text("UI Element Settings");
+        ImGui::Separator();
+        if (ImGui::MenuItem("Remove Component"))
+        {
+            componentDeleted = true;
+            ImGui::CloseCurrentPopup();
+        }
+        ImGui::EndPopup();
+    }
+
+    if (opened)
+    {
+        auto& element = entity.GetComponent<UIElementComponent>();
+        const UUID entityID = entity.GetUUID();
+
+        if (!m_UIEdit.ElementActive || m_UIEdit.Entity != entityID)
+            m_UIEdit.ElementBefore = element;
+        m_UIEdit.Entity = entityID;
+
+        constexpr const char* typeNames[] = { "Panel", "Text", "Button", "Toggle", "Bar", "TextInput", "Image" };
+        int typeIndex = static_cast<int>(element.Type);
+        if (ImGui::Combo("Type", &typeIndex, typeNames, IM_ARRAYSIZE(typeNames)))
+            element.Type = static_cast<UIElementType>(typeIndex);
+
+        ImGui::SeparatorText("Layout");
+        UIEnumCombo("Space", element.Space, { "Canvas", "World" });
+        UIEnumCombo("Anchor", element.Anchor,
+                    { "Top Left", "Top Center", "Top Right", "Middle Left", "Center", "Middle Right",
+                      "Bottom Left", "Bottom Center", "Bottom Right", "Stretch" });
+
+        if (element.Anchor == UIAnchor::Stretch)
+        {
+            ImGui::DragFloat4("Margin", &element.Margin[0], 0.5f, -4096.0f, 4096.0f);
+        }
+        else
+        {
+            ImGui::DragFloat2("Pivot", &element.Pivot[0], 0.01f, 0.0f, 1.0f);
+            ImGui::DragFloat2("Offset", &element.Offset[0], 0.5f, -8192.0f, 8192.0f);
+            ImGui::DragFloat2("Size", &element.Size[0], 0.5f, 0.0f, 8192.0f);
+        }
+
+        ImGui::DragInt("Sort Order##UIElement", &element.SortOrder, 0.1f);
+        ImGui::Checkbox("Visible##UIElement", &element.Visible);
+        ImGui::Checkbox("Interactable", &element.Interactable);
+        ImGui::Checkbox("Clip Children", &element.ClipChildren);
+        ImGui::DragFloat("Opacity", &element.Opacity, 0.01f, 0.0f, 1.0f);
+
+        const bool hasBox = element.Type != UIElementType::Text;
+        if (hasBox)
+        {
+            ImGui::SeparatorText("Style");
+            Editor::ColorWidgets::SrgbColorEdit4("Color", element.Color);
+            UIEnumCombo("Gradient", element.GradientDirection, { "None", "Vertical", "Horizontal" });
+            if (element.GradientDirection != UIGradientDirection::None)
+                Editor::ColorWidgets::SrgbColorEdit4("Gradient Color", element.GradientColor);
+
+            Editor::ColorWidgets::SrgbColorEdit4("Border Color", element.BorderColor);
+            ImGui::DragFloat("Border Width", &element.BorderWidth, 0.1f, 0.0f, 64.0f);
+            ImGui::DragFloat("Corner Radius", &element.CornerRadius, 0.1f, 0.0f, 512.0f);
+
+            if (element.Type == UIElementType::Image)
+                AssetPicker::DrawAssetHandle("Texture", AssetType::Texture2D, element.Texture, "Search textures...");
+        }
+
+        const bool hasText = element.Type == UIElementType::Text || element.Type == UIElementType::Button ||
+                             element.Type == UIElementType::Toggle || element.Type == UIElementType::TextInput;
+        if (hasText)
+        {
+            ImGui::SeparatorText("Text");
+            if (element.Type == UIElementType::Text)
+                UIMultilineText("Text##UIElement", element.Text);
+            else
+                UISingleLineText("Label", element.Text);
+
+            UIFontCombo("Font", element.FontPath);
+            ImGui::DragFloat("Font Size", &element.FontSize, 0.25f, 4.0f, 128.0f);
+            UIEnumCombo("Align", element.TextAlign, { "Left", "Center", "Right" });
+            ImGui::DragFloat("Wrap Width", &element.WrapWidth, 1.0f, 0.0f, 8192.0f);
+            Editor::ColorWidgets::SrgbColorEdit4("Text Color", element.TextColor);
+            Editor::ColorWidgets::SrgbColorEdit4("Shadow Color", element.ShadowColor);
+            ImGui::DragFloat2("Shadow Offset", &element.ShadowOffset[0], 0.1f, -32.0f, 32.0f);
+        }
+
+        if (element.Type == UIElementType::Button || element.Type == UIElementType::Toggle)
+        {
+            ImGui::SeparatorText("Interaction");
+            ImGui::TextDisabled("Tints multiply the base color.");
+            Editor::ColorWidgets::SrgbColorEdit4("Hover Tint", element.HoverColor);
+            Editor::ColorWidgets::SrgbColorEdit4("Press Tint", element.PressColor);
+            Editor::ColorWidgets::SrgbColorEdit4("Disabled Tint", element.DisabledColor);
+
+            if (element.Type == UIElementType::Toggle)
+                ImGui::Checkbox("Is On", &element.IsOn);
+        }
+
+        if (element.Type == UIElementType::Bar)
+        {
+            ImGui::SeparatorText("Bar");
+            ImGui::SliderFloat("Value", &element.Value, 0.0f, 1.0f);
+            Editor::ColorWidgets::SrgbColorEdit4("Fill Color", element.FillColor);
+            Editor::ColorWidgets::SrgbColorEdit4("Background Color", element.BackgroundColor);
+            UIEnumCombo("Fill Direction", element.FillDirection,
+                        { "Left to Right", "Right to Left", "Bottom to Top", "Top to Bottom" });
+        }
+
+        if (element.Type == UIElementType::TextInput)
+        {
+            ImGui::SeparatorText("Text Input");
+            UISingleLineText("Placeholder", element.Placeholder);
+            ImGui::InputScalar("Max Length", ImGuiDataType_U32, &element.MaxLength);
+
+            if (m_Context && m_Context->IsRunning())
+            {
+                ImGui::TextDisabled("Typed: %s", element.InputBuffer.c_str());
+                ImGui::TextDisabled("Focused: %s", element.IsFocused ? "Yes" : "No");
+            }
+        }
+
+        if (m_Context && m_Context->IsRunning())
+        {
+            ImGui::TextDisabled("Hovered: %s | Pressed: %s | Clicked: %s",
+                                element.IsHovered ? "Yes" : "No",
+                                element.IsPressed ? "Yes" : "No",
+                                element.Clicked ? "Yes" : "No");
+        }
+
+        if (ImGui::IsAnyItemActive())
+        {
+            m_UIEdit.ElementActive = true;
+        }
+        else if (m_UIEdit.ElementActive)
+        {
+            if (m_UndoRedo)
+            {
+                m_UndoRedo->Record(std::make_unique<SetComponentValueCommand<UIElementComponent>>(
+                    m_Context, entityID, m_UIEdit.ElementBefore, element, "Edit UI Element"));
+            }
+            m_UIEdit.ElementActive = false;
+        }
+
+        ImGui::TreePop();
+    }
+
+    if (componentDeleted)
+        entity.RemoveComponent<UIElementComponent>();
 }
 
 }

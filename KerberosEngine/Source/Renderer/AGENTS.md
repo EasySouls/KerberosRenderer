@@ -120,8 +120,9 @@ The active pass order is approximately:
 12. anti-aliasing
 13. upscaling
 14. tonemapping
-15. presentation
-16. mouse picking
+15. game UI (display-referred overlay into FinalImage)
+16. presentation
+17. mouse picking
 
 The omni shadow pass is a separate graph pass after the directional
 cascades. It writes the fixed `PointShadowMap` cube array, and the opaque and
@@ -196,6 +197,31 @@ every frame.
 `RenderGraph.hpp/.cpp` is a legacy graph with different resource ownership,
 semaphores, and queue submissions. Do not extend or mix it with `Graph`
 without first proving it is still used.
+
+## Game UI overlay
+
+`Renderer` owns `UIRenderer` (`Renderer/UI/UIRenderer.*`), which draws the game
+UI into `FinalImage` in a "Game UI" graph pass between `Tonemapping` and
+`Presentation`. The pass declares a write of FinalImage with
+`eColorAttachmentRead | eColorAttachmentWrite`, records dynamic rendering with
+`loadOp = LOAD`, and draws one indexed batch produced by
+`Scene::GetUISystem().BuildDrawData`.
+
+- Draw data is rebuilt during command recording from live component values, so a
+  script changing a bar value is visible in the same frame.
+- World-space labels use `PendingRender.Projection * PendingRender.View`
+  (unjittered), not the FSR3-jittered projection.
+- UI colors are display-referred; the shader writes them without exposure or
+  sRGB transfer conversion. Do not tonemap the UI.
+- `UIRenderer` owns no images. Its per-frame vertex/index buffers grow only
+  after `VulkanContext::WaitIdle()`.
+- `ui.slang` uses the global bindless texture set (set 0, bindings 0/1) and a
+  push constant block containing the screen size in the vertex and fragment
+  stages. Integer attributes must not be `nointerpolation` in `VSInput` (SPIR-V
+  forbids `Flat` on vertex inputs) but must be in `VSOutput`.
+- Font atlases are runtime textures, not assets; `UIFontLibrary` registers them
+  through `TextureManager::RegisterTexture`, which allocates a bindless slot
+  keyed by texture pointer.
 
 ## Lighting, exposure, and environment
 
@@ -522,7 +548,8 @@ early-outs for fresh shaders and rewrites the on-disk cache after a successful
 compile. `GrassSystem` caches its shader-object stages under `grass_task`,
 `grass_mesh`, and `grass_fragment` keys. `shadowmap_omni` is the point-shadow
 depth-only shader; its `shadowmap_omni.spv` artifact is listed in
-`compile_shaders.bat` alongside `shadowmap_csm.spv`.
+`compile_shaders.bat` alongside `shadowmap_csm.spv`. `ui` is the game UI shader;
+its `ui.spv` artifact is listed in `compile_shaders.bat` as well.
 
 The glTF importer generates per-vertex tangents from positions, normals, UVs,
 and triangle indices when a primitive omits `TANGENT` or supplies degenerate
