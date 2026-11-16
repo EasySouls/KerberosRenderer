@@ -78,6 +78,12 @@ Editor windows live mainly under
   two-bone strip for validating the skinning path without imported glTF data.
   Static and skinned mesh `Cast Shadows` flags are honored by both the CSM and
   omni shadow passes.
+  Entity rows only draw a tree expander when `HierarchyComponent::Children` is
+  non-empty; the check reads the live hierarchy list per drawn row, so editor
+  edits, undo/redo, prefab instantiation, and runtime spawning update it
+  immediately without a rebuilt cache or a recursive scan. Children are walked
+  from that live list instead of being copied through `Scene::GetChildren`, and
+  stale child IDs are skipped.
   Single-asset component fields use the shared
   `KerberosEditor/Source/Widgets/AssetPicker` searchable dropdown, which keeps
   the matching asset-browser drag/drop payload working. The Animator component

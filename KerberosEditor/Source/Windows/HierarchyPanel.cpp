@@ -610,8 +610,19 @@ void HierarchyPanel::DrawEntityNodeContextMenu(const Entity& entity, bool& entit
 
 void HierarchyPanel::DrawEntityNodeChildren(const Entity& entity)
 {
-    for (const Entity& child : m_Context->GetChildren(entity)) {
-        DrawEntityNode(child);
+    if (!entity.HasComponent<HierarchyComponent>())
+        return;
+    
+    const Entity parent = entity;
+    std::size_t childIndex = 0;
+    while (true)
+    {
+        const auto& children = parent.GetComponent<HierarchyComponent>().Children;
+        if (childIndex >= children.size())
+            break;
+
+        if (const Entity child = m_Context->TryGetEntityByUUID(children[childIndex++]))
+            DrawEntityNode(child);
     }
 }
 
