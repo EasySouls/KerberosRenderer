@@ -313,6 +313,7 @@ namespace PROJECT_NAME
 		dispatcher.Dispatch<KeyPressedEvent>(KBR_BIND_FN(EditorLayer::OnKeyPressed));
 		dispatcher.Dispatch<KeyTypedEvent>(KBR_BIND_FN(EditorLayer::OnKeyTyped));
 		dispatcher.Dispatch<MouseButtonPressedEvent>(KBR_BIND_FN(EditorLayer::OnMouseButtonPressed));
+		dispatcher.Dispatch<MouseButtonReleasedEvent>(KBR_BIND_FN(EditorLayer::OnMouseButtonReleased));
 		dispatcher.Dispatch<WindowDropEvent>(KBR_BIND_FN(EditorLayer::OnWindowDrop));
 	}
 
@@ -1759,6 +1760,12 @@ namespace PROJECT_NAME
 		input.LeftDown = Input::IsMouseButtonPressed(Mouse::ButtonLeft);
 		input.RightDown = Input::IsMouseButtonPressed(Mouse::ButtonRight);
 
+		// Buffered edges so a press+release between two polls still clicks.
+		input.LeftPressed = m_UIInputLeftPressed;
+		input.LeftReleased = m_UIInputLeftReleased;
+		m_UIInputLeftPressed = false;
+		m_UIInputLeftReleased = false;
+
 		input.TypedCharacters = std::move(m_UITypedCharacters);
 		m_UITypedCharacters.clear();
 
@@ -1904,6 +1911,9 @@ namespace PROJECT_NAME
 
 	bool EditorLayer::OnMouseButtonPressed(const MouseButtonPressedEvent &event)
 	{
+		if (event.GetButton() == Mouse::ButtonLeft)
+			m_UIInputLeftPressed = true;
+
 		/// Handle mouse picking
 		/// Only select the entity if we are not using the gizmos or the camera
 		/// TODO: Check if isViewportHovered is needed, Application::BlockEvents should prevent this from firing
@@ -1914,6 +1924,14 @@ namespace PROJECT_NAME
 			else
 				m_HierarchyPanel.SetSelectedEntity({});
 		}
+		return false;
+	}
+
+	bool EditorLayer::OnMouseButtonReleased(const MouseButtonReleasedEvent &event)
+	{
+		if (event.GetButton() == Mouse::ButtonLeft)
+			m_UIInputLeftReleased = true;
+
 		return false;
 	}
 

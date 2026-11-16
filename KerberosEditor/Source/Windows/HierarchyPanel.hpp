@@ -67,7 +67,8 @@ namespace Kerberos
 		void ExecuteCreateEntity(const std::string& name);
 
 		/// Adds a UIElementComponent preconfigured for the requested element type.
-		void AddUIElementWithPreset(Entity entity, UIElementType type);
+		/// Returns false when the entity already has one.
+		bool AddUIElementWithPreset(Entity entity, UIElementType type);
 		void DrawUICanvasComponent(Entity entity);
 		void DrawUIElementComponent(Entity entity);
 
@@ -109,6 +110,10 @@ namespace Kerberos
 			UUID Entity = UUID::Invalid();
 			bool ElementActive = false;
 			bool CanvasActive = false;
+			/// True when one of the component's own widgets edited the value
+			/// during the current gesture, so no-op commands are not recorded.
+			bool ElementDirty = false;
+			bool CanvasDirty = false;
 		};
 		UIComponentEditState m_UIEdit;
 

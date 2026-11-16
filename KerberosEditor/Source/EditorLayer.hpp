@@ -17,6 +17,7 @@
 #include "Scene/Camera/Camera.hpp"
 #include "Scene/Components.hpp"
 #include "Events/MouseButtonPressedEvent.hpp"
+#include "Events/MouseButtonReleasedEvent.hpp"
 #include "Events/WindowDropEvent.hpp"
 #include "Events/KeyTypedEvent.hpp"
 
@@ -83,6 +84,7 @@ namespace Kerberos
 		bool OnKeyPressed(const KeyPressedEvent& event);
 		bool OnKeyTyped(const KeyTypedEvent& event);
 		bool OnMouseButtonPressed(const MouseButtonPressedEvent& event);
+		bool OnMouseButtonReleased(const MouseButtonReleasedEvent& event);
 		bool OnWindowDrop(const WindowDropEvent& event);
 
 		/// Builds this frame's game-UI input snapshot and hands it to the active scene.
@@ -156,6 +158,11 @@ namespace Kerberos
 		bool m_UIInputEnter = false;
 		bool m_UIInputTab = false;
 		bool m_UIInputEscape = false;
+
+		/// Buffered left-button edges so a press+release between two polls is not
+		/// lost by the polled UI input snapshot.
+		bool m_UIInputLeftPressed = false;
+		bool m_UIInputLeftReleased = false;
 
 		bool m_DoesImGuiWantInput = false;
 

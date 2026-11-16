@@ -34,8 +34,10 @@ public:
     static std::vector<std::string> WrapLines(const Font& font, const std::string& text,
                                               float fontSize, float maxWidth);
 
-    /// Appends MSDF glyph quads for text laid out inside rect. Glyphs outside
-    /// clipRect are dropped. Returns the height used by the wrapped block.
+    /// Appends MSDF glyph quads for text laid out inside rect. The block is
+    /// vertically centered in rect (top-aligned when it does not fit) and
+    /// horizontally aligned by style.Align. Glyphs outside clipRect are dropped.
+    /// Returns the height used by the wrapped block.
     static float AppendText(UIDrawData& out, const UITextStyle& style, const std::string& text,
                             const UIRect& rect, const UIRect& clipRect, bool clipEnabled);
 };

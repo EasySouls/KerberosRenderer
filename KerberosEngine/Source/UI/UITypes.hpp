@@ -46,6 +46,13 @@ struct UIInputState
     bool LeftDown = false;
     bool RightDown = false;
 
+    /// Optional buffered left-button edges for the frames between two polls. A
+    /// press and release that both happen between updates still produces a
+    /// click when the host sets both flags. LeftDown remains the fallback for
+    /// hosts that only report the button state.
+    bool LeftPressed = false;
+    bool LeftReleased = false;
+
     /// Characters typed this frame (already filtered for text input).
     std::string TypedCharacters;
     bool Backspace = false;

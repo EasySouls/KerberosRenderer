@@ -36,7 +36,6 @@
 #include <imgui/imgui_internal.h>
 
 #include <algorithm>
-#include <array>
 #include <filesystem>
 #include <format>
 #include <iterator>
@@ -772,15 +771,14 @@ void HierarchyPanel::AddComponentPopup(const Entity entity)
             }
             ImGui::Separator();
             if (EditorIcons::MenuItem(EditorIcon::ComponentText, "World Label")) {
-                AddUIElementWithPreset(entity, UIElementType::Text);
-                if (entity.HasComponent<UIElementComponent>()) {
+                if (AddUIElementWithPreset(entity, UIElementType::Text)) {
                     auto& element = entity.GetComponent<UIElementComponent>();
                     element.Space = UISpace::World;
                     element.Anchor = UIAnchor::BottomCenter;
                     element.Pivot = glm::vec2(0.5f, 1.0f);
                     element.Offset = glm::vec2(0.0f, 24.0f);
                     element.Size = glm::vec2(220.0f, 32.0f);
-                    element.Text = "Text";
+                    element.Text = "Label";
                     element.TextAlign = UITextAlign::Center;
                 }
                 ImGui::CloseCurrentPopup();
@@ -1052,7 +1050,7 @@ void HierarchyPanel::DrawComponents(const Entity entity)
             auto& tag = entity.GetComponent<TagComponent>().Tag;
 
             char buffer[256];
-            strcpy_s(buffer, sizeof(buffer), tag.c_str());
+            std::snprintf(buffer, sizeof(buffer), "%s", tag.c_str());
             if (ImGui::InputText("Tag", buffer, sizeof(buffer))) {
                 tag = buffer;
             }
@@ -1252,7 +1250,7 @@ void HierarchyPanel::DrawComponents(const Entity entity)
                 }
 
                 char buffer[128];
-                strcpy_s(buffer, sizeof(buffer), className.c_str());
+                std::snprintf(buffer, sizeof(buffer), "%s", className.c_str());
 
                 if (!scriptClassExists) {
                     ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.9f, 0.2f, 0.3f, 1.0f));
@@ -1342,7 +1340,7 @@ void HierarchyPanel::DrawComponents(const Entity entity)
                             else if (scriptField.Type == ScriptFieldType::String) {
                                 std::string value = scriptInstance->GetFieldValue<std::string>(name);
                                 char strBuffer[256];
-                                strcpy_s(strBuffer, sizeof(strBuffer), value.c_str());
+                                std::snprintf(strBuffer, sizeof(strBuffer), "%s", value.c_str());
                                 if (ImGui::InputText(name.c_str(), strBuffer, sizeof(strBuffer))) {
                                     scriptInstance->SetFieldValue<std::string>(name, std::string(strBuffer));
                                 }
@@ -1481,7 +1479,7 @@ void HierarchyPanel::DrawComponents(const Entity entity)
                             else if (scriptField.Type == ScriptFieldType::String) {
                                 std::string value = fieldInitializer.GetValue<std::string>();
                                 char strBuffer[256];
-                                strcpy_s(strBuffer, sizeof(strBuffer), value.c_str());
+                                std::snprintf(strBuffer, sizeof(strBuffer), "%s", value.c_str());
                                 if (ImGui::InputText(fieldName.c_str(), strBuffer, sizeof(strBuffer))) {
                                     fieldInitializer.SetValue<std::string>(std::string(strBuffer));
                                 }
@@ -2084,7 +2082,7 @@ void HierarchyPanel::DrawComponents(const Entity entity)
             auto& text = entity.GetComponent<TextComponent>();
 
             char buffer[256];
-            strcpy_s(buffer, sizeof(buffer), text.Text.c_str());
+            std::snprintf(buffer, sizeof(buffer), "%s", text.Text.c_str());
             if (ImGui::InputText("Text", buffer, sizeof(buffer))) {
                 text.Text = buffer;
             }
@@ -2841,7 +2839,7 @@ void HierarchyPanel::DrawComponents(const Entity entity)
                 ImGui::PushID(i);
 
                 char keyBuffer[128];
-                strcpy_s(keyBuffer, sizeof(keyBuffer), entry.Key.c_str());
+                std::snprintf(keyBuffer, sizeof(keyBuffer), "%s", entry.Key.c_str());
                 if (ImGui::InputText("Key", keyBuffer, sizeof(keyBuffer)))
                     entry.Key = keyBuffer;
 
@@ -2885,7 +2883,7 @@ void HierarchyPanel::DrawComponents(const Entity entity)
                 else if (auto* stringValue = std::get_if<std::string>(&entry.Value))
                 {
                     char valueBuffer[256];
-                    strcpy_s(valueBuffer, sizeof(valueBuffer), stringValue->c_str());
+                    std::snprintf(valueBuffer, sizeof(valueBuffer), "%s", stringValue->c_str());
                     if (ImGui::InputText("Value", valueBuffer, sizeof(valueBuffer)))
                         *stringValue = valueBuffer;
                 }
@@ -3200,7 +3198,7 @@ bool UIFontCombo(const char* label, std::string& fontPath)
         ImGui::EndCombo();
     }
     char buffer[260];
-    strcpy_s(buffer, sizeof(buffer), fontPath.c_str());
+    std::snprintf(buffer, sizeof(buffer), "%s", fontPath.c_str());
     if (ImGui::InputText("Font Path", buffer, sizeof(buffer)))
     {
         fontPath = buffer;
@@ -3212,7 +3210,7 @@ bool UIFontCombo(const char* label, std::string& fontPath)
 bool UIMultilineText(const char* label, std::string& text)
 {
     std::vector<char> buffer(1024, '\0');
-    strcpy_s(buffer.data(), buffer.size(), text.c_str());
+    std::snprintf(buffer.data(), buffer.size(), "%s", text.c_str());
     if (ImGui::InputTextMultiline(label, buffer.data(), buffer.size(),
                                   ImVec2(-1.0f, ImGui::GetTextLineHeight() * 3.0f)))
     {
@@ -3225,7 +3223,7 @@ bool UIMultilineText(const char* label, std::string& text)
 bool UISingleLineText(const char* label, std::string& text)
 {
     char buffer[256];
-    strcpy_s(buffer, sizeof(buffer), text.c_str());
+    std::snprintf(buffer, sizeof(buffer), "%s", text.c_str());
     if (ImGui::InputText(label, buffer, sizeof(buffer)))
     {
         text = buffer;
@@ -3236,12 +3234,12 @@ bool UISingleLineText(const char* label, std::string& text)
 
 }
 
-void HierarchyPanel::AddUIElementWithPreset(Entity entity, const UIElementType type)
+bool HierarchyPanel::AddUIElementWithPreset(Entity entity, const UIElementType type)
 {
     if (entity.HasComponent<UIElementComponent>())
     {
         m_NotificationManager.AddNotification("Entity already has a UI Element component!", Notification::Type::Warning);
-        return;
+        return false;
     }
 
     auto& element = entity.AddComponent<UIElementComponent>();
@@ -3266,6 +3264,8 @@ void HierarchyPanel::AddUIElementWithPreset(Entity entity, const UIElementType t
         element.BorderColor = glm::vec4(0.35f, 0.35f, 0.4f, 1.0f);
         element.BorderWidth = 1.0f;
         element.CornerRadius = 8.0f;
+        // Backdrop: children are drawn on top and must receive the hover.
+        element.Interactable = false;
         break;
 
     case UIElementType::Text:
@@ -3273,6 +3273,8 @@ void HierarchyPanel::AddUIElementWithPreset(Entity entity, const UIElementType t
         element.Text = "Text";
         element.TextAlign = UITextAlign::Left;
         element.Color = glm::vec4(0.0f, 0.0f, 0.0f, 0.0f);
+        // Pure decoration: must not swallow hover from elements it overlaps.
+        element.Interactable = false;
         break;
 
     case UIElementType::Button:
@@ -3329,12 +3331,15 @@ void HierarchyPanel::AddUIElementWithPreset(Entity entity, const UIElementType t
     case UIElementType::Image:
         element.Size = glm::vec2(128.0f, 128.0f);
         element.Color = glm::vec4(1.0f);
+        element.Interactable = false;
         break;
 
     default:
         KBRAssert("Invalid UIElementType");
         break;
     }
+
+    return true;
 }
 
 void HierarchyPanel::DrawUICanvasComponent(const Entity entity)
@@ -3382,6 +3387,9 @@ void HierarchyPanel::DrawUICanvasComponent(const Entity entity)
         changed |= UIEnumCombo("Scale Mode##UICanvas", canvas.ScaleMode, { "Match Height", "Match Width", "None" });
         changed |= ImGui::DragFloat("Reference Height##UICanvas", &canvas.ReferenceHeight, 1.0f, 64.0f, 8192.0f);
         changed |= ImGui::DragFloat("Reference Width##UICanvas", &canvas.ReferenceWidth, 1.0f, 64.0f, 8192.0f);
+        
+        if (changed)
+            m_UIEdit.CanvasDirty = true;
 
         if (ImGui::IsAnyItemActive())
         {
@@ -3389,12 +3397,13 @@ void HierarchyPanel::DrawUICanvasComponent(const Entity entity)
         }
         else if (m_UIEdit.CanvasActive)
         {
-            if (m_UndoRedo)
+            if (m_UndoRedo && m_UIEdit.CanvasDirty)
             {
                 m_UndoRedo->Record(std::make_unique<SetComponentValueCommand<UICanvasComponent>>(
                     m_Context, entityID, m_UIEdit.CanvasBefore, canvas, "Edit UI Canvas"));
             }
             m_UIEdit.CanvasActive = false;
+            m_UIEdit.CanvasDirty = false;
         }
 
         ImGui::TreePop();
@@ -3441,49 +3450,55 @@ void HierarchyPanel::DrawUIElementComponent(const Entity entity)
             m_UIEdit.ElementBefore = element;
         m_UIEdit.Entity = entityID;
 
+        bool changed = false;
+
         constexpr const char* typeNames[] = { "Panel", "Text", "Button", "Toggle", "Bar", "TextInput", "Image" };
         int typeIndex = static_cast<int>(element.Type);
         if (ImGui::Combo("Type", &typeIndex, typeNames, IM_ARRAYSIZE(typeNames)))
+        {
             element.Type = static_cast<UIElementType>(typeIndex);
+            changed = true;
+        }
 
         ImGui::SeparatorText("Layout");
-        UIEnumCombo("Space", element.Space, { "Canvas", "World" });
-        UIEnumCombo("Anchor", element.Anchor,
-                    { "Top Left", "Top Center", "Top Right", "Middle Left", "Center", "Middle Right",
-                      "Bottom Left", "Bottom Center", "Bottom Right", "Stretch" });
+        changed |= UIEnumCombo("Space", element.Space, { "Canvas", "World" });
+        changed |= UIEnumCombo("Anchor", element.Anchor,
+                               { "Top Left", "Top Center", "Top Right", "Middle Left", "Center",
+                                 "Middle Right", "Bottom Left", "Bottom Center", "Bottom Right", "Stretch" });
 
         if (element.Anchor == UIAnchor::Stretch)
         {
-            ImGui::DragFloat4("Margin", &element.Margin[0], 0.5f, -4096.0f, 4096.0f);
+            changed |= ImGui::DragFloat4("Margin", &element.Margin[0], 0.5f, -4096.0f, 4096.0f);
         }
         else
         {
-            ImGui::DragFloat2("Pivot", &element.Pivot[0], 0.01f, 0.0f, 1.0f);
-            ImGui::DragFloat2("Offset", &element.Offset[0], 0.5f, -8192.0f, 8192.0f);
-            ImGui::DragFloat2("Size", &element.Size[0], 0.5f, 0.0f, 8192.0f);
+            changed |= ImGui::DragFloat2("Pivot", &element.Pivot[0], 0.01f, 0.0f, 1.0f);
+            changed |= ImGui::DragFloat2("Offset", &element.Offset[0], 0.5f, -8192.0f, 8192.0f);
+            changed |= ImGui::DragFloat2("Size", &element.Size[0], 0.5f, 0.0f, 8192.0f);
         }
 
-        ImGui::DragInt("Sort Order##UIElement", &element.SortOrder, 0.1f);
-        ImGui::Checkbox("Visible##UIElement", &element.Visible);
-        ImGui::Checkbox("Interactable", &element.Interactable);
-        ImGui::Checkbox("Clip Children", &element.ClipChildren);
-        ImGui::DragFloat("Opacity", &element.Opacity, 0.01f, 0.0f, 1.0f);
+        changed |= ImGui::DragInt("Sort Order##UIElement", &element.SortOrder, 0.1f);
+        changed |= ImGui::Checkbox("Visible##UIElement", &element.Visible);
+        changed |= ImGui::Checkbox("Interactable", &element.Interactable);
+        changed |= ImGui::Checkbox("Clip Children", &element.ClipChildren);
+        changed |= ImGui::DragFloat("Opacity", &element.Opacity, 0.01f, 0.0f, 1.0f);
 
         const bool hasBox = element.Type != UIElementType::Text;
         if (hasBox)
         {
             ImGui::SeparatorText("Style");
-            Editor::ColorWidgets::SrgbColorEdit4("Color", element.Color);
-            UIEnumCombo("Gradient", element.GradientDirection, { "None", "Vertical", "Horizontal" });
+            changed |= Editor::ColorWidgets::SrgbColorEdit4("Color", element.Color);
+            changed |= UIEnumCombo("Gradient", element.GradientDirection, { "None", "Vertical", "Horizontal" });
             if (element.GradientDirection != UIGradientDirection::None)
-                Editor::ColorWidgets::SrgbColorEdit4("Gradient Color", element.GradientColor);
+                changed |= Editor::ColorWidgets::SrgbColorEdit4("Gradient Color", element.GradientColor);
 
-            Editor::ColorWidgets::SrgbColorEdit4("Border Color", element.BorderColor);
-            ImGui::DragFloat("Border Width", &element.BorderWidth, 0.1f, 0.0f, 64.0f);
-            ImGui::DragFloat("Corner Radius", &element.CornerRadius, 0.1f, 0.0f, 512.0f);
+            changed |= Editor::ColorWidgets::SrgbColorEdit4("Border Color", element.BorderColor);
+            changed |= ImGui::DragFloat("Border Width", &element.BorderWidth, 0.1f, 0.0f, 64.0f);
+            changed |= ImGui::DragFloat("Corner Radius", &element.CornerRadius, 0.1f, 0.0f, 512.0f);
 
             if (element.Type == UIElementType::Image)
-                AssetPicker::DrawAssetHandle("Texture", AssetType::Texture2D, element.Texture, "Search textures...");
+                changed |= AssetPicker::DrawAssetHandle("Texture", AssetType::Texture2D, element.Texture,
+                                                        "Search textures...");
         }
 
         const bool hasText = element.Type == UIElementType::Text || element.Type == UIElementType::Button ||
@@ -3492,46 +3507,46 @@ void HierarchyPanel::DrawUIElementComponent(const Entity entity)
         {
             ImGui::SeparatorText("Text");
             if (element.Type == UIElementType::Text)
-                UIMultilineText("Text##UIElement", element.Text);
+                changed |= UIMultilineText("Text##UIElement", element.Text);
             else
-                UISingleLineText("Label", element.Text);
+                changed |= UISingleLineText("Label", element.Text);
 
-            UIFontCombo("Font", element.FontPath);
-            ImGui::DragFloat("Font Size", &element.FontSize, 0.25f, 4.0f, 128.0f);
-            UIEnumCombo("Align", element.TextAlign, { "Left", "Center", "Right" });
-            ImGui::DragFloat("Wrap Width", &element.WrapWidth, 1.0f, 0.0f, 8192.0f);
-            Editor::ColorWidgets::SrgbColorEdit4("Text Color", element.TextColor);
-            Editor::ColorWidgets::SrgbColorEdit4("Shadow Color", element.ShadowColor);
-            ImGui::DragFloat2("Shadow Offset", &element.ShadowOffset[0], 0.1f, -32.0f, 32.0f);
+            changed |= UIFontCombo("Font", element.FontPath);
+            changed |= ImGui::DragFloat("Font Size", &element.FontSize, 0.25f, 4.0f, 128.0f);
+            changed |= UIEnumCombo("Align", element.TextAlign, { "Left", "Center", "Right" });
+            changed |= ImGui::DragFloat("Wrap Width", &element.WrapWidth, 1.0f, 0.0f, 8192.0f);
+            changed |= Editor::ColorWidgets::SrgbColorEdit4("Text Color", element.TextColor);
+            changed |= Editor::ColorWidgets::SrgbColorEdit4("Shadow Color", element.ShadowColor);
+            changed |= ImGui::DragFloat2("Shadow Offset", &element.ShadowOffset[0], 0.1f, -32.0f, 32.0f);
         }
 
         if (element.Type == UIElementType::Button || element.Type == UIElementType::Toggle)
         {
             ImGui::SeparatorText("Interaction");
             ImGui::TextDisabled("Tints multiply the base color.");
-            Editor::ColorWidgets::SrgbColorEdit4("Hover Tint", element.HoverColor);
-            Editor::ColorWidgets::SrgbColorEdit4("Press Tint", element.PressColor);
-            Editor::ColorWidgets::SrgbColorEdit4("Disabled Tint", element.DisabledColor);
+            changed |= Editor::ColorWidgets::SrgbColorEdit4("Hover Tint", element.HoverColor);
+            changed |= Editor::ColorWidgets::SrgbColorEdit4("Press Tint", element.PressColor);
+            changed |= Editor::ColorWidgets::SrgbColorEdit4("Disabled Tint", element.DisabledColor);
 
             if (element.Type == UIElementType::Toggle)
-                ImGui::Checkbox("Is On", &element.IsOn);
+                changed |= ImGui::Checkbox("Is On", &element.IsOn);
         }
 
         if (element.Type == UIElementType::Bar)
         {
             ImGui::SeparatorText("Bar");
-            ImGui::SliderFloat("Value", &element.Value, 0.0f, 1.0f);
-            Editor::ColorWidgets::SrgbColorEdit4("Fill Color", element.FillColor);
-            Editor::ColorWidgets::SrgbColorEdit4("Background Color", element.BackgroundColor);
-            UIEnumCombo("Fill Direction", element.FillDirection,
-                        { "Left to Right", "Right to Left", "Bottom to Top", "Top to Bottom" });
+            changed |= ImGui::SliderFloat("Value", &element.Value, 0.0f, 1.0f);
+            changed |= Editor::ColorWidgets::SrgbColorEdit4("Fill Color", element.FillColor);
+            changed |= Editor::ColorWidgets::SrgbColorEdit4("Background Color", element.BackgroundColor);
+            changed |= UIEnumCombo("Fill Direction", element.FillDirection,
+                                   { "Left to Right", "Right to Left", "Bottom to Top", "Top to Bottom" });
         }
 
         if (element.Type == UIElementType::TextInput)
         {
             ImGui::SeparatorText("Text Input");
-            UISingleLineText("Placeholder", element.Placeholder);
-            ImGui::InputScalar("Max Length", ImGuiDataType_U32, &element.MaxLength);
+            changed |= UISingleLineText("Placeholder", element.Placeholder);
+            changed |= ImGui::InputScalar("Max Length", ImGuiDataType_U32, &element.MaxLength);
 
             if (m_Context && m_Context->IsRunning())
             {
@@ -3547,6 +3562,9 @@ void HierarchyPanel::DrawUIElementComponent(const Entity entity)
                                 element.IsPressed ? "Yes" : "No",
                                 element.Clicked ? "Yes" : "No");
         }
+        
+        if (changed)
+            m_UIEdit.ElementDirty = true;
 
         if (ImGui::IsAnyItemActive())
         {
@@ -3554,12 +3572,13 @@ void HierarchyPanel::DrawUIElementComponent(const Entity entity)
         }
         else if (m_UIEdit.ElementActive)
         {
-            if (m_UndoRedo)
+            if (m_UndoRedo && m_UIEdit.ElementDirty)
             {
                 m_UndoRedo->Record(std::make_unique<SetComponentValueCommand<UIElementComponent>>(
                     m_Context, entityID, m_UIEdit.ElementBefore, element, "Edit UI Element"));
             }
             m_UIEdit.ElementActive = false;
+            m_UIEdit.ElementDirty = false;
         }
 
         ImGui::TreePop();

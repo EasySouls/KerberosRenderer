@@ -1,6 +1,7 @@
 #include "kbrpch.hpp"
 #include "UISystem.hpp"
 
+#include "Assets/AssetManager.hpp"
 #include "Scene/Scene.hpp"
 #include "Scene/Entity.hpp"
 #include "Scene/Components.hpp"
@@ -75,24 +76,24 @@ glm::vec4 TintColor(const glm::vec4& base, const glm::vec4& tint, const float op
     return glm::clamp(color, glm::vec4(0.0f), glm::vec4(1.0f));
 }
 
+glm::vec4 ResolveInteractionTint(const UIElementComponent& element)
+{
+    if (element.Type != UIElementType::Button && element.Type != UIElementType::Toggle)
+        return glm::vec4(1.0f);
+
+    if (!element.Interactable)
+        return element.DisabledColor;
+    if (element.IsPressed)
+        return element.PressColor;
+    if (element.IsHovered)
+        return element.HoverColor;
+
+    return glm::vec4(1.0f);
+}
+
 glm::vec4 ResolveBoxColor(const UIElementComponent& element)
 {
-    glm::vec4 color = element.Color;
-
-    if (element.Type == UIElementType::Button || element.Type == UIElementType::Toggle)
-    {
-        glm::vec4 tint(1.0f);
-        if (!element.Interactable)
-            tint = element.DisabledColor;
-        else if (element.IsPressed)
-            tint = element.PressColor;
-        else if (element.IsHovered)
-            tint = element.HoverColor;
-        color *= tint;
-    }
-
-    color.a *= element.Opacity;
-    return glm::clamp(color, glm::vec4(0.0f), glm::vec4(1.0f));
+    return TintColor(element.Color, ResolveInteractionTint(element), element.Opacity);
 }
 
 UIQuad MakeBoxQuad(const UIRect& rect, const glm::vec4& color, const float radius,
@@ -119,9 +120,10 @@ UIQuad MakeGradientQuad(const UIRect& rect, const UIElementComponent& element, c
     if (element.GradientDirection == UIGradientDirection::None)
         return quad;
 
-    glm::vec4 second = element.GradientColor;
-    second.a *= element.Opacity;
-    second = glm::clamp(second, glm::vec4(0.0f), glm::vec4(1.0f));
+    // The gradient half follows the same hover/press/disabled tint as the base
+    // color, otherwise a gradient button only reacts on one side.
+    const glm::vec4 second = TintColor(element.GradientColor, ResolveInteractionTint(element),
+                                       element.Opacity);
 
     if (element.GradientDirection == UIGradientDirection::Vertical)
     {
@@ -365,18 +367,22 @@ void UISystem::Update(Scene& scene, const glm::vec2 screenSize, const glm::mat4&
 
 	ResolveElements(scene, screenSize, viewProjection);
 
-	// Warm font atlases here, not during command recording: a first-use font
-	// uploads its atlas and must not create a one-time command buffer while the
-	// frame is being recorded.
+	// Warm font atlases and image textures here, not during command recording: a
+	// first-use font uploads its atlas and a first-use texture loads from disk,
+	// and neither may create a one-time command buffer while the frame is being
+	// recorded.
 	for (const ResolvedElement& resolved : m_Elements)
 	{
 		const UIElementComponent& element = *resolved.Element;
-		if (!IsTextElement(element))
+
+		if (IsTextElement(element))
 		{
+			UIFontLibrary::Get().Get(element.FontPath, element.FontSize * resolved.Scale);
 			continue;
 		}
 
-		UIFontLibrary::Get().Get(element.FontPath, element.FontSize * resolved.Scale);
+		if (element.Type == UIElementType::Image && element.Texture.IsValid())
+			AssetManager::GetAsset<Texture2D>(element.Texture);
 	}
 
 	for (const auto entityID : scene.m_Registry.view<UIElementComponent>())
@@ -399,12 +405,15 @@ void UISystem::Update(Scene& scene, const glm::vec2 screenSize, const glm::mat4&
 
 	m_InputCaptured = false;
 
-	for (const ResolvedElement& resolved : m_Elements)
+	// A visible modal canvas captures input even when it owns no elements of its
+	// own: an empty pause-screen backdrop must still suppress gameplay input.
+	for (const auto canvasID : scene.m_Registry.view<UICanvasComponent>())
 	{
-		if (resolved.Canvas && resolved.Canvas->Visible && resolved.Canvas->InputEnabled &&
-		    resolved.Canvas->BlockSceneInput)
+		const UICanvasComponent& canvas = scene.m_Registry.get<UICanvasComponent>(canvasID);
+		if (canvas.Visible && canvas.InputEnabled && canvas.BlockSceneInput)
 		{
 			m_InputCaptured = true;
+			break;
 		}
 	}
 
@@ -446,8 +455,10 @@ void UISystem::Update(Scene& scene, const glm::vec2 screenSize, const glm::mat4&
 	if (hovered)
 		hovered->Element->IsHovered = true;
 
-	const bool pressedThisFrame = input.LeftDown && !m_PreviousInput.LeftDown;
-	const bool releasedThisFrame = !input.LeftDown && m_PreviousInput.LeftDown;
+	const bool pressedThisFrame =
+	    input.LeftPressed || (input.LeftDown && !m_PreviousInput.LeftDown);
+	const bool releasedThisFrame =
+	    input.LeftReleased || (!input.LeftDown && m_PreviousInput.LeftDown);
 
 	if (pressedThisFrame)
 	{

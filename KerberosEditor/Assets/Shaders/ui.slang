@@ -1,13 +1,16 @@
 // Game UI shader.
 //
 // One pipeline draws every UI element: solid/gradient rounded rectangles, image
-// quads and MSDF text. Colors arrive already in display-referred space (the UI
-// pass renders into the post-tonemapping FinalImage), so the shader writes them
-// without any linear/sRGB conversion.
+// quads and MSDF text. Authored colors arrive already in display-referred space
+// (the UI pass renders into the post-tonemapping FinalImage) and are written
+// without conversion. Image textures are sampled through sRGB views, so their
+// linear texels are re-encoded before they are blended.
 //
 // Text uses the MTSDF atlas: the RGB channels carry the multi-channel distance
 // field and A carries a true SDF. Median-of-three with a screen-space derivative
 // ramp gives resolution-independent antialiasing.
+
+import tonemapping;
 
 struct UIPushConstants {
     float2 screenSize;
@@ -88,7 +91,11 @@ float4 fragmentMain(VSOutput input) : SV_Target0
 {
     if (input.mode == 2) // image
     {
-        return SampleBindless(input.textureIndex, input.uv) * input.color;
+        // Color textures decode to linear in hardware, but FinalImage is
+        // display-referred, so re-encode. Authored colors are already display
+        // space and are never converted.
+        const float4 sampled = SampleBindless(input.textureIndex, input.uv);
+        return float4(LinearToSrgb(sampled.rgb), sampled.a) * input.color;
     }
 
     if (input.mode == 1) // MSDF/MTSDF text
@@ -100,17 +107,23 @@ float4 fragmentMain(VSOutput input) : SV_Target0
         return float4(input.color.rgb, input.color.a * alpha);
     }
 
-    // Rounded rectangle or its border ring.
-    float2 p = (input.localUV - 0.5) * 2.0 * input.style.xy;
-    float sd = RoundedBoxDistance(p, input.style.xy, input.style.z);
+    // Rounded rectangle or its border ring. The distance field is in pixels and
+    // the radius must not exceed the shorter half extent, otherwise the shape
+    // folds inside out.
+    const float2 halfSize = input.style.xy;
+    const float radius = clamp(input.style.z, 0.0, min(halfSize.x, halfSize.y));
+    float2 p = (input.localUV - 0.5) * 2.0 * halfSize;
+    float sd = RoundedBoxDistance(p, halfSize, radius);
     float aa = max(fwidth(sd) * 0.5, 1e-4);
 
-    float outer = smoothstep(aa, -aa, sd);
+    // smoothstep requires edge0 < edge1, so we use the decreasing form explicitly.
+    float outer = 1.0 - smoothstep(-aa, aa, sd);
     float alpha = outer;
 
     if (input.mode == 3 && input.style.w > 0.0) // border ring
     {
-        float inner = smoothstep(aa, -aa, sd + input.style.w);
+        const float borderWidth = min(input.style.w, min(halfSize.x, halfSize.y));
+        float inner = 1.0 - smoothstep(-aa, aa, sd + borderWidth);
         alpha = max(outer - inner, 0.0);
     }
 

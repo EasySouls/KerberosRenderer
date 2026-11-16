@@ -4267,6 +4267,7 @@ void Renderer::RecompileShaders()
     s_Data->AnimationSystem.RecompileShaders();
     s_Data->ParticleSystem.RecompileShaders();
     s_Data->SkinningSystem.RecompileShaders();
+    s_Data->UIRender.RecompileShaders();
 }
 
 glm::vec3 Renderer::GetLightPositionForShadowMapCalculation()

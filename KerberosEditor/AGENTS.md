@@ -239,13 +239,17 @@ The runtime game UI is authored with `UICanvasComponent` and
 edited in `HierarchyPanel::DrawUICanvasComponent` / `DrawUIElementComponent`;
 the "Add Component" popup has a `UI` submenu with a canvas entry and one preset
 per element type (Panel, Text, Button, Toggle, Bar, Text Input, Image, World
-Label). Presets are created by `AddUIElementWithPreset`. Component edits record
-one `SetComponentValueCommand` per gesture when the last item in the component
-block deactivates.
+Label). Presets are created by `AddUIElementWithPreset`, which returns false when
+the entity already has an element so a preset never overwrites an authored one.
+Component edits record one `SetComponentValueCommand` per gesture when the
+component block's items deactivate, and only when one of that component's own
+widgets changed the value.
 
 `EditorLayer::FeedUIInput` runs at the start of `Scene::OnUpdate` and builds a
 `UIInputState` from the viewport bounds, `Input::GetMousePosition`,
-`Renderer::GetOutputImageSize`, and the buffered keyboard state. `OnKeyTyped`
+`Renderer::GetOutputImageSize`, the buffered keyboard state, and the buffered
+left-button edges latched from `MouseButtonPressedEvent`/`MouseButtonReleasedEvent`
+(so a click between two polls is not lost). `OnKeyTyped`
 accumulates ASCII characters only while Play is active, the viewport is focused,
 and `m_DoesImGuiWantInput` is false. `OnKeyPressed` buffers Backspace, Enter,
 Tab, and Escape before the editor shortcut gate so key repeat reaches text
@@ -376,9 +380,13 @@ table is read positionally.
 Script classes use the `Kerberos.*` namespace (renamed from
 `Kerberos.Source.Kerberos.*`); `ScriptUtils::MigrateLegacyScriptClassName`
 rewrites the old prefix when scenes/prefabs are deserialized. The built-in
-sample scripts (`Player`, `Camera`, `CameraFollow`, `CSharpDemoTree`) live in
+sample scripts (`Player`, `Camera`, `CameraFollow`, `CSharpDemoTree`, `GameHud`)
+live in
 `KerberosScriptCoreLib` under `Kerberos`; user scripts live in their own
-per-project assembly. `CSharpDemoTree` registers the view-only `CSharpDemo`
+per-project assembly. `GameHud` (`Kerberos/Samples/GameHud.cs`) drives
+editor-authored bars/prompts through `UIElementComponent` and
+`Kerberos.Core.UI.InputCaptured`. `CSharpDemoTree` registers the view-only
+`CSharpDemo`
 state tree from `OnCreate`, so attaching it to an entity and entering Play makes
 the tree available in the AI Editor's registered-tree picker. It is the sample
 used to exercise C# trees in the AI Editor and AI runtime inspector.

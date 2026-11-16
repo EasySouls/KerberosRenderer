@@ -38,7 +38,9 @@ backdrop).
 `UIElementComponent::Type` selects the element behavior:
 
 - `Panel` — rounded/gradient rectangle with optional border.
-- `Text` — word-wrapped, aligned MSDF text, optional drop shadow.
+- `Text` — word-wrapped, `TextAlign`-aligned MSDF text, optional drop shadow. Text
+  blocks are vertically centered in the element rect (`UITextLayout::AppendText`);
+  a block taller than the rect starts at the top instead of spilling above it.
 - `Button` — panel + centered label; hover/press/disabled colors are tint
   multipliers (`HoverColor`/`PressColor`/`DisabledColor` multiply `Color`).
 - `Toggle` — button that flips `IsOn` on click and draws a knob.
@@ -75,13 +77,18 @@ and `None` keeps 1:1 design pixels.
   **unjittered** view-projection, then records one indexed draw into
   `FinalImage` with `loadOp = LOAD`.
 
-`FinalImage` is display-referred (sRGB-encoded values in a float format), so UI
-colors are authored in display space and written without any transfer
-conversion. Do not add exposure or tonemapping to the UI shader.
+`FinalImage` is display-referred (sRGB-encoded values in a float format), so
+authored UI colors are written without any transfer conversion. Only image
+elements convert, because their sRGB texture views decode to linear in
+hardware. Do not add exposure or tonemapping to the UI shader.
 
 `BuildDrawData` re-reads component values at record time; this is what makes a
 script assigning `Bar.Value` visible in the same frame. Do not cache draw data
-across frames.
+across frames. `UISystem::Update` also warms the resources the draw path needs —
+font atlases (`UIFontLibrary::Get`) and image textures
+(`AssetManager::GetAsset<Texture2D>` for `Image` elements) — so neither a first
+font nor a first texture upload has to create a one-time command buffer while
+the frame is being recorded.
 
 ## Input contract
 
@@ -95,11 +102,16 @@ bounds, window mouse position, and buffered keyboard events, then calls
 - `TypedCharacters` only accumulates while the viewport is focused and ImGui is
   not capturing text input (`KeyTypedEvent`, ASCII only).
 - Backspace/Enter/Tab/Escape flags are edge flags consumed by `UISystem::Update`.
-- `UISystem` computes press/release edges from `LeftDown`; the host does not
-  send click events.
+- `UISystem` computes press/release edges from `LeftDown`, plus the buffered
+  `LeftPressed`/`LeftReleased` flags `EditorLayer` latches from
+  `MouseButtonPressedEvent`/`MouseButtonReleasedEvent`. A press and release that
+  both happen between two polls therefore still produces a click; `LeftDown`
+  remains the fallback for poll-only hosts.
 
 `UISystem::IsInputCaptured()` is true while a visible canvas with
-`BlockSceneInput` exists or a text field is focused. `Scene::IsUIInputCaptured`
+`BlockSceneInput` exists or a text field is focused. The canvas check reads
+`UICanvasComponent` directly, so a modal canvas with no elements of its own
+(an empty pause-screen backdrop) still captures. `Scene::IsUIInputCaptured`
 exposes it, and C# reads it as `Kerberos.Core.UI.InputCaptured`. Gameplay
 scripts must skip camera/character input while it is true.
 
@@ -149,6 +161,26 @@ The preset pipeline uses no depth attachment, no culling, alpha blending,
 dynamic viewport/scissor, and `UsingDescriptorBuffers = false`; the global
 texture set is bound with `cmd.bindDescriptorSets`.
 
+Color handling: authored colors (`Color`, gradients, text, borders, bar fill)
+are display-referred and written as-is. Image elements sample their texture
+through an sRGB view, so the fragment shader re-encodes the linear texels with
+`LinearToSrgb` (imported from the `tonemapping` module) before blending.
+`FinalImage` is post-tonemapping, so no other pass may add exposure or a second
+encode.
+
+The rounded-box distance field is in pixels. Radius and border width are both
+clamped to the shorter half extent so an authored radius/width can never fold
+the shape inside out, and the AA ramp uses `1 - smoothstep(-aa, aa, x)` because
+`smoothstep` is undefined for reversed edges. The border ring is
+`max(outer - inner, 0)`.
+
+Font atlases are uploaded exactly as msdf-atlas-gen packs them: rows are stored
+top-down (boxes are placed in y-down atlas space) and `getQuadAtlasBounds`
+returns the first and last row of a glyph box, so `UITextLayout` maps the quad's
+top edge to the first row. Do not flip the rows on upload or complement the V
+coordinates; that samples the mirrored cell (gibberish) or mirrors each glyph
+inside its cell.
+
 ## Editor authoring
 
 The hierarchy "Add Component" popup has a `UI` submenu: `UI Canvas`, plus
@@ -159,7 +191,10 @@ style, type-specific fields, fonts (the picker draws the cached
 runtime state while the scene is running.
 
 Undo for UI component edits is a single `SetComponentValueCommand` per gesture,
-committed when the last ImGui item in the component block deactivates.
+committed when the component block's items deactivate and only when one of that
+component's own widgets actually changed the value (the dirty latch). Recording
+on `IsAnyItemActive()` alone would push no-op commands while an unrelated
+inspector widget is dragged, and every such command clears the redo stack.
 
 Scene serialization writes the full authored component state; enum fields are
 stored as the strings returned by the `ToString` helpers in
@@ -176,6 +211,10 @@ stored as the strings returned by the `ToString` helpers in
 - World labels have no occlusion test or stacking; they draw in canvas/world
   order.
 - No UI-specific asset format; UI lives in the scene.
+- Font atlases are never evicted: every distinct `(font path, size bucket)` keeps
+  an RGBA8 atlas alive and permanently holds one bindless texture slot, so a
+  scene that cycles through many fonts/sizes can exhaust slots. Generate a
+  character range that matches the game text rather than widening it casually.
 
 ## Validation
 

@@ -158,7 +158,14 @@ float UITextLayout::AppendText(UIDrawData& out, const UITextStyle& style, const 
 	const float wrapWidth = style.WrapWidth > 0.0f ? style.WrapWidth : rect.Size().x;
 	const std::vector<std::string> lines = WrapLines(font, text, fontSize, wrapWidth);
 
+	// The wrapped block is vertically centered in the rect, which is what labels,
+	// buttons and text fields assume. A block taller than the rect starts at the
+	// top instead of spilling above it.
+	const float blockHeight = static_cast<float>(lines.size()) * lineHeight;
 	float baselineY = rect.Min.y + ascender;
+	if (const float slack = rect.Size().y - blockHeight; slack > 0.0f)
+		baselineY += slack * 0.5f;
+
 	float usedHeight = 0.0f;
 
 	for (const std::string& line : lines)
@@ -197,15 +204,16 @@ float UITextLayout::AppendText(UIDrawData& out, const UITextStyle& style, const 
 				double al = 0.0, ab = 0.0, ar = 0.0, at = 0.0;
 				font.GetQuadAtlasBounds(current, al, ab, ar, at);
 
-				// The atlas is stored y-up in msdf-atlas-gen and uploaded top-down,
-				// so the top atlas bound maps to the smaller Vulkan V coordinate.
+				// `getQuadAtlasBounds` returns the first and last atlas row of the
+				// glyph box (`ab`/`at`); the atlas is uploaded top-down and rows are
+				// stored top-down, so the quad's top edge samples the first row.
 				UIQuad quad;
 				quad.Rect = {
                     .Min = { penX + static_cast<float>(pl) * fontSize, baselineY - static_cast<float>(pt) * fontSize },
                     .Max = { penX + static_cast<float>(pr) * fontSize, baselineY - static_cast<float>(pb) * fontSize }
                 };
-				quad.UVMin = { static_cast<float>(al) / atlasWidth, 1.0f - static_cast<float>(at) / atlasHeight };
-				quad.UVMax = { static_cast<float>(ar) / atlasWidth, 1.0f - static_cast<float>(ab) / atlasHeight };
+				quad.UVMin = { static_cast<float>(al) / atlasWidth, static_cast<float>(ab) / atlasHeight };
+				quad.UVMax = { static_cast<float>(ar) / atlasWidth, static_cast<float>(at) / atlasHeight };
 				quad.TextureIndex = style.TextureIndex;
 				quad.Mode = UIDrawMode::Text;
 

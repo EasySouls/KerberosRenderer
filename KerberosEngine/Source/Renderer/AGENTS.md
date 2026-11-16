@@ -212,7 +212,10 @@ UI into `FinalImage` in a "Game UI" graph pass between `Tonemapping` and
 - World-space labels use `PendingRender.Projection * PendingRender.View`
   (unjittered), not the FSR3-jittered projection.
 - UI colors are display-referred; the shader writes them without exposure or
-  sRGB transfer conversion. Do not tonemap the UI.
+  sRGB transfer conversion. Do not tonemap the UI. Image elements are the one
+  exception: their textures are sampled through sRGB views (linear texels), so
+  `ui.slang` re-encodes them with `LinearToSrgb` from the `tonemapping` module
+  before blending.
 - `UIRenderer` owns no images. Its per-frame vertex/index buffers grow only
   after `VulkanContext::WaitIdle()`.
 - `ui.slang` uses the global bindless texture set (set 0, bindings 0/1) and a
@@ -221,7 +224,9 @@ UI into `FinalImage` in a "Game UI" graph pass between `Tonemapping` and
   forbids `Flat` on vertex inputs) but must be in `VSOutput`.
 - Font atlases are runtime textures, not assets; `UIFontLibrary` registers them
   through `TextureManager::RegisterTexture`, which allocates a bindless slot
-  keyed by texture pointer.
+  keyed by texture pointer. `Font::GenerateAtlas` uploads the atlas unchanged
+  (rows are stored top-down and glyph atlas bounds are row indices), matching
+  the glyph UVs in `UITextLayout`.
 
 ## Lighting, exposure, and environment
 

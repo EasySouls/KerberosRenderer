@@ -138,6 +138,14 @@ void UIRenderer::Shutdown()
 	m_TextureManager = nullptr;
 }
 
+void UIRenderer::RecompileShaders() const
+{
+	if (!m_Pipeline)
+		return;
+
+	m_Pipeline->Recompile();
+}
+
 void UIRenderer::Render(const vk::raii::CommandBuffer& cmd, const uint32_t frameIndex,
                         const UIDrawData& drawData, const glm::vec2 screenSize)
 {

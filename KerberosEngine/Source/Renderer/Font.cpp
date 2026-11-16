@@ -57,7 +57,7 @@ namespace Kerberos
 
 		generator.generate(glyphs.data(), static_cast<int>(glyphs.size()));
 
-		msdfgen::BitmapConstRef<T, N> bitmap = generator.atlasStorage();
+		const msdfgen::BitmapConstRef<T, N> bitmap = generator.atlasStorage();
 
 		TextureSpecification spec;
 		spec.Width = bitmap.width;
@@ -65,13 +65,15 @@ namespace Kerberos
 		spec.Format = ImageFormat::RGBA8;
 		spec.GenerateMips = false;
 
+		// Uploaded as generated. The atlas rows are stored top-down (the packer
+		// places boxes in y-down atlas space and `getQuadAtlasBounds` returns the
+		// first/last row of a glyph box), which is what UITextLayout samples.
 		Buffer textureBuffer;
-		const uint64_t bufferSize = bitmap.width * bitmap.height * sizeof(T) * N;
+		const uint64_t bufferSize = static_cast<uint64_t>(bitmap.width) * bitmap.height * sizeof(T) * N;
 		textureBuffer.Allocate(bufferSize);
 		std::memcpy(textureBuffer.Data, bitmap.pixels, bufferSize);
 
 		const Ref<Texture2D> atlasTexture = Texture2D::FromBuffer(spec, textureBuffer);
-		//atlasTexture->SetData(static_cast<void*>(const_cast<T*>(bitmap.pixels)), bitmap.width * bitmap.height * sizeof(T) * N);
 
 		return atlasTexture;
 	}

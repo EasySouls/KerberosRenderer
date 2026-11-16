@@ -26,6 +26,8 @@ public:
     void Init(TextureManager& textureManager, vk::Format colorFormat);
     void Shutdown();
 
+    void RecompileShaders() const;
+
     void Render(const vk::raii::CommandBuffer& cmd, uint32_t frameIndex,
                 const UIDrawData& drawData, glm::vec2 screenSize);
 
