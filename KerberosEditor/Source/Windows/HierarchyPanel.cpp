@@ -390,8 +390,14 @@ void HierarchyPanel::OnImGuiRender()
 
     const bool dragDropTargetActive = HandleHierarchyPanelDragAndDrop();
 
-    constexpr ImGuiTreeNodeFlags flags =
-        ImGuiTreeNodeFlags_OpenOnArrow | ImGuiTreeNodeFlags_SpanAvailWidth | ImGuiTreeNodeFlags_DefaultOpen;
+    const bool isEmptyScene = m_Context->GetRootEntities().empty();
+    
+    ImGuiTreeNodeFlags flags = ImGuiTreeNodeFlags_OpenOnArrow | ImGuiTreeNodeFlags_SpanAvailWidth;
+    
+    if (!isEmptyScene)
+        flags |= ImGuiTreeNodeFlags_DefaultOpen;
+    else
+        flags |= ImGuiTreeNodeFlags_Leaf | ImGuiTreeNodeFlags_NoTreePushOnOpen;
 
     const char* sceneName = m_Context ? m_Context->GetName().c_str() : "No Scene Loaded";
     EditorIcons::Draw(EditorIcon::AssetScene);
@@ -500,10 +506,17 @@ void HierarchyPanel::SetOnOpenAIStateTree(const std::function<void(AssetHandle)>
 void HierarchyPanel::DrawEntityNode(const Entity& entity)
 {
     const auto& tag = entity.GetComponent<TagComponent>().Tag;
+    
+    const bool hasChildren = entity.HasComponent<HierarchyComponent>() &&
+                         !entity.GetComponent<HierarchyComponent>().Children.empty();
 
-    const ImGuiTreeNodeFlags flags = ImGuiTreeNodeFlags_OpenOnArrow | ImGuiTreeNodeFlags_SpanAvailWidth |
-                                     ImGuiTreeNodeFlags_DefaultOpen |
+    ImGuiTreeNodeFlags flags = ImGuiTreeNodeFlags_OpenOnArrow | ImGuiTreeNodeFlags_SpanAvailWidth |
                                      (entity == m_SelectedEntity ? ImGuiTreeNodeFlags_Selected : 0);
+    
+    if (hasChildren)
+        flags |= ImGuiTreeNodeFlags_DefaultOpen;
+    else
+        flags |= ImGuiTreeNodeFlags_Leaf | ImGuiTreeNodeFlags_NoTreePushOnOpen;
 
     EditorIcon entityIcon = EditorIcon::HierarchyEntity;
     if (entity.HasComponent<PrefabInstanceComponent>())
@@ -549,7 +562,7 @@ void HierarchyPanel::DrawEntityNode(const Entity& entity)
     bool entityDeleted = false;
     DrawEntityNodeContextMenu(entity, entityDeleted);
 
-    if (opened) {
+    if (opened && hasChildren) {
         DrawEntityNodeChildren(entity);
         ImGui::TreePop();
     }
