@@ -16,6 +16,9 @@ public struct SceneData
     public float3 cameraUp;
     public float time;
     public float4x4 motionProjection; // Unjittered projection for motion vectors
+    
+    public uint4 clusterGridSize;   // tilesX, tilesY, slices, lightCount
+    public float4 clusterDepthParams; // nearZ, farZ, sliceScale, maxPerCluster
 };
 
 public struct Material 

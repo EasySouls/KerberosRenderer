@@ -1,6 +1,7 @@
 import common;
 import lights;
 import pbr_helpers;
+import light_clusters;
 
 struct VSInput
 {
@@ -55,6 +56,9 @@ Sampler2D<float> globalAoTexture;
 
 [[vk::binding(10, 0)]]
 SamplerCubeArrayShadow pointShadowMap;
+
+[[vk::binding(11, 0)]] StructuredBuffer<uint2> clusterGrid;
+[[vk::binding(12, 0)]] StructuredBuffer<uint>  clusterLightIndices;
 
 [[vk::binding(0, 1)]]
 Texture2D globalTextures[];
@@ -227,24 +231,51 @@ PBOITData fragmentMain(VSOutput input)
     float3 sunRadiance = globalLighting.sunColor.rgb * globalLighting.sunColor.w * globalLighting.sunDirection.w;
     totalDiffuse += sunResult.diffuse * sunRadiance * (1.0 - shadow);
     totalSpecular += sunResult.specular * sunRadiance * (1.0 - shadow);
-
-    for (uint i = 0; i < min(scene.lightCount, MaxLights); i++) {
-        GPULight light = sceneLights[i];
-        float3 lVec = light.position - input.FragPos_WorldSpace;
-        float3 L = normalize(lVec);
-        float3 radiance = CalculateLightColor(light, input.FragPos_WorldSpace);
-
-        LightResult lightResult = GetDirectLight(L, V, N, F0, albedo, metallic, roughness);
-        
-        if (max(radiance.r, max(radiance.g, radiance.b)) > 0.0)
+    
+    ClusterParams clusterParams = MakeClusterParams(scene);
+    if (ClusterEnabled(clusterParams))
+    {
+        const uint cluster = ClusterIndex(clusterParams, scene.view, input.FragPos_WorldSpace, input.Position.xy);
+        const uint2 range = ClusterLightRange(clusterParams, clusterGrid, cluster);
+        for (uint i = 0; i < range.y; ++i)
         {
-            const float visibility = CalculatePointShadowVisibility(pointShadowMap, light, input.FragPos_WorldSpace, N, globalLighting.lightingParams.z > 0.5);
-            lightResult.diffuse *= visibility;
-            lightResult.specular *= visibility;
+            GPULight light = sceneLights[clusterLightIndices[range.x + i]];
+            float3 lVec = light.position - input.FragPos_WorldSpace;
+            float3 L = normalize(lVec);
+            float3 radiance = CalculateLightColor(light, input.FragPos_WorldSpace);
+            
+            LightResult lightResult = GetDirectLight(L, V, N, F0, albedo, metallic, roughness);
+            
+            if (max(radiance.r, max(radiance.g, radiance.b)) > 0.0)
+            {
+                const float visibility = CalculatePointShadowVisibility(pointShadowMap, light, input.FragPos_WorldSpace, N, globalLighting.lightingParams.z > 0.5);
+                lightResult.diffuse *= visibility;
+                lightResult.specular *= visibility;
+            }
+            totalDiffuse += lightResult.diffuse;
+            totalSpecular += lightResult.specular;
         }
+    }
+    else 
+    { 
+        for (uint i = 0; i < min(scene.lightCount, MaxLights); i++) {
+            GPULight light = sceneLights[i];
+            float3 lVec = light.position - input.FragPos_WorldSpace;
+            float3 L = normalize(lVec);
+            float3 radiance = CalculateLightColor(light, input.FragPos_WorldSpace);
         
-        totalDiffuse += lightResult.diffuse * radiance;
-        totalSpecular += lightResult.specular * radiance;
+            LightResult lightResult = GetDirectLight(L, V, N, F0, albedo, metallic, roughness);
+            
+            if (max(radiance.r, max(radiance.g, radiance.b)) > 0.0)
+            {
+                const float visibility = CalculatePointShadowVisibility(pointShadowMap, light, input.FragPos_WorldSpace, N, globalLighting.lightingParams.z > 0.5);
+                lightResult.diffuse *= visibility;
+                lightResult.specular *= visibility;
+            }
+            
+            totalDiffuse += lightResult.diffuse * radiance;
+            totalSpecular += lightResult.specular * radiance;
+        }
     }
 
     float2 brdf = samplerBRDFLUT.Sample(float2(max(dot(N, V), 0.0), roughness)).rg;

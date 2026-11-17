@@ -22,9 +22,9 @@ public struct GPULight {
     public uint shadowCasterEntityID;
 };
 
-static uint LightType_Point = 0;
-static uint LightType_Spot = 1;
-static uint LightType_Area = 2;
+public static const uint LightType_Point = 0;
+public static const uint LightType_Spot = 1;
+public static const uint LightType_Area = 2;
 
 public static const uint MaxLights = 512;
 

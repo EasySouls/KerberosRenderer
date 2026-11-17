@@ -35,6 +35,7 @@ struct GPUTimings
     float DepthPrePassMilliseconds = 0.0f;
     float ShadowPassMilliseconds = 0.0f;
     float OmniShadowPassMilliseconds = 0.0f;
+    float LightCullingPassMilliseconds = 0.0f;
     float OpaquePassMilliseconds = 0.0f;
     float GrassPassMilliseconds = 0.0f;
     float ParticlesDrawMilliseconds = 0.0f;
@@ -184,6 +185,7 @@ public:
     static bool& GetUseGTAO();
     static bool& GetUseBlurForGTAO();
     static GTAOConstants& GetGTAOConstants();
+    static bool& GetUseClusteredLighting();
 
     /// Linear exposure scale computed from EV100 and exposure compensation.
     static float GetExposure();
@@ -239,6 +241,7 @@ public:
 
 private:
     static void UpdateLights(uint32_t currentImage, const std::vector<GPULight>& sceneLights);
+    static void UpdateLightCullingData(uint32_t lightCount);
     static void UpdateEnvironment(const Scene& scene);
     static void UpdateEnvironmentDescriptors();
 
@@ -309,6 +312,10 @@ private:
                               std::pmr::memory_resource* arena);
 
     static void RenderGTAO(const vk::raii::CommandBuffer& cmd, uint32_t frameIndex, uint32_t currentImage);
+    
+    static void RenderLightCulling(const vk::raii::CommandBuffer& cmd,
+                                    uint32_t frameIndex,
+                                    uint32_t currentImage);
 
     static void RenderOpaque(const vk::raii::CommandBuffer& cmd,
                              uint32_t frameIndex,
@@ -391,6 +398,7 @@ private:
 
     static void PrepareUniformBuffers();
     static void PrepareStorageBuffers();
+    static void PrepareLightClusterBuffers();
     static void SetupDescriptors();
 
     static void CreateSkyboxResources();

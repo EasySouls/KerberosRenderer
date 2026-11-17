@@ -141,17 +141,28 @@ UniformBuffer::UniformBuffer(const vk::DeviceSize bufferSize)
 	m_MappedData = m_BufferMemory.mapMemory(0, bufferSize);
 }
 
-StorageBuffer::StorageBuffer(const vk::DeviceSize bufferSize)
+StorageBuffer::StorageBuffer(const vk::DeviceSize bufferSize,
+                             const vk::BufferUsageFlags extraUsage,
+                             const BufferMemoryUsage memoryUsage)
 {
 	const vk::raii::Device& device = VulkanContext::Get().GetDevice();
 
+	const vk::BufferUsageFlags usage = vk::BufferUsageFlagBits::eStorageBuffer | vk::BufferUsageFlagBits::eShaderDeviceAddress | extraUsage;
+    
+    const vk::MemoryPropertyFlags memoryProperties = memoryUsage == BufferMemoryUsage::DeviceLocal
+        ? vk::MemoryPropertyFlagBits::eDeviceLocal
+        : vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent;
+
 	CreateBuffer(device,
 				 bufferSize,
-				 vk::BufferUsageFlagBits::eStorageBuffer | vk::BufferUsageFlagBits::eShaderDeviceAddress,
-				 vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent,
+				 usage,
+				 memoryProperties,
 				 m_Buffer, m_BufferMemory);
 
-	m_MappedData = m_BufferMemory.mapMemory(0, bufferSize);
+    if (memoryUsage == BufferMemoryUsage::HostVisible)
+    {
+	    m_MappedData = m_BufferMemory.mapMemory(0, bufferSize);
+    }
 
 	m_BufferSize = bufferSize;
 }

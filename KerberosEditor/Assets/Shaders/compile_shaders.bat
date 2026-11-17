@@ -25,6 +25,7 @@ if not exist "%SLANGC%" (
 "%SLANGC%" transparent.slang -target spirv -profile spirv_1_6 -emit-spirv-directly -fvk-use-entrypoint-name -entry vertexMain -entry fragmentMain -o ../Cache/Shaders/transparent.spv
 "%SLANGC%" transparency_resolve.slang -target spirv -profile spirv_1_6 -emit-spirv-directly -fvk-use-entrypoint-name -entry vertexMain -entry resolveMain -o ../Cache/Shaders/transparency_resolve.spv
 "%SLANGC%" gtao.slang -target spirv -profile spirv_1_6 -emit-spirv-directly -fvk-use-entrypoint-name -entry computeMain -o ../Cache/Shaders/gtao.spv
+"%SLANGC%" light_culling.slang -target spirv -profile spirv_1_6 -emit-spirv-directly -fvk-use-entrypoint-name -entry computeMain -o ../Cache/Shaders/light_culling.spv
 "%SLANGC%" fxaa.slang -target spirv -profile spirv_1_6 -emit-spirv-directly -fvk-use-entrypoint-name -entry vertexMain -entry fragmentMain -o ../Cache/Shaders/fxaa.spv
 "%SLANGC%" noop_post_process.slang -target spirv -profile spirv_1_6 -emit-spirv-directly -fvk-use-entrypoint-name -entry vertexMain -entry fragmentMain -o ../Cache/Shaders/noop_post_process.spv
 "%SLANGC%" tonemapping_resolve.slang -target spirv -profile spirv_1_6 -emit-spirv-directly -fvk-use-entrypoint-name -entry vertexMain -entry fragmentMain -o ../Cache/Shaders/tonemapping_resolve.spv

@@ -2,6 +2,7 @@ import common;
 import lights;
 import pbr_helpers;
 import ao;
+import light_clusters;
 
 struct VSInput
 {
@@ -54,6 +55,9 @@ StructuredBuffer<GPULight> sceneLights;
 
 [[vk::binding(9, 0)]]
 Sampler2D<float> globalAoTexture;
+
+[[vk::binding(11, 0)]] StructuredBuffer<uint2> clusterGrid;
+[[vk::binding(12, 0)]] StructuredBuffer<uint>  clusterLightIndices;
 
 [[vk::binding(0, 1)]]
 Texture2D globalTextures[];
@@ -333,16 +337,35 @@ PSOutput fragmentMain(VSOutput input)
     LightResult sunResult = CalculateSunlight(input.FragPos_WorldSpace, N, V, F0, albedo, metallic, roughness);
     totalDiffuse += sunResult.diffuse;
     totalSpecular += sunResult.specular;
+	
+	ClusterParams clusterParams = MakeClusterParams(scene);
+	if (ClusterEnabled(clusterParams))
+	{
+		const uint cluster = ClusterIndex(clusterParams, scene.view, input.FragPos_WorldSpace, input.Position.xy);
+		const uint2 range = ClusterLightRange(clusterParams, clusterGrid, cluster);
+		for (uint i = 0; i < range.y; ++i)
+		{
+			GPULight light = sceneLights[clusterLightIndices[range.x + i]];
+			
+			LightResult lightResult = CalculateLight(light, input.FragPos_WorldSpace, N, V, F0, albedo, metallic, roughness);
+			totalDiffuse += lightResult.diffuse;
+			totalSpecular += lightResult.specular;
+		}
+	}
+	else
+	{
+		for (uint i = 0; i < min(scene.lightCount, MaxLights); i++)
+		{
+			GPULight light = sceneLights[i];
 
-    for (uint i = 0; i < min(scene.lightCount, MaxLights); i++) {
-        GPULight light = sceneLights[i];
+			LightResult lightResult = CalculateLight(light, input.FragPos_WorldSpace, N, V, F0,
+				albedo, metallic, roughness);
+			totalDiffuse += lightResult.diffuse;
+			totalSpecular += lightResult.specular;
+		}
+	}
 
-        LightResult lightResult = CalculateLight(light, input.FragPos_WorldSpace, N, V, F0, albedo, metallic, roughness);
-        totalDiffuse += lightResult.diffuse;
-        totalSpecular += lightResult.specular;
-    }
-
-    Lo = totalDiffuse + totalSpecular;
+	Lo = totalDiffuse + totalSpecular;
 
     float3 coloredAO = GTAOMultiBounce(ao, albedo);
 

@@ -1368,6 +1368,7 @@ namespace PROJECT_NAME
 			ImGui::Text("Depth Pre-Pass: %.3f ms", gpuTimings.DepthPrePassMilliseconds);
 			ImGui::Text("Shadow: %.3f ms", gpuTimings.ShadowPassMilliseconds);
 			ImGui::Text("OmniShadow: %.3f ms", gpuTimings.OmniShadowPassMilliseconds);
+			ImGui::Text("Light Culling: %.3f ms", gpuTimings.LightCullingPassMilliseconds);
 			ImGui::Text("Opaque: %.3f ms", gpuTimings.OpaquePassMilliseconds);
 			ImGui::Text("Grass: %.3f ms", gpuTimings.GrassPassMilliseconds);
 			ImGui::Text("Particles Simulate: %.3f ms", gpuTimings.ParticlesSimulateMilliseconds);
@@ -1626,6 +1627,13 @@ namespace PROJECT_NAME
             ImGui::Checkbox("Use FSR3 Auto Exposure", &Renderer::GetUseFSR3AutoExposure());
             ImGui::Unindent();
         }*/
+	    
+	    bool& useClusteredLighting = Renderer::GetUseClusteredLighting();
+	    ImGui::Checkbox("Use Clustered Lighting (Forward+)", &useClusteredLighting);
+	    if (useClusteredLighting)
+	    {
+	        // TODO: Show slices/tiles/capacity and occupancy
+	    }
 
 		bool& useGTAO = Renderer::GetUseGTAO();
 		ImGui::Checkbox("Use GTAO", &useGTAO);

@@ -12,67 +12,76 @@ void CreateBuffer(
 	vk::raii::DeviceMemory& bufferMemory
 );
 
-namespace Kerberos
+namespace Kerberos {
+
+enum class BufferMemoryUsage : std::uint8_t
 {
-	class VertexBuffer
-	{
-	public:
-		explicit VertexBuffer(const std::vector<Vertex>& vertices);
+	HostVisible,
+	DeviceLocal
+};
 
-		const vk::raii::Buffer& GetBuffer() const { return m_Buffer; }
-		const vk::raii::DeviceMemory& GetBufferMemory() const { return m_BufferMemory; }
-		vk::DeviceAddress GetDeviceAddress() const { return m_DeviceAddress; }
+class VertexBuffer
+{
+public:
+	explicit VertexBuffer(const std::vector<Vertex>& vertices);
 
-	private:
-		vk::raii::Buffer m_Buffer = nullptr;
-		vk::raii::DeviceMemory m_BufferMemory = nullptr;
-		vk::DeviceAddress m_DeviceAddress = 0;
-	};
+	const vk::raii::Buffer& GetBuffer() const { return m_Buffer; }
+	const vk::raii::DeviceMemory& GetBufferMemory() const { return m_BufferMemory; }
+	vk::DeviceAddress GetDeviceAddress() const { return m_DeviceAddress; }
 
-	class IndexBuffer
-	{
-	public:
-		explicit IndexBuffer(const std::vector<uint32_t>& indices);
+private:
+	vk::raii::Buffer m_Buffer = nullptr;
+	vk::raii::DeviceMemory m_BufferMemory = nullptr;
+	vk::DeviceAddress m_DeviceAddress = 0;
+};
 
-		const vk::raii::Buffer& GetBuffer() const { return m_Buffer; }
-		const vk::raii::DeviceMemory& GetBufferMemory() const { return m_BufferMemory; }
-		vk::DeviceAddress GetDeviceAddress() const { return m_DeviceAddress; }
+class IndexBuffer
+{
+public:
+	explicit IndexBuffer(const std::vector<uint32_t>& indices);
 
-	private:
-		vk::raii::Buffer m_Buffer = nullptr;
-		vk::raii::DeviceMemory m_BufferMemory = nullptr;
-		vk::DeviceAddress m_DeviceAddress = 0;
-	};
+	const vk::raii::Buffer& GetBuffer() const { return m_Buffer; }
+	const vk::raii::DeviceMemory& GetBufferMemory() const { return m_BufferMemory; }
+	vk::DeviceAddress GetDeviceAddress() const { return m_DeviceAddress; }
 
-	class UniformBuffer
-	{
-	public:
-		explicit UniformBuffer(vk::DeviceSize bufferSize);
+private:
+	vk::raii::Buffer m_Buffer = nullptr;
+	vk::raii::DeviceMemory m_BufferMemory = nullptr;
+	vk::DeviceAddress m_DeviceAddress = 0;
+};
 
-		const vk::raii::Buffer& GetBuffer() const { return m_Buffer; }
-		const vk::raii::DeviceMemory& GetBufferMemory() const { return m_BufferMemory; }
-		void* GetMappedData() const { return m_MappedData; }
+class UniformBuffer
+{
+public:
+	explicit UniformBuffer(vk::DeviceSize bufferSize);
 
-	private:
-		vk::raii::Buffer m_Buffer = nullptr;
-		vk::raii::DeviceMemory m_BufferMemory = nullptr;
-		void* m_MappedData = nullptr;
-	};
+	const vk::raii::Buffer& GetBuffer() const { return m_Buffer; }
+	const vk::raii::DeviceMemory& GetBufferMemory() const { return m_BufferMemory; }
+	void* GetMappedData() const { return m_MappedData; }
 
-	class StorageBuffer
-	{
-	public:
-		explicit StorageBuffer(vk::DeviceSize bufferSize);
+private:
+	vk::raii::Buffer m_Buffer = nullptr;
+	vk::raii::DeviceMemory m_BufferMemory = nullptr;
+	void* m_MappedData = nullptr;
+};
 
-		const vk::raii::Buffer& GetBuffer() const { return m_Buffer; }
-		const vk::raii::DeviceMemory& GetBufferMemory() const { return m_BufferMemory; }
-		vk::DeviceSize GetBufferSize() const { return m_BufferSize; }
-		void* GetMappedData() const { return m_MappedData; }
+class StorageBuffer
+{
+public:
+	explicit StorageBuffer(vk::DeviceSize bufferSize, 
+	                       vk::BufferUsageFlags extraUsage = {}, 
+	                       BufferMemoryUsage memoryUsage = BufferMemoryUsage::HostVisible);
 
-	private:
-		vk::raii::Buffer m_Buffer = nullptr;
-		vk::raii::DeviceMemory m_BufferMemory = nullptr;
-		vk::DeviceSize m_BufferSize = 0;
-		void* m_MappedData = nullptr;
-	};
+	const vk::raii::Buffer& GetBuffer() const { return m_Buffer; }
+	const vk::raii::DeviceMemory& GetBufferMemory() const { return m_BufferMemory; }
+	vk::DeviceSize GetBufferSize() const { return m_BufferSize; }
+	void* GetMappedData() const { return m_MappedData; }
+
+private:
+	vk::raii::Buffer m_Buffer = nullptr;
+	vk::raii::DeviceMemory m_BufferMemory = nullptr;
+	vk::DeviceSize m_BufferSize = 0;
+	void* m_MappedData = nullptr;
+};
+
 }

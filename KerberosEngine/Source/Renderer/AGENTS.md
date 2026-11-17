@@ -111,18 +111,19 @@ The active pass order is approximately:
 3. directional shadow cascades
 4. omni (point light) shadow cubemaps
 5. GTAO
-6. opaque
-7. particles
-8. grass
-9. transparent
-10. transparency resolve
-11. bloom
-12. anti-aliasing
-13. upscaling
-14. tonemapping
-15. game UI (display-referred overlay into FinalImage)
-16. presentation
-17. mouse picking
+6. light culling (Forward+ cluster assignment; skipped when the grid is inactive)
+7. opaque
+8. particles
+9. grass
+10. transparent
+11. transparency resolve
+12. bloom
+13. anti-aliasing
+14. upscaling
+15. tonemapping
+16. game UI (display-referred overlay into FinalImage)
+17. presentation
+18. mouse picking
 
 The omni shadow pass is a separate graph pass after the directional
 cascades. It writes the fixed `PointShadowMap` cube array, and the opaque and
@@ -262,6 +263,70 @@ relative HDR values are calibrated with `DefaultEnvironmentIntensity`. The sky
 shader and PBR ambient terms multiply by the same environment intensity.
 Packed runtime cubemap artifacts are not implemented yet; the editor loads
 `.kbrcubemap` sources directly through `RuntimeAssetLoader`.
+
+## Clustered lighting (Forward+)
+
+`Renderer` builds a clustered light-assignment grid every frame so that the
+lighting shaders can iterate only the lights that can reach a fragment instead
+of the whole `MaxLights` buffer. The geometry pass, PBR model, shadow maps,
+ray-query shadows, and RTAO are unchanged; clustering only replaces the light
+loop bound.
+
+Constants live in `LightClusters` (`Renderer.cpp`) and are mirrored by
+`KerberosEditor/Assets/Shaders/light_clusters.slang`:
+
+- 16x16 render-resolution tiles (`ClusterTileSize`, `ClusterTileShift`) and
+  `ClusterSlicesMax = 32` exponential depth slices. The grid is allocated for
+  `MaxClusterResolution` (3840x2160) once, so viewport resize only changes the
+  tile counts in the UBO; the buffers are never recreated.
+- `ClusterIndexCapacity = 1 << 22`. The reservation counter (`counters[0]`) is a
+  single global bump allocator: every cluster atomically reserves a compacted
+  contiguous range in the index list, so no GPU prefix sum is needed.
+  Exhausting the capacity clamps the remaining clusters to zero lights, so the
+  capacity must stay comfortably above `clusters * average lights per cluster`.
+- `MaxLightsPerCluster = 256` is the only non-conservative limit: lights beyond
+  a cluster's cap are dropped from that cluster.
+
+Cluster layout is tile-major: `tileIndex + slice * (tilesX * tilesY)` where
+`tileIndex = tileY * tilesX + tileX`. `light_clusters.slang` and
+`light_culling.slang` must agree; keep the index math in the shared module.
+
+Camera near/far are sanitized in `RecordQueuedSceneRender` before
+`clusterDepthParams` is written, and `clusterGridSize.z` (slices) is the
+"clustered lighting on" flag: `0` means the lighting shaders must fall back to
+the full light loop. The CPU also gates the graph pass on
+`RendererData::ClusteredLightingActiveThisFrame` (enabled, valid planes, at
+least one light), so the grid is only built when it will be consumed.
+
+Cluster regions are deliberately conservative: the screen tile rectangle crossed
+with the full slice band, with no per-tile depth bounds. Any light whose
+influence sphere (`GPULight::Range`, which is the exact zero of the falloff in
+`lights.slang`) can touch that region is assigned, so a fragment that picks a
+cluster always finds every light that could illuminate it. Adding per-tile
+opaque depth bounds later would break that guarantee for the transparent OIT
+pass, which is the reason it is not done. Spot lights are culled by their range
+sphere only (no cone test), which is also conservative.
+
+`RenderLightCulling` resets `ClusterCounters` with `vkCmdFillBuffer` (the buffer
+must keep `TRANSFER_DST`), barriers transfer -> compute, and dispatches one
+16x16 workgroup per tile. It writes the "LightCulling" GPU timestamp pair; the
+pass is skipped (and the timestamps zero-filled by `WriteMissingGPUTimestamps`)
+when the grid is inactive. The culling pass uses its own descriptor set
+(`DescriptorSetLayouts.cluster`) rather than the scene set, because the scene
+set contains a dynamic per-object UBO that a compute bind would have to supply
+an offset for.
+
+Descriptors: the shared scene set exposes binding 11 = cluster grid and
+binding 12 = light index list (`FRAGMENT | COMPUTE`). The graph imports both as
+buffers so the compute -> fragment barrier is generated automatically; the
+buffers are non-owning imports and `ClusterCounters` is not in the graph (it is
+reset and consumed inside the culling pass only).
+
+Current state: the culling pass builds the grid, but `pbrtextured`,
+`pbr_ray_query_shadows`, and `transparent` still loop `scene.lightCount`. The
+cluster lookups described above are the intended replacement; until those
+shaders are converted the clustered path has no visual effect and must not be
+described as active lighting.
 
 ## Point and omni shadows
 

@@ -329,6 +329,7 @@ struct DescriptorSetLayouts
     vk::raii::DescriptorSetLayout scene = nullptr;
     vk::raii::DescriptorSetLayout composite = nullptr;
     vk::raii::DescriptorSetLayout gtao = nullptr;
+    vk::raii::DescriptorSetLayout cluster = nullptr;
     vk::raii::DescriptorSetLayout crossBilateralBlur = nullptr;
     vk::raii::DescriptorSetLayout tonemappingResolve = nullptr;
     vk::raii::DescriptorSetLayout fxaa = nullptr;
@@ -351,7 +352,11 @@ struct SceneUniformData
     float deltaTime = 0.0f;
     glm::vec3 cameraUp{ 0.f };
     float time = 0.0f;
+    
     glm::mat4 motionProjection{ 0.f }; /// Unjittered current projection, used for motion vectors
+    
+    glm::uvec4 clusterGridSize{ 0u, 0u, 0u, 0u }; // tilesX, tilesY, slices, effectiveLightCount
+    glm::vec4 clusterDepthParams{ 0.1f, 1000.0f, 0.0f, 0.0f }; // nearZ, farZ, slices/log(far/near), maxPerCluster
 };
 
 static_assert(offsetof(SceneUniformData, camPos) == 528);
@@ -360,7 +365,9 @@ static_assert(offsetof(SceneUniformData, deltaTime) == 572);
 static_assert(offsetof(SceneUniformData, cameraUp) == 576);
 static_assert(offsetof(SceneUniformData, time) == 588);
 static_assert(offsetof(SceneUniformData, motionProjection) == 592);
-static_assert(sizeof(SceneUniformData) == 656);
+static_assert(offsetof(SceneUniformData, clusterGridSize) == 656);
+static_assert(offsetof(SceneUniformData, clusterDepthParams) == 672);
+static_assert(sizeof(SceneUniformData) == 688);
 
 struct GlobalLighting
 {
@@ -483,6 +490,22 @@ struct SMAAData
     };
 };
 
+struct LightClusters
+{
+    constexpr static uint32_t MaxClusterResolutionX = 3840, MaxClusterResolutionY = 2160;
+    constexpr static uint32_t ClusterSlicesMax      = 32;
+    constexpr static uint32_t ClusterIndexCapacity  = 1 << 22; /// 4 M indices = 16 MiB per frame
+    constexpr static uint32_t ClusterTileSize       = 16;
+    constexpr static uint32_t ClusterTileShift      = 4; /// log2(ClusterTileSize)
+    constexpr static uint32_t MaxTilesX = (MaxClusterResolutionX + ClusterTileSize - 1) / ClusterTileSize; // 240
+    constexpr static uint32_t MaxTilesY = (MaxClusterResolutionY + ClusterTileSize - 1) / ClusterTileSize; // 135
+    constexpr static uint32_t MaxClusters = MaxTilesX * MaxTilesY * ClusterSlicesMax;                      // ~1.04 M
+    constexpr static uint32_t MaxLightsPerCluster = 256;
+};
+
+static_assert(LightClusters::ClusterSlicesMax <= 64, "ClusterSlicesMax must not exceed the shader's slice scratch array");
+static_assert((1u << LightClusters::ClusterTileShift) == LightClusters::ClusterTileSize, "ClusterTileShift must be log2(ClusterTileSize)");
+
 struct BloomData
 {
     vk::raii::Image Image = nullptr;
@@ -543,6 +566,9 @@ struct UniformBufferObject
 struct StorageBuffers
 {
     Ref<StorageBuffer> Lights;
+    Ref<StorageBuffer> ClusterGrid; // uint2 per cluster
+    Ref<StorageBuffer> ClusterLightIndices; // uint per light index
+    Ref<StorageBuffer> ClusterCounters; // [0] = reservation offset (uint)
 };
 
 struct DescriptorSets
@@ -551,6 +577,7 @@ struct DescriptorSets
     vk::raii::DescriptorSet skybox = nullptr;
     vk::raii::DescriptorSet resolve = nullptr;
     vk::raii::DescriptorSet gtao = nullptr;
+    vk::raii::DescriptorSet lightCulling = nullptr;
     vk::raii::DescriptorSet crossBilateralBlurHorizontal = nullptr;
     vk::raii::DescriptorSet crossBilateralBlurVertical = nullptr;
     vk::raii::DescriptorSet tonemappingResolve = nullptr;
@@ -585,6 +612,8 @@ enum class GPUTimestampQuery : uint32_t
     ShadowEnd,
     OmniShadowBegin,
     OmniShadowEnd,
+    LightCullingBegin,
+    LightCullingEnd,
     OpaqueBegin,
     OpaqueEnd,
     GrassBegin,
@@ -673,6 +702,9 @@ struct RendererData
 
     vk::raii::PipelineLayout GTAOPipelineLayout = nullptr;
     Ref<ComputePipeline> GTAOPipeline = nullptr;
+    
+    vk::raii::PipelineLayout LightClusterPipelineLayout = nullptr;
+    Ref<ComputePipeline> LightClusterPipeline = nullptr;
 
     vk::raii::PipelineLayout CrossBilateralBlurPipelineLayout = nullptr;
     Ref<ComputePipeline> CrossBilateralBlurPipeline = nullptr;
@@ -784,6 +816,9 @@ struct RendererData
     uint32_t AllObjectCount = 0;
     uint32_t VisibleObjectCount = 0;
     uint32_t CulledObjectCount = 0;
+    
+    bool UseClusteredLighting = true;
+    bool ClusteredLightingActiveThisFrame = false;
 
     AntiAliasingMode AntiAliasingMode = AntiAliasingMode::SMAA;
     TonemappingOperator TonemappingOperator = TonemappingOperator::ACESFitted;
@@ -1331,6 +1366,78 @@ void Renderer::RenderGTAO(const vk::raii::CommandBuffer& cmd, const uint32_t fra
 
 }
 
+void Renderer::RenderLightCulling(const vk::raii::CommandBuffer& cmd,
+                                  const uint32_t frameIndex,
+                                  const uint32_t currentImage)
+{
+    WriteGPUTimestamp(cmd, frameIndex, static_cast<uint32_t>(GPUTimestampQuery::LightCullingBegin));
+
+    if (!s_Data->ClusteredLightingActiveThisFrame ||
+        currentImage >= s_Data->StorageBuffers.size() ||
+        s_Data->StorageBuffers[currentImage].ClusterCounters == nullptr ||
+        s_Data->DescriptorSets[currentImage].lightCulling == nullptr ||
+        s_Data->LightClusterPipeline == nullptr)
+    {
+        WriteGPUTimestamp(cmd, frameIndex, static_cast<uint32_t>(GPUTimestampQuery::LightCullingEnd));
+        return;
+    }
+
+    const auto& counterBuffer = *s_Data->StorageBuffers[currentImage].ClusterCounters;
+    const vk::Buffer counterVkBuffer = *counterBuffer.GetBuffer();
+
+    // The previous use of this buffer is the reservation atomicAdd from the
+    // compute pass, and vkCmdFillBuffer is a transfer operation.
+    const vk::BufferMemoryBarrier2 toTransferBarrier{
+        .srcStageMask = vk::PipelineStageFlagBits2::eComputeShader,
+        .srcAccessMask = vk::AccessFlagBits2::eShaderWrite,
+        .dstStageMask = vk::PipelineStageFlagBits2::eTransfer,
+        .dstAccessMask = vk::AccessFlagBits2::eTransferWrite,
+        .srcQueueFamilyIndex = vk::QueueFamilyIgnored,
+        .dstQueueFamilyIndex = vk::QueueFamilyIgnored,
+        .buffer = counterVkBuffer,
+        .offset = 0,
+        .size = sizeof(uint32_t)
+    };
+    cmd.pipelineBarrier2(vk::DependencyInfo{ .dependencyFlags = {},
+                                            .bufferMemoryBarrierCount = 1,
+                                            .pBufferMemoryBarriers = &toTransferBarrier });
+
+    cmd.fillBuffer(counterVkBuffer, 0, sizeof(uint32_t), 0);
+
+    const vk::BufferMemoryBarrier2 toComputeBarrier{
+        .srcStageMask = vk::PipelineStageFlagBits2::eTransfer,
+        .srcAccessMask = vk::AccessFlagBits2::eTransferWrite,
+        .dstStageMask = vk::PipelineStageFlagBits2::eComputeShader,
+        .dstAccessMask = vk::AccessFlagBits2::eShaderRead | vk::AccessFlagBits2::eShaderWrite,
+        .srcQueueFamilyIndex = vk::QueueFamilyIgnored,
+        .dstQueueFamilyIndex = vk::QueueFamilyIgnored,
+        .buffer = counterVkBuffer,
+        .offset = 0,
+        .size = sizeof(uint32_t)
+    };
+    cmd.pipelineBarrier2(vk::DependencyInfo{ .dependencyFlags = {},
+                                            .bufferMemoryBarrierCount = 1,
+                                            .pBufferMemoryBarriers = &toComputeBarrier });
+
+    s_Data->LightClusterPipeline->Bind(cmd);
+    cmd.bindDescriptorSets(vk::PipelineBindPoint::eCompute,
+                           *s_Data->LightClusterPipelineLayout,
+                           0,
+                           *s_Data->DescriptorSets[currentImage].lightCulling,
+                           {});
+
+    const uint32_t tilesX = s_Data->SceneUniformData.clusterGridSize.x;
+    const uint32_t tilesY = s_Data->SceneUniformData.clusterGridSize.y;
+    if (tilesX > 0 && tilesY > 0)
+    {
+        // One 16x16 workgroup per screen tile, each group fills every depth
+        // slice of its tile's clusters.
+        cmd.dispatch(tilesX, tilesY, 1);
+    }
+
+    WriteGPUTimestamp(cmd, frameIndex, static_cast<uint32_t>(GPUTimestampQuery::LightCullingEnd));
+}
+
 void Renderer::RenderOpaque(const vk::raii::CommandBuffer& cmd,
                             const uint32_t frameIndex,
                             const RenderObjectContainer& renderObjects,
@@ -1859,6 +1966,9 @@ void Renderer::RecordQueuedSceneRender(const vk::raii::CommandBuffer& cmd)
     s_Data->SceneUniformData.previousView = previousView;
     s_Data->SceneUniformData.previousProjection = previousProjection;
     s_Data->SceneUniformData.motionProjection = motionProjection;
+    
+    UpdateLightCullingData(lightCount);
+    
     UpdateSceneUniformBuffers(currentImage,
                               s_Data->PendingRender.View,
                               currentProjection,
@@ -1876,210 +1986,6 @@ void Renderer::RecordQueuedSceneRender(const vk::raii::CommandBuffer& cmd)
 
     CompileAndExecuteRenderGraph(
         cmd, frameIndex, currentImage, allObjects, renderObjects, &frameArena, debugLineVertices);
-
-    //RenderPrePass(cmd, frameIndex, renderObjects, currentImage);
-
-    //RenderShadowPass(cmd, frameIndex, allObjects, &frameArena);
-
-    //RenderGTAO(cmd, frameIndex, currentImage);
-
-    //const vk::Viewport viewport{ .x = 0.0f,
-    //                             .y = 0.0f,
-    //                             .width = s_Data->RenderSize.x,
-    //                             .height = s_Data->RenderSize.y,
-    //                             .minDepth = 0.0f,
-    //                             .maxDepth = 1.0f };
-
-    //const vk::Rect2D renderArea{ .offset = vk::Offset2D{ .x = 0, .y = 0 },
-    //                             .extent = vk::Extent2D{ .width = static_cast<uint32_t>(s_Data->RenderSize.x),
-    //                                                     .height = static_cast<uint32_t>(s_Data->RenderSize.y) } };
-
-    //RenderOpaque(cmd, frameIndex, renderObjects, currentImage, viewport, renderArea);
-
-    //RenderParticles(cmd, frameIndex);
-
-    //cmd.endQuery(s_Data->PipelineStatisticsQueryPools[frameIndex], 0);
-
-    //cmd.beginQuery(s_Data->MeshPipelineStatisticsQueryPools[frameIndex], 0, {});
-
-    //RenderGrass(cmd, frameIndex);
-
-    //cmd.endQuery(s_Data->MeshPipelineStatisticsQueryPools[frameIndex], 0);
-
-    //cmd.beginQuery(s_Data->PipelineStatisticsQueryPools[frameIndex], 1, {});
-
-    //// Transfer accumulation, revealage and distortion images to color attachment optimal for they will be render
-    //// targets
-    //{
-    //    std::array<vk::ImageMemoryBarrier2, 3> barriers;
-    //    for (size_t i = 0; i < barriers.size(); ++i) {
-    //        barriers[i] = { .srcStageMask = vk::PipelineStageFlagBits2::eFragmentShader,
-    //                        .srcAccessMask = vk::AccessFlagBits2::eShaderRead,
-
-    //                        .dstStageMask = vk::PipelineStageFlagBits2::eColorAttachmentOutput,
-    //                        .dstAccessMask = vk::AccessFlagBits2::eColorAttachmentWrite,
-
-    //                        .oldLayout = vk::ImageLayout::eUndefined,
-    //                        .newLayout = vk::ImageLayout::eColorAttachmentOptimal,
-
-    //                        .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-    //                        .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-    //                        .image = (i == 0)   ? s_Data->Transparency.AccumulationImage.Image
-    //                                 : (i == 1) ? s_Data->Transparency.RevealageImage.Image
-    //                                            : s_Data->Transparency.DistortionImage.Image,
-    //                        .subresourceRange = { .aspectMask = vk::ImageAspectFlagBits::eColor,
-    //                                              .baseMipLevel = 0,
-    //                                              .levelCount = 1,
-    //                                              .baseArrayLayer = 0,
-    //                                              .layerCount = 1 } };
-    //    }
-
-    //    const vk::DependencyInfo dependencyInfo = { .dependencyFlags = {},
-    //                                                .imageMemoryBarrierCount = static_cast<uint32_t>(barriers.size()),
-    //                                                .pImageMemoryBarriers = barriers.data() };
-    //    cmd.pipelineBarrier2(dependencyInfo);
-
-    //    const vk::ImageMemoryBarrier2 bloomMaskBarrier = {
-    //        .srcStageMask = vk::PipelineStageFlagBits2::eFragmentShader,
-    //        .srcAccessMask = vk::AccessFlagBits2::eShaderRead,
-    //        .dstStageMask = vk::PipelineStageFlagBits2::eColorAttachmentOutput,
-    //        .dstAccessMask = vk::AccessFlagBits2::eColorAttachmentWrite,
-    //        .oldLayout = vk::ImageLayout::eShaderReadOnlyOptimal,
-    //        .newLayout = vk::ImageLayout::eColorAttachmentOptimal,
-    //        .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-    //        .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-    //        .image = s_Data->BloomMaskImage.Image,
-    //        .subresourceRange = { vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1 }
-    //    };
-    //    cmd.pipelineBarrier2({ .imageMemoryBarrierCount = 1, .pImageMemoryBarriers = &bloomMaskBarrier });
-    //}
-
-    //RenderTransparent(cmd, frameIndex, renderObjects, currentImage, viewport, renderArea);
-
-    //RenderDebugLines(cmd, debugLineVertices, currentImage, viewport, renderArea);
-
-    //// Transition all images needed for the resolve pass to shader read optimal (color, depth, accumulation, revealage,
-    //// distortion) and transition resolve image to color attachment optimal
-    //{
-    //    std::array<vk::ImageMemoryBarrier2, 6> barriers;
-    //    std::array<vk::ImageLayout, 6> oldLayouts = {
-    //        vk::ImageLayout::eColorAttachmentOptimal, // Color image
-    //        vk::ImageLayout::eDepthAttachmentOptimal, // Depth image
-    //        vk::ImageLayout::eColorAttachmentOptimal, // Accumulation image
-    //        vk::ImageLayout::eColorAttachmentOptimal, // Revealage image
-    //        vk::ImageLayout::eColorAttachmentOptimal, // Distortion image
-    //        vk::ImageLayout::eShaderReadOnlyOptimal   // Resolve image
-    //    };
-    //    std::array<vk::ImageLayout, 6> newLayouts = {
-    //        vk::ImageLayout::eShaderReadOnlyOptimal, // Color image
-    //        vk::ImageLayout::eShaderReadOnlyOptimal, // Depth image
-    //        vk::ImageLayout::eShaderReadOnlyOptimal, // Accumulation image
-    //        vk::ImageLayout::eShaderReadOnlyOptimal, // Revealage image
-    //        vk::ImageLayout::eShaderReadOnlyOptimal, // Distortion image
-    //        vk::ImageLayout::eColorAttachmentOptimal // Resolve image
-    //    };
-    //    std::array<vk::AccessFlags2, 6> srcAccessMasks = {
-    //        vk::AccessFlagBits2::eColorAttachmentWrite,        // Color image
-    //        vk::AccessFlagBits2::eDepthStencilAttachmentWrite, // Depth image
-    //        vk::AccessFlagBits2::eColorAttachmentWrite,        // Accumulation image
-    //        vk::AccessFlagBits2::eColorAttachmentWrite,        // Revealage image
-    //        vk::AccessFlagBits2::eColorAttachmentWrite,        // Distortion image
-    //        vk::AccessFlagBits2::eColorAttachmentWrite         // Resolve image
-    //    };
-    //    std::array<vk::PipelineStageFlags2, 6> srcStageMasks = {
-    //        vk::PipelineStageFlagBits2::eColorAttachmentOutput, // Color image
-    //        vk::PipelineStageFlagBits2::eEarlyFragmentTests |
-    //            vk::PipelineStageFlagBits2::eLateFragmentTests, // Depth image
-    //        vk::PipelineStageFlagBits2::eColorAttachmentOutput, // Accumulation image
-    //        vk::PipelineStageFlagBits2::eColorAttachmentOutput, // Revealage image
-    //        vk::PipelineStageFlagBits2::eColorAttachmentOutput, // Distortion image
-    //        vk::PipelineStageFlagBits2::eColorAttachmentOutput  // Resolve image
-    //    };
-    //    std::array<vk::AccessFlags2, 6> dstAccessMasks = {
-    //        vk::AccessFlagBits2::eShaderRead,          // Color image
-    //        vk::AccessFlagBits2::eShaderRead,          // Depth image
-    //        vk::AccessFlagBits2::eShaderRead,          // Accumulation image
-    //        vk::AccessFlagBits2::eShaderRead,          // Revealage image
-    //        vk::AccessFlagBits2::eShaderRead,          // Distortion image
-    //        vk::AccessFlagBits2::eColorAttachmentWrite // Resolve image
-    //    };
-    //    std::array<vk::PipelineStageFlags2, 6> dstStageMasks = {
-    //        vk::PipelineStageFlagBits2::eFragmentShader,       // Color image
-    //        vk::PipelineStageFlagBits2::eFragmentShader,       // Depth image
-    //        vk::PipelineStageFlagBits2::eFragmentShader,       // Accumulation image
-    //        vk::PipelineStageFlagBits2::eFragmentShader,       // Revealage image
-    //        vk::PipelineStageFlagBits2::eFragmentShader,       // Distortion image
-    //        vk::PipelineStageFlagBits2::eColorAttachmentOutput // Resolve image
-    //    };
-    //    std::array<vk::Image, 6> images = { *s_Data->ColorImage.Image,
-    //                                        *s_Data->DepthImage.Image,
-    //                                        *s_Data->Transparency.AccumulationImage.Image,
-    //                                        *s_Data->Transparency.RevealageImage.Image,
-    //                                        *s_Data->Transparency.DistortionImage.Image,
-    //                                        *s_Data->ResolveImage.Image };
-
-    //    for (size_t i = 0; i < barriers.size(); ++i) {
-    //        barriers[i] = { .srcStageMask = srcStageMasks[i],
-    //                        .srcAccessMask = srcAccessMasks[i],
-    //                        .dstStageMask = dstStageMasks[i],
-    //                        .dstAccessMask = dstAccessMasks[i],
-    //                        .oldLayout = oldLayouts[i],
-    //                        .newLayout = newLayouts[i],
-    //                        .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-    //                        .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-    //                        .image = images[i],
-    //                        .subresourceRange = { .aspectMask = i == 1 ? vk::ImageAspectFlagBits::eDepth
-    //                                                                   : vk::ImageAspectFlagBits::eColor,
-    //                                              .baseMipLevel = 0,
-    //                                              .levelCount = 1,
-    //                                              .baseArrayLayer = 0,
-    //                                              .layerCount = 1 } };
-    //    }
-
-    //    const vk::DependencyInfo dependencyInfo = { .dependencyFlags = {},
-    //                                                .imageMemoryBarrierCount = static_cast<uint32_t>(barriers.size()),
-    //                                                .pImageMemoryBarriers = barriers.data() };
-    //    cmd.pipelineBarrier2(dependencyInfo);
-    //}
-
-    //ResolveTransparencyPass(cmd, frameIndex, currentImage, viewport, renderArea);
-
-    //ApplyBloom(cmd, currentImage);
-
-    //ApplyAntiAliasing(cmd, currentImage);
-
-    //ApplyUpscaling(cmd, currentImage);
-
-    //ApplyTonemapping(cmd, currentImage);
-
-    //HandleMousePickingReadback(cmd);
-
-    // Temporarily not needed, since the upscaling pass already transitions the resolve image to shader read optimal,
-    // but if we move the tonemapping pass after the upscaling pass, we might need it again.
-    
-    // Transition composite image layout for shader read in ImGui
-    //{
-    //    vk::ImageMemoryBarrier2 barrier = { .srcStageMask = vk::PipelineStageFlagBits2::eColorAttachmentOutput,
-    //                                        .srcAccessMask = vk::AccessFlagBits2::eColorAttachmentWrite,
-    //                                        .dstStageMask = vk::PipelineStageFlagBits2::eFragmentShader,
-    //                                        .dstAccessMask = vk::AccessFlagBits2::eShaderRead,
-    //                                        .oldLayout = vk::ImageLayout::eColorAttachmentOptimal,
-    //                                        .newLayout = vk::ImageLayout::eShaderReadOnlyOptimal,
-    //                                        .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-    //                                        .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-    //                                        .image = s_Data->CompositeImage.Image,
-    //                                        .subresourceRange = { .aspectMask = vk::ImageAspectFlagBits::eColor,
-    //                                                              .baseMipLevel = 0,
-    //                                                              .levelCount = 1,
-    //                                                              .baseArrayLayer = 0,
-    //                                                              .layerCount = 1 } };
-    //    const vk::DependencyInfo dependencyInfo = { .dependencyFlags = {},
-    //                                                .imageMemoryBarrierCount = 1,
-    //                                                .pImageMemoryBarriers = &barrier };
-    //    cmd.pipelineBarrier2(dependencyInfo);
-
-    //    Log::CoreTrace("Resolve image transitioned for ImGui!");
-    //}
 
     WriteGPUTimestamp(cmd, frameIndex, static_cast<uint32_t>(GPUTimestampQuery::FrameEnd));
     WriteMissingGPUTimestamps(cmd, frameIndex);
@@ -2131,6 +2037,7 @@ void Renderer::CreateResources()
 
     PrepareUniformBuffers();
     PrepareStorageBuffers();
+    PrepareLightClusterBuffers();
 
     auto& context = VulkanContext::Get();
     const auto& device = context.GetDevice();
@@ -2462,6 +2369,34 @@ void Renderer::CreateResources()
         s_Data->CrossBilateralBlurPipeline = CreateRef<ComputePipeline>(blurPipelineSpec);
     }
 
+    // Setup resources for light culling
+    {
+        std::vector<vk::DescriptorSetLayoutBinding> bindings = {
+            { .binding = 0, .descriptorType = vk::DescriptorType::eUniformBuffer,       .descriptorCount = 1, .stageFlags = vk::ShaderStageFlagBits::eCompute },
+            { .binding = 1, .descriptorType = vk::DescriptorType::eStorageBuffer,       .descriptorCount = 1, .stageFlags = vk::ShaderStageFlagBits::eCompute },
+            { .binding = 2, .descriptorType = vk::DescriptorType::eStorageBuffer,       .descriptorCount = 1, .stageFlags = vk::ShaderStageFlagBits::eCompute },
+            { .binding = 3, .descriptorType = vk::DescriptorType::eStorageBuffer,       .descriptorCount = 1, .stageFlags = vk::ShaderStageFlagBits::eCompute },
+            { .binding = 4, .descriptorType = vk::DescriptorType::eStorageBuffer,       .descriptorCount = 1, .stageFlags = vk::ShaderStageFlagBits::eCompute },
+        };
+        vk::DescriptorSetLayoutCreateInfo layoutInfo{
+            .bindingCount = static_cast<uint32_t>(bindings.size()),
+            .pBindings = bindings.data()
+        };
+        s_Data->DescriptorSetLayouts.cluster = vk::raii::DescriptorSetLayout{ device, layoutInfo };
+        
+        vk::PipelineLayoutCreateInfo pipelineLayoutInfo{
+            .setLayoutCount = 1,
+            .pSetLayouts = &*s_Data->DescriptorSetLayouts.cluster
+        };
+        s_Data->LightClusterPipelineLayout = vk::raii::PipelineLayout{ device, pipelineLayoutInfo };
+        
+        ComputePipelineSpecification spec{};
+        spec.Name = "Light Culling Pipeline";
+        spec.Shader = CreateRef<Shader>("light_culling", "Light Culling");
+        spec.PipelineLayout = *s_Data->LightClusterPipelineLayout;
+        s_Data->LightClusterPipeline = CreateRef<ComputePipeline>(spec);
+    }
+    
     // Create the shadow map resources
     {
         // Create shadow map image
@@ -4272,6 +4207,8 @@ void Renderer::RecompileShaders()
         smaaBlendPipeline->Recompile();
     if (const auto& smaaNeighborhoodPipeline = s_Data->SMAAResources.NeighborhoodBlendingPipeline)
         smaaNeighborhoodPipeline->Recompile();
+    if (const auto& clusteredLightingPipeline = s_Data->LightClusterPipeline)
+        clusteredLightingPipeline->Recompile();
 
     s_Data->AnimationSystem.RecompileShaders();
     s_Data->ParticleSystem.RecompileShaders();
@@ -4371,6 +4308,11 @@ bool& Renderer::GetUseBlurForGTAO()
 GTAOConstants& Renderer::GetGTAOConstants()
 {
     return s_Data->GTAOData;
+}
+
+bool& Renderer::GetUseClusteredLighting()
+{
+    return s_Data->UseClusteredLighting;
 }
 
 float Renderer::GetExposure()
@@ -4733,6 +4675,8 @@ void Renderer::ResolveGPUTimings(const uint32_t frameIndex)
         toMilliseconds(GPUTimestampQuery::ShadowBegin, GPUTimestampQuery::ShadowEnd);
     s_Data->LatestGPUTimings.OmniShadowPassMilliseconds =
         toMilliseconds(GPUTimestampQuery::OmniShadowBegin, GPUTimestampQuery::OmniShadowEnd);
+    s_Data->LatestGPUTimings.LightCullingPassMilliseconds =
+        toMilliseconds(GPUTimestampQuery::LightCullingBegin, GPUTimestampQuery::LightCullingEnd);
     s_Data->LatestGPUTimings.OpaquePassMilliseconds =
         toMilliseconds(GPUTimestampQuery::OpaqueBegin, GPUTimestampQuery::OpaqueEnd);
     s_Data->LatestGPUTimings.GrassPassMilliseconds =
@@ -4867,6 +4811,7 @@ void Renderer::GatherProfilingDataFromGPUTimestamps(const GPUTimings& timings)
     KBR_TRACY_PLOT("GPU Prepass Time (ms)", timings.DepthPrePassMilliseconds);
     KBR_TRACY_PLOT("GPU CSM Pass Time (ms)", timings.ShadowPassMilliseconds);
     KBR_TRACY_PLOT("GPU Omni Shadow Pass Time (ms)", timings.OmniShadowPassMilliseconds);
+    KBR_TRACY_PLOT("GPU Light Culling Pass Time (ms)", timings.LightCullingPassMilliseconds);
     KBR_TRACY_PLOT("GPU Opaque Pass Time (ms)", timings.OpaquePassMilliseconds);
     KBR_TRACY_PLOT("GPU Grass Pass Time (ms)", timings.GrassPassMilliseconds);
     KBR_TRACY_PLOT("GPU Particles Draw Time (ms)", timings.ParticlesDrawMilliseconds);
@@ -4913,6 +4858,35 @@ void Renderer::UpdateLights(const uint32_t currentImage, const std::vector<GPULi
     std::memcpy(s_Data->StorageBuffers[currentImage].Lights->GetMappedData(),
                 sceneLights.data(),
                 lightCount * sizeof(GPULight));
+}
+
+void Renderer::UpdateLightCullingData(const uint32_t lightCount)
+{
+    uint32_t tilesX = (static_cast<uint32_t>(s_Data->RenderSize.x) + LightClusters::ClusterTileSize - 1) /
+                      LightClusters::ClusterTileSize;
+    uint32_t tilesY = (static_cast<uint32_t>(s_Data->RenderSize.y) + LightClusters::ClusterTileSize - 1) /
+                      LightClusters::ClusterTileSize;
+    
+    tilesX = std::min(tilesX, LightClusters::MaxTilesX);
+    tilesY = std::min(tilesY, LightClusters::MaxTilesY);
+
+    // Sanitize the slice range to avoid division by zero or log(0) in the shader.
+    const float nearZ = std::max(s_Data->PendingRender.NearPlane, 1e-4f);
+    const float farZ = std::max(s_Data->PendingRender.FarPlane, nearZ * 1.001f);
+
+    const bool clusterGridValid = s_Data->UseClusteredLighting &&
+                                  tilesX > 0 && tilesY > 0 && lightCount > 0;
+    s_Data->ClusteredLightingActiveThisFrame = clusterGridValid;
+    
+    const uint32_t clusterSlices = clusterGridValid ? LightClusters::ClusterSlicesMax : 0;
+    const float clusterSliceScale = clusterGridValid
+        ? static_cast<float>(LightClusters::ClusterSlicesMax) / std::log(farZ / nearZ)
+        : 0.0f;
+
+    // slices == 0 is the "clustered lighting off" flag 
+    s_Data->SceneUniformData.clusterGridSize = { tilesX, tilesY, clusterSlices, lightCount };
+    s_Data->SceneUniformData.clusterDepthParams = { nearZ, farZ,
+        clusterSliceScale, static_cast<float>(LightClusters::MaxLightsPerCluster) };
 }
 
 void Renderer::UpdateSceneUniformBuffers(const uint32_t currentImage,
@@ -5545,12 +5519,24 @@ vk::PipelineStageFlagBits2::eFragmentShader,
         const auto hOutput = s_Data->RenderGraph.ImportImage(*s_Data->OutputImage.Image, outputState, colorRange);
         const auto hFinal = s_Data->RenderGraph.ImportImage(*s_Data->FinalImage.Image, finalState, colorRange);
 
+        BufferHandle hClusterGrid{};
+        BufferHandle hClusterIndices{};
+        if (s_Data->ClusteredLightingActiveThisFrame)
+        {
+            constexpr BufferState computeReadWriteState{
+                .Stages = vk::PipelineStageFlagBits2::eComputeShader,
+                .Access = vk::AccessFlagBits2::eShaderRead | vk::AccessFlagBits2::eShaderWrite };
+
+            hClusterGrid    = s_Data->RenderGraph.ImportBuffer(*s_Data->StorageBuffers[currentImage].ClusterGrid->GetBuffer(), computeReadWriteState);
+            hClusterIndices = s_Data->RenderGraph.ImportBuffer(*s_Data->StorageBuffers[currentImage].ClusterLightIndices->GetBuffer(), computeReadWriteState);
+        }
+        
         ImageHandle hPointShadow{};
         if (s_Data->PointShadowMap.Enabled)
         {
             hPointShadow = s_Data->RenderGraph.ImportImage(*s_Data->PointShadowMap.Image, omniShadowState, omniShadowRange);
         }
-
+        
         s_Data->AnimationSystem.AddPasses(s_Data->RenderGraph, frameIndex);
         s_Data->SkinningSystem.AddPasses(s_Data->RenderGraph, frameIndex);
 
@@ -5632,6 +5618,17 @@ vk::PipelineStageFlagBits2::eFragmentShader,
             }
             return [=](const vk::raii::CommandBuffer& execCmd) { Renderer::RenderGTAO(execCmd, frameIndex, currentImage); };
         });
+        
+        if (s_Data->ClusteredLightingActiveThisFrame)
+        {
+            s_Data->RenderGraph.AddPass("Light Culling", [&](Graph::PassBuilder& builder) -> PassExecuteFunction {
+                builder.Write(hClusterGrid,    vk::PipelineStageFlagBits2::eComputeShader, vk::AccessFlagBits2::eShaderWrite);
+                builder.Write(hClusterIndices, vk::PipelineStageFlagBits2::eComputeShader, vk::AccessFlagBits2::eShaderWrite);
+                return [=](const vk::raii::CommandBuffer& execCmd) {
+                    RenderLightCulling(execCmd, frameIndex, currentImage);
+                };
+            });
+        }
 
         s_Data->RenderGraph.AddPass("Opaque", [&](Graph::PassBuilder& builder) -> PassExecuteFunction {
             builder.Read(hShadow,
@@ -5648,6 +5645,11 @@ vk::PipelineStageFlagBits2::eFragmentShader,
                              vk::ImageLayout::eShaderReadOnlyOptimal,
                              vk::PipelineStageFlagBits2::eFragmentShader,
                              vk::AccessFlagBits2::eShaderRead);
+            }
+            if (hClusterGrid && hClusterIndices)
+            {
+                builder.Read(hClusterGrid,    vk::PipelineStageFlagBits2::eFragmentShader, vk::AccessFlagBits2::eShaderRead);
+                builder.Read(hClusterIndices, vk::PipelineStageFlagBits2::eFragmentShader, vk::AccessFlagBits2::eShaderRead);
             }
 
             builder.Write(hColor,
@@ -5736,6 +5738,11 @@ vk::PipelineStageFlagBits2::eFragmentShader,
                              vk::ImageLayout::eShaderReadOnlyOptimal,
                              vk::PipelineStageFlagBits2::eFragmentShader,
                              vk::AccessFlagBits2::eShaderRead);
+            }
+            if (hClusterGrid && hClusterIndices)
+            {
+                builder.Read(hClusterGrid,    vk::PipelineStageFlagBits2::eFragmentShader, vk::AccessFlagBits2::eShaderRead);
+                builder.Read(hClusterIndices, vk::PipelineStageFlagBits2::eFragmentShader, vk::AccessFlagBits2::eShaderRead);
             }
             
             builder.Write(hAccum,
@@ -7633,9 +7640,26 @@ void Renderer::PrepareUniformBuffers()
 
 void Renderer::PrepareStorageBuffers()
 {
-    for (auto& [lights] : s_Data->StorageBuffers) {
+    for (auto& buffers : s_Data->StorageBuffers)
+    {
         constexpr uint32_t lightBufferSize = sizeof(GPULight) * MaxLights;
-        lights = CreateRef<StorageBuffer>(lightBufferSize);
+        buffers.Lights = CreateRef<StorageBuffer>(lightBufferSize);
+    }
+}
+
+void Renderer::PrepareLightClusterBuffers()
+{
+    for (auto& buffers : s_Data->StorageBuffers)
+    {
+        buffers.ClusterGrid         = CreateRef<StorageBuffer>(sizeof(uint32_t) * 2 * LightClusters::MaxClusters,
+                                                               vk::BufferUsageFlags{},
+                                                               BufferMemoryUsage::DeviceLocal);
+        buffers.ClusterLightIndices = CreateRef<StorageBuffer>(sizeof(uint32_t) * LightClusters::ClusterIndexCapacity,
+                                                               vk::BufferUsageFlags{},
+                                                               BufferMemoryUsage::DeviceLocal);
+        buffers.ClusterCounters     = CreateRef<StorageBuffer>(sizeof(uint32_t),
+                                                               vk::BufferUsageFlagBits::eTransferDst,
+                                                               BufferMemoryUsage::DeviceLocal);
     }
 }
 
@@ -7648,7 +7672,7 @@ void Renderer::SetupDescriptors()
         vk::DescriptorPoolSize{ .type = vk::DescriptorType::eUniformBuffer, .descriptorCount = 10 },
         vk::DescriptorPoolSize{ .type = vk::DescriptorType::eUniformBufferDynamic, .descriptorCount = 10 },
         vk::DescriptorPoolSize{ .type = vk::DescriptorType::eCombinedImageSampler, .descriptorCount = 100 },
-        vk::DescriptorPoolSize{ .type = vk::DescriptorType::eStorageBuffer, .descriptorCount = 10 },
+        vk::DescriptorPoolSize{ .type = vk::DescriptorType::eStorageBuffer, .descriptorCount = 20 },
         vk::DescriptorPoolSize{ .type = vk::DescriptorType::eStorageImage, .descriptorCount = 20 },
         vk::DescriptorPoolSize{ .type = vk::DescriptorType::eSampledImage, .descriptorCount = 20 },
         vk::DescriptorPoolSize{ .type = vk::DescriptorType::eSampler, .descriptorCount = 10 },
@@ -7734,6 +7758,16 @@ void Renderer::SetupDescriptors()
             .descriptorCount = 1,
             .stageFlags = vk::ShaderStageFlagBits::eFragment,
             .pImmutableSamplers = nullptr },
+        vk::DescriptorSetLayoutBinding{ // Light cluster grid
+            .binding = 11,
+            .descriptorType = vk::DescriptorType::eStorageBuffer, 
+            .descriptorCount = 1,
+            .stageFlags = vk::ShaderStageFlagBits::eFragment | vk::ShaderStageFlagBits::eCompute },
+        vk::DescriptorSetLayoutBinding{ // Light cluster indices
+            .binding = 12,
+            .descriptorType = vk::DescriptorType::eStorageBuffer, 
+            .descriptorCount = 1,
+            .stageFlags = vk::ShaderStageFlagBits::eFragment | vk::ShaderStageFlagBits::eCompute },
     };
 
     // The TLAS binding is only legal when the device enabled VK_KHR_acceleration_structure, so the ray query
@@ -7762,6 +7796,19 @@ void Renderer::SetupDescriptors()
 
     std::vector<vk::raii::DescriptorSet> sceneDescriptorSets = device.allocateDescriptorSets(allocInfo);
     std::vector<vk::raii::DescriptorSet> skyboxDescriptorSets = device.allocateDescriptorSets(allocInfo);
+    
+    std::vector<vk::raii::DescriptorSet> lightCullingDescriptorSets;
+    if (s_Data->DescriptorSetLayouts.cluster != nullptr)
+    {
+        const std::vector<vk::DescriptorSetLayout> clusterSetLayouts(s_Data->DescriptorSets.size(),
+                                                                     *s_Data->DescriptorSetLayouts.cluster);
+        const vk::DescriptorSetAllocateInfo clusterAllocInfo{
+            .descriptorPool = *s_Data->DescriptorPool,
+            .descriptorSetCount = static_cast<uint32_t>(s_Data->DescriptorSets.size()),
+            .pSetLayouts = clusterSetLayouts.data() };
+        lightCullingDescriptorSets = device.allocateDescriptorSets(clusterAllocInfo);
+    }
+
     for (uint32_t i = 0; i < s_Data->UniformBuffers.size(); i++) {
         s_Data->DescriptorSets[i].scene = std::move(sceneDescriptorSets[i]);
         context.SetObjectDebugName(s_Data->DescriptorSets[i].scene, "PBR Descriptor Set[" + std::to_string(i) + "]");
@@ -7798,6 +7845,24 @@ void Renderer::SetupDescriptors()
         const vk::DescriptorImageInfo globalAOImageInfo{ .sampler = *s_Data->LinearSampler,
                                                          .imageView = *s_Data->GTAOImage.ImageView,
                                                          .imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal };
+        
+        const vk::DescriptorBufferInfo lightClusterGridBufferInfo{ 
+            .buffer = *s_Data->StorageBuffers[i].ClusterGrid->GetBuffer(), 
+            .offset = 0,
+            .range = s_Data->StorageBuffers[i].ClusterGrid->GetBufferSize() 
+        };
+        
+        const vk::DescriptorBufferInfo lightClusterIndicesInfo{ 
+            .buffer = *s_Data->StorageBuffers[i].ClusterLightIndices->GetBuffer(),
+            .offset = 0,
+            .range = s_Data->StorageBuffers[i].ClusterLightIndices->GetBufferSize()
+        };
+        
+        const vk::DescriptorBufferInfo lightClusterCountersInfo{
+            .buffer = *s_Data->StorageBuffers[i].ClusterCounters->GetBuffer(),
+            .offset = 0,
+            .range = s_Data->StorageBuffers[i].ClusterCounters->GetBufferSize()
+        };
         
         // Keep the descriptor set valid even if cubeImageArrays are not supported
         const vk::ImageView omniShadowView = s_Data->PointShadowMap.Enabled
@@ -7868,6 +7933,19 @@ void Renderer::SetupDescriptors()
                                     .descriptorCount = 1,
                                     .descriptorType = vk::DescriptorType::eCombinedImageSampler,
                                     .pImageInfo = &omniShadowImageInfo },
+            vk::WriteDescriptorSet{ .dstSet = *s_Data->DescriptorSets[i].scene,
+                                    .dstBinding = 11,
+                                    .dstArrayElement = 0,
+                                    .descriptorCount = 1,
+                                    .descriptorType = vk::DescriptorType::eStorageBuffer,
+                                    .pBufferInfo = &lightClusterGridBufferInfo },
+            vk::WriteDescriptorSet{ .dstSet = *s_Data->DescriptorSets[i].scene,
+                                    .dstBinding = 12,
+                                    .dstArrayElement = 0,
+                                    .descriptorCount = 1,
+                                    .descriptorType = vk::DescriptorType::eStorageBuffer,
+                                    .pBufferInfo = &lightClusterIndicesInfo },
+                
             // The TLAS descriptor will be updated later when the TLAS is built for the first time, since it requires a
             // valid acceleration structure handle.
         };
@@ -7900,6 +7978,48 @@ void Renderer::SetupDescriptors()
         };
 
         device.updateDescriptorSets(skyboxDescriptorWrites, {});
+
+        if (i < lightCullingDescriptorSets.size())
+        {
+            s_Data->DescriptorSets[i].lightCulling = std::move(lightCullingDescriptorSets[i]);
+            context.SetObjectDebugName(s_Data->DescriptorSets[i].lightCulling,
+                                       "Light Culling Descriptor Set[" + std::to_string(i) + "]");
+
+            const std::vector lightCullingDescriptorWrites = {
+                vk::WriteDescriptorSet{ .dstSet = *s_Data->DescriptorSets[i].lightCulling,
+                                        .dstBinding = 0,
+                                        .dstArrayElement = 0,
+                                        .descriptorCount = 1,
+                                        .descriptorType = vk::DescriptorType::eUniformBuffer,
+                                        .pBufferInfo = &sceneBufferInfo },
+                vk::WriteDescriptorSet{ .dstSet = *s_Data->DescriptorSets[i].lightCulling,
+                                        .dstBinding = 1,
+                                        .dstArrayElement = 0,
+                                        .descriptorCount = 1,
+                                        .descriptorType = vk::DescriptorType::eStorageBuffer,
+                                        .pBufferInfo = &lightStorageBufferInfo },
+                vk::WriteDescriptorSet{ .dstSet = *s_Data->DescriptorSets[i].lightCulling,
+                                        .dstBinding = 2,
+                                        .dstArrayElement = 0,
+                                        .descriptorCount = 1,
+                                        .descriptorType = vk::DescriptorType::eStorageBuffer,
+                                        .pBufferInfo = &lightClusterGridBufferInfo },
+                vk::WriteDescriptorSet{ .dstSet = *s_Data->DescriptorSets[i].lightCulling,
+                                        .dstBinding = 3,
+                                        .dstArrayElement = 0,
+                                        .descriptorCount = 1,
+                                        .descriptorType = vk::DescriptorType::eStorageBuffer,
+                                        .pBufferInfo = &lightClusterIndicesInfo },
+                vk::WriteDescriptorSet{ .dstSet = *s_Data->DescriptorSets[i].lightCulling,
+                                        .dstBinding = 4,
+                                        .dstArrayElement = 0,
+                                        .descriptorCount = 1,
+                                        .descriptorType = vk::DescriptorType::eStorageBuffer,
+                                        .pBufferInfo = &lightClusterCountersInfo },
+            };
+
+            device.updateDescriptorSets(lightCullingDescriptorWrites, {});
+        }
     }
 }
 
