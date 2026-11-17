@@ -29,6 +29,7 @@
 #include "Material.hpp"
 #include "VulkanContext.hpp"
 #include "Profiling/Profilers.hpp"
+#include "Profiling/TracyGpuInstrumentation.hpp"
 #include "Upscaling/FSR/FSR3Upscaler.hpp"
 #include "Upscaling/Native/NativeUpscaler.hpp"
 #include "Animation/AnimationSystem.hpp"
@@ -1169,21 +1170,24 @@ void Renderer::RenderGTAO(const vk::raii::CommandBuffer& cmd, const uint32_t fra
     WriteGPUTimestamp(cmd, frameIndex, static_cast<uint32_t>(GPUTimestampQuery::AmbientOcclusionPassBegin));
 
     if (s_Data->GTAOEnabledThisFrame) {
-        BeginRenderPassDebugLabel(cmd, "GTAO Compute Pass");
-
-        cmd.bindPipeline(vk::PipelineBindPoint::eCompute, *s_Data->GTAOPipeline->GetVulkanPipeline());
-        cmd.bindDescriptorSets(vk::PipelineBindPoint::eCompute,
-                               *s_Data->GTAOPipelineLayout,
-                               0,
-                               { s_Data->DescriptorSets[currentImage].gtao },
-                               {});
-
         const uint32_t groupX = (static_cast<uint32_t>(s_Data->RenderSize.x) + 7) / 8;
         const uint32_t groupY = (static_cast<uint32_t>(s_Data->RenderSize.y) + 7) / 8;
 
-        cmd.dispatch(groupX, groupY, 1);
+        {
+            BeginRenderPassDebugLabel(cmd, "GTAO Compute Pass");
+            KBR_TRACY_GPU_ZONE(Kerberos::GetTracyContext(), *cmd, "GTAO Compute Pass");
 
-        EndRenderPassDebugLabel(cmd);
+            cmd.bindPipeline(vk::PipelineBindPoint::eCompute, *s_Data->GTAOPipeline->GetVulkanPipeline());
+            cmd.bindDescriptorSets(vk::PipelineBindPoint::eCompute,
+                                   *s_Data->GTAOPipelineLayout,
+                                   0,
+                                   { s_Data->DescriptorSets[currentImage].gtao },
+                                   {});
+
+            cmd.dispatch(groupX, groupY, 1);
+
+            EndRenderPassDebugLabel(cmd);
+        }
 
         if (s_Data->UseBlurredGTAO) {
             // Cross-bilateral blur horizontal pass
@@ -1214,29 +1218,34 @@ void Renderer::RenderGTAO(const vk::raii::CommandBuffer& cmd, const uint32_t fra
                 cmd.pipelineBarrier2(dependencyInfo);
             }
 
-            BeginRenderPassDebugLabel(cmd, "GTAO Horizontal Blur");
-
-            cmd.bindPipeline(vk::PipelineBindPoint::eCompute,
-                             *s_Data->CrossBilateralBlurPipeline->GetVulkanPipeline());
-            cmd.bindDescriptorSets(vk::PipelineBindPoint::eCompute,
-                                   *s_Data->CrossBilateralBlurPipelineLayout,
-                                   0,
-                                   { s_Data->DescriptorSets[currentImage].crossBilateralBlurHorizontal },
-                                   {});
-
             CrossBilateralBlurConstants pushConstants;
-            pushConstants.inverseViewportSize = glm::vec2(1.0f) / s_Data->RenderSize;
-            pushConstants.direction = { 1.0f, 0.0f };
-            cmd.pushConstants<CrossBilateralBlurConstants>(
-                *s_Data->CrossBilateralBlurPipelineLayout, vk::ShaderStageFlagBits::eCompute, 0, { pushConstants });
 
-            cmd.dispatch(groupX, groupY, 1);
+            {
+                BeginRenderPassDebugLabel(cmd, "GTAO Horizontal Blur");
+                KBR_TRACY_GPU_ZONE(Kerberos::GetTracyContext(), *cmd, "GTAO Horizontal Blur");
 
-            EndRenderPassDebugLabel(cmd);
+                cmd.bindPipeline(vk::PipelineBindPoint::eCompute,
+                                 *s_Data->CrossBilateralBlurPipeline->GetVulkanPipeline());
+                cmd.bindDescriptorSets(vk::PipelineBindPoint::eCompute,
+                                       *s_Data->CrossBilateralBlurPipelineLayout,
+                                       0,
+                                       { s_Data->DescriptorSets[currentImage].crossBilateralBlurHorizontal },
+                                       {});
+
+                pushConstants.inverseViewportSize = glm::vec2(1.0f) / s_Data->RenderSize;
+                pushConstants.direction = { 1.0f, 0.0f };
+                cmd.pushConstants<CrossBilateralBlurConstants>(
+                    *s_Data->CrossBilateralBlurPipelineLayout, vk::ShaderStageFlagBits::eCompute, 0, { pushConstants });
+
+                cmd.dispatch(groupX, groupY, 1);
+
+                EndRenderPassDebugLabel(cmd);
+            }
 
             // Cross-bilateral blur vertical pass
 
             BeginRenderPassDebugLabel(cmd, "GTAO Vertical Blur");
+            KBR_TRACY_GPU_ZONE(Kerberos::GetTracyContext(), *cmd, "GTAO Vertical Blur");
 
             {
                 // Transition scratch image to shader read and main image to general for compute shader write
@@ -4749,6 +4758,8 @@ void Renderer::ResolveGPUTimings(const uint32_t frameIndex)
     s_Data->LatestGPUTimings.GameUIPassMilliseconds =
         toMilliseconds(GPUTimestampQuery::GameUIPassBegin, GPUTimestampQuery::GameUIPassEnd);
     s_Data->LatestGPUTimings.IsValid = true;
+    
+    GatherProfilingDataFromGPUTimestamps(s_Data->LatestGPUTimings);
 }
 
 void Renderer::ResetQueryPools(const vk::raii::CommandBuffer& cmd, const uint32_t frameIndex)
@@ -4845,6 +4856,29 @@ void Renderer::ResolvePipelineStatistics(const uint32_t frameIndex)
     s_Data->LatestPipelineStatistics.TaskShaderInvocations = meshResults[0];
     s_Data->LatestPipelineStatistics.MeshShaderInvocations = meshResults[1];
     s_Data->LatestPipelineStatistics.FragmentShaderInvocations += meshResults[2];
+}
+
+void Renderer::GatherProfilingDataFromGPUTimestamps(const GPUTimings& timings)
+{
+    if (!timings.IsValid)
+        return;
+    
+    KBR_TRACY_PLOT("GPU Frame Time (ms)", timings.FrameMilliseconds);
+    KBR_TRACY_PLOT("GPU Prepass Time (ms)", timings.DepthPrePassMilliseconds);
+    KBR_TRACY_PLOT("GPU CSM Pass Time (ms)", timings.ShadowPassMilliseconds);
+    KBR_TRACY_PLOT("GPU Omni Shadow Pass Time (ms)", timings.OmniShadowPassMilliseconds);
+    KBR_TRACY_PLOT("GPU Opaque Pass Time (ms)", timings.OpaquePassMilliseconds);
+    KBR_TRACY_PLOT("GPU Grass Pass Time (ms)", timings.GrassPassMilliseconds);
+    KBR_TRACY_PLOT("GPU Particles Draw Time (ms)", timings.ParticlesDrawMilliseconds);
+    KBR_TRACY_PLOT("GPU Particles Simulate Time (ms)", timings.ParticlesSimulateMilliseconds);
+    KBR_TRACY_PLOT("GPU Transparent Pass Time (ms)", timings.TransparentPassMilliseconds);
+    KBR_TRACY_PLOT("GPU Transparency Resolve Pass Time (ms)", timings.TransparencyResolvePassMilliseconds);
+    KBR_TRACY_PLOT("GPU Bloom Pass Time (ms)", timings.BloomPassMilliseconds);
+    KBR_TRACY_PLOT("GPU Ambient Occlusion Pass Time (ms)", timings.AmbientOcclusionPassMilliseconds);
+    KBR_TRACY_PLOT("GPU Tonemapping Pass Time (ms)", timings.TonemappingPassMilliseconds);
+    KBR_TRACY_PLOT("GPU Antialiasing Pass Time (ms)", timings.AntialiasingPassMilliseconds);
+    KBR_TRACY_PLOT("GPU Upscaling Pass Time (ms)", timings.UpscalingPassMilliseconds);
+    KBR_TRACY_PLOT("GPU GameUI Pass Time (ms)", timings.GameUIPassMilliseconds);
 }
 
 void Renderer::UpdateLights(const uint32_t currentImage, const std::vector<GPULight>& sceneLights)
@@ -5999,6 +6033,7 @@ void Renderer::RenderShadowPass(const vk::raii::CommandBuffer& cmd,
                                                         .pDepthAttachment = &shadowMapDepthAttachmentInfo };
 
         BeginRenderPassDebugLabel(cmd, ShadowCascadePassLabels[cascadeIndex]);
+        KBR_TRACY_GPU_ZONE_TRANSIENT(Kerberos::GetTracyContext(), *cmd, ShadowCascadePassLabels[cascadeIndex].data());
         cmd.beginRendering(shadowMapRenderingInfo);
         cmd.setViewport(0,
                         vk::Viewport{ .x = 0.0f,
@@ -6184,7 +6219,9 @@ void Renderer::RenderOmniShadowPass(const vk::raii::CommandBuffer& cmd,
                 .pColorAttachments = nullptr,
                 .pDepthAttachment = &depthAttachment };
 
-            BeginRenderPassDebugLabel(cmd, std::format("Omni Shadow Pass (slot: {}/face: {})", caster.Slot, face));
+            const std::string omniShadowLabel = std::format("Omni Shadow Pass (slot: {}/face: {})", caster.Slot, face);
+            BeginRenderPassDebugLabel(cmd, omniShadowLabel);
+            KBR_TRACY_GPU_ZONE_TRANSIENT(Kerberos::GetTracyContext(), *cmd, omniShadowLabel.c_str());
             cmd.beginRendering(renderingInfo);
             cmd.setViewport(0, vk::Viewport{
                 .x = 0.0f, .y = 0.0f,
@@ -6737,6 +6774,7 @@ void Renderer::ApplySMAA(const vk::raii::CommandBuffer& cmd,
                                                             .pDepthAttachment = nullptr };
 
         BeginRenderPassDebugLabel(cmd, "SMAA Edge Detection Pass");
+        KBR_TRACY_GPU_ZONE(Kerberos::GetTracyContext(), *cmd, "SMAA Edge Detection Pass");
 
         cmd.beginRendering(edgeDetectionRenderingInfo);
         cmd.setViewport(0, viewport);
@@ -6818,6 +6856,7 @@ void Renderer::ApplySMAA(const vk::raii::CommandBuffer& cmd,
                                                           .pDepthAttachment = nullptr };
 
         BeginRenderPassDebugLabel(cmd, "SMAA Blend Weights Pass");
+        KBR_TRACY_GPU_ZONE(Kerberos::GetTracyContext(), *cmd, "SMAA Blend Weights Pass");
 
         cmd.beginRendering(blendWeightRenderingInfo);
 
@@ -6882,6 +6921,7 @@ void Renderer::ApplySMAA(const vk::raii::CommandBuffer& cmd,
                                                           .pDepthAttachment = nullptr };
 
         BeginRenderPassDebugLabel(cmd, "SMAA Neighbourhood Blend Pass");
+        KBR_TRACY_GPU_ZONE(Kerberos::GetTracyContext(), *cmd, "SMAA Neighbourhood Blend Pass");
 
         cmd.beginRendering(blendWeightRenderingInfo);
 
@@ -7162,87 +7202,93 @@ void Renderer::ApplyBloom(const vk::raii::CommandBuffer& cmd, const uint32_t fra
     constexpr uint32_t groupSize = 8;
     const uint32_t mipCount = s_Data->Bloom.MipLevels;
 
-    BeginRenderPassDebugLabel(cmd, "Bloom Downsample Pass");
-
-    s_Data->Bloom.DownsamplePipeline->Bind(cmd);
     {
-        // Main Image and Bloom Mip 0
-        cmd.bindDescriptorSets(vk::PipelineBindPoint::eCompute,
-                               *s_Data->Bloom.DownsamplePipelineLayout,
-                               0,
-                               { s_Data->Bloom.ExtractSet },
-                               {});
+        BeginRenderPassDebugLabel(cmd, "Bloom Downsample Pass");
+        KBR_TRACY_GPU_ZONE(Kerberos::GetTracyContext(), *cmd, "Bloom Downsample Pass");
 
-        BloomData::DownsamplePushConstants pushConstants;
-        pushConstants.srcTexelSize = 1.0f / s_Data->RenderSize;
-        pushConstants.enablePrefilter = (s_Data->Bloom.Mode == BloomMode::BrightPassPrefilter) ? 1u : 0u;
-        pushConstants.threshold = std::max(s_Data->Bloom.Threshold, 0.0f);
-        pushConstants.knee = std::clamp(s_Data->Bloom.Knee, 0.0f, pushConstants.threshold + 1.0f);
-        pushConstants.isExtract = 1;
-        pushConstants.maxBrightness = s_Data->Bloom.MaxBrightness;
-        pushConstants.exposureScale = s_Data->GlobalLightingData.lightingParams.x;
-        cmd.pushConstants<BloomData::DownsamplePushConstants>(
-            *s_Data->Bloom.DownsamplePipelineLayout, vk::ShaderStageFlagBits::eCompute, 0, { pushConstants });
+        s_Data->Bloom.DownsamplePipeline->Bind(cmd);
+        {
+            // Main Image and Bloom Mip 0
+            cmd.bindDescriptorSets(vk::PipelineBindPoint::eCompute,
+                                   *s_Data->Bloom.DownsamplePipelineLayout,
+                                   0,
+                                   { s_Data->Bloom.ExtractSet },
+                                   {});
 
-        const uint32_t groupX = (static_cast<uint32_t>(s_Data->Bloom.MipSizes[0].x) + groupSize - 1) / groupSize;
-        const uint32_t groupY = (static_cast<uint32_t>(s_Data->Bloom.MipSizes[0].y) + groupSize - 1) / groupSize;
+            BloomData::DownsamplePushConstants pushConstants;
+            pushConstants.srcTexelSize = 1.0f / s_Data->RenderSize;
+            pushConstants.enablePrefilter = (s_Data->Bloom.Mode == BloomMode::BrightPassPrefilter) ? 1u : 0u;
+            pushConstants.threshold = std::max(s_Data->Bloom.Threshold, 0.0f);
+            pushConstants.knee = std::clamp(s_Data->Bloom.Knee, 0.0f, pushConstants.threshold + 1.0f);
+            pushConstants.isExtract = 1;
+            pushConstants.maxBrightness = s_Data->Bloom.MaxBrightness;
+            pushConstants.exposureScale = s_Data->GlobalLightingData.lightingParams.x;
+            cmd.pushConstants<BloomData::DownsamplePushConstants>(
+                *s_Data->Bloom.DownsamplePipelineLayout, vk::ShaderStageFlagBits::eCompute, 0, { pushConstants });
 
-        cmd.dispatch(groupX, groupY, 1);
+            const uint32_t groupX = (static_cast<uint32_t>(s_Data->Bloom.MipSizes[0].x) + groupSize - 1) / groupSize;
+            const uint32_t groupY = (static_cast<uint32_t>(s_Data->Bloom.MipSizes[0].y) + groupSize - 1) / groupSize;
+
+            cmd.dispatch(groupX, groupY, 1);
+        }
+
+        for (uint32_t mip = 0; mip < mipCount - 1; ++mip) {
+            computeBarrier();
+
+            // BloomMipView[i]_SRV, BloomMipView[i+1]_UAV
+            cmd.bindDescriptorSets(vk::PipelineBindPoint::eCompute,
+                                   *s_Data->Bloom.DownsamplePipelineLayout,
+                                   0,
+                                   { s_Data->Bloom.DownsampleSets[mip] },
+                                   {});
+
+            BloomData::DownsamplePushConstants pushConstants;
+            pushConstants.srcTexelSize = 1.0f / s_Data->Bloom.MipSizes[mip];
+            pushConstants.enablePrefilter = 0u;
+            pushConstants.threshold = 0.0f;
+            pushConstants.knee = 0.0f;
+            pushConstants.isExtract = 0;
+            pushConstants.exposureScale = 1.0f;
+            cmd.pushConstants<BloomData::DownsamplePushConstants>(
+                *s_Data->Bloom.DownsamplePipelineLayout, vk::ShaderStageFlagBits::eCompute, 0, { pushConstants });
+
+            const uint32_t groupX = (static_cast<uint32_t>(s_Data->Bloom.MipSizes[mip + 1].x) + groupSize - 1) / groupSize;
+            const uint32_t groupY = (static_cast<uint32_t>(s_Data->Bloom.MipSizes[mip + 1].y) + groupSize - 1) / groupSize;
+            cmd.dispatch(groupX, groupY, 1);
+        }
+
+        EndRenderPassDebugLabel(cmd);
     }
 
-    for (uint32_t mip = 0; mip < mipCount - 1; ++mip) {
-        computeBarrier();
+    {
+        BeginRenderPassDebugLabel(cmd, "Bloom Upsample Pass");
+        KBR_TRACY_GPU_ZONE(Kerberos::GetTracyContext(), *cmd, "Bloom Upsample Pass");
 
-        // BloomMipView[i]_SRV, BloomMipView[i+1]_UAV
-        cmd.bindDescriptorSets(vk::PipelineBindPoint::eCompute,
-                               *s_Data->Bloom.DownsamplePipelineLayout,
-                               0,
-                               { s_Data->Bloom.DownsampleSets[mip] },
-                               {});
+        s_Data->Bloom.UpsamplePipeline->Bind(cmd);
 
-        BloomData::DownsamplePushConstants pushConstants;
-        pushConstants.srcTexelSize = 1.0f / s_Data->Bloom.MipSizes[mip];
-        pushConstants.enablePrefilter = 0u;
-        pushConstants.threshold = 0.0f;
-        pushConstants.knee = 0.0f;
-        pushConstants.isExtract = 0;
-        pushConstants.exposureScale = 1.0f;
-        cmd.pushConstants<BloomData::DownsamplePushConstants>(
-            *s_Data->Bloom.DownsamplePipelineLayout, vk::ShaderStageFlagBits::eCompute, 0, { pushConstants });
+        BloomData::UpsamplePushConstants pushConstants;
+        pushConstants.filterRadius = s_Data->Bloom.FilterRadius;
 
-        const uint32_t groupX = (static_cast<uint32_t>(s_Data->Bloom.MipSizes[mip + 1].x) + groupSize - 1) / groupSize;
-        const uint32_t groupY = (static_cast<uint32_t>(s_Data->Bloom.MipSizes[mip + 1].y) + groupSize - 1) / groupSize;
-        cmd.dispatch(groupX, groupY, 1);
+        for (uint32_t mip = mipCount - 1; mip > 0; --mip) {
+            computeBarrier();
+
+            // BloomMipView[i]_SRV, BloomMipView[i-1]_UAV
+            cmd.bindDescriptorSets(vk::PipelineBindPoint::eCompute,
+                                   *s_Data->Bloom.UpsamplePipelineLayout,
+                                   0,
+                                   { s_Data->Bloom.UpsampleSets[mip - 1] },
+                                   {});
+
+            cmd.pushConstants<BloomData::UpsamplePushConstants>(
+                *s_Data->Bloom.UpsamplePipelineLayout, vk::ShaderStageFlagBits::eCompute, 0, { pushConstants });
+
+            const uint32_t groupX = (static_cast<uint32_t>(s_Data->Bloom.MipSizes[mip - 1].x) + groupSize - 1) / groupSize;
+            const uint32_t groupY = (static_cast<uint32_t>(s_Data->Bloom.MipSizes[mip - 1].y) + groupSize - 1) / groupSize;
+            cmd.dispatch(groupX, groupY, 1);
+        }
+
+        EndRenderPassDebugLabel(cmd);
     }
-
-    EndRenderPassDebugLabel(cmd);
-
-    BeginRenderPassDebugLabel(cmd, "Bloom Upsample Pass");
-
-    s_Data->Bloom.UpsamplePipeline->Bind(cmd);
-
-    BloomData::UpsamplePushConstants pushConstants;
-    pushConstants.filterRadius = s_Data->Bloom.FilterRadius;
-
-    for (uint32_t mip = mipCount - 1; mip > 0; --mip) {
-        computeBarrier();
-
-        // BloomMipView[i]_SRV, BloomMipView[i-1]_UAV
-        cmd.bindDescriptorSets(vk::PipelineBindPoint::eCompute,
-                               *s_Data->Bloom.UpsamplePipelineLayout,
-                               0,
-                               { s_Data->Bloom.UpsampleSets[mip - 1] },
-                               {});
-
-        cmd.pushConstants<BloomData::UpsamplePushConstants>(
-            *s_Data->Bloom.UpsamplePipelineLayout, vk::ShaderStageFlagBits::eCompute, 0, { pushConstants });
-
-        const uint32_t groupX = (static_cast<uint32_t>(s_Data->Bloom.MipSizes[mip - 1].x) + groupSize - 1) / groupSize;
-        const uint32_t groupY = (static_cast<uint32_t>(s_Data->Bloom.MipSizes[mip - 1].y) + groupSize - 1) / groupSize;
-        cmd.dispatch(groupX, groupY, 1);
-    }
-
-    EndRenderPassDebugLabel(cmd);
 
     /*const vk::ImageMemoryBarrier2 bloomFinalBarrier = {
         .srcStageMask = vk::PipelineStageFlagBits2::eComputeShader,

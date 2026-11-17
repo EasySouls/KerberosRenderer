@@ -4,21 +4,42 @@
 
 #include <cstdlib>
 #include <new>
-#include <mutex>
-
-static std::mutex memoryLock;
-
-constexpr int callstackDepth = 10;
 
 namespace
 {
+#ifdef KBR_ENABLE_TRACY_MEMORY_CALLSTACKS
+    // Capturing a callstack for every allocation is extremely expensive and is
+    // only useful for focused allocation investigations. Keep it opt-in.
+    constexpr int CallstackDepth = 10;
+
+    void RecordAllocation(void* ptr, const std::size_t size) noexcept
+    {
+        TracyAllocS(ptr, size, CallstackDepth);
+    }
+
+    void RecordFree(void* ptr) noexcept
+    {
+        TracyFreeS(ptr, CallstackDepth);
+    }
+#else
+    void RecordAllocation(const void* ptr, const std::size_t size) noexcept
+    {
+        TracyAlloc(ptr, size);
+    }
+
+    void RecordFree(const void* ptr) noexcept
+    {
+        TracyFree(ptr);
+    }
+#endif
+
     void* Allocate(const std::size_t size)
     {
         const auto ptr = std::malloc(size);
         if (!ptr)
             throw std::bad_alloc();
 
-        TracyAllocS(ptr, size, callstackDepth);
+        RecordAllocation(ptr, size);
         return ptr;
     }
 
@@ -34,7 +55,7 @@ namespace
         if (!ptr)
             throw std::bad_alloc();
 
-        TracyAllocS(ptr, size, callstackDepth);
+        RecordAllocation(ptr, size);
         return ptr;
     }
 
@@ -43,12 +64,8 @@ namespace
         if (!ptr)
             return;
 
-        TracyFreeS(ptr, callstackDepth);
-#ifdef _MSC_VER
+        RecordFree(ptr);
         std::free(ptr);
-#else
-        std::free(ptr);
-#endif
     }
 
     void DeallocateAligned(void* ptr) noexcept
@@ -56,7 +73,7 @@ namespace
         if (!ptr)
             return;
 
-        TracyFreeS(ptr, callstackDepth);
+        RecordFree(ptr);
 #ifdef _MSC_VER
         _aligned_free(ptr);
 #else
@@ -67,13 +84,11 @@ namespace
 
 void* operator new(const std::size_t size)
 {
-    std::lock_guard lock(memoryLock);
     return Allocate(size);
 }
 
 void* operator new[](const std::size_t size)
 {
-    std::lock_guard lock(memoryLock);
     return Allocate(size);
 }
 
@@ -103,37 +118,31 @@ void* operator new[](const std::size_t size, const std::nothrow_t&) noexcept
 
 void operator delete(void* ptr) noexcept
 {
-    std::lock_guard lock(memoryLock);
     Deallocate(ptr);
 }
 
 void operator delete[](void* ptr) noexcept
 {
-    std::lock_guard lock(memoryLock);
     Deallocate(ptr);
 }
 
 void operator delete(void* ptr, const std::size_t) noexcept
 {
-    std::lock_guard lock(memoryLock);
     Deallocate(ptr);
 }
 
 void operator delete[](void* ptr, const std::size_t) noexcept
 {
-    std::lock_guard lock(memoryLock);
     Deallocate(ptr);
 }
 
 void* operator new(const std::size_t size, const std::align_val_t alignment)
 {
-    std::lock_guard lock(memoryLock);
     return AllocateAligned(size, static_cast<std::size_t>(alignment));
 }
 
 void* operator new[](const std::size_t size, const std::align_val_t alignment)
 {
-    std::lock_guard lock(memoryLock);
     return AllocateAligned(size, static_cast<std::size_t>(alignment));
 }
 
@@ -167,13 +176,11 @@ void* operator new[](const std::size_t size,
 
 void operator delete(void* ptr, const std::align_val_t) noexcept
 {
-    std::lock_guard lock(memoryLock);
     DeallocateAligned(ptr);
 }
 
 void operator delete[](void* ptr, const std::align_val_t) noexcept
 {
-    std::lock_guard lock(memoryLock);
     DeallocateAligned(ptr);
 }
 
@@ -181,7 +188,6 @@ void operator delete(void* ptr,
                      const std::size_t,
                      const std::align_val_t) noexcept
 {
-    std::lock_guard lock(memoryLock);
     DeallocateAligned(ptr);
 }
 
@@ -189,7 +195,6 @@ void operator delete[](void* ptr,
                        const std::size_t,
                        const std::align_val_t) noexcept
 {
-    std::lock_guard lock(memoryLock);
     DeallocateAligned(ptr);
 }
 

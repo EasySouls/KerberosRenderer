@@ -41,6 +41,9 @@ option(KBR_ENABLE_THIRDPARTY_INSTRUMENTATION
        "Enable selected sanitizer/fuzz instrumentation for third-party targets too."
        OFF)
 option(KBR_ENABLE_TRACY "Enable Tracy client profiling instrumentation." OFF)
+option(KBR_ENABLE_TRACY_MEMORY_CALLSTACKS
+       "Capture callstacks for Tracy CPU allocation events (very expensive; requires KBR_ENABLE_TRACY)."
+       OFF)
 
 if(MSVC)
     # Use the DLL runtime consistently for the engine and static third-party

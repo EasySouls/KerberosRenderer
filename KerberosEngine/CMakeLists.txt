@@ -66,6 +66,9 @@ target_compile_definitions(KerberosEngine PUBLIC
 if(KBR_ENABLE_TRACY)
     target_compile_definitions(KerberosEngine PUBLIC KBR_ENABLE_TRACY)
     target_link_libraries(KerberosEngine PUBLIC Tracy::TracyClient)
+    if(KBR_ENABLE_TRACY_MEMORY_CALLSTACKS)
+        target_compile_definitions(KerberosEngine PUBLIC KBR_ENABLE_TRACY_MEMORY_CALLSTACKS)
+    endif()
 endif()
 
 # Enable these later, but a few libraries are compiled as part of the engine that have warnings

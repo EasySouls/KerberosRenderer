@@ -367,6 +367,8 @@ private:
     static void ResolveGPUTimings(uint32_t frameIndex);
     static void ResetQueryPools(const vk::raii::CommandBuffer& cmd, uint32_t frameIndex);
     static void ResolvePipelineStatistics(uint32_t frameIndex);
+    
+    static void GatherProfilingDataFromGPUTimestamps(const GPUTimings& timings);
 
     static glm::mat4 CalculateLightSpaceMatrix();
 

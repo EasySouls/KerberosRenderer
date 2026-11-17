@@ -187,6 +187,7 @@ namespace Kerberos
 		void CreateDepthResources();
 		void CreateImGuiDescriptorPool();
 		void SetupImGui();
+	    void SetupTracyGPUProfiling() const;
 
 		void CleanupSwapChain();
 		void RecreateSwapchain();

@@ -8,6 +8,7 @@
 #include "Scene/Scene.hpp"
 #include "VulkanContext.hpp"
 #include "Profiling/Profilers.hpp"
+#include "Profiling/TracyGpuInstrumentation.hpp"
 
 #include <array>
 #include <format>
@@ -223,6 +224,7 @@ void ParticleSystem::Update(const Ref<Scene>& scene,
     KBR_TRACY_FUNCTION();
 
     BeginRenderPassDebugLabel(cmd, "Particle System Compute Update Passes");
+    KBR_TRACY_GPU_ZONE(Kerberos::GetTracyContext(), *cmd, "Particle System Compute Update Passes");
 
     // Ensures the previous frame has completely finished reading/writing the global particle buffers.
     vk::MemoryBarrier2 globalBarrier{
@@ -330,6 +332,7 @@ void ParticleSystem::Update(const Ref<Scene>& scene,
 
 #endif
         BeginRenderPassDebugLabel(cmd, "Particle Emit Pass");
+        KBR_TRACY_GPU_ZONE(Kerberos::GetTracyContext(), *cmd, "Particle Emit Pass");
 
         if (requestCount > 0) {
             cmd.bindPipeline(vk::PipelineBindPoint::eCompute, m_SpawnPipeline->GetVulkanPipeline());
@@ -356,6 +359,7 @@ void ParticleSystem::Update(const Ref<Scene>& scene,
     // appended newly spawned particles to the current active list.
     {
         BeginRenderPassDebugLabel(cmd, "Particle Prepare Simulation Pass");
+        KBR_TRACY_GPU_ZONE(Kerberos::GetTracyContext(), *cmd, "Particle Prepare Simulation Pass");
 
         cmd.bindPipeline(vk::PipelineBindPoint::eCompute, m_PrepareSimulatePipeline->GetVulkanPipeline());
         cmd.dispatch(1, 1, 1);
@@ -375,6 +379,7 @@ void ParticleSystem::Update(const Ref<Scene>& scene,
     // Simulate only the active index list. The dispatch count is generated on the GPU.
     {
         BeginRenderPassDebugLabel(cmd, "Particle Simulate Pass");
+        KBR_TRACY_GPU_ZONE(Kerberos::GetTracyContext(), *cmd, "Particle Simulate Pass");
 
         cmd.bindPipeline(vk::PipelineBindPoint::eCompute, m_UpdatePipeline->GetVulkanPipeline());
         cmd.dispatchIndirect(m_IndirectDrawBuffers[frameIndex].Handle, DispatchIndirectOffset);
@@ -394,6 +399,7 @@ void ParticleSystem::Update(const Ref<Scene>& scene,
     // Publish the compacted list and indirect draw count for this frame.
     {
         BeginRenderPassDebugLabel(cmd, "Particle Finalize Simulation Pass");
+        KBR_TRACY_GPU_ZONE(Kerberos::GetTracyContext(), *cmd, "Particle Finalize Simulation Pass");
 
         cmd.bindPipeline(vk::PipelineBindPoint::eCompute, m_FinalizeSimulatePipeline->GetVulkanPipeline());
         cmd.dispatch(1, 1, 1);
@@ -417,6 +423,7 @@ void ParticleSystem::RecordDraw(const vk::raii::CommandBuffer& cmd, const uint32
     KBR_TRACY_FUNCTION();
 
     BeginRenderPassDebugLabel(cmd, "Particle Render Pass");
+    KBR_TRACY_GPU_ZONE(Kerberos::GetTracyContext(), *cmd, "Particle Render Pass");
 
     cmd.bindPipeline(vk::PipelineBindPoint::eGraphics, m_RenderPipeline->GetVulkanPipeline());
 

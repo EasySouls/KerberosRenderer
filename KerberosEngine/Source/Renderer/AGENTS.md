@@ -585,7 +585,16 @@ Compile shaders from `KerberosEditor\Assets\Shaders`:
 ```
 
 Vulkan validation, synchronization validation, debug labels, shader printf,
-and Tracy zones are important diagnostics. For renderer changes, validate
+and Tracy zones are important diagnostics. Tracy GPU zones are scope guards
+declared next to each `BeginRenderPassDebugLabel` call and must leave scope at
+the matching `EndRenderPassDebugLabel`; `VulkanContext::RecordCommandBuffer`
+calls `TracyVkCollect` once per frame before closing the command buffer. The
+Tracy Vulkan context is created only when `VK_EXT_calibrated_timestamps` is
+active and the graphics queue reports `timestampValidBits > 0`, and it is
+destroyed in `VulkanContext::Cleanup`. VRAM plots (`VRAM Used (MB)`,
+`VRAM Budget (MB)`) come from the VMA heap budgets summed over device-local
+heaps in `MemoryBudget::UpdateMemoryBudgetInfo`. See `docs/TracyProfiling.md`.
+For renderer changes, validate
 swapchain/viewport resize, frame synchronization, graph barriers/layouts,
 descriptor lifetime, and shader compilation. For point/omni shadows, validate
 0, 1, 16, and 17+ candidates, camera-frustum light culling, per-face mesh

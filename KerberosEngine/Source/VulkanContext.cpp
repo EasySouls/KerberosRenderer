@@ -3,6 +3,7 @@
 #include "Renderer/Textures/Texture.hpp"
 #include "Renderer/Renderer.hpp"
 #include "Profiling/Profilers.hpp"
+#include "Profiling/TracyGpuInstrumentation.hpp"
 #include "Utils.hpp"
 
 #include "imgui.h"
@@ -45,6 +46,8 @@ static constexpr std::array optionalDeviceExtensions = {
 	vk::EXTDescriptorBufferExtensionName,
 	vk::EXTMeshShaderExtensionName,
 	vk::EXTShaderObjectExtensionName,
+	// Required for Tracy Vulkan GPU profiling
+	vk::EXTCalibratedTimestampsExtensionName,
 	// Ray Tracing optional extensions
 	vk::KHRAccelerationStructureExtensionName,
 	vk::KHRBufferDeviceAddressExtensionName,
@@ -174,8 +177,24 @@ static VKAPI_ATTR vk::Bool32 VKAPI_CALL DebugCallback(
 	return vk::False;
 }
 
+namespace {
+
+#ifdef KBR_ENABLE_TRACY
+// TODO: Should not be static, and should be one per queue
+TracyVkCtx tracyContext = nullptr;
+#endif
+
+}
+
 namespace Kerberos
 {
+#if defined(KBR_ENABLE_TRACY)
+	TracyVkCtx GetTracyContext()
+	{
+		return tracyContext;
+	}
+#endif
+
 	VulkanContext* VulkanContext::s_Instance = nullptr;
 
 	VulkanContext::VulkanContext(GLFWwindow* window)
@@ -207,6 +226,8 @@ namespace Kerberos
 
 		CreateImGuiDescriptorPool();
 		SetupImGui();
+	    
+	    SetupTracyGPUProfiling();
 	}
 
 	VulkanContext::~VulkanContext()
@@ -937,6 +958,10 @@ namespace Kerberos
 			vk::PipelineStageFlagBits2::eBottomOfPipe,
 			vk::ImageAspectFlagBits::eColor
 		);
+	    
+#if defined(KBR_ENABLE_TRACY)
+	    KBR_TRACY_GPU_COLLECT(tracyContext, *m_CommandBuffers[m_FrameIndex]);
+#endif
 
 		m_CommandBuffers[m_FrameIndex].end();
 	}
@@ -1776,6 +1801,14 @@ namespace Kerberos
 	{
 		m_Device.waitIdle();
 
+#if defined(KBR_ENABLE_TRACY)
+		if (tracyContext != nullptr)
+		{
+			TracyVkDestroy(tracyContext);
+			tracyContext = nullptr;
+		}
+#endif
+
 		ImGui_ImplVulkan_Shutdown();
 		ImGui_ImplGlfw_Shutdown();
 		ImGui::DestroyContext();
@@ -1951,7 +1984,53 @@ namespace Kerberos
 		io.FontDefault = interRegular;
 	}
 
-	vk::SampleCountFlagBits VulkanContext::GetMaxUsableSampleCount(const vk::raii::PhysicalDevice& physicalDevice)
+    void VulkanContext::SetupTracyGPUProfiling() const
+    {
+#if defined(KBR_ENABLE_TRACY)
+	    const std::vector<vk::QueueFamilyProperties> queueFamilyProperties = m_PhysicalDevice.getQueueFamilyProperties();
+	    const bool supportsTimestampQueries =
+	        m_QueueFamilyInfo.graphics < queueFamilyProperties.size() &&
+	        queueFamilyProperties[m_QueueFamilyInfo.graphics].timestampValidBits > 0;
+
+	    if (IsExtensionActive(vk::EXTCalibratedTimestampsExtensionName) && supportsTimestampQueries)
+	    {
+	        // Extension entry points are not exported by the Windows Vulkan import
+	        // library, so resolve them through the loader.
+	        const auto* dispatcher = m_Instance.getDispatcher();
+	        const auto getDeviceProcAddr = reinterpret_cast<PFN_vkGetDeviceProcAddr>(
+	            dispatcher->vkGetInstanceProcAddr(static_cast<VkInstance>(*m_Instance), "vkGetDeviceProcAddr"));
+	        const auto getTimeDomains = reinterpret_cast<PFN_vkGetPhysicalDeviceCalibrateableTimeDomainsEXT>(
+	            dispatcher->vkGetInstanceProcAddr(static_cast<VkInstance>(*m_Instance),
+	                                              "vkGetPhysicalDeviceCalibrateableTimeDomainsEXT"));
+	        const auto getCalibratedTimestamps = getDeviceProcAddr != nullptr
+	            ? reinterpret_cast<PFN_vkGetCalibratedTimestampsEXT>(
+	                  getDeviceProcAddr(static_cast<VkDevice>(*m_Device), "vkGetCalibratedTimestampsEXT"))
+	            : nullptr;
+
+	        if (getTimeDomains != nullptr && getCalibratedTimestamps != nullptr)
+	        {
+	            tracyContext = TracyVkContextCalibrated(
+	                *m_PhysicalDevice,
+	                *m_Device,
+	                *m_GraphicsQueue,
+	                *m_CommandBuffers[0],
+	                getTimeDomains, getCalibratedTimestamps
+	            );
+	            TracyVkContextName(tracyContext, "Graphics", 8);
+	        }
+	        else
+	        {
+	            Log::CoreWarn("Tracy GPU profiling disabled: calibrated timestamp entry points could not be resolved.");
+	        }
+	    }
+	    else
+	    {
+	        Log::CoreWarn("Tracy GPU profiling disabled: VK_EXT_calibrated_timestamps or graphics queue timestamp support is unavailable.");
+	    }
+#endif
+    }
+
+    vk::SampleCountFlagBits VulkanContext::GetMaxUsableSampleCount(const vk::raii::PhysicalDevice& physicalDevice)
 	{
 		const vk::PhysicalDeviceProperties physicalDeviceProperties = physicalDevice.getProperties2().properties;
 

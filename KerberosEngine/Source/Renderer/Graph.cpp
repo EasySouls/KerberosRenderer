@@ -1,5 +1,6 @@
 #include "Graph.hpp"
 
+#include "Profiling/TracyGpuInstrumentation.hpp"
 #include "VulkanContext.hpp"
 
 #include <algorithm>
@@ -367,6 +368,7 @@ namespace Kerberos::RenderGraph
         for (const auto& [Handle, Name, ImageBarriers, BufferBarriers] : m_CompiledPasses)
         {
             BeginRenderPassDebugLabel(cmd, Name);
+            KBR_TRACY_GPU_ZONE_TRANSIENT(Kerberos::GetTracyContext(), *cmd, Name.c_str());
 
             if (!ImageBarriers.empty() || !BufferBarriers.empty()) {
                 vk::DependencyInfo dependency{};

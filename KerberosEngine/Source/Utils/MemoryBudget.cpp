@@ -1,6 +1,8 @@
 #include "kbrpch.hpp"
 #include "MemoryBudget.hpp"
 
+#include "Renderer/VMA/VMA.hpp"
+#include "Profiling/TracyInstrumentation.hpp"
 #include "VulkanContext.hpp"
 
 namespace Kerberos
@@ -66,6 +68,40 @@ namespace Kerberos
 			.MemoryBudgetProps = memoryBudgetProps,
 			.DeviceMemoryProps = deviceMemoryProps.memoryProperties
 		};
+
+#if defined(KBR_ENABLE_TRACY)
+		// Publish VRAM usage to Tracy. Sum device-local heaps so multi-heap
+		// configurations (for example ReBAR or APUs) report the full budget.
+		const VmaAllocator allocator = VulkanContext::Get().GetAllocator().get();
+		VmaBudget budgets[VK_MAX_MEMORY_HEAPS]{};
+		vmaGetHeapBudgets(allocator, budgets);
+
+		constexpr double bytesPerMegabyte = 1024.0 * 1024.0;
+		double deviceLocalUsedMB = 0.0;
+		double deviceLocalBudgetMB = 0.0;
+		bool hasDeviceLocalHeap = false;
+
+		for (uint32_t heapIndex = 0; heapIndex < static_cast<uint32_t>(deviceMemoryHeapCount); ++heapIndex)
+		{
+			if (!(deviceMemoryProps.memoryProperties.memoryHeaps[heapIndex].flags & vk::MemoryHeapFlagBits::eDeviceLocal))
+			{
+				continue;
+			}
+
+			hasDeviceLocalHeap = true;
+			deviceLocalUsedMB += static_cast<double>(budgets[heapIndex].usage) / bytesPerMegabyte;
+			deviceLocalBudgetMB += static_cast<double>(budgets[heapIndex].budget) / bytesPerMegabyte;
+		}
+
+		if (!hasDeviceLocalHeap)
+		{
+			deviceLocalUsedMB = static_cast<double>(budgets[0].usage) / bytesPerMegabyte;
+			deviceLocalBudgetMB = static_cast<double>(budgets[0].budget) / bytesPerMegabyte;
+		}
+
+		KBR_TRACY_PLOT("VRAM Used (MB)", deviceLocalUsedMB);
+		KBR_TRACY_PLOT("VRAM Budget (MB)", deviceLocalBudgetMB);
+#endif
 	}
 
 	std::string MemoryBudget::ReadMemoryHeapFlags(const vk::MemoryHeapFlags inputVkMemoryHeapFlag)
